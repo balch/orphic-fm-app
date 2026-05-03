@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
@@ -13,7 +14,6 @@ import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingFills
 import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
@@ -157,8 +157,8 @@ class ArmyStompVibe : VibeProvider {
         progressionDriftRange = 0.25f,
         tracks = listOf(
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.90f,
                 pan = 0.00f,
@@ -168,8 +168,8 @@ class ArmyStompVibe : VibeProvider {
                 barStrategy = BarStrategy.REPEAT
             ),
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.55f,
                 pan = -0.10f,
@@ -179,8 +179,8 @@ class ArmyStompVibe : VibeProvider {
                 barStrategy = BarStrategy.REPEAT
             ),
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.NSE,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.NOISE,
                 role = TrackRole.Percussive,
                 volume = 0.35f,
                 pan = 0.15f,
@@ -195,8 +195,8 @@ class ArmyStompVibe : VibeProvider {
             // noteRangeHigh dropped to B2 keeps it from climbing into the lead's
             // E3 floor (see Path B note on the squash lead below).
             TrackVoice(
-                engineEdm = Engine.PD,
-                engineSpace = Engine.DX,
+                engineEdm = OrpheusEngineId.PHASE_DISTORTION,
+                engineSpace = OrpheusEngineId.SIX_OP_FM,
                 harmonics = .05f, // Mooger Low
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.85f,
@@ -215,13 +215,13 @@ class ArmyStompVibe : VibeProvider {
             //   * pan = 0.20         — pushed right (bass holds center)
             //   * floor = E3 (52)    — never overlaps the bass's B2 ceiling
             //   * reverbBrightness   — 0.7 (brighter tail pushes it back in depth)
-            // The space-side stays Engine.STR so at low energy you get a lush
+            // The space-side stays OrpheusEngineId.STRING so at low energy you get a lush
             // string crossfade. (A/B winner over the brass approach: tried DX3
             // idx 31 "Br trumpet" — clean spectral separation but lost the
             // unified filter-sweep palette that defines the vibe's character.)
             TrackVoice(
-                engineEdm = Engine.DX2, // Fender
-                engineSpace = Engine.DX3, // Hammond
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Fender
+                engineSpace = OrpheusEngineId.SIX_OP_FM_3, // Hammond
                 harmonics = .05f,
                 role = TrackRole.Melodic(lickMode = LickMode.Squash),
                 volume = 0.60f,
@@ -237,8 +237,8 @@ class ArmyStompVibe : VibeProvider {
             ), // Squash: CALL_RESPONSE owns bar 2
             // Track 5: Texture pad — density bumped so it can pulse under the breakdown.
             TrackVoice(
-                engineEdm = Engine.GRN,
-                engineSpace = Engine.GRN,
+                engineEdm = OrpheusEngineId.GRAIN,
+                engineSpace = OrpheusEngineId.GRAIN,
                 role = TrackRole.Melodic(),
                 volume = 0.30f,
                 pan = 0.30f,
@@ -260,8 +260,8 @@ class ArmyStompVibe : VibeProvider {
                 reverbBrightness = 0.5f
             ),
             TrackVoice(
-                engineEdm = Engine.NSE,
-                engineSpace = Engine.PAR,
+                engineEdm = OrpheusEngineId.NOISE,
+                engineSpace = OrpheusEngineId.PARTICLE,
                 role = TrackRole.Percussive,
                 volume = 0.30f,
                 pan = -0.30f,
@@ -284,7 +284,7 @@ class ArmyStompVibe : VibeProvider {
             ),
             // Track 7: CHORDAL mallet — subtle PAD during march sections, becomes
             // off-beat SKA_UPSTROKES stabs in the breakdown via section override.
-            // Engine.DX2 with harmonics=0.54 selects patch idx 17 = "Marimba" — same
+            // OrpheusEngineId.SIX_OP_FM_2 with harmonics=0.54 selects patch idx 17 = "Marimba" — same
             // FM mallet family as Xylophone but inherently woodier and lower-register,
             // so the ring stays without the bell-y top end. Range dropped to F2-C4 to
             // keep the marimba in its idiomatic register and let chords sit just above
@@ -293,7 +293,7 @@ class ArmyStompVibe : VibeProvider {
             // ska. DX3/0.05 = "Hammond" → too organ-y, lost the ring. Marimba threads
             // both: ring + lower register + percussive chord stab.)
             TrackVoice(
-                engineEdm = Engine.DX2, engineSpace = Engine.DX2,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2, engineSpace = OrpheusEngineId.SIX_OP_FM_2,
                 role = TrackRole.Chordal(
                     comping = ChordComping(
                         style = CompingStyle.BLUES_SHUFFLE,

@@ -23,7 +23,7 @@ data class VoiceUiState(
     val peakLevel: Float = 0.0f,
     val bendPosition: Float = 0.0f,
     val bpm: Double = 120.0,
-    val duoEngines: List<Int> = List(6) { 0 },
+    val duoEngines: List<Int> = List(6) { -1 },  // -1 = OSC mode (OrpheusEngineId.OSC.id)
     val duoHarmonics: List<Float> = List(6) { 0.5f },
     val duoMorphs: List<Float> = List(6) { 0.0f },
     val duoModSourceLevels: List<Float> = List(6) { 0.0f },

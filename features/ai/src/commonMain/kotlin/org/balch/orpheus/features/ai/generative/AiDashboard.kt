@@ -290,7 +290,7 @@ private fun DashboardSoloPreview() {
                     AiStatusMessage("Mood: Midnight Jazz"),
                 ),
                 controlLog = previewFlow(
-                    AiStatusMessage("Set voice_duo_engine_0: 5"),
+                    AiStatusMessage("Set voice_duo_engine_0: 10"),
                     AiStatusMessage("Set beats_bpm: 95"),
                     AiStatusMessage("Set beats_run: 1.0"),
                     AiStatusMessage("Pattern: d1 $ note \"c3 eb3 g3 bb3\""),

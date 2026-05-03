@@ -63,7 +63,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             }
 
             // Per-duo voice parameters: engine, sharpness→timbre, harmonics, morph.
-            // Maps Kotlin plugin ordinals to C++ voice_params atomics.
+            // duo_engine value is OrpheusEngineId.id (C++ engine index directly — no mapping).
             static uint16_t eng_hashes[] = {
                 engine_hash16("duo_engine_0"), engine_hash16("duo_engine_1"),
                 engine_hash16("duo_engine_2"), engine_hash16("duo_engine_3"),
@@ -80,24 +80,9 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine_hash16("duo_morph_0"), engine_hash16("duo_morph_1"),
                 engine_hash16("duo_morph_2"), engine_hash16("duo_morph_3"),
                 engine_hash16("duo_morph_4"), engine_hash16("duo_morph_5")};
-            // Kotlin PlaitsEngineId ordinals → C++ engine indices
-            // (matches DspSynthEngine.CPP_ENGINE_MAP)
-            static const int kEngineMap[] = {
-                21, 22, 23, 21, 10, 17, 9, 8, 12, 11, 19, 20, 18, 16, 14, 13, 15,
-                0, 1, 2, 5, 6, 7,
-                3, 4  // SixOp FM bank 2, bank 3
-            };
-            static const int kEngineMapSize = sizeof(kEngineMap) / sizeof(kEngineMap[0]);
             for (int i = 0; i < 6; i++) {
                 if (symbol_hash == eng_hashes[i]) {
-                    int ordinal = static_cast<int>(value);
-                    int cpp_idx;
-                    if (ordinal <= 0) {
-                        cpp_idx = -1;  // Engine 0 (OSC mode)
-                    } else {
-                        int map_idx = ordinal - 1;
-                        cpp_idx = (map_idx < kEngineMapSize) ? kEngineMap[map_idx] : 0;
-                    }
+                    int cpp_idx = static_cast<int>(value);  // canonical OrpheusEngineId.id
                     int voiceA = i * 2;
                     engine->voice_params[voiceA].engine_index.store(cpp_idx, std::memory_order_relaxed);
                     engine->voice_params[voiceA + 1].engine_index.store(cpp_idx, std::memory_order_relaxed);

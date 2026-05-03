@@ -24,6 +24,11 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->voices_dsp[i].Init(&allocator);
     }
 
+    // Initialize all Braids macro oscillators (used when engine_index >= 100)
+    for (int i = 0; i < kNumVoices; i++) {
+        engine->braids_voices[i].Init();
+    }
+
     // Initialize bass voice
     {
         stmlib::BufferAllocator bass_allocator(engine->bass_voice_alloc_buffer, kVoiceAllocBytes);

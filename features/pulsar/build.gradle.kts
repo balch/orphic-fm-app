@@ -18,6 +18,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.audio)
             implementation(projects.core.pluginApi)
         }
         jvmTest.dependencies {

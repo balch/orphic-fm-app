@@ -530,3 +530,4 @@ bool run_pulsar_band_solo_tests();
 bool run_pulsar_lick_techniques_tests();
 bool run_pulsar_glide_tests();
 bool run_markov_solo_tests();
+bool run_braids_tests();

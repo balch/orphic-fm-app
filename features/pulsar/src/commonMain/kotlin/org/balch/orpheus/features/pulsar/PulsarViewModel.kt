@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
@@ -1422,7 +1423,7 @@ class PulsarViewModel(
                 noteRangeHigh = 72,
                 rhythmDensity = RhythmPattern.SPARSE.density,
             ),
-            tracks = List(8) { TrackVoice(engineEdm = Engine.VA, engineSpace = Engine.VA, role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic()) },
+            tracks = List(8) { TrackVoice(engineEdm = OrpheusEngineId.VIRTUAL_ANALOG, engineSpace = OrpheusEngineId.VIRTUAL_ANALOG, role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic()) },
         )
 
         fun previewFeature(state: PulsarUiState = PulsarUiState(

@@ -67,7 +67,7 @@ class VoicePlugin(
     private val _quadTriggerSource = IntArray(3)
     private val _quadPitchSource = IntArray(3)
     private val _quadEnvTriggerMode = BooleanArray(3)
-    private val _duoEngine = IntArray(6)
+    private val _duoEngine = IntArray(6) { -1 }  // -1 = OSC mode (OrpheusEngineId.OSC.id)
     private val _duoHarmonics = FloatArray(6) { 0.0f }
     private val _duoProsody = FloatArray(6) { 0.5f }
     private val _duoSpeed = FloatArray(6) { 0.0f }
@@ -138,8 +138,11 @@ class VoicePlugin(
             }
             controlPort(VoiceSymbol.duoEngine(i)) {
                 intType {
-                    default = 0
-                    min = 0; max = 17
+                    default = -1
+                    // Sparse OrpheusEngineId.id space: -1 (OSC), 0..23 (Plaits), 100..108 (Braids).
+                    // min/max here are advisory metadata only — the setter does not clamp,
+                    // and not every value in [min, max] is a valid id.
+                    min = -1; max = 108
                     get { _duoEngine[i] }
                     set {
                         _duoEngine[i] = it

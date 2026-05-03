@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.dsp.DspSynthEngine.Companion.OSC_ENGINE_CPP_INDEX
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -184,13 +184,12 @@ class DspSynthEngine(
         }
         val vp = pluginProvider.voicePlugin
         for (duo in 0..5) {
-            val engineOrdinal = vp.getDuoEngine(duo)
+            val engineId = vp.getDuoEngine(duo)
             val voiceA = duo * 2
-            val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
             // Set engine BEFORE active to avoid race: audio thread may see active=1
             // with stale engine_index=0, triggering the Plaits fallback path.
-            nativeBridge.nativeSetVoiceEngine(voiceA, cppIndex)
-            nativeBridge.nativeSetVoiceEngine(voiceA + 1, cppIndex)
+            nativeBridge.nativeSetVoiceEngine(voiceA, engineId)
+            nativeBridge.nativeSetVoiceEngine(voiceA + 1, engineId)
             // Always keep voices active in C++ — it's the only audio path
             nativeBridge.nativeSetVoiceActive(voiceA, true)
             nativeBridge.nativeSetVoiceActive(voiceA + 1, true)
@@ -199,7 +198,7 @@ class DspSynthEngine(
             nativeBridge.nativeSetVoiceTimbre(voiceA, vp.getDuoSharpness(duo))
             nativeBridge.nativeSetVoiceTimbre(voiceA + 1, vp.getDuoSharpness(duo))
             // Speech engine: morph is per-voice envSpeed (word selection); otherwise duo morph
-            if (engineOrdinal == SPEECH_ENGINE_ORDINAL) {
+            if (engineId == OrpheusEngineId.SPEECH.id) {
                 nativeBridge.nativeSetVoiceMorph(voiceA, vp.getEnvSpeed(voiceA))
                 nativeBridge.nativeSetVoiceMorph(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
             } else {
@@ -216,7 +215,7 @@ class DspSynthEngine(
             val modLvl = voiceManager.getDuoModSourceLevel(duo)
             pluginProvider.voicePlugin.setDuoModSource(duo, modSrc.ordinal)
             pluginProvider.voicePlugin.setDuoModSourceLevel(duo, modLvl)
-            log.debug { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true modSrc=$modSrc modLvl=$modLvl" }
+            log.debug { "syncNative: duo=$duo engineId=$engineId active=true modSrc=$modSrc modLvl=$modLvl" }
         }
         // Sync per-quad volume
         for (quad in 0..2) {
@@ -310,7 +309,7 @@ class DspSynthEngine(
                         nativeBridge.nativeSetVoiceDecay(index, value)
                         // Speech engine: envSpeed overrides morph for word selection
                         val duoIndex = index / 2
-                        if (pluginProvider.voicePlugin.getDuoEngine(duoIndex) == SPEECH_ENGINE_ORDINAL) {
+                        if (pluginProvider.voicePlugin.getDuoEngine(duoIndex) == OrpheusEngineId.SPEECH.id) {
                             nativeBridge.nativeSetVoiceMorph(index, value)
                         }
                     }
@@ -327,18 +326,17 @@ class DspSynthEngine(
                         pluginProvider.voicePlugin.setDuoModSource(index, modSourceOrdinal)
                     }
                     "duo_engine" -> {
-                        val engineOrdinal = value as Int
-                        voiceManager.setDuoEngine(index, engineOrdinal)
+                        val engineId = value as Int
+                        voiceManager.setDuoEngine(index, engineId)
                         // Forward engine index to C++ for both voices in the duo
                         // Always keep active — C++ is the only audio path on Android
                         val voiceA = index * 2
-                        val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
-                        nativeBridge.nativeSetVoiceEngine(voiceA, cppIndex)
-                        nativeBridge.nativeSetVoiceEngine(voiceA + 1, cppIndex)
+                        nativeBridge.nativeSetVoiceEngine(voiceA, engineId)
+                        nativeBridge.nativeSetVoiceEngine(voiceA + 1, engineId)
                         nativeBridge.nativeSetVoiceActive(voiceA, true)
                         nativeBridge.nativeSetVoiceActive(voiceA + 1, true)
                         // Speech engine: override C++ morph with per-voice envSpeed for word selection
-                        if (engineOrdinal == SPEECH_ENGINE_ORDINAL) {
+                        if (engineId == OrpheusEngineId.SPEECH.id) {
                             val vp = pluginProvider.voicePlugin
                             nativeBridge.nativeSetVoiceMorph(voiceA, vp.getEnvSpeed(voiceA))
                             nativeBridge.nativeSetVoiceMorph(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
@@ -355,7 +353,7 @@ class DspSynthEngine(
                     "duo_morph" -> {
                         voiceManager.setDuoMorph(index, value as Float)
                         // Speech engine: morph is controlled by envSpeed, not duo_morph
-                        if (pluginProvider.voicePlugin.getDuoEngine(index) != SPEECH_ENGINE_ORDINAL) {
+                        if (pluginProvider.voicePlugin.getDuoEngine(index) != OrpheusEngineId.SPEECH.id) {
                             val voiceA = index * 2
                             nativeBridge.nativeSetVoiceMorph(voiceA, value)
                             nativeBridge.nativeSetVoiceMorph(voiceA + 1, value)
@@ -883,72 +881,13 @@ class DspSynthEngine(
     override fun getQuadTriggerSource(quadIndex: Int) = voiceManager.getQuadTriggerSource(quadIndex)
     override fun getQuadEnvelopeTriggerMode(quadIndex: Int) = voiceManager.getQuadEnvelopeTriggerMode(quadIndex)
 
-    /**
-     * Maps Kotlin PlaitsEngineId ordinal+1 (1-based engineOrdinal) to
-     * C++ Plaits engine registration index.
-     *
-     * Voice ordinal 0 is the legacy pre-Plaits "OSC mode" (triangle+square with
-     * ADSR+hold) and returns [OSC_ENGINE_CPP_INDEX] — the C++ voice path routes
-     * that sentinel to the built-in OSC renderer instead of Plaits.
-     *
-     * C++ registration order (from plaits/dsp/voice.cc Init()):
-     * 0-7: engine2 (VA VCF, Phase Dist, 6-Op×3, Wave Terrain, String Machine, Chiptune)
-     * 8: VirtualAnalog, 9: Waveshaping, 10: FM, 11: Grain, 12: Additive,
-     * 13: Wavetable, 14: Chord, 15: Speech, 16: Swarm, 17: Noise,
-     * 18: Particle, 19: String, 20: Modal, 21: BassDrum, 22: SnareDrum, 23: HiHat
-     */
-    private fun plaitsEngineOrdinalToCpp(engineOrdinal: Int): Int {
-        if (engineOrdinal <= 0) return OSC_ENGINE_CPP_INDEX
-        val idx = engineOrdinal - 1
-        return if (idx < CPP_ENGINE_MAP.size) CPP_ENGINE_MAP[idx] else 0
-    }
-
     companion object {
         private const val LOOPER_URI = "org.balch.orpheus.plugins.looper"
-        /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
-        private const val SPEECH_ENGINE_ORDINAL = 17
-
-        /**
-         * Sentinel returned by [plaitsEngineOrdinalToCpp] when the voice is in
-         * legacy OSC mode (triangle+square with ADSR+hold) — not a Plaits engine.
-         * C++ voice routing checks for this value and takes the OSC code path.
-         */
-        const val OSC_ENGINE_CPP_INDEX = -1
 
         // Per-voice pitch multiplier in semitones (matches DspVoiceManager voice list):
         // 0,1=bass(0.5x→-12), 2-5=mid(1.0x→0), 6,7=high(2.0x→+12), 8-11=repl(1.0x→0)
         private val VOICE_PITCH_MULT_SEMITONES = floatArrayOf(
             -12f, -12f, 0f, 0f, 0f, 0f, 12f, 12f, 0f, 0f, 0f, 0f
-        )
-
-        // PlaitsEngineId ordinals (0-based) → C++ engine indices
-        private val CPP_ENGINE_MAP = intArrayOf(
-            21, // ANALOG_BASS_DRUM
-            22, // ANALOG_SNARE_DRUM
-            23, // METALLIC_HI_HAT
-            21, // FM_DRUM (mapped to bass drum — custom engine not in MI source)
-            10, // FM
-            17, // NOISE
-            9,  // WAVESHAPING
-            8,  // VIRTUAL_ANALOG
-            12, // ADDITIVE
-            11, // GRAIN
-            19, // STRING
-            20, // MODAL
-            18, // PARTICLE
-            16, // SWARM
-            14, // CHORD
-            13, // WAVETABLE
-            15, // SPEECH
-            // V1.2 engines (engine2/ directory)
-            0,  // VIRTUAL_ANALOG_VCF (C++ index 0)
-            1,  // PHASE_DISTORTION (C++ index 1)
-            2,  // SIX_OP_FM (C++ index 2; SixOp bank 0)
-            5,  // WAVE_TERRAIN (C++ index 5)
-            6,  // STRING_MACHINE (C++ index 6)
-            7,  // CHIPTUNE (C++ index 7)
-            3,  // SIX_OP_FM_2 (C++ index 3; SixOp bank 1)
-            4,  // SIX_OP_FM_3 (C++ index 4; SixOp bank 2)
         )
     }
 }

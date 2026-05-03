@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.Arrangement
@@ -10,7 +11,6 @@ import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.ChordFollow
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
@@ -135,8 +135,8 @@ class VoltageStrutVibe : VibeProvider {
         tracks = listOf(
             // 0: electronic kick — locked 4-on-floor, REPEAT (the anchor).
             TrackVoice(
-                engineEdm = Engine.FM,
-                engineSpace = Engine.FM,
+                engineEdm = OrpheusEngineId.FM,
+                engineSpace = OrpheusEngineId.FM,
                 role = TrackRole.Percussive,
                 volume = 0.95f,
                 pan = 0.00f,
@@ -149,8 +149,8 @@ class VoltageStrutVibe : VibeProvider {
             ),
             // 1: electronic snare — funky backbeat with mutation, clappy edge.
             TrackVoice(
-                engineEdm = Engine.PD,
-                engineSpace = Engine.NSE,
+                engineEdm = OrpheusEngineId.PHASE_DISTORTION,
+                engineSpace = OrpheusEngineId.NOISE,
                 role = TrackRole.Percussive,
                 volume = 0.70f,
                 pan = -0.10f,
@@ -164,8 +164,8 @@ class VoltageStrutVibe : VibeProvider {
             ),
             // 2: dense hats — busy 16ths with ghosts, MUTATE for funk variation.
             TrackVoice(
-                engineEdm = Engine.PAR,
-                engineSpace = Engine.PAR,
+                engineEdm = OrpheusEngineId.PARTICLE,
+                engineSpace = OrpheusEngineId.PARTICLE,
                 role = TrackRole.Percussive,
                 volume = 0.65f,
                 pan = 0.20f,
@@ -176,8 +176,8 @@ class VoltageStrutVibe : VibeProvider {
             ),
             // 3: MAIN BASS — waveshaping hook, plays the lick, follows the chord root.
             TrackVoice(
-                engineEdm = Engine.WSH,
-                engineSpace = Engine.WSH,
+                engineEdm = OrpheusEngineId.WAVESHAPING,
+                engineSpace = OrpheusEngineId.WAVESHAPING,
                 role = TrackRole.Melodic(
                     chordFollow = ChordFollow.ROOT_ONLY,
                     lickMode = LickMode.Fill,
@@ -198,16 +198,16 @@ class VoltageStrutVibe : VibeProvider {
                 glideRate = 0.05f,
             ),
             // 4: lead — glassy FM stabs, moderate density, energy-driven.
-            // Engine.DX2 + harmonics=0.50 lands on patch idx 16 = "Xylophone". At this
+            // OrpheusEngineId.SIX_OP_FM_2 + harmonics=0.50 lands on patch idx 16 = "Xylophone". At this
             // track's C4–G6 register with reverb=0.60, delay=0.30 and MUTATE strategy,
             // the mallet attack reads as glassy/bell-tone FM stabs — NOT a literal
-            // xylophone. (Tried Engine.DX idx 17 "Insert 1 BRASSY" — actual brass
+            // xylophone. (Tried OrpheusEngineId.SIX_OP_FM idx 17 "Insert 1 BRASSY" — actual brass
             // stabs — but the strut character wanted the percussive top-end clarity
             // that the mallet patch provides at high register.) Crossfades to VA
             // (clean analog poly) when Energy drops for a softer space-side voice.
             TrackVoice(
-                engineEdm = Engine.DX2,
-                engineSpace = Engine.VA,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2,
+                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
                 volume = 0.55f,
                 pan = 0.05f,
@@ -229,8 +229,8 @@ class VoltageStrutVibe : VibeProvider {
             // register = locked drone under the main hook. Density 0.55 gives it a
             // steady pulse (roughly 8ths) rather than a single sustained drone.
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.PD,
+                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineSpace = OrpheusEngineId.PHASE_DISTORTION,
                 role = TrackRole.Percussive,
                 volume = 0.55f,
                 pan = 0.00f,
@@ -249,8 +249,8 @@ class VoltageStrutVibe : VibeProvider {
             ),
             // 6: PERCUSSIVE FX — noise hits, ticks/snaps. No pad, no sustain.
             TrackVoice(
-                engineEdm = Engine.NSE,
-                engineSpace = Engine.NSE,
+                engineEdm = OrpheusEngineId.NOISE,
+                engineSpace = OrpheusEngineId.NOISE,
                 role = TrackRole.Percussive,
                 volume = 0.40f,
                 pan = 0.30f,
@@ -269,8 +269,8 @@ class VoltageStrutVibe : VibeProvider {
             ),
             // 7: PERCUSSIVE FX — particle clicks, tuned-ish transients.
             TrackVoice(
-                engineEdm = Engine.GRN,
-                engineSpace = Engine.GRN,
+                engineEdm = OrpheusEngineId.GRAIN,
+                engineSpace = OrpheusEngineId.GRAIN,
                 role = TrackRole.Percussive,
                 volume = 0.55f,
                 pan = -0.30f,

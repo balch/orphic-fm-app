@@ -42,6 +42,7 @@
 #undef LUT_BIPOLAR_FOLD
 #undef LUT_BIPOLAR_FOLD_SIZE
 #include "tides2/poly_slope_generator.h"
+#include "braids/macro_oscillator.h"
 #include "tides2/ramp/ramp_extractor.h"
 
 #include "orpheus_automation.h"
@@ -255,6 +256,15 @@ struct OrpheusEngine {
         float prev_output = 0.0f;
     };
     VoiceOscState voice_osc_state[kNumVoices];
+
+    // ── Per-voice Braids MacroOscillator ──────────────
+    // Used when engine_index >= 100 (Braids range). Init'd in orpheus_engine_create.
+    braids::MacroOscillator braids_voices[kNumVoices];
+    // Resampler residue: fractional source-sample offset where the next host block's
+    // output sample 0 begins. Keeps the 96k→host linear-interp path phase-continuous
+    // across host blocks at non-48k host rates. Reset to 0 when oscillator re-Init'd.
+    float braids_src_phase[kNumVoices] = {};
+
 
     // Per-voice hold level (0.0-1.0, raw from UI before scaling)
     std::atomic<float> voice_hold_level[kNumVoices] = {};

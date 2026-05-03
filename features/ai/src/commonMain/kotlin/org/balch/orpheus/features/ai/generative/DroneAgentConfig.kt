@@ -148,11 +148,11 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         The system has initialized a unique preset. Now activate the drone.
 
         1. **Pick engines** for duos 4-5 (voice_duo_engine_4/5) that match the mood prompt:
-           - Ethereal/cosmic → 13 (particle) or 10 (grain)
-           - Warm/organic → 0 (osc) or 8 (va)
-           - Metallic/bells → 12 (modal) or 9 (additive)
-           - Strings/bowed → 11 (string)
-           - Occasionally (~1 in 25), try hidden engines: 18=VCF, 19=PD, 20=DX, 21=TRN, 22=ENS, 23=NES
+           - Ethereal/cosmic → 18 (particle) or 11 (grain)
+           - Warm/organic → -1 (osc) or 8 (va)
+           - Metallic/bells → 20 (modal) or 12 (additive)
+           - Strings/bowed → 19 (string)
+           - Occasionally (~1 in 25), try hidden engines: 0=VCF, 1=PD, 2=DX, 5=TRN, 6=ENS, 7=NES
         2. **Set sharpness** (voice_duo_sharpness_4/5) to match mood energy.
         3. **Set modulation**: voice_mod_depth_8..11 for FM richness, voice_vibrato for movement.
         4. **Set effects**: reverb_amount/time, delay_feedback/mix, distortion_drive as appropriate.

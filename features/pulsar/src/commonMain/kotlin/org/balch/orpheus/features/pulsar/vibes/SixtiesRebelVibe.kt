@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
@@ -8,7 +9,6 @@ import org.balch.orpheus.features.pulsar.ChordComping
 import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
@@ -117,8 +117,8 @@ class SixtiesRebelVibe : VibeProvider {
         tracks = listOf(
             // 0: Kick - driving pulse
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.85f,
                 density = 0.45f,
@@ -126,8 +126,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 1: Snare - crackling backbeat
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.75f,
                 density = 0.35f,
@@ -138,8 +138,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 2: Hats - steady 8ths
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.55f,
                 density = 0.60f,
@@ -147,8 +147,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 3: Bass - driving root notes
             TrackVoice(
-                engineEdm = Engine.DX, // Solid bass
-                engineSpace = Engine.VA,
+                engineEdm = OrpheusEngineId.SIX_OP_FM, // Solid bass
+                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
                 harmonics = 0.02f, // DX Idx 0: Solid bass
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.80f,
@@ -159,8 +159,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 4: Fuzz Lead - the signature lick
             TrackVoice(
-                engineEdm = Engine.WSH, // Gritty fuzz
-                engineSpace = Engine.FM,
+                engineEdm = OrpheusEngineId.WAVESHAPING, // Gritty fuzz
+                engineSpace = OrpheusEngineId.FM,
                 role = TrackRole.Melodic(lickMode = LickMode.Fill),
                 volume = 0.65f,
                 pan = 0.15f,
@@ -177,8 +177,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 5: Acoustic Strums
             TrackVoice(
-                engineEdm = Engine.DX2, // Guit acous
-                engineSpace = Engine.CHD,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Guit acous
+                engineSpace = OrpheusEngineId.CHORD,
                 harmonics = 0.35f, // DX2 Idx 11: Guit acous
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
@@ -194,8 +194,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 6: Piano - staccato accents
             TrackVoice(
-                engineEdm = Engine.DX2, // Steinway
-                engineSpace = Engine.VA,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Steinway
+                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
                 harmonics = 0.32f, // DX2 Idx 10: Steinway
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
@@ -209,8 +209,8 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             // 7: Tambourine / Percussion
             TrackVoice(
-                engineEdm = Engine.MOD,
-                engineSpace = Engine.PAR,
+                engineEdm = OrpheusEngineId.MODAL,
+                engineSpace = OrpheusEngineId.PARTICLE,
                 role = TrackRole.Percussive,
                 volume = 0.40f,
                 density = 0.30f,

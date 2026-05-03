@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.ArpMode
@@ -15,7 +16,6 @@ import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingFills
 import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
@@ -174,8 +174,8 @@ class TechnoWobbleVibe : VibeProvider {
         tracks = listOf(
             // Track 0: Kick — dead-straight four-on-the-floor, heavy
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.95f,
                 pan = 0.00f,
@@ -186,8 +186,8 @@ class TechnoWobbleVibe : VibeProvider {
             ),
             // Track 1: Snare — processed, lo-fi thwack on 2 and 4
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.72f,
                 pan = -0.08f,
@@ -203,8 +203,8 @@ class TechnoWobbleVibe : VibeProvider {
             // Track 2: Hihat — minimal, scratchy. This is NOT techno — hats
             // are an accent color, not a driving force.
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.40f,
                 pan = 0.15f,
@@ -218,8 +218,8 @@ class TechnoWobbleVibe : VibeProvider {
             // the riff cleanly without any extra wandering. Fill mode so the
             // lick is a full-bar statement, not a sub-bar stab.
             TrackVoice(
-                engineEdm = Engine.WSH,
-                engineSpace = Engine.STR,
+                engineEdm = OrpheusEngineId.WAVESHAPING,
+                engineSpace = OrpheusEngineId.STRING,
                 role = TrackRole.Melodic(
                     chordFollow = ChordFollow.ROOT_ONLY,
                     lickMode = LickMode.Fill,
@@ -248,8 +248,8 @@ class TechnoWobbleVibe : VibeProvider {
             // the kick, but with octave jumps and drops so it feels
             // unpredictable and aggressive — not a tidy chord pattern.
             TrackVoice(
-                engineEdm = Engine.WSH,
-                engineSpace = Engine.STR,
+                engineEdm = OrpheusEngineId.WAVESHAPING,
+                engineSpace = OrpheusEngineId.STRING,
                 role = TrackRole.Chordal(
                     comping = ChordComping(
                         style = CompingStyle.ROCK_DOWNBEATS,
@@ -288,8 +288,8 @@ class TechnoWobbleVibe : VibeProvider {
             // Track 5: Pad — dark sustained string ensemble. Drones under
             // everything with slow LFO timbre drift. This is the bed.
             TrackVoice(
-                engineEdm = Engine.DX3,
-                engineSpace = Engine.DX3,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_3,
+                engineSpace = OrpheusEngineId.SIX_OP_FM_3,
                 role = TrackRole.Melodic(),
                 volume = 0.45f,
                 pan = -0.35f,
@@ -318,8 +318,8 @@ class TechnoWobbleVibe : VibeProvider {
             // crackle and grain clouds as a musical element, not an accent.
             // Panned opposite the pad for width.
             TrackVoice(
-                engineEdm = Engine.GRN,
-                engineSpace = Engine.NSE,
+                engineEdm = OrpheusEngineId.GRAIN,
+                engineSpace = OrpheusEngineId.NOISE,
                 role = TrackRole.Percussive,
                 volume = 0.30f,
                 pan = 0.35f,
@@ -347,8 +347,8 @@ class TechnoWobbleVibe : VibeProvider {
             // Metallic hits that surface occasionally. WILD macro map so it
             // gets swept unpredictably as the macros move.
             TrackVoice(
-                engineEdm = Engine.MOD,
-                engineSpace = Engine.MOD,
+                engineEdm = OrpheusEngineId.MODAL,
+                engineSpace = OrpheusEngineId.MODAL,
                 role = TrackRole.Melodic(),
                 volume = 0.25f,
                 pan = 0.00f,

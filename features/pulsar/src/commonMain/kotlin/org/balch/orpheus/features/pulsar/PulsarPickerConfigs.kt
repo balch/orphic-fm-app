@@ -27,7 +27,8 @@ private val PULSAR_FULL_RING = listOf(
     PickerEntry("SM",   6, OrpheusColors.engineOrange.copy(alpha = 0.8f)),
 )
 
-// V1.2 engines (C++ only) — double-click easter egg ring, using C++ indices
+// V1.2 engines (C++ only) — double-click easter egg ring, using C++ indices.
+// Also includes 4 Braids character engines (ids 105-108).
 private val PULSAR_V2_RING = listOf(
     PickerEntry("VCF",  0, OrpheusColors.engineRed),       // VirtualAnalogVCF
     PickerEntry("PD",   1, OrpheusColors.enginePurple),    // PhaseDistortion
@@ -37,9 +38,25 @@ private val PULSAR_V2_RING = listOf(
     PickerEntry("TRN",  5, OrpheusColors.engineGreen),     // WaveTerrain
     PickerEntry("ENS",  6, OrpheusColors.engineBlue),      // StringMachine
     PickerEntry("NES",  7, OrpheusColors.neonCyan),        // Chiptune
+    // Braids character engines (ids 105..108)
+    PickerEntry("CSAW", 105, OrpheusColors.engineYellow),
+    PickerEntry("TOY",  106, OrpheusColors.presetOrange),
+    PickerEntry("VOW",  107, OrpheusColors.synthGreen),
+    PickerEntry("?",    108, OrpheusColors.neonMagenta),
 )
 
 val PULSAR_V2_PICKER = PickerConfig(PULSAR_V2_RING, "V2", -1)
+
+// Braids chord engines (triple-click ring, ids 100..104).
+private val PULSAR_V3_RING = listOf(
+    PickerEntry("3SAW", 100, OrpheusColors.engineRed),
+    PickerEntry("3SQR", 101, OrpheusColors.enginePurple),
+    PickerEntry("3TRI", 102, OrpheusColors.engineYellow),
+    PickerEntry("3SIN", 103, OrpheusColors.engineBlue),
+    PickerEntry("3RM",  104, OrpheusColors.synthGreen),
+)
+
+val PULSAR_V3_PICKER = PickerConfig(PULSAR_V3_RING, "CHD", -1)
 
 /** Kick track: full ring, BD center */
 val PULSAR_KICK_PICKER = PickerConfig(PULSAR_FULL_RING, "BD", 21)
@@ -82,5 +99,9 @@ fun pulsarEngineLabel(engineIndex: Int): String = when (engineIndex) {
     12 -> "ADD"; 13 -> "WTB"; 14 -> "CHD"; 15 -> "SPK"; 16 -> "SWM"
     17 -> "NSE"; 18 -> "PAR"; 19 -> "STR"; 20 -> "MOD"
     21 -> "BD"; 22 -> "SD"; 23 -> "HH"
+    // Braids chord engines (100..104)
+    100 -> "3SAW"; 101 -> "3SQR"; 102 -> "3TRI"; 103 -> "3SIN"; 104 -> "3RM"
+    // Braids character engines (105..108)
+    105 -> "CSAW"; 106 -> "TOY"; 107 -> "VOW"; 108 -> "?"
     else -> "E$engineIndex"
 }

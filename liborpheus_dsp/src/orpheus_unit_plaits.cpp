@@ -549,9 +549,20 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_src * md * 0.5f));
         }
 
-        // Render via OrpheusVoice (handles engine selection, outGain, soft_limit)
-        voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, accent,
-                     out, num_frames);
+        // Render: Braids range (100..199) → MacroOscillator wrapper.
+        // Otherwise → OrpheusVoice (handles Plaits engine selection, outGain, soft_limit).
+        // Pass the FM-modulated harmonics/morph locals so LFO/Tides/etc. modulation
+        // reaches the Braids macro params (parameter_[0/1]).
+        if (engine_index >= 100 && engine_index < 200) {
+            unit_process_braids(engine->braids_voices[idx],
+                                engine->braids_src_phase[idx],
+                                engine_index,
+                                note, harmonics, timbre, morph,
+                                sr, out, num_frames);
+        } else {
+            voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, accent,
+                         out, num_frames);
+        }
 
         // ADSR envelope — wraps main voices (matching JSyn's DspVoice VCA).
         // Drum voices (idx >= kNumMainVoices) bypass ADSR: their Plaits engines

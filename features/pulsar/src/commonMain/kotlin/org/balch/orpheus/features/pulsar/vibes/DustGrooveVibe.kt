@@ -3,13 +3,13 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.ChordFollow
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
@@ -113,8 +113,8 @@ class DustGrooveVibe : VibeProvider {
         progressionDriftRange = 0.15f,
         tracks = listOf(
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.85f,
                 pan = 0.00f,
@@ -124,8 +124,8 @@ class DustGrooveVibe : VibeProvider {
                 barStrategy = BarStrategy.REPEAT
             ),
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.65f,
                 pan = -0.10f,
@@ -135,8 +135,8 @@ class DustGrooveVibe : VibeProvider {
                 barStrategy = BarStrategy.FILL
             ),
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.60f,
                 pan = 0.20f,
@@ -148,8 +148,8 @@ class DustGrooveVibe : VibeProvider {
             // Bass: locked pattern + ROOT_ONLY chord follow keeps the dusty pocket tight.
             // noteRangeLow 33 (A1) preserved — the dusty warmth is the character.
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.VA,
+                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.80f,
                 pan = 0.00f,
@@ -162,8 +162,8 @@ class DustGrooveVibe : VibeProvider {
                 reverbBrightness = 0.35f,
             ),
             TrackVoice(
-                engineEdm = Engine.FM,
-                engineSpace = Engine.FM,
+                engineEdm = OrpheusEngineId.FM,
+                engineSpace = OrpheusEngineId.FM,
                 role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                 volume = 0.45f,
                 pan = -0.20f,
@@ -177,8 +177,8 @@ class DustGrooveVibe : VibeProvider {
                 glideRate = 0.1f,
             ),
             TrackVoice(
-                engineEdm = Engine.WSH,
-                engineSpace = Engine.ADD,
+                engineEdm = OrpheusEngineId.WAVESHAPING,
+                engineSpace = OrpheusEngineId.ADDITIVE,
                 role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                 volume = 0.30f,
                 pan = 0.30f,
@@ -201,8 +201,8 @@ class DustGrooveVibe : VibeProvider {
                 glideRate = 0.2f,
             ),
             TrackVoice(
-                engineEdm = Engine.GRN,
-                engineSpace = Engine.WTB,
+                engineEdm = OrpheusEngineId.GRAIN,
+                engineSpace = OrpheusEngineId.WAVETABLE,
                 role = TrackRole.Melodic(),
                 volume = 0.30f,
                 pan = -0.30f,
@@ -225,8 +225,8 @@ class DustGrooveVibe : VibeProvider {
                 glideRate = 0.25f
             ),
             TrackVoice(
-                engineEdm = Engine.PAR,
-                engineSpace = Engine.NSE,
+                engineEdm = OrpheusEngineId.PARTICLE,
+                engineSpace = OrpheusEngineId.NOISE,
                 role = TrackRole.Percussive,
                 volume = 0.20f,
                 pan = 0.35f,

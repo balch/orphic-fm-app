@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
@@ -14,7 +15,6 @@ import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.symbols.DRUM_URI
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 
 /**
  * DSP Plugin for drum synthesis with selectable Plaits engines per slot.
@@ -39,9 +39,9 @@ class DrumPlugin(
         const val URI = DRUM_URI
         /** Default engines for each slot */
         val DEFAULT_ENGINES = arrayOf(
-            PlaitsEngineId.ANALOG_BASS_DRUM,
-            PlaitsEngineId.ANALOG_SNARE_DRUM,
-            PlaitsEngineId.METALLIC_HI_HAT
+            OrpheusEngineId.ANALOG_BASS_DRUM,
+            OrpheusEngineId.ANALOG_SNARE_DRUM,
+            OrpheusEngineId.METALLIC_HI_HAT
         )
     }
 
@@ -53,7 +53,12 @@ class DrumPlugin(
     private val decays = FloatArray(3) { 0.5f }
     private val p4s = FloatArray(3) { 0.5f }
     private val p5s = FloatArray(3) { 0.5f }
-    private val engineIds = IntArray(3) { i -> DEFAULT_ENGINES[i].ordinal }
+    // Drum slot engine selection is stored as the OrpheusEngineId entry ORDINAL, not
+    // the canonical id. The drum picker presents a curated subset indexed positionally,
+    // so ordinals are stable for this UI. This intentionally diverges from VoicePlugin/
+    // Pulsar, which store the canonical id. Drum engine selection does not flow to C++
+    // today (BD/SD/HH dispatch is hardcoded native-side) — this is plugin/UI state only.
+    private val engineSlotIndices = IntArray(3) { i -> DEFAULT_ENGINES[i].ordinal }
 
     // Routing state (facade for engine)
     private val triggerSources = IntArray(3)
@@ -157,31 +162,32 @@ class DrumPlugin(
             intType { get { pitchSources[2] }; set { pitchSources[2] = it; listener?.onRoutingChange(2, "pitch", it) } }
         }
 
-        // Engine selection
+        // Engine selection — values are OrpheusEngineId entry ordinals (NOT canonical ids).
+        // See engineSlotIndices for rationale.
         controlPort(DrumSymbol.BD_ENGINE) {
             intType {
                 default = DEFAULT_ENGINES[0].ordinal
-                min = 0; max = PlaitsEngineId.entries.size - 1
-                options = PlaitsEngineId.entries.map { it.displayName }
-                get { engineIds[0] }
+                min = 0; max = OrpheusEngineId.entries.size - 1
+                options = OrpheusEngineId.entries.map { it.displayName }
+                get { engineSlotIndices[0] }
                 set { setSlotEngine(0, it) }
             }
         }
         controlPort(DrumSymbol.SD_ENGINE) {
             intType {
                 default = DEFAULT_ENGINES[1].ordinal
-                min = 0; max = PlaitsEngineId.entries.size - 1
-                options = PlaitsEngineId.entries.map { it.displayName }
-                get { engineIds[1] }
+                min = 0; max = OrpheusEngineId.entries.size - 1
+                options = OrpheusEngineId.entries.map { it.displayName }
+                get { engineSlotIndices[1] }
                 set { setSlotEngine(1, it) }
             }
         }
         controlPort(DrumSymbol.HH_ENGINE) {
             intType {
                 default = DEFAULT_ENGINES[2].ordinal
-                min = 0; max = PlaitsEngineId.entries.size - 1
-                options = PlaitsEngineId.entries.map { it.displayName }
-                get { engineIds[2] }
+                min = 0; max = OrpheusEngineId.entries.size - 1
+                options = OrpheusEngineId.entries.map { it.displayName }
+                get { engineSlotIndices[2] }
                 set { setSlotEngine(2, it) }
             }
         }
@@ -276,7 +282,8 @@ class DrumPlugin(
     fun getDecay(type: Int) = decays.getOrElse(type) { 0.5f }
     fun getP4(type: Int) = p4s.getOrElse(type) { 0.5f }
     fun getP5(type: Int) = p5s.getOrElse(type) { 0.5f }
-    fun getEngineId(type: Int) = engineIds.getOrElse(type) { 0 }
+    /** Returns the OrpheusEngineId entry ordinal for the given drum slot (NOT a canonical id). */
+    fun getEngineSlotIndex(type: Int) = engineSlotIndices.getOrElse(type) { 0 }
 
     // Setters for syncing
     fun setRouting(drumIndex: Int, type: String, value: Int) {
@@ -288,9 +295,10 @@ class DrumPlugin(
 
     // --- Private helpers ---
 
-    private fun setSlotEngine(slot: Int, engineOrdinal: Int) {
-        val entries = PlaitsEngineId.entries
-        if (engineOrdinal !in entries.indices) return
-        engineIds[slot] = engineOrdinal
+    /** [engineSlotIndex] is the OrpheusEngineId entry ordinal (NOT a canonical engine id). */
+    private fun setSlotEngine(slot: Int, engineSlotIndex: Int) {
+        val entries = OrpheusEngineId.entries
+        if (engineSlotIndex !in entries.indices) return
+        engineSlotIndices[slot] = engineSlotIndex
     }
 }

@@ -58,57 +58,58 @@ data class EngineEntry(
     val description: String,
 )
 
+// EngineEntry.ordinal carries OrpheusEngineId.id (C++ engine index directly).
 val ENGINE_GROUPS = listOf(
     EngineGroup(
         name = "Classic",
         color = OrpheusColors.neonMagenta,
         engines = listOf(
-            EngineEntry("OSC", 0, "Analog oscillator"),
-            EngineEntry("VA", 8, "Virtual analog"),
-            EngineEntry("FM", 5, "FM synthesis"),
-            EngineEntry("WSH", 7, "Waveshaper"),
+            EngineEntry("OSC", -1, "Analog oscillator"),
+            EngineEntry("VA",   8, "Virtual analog"),
+            EngineEntry("FM",  10, "FM synthesis"),
+            EngineEntry("WSH",  9, "Waveshaper"),
         ),
     ),
     EngineGroup(
         name = "Textural",
         color = OrpheusColors.synthGreen,
         engines = listOf(
-            EngineEntry("GRN", 10, "Granular"),
-            EngineEntry("NSE", 6, "Noise"),
-            EngineEntry("ADD", 9, "Additive"),
-            EngineEntry("WTB", 16, "Wavetable"),
+            EngineEntry("GRN", 11, "Granular"),
+            EngineEntry("NSE", 17, "Noise"),
+            EngineEntry("ADD", 12, "Additive"),
+            EngineEntry("WTB", 13, "Wavetable"),
         ),
     ),
     EngineGroup(
         name = "Physical",
         color = OrpheusColors.warmGlow,
         engines = listOf(
-            EngineEntry("STR", 11, "String model"),
-            EngineEntry("MOD", 12, "Modal resonator"),
-            EngineEntry("SWM", 14, "Swarm"),
-            EngineEntry("SPK", 17, "Speech"),
+            EngineEntry("STR", 19, "String model"),
+            EngineEntry("MOD", 20, "Modal resonator"),
+            EngineEntry("SWM", 16, "Swarm"),
+            EngineEntry("SPK", 15, "Speech"),
         ),
     ),
     EngineGroup(
         name = "Harmonic",
         color = OrpheusColors.electricBlue,
         engines = listOf(
-            EngineEntry("PAR", 13, "Partials"),
-            EngineEntry("CHD", 15, "Chords"),
+            EngineEntry("PAR", 18, "Partials"),
+            EngineEntry("CHD", 14, "Chords"),
         ),
     ),
     EngineGroup(
         name = "V2",
         color = OrpheusColors.neonCyan,
         engines = listOf(
-            EngineEntry("VCF", 18, "Filter model"),
-            EngineEntry("PD", 19, "Phase distortion"),
-            EngineEntry("DX", 20, "6-op FM"),
-            EngineEntry("DX2", 24, "6-op FM Bank 2"),
-            EngineEntry("DX3", 25, "6-op FM Bank 3"),
-            EngineEntry("TRN", 21, "Wave Terrain"),
-            EngineEntry("ENS", 22, "Ensemble"),
-            EngineEntry("NES", 23, "Chiptune"),
+            EngineEntry("VCF",  0, "Filter model"),
+            EngineEntry("PD",   1, "Phase distortion"),
+            EngineEntry("DX",   2, "6-op FM"),
+            EngineEntry("DX2",  3, "6-op FM Bank 2"),
+            EngineEntry("DX3",  4, "6-op FM Bank 3"),
+            EngineEntry("TRN",  5, "Wave Terrain"),
+            EngineEntry("ENS",  6, "Ensemble"),
+            EngineEntry("NES",  7, "Chiptune"),
         ),
     ),
 )

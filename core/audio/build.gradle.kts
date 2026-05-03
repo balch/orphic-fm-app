@@ -40,6 +40,9 @@ kotlin {
             implementation(libs.kotlinx.collections.immutable)
             implementation(libs.kotlinx.datetime)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlinx.serialization.json)
+        }
         val jvmMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)

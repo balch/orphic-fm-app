@@ -1298,6 +1298,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             stmlib::BufferAllocator allocator(
                 state->voice_alloc_buffers[t], kVoiceAllocBytes_Pulsar);
             state->tracks[t].voice.Init(&allocator);
+            state->tracks[t].braids_voice.Init();
             state->tracks[t].tides_env.Init();
             state->tracks[t].mod_poly_lfo.Init();
             state->tracks[t].mod_slope.Init();
@@ -2450,20 +2451,36 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         const int active_lpg_mode = (ts.engine_index == active_edm_engine)
             ? ts.lpg_mode
             : ts.lpg_mode_space;
-        ts.voice.Render(
-            ts.engine_index,
-            gate_for_render,
-            note_for_render,
-            clamp01(mod_harmonics),
-            clamp01(mod_timbre),
-            clamp01(mod_morph),
-            accent_for_render,
-            track_buffer,
-            num_frames,
-            static_cast<LpgMode>(active_lpg_mode),
-            ts.lpg_decay,
-            ts.lpg_colour
-        );
+        // Braids range (100..199) → MacroOscillator wrapper.
+        // Otherwise → OrpheusVoice (Plaits engines + LPG).
+        // Braids' MacroOscillator silently clamps unknown indices to its last
+        // shape; OrpheusVoice clamps engine_index to engines_.size()-1 = 23
+        // (HiHat). Without this branch, Pulsar tracks set to a Braids id
+        // would render HiHat instead of the chord/character engine.
+        if (ts.engine_index >= 100 && ts.engine_index < 200) {
+            unit_process_braids(ts.braids_voice, ts.braids_src_phase,
+                                ts.engine_index,
+                                note_for_render,
+                                clamp01(mod_harmonics),
+                                clamp01(mod_timbre),
+                                clamp01(mod_morph),
+                                sample_rate, track_buffer, num_frames);
+        } else {
+            ts.voice.Render(
+                ts.engine_index,
+                gate_for_render,
+                note_for_render,
+                clamp01(mod_harmonics),
+                clamp01(mod_timbre),
+                clamp01(mod_morph),
+                accent_for_render,
+                track_buffer,
+                num_frames,
+                static_cast<LpgMode>(active_lpg_mode),
+                ts.lpg_decay,
+                ts.lpg_colour
+            );
+        }
 
         // ── Apply Tides envelope ──
         // Self-enveloped engines bypass: 19-23 (String, Modal, BD, SD, HH), 2-4 (SixOp)

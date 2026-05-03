@@ -1,5 +1,10 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
@@ -7,7 +12,6 @@ import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.ChordComping
 import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
@@ -38,8 +42,8 @@ import org.balch.orpheus.features.pulsar.row
  * Transitions are crisp, and the tension builds through rhythmic density.
  */
 // Not Ready For PrimeTime
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class ModPioneerVibe : VibeProvider {
     // i — bVII — bVI — v (Am — G — F — E in A minor). Descending minor move.
     private val verseProgression = chords(0, 6, 5, 4)
@@ -107,8 +111,8 @@ class ModPioneerVibe : VibeProvider {
         tracks = listOf(
             // 0: Kick
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.80f,
                 density = 0.40f,
@@ -116,8 +120,8 @@ class ModPioneerVibe : VibeProvider {
             ),
             // 1: Snare
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.70f,
                 density = 0.35f,
@@ -125,8 +129,8 @@ class ModPioneerVibe : VibeProvider {
             ),
             // 2: Hats
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.50f,
                 density = 0.70f,
@@ -134,9 +138,12 @@ class ModPioneerVibe : VibeProvider {
             ),
             // 3: Melodic Bass - the "driving" force
             TrackVoice(
-                engineEdm = Engine.VA, // Warm analog
-                engineSpace = Engine.PD,
+                engineEdm = OrpheusEngineId.OSC,
+                engineSpace = OrpheusEngineId.OSC,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
+                harmonics = 0.0f,
+                morph = 0f,
+                timbre = .2f,
                 volume = 0.85f,
                 density = 0.45f,
                 barStrategy = BarStrategy.REPEAT,
@@ -146,8 +153,8 @@ class ModPioneerVibe : VibeProvider {
             ),
             // 4: Sharp Guitar Stabs
             TrackVoice(
-                engineEdm = Engine.DX2, // Fender 1
-                engineSpace = Engine.WSH,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Fender 1
+                engineSpace = OrpheusEngineId.WAVESHAPING,
                 harmonics = 0.05f, // DX2 Idx 1: Fender 1
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
@@ -163,8 +170,8 @@ class ModPioneerVibe : VibeProvider {
             ),
             // 5: Rhythm Guitar
             TrackVoice(
-                engineEdm = Engine.DX2, // Guit acous
-                engineSpace = Engine.CHD,
+                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Guit acous
+                engineSpace = OrpheusEngineId.CHORD,
                 harmonics = 0.35f, // DX2 Idx 11: Guit acous
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
@@ -175,11 +182,12 @@ class ModPioneerVibe : VibeProvider {
                 density = 0.20f,
                 barStrategy = BarStrategy.MUTATE,
             ),
-            // 6: Vox Organ - sustained textures
+            // 6: Triple-saw chord stab (Braids) - on EDM, organ pad on Space
+            // HARMONICS knob picks the chord interval inside the Braids triple-saw.
             TrackVoice(
-                engineEdm = Engine.DX3, // Hammond
-                engineSpace = Engine.ENS,
-                harmonics = 0.05f, // DX3 Idx 1: Hammond
+                engineEdm = OrpheusEngineId.BRAIDS_TRIPLE_SAW,
+                engineSpace = OrpheusEngineId.STRING_MACHINE,
+                harmonics = 0.45f, // mid chord interval on Braids triple-saw
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
                     comping = ChordComping(style = CompingStyle.PAD)
@@ -192,8 +200,8 @@ class ModPioneerVibe : VibeProvider {
             ),
             // 7: Tambourine
             TrackVoice(
-                engineEdm = Engine.MOD,
-                engineSpace = Engine.PAR,
+                engineEdm = OrpheusEngineId.MODAL,
+                engineSpace = OrpheusEngineId.PARTICLE,
                 role = TrackRole.Percussive,
                 volume = 0.45f,
                 density = 0.35f,

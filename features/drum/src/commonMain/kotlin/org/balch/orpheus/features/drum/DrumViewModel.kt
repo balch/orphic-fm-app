@@ -60,7 +60,7 @@ data class DrumUiState(
     val hhTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     val hhPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
 
-    // Engine Selection (PlaitsEngineId ordinals)
+    // Engine Selection (OrpheusEngineId ordinals)
     val bdEngine: Int = 0,
     val sdEngine: Int = 1,
     val hhEngine: Int = 2,

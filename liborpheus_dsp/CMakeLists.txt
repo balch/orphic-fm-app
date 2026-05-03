@@ -105,6 +105,19 @@ set(TIDES2_SRC
     "${EURORACK_DIR}/tides2/ramp/ramp_extractor.cc"
 )
 
+# ── Braids sources (MacroOscillator) ──────────────
+# Excludes ui.cc, bootloader/, and settings.cc — those depend on STM32
+# storage/ui hardware. We use the MacroOscillator API directly with
+# explicit set_shape/set_pitch/set_parameters; no flash-stored settings.
+# settings.h is still included via macro_oscillator.h for the shape enum.
+set(BRAIDS_SRC
+    "${EURORACK_DIR}/braids/macro_oscillator.cc"
+    "${EURORACK_DIR}/braids/analog_oscillator.cc"
+    "${EURORACK_DIR}/braids/digital_oscillator.cc"
+    "${EURORACK_DIR}/braids/quantizer.cc"
+    "${EURORACK_DIR}/braids/resources.cc"
+)
+
 # ── Orpheus engine sources ────────────────────────
 set(ORPHEUS_SRC
     "src/orpheus_engine.cpp"
@@ -132,6 +145,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_horn.cpp"
     "src/orpheus_turntable.cpp"
     "src/orpheus_unit_tides.cpp"
+    "src/orpheus_unit_braids.cpp"
     "src/orpheus_unit_pulsar.cpp"
     "src/orpheus_unit_pulsar_delay.cpp"
     "src/orpheus_unit_pulsar_reverb.cpp"
@@ -150,6 +164,7 @@ add_library(orpheus_dsp STATIC
     ${STREAMS_SRC}
     ${FRAMES_SRC}
     ${TIDES2_SRC}
+    ${BRAIDS_SRC}
 )
 
 target_include_directories(orpheus_dsp PUBLIC
@@ -226,6 +241,7 @@ if(BUILD_TESTS)
         test/test_pulsar_glide.cpp
         test/test_markov_solo.cpp
         test/test_pulsar_analysis.cpp
+        test/test_braids.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

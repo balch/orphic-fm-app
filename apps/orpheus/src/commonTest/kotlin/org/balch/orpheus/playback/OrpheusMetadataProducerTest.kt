@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.TestDispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -13,7 +14,6 @@ import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.pulsar.Album
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
@@ -47,8 +47,8 @@ private fun sampleVibe(
     ),
     tracks = List(8) {
         TrackVoice(
-            engineEdm = Engine.VA,
-            engineSpace = Engine.VA,
+            engineEdm = OrpheusEngineId.VIRTUAL_ANALOG,
+            engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
             role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
         )
     },

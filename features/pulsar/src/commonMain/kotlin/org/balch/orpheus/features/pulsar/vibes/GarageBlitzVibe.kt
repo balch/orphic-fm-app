@@ -1,8 +1,8 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.ChordFollow
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.GenreProfile
@@ -74,7 +74,7 @@ class GarageBlitzVibe : VibeProvider {
         tracks = listOf(
             // Track 0: Kick — pounding on 1 and 3
             TrackVoice(
-                engineEdm = Engine.BD, engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM, engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.95f, pan = 0.00f, density = 0.55f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -83,7 +83,7 @@ class GarageBlitzVibe : VibeProvider {
             ),
             // Track 1: Snare — backbeat on 2 and 4, the garage-rock stomp
             TrackVoice(
-                engineEdm = Engine.SD, engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM, engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.80f, pan = -0.10f, density = 0.40f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -92,7 +92,7 @@ class GarageBlitzVibe : VibeProvider {
             ),
             // Track 2: Hihat — steady 8th notes, driving
             TrackVoice(
-                engineEdm = Engine.HH, engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT, engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.60f, pan = 0.15f, density = 0.60f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -102,7 +102,7 @@ class GarageBlitzVibe : VibeProvider {
             // Track 3: Bass — WSH (gritty) plays the riff locked to chord root.
             // Bass doubles the rhythm of the lead but just pounds on root.
             TrackVoice(
-                engineEdm = Engine.WSH, engineSpace = Engine.VA,
+                engineEdm = OrpheusEngineId.WAVESHAPING, engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.75f, pan = 0.00f, density = 0.50f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
@@ -115,7 +115,7 @@ class GarageBlitzVibe : VibeProvider {
             // LickMode.Fill spans the full bar; chordFollow = FOLLOW so it transposes
             // with the 2-chord progression (i ↔ VII) — the whole riff moves together.
             TrackVoice(
-                engineEdm = Engine.WSH, engineSpace = Engine.WSH,
+                engineEdm = OrpheusEngineId.WAVESHAPING, engineSpace = OrpheusEngineId.WAVESHAPING,
                 role = TrackRole.Melodic(lickMode = LickMode.Fill),
                 volume = 0.85f, pan = 0.00f, density = 0.60f,
                 harmonics = 0.75f, timbre = 0.6f, morph = 0.4f,  // gritty distorted tone
@@ -129,7 +129,7 @@ class GarageBlitzVibe : VibeProvider {
             // Drops/ghosts/octave jumps keep the organ loose and alive — garage
             // rock organ should feel stomped at, not programmed.
             TrackVoice(
-                engineEdm = Engine.CHD, engineSpace = Engine.CHD,
+                engineEdm = OrpheusEngineId.CHORD, engineSpace = OrpheusEngineId.CHORD,
                 role = TrackRole.Chordal(
                     comping = ChordComping(
                         style = CompingStyle.ROCK_DOWNBEATS,
@@ -155,7 +155,7 @@ class GarageBlitzVibe : VibeProvider {
             ),
             // Track 6: Noise/tambourine — sparse garage texture
             TrackVoice(
-                engineEdm = Engine.NSE, engineSpace = Engine.PAR,
+                engineEdm = OrpheusEngineId.NOISE, engineSpace = OrpheusEngineId.PARTICLE,
                 role = TrackRole.Percussive,
                 volume = 0.25f, pan = -0.30f, density = 0.10f,
                 envelopeProfile = EnvelopeProfile.EFFECT,
@@ -167,7 +167,7 @@ class GarageBlitzVibe : VibeProvider {
             ),
             // Track 7: silent placeholder
             TrackVoice(
-                engineEdm = Engine.NES, engineSpace = Engine.NES,
+                engineEdm = OrpheusEngineId.CHIPTUNE, engineSpace = OrpheusEngineId.CHIPTUNE,
                 role = TrackRole.Melodic(),
                 volume = 0.0f, density = 0.0f,
                 envelopeProfile = EnvelopeProfile.WILD,
@@ -352,8 +352,8 @@ private fun generateBaseVibe(
     progressionDriftRange = progressionDriftRange,
     tracks = listOf(
         TrackVoice(
-            engineEdm = Engine.BD,
-            engineSpace = Engine.BD,
+            engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+            engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
             role = TrackRole.Percussive,
             volume = 0.90f,
             pan = 0.00f,
@@ -362,8 +362,8 @@ private fun generateBaseVibe(
             macroMap = TrackMacroMap.RHYTHM
         ),
         TrackVoice(
-            engineEdm = Engine.SD,
-            engineSpace = Engine.SD,
+            engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+            engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
             role = TrackRole.Percussive,
             volume = 0.70f,
             pan = -0.10f,
@@ -372,8 +372,8 @@ private fun generateBaseVibe(
             macroMap = TrackMacroMap.RHYTHM
         ),
         TrackVoice(
-            engineEdm = Engine.HH,
-            engineSpace = Engine.HH,
+            engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+            engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
             role = TrackRole.Percussive,
             volume = 0.65f,
             pan = 0.15f,
@@ -385,8 +385,8 @@ private fun generateBaseVibe(
         // Removed PitchEvolution.Contour Markov drift — it was compounding with chord
         // transposition and making the bass wander.
         TrackVoice(
-            engineEdm = Engine.WSH,
-            engineSpace = Engine.VA,
+            engineEdm = OrpheusEngineId.WAVESHAPING,
+            engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
             role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
             volume = 0.65f,
             pan = 0.00f,
@@ -401,8 +401,8 @@ private fun generateBaseVibe(
         // CHD pad: REPEAT + no Markov. CHD handles chord voicing natively; progression
         // transposition moves chords cleanly without Markov stacking on top.
         TrackVoice(
-            engineEdm = Engine.CHD,
-            engineSpace = Engine.CHD,
+            engineEdm = OrpheusEngineId.CHORD,
+            engineSpace = OrpheusEngineId.CHORD,
             role = TrackRole.Melodic(),
             volume = 0.52f,
             pan = -0.20f,
@@ -416,8 +416,8 @@ private fun generateBaseVibe(
             glideRate = 0.05f,
         ),
         TrackVoice(
-            engineEdm = Engine.WSH,
-            engineSpace = Engine.ENS,
+            engineEdm = OrpheusEngineId.WAVESHAPING,
+            engineSpace = OrpheusEngineId.STRING_MACHINE,
             role = TrackRole.Melodic(),
             volume = 0.50f,
             pan = 0.25f,
@@ -438,8 +438,8 @@ private fun generateBaseVibe(
             reverbBrightness = 0.5f
         ),
         TrackVoice(
-            engineEdm = Engine.NSE,
-            engineSpace = Engine.PAR,
+            engineEdm = OrpheusEngineId.NOISE,
+            engineSpace = OrpheusEngineId.PARTICLE,
             role = TrackRole.Percussive,
             volume = 0.35f,
             pan = -0.30f,
@@ -460,8 +460,8 @@ private fun generateBaseVibe(
             reverbBrightness = 0.5f
         ),
         TrackVoice(
-            engineEdm = Engine.NES,
-            engineSpace = Engine.NES,
+            engineEdm = OrpheusEngineId.CHIPTUNE,
+            engineSpace = OrpheusEngineId.CHIPTUNE,
             role = TrackRole.Melodic(),
             volume = 0.20f,
             pan = 0.35f,

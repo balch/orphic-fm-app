@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.ArpDirection
 import org.balch.orpheus.features.pulsar.ArpMode
@@ -15,7 +16,6 @@ import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingFills
 import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
@@ -121,8 +121,8 @@ class FilterFunkVibe : VibeProvider {
         progressionDriftRange = 0.15f,
         tracks = listOf(
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.90f,
                 pan = 0.00f,
@@ -132,8 +132,8 @@ class FilterFunkVibe : VibeProvider {
                 barStrategy = BarStrategy.REPEAT
             ),
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.NSE,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.NOISE,
                 role = TrackRole.Percussive,
                 volume = 0.45f,
                 pan = -0.10f,
@@ -143,8 +143,8 @@ class FilterFunkVibe : VibeProvider {
                 barStrategy = BarStrategy.MUTATE
             ),
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.55f,
                 pan = 0.15f,
@@ -157,8 +157,8 @@ class FilterFunkVibe : VibeProvider {
             // the bass chases chord roots beat-by-beat (classic funk). noteRangeLow 33 → 40
             // lifts it to E2 for punchy funk bass instead of A1 sub.
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.VCF,
+                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.85f,
                 pan = 0.00f,
@@ -171,8 +171,8 @@ class FilterFunkVibe : VibeProvider {
                 reverbBrightness = 0.25f,
             ),
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.WSH,
+                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineSpace = OrpheusEngineId.WAVESHAPING,
                 role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                 volume = 0.50f,
                 pan = -0.20f,
@@ -186,8 +186,8 @@ class FilterFunkVibe : VibeProvider {
                 glideRate = 0.1f,
             ),
             TrackVoice(
-                engineEdm = Engine.ENS,
-                engineSpace = Engine.TRN,
+                engineEdm = OrpheusEngineId.STRING_MACHINE,
+                engineSpace = OrpheusEngineId.WAVE_TERRAIN,
                 role = TrackRole.Chordal(
                     comping = ChordComping(
                         style = CompingStyle.FUNK_STABS,
@@ -235,8 +235,8 @@ class FilterFunkVibe : VibeProvider {
             // frequency randomization. Keeping all three in the low-quarter
             // puts us in the "dust cloud of discrete grains" zone.
             TrackVoice(
-                engineEdm = Engine.PAR,
-                engineSpace = Engine.PAR,
+                engineEdm = OrpheusEngineId.PARTICLE,
+                engineSpace = OrpheusEngineId.PARTICLE,
                 role = TrackRole.Percussive,
                 volume = 0.20f,
                 pan = -0.25f,
@@ -253,8 +253,8 @@ class FilterFunkVibe : VibeProvider {
                 reverbBrightness = 0.7f,
             ),
             TrackVoice(
-                engineEdm = Engine.GRN,
-                engineSpace = Engine.GRN,
+                engineEdm = OrpheusEngineId.GRAIN,
+                engineSpace = OrpheusEngineId.GRAIN,
                 role = TrackRole.Melodic(),
                 volume = 0.15f,
                 pan = 0.00f,

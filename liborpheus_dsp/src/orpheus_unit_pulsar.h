@@ -198,6 +198,12 @@ enum PulsarEnvPhase { ENV_IDLE, ENV_ATTACK, ENV_SUSTAIN, ENV_DECAY };
 
 struct PulsarTrackState {
     OrpheusVoice voice;
+    // Per-track Braids macro oscillator. Used when engine_index >= 100.
+    // Init'd in PulsarState init alongside `voice`.
+    braids::MacroOscillator braids_voice;
+    // Resampler residue carried across host blocks for the 96k→host linear-interp
+    // path. See orpheus_engine.h::braids_src_phase for rationale.
+    float braids_src_phase = 0.0f;
     PulsarStep steps[kMaxPulsarSteps];
     int step_count;
     int playhead;

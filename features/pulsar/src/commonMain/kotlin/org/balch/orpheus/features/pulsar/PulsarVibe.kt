@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.audio.OrpheusEngineId
 
 private fun validateProgression(steps: List<ChordStep>, where: String) {
     require(steps.size in 1..8) {
@@ -192,34 +193,6 @@ data class TrackMacroMap(
     }
 }
 
-/** Plaits engine indices — matches C++ kEngineBusType[] order. */
-@Serializable
-enum class Engine(val id: Int) {
-    VCF(0),    // VirtualAnalogVCF — bass filter sweep
-    PD(1),     // PhaseDistortion
-    DX(2),     // SixOp FM1
-    DX2(3),    // SixOp FM2
-    DX3(4),    // SixOp FM3
-    TRN(5),    // WaveTerrain
-    ENS(6),    // StringMachine (ensemble)
-    NES(7),    // Chiptune
-    VA(8),     // VirtualAnalog
-    WSH(9),    // Waveshaping
-    FM(10),    // FM
-    GRN(11),   // Grain
-    ADD(12),   // Additive
-    WTB(13),   // Wavetable
-    CHD(14),   // Chord
-    SPK(15),   // Speech
-    SWM(16),   // Swarm
-    NSE(17),   // Noise (percussive)
-    PAR(18),   // Particle (percussive)
-    STR(19),   // String
-    MOD(20),   // Modal (tuned percussion)
-    BD(21),    // BassDrum
-    SD(22),    // SnareDrum
-    HH(23),    // HiHat
-}
 
 /**
  * Envelope shape categories — controls attack/decay/sustain character.
@@ -613,8 +586,8 @@ data class ChordComping(
  */
 @Serializable
 data class TrackVoice(
-    val engineEdm: Engine,
-    val engineSpace: Engine,
+    val engineEdm: OrpheusEngineId,
+    val engineSpace: OrpheusEngineId,
     val role: TrackRole = TrackRole.Percussive,
     val volume: Float = 0.8f,
     val pan: Float = 0.0f,
@@ -1073,7 +1046,7 @@ data class LickBias(
  */
 @Serializable
 data class MelodicOverride(
-    val engine: Engine? = null,
+    val engine: OrpheusEngineId? = null,
     val lick: Lick? = null,
     val octaveShift: Int = 0,
     val noteRangeLow: Int? = null,

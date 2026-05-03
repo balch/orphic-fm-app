@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
@@ -13,7 +14,6 @@ import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingFills
 import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.Evolution
@@ -164,8 +164,8 @@ class TremoloTideVibe : VibeProvider {
         tracks = listOf(
             // 0: kick — sparse half-time. Boom on 1, ghost on 3.
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.70f,
                 pan = 0.00f,
@@ -177,8 +177,8 @@ class TremoloTideVibe : VibeProvider {
             ),
             // 1: snare — soft brushes-feel backbeat on 2 and 4.
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.50f,
                 pan = -0.05f,
@@ -193,8 +193,8 @@ class TremoloTideVibe : VibeProvider {
             ),
             // 2: hat / shaker — soft 8th feel, low velocity.
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.35f,
                 pan = 0.10f,
@@ -207,8 +207,8 @@ class TremoloTideVibe : VibeProvider {
             // 3: bass — sustained pedal note that glides between chord roots.
             //    Long notes, glideRate high, ROOT_ONLY locks to chord root.
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.PD,
+                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineSpace = OrpheusEngineId.PHASE_DISTORTION,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.78f,
                 pan = 0.00f,
@@ -233,8 +233,8 @@ class TremoloTideVibe : VibeProvider {
             //    DX2 in EDM slot for plaintive bell-like attack;
             //    WTB in space slot for darker shimmer when energy is low.
             TrackVoice(
-                engineEdm = Engine.DX,
-                engineSpace = Engine.DX2,
+                engineEdm = OrpheusEngineId.SIX_OP_FM,
+                engineSpace = OrpheusEngineId.SIX_OP_FM_2,
                 role = TrackRole.Melodic(lickMode = LickMode.Fill),
                 volume = 0.25f,
                 pan = 0.15f,
@@ -271,8 +271,8 @@ class TremoloTideVibe : VibeProvider {
             //    JAZZ_COMP keeps the bed quiet outside the verse — verse
             //    flips it to PAD for held bedrock.
             TrackVoice(
-                engineEdm = Engine.CHD,
-                engineSpace = Engine.ENS,
+                engineEdm = OrpheusEngineId.CHORD,
+                engineSpace = OrpheusEngineId.STRING_MACHINE,
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
                     comping = ChordComping(
@@ -306,8 +306,8 @@ class TremoloTideVibe : VibeProvider {
             ),
             // 6: counter-pad (strings) — provides motion above the ensemble bed.
             TrackVoice(
-                engineEdm = Engine.STR,
-                engineSpace = Engine.STR,
+                engineEdm = OrpheusEngineId.STRING,
+                engineSpace = OrpheusEngineId.STRING,
                 role = TrackRole.Melodic(lickMode = LickMode.Fill),
                 volume = 0.42f,
                 pan = 0.30f,
@@ -331,8 +331,8 @@ class TremoloTideVibe : VibeProvider {
             ),
             // 7: resonant accent (modal) — sparse rings/pings for chorus accents.
             TrackVoice(
-                engineEdm = Engine.MOD,
-                engineSpace = Engine.MOD,
+                engineEdm = OrpheusEngineId.MODAL,
+                engineSpace = OrpheusEngineId.MODAL,
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.ROOT_ONLY,
                     comping = ChordComping(

@@ -345,6 +345,7 @@ fun PulsarPanel(
                     label = pulsarEngineLabel(edmEngine),
                     config = PULSAR_TRACK_PICKERS[selected],
                     v2Config = PULSAR_V2_PICKER,
+                    v3Config = PULSAR_V3_PICKER,
                     size = 36.dp,
                     onExpandedChange = { pickerOpen = it },
                 )
@@ -361,6 +362,7 @@ fun PulsarPanel(
                     label = pulsarEngineLabel(spaceEngine),
                     config = PULSAR_TRACK_PICKERS[selected],
                     v2Config = PULSAR_V2_PICKER,
+                    v3Config = PULSAR_V3_PICKER,
                     size = 36.dp,
                     onExpandedChange = { pickerOpen = it },
                 )

@@ -72,46 +72,66 @@ data class PickerConfig(
     val sweepDeg get() = 360f / segmentCount
 }
 
-// ── Voice engines (same ring, center = "OSC" ordinal 0) ──
+// ── Voice engines (center = OSC, id = -1) ──
+// PickerEntry.ordinal field now carries OrpheusEngineId.id (C++ engine index directly).
 
 val VOICE_PICKER_CONFIG = PickerConfig(
     ring = listOf(
-        PickerEntry("FM",  5, OrpheusColors.warmGlow),
-        PickerEntry("NSE", 6, OrpheusColors.neonCyan),
-        PickerEntry("WSH", 7, OrpheusColors.enginePurple),
-        PickerEntry("VA",  8, OrpheusColors.engineRed),
-        PickerEntry("ADD", 9, OrpheusColors.engineBlue),
-        PickerEntry("GRN", 10, OrpheusColors.engineGreen),
-        PickerEntry("STR", 11, OrpheusColors.engineYellow),
-        PickerEntry("MOD", 12, OrpheusColors.engineOrange),
-        PickerEntry("PAR", 13, OrpheusColors.neonMagenta),
-        PickerEntry("SWM", 14, OrpheusColors.electricBlue),
-        PickerEntry("CHD", 15, OrpheusColors.synthGreen),
-        PickerEntry("WTB", 16, OrpheusColors.presetOrange),
-        PickerEntry("SPK", 17, OrpheusColors.warmGlow.copy(alpha = 0.9f)),
+        PickerEntry("FM",  10, OrpheusColors.warmGlow),
+        PickerEntry("NSE", 17, OrpheusColors.neonCyan),
+        PickerEntry("WSH",  9, OrpheusColors.enginePurple),
+        PickerEntry("VA",   8, OrpheusColors.engineRed),
+        PickerEntry("ADD", 12, OrpheusColors.engineBlue),
+        PickerEntry("GRN", 11, OrpheusColors.engineGreen),
+        PickerEntry("STR", 19, OrpheusColors.engineYellow),
+        PickerEntry("MOD", 20, OrpheusColors.engineOrange),
+        PickerEntry("PAR", 18, OrpheusColors.neonMagenta),
+        PickerEntry("SWM", 16, OrpheusColors.electricBlue),
+        PickerEntry("CHD", 14, OrpheusColors.synthGreen),
+        PickerEntry("WTB", 13, OrpheusColors.presetOrange),
+        PickerEntry("SPK", 15, OrpheusColors.warmGlow.copy(alpha = 0.9f)),
     ),
     centerLabel = "OSC",
-    centerOrdinal = 0,
+    centerOrdinal = -1,
 )
 
 // ── V1.2 engines (C++ only, easter egg ring) ──
 
 val VOICE_PICKER_V2_CONFIG = PickerConfig(
     ring = listOf(
-        PickerEntry("VCF", 18, OrpheusColors.engineRed),
-        PickerEntry("PD",  19, OrpheusColors.enginePurple),
-        PickerEntry("DX",  20, OrpheusColors.warmGlow),
-        PickerEntry("DX2", 24, OrpheusColors.warmGlow.copy(alpha = 0.85f)),
-        PickerEntry("DX3", 25, OrpheusColors.warmGlow.copy(alpha = 0.7f)),
-        PickerEntry("TRN", 21, OrpheusColors.engineGreen),
-        PickerEntry("ENS", 22, OrpheusColors.engineBlue),
-        PickerEntry("NES", 23, OrpheusColors.neonCyan),
+        PickerEntry("VCF", 0, OrpheusColors.engineRed),
+        PickerEntry("PD",  1, OrpheusColors.enginePurple),
+        PickerEntry("DX",  2, OrpheusColors.warmGlow),
+        PickerEntry("DX2", 3, OrpheusColors.warmGlow.copy(alpha = 0.85f)),
+        PickerEntry("DX3", 4, OrpheusColors.warmGlow.copy(alpha = 0.7f)),
+        PickerEntry("TRN", 5, OrpheusColors.engineGreen),
+        PickerEntry("ENS", 6, OrpheusColors.engineBlue),
+        PickerEntry("NES", 7, OrpheusColors.neonCyan),
+        // Braids character engines (ids 105..108)
+        PickerEntry("CSAW", 105, OrpheusColors.engineYellow),
+        PickerEntry("TOY",  106, OrpheusColors.presetOrange),
+        PickerEntry("VOW",  107, OrpheusColors.synthGreen),
+        PickerEntry("?",    108, OrpheusColors.neonMagenta),
     ),
     centerLabel = "V2",
     centerOrdinal = -1,
 )
 
-// ── Drum engines (PlaitsEngineId ordinals, skipping 3=FMD) ──
+// ── Braids chord engines (triple-click ring) ──
+
+val VOICE_PICKER_V3_CONFIG = PickerConfig(
+    ring = listOf(
+        PickerEntry("3SAW", 100, OrpheusColors.engineRed),
+        PickerEntry("3SQR", 101, OrpheusColors.enginePurple),
+        PickerEntry("3TRI", 102, OrpheusColors.engineYellow),
+        PickerEntry("3SIN", 103, OrpheusColors.engineBlue),
+        PickerEntry("3RM",  104, OrpheusColors.synthGreen),
+    ),
+    centerLabel = "CHD",
+    centerOrdinal = -1,
+)
+
+// ── Drum engines (OrpheusEngineId ordinals, skipping 3=FMD) ──
 
 private val DRUM_RING = listOf(
     PickerEntry("BD",  0, OrpheusColors.neonMagenta),
@@ -188,18 +208,23 @@ fun pickerSegmentToOrdinal(segment: Int, config: PickerConfig = VOICE_PICKER_CON
         else -> config.centerOrdinal
     }
 
-/** Maps a voice engine ordinal to its short display label. */
-fun engineLabel(ordinal: Int): String = when (ordinal) {
-    0 -> "OSC"
-    5 -> "FM"; 6 -> "NSE"; 7 -> "WSH"
-    8 -> "VA"; 9 -> "ADD"; 10 -> "GRN"; 11 -> "STR"; 12 -> "MOD"
-    13 -> "PAR"; 14 -> "SWM"; 15 -> "CHD"; 16 -> "WTB"; 17 -> "SPK"
-    18 -> "VCF"; 19 -> "PD"; 20 -> "DX"; 21 -> "TRN"; 22 -> "ENS"; 23 -> "NES"
-    24 -> "DX2"; 25 -> "DX3"
+/** Maps an OrpheusEngineId.id (C++ engine index) to its short display label. */
+fun engineLabel(engineId: Int): String = when (engineId) {
+    -1 -> "OSC"
+    0 -> "VCF"; 1 -> "PD"; 2 -> "DX"; 3 -> "DX2"; 4 -> "DX3"
+    5 -> "TRN"; 6 -> "ENS"; 7 -> "NES"
+    8 -> "VA"; 9 -> "WSH"; 10 -> "FM"; 11 -> "GRN"; 12 -> "ADD"
+    13 -> "WTB"; 14 -> "CHD"; 15 -> "SPK"; 16 -> "SWM"; 17 -> "NSE"
+    18 -> "PAR"; 19 -> "STR"; 20 -> "MOD"
+    21 -> "BD"; 22 -> "SD"; 23 -> "HH"
+    // Braids chord engines (100..104)
+    100 -> "3SAW"; 101 -> "3SQR"; 102 -> "3TRI"; 103 -> "3SIN"; 104 -> "3RM"
+    // Braids character engines (105..108)
+    105 -> "CSAW"; 106 -> "TOY"; 107 -> "VOW"; 108 -> "?"
     else -> "?"
 }
 
-/** Maps a drum engine ordinal (PlaitsEngineId) to its short display label. */
+/** Maps a drum engine ordinal (OrpheusEngineId) to its short display label. */
 fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
     0 -> "BD"; 1 -> "SD"; 2 -> "HH"; 3 -> "FM"
     4 -> "FM2"; 5 -> "NSE"; 6 -> "WSH"
@@ -229,6 +254,7 @@ fun EnginePickerButton(
     label: String,
     config: PickerConfig = VOICE_PICKER_CONFIG,
     v2Config: PickerConfig? = null,
+    v3Config: PickerConfig? = null,
     gestureKey: Any = Unit,
     glowEnergy: Float = 0f,
     size: Dp = 28.dp,
@@ -245,6 +271,7 @@ fun EnginePickerButton(
     var hoveredSegment by remember { mutableStateOf<Int?>(null) }
     val currentOnEngineChange by rememberUpdatedState(onEngineChange)
     var lastDownTimeMs by remember { mutableStateOf(0L) }
+    var consecutiveClicks by remember { mutableStateOf(0) }
     var activeConfig by remember { mutableStateOf(config) }
 
     // Show popup for either user gesture or external (AI) selection
@@ -303,11 +330,15 @@ fun EnginePickerButton(
                         awaitFirstDown(requireUnconsumed = false)
                             .also { it.consume() }
                         val nowMs = currentTimeMillis()
-                        val isDoubleClick = v2Config != null &&
-                            (nowMs - lastDownTimeMs) < DOUBLE_CLICK_THRESHOLD_MS
+                        val withinThreshold = (nowMs - lastDownTimeMs) < DOUBLE_CLICK_THRESHOLD_MS
+                        consecutiveClicks = if (withinThreshold) consecutiveClicks + 1 else 1
                         lastDownTimeMs = nowMs
 
-                        activeConfig = if (isDoubleClick) v2Config else config
+                        activeConfig = when {
+                            consecutiveClicks >= 3 && v3Config != null -> v3Config
+                            consecutiveClicks >= 2 && v2Config != null -> v2Config
+                            else -> config
+                        }
                         showEnginePicker = true
                         onExpandedChange?.invoke(true)
                         hoveredSegment = null

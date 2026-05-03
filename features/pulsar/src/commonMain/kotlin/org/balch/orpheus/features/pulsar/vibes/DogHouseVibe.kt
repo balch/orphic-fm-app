@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.ArpDirection
@@ -16,7 +17,6 @@ import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingFills
 import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
@@ -132,8 +132,8 @@ class DogHouseVibe : VibeProvider {
         progressionDriftRange = 0.12f,                    // subtle drift — preserve the blues shape
         tracks = listOf(
             TrackVoice(
-                engineEdm = Engine.BD,
-                engineSpace = Engine.BD,
+                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.85f,
                 pan = 0.00f,
@@ -143,8 +143,8 @@ class DogHouseVibe : VibeProvider {
                 barStrategy = BarStrategy.MUTATE
             ),
             TrackVoice(
-                engineEdm = Engine.SD,
-                engineSpace = Engine.SD,
+                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 role = TrackRole.Percussive,
                 volume = 0.60f,
                 pan = -0.10f,
@@ -154,8 +154,8 @@ class DogHouseVibe : VibeProvider {
                 barStrategy = BarStrategy.FILL
             ),
             TrackVoice(
-                engineEdm = Engine.HH,
-                engineSpace = Engine.HH,
+                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
+                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
                 role = TrackRole.Percussive,
                 volume = 0.55f,
                 pan = 0.15f,
@@ -166,8 +166,8 @@ class DogHouseVibe : VibeProvider {
             ),
             // Bass: REPEAT pattern so the riff is tight — chord transposition provides the only variation.
             TrackVoice(
-                engineEdm = Engine.WSH,
-                engineSpace = Engine.STR,
+                engineEdm = OrpheusEngineId.WAVESHAPING,
+                engineSpace = OrpheusEngineId.STRING,
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.75f,
                 pan = 0.00f,
@@ -181,13 +181,13 @@ class DogHouseVibe : VibeProvider {
             ),
             // Keys: reduced volume + density + REPEAT strategy so chord progression motion
             // sits behind the drums/bass instead of dominating (restores pre-progression-wiring feel).
-            // Engine.DX with harmonics=0.33 lands on patch index 10 = "Syn-bass 2" (DX bank
+            // OrpheusEngineId.SIX_OP_FM with harmonics=0.33 lands on patch index 10 = "Syn-bass 2" (DX bank
             // is the bass+analog-synth bank, not E.piano — see references/fm_patches.md).
             // At volume=0.28 played as Chordal/BLUES_SHUFFLE comping, this synth-bass tone
             // voices chords with a thick analog-FM character that sits well under the bass.
             TrackVoice(
-                engineEdm = Engine.DX,
-                engineSpace = Engine.GRN,
+                engineEdm = OrpheusEngineId.SIX_OP_FM,
+                engineSpace = OrpheusEngineId.GRAIN,
                 harmonics = 0.33f,  // DX bank idx 10 = "Syn-bass 2" — synth-bass voicing chords
                 timbre = 0.32f,     // modulator index — not too bright for blues
                 morph = 0.31f,       // less feedback, cleaner attack
@@ -225,8 +225,8 @@ class DogHouseVibe : VibeProvider {
                 glideRate = 0.1f,
             ),
             TrackVoice(
-                engineEdm = Engine.STR,
-                engineSpace = Engine.STR,
+                engineEdm = OrpheusEngineId.STRING,
+                engineSpace = OrpheusEngineId.STRING,
                 role = TrackRole.Melodic(),
                 volume = 0.30f,
                 pan = 0.30f,
@@ -249,8 +249,8 @@ class DogHouseVibe : VibeProvider {
                 glideRate = 0.4f
             ),
             TrackVoice(
-                engineEdm = Engine.GRN,
-                engineSpace = Engine.GRN,
+                engineEdm = OrpheusEngineId.GRAIN,
+                engineSpace = OrpheusEngineId.GRAIN,
                 role = TrackRole.Melodic(),
                 volume = 0.30f,
                 pan = -0.30f,
@@ -273,8 +273,8 @@ class DogHouseVibe : VibeProvider {
                 glideRate = 0.35f
             ),
             TrackVoice(
-                engineEdm = Engine.MOD,
-                engineSpace = Engine.STR,
+                engineEdm = OrpheusEngineId.MODAL,
+                engineSpace = OrpheusEngineId.STRING,
                 role = TrackRole.Melodic(),
                 volume = 0.20f,
                 pan = 0.00f,

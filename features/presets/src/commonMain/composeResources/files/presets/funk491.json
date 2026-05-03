@@ -1,1189 +1,1189 @@
 {
-    "portValues": {
-        "org.balch.orpheus.plugins.polylfo:shape": {
-            "type": "float",
-            "value": 0.30999997
-        },
-        "org.balch.orpheus.plugins.polylfo:shape_spread": {
-            "type": "float",
-            "value": 0.625
-        },
-        "org.balch.orpheus.plugins.polylfo:spread": {
-            "type": "float",
-            "value": 0.7083333
-        },
-        "org.balch.orpheus.plugins.polylfo:coupling": {
-            "type": "float",
-            "value": 0.66999984
-        },
-        "org.balch.orpheus.plugins.polylfo:rate": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.polylfo:bypass": {
-            "type": "bool",
-            "value": true
-        },
-        "org.balch.orpheus.plugins.dj:wet_a": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.dj:wet_b": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.dj:source_a": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.dj:source_b": {
-            "type": "int",
-            "value": 2
-        },
-        "org.balch.orpheus.plugins.dj:velocity_a": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.dj:velocity_b": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.dj:frozen_a": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.dj:frozen_b": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.dj:crossfader": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.dj:delay_send": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.dj:reverb_send": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.lorenz:rate": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.lorenz:balance": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.lorenz:bypass": {
-            "type": "bool",
-            "value": true
-        },
-        "org.balch.orpheus.plugins.bass:engine": {
-            "type": "int",
-            "value": 1
-        },
-        "org.balch.orpheus.plugins.bass:root_note": {
-            "type": "int",
-            "value": 34
-        },
-        "org.balch.orpheus.plugins.bass:scale": {
-            "type": "int",
-            "value": 1
-        },
-        "org.balch.orpheus.plugins.bass:clock_div": {
-            "type": "int",
-            "value": 3
-        },
-        "org.balch.orpheus.plugins.bass:step_count": {
-            "type": "int",
-            "value": 8
-        },
-        "org.balch.orpheus.plugins.bass:mutation": {
-            "type": "float",
-            "value": 0.24000002
-        },
-        "org.balch.orpheus.plugins.bass:cutoff": {
-            "type": "float",
-            "value": 0.65999997
-        },
-        "org.balch.orpheus.plugins.bass:resonance": {
-            "type": "float",
-            "value": 0.14999998
-        },
-        "org.balch.orpheus.plugins.bass:envelope": {
-            "type": "float",
-            "value": 0.20000023
-        },
-        "org.balch.orpheus.plugins.bass:overdrive": {
-            "type": "float",
-            "value": 0.62999976
-        },
-        "org.balch.orpheus.plugins.bass:compressor": {
-            "type": "float",
-            "value": 0.5099999
-        },
-        "org.balch.orpheus.plugins.bass:mix": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.bass:lfo_mix": {
-            "type": "float",
-            "value": 0.65999967
-        },
-        "org.balch.orpheus.plugins.bass:trigger_source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.bass:pitch_source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.bass:timbre_source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.bass:accent_amount": {
-            "type": "float",
-            "value": 0.7099998
-        },
-        "org.balch.orpheus.plugins.bass:jitter": {
-            "type": "float",
-            "value": 0.19000001
-        },
-        "org.balch.orpheus.plugins.bass:fx_send": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.duolfo:mode": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.duolfo:link": {
-            "type": "bool",
-            "value": true
-        },
-        "org.balch.orpheus.plugins.duolfo:shape": {
-            "type": "float",
-            "value": 0.9
-        },
-        "org.balch.orpheus.plugins.duolfo:freq_a": {
-            "type": "float",
-            "value": 0.0151437875
-        },
-        "org.balch.orpheus.plugins.duolfo:freq_b": {
-            "type": "float",
-            "value": 0.029325282
-        },
-        "org.balch.orpheus.plugins.duolfo:range_min": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.duolfo:range_max": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.duolfo:source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.tides:frequency": {
-            "type": "float",
-            "value": 0.72999996
-        },
-        "org.balch.orpheus.plugins.tides:slope": {
-            "type": "float",
-            "value": 0.6399997
-        },
-        "org.balch.orpheus.plugins.tides:shape": {
-            "type": "float",
-            "value": 0.6199998
-        },
-        "org.balch.orpheus.plugins.tides:smoothness": {
-            "type": "float",
-            "value": 0.8499991
-        },
-        "org.balch.orpheus.plugins.tides:shift": {
-            "type": "float",
-            "value": 0.31999996
-        },
-        "org.balch.orpheus.plugins.tides:mix": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.tides:clock_offset": {
-            "type": "float",
-            "value": 0.32999998
-        },
-        "org.balch.orpheus.plugins.tides:ramp_mode": {
-            "type": "int",
-            "value": 1
-        },
-        "org.balch.orpheus.plugins.tides:output_mode": {
-            "type": "int",
-            "value": 1
-        },
-        "org.balch.orpheus.plugins.tides:range": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.tides:gate_source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.tides:clock_source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.tts:rate": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.tts:speed": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.tts:volume": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.tts:reverb": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.tts:phaser": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.tts:feedback": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.reverb:amount": {
-            "type": "float",
-            "value": 0.54000044
-        },
-        "org.balch.orpheus.plugins.reverb:time": {
-            "type": "float",
-            "value": 0.7
-        },
-        "org.balch.orpheus.plugins.reverb:damping": {
-            "type": "float",
-            "value": 0.39000022
-        },
-        "org.balch.orpheus.plugins.reverb:diffusion": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.beats:x": {
-            "type": "float",
-            "value": 0.225
-        },
-        "org.balch.orpheus.plugins.beats:y": {
-            "type": "float",
-            "value": 0.6142857
-        },
-        "org.balch.orpheus.plugins.beats:bpm": {
-            "type": "float",
-            "value": 120.0
-        },
-        "org.balch.orpheus.plugins.beats:randomness": {
-            "type": "float",
-            "value": 0.21000004
-        },
-        "org.balch.orpheus.plugins.beats:swing": {
-            "type": "float",
-            "value": 0.5999997
-        },
-        "org.balch.orpheus.plugins.beats:mode": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.beats:density_0": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.beats:euclidean_0": {
-            "type": "int",
-            "value": 16
-        },
-        "org.balch.orpheus.plugins.beats:density_1": {
-            "type": "float",
-            "value": 0.57999974
-        },
-        "org.balch.orpheus.plugins.beats:euclidean_1": {
-            "type": "int",
-            "value": 16
-        },
-        "org.balch.orpheus.plugins.beats:density_2": {
-            "type": "float",
-            "value": 0.7999997
-        },
-        "org.balch.orpheus.plugins.beats:euclidean_2": {
-            "type": "int",
-            "value": 16
-        },
-        "org.balch.orpheus.plugins.horn:speed": {
-            "type": "float",
-            "value": 0.2900002
-        },
-        "org.balch.orpheus.plugins.horn:ratio": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.horn:depth": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.horn:mix": {
-            "type": "float",
-            "value": 0.9699994
-        },
-        "org.balch.orpheus.plugins.horn:brake": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.drum:mix": {
-            "type": "float",
-            "value": 0.30000037
-        },
-        "org.balch.orpheus.plugins.drum:bypass": {
-            "type": "bool",
-            "value": true
-        },
-        "org.balch.orpheus.plugins.drum:bd_freq": {
-            "type": "float",
-            "value": 0.17000008
-        },
-        "org.balch.orpheus.plugins.drum:bd_tone": {
-            "type": "float",
-            "value": 0.19000022
-        },
-        "org.balch.orpheus.plugins.drum:bd_decay": {
-            "type": "float",
-            "value": 0.5999999
-        },
-        "org.balch.orpheus.plugins.drum:bd_p4": {
-            "type": "float",
-            "value": 0.32000065
-        },
-        "org.balch.orpheus.plugins.drum:bd_p5": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.drum:sd_freq": {
-            "type": "float",
-            "value": 0.16000016
-        },
-        "org.balch.orpheus.plugins.drum:sd_tone": {
-            "type": "float",
-            "value": 0.31000003
-        },
-        "org.balch.orpheus.plugins.drum:sd_decay": {
-            "type": "float",
-            "value": 0.44000006
-        },
-        "org.balch.orpheus.plugins.drum:sd_p4": {
-            "type": "float",
-            "value": 0.61999995
-        },
-        "org.balch.orpheus.plugins.drum:hh_freq": {
-            "type": "float",
-            "value": 0.1499997
-        },
-        "org.balch.orpheus.plugins.drum:hh_tone": {
-            "type": "float",
-            "value": 0.31
-        },
-        "org.balch.orpheus.plugins.drum:hh_decay": {
-            "type": "float",
-            "value": 0.31000012
-        },
-        "org.balch.orpheus.plugins.drum:hh_p4": {
-            "type": "float",
-            "value": 0.29000002
-        },
-        "org.balch.orpheus.plugins.drum:bd_trigger_src": {
-            "type": "int",
-            "value": 3
-        },
-        "org.balch.orpheus.plugins.drum:bd_pitch_src": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.drum:sd_trigger_src": {
-            "type": "int",
-            "value": 1
-        },
-        "org.balch.orpheus.plugins.drum:sd_pitch_src": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.drum:hh_trigger_src": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.drum:hh_pitch_src": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.drum:bd_engine": {
-            "type": "int",
-            "value": 11
-        },
-        "org.balch.orpheus.plugins.drum:sd_engine": {
-            "type": "int",
-            "value": 18
-        },
-        "org.balch.orpheus.plugins.drum:hh_engine": {
-            "type": "int",
-            "value": 11
-        },
-        "org.balch.orpheus.plugins.voice:tune_0": {
-            "type": "float",
-            "value": 0.354
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_0": {
-            "type": "float",
-            "value": 0.08
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_0": {
-            "type": "float",
-            "value": 0.073529415
-        },
-        "org.balch.orpheus.plugins.voice:tune_1": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_1": {
-            "type": "float",
-            "value": 0.08
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_1": {
-            "type": "float",
-            "value": 0.22058824
-        },
-        "org.balch.orpheus.plugins.voice:tune_2": {
-            "type": "float",
-            "value": 0.354
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_2": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_2": {
-            "type": "float",
-            "value": 0.3529412
-        },
-        "org.balch.orpheus.plugins.voice:tune_3": {
-            "type": "float",
-            "value": 0.417
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_3": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_3": {
-            "type": "float",
-            "value": 0.4852941
-        },
-        "org.balch.orpheus.plugins.voice:tune_4": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_4": {
-            "type": "float",
-            "value": 0.4
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_4": {
-            "type": "float",
-            "value": 0.5294118
-        },
-        "org.balch.orpheus.plugins.voice:tune_5": {
-            "type": "float",
-            "value": 0.563
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_5": {
-            "type": "float",
-            "value": 0.4
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_5": {
-            "type": "float",
-            "value": 0.63235295
-        },
-        "org.balch.orpheus.plugins.voice:tune_6": {
-            "type": "float",
-            "value": 0.354
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_6": {
-            "type": "float",
-            "value": 0.15
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_6": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:tune_7": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_7": {
-            "type": "float",
-            "value": 0.15
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_7": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:tune_8": {
-            "type": "float",
-            "value": 0.354
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_8": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_8": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:tune_9": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_9": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_9": {
-            "type": "float",
-            "value": 0.4852941
-        },
-        "org.balch.orpheus.plugins.voice:tune_10": {
-            "type": "float",
-            "value": 0.417
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_10": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_10": {
-            "type": "float",
-            "value": 0.5882353
-        },
-        "org.balch.orpheus.plugins.voice:tune_11": {
-            "type": "float",
-            "value": 0.604
-        },
-        "org.balch.orpheus.plugins.voice:mod_depth_11": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:env_speed_11": {
-            "type": "float",
-            "value": 0.5735294
-        },
-        "org.balch.orpheus.plugins.voice:duo_sharpness_0": {
-            "type": "float",
-            "value": 0.7899999
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_0": {
-            "type": "int",
-            "value": 4
-        },
-        "org.balch.orpheus.plugins.voice:duo_engine_0": {
-            "type": "int",
-            "value": 11
-        },
-        "org.balch.orpheus.plugins.voice:duo_harmonics_0": {
-            "type": "float",
-            "value": 0.41000053
-        },
-        "org.balch.orpheus.plugins.voice:duo_prosody_0": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:duo_speed_0": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_morph_0": {
-            "type": "float",
-            "value": 0.8769968
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_level_0": {
-            "type": "float",
-            "value": 0.9166667
-        },
-        "org.balch.orpheus.plugins.voice:duo_sharpness_1": {
-            "type": "float",
-            "value": 0.5200005
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_1": {
-            "type": "int",
-            "value": 4
-        },
-        "org.balch.orpheus.plugins.voice:duo_engine_1": {
-            "type": "int",
-            "value": 19
-        },
-        "org.balch.orpheus.plugins.voice:duo_harmonics_1": {
-            "type": "float",
-            "value": 0.52000046
-        },
-        "org.balch.orpheus.plugins.voice:duo_prosody_1": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:duo_speed_1": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_morph_1": {
-            "type": "float",
-            "value": 0.46000046
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_level_1": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_sharpness_2": {
-            "type": "float",
-            "value": 0.41999996
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_2": {
-            "type": "int",
-            "value": 2
-        },
-        "org.balch.orpheus.plugins.voice:duo_engine_2": {
-            "type": "int",
-            "value": 15
-        },
-        "org.balch.orpheus.plugins.voice:duo_harmonics_2": {
-            "type": "float",
-            "value": 0.5100001
-        },
-        "org.balch.orpheus.plugins.voice:duo_prosody_2": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:duo_speed_2": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_morph_2": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_level_2": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_sharpness_3": {
-            "type": "float",
-            "value": 0.55
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_3": {
-            "type": "int",
-            "value": 2
-        },
-        "org.balch.orpheus.plugins.voice:duo_engine_3": {
-            "type": "int",
-            "value": 5
-        },
-        "org.balch.orpheus.plugins.voice:duo_harmonics_3": {
-            "type": "float",
-            "value": 0.45
-        },
-        "org.balch.orpheus.plugins.voice:duo_prosody_3": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:duo_speed_3": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_morph_3": {
-            "type": "float",
-            "value": 0.55
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_level_3": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_sharpness_4": {
-            "type": "float",
-            "value": 0.7600002
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_4": {
-            "type": "int",
-            "value": 2
-        },
-        "org.balch.orpheus.plugins.voice:duo_engine_4": {
-            "type": "int",
-            "value": 14
-        },
-        "org.balch.orpheus.plugins.voice:duo_harmonics_4": {
-            "type": "float",
-            "value": 0.46000016
-        },
-        "org.balch.orpheus.plugins.voice:duo_prosody_4": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:duo_speed_4": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_morph_4": {
-            "type": "float",
-            "value": 0.6600003
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_level_4": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_sharpness_5": {
-            "type": "float",
-            "value": 0.8099997
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_5": {
-            "type": "int",
-            "value": 4
-        },
-        "org.balch.orpheus.plugins.voice:duo_engine_5": {
-            "type": "int",
-            "value": 13
-        },
-        "org.balch.orpheus.plugins.voice:duo_harmonics_5": {
-            "type": "float",
-            "value": 0.8499996
-        },
-        "org.balch.orpheus.plugins.voice:duo_prosody_5": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:duo_speed_5": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:duo_morph_5": {
-            "type": "float",
-            "value": 0.8799997
-        },
-        "org.balch.orpheus.plugins.voice:duo_mod_source_level_5": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:fm_structure_cross_quad": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.voice:total_feedback": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:vibrato": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:coupling": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_pitch_0": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:quad_hold_0": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_volume_0": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_trigger_source_0": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.voice:quad_pitch_source_0": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.voice:quad_env_trigger_mode_0": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.voice:quad_pitch_1": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:quad_hold_1": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_volume_1": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_trigger_source_1": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.voice:quad_pitch_source_1": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.voice:quad_env_trigger_mode_1": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.voice:quad_pitch_2": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.voice:quad_hold_2": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_volume_2": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.voice:quad_trigger_source_2": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.voice:quad_pitch_source_2": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.voice:quad_env_trigger_mode_2": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.warps:algorithm": {
-            "type": "float",
-            "value": 1.5
-        },
-        "org.balch.orpheus.plugins.warps:timbre": {
-            "type": "float",
-            "value": 0.45
-        },
-        "org.balch.orpheus.plugins.warps:level1": {
-            "type": "float",
-            "value": 0.45
-        },
-        "org.balch.orpheus.plugins.warps:level2": {
-            "type": "float",
-            "value": 0.35
-        },
-        "org.balch.orpheus.plugins.warps:mix": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.warps:carrier_source": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.warps:modulator_source": {
-            "type": "int",
-            "value": 3
-        },
-        "org.balch.orpheus.plugins.delay:feedback": {
-            "type": "float",
-            "value": 0.6599998
-        },
-        "org.balch.orpheus.plugins.delay:mix": {
-            "type": "float",
-            "value": 0.14999998
-        },
-        "org.balch.orpheus.plugins.delay:time_1": {
-            "type": "float",
-            "value": 0.23000003
-        },
-        "org.balch.orpheus.plugins.delay:time_2": {
-            "type": "float",
-            "value": 0.37000003
-        },
-        "org.balch.orpheus.plugins.delay:mod_depth_1": {
-            "type": "float",
-            "value": 0.6799997
-        },
-        "org.balch.orpheus.plugins.delay:mod_depth_2": {
-            "type": "float",
-            "value": 0.26000002
-        },
-        "org.balch.orpheus.plugins.delay:stereo_mode": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.delay:mod_source_is_lfo": {
-            "type": "bool",
-            "value": true
-        },
-        "org.balch.orpheus.plugins.delay:lfo_wave_is_triangle": {
-            "type": "bool",
-            "value": true
-        },
-        "org.balch.orpheus.plugins.stereo:master_pan": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_0": {
-            "type": "float",
-            "value": -0.7
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_1": {
-            "type": "float",
-            "value": -0.5
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_2": {
-            "type": "float",
-            "value": -0.2
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_3": {
-            "type": "float",
-            "value": -0.1
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_4": {
-            "type": "float",
-            "value": -0.6
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_5": {
-            "type": "float",
-            "value": 0.6
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_6": {
-            "type": "float",
-            "value": 0.15
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_7": {
-            "type": "float",
-            "value": 0.3
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_8": {
-            "type": "float",
-            "value": -0.3
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_9": {
-            "type": "float",
-            "value": 0.3
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_10": {
-            "type": "float",
-            "value": -0.15
-        },
-        "org.balch.orpheus.plugins.stereo:voice_pan_11": {
-            "type": "float",
-            "value": 0.15
-        },
-        "org.balch.orpheus.plugins.grains:position": {
-            "type": "float",
-            "value": 0.4
-        },
-        "org.balch.orpheus.plugins.grains:size": {
-            "type": "float",
-            "value": 0.65
-        },
-        "org.balch.orpheus.plugins.grains:pitch": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.grains:density": {
-            "type": "float",
-            "value": 0.55
-        },
-        "org.balch.orpheus.plugins.grains:texture": {
-            "type": "float",
-            "value": 0.75
-        },
-        "org.balch.orpheus.plugins.grains:dry_wet": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.grains:freeze": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.grains:trigger": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.grains:mode": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.grains:feedback": {
-            "type": "float",
-            "value": 0.35
-        },
-        "org.balch.orpheus.plugins.grains:reverb": {
-            "type": "float",
-            "value": 0.6
-        },
-        "org.balch.orpheus.plugins.distortion:drive": {
-            "type": "float",
-            "value": 0.25
-        },
-        "org.balch.orpheus.plugins.distortion:mix": {
-            "type": "float",
-            "value": 0.15
-        },
-        "org.balch.orpheus.plugins.distortion:dry_level": {
-            "type": "float",
-            "value": 0.85
-        },
-        "org.balch.orpheus.plugins.vibrato:depth": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.vibrato:rate": {
-            "type": "float",
-            "value": 5.0
-        },
-        "org.balch.orpheus.plugins.flux:spread": {
-            "type": "float",
-            "value": 0.70999986
-        },
-        "org.balch.orpheus.plugins.flux:x_bias": {
-            "type": "float",
-            "value": 0.19
-        },
-        "org.balch.orpheus.plugins.flux:steps": {
-            "type": "float",
-            "value": 0.63999987
-        },
-        "org.balch.orpheus.plugins.flux:deja_vu": {
-            "type": "float",
-            "value": 0.6
-        },
-        "org.balch.orpheus.plugins.flux:deja_vu_length": {
-            "type": "int",
-            "value": 8
-        },
-        "org.balch.orpheus.plugins.flux:x_scale": {
-            "type": "int",
-            "value": 3
-        },
-        "org.balch.orpheus.plugins.flux:rate": {
-            "type": "float",
-            "value": 0.5500001
-        },
-        "org.balch.orpheus.plugins.flux:jitter": {
-            "type": "float",
-            "value": 0.2
-        },
-        "org.balch.orpheus.plugins.flux:probability": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.flux:t_model": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.flux:t_range": {
-            "type": "int",
-            "value": 1
-        },
-        "org.balch.orpheus.plugins.flux:pulse_width": {
-            "type": "float",
-            "value": 0.38999987
-        },
-        "org.balch.orpheus.plugins.flux:pulse_width_std": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.flux:deja_vu_mode": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.flux:x_control_mode": {
-            "type": "int",
-            "value": 2
-        },
-        "org.balch.orpheus.plugins.flux:x_range": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.flux:mix": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.flux:range_min": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.flux:range_max": {
-            "type": "float",
-            "value": 1.0
-        },
-        "org.balch.orpheus.plugins.bender:bend": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.bender:max_bend": {
-            "type": "float",
-            "value": 24.0
-        },
-        "org.balch.orpheus.plugins.bender:random_depth": {
-            "type": "float",
-            "value": 0.1
-        },
-        "org.balch.orpheus.plugins.bender:timbre_mod": {
-            "type": "float",
-            "value": 0.3
-        },
-        "org.balch.orpheus.plugins.bender:tension_vol": {
-            "type": "float",
-            "value": 0.015
-        },
-        "org.balch.orpheus.plugins.resonator:mode": {
-            "type": "int",
-            "value": 0
-        },
-        "org.balch.orpheus.plugins.resonator:target_mix": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.resonator:structure": {
-            "type": "float",
-            "value": 0.4
-        },
-        "org.balch.orpheus.plugins.resonator:brightness": {
-            "type": "float",
-            "value": 0.5
-        },
-        "org.balch.orpheus.plugins.resonator:damping": {
-            "type": "float",
-            "value": 0.45
-        },
-        "org.balch.orpheus.plugins.resonator:position": {
-            "type": "float",
-            "value": 0.35
-        },
-        "org.balch.orpheus.plugins.resonator:mix": {
-            "type": "float",
-            "value": 0.0
-        },
-        "org.balch.orpheus.plugins.resonator:snap_back": {
-            "type": "bool",
-            "value": false
-        },
-        "org.balch.orpheus.plugins.tts:text_input": {
-            "type": "string",
-            "value": ""
-        },
-        "org.balch.orpheus.plugins.tts:selected_voice": {
-            "type": "string",
-            "value": "Daniel"
-        },
-        "org.balch.orpheus.plugins.tts:spacebar_trigger": {
-            "type": "bool",
-            "value": false
-        }
+  "portValues": {
+    "org.balch.orpheus.plugins.polylfo:shape": {
+      "type": "float",
+      "value": 0.30999997
     },
-    "createdAt": 0
+    "org.balch.orpheus.plugins.polylfo:shape_spread": {
+      "type": "float",
+      "value": 0.625
+    },
+    "org.balch.orpheus.plugins.polylfo:spread": {
+      "type": "float",
+      "value": 0.7083333
+    },
+    "org.balch.orpheus.plugins.polylfo:coupling": {
+      "type": "float",
+      "value": 0.66999984
+    },
+    "org.balch.orpheus.plugins.polylfo:rate": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.polylfo:bypass": {
+      "type": "bool",
+      "value": true
+    },
+    "org.balch.orpheus.plugins.dj:wet_a": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.dj:wet_b": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.dj:source_a": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.dj:source_b": {
+      "type": "int",
+      "value": 2
+    },
+    "org.balch.orpheus.plugins.dj:velocity_a": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.dj:velocity_b": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.dj:frozen_a": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.dj:frozen_b": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.dj:crossfader": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.dj:delay_send": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.dj:reverb_send": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.lorenz:rate": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.lorenz:balance": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.lorenz:bypass": {
+      "type": "bool",
+      "value": true
+    },
+    "org.balch.orpheus.plugins.bass:engine": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.bass:root_note": {
+      "type": "int",
+      "value": 34
+    },
+    "org.balch.orpheus.plugins.bass:scale": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.bass:clock_div": {
+      "type": "int",
+      "value": 3
+    },
+    "org.balch.orpheus.plugins.bass:step_count": {
+      "type": "int",
+      "value": 8
+    },
+    "org.balch.orpheus.plugins.bass:mutation": {
+      "type": "float",
+      "value": 0.24000002
+    },
+    "org.balch.orpheus.plugins.bass:cutoff": {
+      "type": "float",
+      "value": 0.65999997
+    },
+    "org.balch.orpheus.plugins.bass:resonance": {
+      "type": "float",
+      "value": 0.14999998
+    },
+    "org.balch.orpheus.plugins.bass:envelope": {
+      "type": "float",
+      "value": 0.20000023
+    },
+    "org.balch.orpheus.plugins.bass:overdrive": {
+      "type": "float",
+      "value": 0.62999976
+    },
+    "org.balch.orpheus.plugins.bass:compressor": {
+      "type": "float",
+      "value": 0.5099999
+    },
+    "org.balch.orpheus.plugins.bass:mix": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.bass:lfo_mix": {
+      "type": "float",
+      "value": 0.65999967
+    },
+    "org.balch.orpheus.plugins.bass:trigger_source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.bass:pitch_source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.bass:timbre_source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.bass:accent_amount": {
+      "type": "float",
+      "value": 0.7099998
+    },
+    "org.balch.orpheus.plugins.bass:jitter": {
+      "type": "float",
+      "value": 0.19000001
+    },
+    "org.balch.orpheus.plugins.bass:fx_send": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.duolfo:mode": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.duolfo:link": {
+      "type": "bool",
+      "value": true
+    },
+    "org.balch.orpheus.plugins.duolfo:shape": {
+      "type": "float",
+      "value": 0.9
+    },
+    "org.balch.orpheus.plugins.duolfo:freq_a": {
+      "type": "float",
+      "value": 0.0151437875
+    },
+    "org.balch.orpheus.plugins.duolfo:freq_b": {
+      "type": "float",
+      "value": 0.029325282
+    },
+    "org.balch.orpheus.plugins.duolfo:range_min": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.duolfo:range_max": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.duolfo:source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.tides:frequency": {
+      "type": "float",
+      "value": 0.72999996
+    },
+    "org.balch.orpheus.plugins.tides:slope": {
+      "type": "float",
+      "value": 0.6399997
+    },
+    "org.balch.orpheus.plugins.tides:shape": {
+      "type": "float",
+      "value": 0.6199998
+    },
+    "org.balch.orpheus.plugins.tides:smoothness": {
+      "type": "float",
+      "value": 0.8499991
+    },
+    "org.balch.orpheus.plugins.tides:shift": {
+      "type": "float",
+      "value": 0.31999996
+    },
+    "org.balch.orpheus.plugins.tides:mix": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.tides:clock_offset": {
+      "type": "float",
+      "value": 0.32999998
+    },
+    "org.balch.orpheus.plugins.tides:ramp_mode": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.tides:output_mode": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.tides:range": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.tides:gate_source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.tides:clock_source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.tts:rate": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.tts:speed": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.tts:volume": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.tts:reverb": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.tts:phaser": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.tts:feedback": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.reverb:amount": {
+      "type": "float",
+      "value": 0.54000044
+    },
+    "org.balch.orpheus.plugins.reverb:time": {
+      "type": "float",
+      "value": 0.7
+    },
+    "org.balch.orpheus.plugins.reverb:damping": {
+      "type": "float",
+      "value": 0.39000022
+    },
+    "org.balch.orpheus.plugins.reverb:diffusion": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.beats:x": {
+      "type": "float",
+      "value": 0.225
+    },
+    "org.balch.orpheus.plugins.beats:y": {
+      "type": "float",
+      "value": 0.6142857
+    },
+    "org.balch.orpheus.plugins.beats:bpm": {
+      "type": "float",
+      "value": 120.0
+    },
+    "org.balch.orpheus.plugins.beats:randomness": {
+      "type": "float",
+      "value": 0.21000004
+    },
+    "org.balch.orpheus.plugins.beats:swing": {
+      "type": "float",
+      "value": 0.5999997
+    },
+    "org.balch.orpheus.plugins.beats:mode": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.beats:density_0": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.beats:euclidean_0": {
+      "type": "int",
+      "value": 16
+    },
+    "org.balch.orpheus.plugins.beats:density_1": {
+      "type": "float",
+      "value": 0.57999974
+    },
+    "org.balch.orpheus.plugins.beats:euclidean_1": {
+      "type": "int",
+      "value": 16
+    },
+    "org.balch.orpheus.plugins.beats:density_2": {
+      "type": "float",
+      "value": 0.7999997
+    },
+    "org.balch.orpheus.plugins.beats:euclidean_2": {
+      "type": "int",
+      "value": 16
+    },
+    "org.balch.orpheus.plugins.horn:speed": {
+      "type": "float",
+      "value": 0.2900002
+    },
+    "org.balch.orpheus.plugins.horn:ratio": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.horn:depth": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.horn:mix": {
+      "type": "float",
+      "value": 0.9699994
+    },
+    "org.balch.orpheus.plugins.horn:brake": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.drum:mix": {
+      "type": "float",
+      "value": 0.30000037
+    },
+    "org.balch.orpheus.plugins.drum:bypass": {
+      "type": "bool",
+      "value": true
+    },
+    "org.balch.orpheus.plugins.drum:bd_freq": {
+      "type": "float",
+      "value": 0.17000008
+    },
+    "org.balch.orpheus.plugins.drum:bd_tone": {
+      "type": "float",
+      "value": 0.19000022
+    },
+    "org.balch.orpheus.plugins.drum:bd_decay": {
+      "type": "float",
+      "value": 0.5999999
+    },
+    "org.balch.orpheus.plugins.drum:bd_p4": {
+      "type": "float",
+      "value": 0.32000065
+    },
+    "org.balch.orpheus.plugins.drum:bd_p5": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.drum:sd_freq": {
+      "type": "float",
+      "value": 0.16000016
+    },
+    "org.balch.orpheus.plugins.drum:sd_tone": {
+      "type": "float",
+      "value": 0.31000003
+    },
+    "org.balch.orpheus.plugins.drum:sd_decay": {
+      "type": "float",
+      "value": 0.44000006
+    },
+    "org.balch.orpheus.plugins.drum:sd_p4": {
+      "type": "float",
+      "value": 0.61999995
+    },
+    "org.balch.orpheus.plugins.drum:hh_freq": {
+      "type": "float",
+      "value": 0.1499997
+    },
+    "org.balch.orpheus.plugins.drum:hh_tone": {
+      "type": "float",
+      "value": 0.31
+    },
+    "org.balch.orpheus.plugins.drum:hh_decay": {
+      "type": "float",
+      "value": 0.31000012
+    },
+    "org.balch.orpheus.plugins.drum:hh_p4": {
+      "type": "float",
+      "value": 0.29000002
+    },
+    "org.balch.orpheus.plugins.drum:bd_trigger_src": {
+      "type": "int",
+      "value": 3
+    },
+    "org.balch.orpheus.plugins.drum:bd_pitch_src": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.drum:sd_trigger_src": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.drum:sd_pitch_src": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.drum:hh_trigger_src": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.drum:hh_pitch_src": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.drum:bd_engine": {
+      "type": "int",
+      "value": 11
+    },
+    "org.balch.orpheus.plugins.drum:sd_engine": {
+      "type": "int",
+      "value": 18
+    },
+    "org.balch.orpheus.plugins.drum:hh_engine": {
+      "type": "int",
+      "value": 11
+    },
+    "org.balch.orpheus.plugins.voice:tune_0": {
+      "type": "float",
+      "value": 0.354
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_0": {
+      "type": "float",
+      "value": 0.08
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_0": {
+      "type": "float",
+      "value": 0.073529415
+    },
+    "org.balch.orpheus.plugins.voice:tune_1": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_1": {
+      "type": "float",
+      "value": 0.08
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_1": {
+      "type": "float",
+      "value": 0.22058824
+    },
+    "org.balch.orpheus.plugins.voice:tune_2": {
+      "type": "float",
+      "value": 0.354
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_2": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_2": {
+      "type": "float",
+      "value": 0.3529412
+    },
+    "org.balch.orpheus.plugins.voice:tune_3": {
+      "type": "float",
+      "value": 0.417
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_3": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_3": {
+      "type": "float",
+      "value": 0.4852941
+    },
+    "org.balch.orpheus.plugins.voice:tune_4": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_4": {
+      "type": "float",
+      "value": 0.4
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_4": {
+      "type": "float",
+      "value": 0.5294118
+    },
+    "org.balch.orpheus.plugins.voice:tune_5": {
+      "type": "float",
+      "value": 0.563
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_5": {
+      "type": "float",
+      "value": 0.4
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_5": {
+      "type": "float",
+      "value": 0.63235295
+    },
+    "org.balch.orpheus.plugins.voice:tune_6": {
+      "type": "float",
+      "value": 0.354
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_6": {
+      "type": "float",
+      "value": 0.15
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_6": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:tune_7": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_7": {
+      "type": "float",
+      "value": 0.15
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_7": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:tune_8": {
+      "type": "float",
+      "value": 0.354
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_8": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_8": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:tune_9": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_9": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_9": {
+      "type": "float",
+      "value": 0.4852941
+    },
+    "org.balch.orpheus.plugins.voice:tune_10": {
+      "type": "float",
+      "value": 0.417
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_10": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_10": {
+      "type": "float",
+      "value": 0.5882353
+    },
+    "org.balch.orpheus.plugins.voice:tune_11": {
+      "type": "float",
+      "value": 0.604
+    },
+    "org.balch.orpheus.plugins.voice:mod_depth_11": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:env_speed_11": {
+      "type": "float",
+      "value": 0.5735294
+    },
+    "org.balch.orpheus.plugins.voice:duo_sharpness_0": {
+      "type": "float",
+      "value": 0.7899999
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_0": {
+      "type": "int",
+      "value": 4
+    },
+    "org.balch.orpheus.plugins.voice:duo_engine_0": {
+      "type": "int",
+      "value": 19
+    },
+    "org.balch.orpheus.plugins.voice:duo_harmonics_0": {
+      "type": "float",
+      "value": 0.41000053
+    },
+    "org.balch.orpheus.plugins.voice:duo_prosody_0": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:duo_speed_0": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_morph_0": {
+      "type": "float",
+      "value": 0.8769968
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_level_0": {
+      "type": "float",
+      "value": 0.9166667
+    },
+    "org.balch.orpheus.plugins.voice:duo_sharpness_1": {
+      "type": "float",
+      "value": 0.5200005
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_1": {
+      "type": "int",
+      "value": 4
+    },
+    "org.balch.orpheus.plugins.voice:duo_engine_1": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.voice:duo_harmonics_1": {
+      "type": "float",
+      "value": 0.52000046
+    },
+    "org.balch.orpheus.plugins.voice:duo_prosody_1": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:duo_speed_1": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_morph_1": {
+      "type": "float",
+      "value": 0.46000046
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_level_1": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_sharpness_2": {
+      "type": "float",
+      "value": 0.41999996
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_2": {
+      "type": "int",
+      "value": 2
+    },
+    "org.balch.orpheus.plugins.voice:duo_engine_2": {
+      "type": "int",
+      "value": 14
+    },
+    "org.balch.orpheus.plugins.voice:duo_harmonics_2": {
+      "type": "float",
+      "value": 0.5100001
+    },
+    "org.balch.orpheus.plugins.voice:duo_prosody_2": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:duo_speed_2": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_morph_2": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_level_2": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_sharpness_3": {
+      "type": "float",
+      "value": 0.55
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_3": {
+      "type": "int",
+      "value": 2
+    },
+    "org.balch.orpheus.plugins.voice:duo_engine_3": {
+      "type": "int",
+      "value": 10
+    },
+    "org.balch.orpheus.plugins.voice:duo_harmonics_3": {
+      "type": "float",
+      "value": 0.45
+    },
+    "org.balch.orpheus.plugins.voice:duo_prosody_3": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:duo_speed_3": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_morph_3": {
+      "type": "float",
+      "value": 0.55
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_level_3": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_sharpness_4": {
+      "type": "float",
+      "value": 0.7600002
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_4": {
+      "type": "int",
+      "value": 2
+    },
+    "org.balch.orpheus.plugins.voice:duo_engine_4": {
+      "type": "int",
+      "value": 16
+    },
+    "org.balch.orpheus.plugins.voice:duo_harmonics_4": {
+      "type": "float",
+      "value": 0.46000016
+    },
+    "org.balch.orpheus.plugins.voice:duo_prosody_4": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:duo_speed_4": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_morph_4": {
+      "type": "float",
+      "value": 0.6600003
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_level_4": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_sharpness_5": {
+      "type": "float",
+      "value": 0.8099997
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_5": {
+      "type": "int",
+      "value": 4
+    },
+    "org.balch.orpheus.plugins.voice:duo_engine_5": {
+      "type": "int",
+      "value": 18
+    },
+    "org.balch.orpheus.plugins.voice:duo_harmonics_5": {
+      "type": "float",
+      "value": 0.8499996
+    },
+    "org.balch.orpheus.plugins.voice:duo_prosody_5": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:duo_speed_5": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:duo_morph_5": {
+      "type": "float",
+      "value": 0.8799997
+    },
+    "org.balch.orpheus.plugins.voice:duo_mod_source_level_5": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:fm_structure_cross_quad": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.voice:total_feedback": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:vibrato": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:coupling": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_pitch_0": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:quad_hold_0": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_volume_0": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_trigger_source_0": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.voice:quad_pitch_source_0": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.voice:quad_env_trigger_mode_0": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.voice:quad_pitch_1": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:quad_hold_1": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_volume_1": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_trigger_source_1": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.voice:quad_pitch_source_1": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.voice:quad_env_trigger_mode_1": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.voice:quad_pitch_2": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.voice:quad_hold_2": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_volume_2": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.voice:quad_trigger_source_2": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.voice:quad_pitch_source_2": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.voice:quad_env_trigger_mode_2": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.warps:algorithm": {
+      "type": "float",
+      "value": 1.5
+    },
+    "org.balch.orpheus.plugins.warps:timbre": {
+      "type": "float",
+      "value": 0.45
+    },
+    "org.balch.orpheus.plugins.warps:level1": {
+      "type": "float",
+      "value": 0.45
+    },
+    "org.balch.orpheus.plugins.warps:level2": {
+      "type": "float",
+      "value": 0.35
+    },
+    "org.balch.orpheus.plugins.warps:mix": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.warps:carrier_source": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.warps:modulator_source": {
+      "type": "int",
+      "value": 3
+    },
+    "org.balch.orpheus.plugins.delay:feedback": {
+      "type": "float",
+      "value": 0.6599998
+    },
+    "org.balch.orpheus.plugins.delay:mix": {
+      "type": "float",
+      "value": 0.14999998
+    },
+    "org.balch.orpheus.plugins.delay:time_1": {
+      "type": "float",
+      "value": 0.23000003
+    },
+    "org.balch.orpheus.plugins.delay:time_2": {
+      "type": "float",
+      "value": 0.37000003
+    },
+    "org.balch.orpheus.plugins.delay:mod_depth_1": {
+      "type": "float",
+      "value": 0.6799997
+    },
+    "org.balch.orpheus.plugins.delay:mod_depth_2": {
+      "type": "float",
+      "value": 0.26000002
+    },
+    "org.balch.orpheus.plugins.delay:stereo_mode": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.delay:mod_source_is_lfo": {
+      "type": "bool",
+      "value": true
+    },
+    "org.balch.orpheus.plugins.delay:lfo_wave_is_triangle": {
+      "type": "bool",
+      "value": true
+    },
+    "org.balch.orpheus.plugins.stereo:master_pan": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_0": {
+      "type": "float",
+      "value": -0.7
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_1": {
+      "type": "float",
+      "value": -0.5
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_2": {
+      "type": "float",
+      "value": -0.2
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_3": {
+      "type": "float",
+      "value": -0.1
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_4": {
+      "type": "float",
+      "value": -0.6
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_5": {
+      "type": "float",
+      "value": 0.6
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_6": {
+      "type": "float",
+      "value": 0.15
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_7": {
+      "type": "float",
+      "value": 0.3
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_8": {
+      "type": "float",
+      "value": -0.3
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_9": {
+      "type": "float",
+      "value": 0.3
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_10": {
+      "type": "float",
+      "value": -0.15
+    },
+    "org.balch.orpheus.plugins.stereo:voice_pan_11": {
+      "type": "float",
+      "value": 0.15
+    },
+    "org.balch.orpheus.plugins.grains:position": {
+      "type": "float",
+      "value": 0.4
+    },
+    "org.balch.orpheus.plugins.grains:size": {
+      "type": "float",
+      "value": 0.65
+    },
+    "org.balch.orpheus.plugins.grains:pitch": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.grains:density": {
+      "type": "float",
+      "value": 0.55
+    },
+    "org.balch.orpheus.plugins.grains:texture": {
+      "type": "float",
+      "value": 0.75
+    },
+    "org.balch.orpheus.plugins.grains:dry_wet": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.grains:freeze": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.grains:trigger": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.grains:mode": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.grains:feedback": {
+      "type": "float",
+      "value": 0.35
+    },
+    "org.balch.orpheus.plugins.grains:reverb": {
+      "type": "float",
+      "value": 0.6
+    },
+    "org.balch.orpheus.plugins.distortion:drive": {
+      "type": "float",
+      "value": 0.25
+    },
+    "org.balch.orpheus.plugins.distortion:mix": {
+      "type": "float",
+      "value": 0.15
+    },
+    "org.balch.orpheus.plugins.distortion:dry_level": {
+      "type": "float",
+      "value": 0.85
+    },
+    "org.balch.orpheus.plugins.vibrato:depth": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.vibrato:rate": {
+      "type": "float",
+      "value": 5.0
+    },
+    "org.balch.orpheus.plugins.flux:spread": {
+      "type": "float",
+      "value": 0.70999986
+    },
+    "org.balch.orpheus.plugins.flux:x_bias": {
+      "type": "float",
+      "value": 0.19
+    },
+    "org.balch.orpheus.plugins.flux:steps": {
+      "type": "float",
+      "value": 0.63999987
+    },
+    "org.balch.orpheus.plugins.flux:deja_vu": {
+      "type": "float",
+      "value": 0.6
+    },
+    "org.balch.orpheus.plugins.flux:deja_vu_length": {
+      "type": "int",
+      "value": 8
+    },
+    "org.balch.orpheus.plugins.flux:x_scale": {
+      "type": "int",
+      "value": 3
+    },
+    "org.balch.orpheus.plugins.flux:rate": {
+      "type": "float",
+      "value": 0.5500001
+    },
+    "org.balch.orpheus.plugins.flux:jitter": {
+      "type": "float",
+      "value": 0.2
+    },
+    "org.balch.orpheus.plugins.flux:probability": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.flux:t_model": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.flux:t_range": {
+      "type": "int",
+      "value": 1
+    },
+    "org.balch.orpheus.plugins.flux:pulse_width": {
+      "type": "float",
+      "value": 0.38999987
+    },
+    "org.balch.orpheus.plugins.flux:pulse_width_std": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.flux:deja_vu_mode": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.flux:x_control_mode": {
+      "type": "int",
+      "value": 2
+    },
+    "org.balch.orpheus.plugins.flux:x_range": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.flux:mix": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.flux:range_min": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.flux:range_max": {
+      "type": "float",
+      "value": 1.0
+    },
+    "org.balch.orpheus.plugins.bender:bend": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.bender:max_bend": {
+      "type": "float",
+      "value": 24.0
+    },
+    "org.balch.orpheus.plugins.bender:random_depth": {
+      "type": "float",
+      "value": 0.1
+    },
+    "org.balch.orpheus.plugins.bender:timbre_mod": {
+      "type": "float",
+      "value": 0.3
+    },
+    "org.balch.orpheus.plugins.bender:tension_vol": {
+      "type": "float",
+      "value": 0.015
+    },
+    "org.balch.orpheus.plugins.resonator:mode": {
+      "type": "int",
+      "value": 0
+    },
+    "org.balch.orpheus.plugins.resonator:target_mix": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.resonator:structure": {
+      "type": "float",
+      "value": 0.4
+    },
+    "org.balch.orpheus.plugins.resonator:brightness": {
+      "type": "float",
+      "value": 0.5
+    },
+    "org.balch.orpheus.plugins.resonator:damping": {
+      "type": "float",
+      "value": 0.45
+    },
+    "org.balch.orpheus.plugins.resonator:position": {
+      "type": "float",
+      "value": 0.35
+    },
+    "org.balch.orpheus.plugins.resonator:mix": {
+      "type": "float",
+      "value": 0.0
+    },
+    "org.balch.orpheus.plugins.resonator:snap_back": {
+      "type": "bool",
+      "value": false
+    },
+    "org.balch.orpheus.plugins.tts:text_input": {
+      "type": "string",
+      "value": ""
+    },
+    "org.balch.orpheus.plugins.tts:selected_voice": {
+      "type": "string",
+      "value": "Daniel"
+    },
+    "org.balch.orpheus.plugins.tts:spacebar_trigger": {
+      "type": "bool",
+      "value": false
+    }
+  },
+  "createdAt": 0
 }

@@ -30,14 +30,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         effects, and textures best serve the requested atmosphere.
 
         1. **PICK ENGINES** (voice_duo_engine_0..3) — Choose synthesis engines that fit the mood:
-           - 0=osc (default, warm pads), 5=fm (bright, metallic), 6=noise (texture, wind),
-             7=wave (rich harmonics), 8=va (classic analog), 9=additive (organ, bells),
-             10=grain (granular, glitchy), 11=string (plucked, bowed), 12=modal (struck, resonant),
-             13=particle (scattered, ethereal), 14=swarm (dense, buzzy), 15=chord (full chords),
-             16=wavetable (evolving), 17=speech (vocal formants)
+           - -1=osc (default, warm pads), 10=fm (bright, metallic), 17=noise (texture, wind),
+             9=wave (rich harmonics), 8=va (classic analog), 12=additive (organ, bells),
+             11=grain (granular, glitchy), 19=string (plucked, bowed), 20=modal (struck, resonant),
+             18=particle (scattered, ethereal), 16=swarm (dense, buzzy), 14=chord (full chords),
+             13=wavetable (evolving), 15=speech (vocal formants)
            - Mix different engines across duos for richer timbres (e.g., duo 0=string, duo 1=fm)
            - Match to mood: cinematic→string/modal, aggressive→wave/fm, ethereal→grain/particle
-           - Rarely (~1 in 25), you may use hidden engines: 18=VCF, 19=PD, 20=DX, 21=TRN, 22=ENS, 23=NES.
+           - Rarely (~1 in 25), you may use hidden engines: 0=VCF, 1=PD, 2=DX, 5=TRN, 6=ENS, 7=NES.
              Don't announce them — just slip them in for variety.
 
         2. **SET DUO SHARPNESS** (voice_duo_sharpness_0..3) — Waveform character:

@@ -1362,6 +1362,61 @@ bool run_pulsar_tests() {
         orpheus_engine_destroy(eng5);
     }
 
+    // ── Test: Pulsar with a Braids chord engine produces sound ──
+    {
+        printf("  Test: Pulsar with BRAIDS_TRIPLE_SAW chord track produces sound\n");
+
+        OrpheusEngine* eng_b = orpheus_engine_create(48000.0f);
+        GraphUnit u_b;
+        std::memset(&u_b, 0, sizeof(u_b));
+        u_b.type = UNIT_PULSAR;
+        u_b.enabled = true;
+
+        eng_b->pulsar_playing.store(1, std::memory_order_relaxed);
+        eng_b->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        setup_cosmic_techno(eng_b);
+        trigger_vibe_load(eng_b);
+        eng_b->clock_bpm.store(128.0f, std::memory_order_relaxed);
+
+        // Override every track's engineEdm to BRAIDS_TRIPLE_SAW (id 100) so we
+        // exercise the Braids dispatch path no matter which tracks fire.
+        for (int t = 0; t < 8; t++) {
+            eng_b->pulsar_track_engine_edm[t].store(100, std::memory_order_relaxed);
+        }
+        // Force EDM end of the energy spectrum so engineEdm is what plays.
+        eng_b->pulsar_energy.store(1.0f, std::memory_order_relaxed);
+
+        // Render ~2 seconds.
+        for (int i = 0; i < 200; i++) {
+            unit_process_pulsar(&u_b, eng_b, 512, 48000.0f);
+        }
+
+        float peak = 0.0f;
+        bool any_nan = false;
+        for (int i = 0; i < 512; i++) {
+            float al = eng_b->pulsar_out_l[i];
+            float ar = eng_b->pulsar_out_r[i];
+            if (!std::isfinite(al) || !std::isfinite(ar)) any_nan = true;
+            float ap = std::fabs(al);
+            if (ap > peak) peak = ap;
+            ap = std::fabs(ar);
+            if (ap > peak) peak = ap;
+        }
+
+        if (any_nan) {
+            printf("    FAIL: NaN/Inf in output\n");
+            fail++;
+        } else if (peak > 0.001f) {
+            printf("    PASS: peak amplitude = %.4f (Braids chord engine renders in Pulsar)\n", peak);
+            pass++;
+        } else {
+            printf("    FAIL: peak = %.4f (expected > 0.001)\n", peak);
+            fail++;
+        }
+
+        orpheus_engine_destroy(eng_b);
+    }
+
     printf("\nPulsar: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);
 }

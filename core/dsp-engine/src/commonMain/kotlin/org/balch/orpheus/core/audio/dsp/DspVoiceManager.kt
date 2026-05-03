@@ -35,7 +35,7 @@ class DspVoiceManager(
     private var _voiceCoupling = 0.0f
 
     // Plaits engine selection
-    private val _duoEngine = IntArray(6)  // 0 = default oscillators
+    private val _duoEngine = IntArray(6) { -1 }  // -1 = OSC mode (OrpheusEngineId.OSC.id)
     private val _duoHarmonics = FloatArray(6) { 0.0f }
     private val _duoProsody = FloatArray(6) { 0.5f }
     private val _duoSpeed = FloatArray(6) { 0.0f }

@@ -1066,28 +1066,51 @@ class TidalRepl(
     }
 
     /**
-     * Resolve an engine name to a duo engine port value.
-     * These are the integer values stored in the DUO_ENGINE port.
+     * Resolve an engine name to an OrpheusEngineId.id (C++ engine index).
+     * Values match OrpheusEngineId.id — passed directly to voice_params[].engine_index.
+     *
+     * Numeric string aliases ("8", "10", …) intentionally match the canonical id.
+     * Note: there is no "0" alias for OSC — id 0 is now VCF; OSC is -1.
      */
     private fun resolveEngineId(name: String): Int? = when (name) {
-        "osc", "default", "0" -> 0
-        "fm", "5" -> 5
-        "noise", "nse", "6" -> 6
-        "wave", "waveshaping", "wsh", "7" -> 7
-        "va", "analog", "8" -> 8
-        "additive", "add", "9" -> 9
-        "grain", "granular", "grn", "10" -> 10
-        "string", "str", "11" -> 11
-        "modal", "mod", "12" -> 12
-        "particle", "par", "13" -> 13
-        "swarm", "swm", "14" -> 14
-        "chord", "chd", "15" -> 15
-        "wavetable", "wtb", "16" -> 16
-        "speech", "spk", "talk", "17" -> 17
-        "bd", "bassdrum", "1" -> 1
-        "sd", "snare", "2" -> 2
-        "hh", "hihat", "3" -> 3
-        "fmdrum", "4" -> 4
+        "osc", "default", "-1" -> -1            // OSC
+        "fm", "10" -> 10                        // FM
+        "noise", "nse", "17" -> 17              // NOISE
+        "wave", "waveshaping", "wsh", "9" -> 9  // WAVESHAPING
+        "va", "analog", "8" -> 8                // VIRTUAL_ANALOG
+        "additive", "add", "12" -> 12           // ADDITIVE
+        "grain", "granular", "grn", "11" -> 11  // GRAIN
+        "string", "str", "19" -> 19             // STRING
+        "modal", "mod", "20" -> 20              // MODAL
+        "particle", "par", "18" -> 18           // PARTICLE
+        "swarm", "swm", "16" -> 16              // SWARM
+        "chord", "chd", "14" -> 14              // CHORD
+        "wavetable", "wtb", "13" -> 13          // WAVETABLE
+        "speech", "spk", "talk", "15" -> 15     // SPEECH
+        "bd", "bassdrum", "21" -> 21            // ANALOG_BASS_DRUM
+        "sd", "snare", "22" -> 22               // ANALOG_SNARE_DRUM
+        "hh", "hihat", "23" -> 23               // METALLIC_HI_HAT
+        "fmdrum", "fmd" -> 21                   // FM_DRUM (aliases BD)
+        // Plaits v1.2 (engine2) — native-only
+        "vcf", "0" -> 0                         // VIRTUAL_ANALOG_VCF
+        "pd", "1" -> 1                          // PHASE_DISTORTION
+        "dx", "sixop", "2" -> 2                 // SIX_OP_FM
+        "dx2", "3" -> 3                         // SIX_OP_FM_2
+        "dx3", "4" -> 4                         // SIX_OP_FM_3
+        "trn", "terrain", "5" -> 5              // WAVE_TERRAIN
+        "ens", "ensemble", "6" -> 6             // STRING_MACHINE
+        "nes", "chiptune", "7" -> 7             // CHIPTUNE
+        // Braids — chord engines
+        "3saw", "triple_saw", "100" -> 100      // BRAIDS_TRIPLE_SAW
+        "3sqr", "triple_square", "101" -> 101   // BRAIDS_TRIPLE_SQUARE
+        "3tri", "triple_triangle", "102" -> 102 // BRAIDS_TRIPLE_TRIANGLE
+        "3sin", "triple_sine", "103" -> 103     // BRAIDS_TRIPLE_SINE
+        "3rm", "triple_ringmod", "104" -> 104   // BRAIDS_TRIPLE_RING_MOD
+        // Braids — character engines
+        "csaw", "105" -> 105                    // BRAIDS_CSAW
+        "toy", "106" -> 106                     // BRAIDS_TOY
+        "vow", "vowel", "107" -> 107            // BRAIDS_VOWEL_FOF
+        "?", "qmark", "108" -> 108              // BRAIDS_QUESTION_MARK
         else -> null
     }
 }

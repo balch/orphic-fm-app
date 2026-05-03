@@ -1,5 +1,6 @@
 #pragma once
 #include "orpheus_graph.h"
+#include "braids/macro_oscillator.h"
 
 // Forward decl for engine-aware unit processors
 struct OrpheusEngine;
@@ -48,6 +49,26 @@ void unit_process_tides(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_pulsar_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
 void unit_process_pulsar_reverb(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
+
+// Render a Braids voice into out_buffer.
+// `osc` is the per-voice/per-track MacroOscillator instance (caller owns it).
+// `src_phase` is the per-voice fractional source-sample residue; the function
+//   reads/updates it so the 96k→host resampler stays phase-continuous across
+//   host blocks at non-48k host rates. Reset to 0 when `osc` is re-Init'd.
+//   At exactly 48 kHz host rate the residue is unused (fast path is phase-locked).
+// `engine_id` is the canonical OrpheusEngineId.id (must be in [100, 200)).
+// `pitch_midi` is the MIDI note number.
+// `harmonics`/`morph` are 0..1 (Braids parameter_[0]/[1]).
+// `timbre` is currently ignored (Braids only has 2 macro params).
+// `sample_rate` is the host output rate; the unit oversamples and resamples.
+//   Audio quality degrades below ~24 kHz host (the staging buffer clamps).
+void unit_process_braids(braids::MacroOscillator& osc,
+                         float& src_phase,
+                         int engine_id,
+                         float pitch_midi,
+                         float harmonics, float timbre, float morph,
+                         float sample_rate,
+                         float* out_buffer, int num_frames);
 
 // Initialize unit state from descriptor params
 void unit_init(GraphUnit* u, float sample_rate);

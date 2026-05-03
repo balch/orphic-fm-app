@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.AudioEngine
@@ -191,8 +192,8 @@ private fun sectionedVibe(bpm: Float, mults: List<Float>): Vibe {
         ),
         tracks = List(8) {
             TrackVoice(
-                engineEdm = Engine.VA,
-                engineSpace = Engine.VA,
+                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG,
+                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
                 role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
             )
         },

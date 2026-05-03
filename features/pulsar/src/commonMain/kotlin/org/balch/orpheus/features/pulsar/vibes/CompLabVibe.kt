@@ -1,9 +1,9 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.ChordComping
-import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.GenreProfile
@@ -83,8 +83,8 @@ class CompRockVibe : VibeProvider {
     // "grace note landing on root" feel without the climbing blip.
     override val vibe = generateCompLabVibe(
         name = "Comp Rock",
-        chordEngineEdm = Engine.PD,
-        chordEngineSpace = Engine.PD,
+        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
         compingOverride = ChordComping(
             style = CompingStyle.ROCK_DOWNBEATS,
             sectionInversion = SectionInversion.ROOT_POSITION,
@@ -108,8 +108,8 @@ class CompFunkVibe : VibeProvider {
     override val vibe = generateCompLabVibe(
         name = "Comp Funk",
         bpm = 100f,
-        chordEngineEdm = Engine.PD,
-        chordEngineSpace = Engine.PD,
+        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
         compingOverride = ChordComping(
             style = CompingStyle.FUNK_STABS,
             sectionInversion = SectionInversion.FIRST_INVERSION,
@@ -155,8 +155,8 @@ class CompBluesVibe : VibeProvider {
         bpm = 92f,
         rootNote = RootNote.E,
         progressionStyle = ProgressionStyle.BLUES,
-        chordEngineEdm = Engine.PD,
-        chordEngineSpace = Engine.PD,
+        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
         compingOverride = ChordComping(
             style = CompingStyle.BLUES_SHUFFLE,
             sectionInversion = SectionInversion.OPEN_VOICING,
@@ -180,8 +180,8 @@ class CompJazzVibe : VibeProvider {
         bpm = 105f,
         progressionStyle = ProgressionStyle.JAZZ,
         scaleType = ScaleType.MINOR_PENTATONIC,
-        chordEngineEdm = Engine.PD,
-        chordEngineSpace = Engine.PD,
+        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
         compingOverride = ChordComping(
             style = CompingStyle.JAZZ_COMP,
             sectionInversion = SectionInversion.OPEN_VOICING,
@@ -227,8 +227,8 @@ class CompGospelVibe : VibeProvider {
         name = "Comp Gospel",
         bpm = 96f,
         rootNote = RootNote.G,
-        chordEngineEdm = Engine.PD,
-        chordEngineSpace = Engine.PD,
+        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
         compingOverride = ChordComping(
             style = CompingStyle.GOSPEL_STABS,
             sectionInversion = SectionInversion.FIRST_INVERSION,
@@ -260,8 +260,8 @@ private fun generateCompLabVibe(
     chordsPerBar: Int = 2,
     // Chord track engines — defaults work as PAD/pad-like, piano-flavored
     // vibes override to monophonic engines that arp naturally into chords.
-    chordEngineEdm: Engine = Engine.CHD,
-    chordEngineSpace: Engine = Engine.CHD,
+    chordEngineEdm: OrpheusEngineId = OrpheusEngineId.CHORD,
+    chordEngineSpace: OrpheusEngineId = OrpheusEngineId.CHORD,
     arrangement: Arrangement? = null,
 ) = Vibe(
     name = name,
@@ -287,7 +287,7 @@ private fun generateCompLabVibe(
     tracks = listOf(
         // Track 0: Kick
         TrackVoice(
-            engineEdm = Engine.BD, engineSpace = Engine.BD,
+            engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM, engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
             role = TrackRole.Percussive,
             volume = 0.85f, density = 0.5f,
             envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -296,7 +296,7 @@ private fun generateCompLabVibe(
         ),
         // Track 1: Snare
         TrackVoice(
-            engineEdm = Engine.SD, engineSpace = Engine.SD,
+            engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM, engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
             role = TrackRole.Percussive,
             volume = 0.65f, pan = -0.1f, density = 0.4f,
             envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -305,7 +305,7 @@ private fun generateCompLabVibe(
         ),
         // Track 2: Hihat
         TrackVoice(
-            engineEdm = Engine.HH, engineSpace = Engine.HH,
+            engineEdm = OrpheusEngineId.METALLIC_HI_HAT, engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
             role = TrackRole.Percussive,
             volume = 0.55f, pan = 0.15f, density = 0.6f,
             envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -314,7 +314,7 @@ private fun generateCompLabVibe(
         ),
         // Track 3: Bass
         TrackVoice(
-            engineEdm = Engine.VCF, engineSpace = Engine.VA,
+            engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF, engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
             role = TrackRole.Melodic(),
             volume = 0.7f, density = 0.5f,
             envelopeProfile = EnvelopeProfile.MELODIC,
@@ -332,21 +332,21 @@ private fun generateCompLabVibe(
         ),
         // Tracks 5-7: silent placeholders (8-track requirement)
         TrackVoice(
-            engineEdm = Engine.ENS, engineSpace = Engine.ENS,
+            engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING_MACHINE,
             role = TrackRole.Melodic(),
             volume = 0.0f, density = 0.0f,
             envelopeProfile = EnvelopeProfile.EFFECT,
             macroMap = TrackMacroMap.EFFECT,
         ),
         TrackVoice(
-            engineEdm = Engine.ENS, engineSpace = Engine.ENS,
+            engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING_MACHINE,
             role = TrackRole.Melodic(),
             volume = 0.0f, density = 0.0f,
             envelopeProfile = EnvelopeProfile.EFFECT,
             macroMap = TrackMacroMap.EFFECT,
         ),
         TrackVoice(
-            engineEdm = Engine.ENS, engineSpace = Engine.ENS,
+            engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING_MACHINE,
             role = TrackRole.Melodic(),
             volume = 0.0f, density = 0.0f,
             envelopeProfile = EnvelopeProfile.EFFECT,
