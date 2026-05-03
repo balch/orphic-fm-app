@@ -51,7 +51,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
     private var rifArt: Bitmap? = null
     private var stealthRenderer: ProceduralArtRenderer? = null
     private var isPlaying = true
-    private var currentTitle = "Orphic-DJ"
+    private var currentTitle = "Orphic DJ"
     private var primarySubtitle = ""
     private var isForegroundStarted = false
     // Set true once ACTION_STOP is processed. Defends against late intents
@@ -172,7 +172,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 updatePlaybackState(false)
             }
             ACTION_UPDATE_METADATA -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Orphic-DJ"
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Orphic DJ"
                 val subtitle = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
                 val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
 
@@ -411,7 +411,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 "Audio Playback",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows when Orphic-DJ is playing audio"
+                description = "Shows when Orphic DJ is playing audio"
                 setShowBadge(false)
                 enableLights(true)
                 lightColor = NOTIFICATION_COLOR

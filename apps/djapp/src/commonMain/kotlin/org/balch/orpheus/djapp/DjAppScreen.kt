@@ -252,7 +252,7 @@ private fun DjAppHeaderRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppTitleTreatment(
-            title = "Orphic-DJ",
+            title = "Orphic DJ",
             modifier = Modifier.height(36.dp),
             effects = effects,
             showSizeEffects = false,

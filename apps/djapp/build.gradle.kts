@@ -78,7 +78,7 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "DjApp"
             packageVersion = "1.0.0"
-            macOS { dockName = "Orphic-DJ" }
+            macOS { dockName = "Orphic DJ" }
         }
 
         jvmArgs += listOf("-Dorpheus.engine=cpp")

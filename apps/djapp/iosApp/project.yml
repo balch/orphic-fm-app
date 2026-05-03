@@ -17,7 +17,7 @@ targets:
     info:
       path: DjApp/Info.plist
       properties:
-        CFBundleDisplayName: "Orphic-DJ"
+        CFBundleDisplayName: "Orphic DJ"
         LSRequiresIPhoneOS: true
         UIRequiredDeviceCapabilities:
           - arm64
