@@ -18,6 +18,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -112,104 +113,112 @@ class DustGrooveVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_8,
         progressionDriftRange = 0.15f,
         tracks = listOf(
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.85f,
-                pan = 0.00f,
-                density = 0.50f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.65f,
-                pan = -0.10f,
-                density = 0.40f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.FILL
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
-                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-                role = TrackRole.Percussive,
-                volume = 0.60f,
-                pan = 0.20f,
-                density = 0.65f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.50f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT
+                )
+            },
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.65f).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    pan = -0.10f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.FILL
+                )
+            },
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.60f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.20f,
+                    density = 0.65f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE
+                )
+            },
             // Bass: locked pattern + ROOT_ONLY chord follow keeps the dusty pocket tight.
             // noteRangeLow 33 (A1) preserved — the dusty warmth is the character.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
-                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
                 volume = 0.80f,
-                pan = 0.00f,
-                density = 0.55f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 33,
                 noteRangeHigh = 52,
                 reverbBrightness = 0.35f,
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.FM,
-                engineSpace = OrpheusEngineId.FM,
-                role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                    pan = 0.00f,
+                    density = 0.55f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.FM,
                 volume = 0.45f,
-                pan = -0.20f,
-                density = 0.35f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.CALL_RESPONSE,
                 noteRangeLow = 45,
                 noteRangeHigh = 64,
                 reverbBrightness = 0.45f,
                 glideRate = 0.1f,
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.WAVESHAPING,
-                engineSpace = OrpheusEngineId.ADDITIVE,
-                role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
+            ).let { lead ->
+                TrackVoice(
+                    engineEdm = lead,
+                    engineSpace = lead,
+                    role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
+                    pan = -0.20f,
+                    density = 0.35f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.CALL_RESPONSE,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.WAVESHAPING,
                 volume = 0.30f,
-                pan = 0.30f,
-                density = 0.20f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.CALL_RESPONSE,
                 modLfoRate = 0.3f,
                 modLfoDepth = 0.5f,
                 modLfoShape = 0.35f,
                 modLfoCoupling = 0.2f,
-//                holdProbability = 0.45f,
-//                holdLengthMin = 4,
-//                holdLengthMax = 10,
+//                    holdProbability = 0.45f,
+//                    holdLengthMin = 4,
+//                    holdLengthMax = 10,
                 reverbSend = 0.35f,
                 delaySend = 0.25f,
                 noteRangeLow = 38,
                 noteRangeHigh = 59,
                 reverbBrightness = 0.55f,
                 glideRate = 0.2f,
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.GRAIN,
-                engineSpace = OrpheusEngineId.WAVETABLE,
-                role = TrackRole.Melodic(),
+            ).let { wsh ->
+                TrackVoice(
+                    engineEdm = wsh,
+                    engineSpace = wsh.copy(engineId = OrpheusEngineId.ADDITIVE),
+                    role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
+                    pan = 0.30f,
+                    density = 0.20f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.CALL_RESPONSE,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.GRAIN,
                 volume = 0.30f,
-                pan = -0.30f,
-                density = 0.15f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.25f,
                 modLfoDepth = 0.4f,
                 modLfoShape = 0.45f,
@@ -222,18 +231,22 @@ class DustGrooveVibe : VibeProvider {
                 noteRangeLow = 40,
                 noteRangeHigh = 60,
                 reverbBrightness = 0.5f,
-                glideRate = 0.25f
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PARTICLE,
-                engineSpace = OrpheusEngineId.NOISE,
-                role = TrackRole.Percussive,
+                glideRate = 0.25f,
+            ).let { grain ->
+                TrackVoice(
+                    engineEdm = grain,
+                    engineSpace = grain.copy(engineId = OrpheusEngineId.WAVETABLE),
+                    role = TrackRole.Melodic(),
+                    pan = -0.30f,
+                    density = 0.15f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PARTICLE,
                 volume = 0.20f,
-                pan = 0.35f,
-                density = 0.08f,
-                envelopeProfile = EnvelopeProfile.WILD,
-                macroMap = TrackMacroMap.WILD,
-                barStrategy = BarStrategy.REPEAT,
                 modLfoRate = 0.35f,
                 modLfoDepth = 0.35f,
                 modLfoShape = 0.55f,
@@ -246,8 +259,19 @@ class DustGrooveVibe : VibeProvider {
                 noteRangeLow = 36,
                 noteRangeHigh = 60,
                 reverbBrightness = 0.45f,
-                glideRate = 0.15f
-            ),
+                glideRate = 0.15f,
+            ).let { fx ->
+                TrackVoice(
+                    engineEdm = fx,
+                    engineSpace = fx.copy(engineId = OrpheusEngineId.NOISE),
+                    role = TrackRole.Percussive,
+                    pan = 0.35f,
+                    density = 0.08f,
+                    envelopeProfile = EnvelopeProfile.WILD,
+                    macroMap = TrackMacroMap.WILD,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

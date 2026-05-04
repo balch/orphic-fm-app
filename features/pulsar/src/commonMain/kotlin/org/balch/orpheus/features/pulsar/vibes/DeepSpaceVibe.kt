@@ -15,6 +15,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.PitchEvolution
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
@@ -129,37 +130,55 @@ class DeepSpaceVibe : VibeProvider {
 
             // 0 KICK: Sonar ping — the Leslie piano ping that opens Echoes
             // Modal resonator, sparse deep hits, iconic single-note punctuation
-            TrackVoice(
-                engineEdm = OrpheusEngineId.MODAL, engineSpace = OrpheusEngineId.MODAL,
-                density = 0.29f, role = TrackRole.Melodic(), volume = 0.90f, pan = 0.0f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.MODAL,
+                volume = 0.90f,
                 harmonics = 0.35f, timbre = 0.25f, morph = 0.55f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 37, noteRangeHigh = 49,
                 reverbBrightness = 0.5f, reverbSend = 0.65f, delaySend = 0.3f,
-            ),
+            ).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    density = 0.29f, role = TrackRole.Melodic(), pan = 0.0f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 1 PERC: Ride shimmer — light metallic texture, like distant cymbals
-            TrackVoice(
-                engineEdm = OrpheusEngineId.STRING, engineSpace = OrpheusEngineId.STRING,
-                density = 0.42f, role = TrackRole.Melodic(), volume = 0.9f, pan = -0.25f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.STRING,
+                volume = 0.9f,
                 harmonics = 0.45f, timbre = 0.35f, morph = 0.15f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 55, noteRangeHigh = 67,
                 reverbBrightness = 0.55f, delaySend = 0.65f, reverbSend = 0.3f,
-            ),
+            ).let { perc ->
+                TrackVoice(
+                    engineEdm = perc,
+                    engineSpace = perc,
+                    density = 0.42f, role = TrackRole.Melodic(), pan = -0.25f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 2 HH: Wind/atmosphere — crystalline particle scatter, like wind through a canyon
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PARTICLE, engineSpace = OrpheusEngineId.PARTICLE,
-                density = 0.7f, role = TrackRole.Melodic(), volume = 0.9f, pan = 0.3f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PARTICLE,
+                volume = 0.9f,
                 harmonics = 1f, timbre = 0.5f, morph = 1f,
-                envelopeProfile = EnvelopeProfile.DRONE,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.REPEAT,
                 reverbBrightness = 0.75f, reverbSend = 0.3f, delaySend = 0.25f,
-            ),
+            ).let { wind ->
+                TrackVoice(
+                    engineEdm = wind,
+                    engineSpace = wind,
+                    density = 0.7f, role = TrackRole.Melodic(), pan = 0.3f,
+                    envelopeProfile = EnvelopeProfile.DRONE,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
 
             // ═══════════════════════════════════════════════════════════
             // Melodic — the Echoes core
@@ -168,80 +187,110 @@ class DeepSpaceVibe : VibeProvider {
             // 3 BASS: The Echoes bass riff — PD for warm dark bass, lick-driven.
             // chordFollow = FIXED so the iconic C#-D#-E-F#-E-D#-C#-B riff plays
             // exactly as written — chord progression moves via the KEYS drone above.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PHASE_DISTORTION, engineSpace = OrpheusEngineId.PHASE_DISTORTION,
-                role = TrackRole.Melodic(lickMode = LickMode.Fill, chordFollow = ChordFollow.FIXED),
-                volume = 0.22f, pan = 0.0f, density = 0.14f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PHASE_DISTORTION,
+                volume = 0.22f,
                 harmonics = 0.5f, timbre = 0.55f, morph = 0.1f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 37, noteRangeHigh = 49,
                 reverbBrightness = 0.5f, reverbSend = 0.2f, delaySend = 0.3f,
                 glideRate = 0.5f,
                 holdProbability = 0.9f, holdLengthMin = 6, holdLengthMax = 16,
-            ),
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass,
+                    role = TrackRole.Melodic(lickMode = LickMode.Fill, chordFollow = ChordFollow.FIXED),
+                    pan = 0.0f, density = 0.14f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 4 KEYS: Evolving drone — VA (warm organ) at high energy, ENS (lush pad) at low
             // Long sustains with slow timbral drift. LFO sweeps harmonics/timbre for builds.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG, engineSpace = OrpheusEngineId.STRING_MACHINE,
-                density = 0.12f, role = TrackRole.Melodic(), volume = 0.70f, pan = -0.1f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.VIRTUAL_ANALOG,
+                volume = 0.70f,
                 harmonics = 0.25f, timbre = 0.2f, morph = 0.1f,
-                envelopeProfile = EnvelopeProfile.DRONE,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.INDEPENDENT,
                 noteRangeLow = 49, noteRangeHigh = 61,
                 reverbBrightness = 0.45f, reverbSend = 0.35f, delaySend = 0.25f,
                 modLfoRate = 0.015f, modLfoDepth = 0.7f, modLfoShape = 0.1f, modLfoCoupling = 0.4f,
                 glideRate = 0.6f,
                 holdProbability = 0.5f, holdLengthMin = 6, holdLengthMax = 22,
-                evolution = Evolution(pitch = PitchEvolution.Contour()),
-            ),
+            ).let { keys ->
+                TrackVoice(
+                    engineEdm = keys,
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    density = 0.12f, role = TrackRole.Melodic(), pan = -0.1f,
+                    envelopeProfile = EnvelopeProfile.DRONE,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                    evolution = Evolution(pitch = PitchEvolution.Contour()),
+                )
+            },
 
             // ═══════════════════════════════════════════════════════════
             // Texture / FX — atmosphere and color
             // ═══════════════════════════════════════════════════════════
 
             // 5 PAD (Guitar): Gilmour guitar — resonant STR, high harmonics, delay+reverb
-            TrackVoice(
-                engineEdm = OrpheusEngineId.STRING, engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(), volume = 0.65f, pan = 0.2f, density = 0.22f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.STRING,
+                volume = 0.65f,
                 harmonics = 0.9f, timbre = 0.5f, morph = 0.1f,
-                envelopeProfile = EnvelopeProfile.DRONE,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.INDEPENDENT,
                 noteRangeLow = 49, noteRangeHigh = 67,
                 reverbBrightness = 0.55f, glideRate = 0.7f,
                 modLfoRate = 0.04f, modLfoDepth = 0.35f, modLfoShape = 0.15f, modLfoCoupling = 0.2f,
                 holdProbability = 0.9f, holdLengthMin = 8, holdLengthMax = 24,
                 reverbSend = 0.3f, delaySend = 0.3f,
-            ),
+            ).let { guitar ->
+                TrackVoice(
+                    engineEdm = guitar,
+                    engineSpace = guitar,
+                    role = TrackRole.Melodic(), pan = 0.2f, density = 0.22f,
+                    envelopeProfile = EnvelopeProfile.DRONE,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // 6 TEXTURE: Seagull/void sounds — particle clouds for the atonal middle section
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PARTICLE, engineSpace = OrpheusEngineId.PARTICLE,
-                role = TrackRole.Melodic(), volume = 0.50f, pan = -0.35f, density = 0.16f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PARTICLE,
+                volume = 0.50f,
                 harmonics = 0.3f, timbre = 0.45f, morph = 0.25f,
-                envelopeProfile = EnvelopeProfile.WILD,
-                macroMap = TrackMacroMap.WILD,
-                barStrategy = BarStrategy.INDEPENDENT,
                 noteRangeLow = 43, noteRangeHigh = 61,
                 reverbBrightness = 0.7f, glideRate = 0.4f,
                 modLfoRate = 0.07f, modLfoDepth = 0.5f, modLfoShape = 0.35f, modLfoCoupling = 0.4f,
                 holdProbability = 0.75f, holdLengthMin = 4, holdLengthMax = 14,
                 reverbSend = 0.4f, delaySend = 0.25f,
-            ),
+            ).let { texture ->
+                TrackVoice(
+                    engineEdm = texture,
+                    engineSpace = texture,
+                    role = TrackRole.Melodic(), pan = -0.35f, density = 0.16f,
+                    envelopeProfile = EnvelopeProfile.WILD,
+                    macroMap = TrackMacroMap.WILD,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // 7 FX: Echo repeats — delayed resonant pings that fade into the distance
-            TrackVoice(
-                engineEdm = OrpheusEngineId.MODAL, engineSpace = OrpheusEngineId.MODAL,
-                role = TrackRole.Melodic(), volume = 0.40f, pan = 0.35f, density = 0.08f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.MODAL,
+                volume = 0.40f,
                 harmonics = 0.5f, timbre = 0.4f, morph = 0.15f,
-                envelopeProfile = EnvelopeProfile.WILD,
-                macroMap = TrackMacroMap.WILD,
-                barStrategy = BarStrategy.INDEPENDENT,
                 noteRangeLow = 55, noteRangeHigh = 73,
                 reverbBrightness = 0.8f,
                 reverbSend = 0.45f, delaySend = 0.35f,
-            ),
+            ).let { fx ->
+                TrackVoice(
+                    engineEdm = fx,
+                    engineSpace = fx,
+                    role = TrackRole.Melodic(), pan = 0.35f, density = 0.08f,
+                    envelopeProfile = EnvelopeProfile.WILD,
+                    macroMap = TrackMacroMap.WILD,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

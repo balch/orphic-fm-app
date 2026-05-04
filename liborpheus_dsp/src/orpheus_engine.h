@@ -740,13 +740,27 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend
     std::atomic<int> pulsar_track_engine_edm[8]{};
     std::atomic<int> pulsar_track_engine_space[8]{};
+    // Mirrors PulsarTrackState::engine_index — written unconditionally by
+    // unit_process_pulsar each block (after the energy-driven slot decision,
+    // even when edm == spa or the crossfade zone keeps the prior choice).
+    // Initialized from pulsar_track_engine_edm in set_port whenever Kotlin
+    // assigns the EDM slot, so downstream units (e.g. pulsar_delay) never
+    // read a stale 0 on the first audio block after a vibe load.
+    std::atomic<int> pulsar_track_active_engine[8]{};
 
-    // Per-track voice params (set by Kotlin on vibe load)
+    // Per-track voice params (set by Kotlin on vibe load).
+    // Most params have an _edm + _space pair so the two engine slots
+    // (engineEdm/engineSpace) can be tuned independently — see comment at
+    // pulsar_track_lpg_mode below for the active-slot selection pattern.
     std::atomic<float> pulsar_track_volume[8]{};
+    std::atomic<float> pulsar_track_volume_space[8]{};
     std::atomic<float> pulsar_track_pan[8]{};
     std::atomic<float> pulsar_track_harmonics[8]{};
+    std::atomic<float> pulsar_track_harmonics_space[8]{};
     std::atomic<float> pulsar_track_timbre[8]{};
+    std::atomic<float> pulsar_track_timbre_space[8]{};
     std::atomic<float> pulsar_track_morph[8]{};
+    std::atomic<float> pulsar_track_morph_space[8]{};
     std::atomic<int>   pulsar_track_envelope[8]{};
     std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL
     std::atomic<int>   pulsar_track_bar_strategy[8]{};  // BarStrategy enum (0-4)
@@ -896,35 +910,49 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_band_bars_per_lead_min{2};
     std::atomic<int>   pulsar_band_bars_per_lead_max{4};
 
-    // Per-track hold parameters (TEXTURE/FX tracks 5-7)
+    // Per-track hold parameters (TEXTURE/FX tracks 5-7) — per-engine
     std::atomic<float> pulsar_track_hold_probability[8] = {};
+    std::atomic<float> pulsar_track_hold_probability_space[8] = {};
     std::atomic<int>   pulsar_track_hold_length_min[8] = {};
+    std::atomic<int>   pulsar_track_hold_length_min_space[8] = {};
     std::atomic<int>   pulsar_track_hold_length_max[8] = {};
+    std::atomic<int>   pulsar_track_hold_length_max_space[8] = {};
 
-    // Per-track mod LFO parameters (TEXTURE/FX modulation)
+    // Per-track mod LFO parameters (TEXTURE/FX modulation) — per-engine
     std::atomic<float> pulsar_track_mod_lfo_rate[8] = {};      // Hz (0.05-2.0)
+    std::atomic<float> pulsar_track_mod_lfo_rate_space[8] = {};
     std::atomic<float> pulsar_track_mod_lfo_depth[8] = {};     // 0.0-1.0
+    std::atomic<float> pulsar_track_mod_lfo_depth_space[8] = {};
     std::atomic<float> pulsar_track_mod_lfo_shape[8] = {};     // 0.0-1.0 (PolyLfo shape morph)
+    std::atomic<float> pulsar_track_mod_lfo_shape_space[8] = {};
     std::atomic<float> pulsar_track_mod_lfo_coupling[8] = {};  // 0.0-1.0
+    std::atomic<float> pulsar_track_mod_lfo_coupling_space[8] = {};
 
     // Track mute (0=enabled, 1=muted) — UI toggle, not persisted
     std::atomic<int>   pulsar_track_mute[8] = {};
 
-    // Per-track delay/reverb sends
+    // Per-track delay/reverb sends — per-engine
     std::atomic<float> pulsar_track_delay_send[8] = {};
+    std::atomic<float> pulsar_track_delay_send_space[8] = {};
     std::atomic<float> pulsar_track_reverb_send[8] = {};
+    std::atomic<float> pulsar_track_reverb_send_space[8] = {};
 
-    // Per-track note range overrides (0 = use genre default)
+    // Per-track note range overrides (0 = use genre default) — per-engine
     std::atomic<int>   pulsar_track_note_range_low[8] = {};
+    std::atomic<int>   pulsar_track_note_range_low_space[8] = {};
     std::atomic<int>   pulsar_track_note_range_high[8] = {};
-    // Per-track reverb send brightness (0-1, default 0.5)
+    std::atomic<int>   pulsar_track_note_range_high_space[8] = {};
+    // Per-track reverb send brightness (0-1, default 0.5) — per-engine
     std::atomic<float> pulsar_track_reverb_brightness[8] = {};
+    std::atomic<float> pulsar_track_reverb_brightness_space[8] = {};
     // Per-track density override (-1 = use genre, 0-1 = override)
     std::atomic<float> pulsar_track_density_override[8] = {};
-    // Per-track delay feedback (-1 = use global, 0-0.95 = override)
+    // Per-track delay feedback (-1 = use global, 0-0.95 = override) — per-engine
     std::atomic<float> pulsar_track_delay_feedback[8] = {};
-    // Per-track glide rate (0 = instant, 1 = very slow ~2s)
+    std::atomic<float> pulsar_track_delay_feedback_space[8] = {};
+    // Per-track glide rate (0 = instant, 1 = very slow ~2s) — per-engine
     std::atomic<float> pulsar_track_glide_rate[8] = {};
+    std::atomic<float> pulsar_track_glide_rate_space[8] = {};
     // Per-track lick usage
     std::atomic<int>   pulsar_track_lick_mode[8] = {};  // LickMode: 0=NONE, 1=SQUASH, 2=FILL
     std::atomic<int>   pulsar_track_comping_style[8] = {};  // CompingStyleId: 0=PAD, 1=FUNK, 2=ROCK, 3=CUSTOM
@@ -954,10 +982,12 @@ struct OrpheusEngine {
     // engineSpace is active. The space slot is "fall through to lpg_mode" via
     // a sentinel of LPG_ENGINE_DEFAULT (3) — Kotlin pushes the per-slot
     // mode if a vibe sets `lpgModeSpace` explicitly.
-    std::atomic<int>   pulsar_track_lpg_mode[8]       = {};
-    std::atomic<int>   pulsar_track_lpg_mode_space[8] = {};
-    std::atomic<float> pulsar_track_lpg_decay[8]      = {};
-    std::atomic<float> pulsar_track_lpg_colour[8]     = {};
+    std::atomic<int>   pulsar_track_lpg_mode[8]         = {};
+    std::atomic<int>   pulsar_track_lpg_mode_space[8]   = {};
+    std::atomic<float> pulsar_track_lpg_decay[8]        = {};
+    std::atomic<float> pulsar_track_lpg_decay_space[8]  = {};
+    std::atomic<float> pulsar_track_lpg_colour[8]       = {};
+    std::atomic<float> pulsar_track_lpg_colour_space[8] = {};
 
     // Per-track evolution parameters
     // Note: tension_resp and voicing_tension zero-init here; Kotlin defaults are 1.0f.

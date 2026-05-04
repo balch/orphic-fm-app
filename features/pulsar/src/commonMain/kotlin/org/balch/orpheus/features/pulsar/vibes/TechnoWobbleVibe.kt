@@ -26,6 +26,7 @@ import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.LpgMode
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -173,110 +174,96 @@ class TechnoWobbleVibe : VibeProvider {
         progressionDriftRange = 0.08f,                    // very tight — stays locked
         tracks = listOf(
             // Track 0: Kick — dead-straight four-on-the-floor, heavy
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.95f,
-                pan = 0.00f,
-                density = 0.50f,   // 4-on-floor lands kicks on every quarter
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.95f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.50f,   // 4-on-floor lands kicks on every quarter
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // Track 1: Snare — processed, lo-fi thwack on 2 and 4
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 volume = 0.72f,
-                pan = -0.08f,
-                density = 0.35f,
                 harmonics = 0.55f,  // slight noise boost for the processed snap
                 timbre = 0.45f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
                 reverbSend = 0.25f,  // a touch of reverb for the "big room" snare
                 reverbBrightness = 0.35f,
-            ),
+            ).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    pan = -0.08f,
+                    density = 0.35f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // Track 2: Hihat — minimal, scratchy. This is NOT techno — hats
             // are an accent color, not a driving force.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
-                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-                role = TrackRole.Percussive,
-                volume = 0.40f,
-                pan = 0.15f,
-                density = 0.22f,     // sparse — not a 16th-note stream
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.40f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.15f,
+                    density = 0.22f,     // sparse — not a 16th-note stream
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // Track 3: Bass — the engine of the whole thing. Gritty WSH engine
             // with the lick locked in. ROOT_ONLY so the chord motion transposes
             // the riff cleanly without any extra wandering. Fill mode so the
             // lick is a full-bar statement, not a sub-bar stab.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.WAVESHAPING,
-                engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(
-                    chordFollow = ChordFollow.ROOT_ONLY,
-                    lickMode = LickMode.Fill,
-                ),
-                // WSH (EDM slot) needs the LPG vactrol pluck so its raw oscillator
-                // gets an articulate attack. STR (SPACE slot) already has its own
-                // physical-model decay envelope — BYPASS lets it ride at full volume
-                // instead of being doubly attenuated.
-                lpgMode = LpgMode.PLUCK,
-                lpgModeSpace = LpgMode.BYPASS,
+            //
+            // WSH (EDM slot) needs the LPG vactrol pluck so its raw oscillator
+            // gets an articulate attack. STR (SPACE slot) already has its own
+            // physical-model decay envelope — BYPASS lets it ride at full volume
+            // instead of being doubly attenuated.
+            OrpheusEngine(
+                engineId = OrpheusEngineId.WAVESHAPING,
                 volume = 0.85f,
-                pan = 0.00f,
-                density = 0.55f,
                 harmonics = 0.42f,
                 timbre = 0.55f,
                 morph = 0.35f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 32,   // G#1/Ab1 — deep
                 noteRangeHigh = 50,
                 reverbBrightness = 0.25f,  // dark bass, not bright
-            ),
+                lpgMode = LpgMode.PLUCK,
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.STRING, lpgMode = LpgMode.BYPASS),
+                    role = TrackRole.Melodic(
+                        chordFollow = ChordFollow.ROOT_ONLY,
+                        lickMode = LickMode.Fill,
+                    ),
+                    pan = 0.00f,
+                    density = 0.55f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // Track 4: Lead stabs — distorted mid-register, sparse but piercing.
             // CHORDAL with ROCK_DOWNBEATS style so it hits on 1 and 3 alongside
             // the kick, but with octave jumps and drops so it feels
             // unpredictable and aggressive — not a tidy chord pattern.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.WAVESHAPING,
-                engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Chordal(
-                    comping = ChordComping(
-                        style = CompingStyle.ROCK_DOWNBEATS,
-                        arpMode = ArpMode.NEVER,  // straight stabs, no arp
-                        sectionInversion = SectionInversion.ROOT_POSITION,
-                        humanization = CompingHumanization(
-                            dropProbability = 0.30f,       // lots of dropped stabs — sparse, deliberate
-                            ghostProbability = 0.15f,
-                            octaveJumpProbability = 0.20f, // occasional octave leaps
-                            extensionProbability = 0.10f,  // sparse color
-                        ),
-                        fills = CompingFills(
-                            everyNBars = 8,
-                            fillType = FillType.TURNAROUND,
-                            skipProbability = 0.5f,
-                        ),
-                    ),
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.WAVESHAPING,
+                volume = 0.55f,
                 harmonics = 0.75f,   // heavy distortion character
                 timbre = 0.60f,
                 morph = 0.50f,
-                volume = 0.55f,
-                pan = 0.10f,
-                density = 0.28f,     // sparse — each hit matters
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.MUTATE,
                 noteRangeLow = 48,   // C3 — mid range
                 noteRangeHigh = 68,
                 reverbSend = 0.35f,  // wet — long tail on every stab
@@ -284,22 +271,43 @@ class TechnoWobbleVibe : VibeProvider {
                 reverbBrightness = 0.55f,
                 delayFeedback = 0.45f, // trailing echoes
                 glideRate = 0.08f,
-            ),
+            ).let { stab ->
+                TrackVoice(
+                    engineEdm = stab,
+                    engineSpace = stab.copy(engineId = OrpheusEngineId.STRING),
+                    role = TrackRole.Chordal(
+                        comping = ChordComping(
+                            style = CompingStyle.ROCK_DOWNBEATS,
+                            arpMode = ArpMode.NEVER,  // straight stabs, no arp
+                            sectionInversion = SectionInversion.ROOT_POSITION,
+                            humanization = CompingHumanization(
+                                dropProbability = 0.30f,       // lots of dropped stabs — sparse, deliberate
+                                ghostProbability = 0.15f,
+                                octaveJumpProbability = 0.20f, // occasional octave leaps
+                                extensionProbability = 0.10f,  // sparse color
+                            ),
+                            fills = CompingFills(
+                                everyNBars = 8,
+                                fillType = FillType.TURNAROUND,
+                                skipProbability = 0.5f,
+                            ),
+                        ),
+                    ),
+                    pan = 0.10f,
+                    density = 0.28f,     // sparse — each hit matters
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // Track 5: Pad — dark sustained string ensemble. Drones under
             // everything with slow LFO timbre drift. This is the bed.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_3,
-                engineSpace = OrpheusEngineId.SIX_OP_FM_3,
-                role = TrackRole.Melodic(),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_3,
                 volume = 0.45f,
-                pan = -0.35f,
-                density = 0.12f,     // very sparse hits but long-held
                 harmonics = 0.30f,   // dark
                 timbre = 0.25f,
                 morph = 0.15f,
-                envelopeProfile = EnvelopeProfile.DRONE,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.04f,  // glacial drift
                 modLfoDepth = 0.65f,
                 modLfoShape = 0.2f,  // sine-ish, smooth
@@ -313,23 +321,27 @@ class TechnoWobbleVibe : VibeProvider {
                 noteRangeHigh = 62,
                 reverbBrightness = 0.35f,  // dark reverb
                 glideRate = 0.6f,
-            ),
+            ).let { pad ->
+                TrackVoice(
+                    engineEdm = pad,
+                    engineSpace = pad,
+                    role = TrackRole.Melodic(),
+                    pan = -0.35f,
+                    density = 0.12f,     // very sparse hits but long-held
+                    envelopeProfile = EnvelopeProfile.DRONE,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // Track 6: Noise/grain texture — the "dirt" layer. Distortion
             // crackle and grain clouds as a musical element, not an accent.
             // Panned opposite the pad for width.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.GRAIN,
-                engineSpace = OrpheusEngineId.NOISE,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.GRAIN,
                 volume = 0.30f,
-                pan = 0.35f,
-                density = 0.18f,
                 harmonics = 0.55f,
                 timbre = 0.45f,
                 morph = 0.50f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.08f,
                 modLfoDepth = 0.55f,
                 modLfoShape = 0.7f,   // more angular — mechanical
@@ -342,23 +354,27 @@ class TechnoWobbleVibe : VibeProvider {
                 noteRangeLow = 40,
                 noteRangeHigh = 60,
                 reverbBrightness = 0.30f,
-            ),
+            ).let { texture ->
+                TrackVoice(
+                    engineEdm = texture,
+                    engineSpace = texture.copy(engineId = OrpheusEngineId.NOISE),
+                    role = TrackRole.Percussive,
+                    pan = 0.35f,
+                    density = 0.18f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // Track 7: Wild card — modal resonator for the industrial "clang."
             // Metallic hits that surface occasionally. WILD macro map so it
             // gets swept unpredictably as the macros move.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.MODAL,
-                engineSpace = OrpheusEngineId.MODAL,
-                role = TrackRole.Melodic(),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.MODAL,
                 volume = 0.25f,
-                pan = 0.00f,
-                density = 0.08f,     // very sparse — dramatic interruptions
                 harmonics = 0.65f,
                 timbre = 0.55f,
                 morph = 0.70f,
-                envelopeProfile = EnvelopeProfile.WILD,
-                macroMap = TrackMacroMap.WILD,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.05f,
                 modLfoDepth = 0.45f,
                 modLfoShape = 0.6f,
@@ -372,7 +388,18 @@ class TechnoWobbleVibe : VibeProvider {
                 noteRangeHigh = 66,
                 reverbBrightness = 0.40f,
                 glideRate = 0.25f,
-            ),
+            ).let { wild ->
+                TrackVoice(
+                    engineEdm = wild,
+                    engineSpace = wild,
+                    role = TrackRole.Melodic(),
+                    pan = 0.00f,
+                    density = 0.08f,     // very sparse — dramatic interruptions
+                    envelopeProfile = EnvelopeProfile.WILD,
+                    macroMap = TrackMacroMap.WILD,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
         ),
         stepCount = 32,  // 32-step patterns support the 8-bar hypnotic loop
         tension = TensionProfile(

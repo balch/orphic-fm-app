@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -134,69 +135,82 @@ class VoltageStrutVibe : VibeProvider {
         progressionDriftRange = 0.52f,
         tracks = listOf(
             // 0: electronic kick — locked 4-on-floor, REPEAT (the anchor).
-            TrackVoice(
-                engineEdm = OrpheusEngineId.FM,
-                engineSpace = OrpheusEngineId.FM,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.FM,
                 volume = 0.95f,
-                pan = 0.00f,
-                density = 0.55f,
                 timbre = 0.35f,
                 morph = 0.30f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
-            ),
+            ).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.55f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 1: electronic snare — funky backbeat with mutation, clappy edge.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PHASE_DISTORTION,
-                engineSpace = OrpheusEngineId.NOISE,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PHASE_DISTORTION,
                 volume = 0.70f,
-                pan = -0.10f,
-                density = 0.40f,
                 harmonics = 0.55f,
                 timbre = 0.55f,
                 morph = 0.45f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE,
-            ),
+            ).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare.copy(engineId = OrpheusEngineId.NOISE),
+                    role = TrackRole.Percussive,
+                    pan = -0.10f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 2: dense hats — busy 16ths with ghosts, MUTATE for funk variation.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PARTICLE,
-                engineSpace = OrpheusEngineId.PARTICLE,
-                role = TrackRole.Percussive,
-                volume = 0.65f,
-                pan = 0.20f,
-                density = 0.80f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.PARTICLE, volume = 0.65f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.20f,
+                    density = 0.80f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 3: MAIN BASS — waveshaping hook, plays the lick, follows the chord root.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.WAVESHAPING,
-                engineSpace = OrpheusEngineId.WAVESHAPING,
-                role = TrackRole.Melodic(
-                    chordFollow = ChordFollow.ROOT_ONLY,
-                    lickMode = LickMode.Fill,
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.WAVESHAPING,
                 volume = 0.80f,
-                pan = 0.00f,
-                density = 0.60f,
                 harmonics = 0.55f,
                 timbre = 0.55f,
                 morph = 0.45f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 40,
                 noteRangeHigh = 58,
                 reverbBrightness = 0.45f,
                 reverbSend = 0.10f,
                 glideRate = 0.05f,
-            ),
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass,
+                    role = TrackRole.Melodic(
+                        chordFollow = ChordFollow.ROOT_ONLY,
+                        lickMode = LickMode.Fill,
+                    ),
+                    pan = 0.00f,
+                    density = 0.60f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 4: lead — glassy FM stabs, moderate density, energy-driven.
             // OrpheusEngineId.SIX_OP_FM_2 + harmonics=0.50 lands on patch idx 16 = "Xylophone". At this
             // track's C4–G6 register with reverb=0.60, delay=0.30 and MUTATE strategy,
@@ -205,88 +219,104 @@ class VoltageStrutVibe : VibeProvider {
             // stabs — but the strut character wanted the percussive top-end clarity
             // that the mallet patch provides at high register.) Crossfades to VA
             // (clean analog poly) when Energy drops for a softer space-side voice.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_2,
-                engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_2,
                 volume = 0.55f,
-                pan = 0.05f,
-                density = 0.40f,
                 harmonics = 0.50f,  // DX2 idx 16 = "Xylophone" — glassy mallet at C4-G6
                 timbre = 0.55f,
                 morph = 0.45f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.MUTATE,
                 noteRangeLow = 60,
                 noteRangeHigh = 82,
                 reverbBrightness = 0.60f,
                 reverbSend = 0.25f,
                 delaySend = 0.30f,
                 glideRate = 0.10f,
-            ),
+            ).let { lead ->
+                TrackVoice(
+                    engineEdm = lead,
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
+                    pan = 0.05f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 5: SECOND BASS — steady sub pedal. FIXED chord-follow + REPEAT + deep
             // register = locked drone under the main hook. Density 0.55 gives it a
             // steady pulse (roughly 8ths) rather than a single sustained drone.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
-                engineSpace = OrpheusEngineId.PHASE_DISTORTION,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
                 volume = 0.55f,
-                pan = 0.00f,
-                density = 0.25f,
                 harmonics = 0.30f,   // dark, round sub
                 timbre = 0.25f,
                 morph = 0.30f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 28,
                 noteRangeHigh = 40,
                 reverbBrightness = 0.25f,
                 reverbSend = 0.05f,
                 glideRate = 0.0f,
-            ),
+            ).let { sub ->
+                TrackVoice(
+                    engineEdm = sub,
+                    engineSpace = sub.copy(engineId = OrpheusEngineId.PHASE_DISTORTION),
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.25f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 6: PERCUSSIVE FX — noise hits, ticks/snaps. No pad, no sustain.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.NOISE,
-                engineSpace = OrpheusEngineId.NOISE,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.NOISE,
                 volume = 0.40f,
-                pan = 0.30f,
-                density = 0.25f,
                 harmonics = 0.60f,
                 timbre = 0.65f,
                 morph = 0.50f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.3f,
                 modLfoDepth = 0.25f,
                 reverbBrightness = 0.70f,
                 reverbSend = 0.25f,
                 delaySend = 0.30f,
-            ),
+            ).let { fx ->
+                TrackVoice(
+                    engineEdm = fx,
+                    engineSpace = fx,
+                    role = TrackRole.Percussive,
+                    pan = 0.30f,
+                    density = 0.25f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // 7: PERCUSSIVE FX — particle clicks, tuned-ish transients.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.GRAIN,
-                engineSpace = OrpheusEngineId.GRAIN,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.GRAIN,
                 volume = 0.55f,
-                pan = -0.30f,
-                density = 0.22f,
                 harmonics = 0.45f,
                 timbre = 0.60f,
                 morph = 0.35f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.4f,
                 modLfoDepth = 0.25f,
                 reverbBrightness = 0.65f,
                 reverbSend = 0.20f,
                 delaySend = 0.25f,
-            ),
+            ).let { particles ->
+                TrackVoice(
+                    engineEdm = particles,
+                    engineSpace = particles,
+                    role = TrackRole.Percussive,
+                    pan = -0.30f,
+                    density = 0.22f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

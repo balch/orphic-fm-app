@@ -20,6 +20,9 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.ports.PortRegistry
@@ -27,50 +30,35 @@ import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
-import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 /**
- * Verifies the per-section bpmMultiplier implementation in [PulsarViewModel]:
- * each section transition rescales live BPM by (newMult / previousMult), so
- * user-dialed tempo edits compose through multipliers across sections.
+ * Guards the per-section override push path in [PulsarViewModel.pushArrangement].
+ * The reviewer flagged a (false-positive) concern that section-level
+ * customProgression / chordsPerBar / compingHumanization were silently dropped;
+ * these tests pin the behavior so a future refactor can't regress it.
+ *
+ * Each test loads a vibe whose Section carries a non-default override field,
+ * then asserts that the corresponding `section_progression_*`,
+ * `section_chords_per_bar_*`, or `section_comping_humanization_*` symbol
+ * received the right value through the SynthController.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class PulsarSectionBpmTest {
+class PulsarSectionProgressionPushTest {
 
     private val testDispatcher = StandardTestDispatcher()
-    private val arrangementFlow = MutableStateFlow<PulsarArrangementState?>(ARRANGEMENT_STATE_UNKNOWN)
+    private val ports = mutableMapOf<String, PortValue>()
+    private val arrangementFlow =
+        MutableStateFlow<PulsarArrangementState?>(ARRANGEMENT_STATE_UNKNOWN)
 
     @BeforeTest fun setUp() { Dispatchers.setMain(testDispatcher) }
     @AfterTest fun tearDown() { Dispatchers.resetMain() }
 
-    private fun pushSection(index: Int) {
-        arrangementFlow.value = PulsarArrangementState(
-            sectionIndex = index,
-            barsElapsed = 0,
-            barsTotal = 8,
-            soloActive = false,
-            soloTrack = -1,
-            soloMode = 0,
-        )
-    }
-
-    private fun assertBpmNear(expected: Double, actual: Double, label: String) {
-        assertTrue(
-            abs(expected - actual) < 0.01,
-            "$label — expected ~$expected, got $actual"
-        )
-    }
-
-    private fun makeViewModel(
-        vibe: Vibe,
-        globalTempo: GlobalTempo,
-    ): PulsarViewModel {
+    private fun makeViewModel(vibe: Vibe): PulsarViewModel {
         val controller = SynthController().apply {
-            val ports = mutableMapOf<String, PortValue>()
             setDelegates(
                 setter = { id, value ->
                     ports["${id.uri}:${id.symbol}"] = value
@@ -79,131 +67,132 @@ class PulsarSectionBpmTest {
                 getter = { id -> ports["${id.uri}:${id.symbol}"] },
             )
         }
+        val tempo = GlobalTempo(PushTestAudioEngine())
         val portRegistry = PortRegistry(emptySet())
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = ArrangementStubEngine(arrangementFlow),
-            globalTempo = globalTempo,
-            appPreferencesRepository = StubPrefs(),
-            presetLoader = PresetLoader(portRegistry, globalTempo, controller),
-            dispatcherProvider = TestDispatchers(testDispatcher),
+            synthEngine = PushTestSynthEngine(arrangementFlow),
+            globalTempo = tempo,
+            appPreferencesRepository = PushTestPrefs(),
+            presetLoader = PresetLoader(portRegistry, tempo, controller),
+            dispatcherProvider = PushTestDispatchers(testDispatcher),
             scope = FeatureCoroutineScope(),
-            vibeProviders = setOf(SectionedVibeProvider(vibe)),
+            vibeProviders = setOf(PushTestVibeProvider(vibe)),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
         )
     }
 
+    private fun port(symbol: String): PortValue? =
+        ports["$PULSAR_URI:$symbol"]
+
+    private fun intPort(symbol: String): Int? = (port(symbol) as? IntValue)?.value
+    private fun floatPort(symbol: String): Float? = (port(symbol) as? FloatValue)?.value
+
     @Test
-    fun `section transition halves BPM via 0_5x multiplier`() = runTest(testDispatcher) {
-        val vibe = sectionedVibe(
-            bpm = 120f,
-            mults = listOf(1.0f, 0.5f, 1.0f),
+    fun `section customProgression and chordsPerBar reach controller`() = runTest(testDispatcher) {
+        // Section 0: glide-rich progression with explicit chordsPerBar=4.
+        // Section 1: no overrides — should serialize as length=0 / chordsPerBar=0.
+        val s0Progression = listOf(
+            ChordStep(0),
+            ChordStep(3, glideRate = 0.45f),
+            ChordStep(5),
+            ChordStep(4),
         )
-        val tempo = GlobalTempo(StubAudioEngine())
-        val vm = makeViewModel(vibe, tempo)
-        vm.actions.setVibe(vibe)
-        advanceUntilIdle()
-        assertBpmNear(120.0, tempo.getBpm(), "after applyVibe, BPM should equal vibe.bpm")
-
-        pushSection(0); advanceUntilIdle()
-        assertBpmNear(120.0, tempo.getBpm(), "section 0 (mult=1.0) should not change BPM")
-
-        pushSection(1); advanceUntilIdle()
-        assertBpmNear(60.0, tempo.getBpm(), "section 1 (mult=0.5) should halve BPM")
-
-        pushSection(2); advanceUntilIdle()
-        assertBpmNear(120.0, tempo.getBpm(),
-            "section 2 (mult=1.0) should restore BPM via the 1.0/0.5 rescale")
-    }
-
-    @Test
-    fun `live BPM dial during a section composes through subsequent transitions`() = runTest(testDispatcher) {
-        // Values chosen to stay inside GlobalTempo's 60..200 coercion range while
-        // still making the "compose with live edit" semantics distinguishable from
-        // the naive "vibe.bpm * mult" semantics.
-        val vibe = sectionedVibe(
-            bpm = 100f,
-            mults = listOf(1.0f, 0.8f, 1.5f),
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "verse",
+                    barsMin = 4, barsMax = 4,
+                    customProgression = s0Progression,
+                    chordsPerBar = 4,
+                ),
+                Section(name = "chorus", barsMin = 4, barsMax = 4),
+            ),
         )
-        val tempo = GlobalTempo(StubAudioEngine())
-        val vm = makeViewModel(vibe, tempo)
-        vm.actions.setVibe(vibe)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
         advanceUntilIdle()
 
-        pushSection(0); advanceUntilIdle()
-        pushSection(1); advanceUntilIdle()
-        assertBpmNear(80.0, tempo.getBpm(), "section 1 (mult=0.8) should be 80")
-
-        // User dials during the 0.8× section — implicit "1.0× base" is now 125.
-        tempo.setBpm(100.0)
-        advanceUntilIdle()
-
-        pushSection(2); advanceUntilIdle()
-        assertBpmNear(187.5, tempo.getBpm(),
-            "section 2 (mult=1.5) should be 100 * (1.5/0.8) = 187.5, " +
-                "preserving the user's live edit through the multiplier ratio " +
-                "(naive vibe.bpm * mult would yield 150)")
-    }
-
-    @Test
-    fun `vibe reload resets section-mult tracker so next section composes against vibe_bpm`() =
-        runTest(testDispatcher) {
-            val tempo = GlobalTempo(StubAudioEngine())
-            val v1 = sectionedVibe(bpm = 120f, mults = listOf(1.0f, 0.5f))
-            val v2 = sectionedVibe(bpm = 100f, mults = listOf(1.5f, 1.0f))
-
-            val vm = makeViewModel(v1, tempo)
-            vm.actions.setVibe(v1); advanceUntilIdle()
-            pushSection(0); advanceUntilIdle()
-            pushSection(1); advanceUntilIdle()
-            assertBpmNear(60.0, tempo.getBpm(), "v1 section 1 should be 60")
-
-            // Switching vibes resets the BPM to v2.bpm (applyVibe does this) and
-            // resets lastSectionMult to 1.0 so the next section's multiplier
-            // applies on top of v2.bpm directly.
-            vm.actions.setVibe(v2); advanceUntilIdle()
-            assertBpmNear(100.0, tempo.getBpm(), "applyVibe(v2) should set BPM to v2.bpm")
-
-            // arrangementFlow still holds sectionIndex=1 from v1. Re-emit to drive
-            // the v2 section path. Going to section 0 of v2 (mult=2.0) from the
-            // reset baseline (lastSectionMult=1.0) should produce 100 * 2.0.
-            pushSection(-1); advanceUntilIdle()  // move out of section so the next push isn't deduped
-            pushSection(0); advanceUntilIdle()
-            assertBpmNear(150.0, tempo.getBpm(),
-                "v2 section 0 (mult=1.5) should be 100 * (1.5/1.0) = 150 after vibe reset")
+        // Section 0: length encodes the override count; degree+glide arrays match.
+        assertEquals(s0Progression.size, intPort("section_progression_active_0"),
+            "section 0 progression length should be ${s0Progression.size}")
+        assertEquals(4, intPort("section_chords_per_bar_0"),
+            "section 0 chordsPerBar override should be 4")
+        s0Progression.forEachIndexed { i, step ->
+            assertEquals(step.degree, intPort("section_progression_degree_${i}"),
+                "section 0 degree[$i]")
+            assertEquals(step.glideRate, floatPort("section_progression_glide_${i}"),
+                "section 0 glide[$i]")
         }
+
+        // Section 1: no overrides — sentinels are 0 (no override) per engine.h:864/870.
+        assertEquals(0, intPort("section_progression_active_1"),
+            "section 1 progression length should be 0 (no override)")
+        assertEquals(0, intPort("section_chords_per_bar_1"),
+            "section 1 chordsPerBar override should be 0 (inherit vibe default)")
+    }
+
+    @Test
+    fun `section compingHumanization override reaches controller`() = runTest(testDispatcher) {
+        val humanization = CompingHumanization(
+            dropProbability = 0.18f,
+            ghostProbability = 0.22f,
+            octaveJumpProbability = 0.12f,
+            extensionProbability = 0.15f,
+        )
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "loose",
+                    barsMin = 4, barsMax = 4,
+                    compingHumanization = humanization,
+                ),
+                Section(name = "tight", barsMin = 4, barsMax = 4),
+            ),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        // Section 0: active=1, all four floats packed in order.
+        assertEquals(1, intPort("section_comping_humanization_active_0"),
+            "section 0 humanization active flag should be 1")
+        assertEquals(humanization.dropProbability,    floatPort("section_comping_humanization_data_0"))
+        assertEquals(humanization.ghostProbability,   floatPort("section_comping_humanization_data_1"))
+        assertEquals(humanization.octaveJumpProbability, floatPort("section_comping_humanization_data_2"))
+        assertEquals(humanization.extensionProbability,  floatPort("section_comping_humanization_data_3"))
+
+        // Section 1: active=0; data slots stay at their initialized 0.
+        assertEquals(0, intPort("section_comping_humanization_active_1"),
+            "section 1 humanization active flag should be 0")
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
-private fun sectionedVibe(bpm: Float, mults: List<Float>): Vibe {
-    val sections = mults.mapIndexed { i, m ->
-        Section(name = "s$i", barsMin = 4, barsMax = 4, bpmMultiplier = m)
-    }
-    return Vibe(
-        name = "Test-${mults.joinToString(",")}-bpm$bpm",
-        bpm = bpm,
-        rootNote = RootNote.C,
-        scaleType = ScaleType.MINOR,
-        genre = GenreProfile(
-            swingAmount = 0f, ghostProbability = 0f,
-            noteRangeLow = 36, noteRangeHigh = 72,
-            rhythmDensity = RhythmPattern.SPARSE.density,
-        ),
-        tracks = List(8) {
-            TrackVoice(
-                engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
-                engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
-                role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
-            )
-        },
-        arrangement = Arrangement(sections = sections),
-    )
-}
+private fun pushTestVibe(sections: List<Section>): Vibe = Vibe(
+    name = "Section Push Test",
+    bpm = 120f,
+    rootNote = RootNote.C,
+    scaleType = ScaleType.MINOR,
+    genre = GenreProfile(
+        swingAmount = 0f, ghostProbability = 0f,
+        noteRangeLow = 36, noteRangeHigh = 72,
+        rhythmDensity = RhythmPattern.SPARSE.density,
+    ),
+    tracks = List(8) {
+        TrackVoice(
+            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+            role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
+        )
+    },
+    arrangement = Arrangement(sections = sections),
+)
 
-private class SectionedVibeProvider(override val vibe: Vibe) : VibeProvider
+private class PushTestVibeProvider(override val vibe: Vibe) : VibeProvider
 
-private class StubAudioEngine : AudioEngine {
+private class PushTestAudioEngine : AudioEngine {
     override fun start() {}
     override fun stop() {}
     override val isRunning: Boolean = false
@@ -212,14 +201,14 @@ private class StubAudioEngine : AudioEngine {
     override fun getCurrentTime(): Double = 0.0
 }
 
-private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
+private class PushTestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
     override val main get() = d
     override val io get() = d
     override val default get() = d
     override val unconfined get() = d
 }
 
-private class StubPrefs : AppPreferencesRepository {
+private class PushTestPrefs : AppPreferencesRepository {
     private var prefs = AppPreferences()
     override suspend fun load() = prefs
     override suspend fun save(preferences: AppPreferences) { prefs = preferences }
@@ -228,9 +217,8 @@ private class StubPrefs : AppPreferencesRepository {
     }
 }
 
-// SynthEngine stub that exposes a writable arrangement flow so the test can
-// drive section transitions. Everything else is a no-op.
-private class ArrangementStubEngine(
+// SynthEngine stub. Mirrors the no-op pattern used by PulsarSectionBpmTest.
+private class PushTestSynthEngine(
     private val arrangement: MutableStateFlow<PulsarArrangementState?>,
 ) : SynthEngine {
     override val pulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> get() = arrangement

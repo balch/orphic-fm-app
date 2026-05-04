@@ -24,6 +24,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.PitchEvolution
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
@@ -163,62 +164,67 @@ class TremoloTideVibe : VibeProvider {
         progressionDriftRange = 0.08f,                    // very tight — keep the cycle locked
         tracks = listOf(
             // 0: kick — sparse half-time. Boom on 1, ghost on 3.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.ANALOG_BASS_DRUM,
                 volume = 0.70f,
-                pan = 0.00f,
-                density = 0.18f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
                 reverbSend = 0.1f,
-            ),
+            ).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.18f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 1: snare — soft brushes-feel backbeat on 2 and 4.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.ANALOG_SNARE_DRUM,
                 volume = 0.50f,
-                pan = -0.05f,
-                density = 0.22f,
                 harmonics = 0.30f,
                 timbre = 0.25f,    // duller, more brush-like
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE,
                 reverbSend = 0.40f,    // wet snare — Lynch-y reverb tail
                 reverbBrightness = 0.55f,
-            ),
+            ).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    pan = -0.05f,
+                    density = 0.22f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 2: hat / shaker — soft 8th feel, low velocity.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
-                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-                role = TrackRole.Percussive,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.METALLIC_HI_HAT,
                 volume = 0.35f,
-                pan = 0.10f,
-                density = 0.30f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE,
                 reverbSend = 0.20f,
-            ),
+            ).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.10f,
+                    density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 3: bass — sustained pedal note that glides between chord roots.
             //    Long notes, glideRate high, ROOT_ONLY locks to chord root.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
-                engineSpace = OrpheusEngineId.PHASE_DISTORTION,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
                 volume = 0.78f,
-                pan = 0.00f,
-                density = 0.30f,
                 harmonics = 0.25f,
                 timbre = 0.30f,
                 morph = 0.40f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 33,
                 noteRangeHigh = 47,        // strictly low register
                 holdProbability = 0.85f,    // sustain into next chord
@@ -228,23 +234,27 @@ class TremoloTideVibe : VibeProvider {
                 reverbSend = 0.15f,
                 delaySend = 0.15f,
                 reverbBrightness = 0.30f,   // dark bass tail
-            ),
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.PHASE_DISTORTION),
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                    pan = 0.00f,
+                    density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 4: tremolo lead — the iconic clean guitar voice. Plays the lick.
             //    DX2 in EDM slot for plaintive bell-like attack;
             //    WTB in space slot for darker shimmer when energy is low.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM,
-                engineSpace = OrpheusEngineId.SIX_OP_FM_2,
-                role = TrackRole.Melodic(lickMode = LickMode.Fill),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM,
                 volume = 0.25f,
-                pan = 0.15f,
-                density = 0.20f,
                 morph = .74f,
                 timbre = .67f,
                 harmonics = 0.35f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.MUTATE,
                 noteRangeLow = 55,
                 noteRangeHigh = 76,
                 holdProbability = 0.55f,
@@ -254,42 +264,36 @@ class TremoloTideVibe : VibeProvider {
                 reverbSend = 0.5f,
                 delaySend = 0.50f,          // dotted-eighth wash
                 reverbBrightness = 0.78f,   // shimmery top
-                // Section-aware lick evolution: bigger Markov pitch drift +
-                // aggressive rhythmic transforms at peak tension. evolutionWeight
-                // gates intensity by tension — quiet at section start, gnarliest
-                // at section end / chorus / solo.
-                evolution = Evolution(
-                    pitch = PitchEvolution.Contour(driftRange = 0.25f),
-                    rhythmic = RhythmicEvolution(tensionResponse = 0.85f),
-                ),
-                evolutionWeight = 0.8f,
-            ),
+            ).let { lead ->
+                TrackVoice(
+                    engineEdm = lead,
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.SIX_OP_FM_2),
+                    role = TrackRole.Melodic(lickMode = LickMode.Fill),
+                    pan = 0.15f,
+                    density = 0.20f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.MUTATE,
+                    // Section-aware lick evolution: bigger Markov pitch drift +
+                    // aggressive rhythmic transforms at peak tension. evolutionWeight
+                    // gates intensity by tension — quiet at section start, gnarliest
+                    // at section end / chorus / solo.
+                    evolution = Evolution(
+                        pitch = PitchEvolution.Contour(driftRange = 0.25f),
+                        rhythmic = RhythmicEvolution(tensionResponse = 0.85f),
+                    ),
+                    evolutionWeight = 0.8f,
+                )
+            },
             // 5: chordal pad — syncopated stabs by default; the verse promotes
             //    this to a sustained drone via TrackSectionOverride below.
             //    The chord engine picks up the progression; ENS in the space
             //    slot keeps a string-ensemble shimmer when energy is low.
             //    JAZZ_COMP keeps the bed quiet outside the verse — verse
             //    flips it to PAD for held bedrock.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.CHORD,
-                engineSpace = OrpheusEngineId.STRING_MACHINE,
-                role = TrackRole.Chordal(
-                    chordFollow = ChordFollow.FOLLOW,
-                    comping = ChordComping(
-                        style = CompingStyle.GOSPEL_STABS,
-                        arpSpeed = 1.0f,
-                        fills = CompingFills(
-                            everyNBars = 16,
-                            fillType = FillType.STAB_FLURRY,
-                        ),
-                    ),
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.CHORD,
                 volume = 0.40f,
-                pan = -0.25f,
-                density = 0.40f,
-                envelopeProfile = EnvelopeProfile.EFFECT,  // ducks under solos; verse swaps to DRONE
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 modLfoRate = 0.05f,
                 modLfoDepth = 0.35f,
                 modLfoShape = 0.4f,
@@ -303,18 +307,32 @@ class TremoloTideVibe : VibeProvider {
                 delaySend = 0.25f,
                 reverbBrightness = 0.70f,
                 glideRate = 0.50f,
-            ),
+            ).let { chord ->
+                TrackVoice(
+                    engineEdm = chord,
+                    engineSpace = chord.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    role = TrackRole.Chordal(
+                        chordFollow = ChordFollow.FOLLOW,
+                        comping = ChordComping(
+                            style = CompingStyle.GOSPEL_STABS,
+                            arpSpeed = 1.0f,
+                            fills = CompingFills(
+                                everyNBars = 16,
+                                fillType = FillType.STAB_FLURRY,
+                            ),
+                        ),
+                    ),
+                    pan = -0.25f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,  // ducks under solos; verse swaps to DRONE
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 6: counter-pad (strings) — provides motion above the ensemble bed.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.STRING,
-                engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(lickMode = LickMode.Fill),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.STRING,
                 volume = 0.42f,
-                pan = 0.30f,
-                density = 0.12f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.07f,
                 modLfoDepth = 0.5f,
                 modLfoShape = 0.5f,
@@ -328,35 +346,25 @@ class TremoloTideVibe : VibeProvider {
                 delaySend = 0.30f,
                 reverbBrightness = 0.75f,
                 glideRate = 0.45f,
-            ),
+            ).let { strings ->
+                TrackVoice(
+                    engineEdm = strings,
+                    engineSpace = strings,
+                    role = TrackRole.Melodic(lickMode = LickMode.Fill),
+                    pan = 0.30f,
+                    density = 0.12f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // 7: resonant accent (modal) — sparse rings/pings for chorus accents.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.MODAL,
-                engineSpace = OrpheusEngineId.MODAL,
-                role = TrackRole.Chordal(
-                    chordFollow = ChordFollow.ROOT_ONLY,
-                    comping = ChordComping(
-                        style = CompingStyle.REGGAE_SKANK,
-                        fills = CompingFills(
-                            everyNBars = 8,
-                            skipProbability = .25f,
-                            fillType = FillType.TURNAROUND
-                        ),
-                        humanization = CompingHumanization(
-                            dropProbability = .05f,
-                            ghostProbability = .2f,
-                            octaveJumpProbability = .05f,
-                            extensionProbability = .05f,
-                        )
-                    )
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.MODAL,
                 volume = 0.25f,
-                pan = 0.00f,
                 harmonics = 0.55f,
                 timbre = 0.40f,
                 morph = 0.50f,
-                envelopeProfile = EnvelopeProfile.DRONE,
-                macroMap = TrackMacroMap.WILD,
                 modLfoRate = 0.04f,
                 modLfoDepth = 0.4f,
                 modLfoShape = 0.3f,
@@ -369,7 +377,32 @@ class TremoloTideVibe : VibeProvider {
                 reverbSend = 0.50f,
                 delaySend = 0.25f,
                 reverbBrightness = 0.45f,
-            ),
+            ).let { accent ->
+                TrackVoice(
+                    engineEdm = accent,
+                    engineSpace = accent,
+                    role = TrackRole.Chordal(
+                        chordFollow = ChordFollow.ROOT_ONLY,
+                        comping = ChordComping(
+                            style = CompingStyle.REGGAE_SKANK,
+                            fills = CompingFills(
+                                everyNBars = 8,
+                                skipProbability = .25f,
+                                fillType = FillType.TURNAROUND
+                            ),
+                            humanization = CompingHumanization(
+                                dropProbability = .05f,
+                                ghostProbability = .2f,
+                                octaveJumpProbability = .05f,
+                                extensionProbability = .05f,
+                            )
+                        )
+                    ),
+                    pan = 0.00f,
+                    envelopeProfile = EnvelopeProfile.DRONE,
+                    macroMap = TrackMacroMap.WILD,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

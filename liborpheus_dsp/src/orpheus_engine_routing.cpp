@@ -728,20 +728,36 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strncmp(symbol, "track_", 6) == 0 && symbol[6] >= '0' && symbol[6] <= '7') {
             int t = symbol[6] - '0';
             const char* param = symbol + 8; // skip "track_N_"
-            if (std::strcmp(param, "engine_edm") == 0)
-                engine->pulsar_track_engine_edm[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            if (std::strcmp(param, "engine_edm") == 0) {
+                int v = static_cast<int>(value);
+                engine->pulsar_track_engine_edm[t].store(v, std::memory_order_relaxed);
+                // Seed the active-engine mirror so the very first audio block
+                // after a vibe load doesn't read a stale 0 (which would route
+                // pulsar_delay's per-track feedback/send through the wrong slot
+                // for one block). unit_process_pulsar republishes this every
+                // block thereafter.
+                engine->pulsar_track_active_engine[t].store(v, std::memory_order_relaxed);
+            }
             else if (std::strcmp(param, "engine_space") == 0)
                 engine->pulsar_track_engine_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "volume") == 0)
                 engine->pulsar_track_volume[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "volume_space") == 0)
+                engine->pulsar_track_volume_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "pan") == 0)
                 engine->pulsar_track_pan[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "harmonics") == 0)
                 engine->pulsar_track_harmonics[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_space") == 0)
+                engine->pulsar_track_harmonics_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "timbre") == 0)
                 engine->pulsar_track_timbre[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "timbre_space") == 0)
+                engine->pulsar_track_timbre_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "morph") == 0)
                 engine->pulsar_track_morph[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "morph_space") == 0)
+                engine->pulsar_track_morph_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "envelope") == 0)
                 engine->pulsar_track_envelope[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "role") == 0)
@@ -756,34 +772,62 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_mute[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_rate") == 0)
                 engine->pulsar_track_mod_lfo_rate[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "mod_lfo_rate_space") == 0)
+                engine->pulsar_track_mod_lfo_rate_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_depth") == 0)
                 engine->pulsar_track_mod_lfo_depth[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "mod_lfo_depth_space") == 0)
+                engine->pulsar_track_mod_lfo_depth_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_shape") == 0)
                 engine->pulsar_track_mod_lfo_shape[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "mod_lfo_shape_space") == 0)
+                engine->pulsar_track_mod_lfo_shape_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_coupling") == 0)
                 engine->pulsar_track_mod_lfo_coupling[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "mod_lfo_coupling_space") == 0)
+                engine->pulsar_track_mod_lfo_coupling_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "hold_probability") == 0)
                 engine->pulsar_track_hold_probability[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "hold_probability_space") == 0)
+                engine->pulsar_track_hold_probability_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "hold_length_min") == 0)
                 engine->pulsar_track_hold_length_min[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "hold_length_min_space") == 0)
+                engine->pulsar_track_hold_length_min_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "hold_length_max") == 0)
                 engine->pulsar_track_hold_length_max[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "hold_length_max_space") == 0)
+                engine->pulsar_track_hold_length_max_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "delay_send") == 0)
                 engine->pulsar_track_delay_send[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "delay_send_space") == 0)
+                engine->pulsar_track_delay_send_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "reverb_send") == 0)
                 engine->pulsar_track_reverb_send[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "reverb_send_space") == 0)
+                engine->pulsar_track_reverb_send_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "note_range_low") == 0)
                 engine->pulsar_track_note_range_low[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "note_range_low_space") == 0)
+                engine->pulsar_track_note_range_low_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "note_range_high") == 0)
                 engine->pulsar_track_note_range_high[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "note_range_high_space") == 0)
+                engine->pulsar_track_note_range_high_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "reverb_brightness") == 0)
                 engine->pulsar_track_reverb_brightness[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "reverb_brightness_space") == 0)
+                engine->pulsar_track_reverb_brightness_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "density_override") == 0)
                 engine->pulsar_track_density_override[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "delay_feedback") == 0)
                 engine->pulsar_track_delay_feedback[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "delay_feedback_space") == 0)
+                engine->pulsar_track_delay_feedback_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "glide_rate") == 0)
                 engine->pulsar_track_glide_rate[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "glide_rate_space") == 0)
+                engine->pulsar_track_glide_rate_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "lick_mode") == 0)
                 engine->pulsar_track_lick_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "comping_style") == 0)
@@ -820,8 +864,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_lpg_mode_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "lpg_decay") == 0)
                 engine->pulsar_track_lpg_decay[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "lpg_decay_space") == 0)
+                engine->pulsar_track_lpg_decay_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "lpg_colour") == 0)
                 engine->pulsar_track_lpg_colour[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "lpg_colour_space") == 0)
+                engine->pulsar_track_lpg_colour_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_note_follow") == 0)
                 engine->pulsar_track_evo_note_follow[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_pitch_mode") == 0)

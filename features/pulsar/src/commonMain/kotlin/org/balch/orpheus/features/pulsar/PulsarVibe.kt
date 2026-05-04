@@ -49,8 +49,8 @@ fun chords(vararg degrees: Int): List<ChordStep> = degrees.map { ChordStep(it) }
  * @param scaleDegree Index into the current scale (0 = root, 1 = 2nd degree, etc.)
  * @param duration Note length in beats (0.25 = 16th, 0.5 = 8th, 1.0 = quarter)
  * @param velocity Hit strength 0-1 (lower = ghost note feel)
- * @param glideRate Optional per-note portamento. `-1f` (default) = use the track's
- *   own [TrackVoice.glideRate]. A value in `0f..1f` overrides for this step only:
+ * @param glideRate Optional per-note portamento. `-1f` (default) = use the active
+ *   voice's own [OrpheusEngine.glideRate]. A value in `0f..1f` overrides for this step only:
  *   0 = instant pitch jump; 0.3 = smooth; 0.6+ = very slow slide. The sentinel
  *   matches the C++ engine's `glide_rate` convention exactly (no boxing, no
  *   marshalling translation).
@@ -242,14 +242,13 @@ enum class ChordFollow {
 }
 
 /**
- * Per-track low-pass gate mode. Models the vactrol-based LPG that hardware Plaits
+ * Per-voice low-pass gate mode. Models the vactrol-based LPG that hardware Plaits
  * applies after engine rendering. Orpheus bypasses Plaits' built-in LPG and lets
- * each [TrackVoice] opt in.
+ * each [OrpheusEngine] opt in.
  *
- * The default ([null] in [TrackVoice.lpgMode]) consults the per-engine table
- * `kOrpheusLpgDefault[]` in `orpheus_voice.h` — drums and self-enveloped engines
- * (DX, String, Modal, BassDrum, etc.) bypass; raw oscillator engines
- * (Waveshaping, VirtualAnalog, FM) default to [PLUCK] for an articulate attack.
+ * Set [OrpheusEngine.lpgMode] explicitly to control the vactrol — e.g. force
+ * [BYPASS] on a Modal-engine drone, or force [PLUCK] on a Waveshaping-engine bass
+ * for an articulate attack.
  */
 @Serializable
 enum class LpgMode(val id: Int) {
@@ -538,69 +537,13 @@ data class ChordComping(
     val fills: CompingFills = CompingFills(),
 )
 
-/**
- * One of 8 tracks in a Vibe. Each track is a voice with its own engine, density,
- * envelope shape, and effect sends. Convention: tracks 0-2 = rhythm (kick/snare/hat),
- * 3-4 = melodic, 5-6 = texture/effects, 7 = wild card — but any track can use any engine.
- *
- * ## Quick tuning guide
- * - **Volume/pan/density** shape the mix and busyness of this track.
- * - **harmonics/timbre/morph** are the Plaits engine knobs (meaning varies by engine).
- * - **delaySend/reverbSend** route this track to the vibe's dedicated effects (scaled by DEEP).
- * - **modLfo*** add slow parameter drift for texture tracks.
- * - **holdProbability** creates sustained/tied notes for pads and drones.
- *
- * @param engineEdm Plaits engine used when the vibe leans EDM (high energy).
- * @param engineSpace Plaits engine used when the vibe leans Space (low energy).
- *   The engine crossfades between EDM and Space based on the energy macro.
- * @param role Track behavior role — determines pattern generation and pitch handling.
- * @param volume Track volume 0-1. Start around 0.8 for leads, 0.3-0.5 for texture.
- * @param pan Stereo position: -1.0 = hard left, 0.0 = center, 1.0 = hard right.
- * @param density Probability that a step gets a note, 0-1.
- *   0.5 = half the steps fire. Rhythm tracks want 0.3-0.6, texture tracks 0.05-0.2.
- * @param harmonics Engine-specific: usually harmonic content or brightness.
- * @param timbre Engine-specific: usually tone color or filter position.
- * @param morph Engine-specific: usually waveshape or model parameter.
- * @param envelopeProfile Envelope shape category — determines attack/decay character.
- * @param macroMap How the 4 macro knobs (energy/complexity/space/mood) affect this track.
- * @param barStrategy How the pattern evolves across bars (REPEAT, MUTATE, FILL, etc.)
- * @param evolutionWeight How much tension-driven timbre evolution affects this track.
- *   -1 = auto (1.0 for MELODIC macroMap, 0.0 for others). 0-1 for explicit control.
- * @param modLfoRate LFO speed for slow parameter modulation. 0.0-1.0, useful range 0.03-0.3.
- * @param modLfoDepth LFO modulation depth. 0 = off. 0.3-0.7 for subtle movement.
- * @param modLfoShape LFO waveshape. 0 = sine-like, 0.5 = triangle-like, 1.0 = square-like.
- * @param modLfoCoupling How much the LFO affects multiple parameters together.
- * @param holdProbability Chance of generating a sustained/tied note instead of a single hit.
- *   0.0 = never, 0.9 = mostly sustained. Great for pads and drones.
- * @param holdLengthMin Minimum held note length in steps.
- * @param holdLengthMax Maximum held note length in steps.
- * @param delaySend Send level to the vibe's delay effect, 0-1.
- * @param reverbSend Send level to the vibe's reverb effect, 0-1.
- * @param noteRangeLow MIDI note floor for this track (null = use genre default).
- * @param noteRangeHigh MIDI note ceiling for this track (null = use genre default).
- * @param reverbBrightness Per-track reverb color: 0 = dark/warm, 1 = bright/shimmery.
- * @param delayFeedback Per-track delay feedback override (null = use vibe's global setting).
- * @param glideRate Portamento speed: 0 = instant, 0.3 = smooth, 1.0 = very slow (~2s).
- * @param lickMode How this track maps the vibe's lick to sequencer steps.
- * @param evolution Per-track evolution config for rhythmic and pitch evolution.
- */
 @Serializable
-data class TrackVoice(
-    val engineEdm: OrpheusEngineId,
-    val engineSpace: OrpheusEngineId,
-    val role: TrackRole = TrackRole.Percussive,
-    val volume: Float = 0.8f,
-    val pan: Float = 0.0f,
-    val density: Float = 0.5f,
+data class OrpheusEngine(
+    val engineId: OrpheusEngineId,
+    val volume: Float = .8f,
     val harmonics: Float = 0.5f,
     val timbre: Float = 0.5f,
     val morph: Float = 0.5f,
-    val envelopeProfile: EnvelopeProfile = EnvelopeProfile.RHYTHM,
-    val macroMap: TrackMacroMap = TrackMacroMap.RHYTHM,
-    val barStrategy: BarStrategy = BarStrategy.REPEAT,
-    val evolutionWeight: Float = -1f,
-    val soloBehavior: SoloBehavior? = null,
-    val duckingProfile: DuckingProfile? = null,
     val modLfoRate: Float = 0.2f,
     val modLfoDepth: Float = 0.0f,
     val modLfoShape: Float = 0.3f,
@@ -610,30 +553,55 @@ data class TrackVoice(
     val holdLengthMax: Int = 8,
     val delaySend: Float = 0.0f,
     val reverbSend: Float = 0.0f,
-    val noteRangeLow: Int? = null,
-    val noteRangeHigh: Int? = null,
+    val noteRangeLow: Int = 0,
+    val noteRangeHigh: Int = 0,
     val reverbBrightness: Float = 0.5f,
     val delayFeedback: Float? = null,
     val glideRate: Float = 0.0f,
-    /**
-     * Per-track LPG mode applied when [engineEdm] is the active engine.
-     * `null` (default) consults the per-engine default table in
-     * `orpheus_voice.h`. Set explicitly to override — e.g. force `BYPASS`
-     * on a Modal-engine drone, or force `PLUCK` on a Modal-engine stab.
-     */
-    val lpgMode: LpgMode? = null,
-    /**
-     * LPG mode applied when [engineSpace] is the active engine. `null`
-     * (default) inherits from [lpgMode] — the common case is a single mode
-     * for both slots. Set explicitly when the two engines need different
-     * behavior (e.g. `lpgMode = PLUCK` for a raw `WSH` bass + `lpgModeSpace
-     * = BYPASS` for a `STR` drone that should ride its own physical envelope).
-     */
-    val lpgModeSpace: LpgMode? = null,
-    /** LPG decay length, 0..1. Longer = slower vactrol tail. Shared across slots. */
+    val lpgMode: LpgMode = LpgMode.BYPASS,
     val lpgDecay: Float = 0.5f,
-    /** LPG colour (HF bleed), 0..1. 0 = dark/closed, 1 = bright/open. Shared across slots. */
     val lpgColour: Float = 0.5f,
+)
+
+
+/**
+ * One of 8 tracks in a Vibe. Each track has two interchangeable voices ([engineEdm]
+ * and [engineSpace]) that crossfade based on the energy macro, plus track-level
+ * mixing/behavior properties shared across both voices.
+ *
+ * Engine character (volume, harmonics, timbre, morph, mod LFO, holds, sends, range,
+ * LPG, glide) lives on [OrpheusEngine] so each voice can be tuned independently.
+ * Track-level concerns (pan, density, role, envelope, macro map, evolution, solos)
+ * live here since they describe the track regardless of which voice is active.
+ *
+ * @param engineEdm Voice used when the vibe leans EDM (high energy).
+ * @param engineSpace Voice used when the vibe leans Space (low energy).
+ * @param role Track behavior role — determines pattern generation and pitch handling.
+ * @param pan Stereo position: -1.0 = hard left, 0.0 = center, 1.0 = hard right.
+ * @param density Probability that a step gets a note, 0-1.
+ *   0.5 = half the steps fire. Rhythm tracks want 0.3-0.6, texture tracks 0.05-0.2.
+ * @param envelopeProfile Envelope shape category — determines attack/decay character.
+ * @param macroMap How the 4 macro knobs (energy/complexity/space/mood) affect this track.
+ * @param barStrategy How the pattern evolves across bars (REPEAT, MUTATE, FILL, etc.)
+ * @param evolutionWeight How much tension-driven timbre evolution affects this track.
+ *   -1 = auto (1.0 for MELODIC macroMap, 0.0 for others). 0-1 for explicit control.
+ * @param soloBehavior How this track behaves when chosen as soloist (null = never solos).
+ * @param duckingProfile How this track ducks during another track's solo (null = defaults).
+ * @param evolution Per-track evolution config for rhythmic and pitch evolution.
+ */
+@Serializable
+data class TrackVoice(
+    val engineEdm: OrpheusEngine,
+    val engineSpace: OrpheusEngine,
+    val role: TrackRole = TrackRole.Percussive,
+    val pan: Float = 0.0f,
+    val density: Float = 0.5f,
+    val envelopeProfile: EnvelopeProfile = EnvelopeProfile.RHYTHM,
+    val macroMap: TrackMacroMap = TrackMacroMap.RHYTHM,
+    val barStrategy: BarStrategy = BarStrategy.REPEAT,
+    val evolutionWeight: Float = -1f,
+    val soloBehavior: SoloBehavior? = null,
+    val duckingProfile: DuckingProfile? = null,
     val evolution: Evolution = Evolution(),
 )
 

@@ -13,6 +13,7 @@ import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -106,103 +107,123 @@ class ModPioneerVibe : VibeProvider {
         progressionDriftRange = 0.12f,
         tracks = listOf(
             // 0: Kick
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.80f,
-                density = 0.40f,
-                barStrategy = BarStrategy.REPEAT,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.80f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    density = 0.40f,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 1: Snare
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.70f,
-                density = 0.35f,
-                barStrategy = BarStrategy.FILL,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.70f).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    density = 0.35f,
+                    barStrategy = BarStrategy.FILL,
+                )
+            },
             // 2: Hats
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
-                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-                role = TrackRole.Percussive,
-                volume = 0.50f,
-                density = 0.70f,
-                barStrategy = BarStrategy.MUTATE,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.50f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    density = 0.70f,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 3: Melodic Bass - the "driving" force
-            TrackVoice(
-                engineEdm = OrpheusEngineId.OSC,
-                engineSpace = OrpheusEngineId.OSC,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.OSC,
+                volume = 0.85f,
                 harmonics = 0.0f,
                 morph = 0f,
                 timbre = .2f,
-                volume = 0.85f,
-                density = 0.45f,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 45,
                 noteRangeHigh = 57,
                 glideRate = 0.20f,
-            ),
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass,
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
+                    density = 0.45f,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 4: Sharp Guitar Stabs
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Fender 1
-                engineSpace = OrpheusEngineId.WAVESHAPING,
-                harmonics = 0.05f, // DX2 Idx 1: Fender 1
-                role = TrackRole.Chordal(
-                    chordFollow = ChordFollow.FOLLOW,
-                    comping = ChordComping(
-                        style = CompingStyle.SKA_UPSTROKES, // Crisp off-beats
-                        arpSpeed = 0.90f,
-                    )
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_2, // Fender 1
                 volume = 0.55f,
-                pan = -0.25f,
-                density = 0.25f,
+                harmonics = 0.05f, // DX2 Idx 1: Fender 1
                 reverbSend = 0.20f,
-            ),
+            ).let { stabs ->
+                TrackVoice(
+                    engineEdm = stabs,
+                    engineSpace = stabs.copy(engineId = OrpheusEngineId.WAVESHAPING),
+                    role = TrackRole.Chordal(
+                        chordFollow = ChordFollow.FOLLOW,
+                        comping = ChordComping(
+                            style = CompingStyle.SKA_UPSTROKES, // Crisp off-beats
+                            arpSpeed = 0.90f,
+                        )
+                    ),
+                    pan = -0.25f,
+                    density = 0.25f,
+                )
+            },
             // 5: Rhythm Guitar
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Guit acous
-                engineSpace = OrpheusEngineId.CHORD,
-                harmonics = 0.35f, // DX2 Idx 11: Guit acous
-                role = TrackRole.Chordal(
-                    chordFollow = ChordFollow.FOLLOW,
-                    comping = ChordComping(style = CompingStyle.ROCK_DOWNBEATS)
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_2, // Guit acous
                 volume = 0.45f,
-                pan = 0.25f,
-                density = 0.20f,
-                barStrategy = BarStrategy.MUTATE,
-            ),
+                harmonics = 0.35f, // DX2 Idx 11: Guit acous
+            ).let { rhythm ->
+                TrackVoice(
+                    engineEdm = rhythm,
+                    engineSpace = rhythm.copy(engineId = OrpheusEngineId.CHORD),
+                    role = TrackRole.Chordal(
+                        chordFollow = ChordFollow.FOLLOW,
+                        comping = ChordComping(style = CompingStyle.ROCK_DOWNBEATS)
+                    ),
+                    pan = 0.25f,
+                    density = 0.20f,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // 6: Triple-saw chord stab (Braids) - on EDM, organ pad on Space
             // HARMONICS knob picks the chord interval inside the Braids triple-saw.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.BRAIDS_TRIPLE_SAW,
-                engineSpace = OrpheusEngineId.STRING_MACHINE,
-                harmonics = 0.45f, // mid chord interval on Braids triple-saw
-                role = TrackRole.Chordal(
-                    chordFollow = ChordFollow.FOLLOW,
-                    comping = ChordComping(style = CompingStyle.PAD)
-                ),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.BRAIDS_TRIPLE_SAW,
                 volume = 0.40f,
-                pan = 0.15f,
-                density = 0.15f,
+                harmonics = 0.45f, // mid chord interval on Braids triple-saw
                 holdProbability = 0.75f,
                 reverbSend = 0.40f,
-            ),
+            ).let { stab ->
+                TrackVoice(
+                    engineEdm = stab,
+                    engineSpace = stab.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    role = TrackRole.Chordal(
+                        chordFollow = ChordFollow.FOLLOW,
+                        comping = ChordComping(style = CompingStyle.PAD)
+                    ),
+                    pan = 0.15f,
+                    density = 0.15f,
+                )
+            },
             // 7: Tambourine
-            TrackVoice(
-                engineEdm = OrpheusEngineId.MODAL,
-                engineSpace = OrpheusEngineId.PARTICLE,
-                role = TrackRole.Percussive,
-                volume = 0.45f,
-                density = 0.35f,
-                barStrategy = BarStrategy.INDEPENDENT,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.MODAL, volume = 0.45f).let { tamb ->
+                TrackVoice(
+                    engineEdm = tamb,
+                    engineSpace = tamb.copy(engineId = OrpheusEngineId.PARTICLE),
+                    role = TrackRole.Percussive,
+                    density = 0.35f,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
         ),
         effects = VibeEffects(
             delayTimeA = 0.375f, // Dotted 8th

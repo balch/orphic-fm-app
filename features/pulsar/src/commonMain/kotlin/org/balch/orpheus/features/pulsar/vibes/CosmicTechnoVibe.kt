@@ -11,6 +11,7 @@ import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -85,32 +86,165 @@ class CosmicTechnoVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_4,
         progressionDriftRange = 0.15f,
         tracks = listOf(
-            TrackVoice(engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,  engineSpace = OrpheusEngineId.MODAL, role = TrackRole.Percussive,  volume = 0.90f, pan =  0.00f, density = 0.50f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.REPEAT),
-            TrackVoice(engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,  engineSpace = OrpheusEngineId.NOISE, role = TrackRole.Percussive,  volume = 0.60f, pan = -0.15f, density = 0.35f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.MUTATE),
-            TrackVoice(engineEdm = OrpheusEngineId.METALLIC_HI_HAT,  engineSpace = OrpheusEngineId.METALLIC_HI_HAT,  role = TrackRole.Percussive,  volume = 0.65f, pan =  0.20f, density = 0.80f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.MUTATE),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick.copy(engineId = OrpheusEngineId.MODAL),
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.50f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.60f).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare.copy(engineId = OrpheusEngineId.NOISE),
+                    role = TrackRole.Percussive,
+                    pan = -0.15f,
+                    density = 0.35f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.65f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.20f,
+                    density = 0.80f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE,
+                )
+            },
             // Bass: locked techno pocket — REPEAT + ROOT_ONLY. Raised noteRangeLow
             // from F#1 (30) to E2 (40) for punchy techno bass instead of rumble.
-            TrackVoice(engineEdm = OrpheusEngineId.WAVESHAPING, engineSpace = OrpheusEngineId.STRING, role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY), volume = 0.75f, pan =  0.00f, density = 0.40f, envelopeProfile = EnvelopeProfile.MELODIC, macroMap = TrackMacroMap.MELODIC, barStrategy = BarStrategy.REPEAT,
-                noteRangeLow = 40, noteRangeHigh = 54, reverbBrightness = 0.5f),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.WAVESHAPING,
+                volume = 0.75f,
+                noteRangeLow = 40,
+                noteRangeHigh = 54,
+                reverbBrightness = 0.5f,
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.STRING),
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                    pan = 0.00f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // Keys (CHD chord engine): REPEAT rhythm so chord pads don't drift on top
             // of the progression's native chord changes. FOLLOW stays default (chords move).
-            TrackVoice(engineEdm = OrpheusEngineId.CHORD, engineSpace = OrpheusEngineId.STRING_MACHINE, role = TrackRole.Melodic(), volume = 0.55f, pan = -0.25f, density = 0.30f, envelopeProfile = EnvelopeProfile.MELODIC, macroMap = TrackMacroMap.MELODIC, barStrategy = BarStrategy.REPEAT,
-                noteRangeLow = 48, noteRangeHigh = 72, reverbBrightness = 0.5f, glideRate = 0.05f),
-            TrackVoice(engineEdm = OrpheusEngineId.CHORD, engineSpace = OrpheusEngineId.CHORD, role = TrackRole.Melodic(), volume = 0.40f, pan = -0.35f, density = 0.20f, envelopeProfile = EnvelopeProfile.EFFECT,  macroMap = TrackMacroMap.EFFECT,  barStrategy = BarStrategy.INDEPENDENT,
-                modLfoRate = 0.5f, modLfoDepth = 0.3f, modLfoShape = 0.3f, modLfoCoupling = 0.1f,
-                holdProbability = 0.1f, holdLengthMin = 2, holdLengthMax = 4,
-                reverbSend = 0.1f, delaySend = 0.15f,
-                noteRangeLow = 36, noteRangeHigh = 60, reverbBrightness = 0.5f),
-            TrackVoice(engineEdm = OrpheusEngineId.NOISE, engineSpace = OrpheusEngineId.NOISE, role = TrackRole.Percussive,  volume = 0.30f, pan =  0.30f, density = 0.15f, envelopeProfile = EnvelopeProfile.EFFECT,  macroMap = TrackMacroMap.EFFECT,  barStrategy = BarStrategy.INDEPENDENT,
-                modLfoRate = 0.4f, modLfoDepth = 0.25f, modLfoShape = 0.4f, modLfoCoupling = 0.1f,
-                holdProbability = 0.05f, holdLengthMin = 2, holdLengthMax = 3,
-                reverbSend = 0.1f, delaySend = 0.1f,
-                noteRangeLow = 36, noteRangeHigh = 60, reverbBrightness = 0.5f),
-            TrackVoice(engineEdm = OrpheusEngineId.MODAL, engineSpace = OrpheusEngineId.STRING, role = TrackRole.Melodic(), volume = 0.25f, pan =  0.40f, density = 0.08f, envelopeProfile = EnvelopeProfile.WILD,    macroMap = TrackMacroMap.WILD,    barStrategy = BarStrategy.INDEPENDENT,
-                modLfoRate = 0.6f, modLfoDepth = 0.2f, modLfoShape = 0.5f, modLfoCoupling = 0.15f,
-                holdProbability = 0.0f, holdLengthMin = 2, holdLengthMax = 4,
-                reverbSend = 0.15f, delaySend = 0.1f,
-                noteRangeLow = 36, noteRangeHigh = 66, reverbBrightness = 0.5f, glideRate = 0.1f),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.CHORD,
+                volume = 0.55f,
+                noteRangeLow = 48,
+                noteRangeHigh = 72,
+                reverbBrightness = 0.5f,
+                glideRate = 0.05f,
+            ).let { keys ->
+                TrackVoice(
+                    engineEdm = keys,
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    role = TrackRole.Melodic(),
+                    pan = -0.25f,
+                    density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.CHORD,
+                volume = 0.40f,
+                modLfoRate = 0.5f,
+                modLfoDepth = 0.3f,
+                modLfoShape = 0.3f,
+                modLfoCoupling = 0.1f,
+                holdProbability = 0.1f,
+                holdLengthMin = 2,
+                holdLengthMax = 4,
+                reverbSend = 0.1f,
+                delaySend = 0.15f,
+                noteRangeLow = 36,
+                noteRangeHigh = 60,
+                reverbBrightness = 0.5f,
+            ).let { chordPad ->
+                TrackVoice(
+                    engineEdm = chordPad,
+                    engineSpace = chordPad,
+                    role = TrackRole.Melodic(),
+                    pan = -0.35f,
+                    density = 0.20f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.NOISE,
+                volume = 0.30f,
+                modLfoRate = 0.4f,
+                modLfoDepth = 0.25f,
+                modLfoShape = 0.4f,
+                modLfoCoupling = 0.1f,
+                holdProbability = 0.05f,
+                holdLengthMin = 2,
+                holdLengthMax = 3,
+                reverbSend = 0.1f,
+                delaySend = 0.1f,
+                noteRangeLow = 36,
+                noteRangeHigh = 60,
+                reverbBrightness = 0.5f,
+            ).let { fx ->
+                TrackVoice(
+                    engineEdm = fx,
+                    engineSpace = fx,
+                    role = TrackRole.Percussive,
+                    pan = 0.30f,
+                    density = 0.15f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.MODAL,
+                volume = 0.25f,
+                modLfoRate = 0.6f,
+                modLfoDepth = 0.2f,
+                modLfoShape = 0.5f,
+                modLfoCoupling = 0.15f,
+                holdProbability = 0.0f,
+                holdLengthMin = 2,
+                holdLengthMax = 4,
+                reverbSend = 0.15f,
+                delaySend = 0.1f,
+                noteRangeLow = 36,
+                noteRangeHigh = 66,
+                reverbBrightness = 0.5f,
+                glideRate = 0.1f,
+            ).let { wild ->
+                TrackVoice(
+                    engineEdm = wild,
+                    engineSpace = wild.copy(engineId = OrpheusEngineId.STRING),
+                    role = TrackRole.Melodic(),
+                    pan = 0.40f,
+                    density = 0.08f,
+                    envelopeProfile = EnvelopeProfile.WILD,
+                    macroMap = TrackMacroMap.WILD,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

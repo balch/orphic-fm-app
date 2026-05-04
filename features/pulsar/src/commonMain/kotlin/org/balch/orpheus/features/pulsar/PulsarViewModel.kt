@@ -396,6 +396,30 @@ class PulsarViewModel(
     private val trackLpgColourIds = (0..7).map {
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_COLOUR.ordinal + it].controlId)
     }
+    // Per-engine Space variants — pushed alongside the EDM-side ports above.
+    // C++ render path picks between EDM and Space atomics based on which engine
+    // slot is active for each track in the current render block.
+    private val trackVolumeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VOLUME_SPACE.ordinal + it].controlId) }
+    private val trackHarmonicsSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_SPACE.ordinal + it].controlId) }
+    private val trackTimbreSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_TIMBRE_SPACE.ordinal + it].controlId) }
+    private val trackMorphSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_SPACE.ordinal + it].controlId) }
+    private val trackModLfoRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_RATE_SPACE.ordinal + it].controlId) }
+    private val trackModLfoDepthSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_DEPTH_SPACE.ordinal + it].controlId) }
+    private val trackModLfoShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_SHAPE_SPACE.ordinal + it].controlId) }
+    private val trackModLfoCouplingSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_COUPLING_SPACE.ordinal + it].controlId) }
+    private val trackHoldProbabilitySpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HOLD_PROBABILITY_SPACE.ordinal + it].controlId) }
+    private val trackHoldLengthMinSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HOLD_LENGTH_MIN_SPACE.ordinal + it].controlId) }
+    private val trackHoldLengthMaxSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HOLD_LENGTH_MAX_SPACE.ordinal + it].controlId) }
+    private val trackDelaySendSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_SEND_SPACE.ordinal + it].controlId) }
+    private val trackReverbSendSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_REVERB_SEND_SPACE.ordinal + it].controlId) }
+    private val trackNoteRangeLowSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_NOTE_RANGE_LOW_SPACE.ordinal + it].controlId) }
+    private val trackNoteRangeHighSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_NOTE_RANGE_HIGH_SPACE.ordinal + it].controlId) }
+    private val trackReverbBrightnessSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_REVERB_BRIGHTNESS_SPACE.ordinal + it].controlId) }
+    private val trackDelayFeedbackSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_FEEDBACK_SPACE.ordinal + it].controlId) }
+    private val trackGlideRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE_SPACE.ordinal + it].controlId) }
+    private val trackLpgDecaySpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_DECAY_SPACE.ordinal + it].controlId) }
+    private val trackLpgColourSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_COLOUR_SPACE.ordinal + it].controlId) }
+
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
     private val trackEvoPitchModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_PITCH_MODE.ordinal + it].controlId) }
@@ -735,15 +759,26 @@ class PulsarViewModel(
             synthController.setPluginControl(muteSymbols[i].controlId, FloatValue(0f))
         }
 
-        // Push per-track voice params
+        // Push per-track voice params.
+        // Engine character knobs (volume, harmonics, timbre, morph, mod LFO, holds,
+        // sends, range, reverbBrightness, delayFeedback, glide, LPG) live on
+        // OrpheusEngine. Each per-engine knob has _edm + _space ports — the
+        // C++ render path picks between them per render block based on which
+        // slot is active (engine_index == active_edm vs Space).
         vibe.tracks.forEachIndexed { i, tv ->
-            trackEdmIds[i].value = IntValue(tv.engineEdm.id)
-            trackSpaceIds[i].value = IntValue(tv.engineSpace.id)
-            trackVolumeIds[i].value = FloatValue(tv.volume)
+            val edm = tv.engineEdm
+            val spa = tv.engineSpace
+            trackEdmIds[i].value = IntValue(edm.engineId.id)
+            trackSpaceIds[i].value = IntValue(spa.engineId.id)
+            trackVolumeIds[i].value = FloatValue(edm.volume)
+            trackVolumeSpaceIds[i].value = FloatValue(spa.volume)
             trackPanIds[i].value = FloatValue(tv.pan)
-            trackHarmonicsIds[i].value = FloatValue(tv.harmonics)
-            trackTimbreIds[i].value = FloatValue(tv.timbre)
-            trackMorphIds[i].value = FloatValue(tv.morph)
+            trackHarmonicsIds[i].value = FloatValue(edm.harmonics)
+            trackHarmonicsSpaceIds[i].value = FloatValue(spa.harmonics)
+            trackTimbreIds[i].value = FloatValue(edm.timbre)
+            trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
+            trackMorphIds[i].value = FloatValue(edm.morph)
+            trackMorphSpaceIds[i].value = FloatValue(spa.morph)
             trackEnvelopeIds[i].value = IntValue(tv.envelopeProfile.id)
             trackRoleIds[i].value = IntValue(tv.role.engineId)
             trackBarStrategyIds[i].value = IntValue(tv.barStrategy.id)
@@ -759,19 +794,31 @@ class PulsarViewModel(
                 (tv.evolution.pitch as? PitchEvolution.Voicing)?.tensionResponse ?: 1.0f
             )
             pushMacroMap(i, tv.macroMap)
-            trackModLfoRateIds[i].value = FloatValue(tv.modLfoRate)
-            trackModLfoDepthIds[i].value = FloatValue(tv.modLfoDepth)
-            trackModLfoShapeIds[i].value = FloatValue(tv.modLfoShape)
-            trackModLfoCouplingIds[i].value = FloatValue(tv.modLfoCoupling)
-            trackHoldProbabilityIds[i].value = FloatValue(tv.holdProbability)
-            trackHoldLengthMinIds[i].value = IntValue(tv.holdLengthMin)
-            trackHoldLengthMaxIds[i].value = IntValue(tv.holdLengthMax)
-            trackNoteRangeLowIds[i].value = IntValue(tv.noteRangeLow ?: 0)
-            trackNoteRangeHighIds[i].value = IntValue(tv.noteRangeHigh ?: 0)
-            trackReverbBrightnessIds[i].value = FloatValue(tv.reverbBrightness)
+            trackModLfoRateIds[i].value = FloatValue(edm.modLfoRate)
+            trackModLfoRateSpaceIds[i].value = FloatValue(spa.modLfoRate)
+            trackModLfoDepthIds[i].value = FloatValue(edm.modLfoDepth)
+            trackModLfoDepthSpaceIds[i].value = FloatValue(spa.modLfoDepth)
+            trackModLfoShapeIds[i].value = FloatValue(edm.modLfoShape)
+            trackModLfoShapeSpaceIds[i].value = FloatValue(spa.modLfoShape)
+            trackModLfoCouplingIds[i].value = FloatValue(edm.modLfoCoupling)
+            trackModLfoCouplingSpaceIds[i].value = FloatValue(spa.modLfoCoupling)
+            trackHoldProbabilityIds[i].value = FloatValue(edm.holdProbability)
+            trackHoldProbabilitySpaceIds[i].value = FloatValue(spa.holdProbability)
+            trackHoldLengthMinIds[i].value = IntValue(edm.holdLengthMin)
+            trackHoldLengthMinSpaceIds[i].value = IntValue(spa.holdLengthMin)
+            trackHoldLengthMaxIds[i].value = IntValue(edm.holdLengthMax)
+            trackHoldLengthMaxSpaceIds[i].value = IntValue(spa.holdLengthMax)
+            trackNoteRangeLowIds[i].value = IntValue(edm.noteRangeLow)
+            trackNoteRangeLowSpaceIds[i].value = IntValue(spa.noteRangeLow)
+            trackNoteRangeHighIds[i].value = IntValue(edm.noteRangeHigh)
+            trackNoteRangeHighSpaceIds[i].value = IntValue(spa.noteRangeHigh)
+            trackReverbBrightnessIds[i].value = FloatValue(edm.reverbBrightness)
+            trackReverbBrightnessSpaceIds[i].value = FloatValue(spa.reverbBrightness)
             genreDensityIds[i].value = FloatValue(tv.density)
-            trackDelayFeedbackIds[i].value = FloatValue(tv.delayFeedback ?: -1f)
-            trackGlideRateIds[i].value = FloatValue(tv.glideRate)
+            trackDelayFeedbackIds[i].value = FloatValue(edm.delayFeedback ?: -1f)
+            trackDelayFeedbackSpaceIds[i].value = FloatValue(spa.delayFeedback ?: -1f)
+            trackGlideRateIds[i].value = FloatValue(edm.glideRate)
+            trackGlideRateSpaceIds[i].value = FloatValue(spa.glideRate)
             trackLickModeIds[i].value = IntValue(when (tv.lickMode) {
                 is LickMode.None -> 0
                 is LickMode.Squash -> 1
@@ -790,21 +837,25 @@ class PulsarViewModel(
             trackFillTypeIds[i].value = IntValue(tv.chordComping?.fills?.fillType?.ordinal ?: 0)
             trackFillSkipProbIds[i].value = FloatValue(tv.chordComping?.fills?.skipProbability ?: 0f)
             trackChordFollowIds[i].value = IntValue(tv.chordFollow.ordinal)
-            // LPG: null mode → ENGINE_DEFAULT (3); explicit override → that mode's id.
-            // SPACE slot inherits from EDM slot when lpgModeSpace is null, so a vibe
-            // that sets `lpgMode = PLUCK` covers both engine slots without extra config.
-            val effectiveLpgMode = tv.lpgMode ?: LpgMode.ENGINE_DEFAULT
-            val effectiveLpgModeSpace = tv.lpgModeSpace ?: effectiveLpgMode
-            trackLpgModeIds[i].value = IntValue(effectiveLpgMode.id)
-            trackLpgModeSpaceIds[i].value = IntValue(effectiveLpgModeSpace.id)
-            trackLpgDecayIds[i].value = FloatValue(tv.lpgDecay)
-            trackLpgColourIds[i].value = FloatValue(tv.lpgColour)
+            // LPG mode is per-engine: edm.lpgMode applies to the EDM slot,
+            // engineSpace.lpgMode to the SPACE slot. C++ selects per render block
+            // based on which engine is active (orpheus_unit_pulsar.cpp:2451).
+            trackLpgModeIds[i].value = IntValue(edm.lpgMode.id)
+            trackLpgModeSpaceIds[i].value = IntValue(spa.lpgMode.id)
+            trackLpgDecayIds[i].value = FloatValue(edm.lpgDecay)
+            trackLpgDecaySpaceIds[i].value = FloatValue(spa.lpgDecay)
+            trackLpgColourIds[i].value = FloatValue(edm.lpgColour)
+            trackLpgColourSpaceIds[i].value = FloatValue(spa.lpgColour)
+            trackDelaySendSpaceIds[i].value = FloatValue(spa.delaySend)
+            trackReverbSendSpaceIds[i].value = FloatValue(spa.reverbSend)
         }
         // Seed per-track send bases from vibe; section overrides may swap these later.
+        // sendBase[] tracks the EDM-side default; the C++ delay unit reads the
+        // active slot's send (via pulsar_track_active_engine) for feedback blending.
         for (i in 0 until 8) {
             val tv = vibe.tracks.getOrNull(i)
-            sendBaseDelay[i] = tv?.delaySend ?: 0f
-            sendBaseReverb[i] = tv?.reverbSend ?: 0f
+            sendBaseDelay[i] = tv?.engineEdm?.delaySend ?: 0f
+            sendBaseReverb[i] = tv?.engineEdm?.reverbSend ?: 0f
         }
         stepCountId.value = IntValue(vibe.stepCount)
         pushEffectiveSends(deepId.value.asFloat())
@@ -987,15 +1038,16 @@ class PulsarViewModel(
         val overrides = section.trackOverrides
         for (i in 0 until 8) {
             val tv = vibe.tracks.getOrNull(i) ?: continue
+            val edm = tv.engineEdm
             val o = overrides?.get(i)
-            trackHoldProbabilityIds[i].value = FloatValue(o?.holdProbability ?: tv.holdProbability)
-            trackHoldLengthMinIds[i].value = IntValue(o?.holdLengthMin ?: tv.holdLengthMin)
-            trackHoldLengthMaxIds[i].value = IntValue(o?.holdLengthMax ?: tv.holdLengthMax)
-            trackVolumeIds[i].value = FloatValue(o?.volume ?: tv.volume)
+            trackHoldProbabilityIds[i].value = FloatValue(o?.holdProbability ?: edm.holdProbability)
+            trackHoldLengthMinIds[i].value = IntValue(o?.holdLengthMin ?: edm.holdLengthMin)
+            trackHoldLengthMaxIds[i].value = IntValue(o?.holdLengthMax ?: edm.holdLengthMax)
+            trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
             genreDensityIds[i].value = FloatValue(o?.density ?: tv.density)
             trackEnvelopeIds[i].value = IntValue((o?.envelopeProfile ?: tv.envelopeProfile).id)
-            sendBaseDelay[i] = o?.delaySend ?: tv.delaySend
-            sendBaseReverb[i] = o?.reverbSend ?: tv.reverbSend
+            sendBaseDelay[i] = o?.delaySend ?: edm.delaySend
+            sendBaseReverb[i] = o?.reverbSend ?: edm.reverbSend
         }
         pushEffectiveSends(deepId.value.asFloat())
     }
@@ -1423,7 +1475,14 @@ class PulsarViewModel(
                 noteRangeHigh = 72,
                 rhythmDensity = RhythmPattern.SPARSE.density,
             ),
-            tracks = List(8) { TrackVoice(engineEdm = OrpheusEngineId.VIRTUAL_ANALOG, engineSpace = OrpheusEngineId.VIRTUAL_ANALOG, role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic()) },
+            tracks = List(8) {
+                val engine = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG)
+                TrackVoice(
+                    engineEdm = engine,
+                    engineSpace = engine,
+                    role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
+                )
+            },
         )
 
         fun previewFeature(state: PulsarUiState = PulsarUiState(

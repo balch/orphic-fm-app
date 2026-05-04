@@ -25,8 +25,16 @@ void unit_process_pulsar_delay(GraphUnit* u, OrpheusEngine* engine, int num_fram
         float pulsar_fb_sum = 0.0f;
         float pulsar_fb_weight = 0.0f;
         for (int t = 0; t < 8; t++) {
-            float fb = engine->pulsar_track_delay_feedback[t].load(std::memory_order_relaxed);
-            float send = engine->pulsar_track_delay_send[t].load(std::memory_order_relaxed);
+            // Per-engine: pick EDM vs Space slot for this track's feedback + send.
+            const int edm_engine = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+            const int active_engine = engine->pulsar_track_active_engine[t].load(std::memory_order_relaxed);
+            const bool use_edm = (active_engine == edm_engine);
+            float fb = use_edm
+                ? engine->pulsar_track_delay_feedback[t].load(std::memory_order_relaxed)
+                : engine->pulsar_track_delay_feedback_space[t].load(std::memory_order_relaxed);
+            float send = use_edm
+                ? engine->pulsar_track_delay_send[t].load(std::memory_order_relaxed)
+                : engine->pulsar_track_delay_send_space[t].load(std::memory_order_relaxed);
             if (fb >= 0.0f && send > 0.001f) {
                 pulsar_fb_sum += fb * send;
                 pulsar_fb_weight += send;

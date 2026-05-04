@@ -72,7 +72,7 @@ All of this is in `PulsarVibe.kt`. Read the KDoc there for the full range of val
 - `rhythmDensity`: Use `RhythmPattern.*.density`. `SPARSE` (ambient), `FOUR_ON_FLOOR` (club), `BACKBEAT` (rock/hip-hop), `DENSE_16TH` (DnB/techno).
 - `progressionStyle`: `POP` (I-IV-V-vi), `BLUES` (12-bar), `DARK` (diminished/minor), `DRONE` (static), `MODAL` (no resolution), `ASCENDING` (rising), `JAZZ` (ii-V-I), `SAD` (descending).
 - `chordsPerBar`: `1` = slow (static/dronal), `2` = standard, `4` = busy.
-- `customProgression`: Optional `List<Int>` of scale degrees (0..6). Overrides the template sequence but keeps the Markov matrix. Great for "hang on tonic then dip" forms. Size 1..8.
+- `customProgression`: Optional `List<ChordStep>` (degree 0..6 + optional per-chord glide 0..1). Use the `chords(0, 3, 5, 6)` helper for the no-glide case, or build the list explicitly with `listOf(ChordStep(0), ChordStep(3, glideRate = 0.4f), ...)` when you want a slide into a specific chord. Overrides the template sequence but keeps the Markov matrix. Great for "hang on tonic then dip" forms. Size 1..8.
 - `chordTransitionMatrix`: Optional 7x7 Markov via `chordMatrix(...)`. Use only when a preset `progressionStyle` does not cover the target motion (see `DeepSpaceVibe` for an example).
 
 ### `progressionAnchor` + `progressionDriftRange`
@@ -81,30 +81,82 @@ How often the Markov progression resets to its starting state. `EVERY_4` or `EVE
 
 ### `tracks` — exactly 8 `TrackVoice`s
 
-Convention (not enforced): 0=kick, 1=snare, 2=hat, 3=bass, 4=keys/lead, 5-6=texture/FX, 7=wildcard. Any track can use any engine. Each track has:
+Convention (not enforced): 0=kick, 1=snare, 2=hat, 3=bass, 4=keys/lead, 5-6=texture/FX, 7=wildcard. Any track can use any engine.
 
-- **`engineEdm` / `engineSpace`**: Two Plaits engines. The mix crossfades between them based on the Energy macro. Use the same engine in both slots if you do not want crossfade. Common picks:
+A `TrackVoice` is split into **two layers**:
+1. **Per-voice character** lives on `OrpheusEngine` — separate instances for `engineEdm` (high energy) and `engineSpace` (low energy). The two slots crossfade based on the Energy macro.
+2. **Track-level concerns** (role, mix, pattern generator, evolution) live on `TrackVoice` — they describe the track regardless of which voice is active.
+
+#### Authoring convention — `.let { ... }` + `.copy()`
+
+To avoid duplicating shared knobs across both engine slots, declare the engine once and reuse:
+
+```kotlin
+// Same engine on both sides — declare once, reuse
+OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+    TrackVoice(
+        engineEdm = kick,
+        engineSpace = kick,
+        role = TrackRole.Percussive,
+        density = 0.45f,
+        // ...track-level fields
+    )
+},
+
+// Engines differ in id only — share knobs, .copy() the id
+OrpheusEngine(
+    engineId = OrpheusEngineId.WAVESHAPING,
+    volume = 0.75f,
+    noteRangeLow = 33,
+    noteRangeHigh = 52,
+).let { bass ->
+    TrackVoice(
+        engineEdm = bass,
+        engineSpace = bass.copy(engineId = OrpheusEngineId.STRING),
+        role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+        // ...
+    )
+},
+
+// Engines differ in id AND one knob — chain the .copy()
+engineSpace = bass.copy(engineId = OrpheusEngineId.STRING, harmonics = 0.7f),
+```
+
+Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, etc.) — it reads better than a generic `engine`. **Do not duplicate `OrpheusEngine(...)` blocks in full** — that's the explicit anti-pattern this convention exists to prevent.
+
+#### `OrpheusEngine` (per-voice character)
+
+- **`engineId`**: The Plaits engine. Required. Common picks:
   - Drums: `BD`, `SD`, `HH`, `NSE`, `PAR`.
   - Bass: `WSH` (gritty), `VCF` (filter-sweep bass), `PD` (warm round), `VA` (analog poly), `DX` (FM bass — see below).
   - Keys / E.piano / chroma percussion: `DX2` (see below — NOT a generic FM lead).
   - Lead: `DX3` (FM brass/strings/pads — see below), `WSH` (distorted), `FM` (2-op), `WTB` (wavetable).
   - Pad: `ENS` (string ensemble), `STR` (string model), `GRN` (granular), `CHD` (chord engine), `ADD` (additive), `DX3` (FM cinematic pads).
   - Texture/FX: `MOD` (modal/metallic), `PAR` (particles), `SPK` (speech), `SWM` (swarm), `NES` (chiptune), `TRN` (wave terrain).
-  - **Important**: `DX` / `DX2` / `DX3` are *not* three flavors of one FM engine. They share a 6-op FM voice but each loads a different 32-patch sysex bank. `harmonics` is a **patch selector** (quantized to 32 zones), not a tone control. Picking the wrong bank lands on the wrong family of patches (e.g. xylophone instead of brass). **See `references/fm_patches.md` for the full bank tables and harmonics math** before using a DX engine.
-- **`role`**: `TrackRole.Percussive`, `TrackRole.Melodic(chordFollow, lickMode)`, or `TrackRole.Chordal(comping, chordFollow)`. Wrong role = wrong pattern generator (e.g. chord-following on drums makes no sense).
-- **`volume` / `pan` / `density`**: mix-level basics.
-- **`harmonics` / `timbre` / `morph`**: Plaits engine knobs, meaning varies per engine. Default 0.3-0.5 works for most engines. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md` for the bank tables.** Always set `harmonics` explicitly on these engines; default 0.0 always picks patch index 0, which is rarely what you want.
-- **`envelopeProfile`**: Per-track envelope shape that also drives solo/ducking behavior. `RHYTHM` (drums), `MELODIC` (bass/lead/keys), `EFFECT` (pad/texture — gains reverb during others' solos), `WILD` (wildcard — boosts when soloing, ducks when others do), `DRONE` (infinite sustain ambient — never ducks). See `references/envelopes.md` for solo/ducking specifics.
-- **`macroMap`**: `TrackMacroMap.RHYTHM`/`MELODIC`/`EFFECT`/`WILD`. Controls how the 4 macros move this track's parameters. Match to `envelopeProfile` unless you have a reason not to.
-- **`barStrategy`**: `REPEAT` (same every bar — driving elements, anchoring bass), `MUTATE` (slight variation), `FILL` (adds fills at phrase boundaries), `CALL_RESPONSE` (alternates), `INDEPENDENT` (regenerated — textures, pads).
-- **`modLfo*`**: Slow-modulation parameters for pad/texture tracks. `rate` 0.03-0.1 is glacial; `depth` 0.3-0.7 audible.
-- **`holdProbability/Min/Max`**: Sustained/tied notes. `0.8+` for pads, `0.0` for drums.
-- **`delaySend` / `reverbSend`**: Per-track sends to the vibe's effects. Leads get moderate sends; pads get generous sends; drums usually stay dry.
-- **`noteRangeLow/High`** (optional): Per-track MIDI bounds, overrides genre defaults.
-- **`reverbBrightness`** (0-1): Dark (0.3) for deep/brooding, bright (0.7+) for airy/shimmery.
-- **`delayFeedback`** (optional): Per-track override of the vibe-level delay feedback.
-- **`glideRate`** (0-1): Portamento — smooth pitch transitions. 0 = instant, 0.3 = smooth, 0.6+ = very slow.
-- **`evolution`**: `Evolution(rhythmic = ..., pitch = ...)`. Optional Markov drift. `PitchEvolution.Contour` for melodic tracks; `PitchEvolution.Voicing` for chordal tracks.
+  - **Important**: `DX` / `DX2` / `DX3` share a 6-op FM voice but load different 32-patch sysex banks. `harmonics` is a **patch selector** (quantized to 32 zones), not a tone control. **See `references/fm_patches.md`** for the bank tables before using a DX engine.
+- **`volume`** (default `0.8`): Track volume. Start ~0.8 for leads, 0.3-0.5 for texture.
+- **`harmonics` / `timbre` / `morph`** (default `0.5`): Plaits engine knobs, meaning varies per engine. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md`.** Always set explicitly on DX engines.
+- **`modLfoRate` / `modLfoDepth` / `modLfoShape` / `modLfoCoupling`**: Slow-modulation parameters for pad/texture voices. `rate` 0.03-0.1 is glacial; `depth` 0.3-0.7 audible. `depth = 0` (default) disables.
+- **`holdProbability` / `holdLengthMin` / `holdLengthMax`**: Sustained/tied notes. `0.8+` for pads, `0` (default) for drums.
+- **`delaySend` / `reverbSend`** (default `0.0`): Per-voice sends to the vibe's effects. Leads moderate, pads generous, drums usually dry.
+- **`noteRangeLow` / `noteRangeHigh`** (default `0` = use genre default): Per-voice MIDI bounds.
+- **`reverbBrightness`** (default `0.5`): Dark (0.3) for deep/brooding, bright (0.7+) for airy/shimmery.
+- **`delayFeedback`** (default `null` = use vibe-level): Per-voice override.
+- **`glideRate`** (default `0.0`): Portamento. 0 = instant, 0.3 = smooth, 0.6+ = very slow.
+- **`lpgMode`** (default `BYPASS`): Vactrol LPG mode — `BYPASS` (raw), `SUSTAINED` (gate-following), `PLUCK` (asymmetric bloom), or `ENGINE_DEFAULT` (consult per-engine table). Set explicitly per voice when EDM/Space want different envelope behavior (e.g. `PLUCK` for a WSH bass on EDM, `BYPASS` for a STR drone on Space).
+- **`lpgDecay` / `lpgColour`** (default `0.5`): Vactrol decay length and HF bleed.
+
+#### `TrackVoice` (track-level)
+
+- **`role`**: `TrackRole.Percussive`, `TrackRole.Melodic(chordFollow, lickMode)`, or `TrackRole.Chordal(comping, chordFollow)`. Wrong role = wrong pattern generator.
+- **`pan`**: Stereo position -1.0 to 1.0.
+- **`density`**: Probability that a step gets a note, 0-1.
+- **`envelopeProfile`**: Per-track envelope shape — `RHYTHM`, `MELODIC`, `EFFECT`, `WILD`, `DRONE`. See `references/envelopes.md` for solo/ducking specifics.
+- **`macroMap`**: `TrackMacroMap.RHYTHM`/`MELODIC`/`EFFECT`/`WILD`. Match to `envelopeProfile` unless you have a reason not to.
+- **`barStrategy`**: `REPEAT`, `MUTATE`, `FILL`, `CALL_RESPONSE`, `INDEPENDENT`.
+- **`evolutionWeight`** (default `-1` = auto): How much tension-driven evolution affects this track.
+- **`soloBehavior`** / **`duckingProfile`**: Optional. See `PulsarVibe.kt` KDoc.
+- **`evolution`**: `Evolution(rhythmic, pitch)` — optional Markov drift. `PitchEvolution.Contour` for melodic, `PitchEvolution.Voicing` for chordal.
 
 ### `TrackRole.Chordal` sub-tuning (`ChordComping`)
 
@@ -203,8 +255,9 @@ When a user gives a musical reference, decompose it along these axes:
 - **Minimal / ambient** -> `RhythmPattern.SPARSE`, drums at `density < 0.2`, or replace with modal/particle hits.
 
 ### Chord harmony
-- If the reference has a clear progression, use `customProgression = listOf(0, 0, 3, 4, ...)` (0-indexed scale degrees I-VII = 0-6).
-- If the reference hangs on one chord, use `progressionStyle = DRONE` or `customProgression = listOf(0)`.
+- If the reference has a clear progression, use `customProgression = chords(0, 0, 3, 4)` (0-indexed scale degrees I-VII = 0-6).
+- If the reference hangs on one chord, use `progressionStyle = DRONE` or `customProgression = chords(0)`.
+- For per-chord pedal-steel slides, build the list explicitly: `customProgression = listOf(ChordStep(0), ChordStep(3, glideRate = 0.45f), ChordStep(4))`.
 - If the reference has jazz substitutions, supply a `chordTransitionMatrix` via `chordMatrix(...)` (see `DeepSpaceVibe`).
 - `chordsPerBar = 1` = slow (1 chord per bar), `2` = standard, `4` = busy.
 
@@ -276,7 +329,7 @@ Existing vibes in the `vibes/` directory use the full list of explicit imports (
 
 ## When things go wrong
 
-- **"Vibe requires exactly 8 tracks"** runtime error: count your `TrackVoice` entries. Use silent placeholders (`volume = 0.0f, density = 0.0f`) if you do not need all 8.
+- **"Vibe requires exactly 8 tracks"** runtime error: count your `TrackVoice` entries. For silent placeholders, set `density = 0.0f` on the `TrackVoice` and `volume = 0.0f` inside both `OrpheusEngine` slots.
 - **"Row 'X' has N values, expected M"**: your `bandMatrix` or `chordMatrix` row length does not match the number of members/degrees. `bandMatrix` is NxN where N = number of rows; `chordMatrix` is fixed 7x7.
 - **"customProgression degrees must be 0..6"**: use 0 (I) through 6 (VII). Do not use negative numbers or values >= 7.
 - **Vibe does not show up in the picker**: verify the `@Inject` + `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())` annotations are both present and the class implements `VibeProvider`. Also rebuild — Metro DI code generation requires a recompile.

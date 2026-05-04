@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.EvolutionTension
 import org.balch.orpheus.features.pulsar.FillType
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -131,109 +132,118 @@ class DogHouseVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_8,   // reset each 8-bar phrase
         progressionDriftRange = 0.12f,                    // subtle drift — preserve the blues shape
         tracks = listOf(
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.85f,
-                pan = 0.00f,
-                density = 0.45f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.60f,
-                pan = -0.10f,
-                density = 0.35f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.FILL
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
-                engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-                role = TrackRole.Percussive,
-                volume = 0.55f,
-                pan = 0.15f,
-                density = 0.55f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.MUTATE
-            ),
+            // Kick: same engine on both sides
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.45f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE
+                )
+            },
+            // Snare: same engine on both sides
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.60f).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    pan = -0.10f,
+                    density = 0.35f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.FILL
+                )
+            },
+            // Hat: same engine on both sides
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.55f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.15f,
+                    density = 0.55f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.MUTATE
+                )
+            },
             // Bass: REPEAT pattern so the riff is tight — chord transposition provides the only variation.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.WAVESHAPING,
-                engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+            // Engines differ in id only; all knobs shared.
+            OrpheusEngine(
+                engineId = OrpheusEngineId.WAVESHAPING,
                 volume = 0.75f,
-                pan = 0.00f,
-                density = 0.40f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 33,
                 noteRangeHigh = 52,
                 reverbBrightness = 0.25f,
-            ),
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.STRING),
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                    pan = 0.00f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // Keys: reduced volume + density + REPEAT strategy so chord progression motion
             // sits behind the drums/bass instead of dominating (restores pre-progression-wiring feel).
             // OrpheusEngineId.SIX_OP_FM with harmonics=0.33 lands on patch index 10 = "Syn-bass 2" (DX bank
             // is the bass+analog-synth bank, not E.piano — see references/fm_patches.md).
             // At volume=0.28 played as Chordal/BLUES_SHUFFLE comping, this synth-bass tone
             // voices chords with a thick analog-FM character that sits well under the bass.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM,
-                engineSpace = OrpheusEngineId.GRAIN,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM,
+                volume = 0.28f,
                 harmonics = 0.33f,  // DX bank idx 10 = "Syn-bass 2" — synth-bass voicing chords
                 timbre = 0.32f,     // modulator index — not too bright for blues
-                morph = 0.31f,       // less feedback, cleaner attack
-                volume = 0.28f,
-                pan = -0.25f,
-                density = 0.30f,
-                role = TrackRole.Chordal(
-                    comping = ChordComping(
-                        style = CompingStyle.BLUES_SHUFFLE,
-                        arpMode = ArpMode.AUTO,
-                        arpSpeed = 0.1f,
-                        arpDirection = ArpDirection.UP_DOWN,
-                        sectionInversion = SectionInversion.FIRST_INVERSION,
-                        humanization = CompingHumanization(
-                            dropProbability = .2f,
-                            ghostProbability = .2f,
-                            octaveJumpProbability = .4f,
-                            extensionProbability = .4f
-                        ),
-                        fills = CompingFills(
-                            everyNBars = 6,
-                            fillType = FillType.TURNAROUND,
-                            skipProbability = .1f
-                        ),
-                    ),
-                ),
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
+                morph = 0.31f,      // less feedback, cleaner attack
                 noteRangeLow = 45,
                 noteRangeHigh = 65,
                 reverbBrightness = 0.5f,
                 delayFeedback = .3f,
                 delaySend = .3f,
                 glideRate = 0.1f,
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.STRING,
-                engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(),
+            ).let { keys ->
+                TrackVoice(
+                    engineEdm = keys,
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.GRAIN),
+                    pan = -0.25f,
+                    density = 0.30f,
+                    role = TrackRole.Chordal(
+                        comping = ChordComping(
+                            style = CompingStyle.BLUES_SHUFFLE,
+                            arpMode = ArpMode.AUTO,
+                            arpSpeed = 0.1f,
+                            arpDirection = ArpDirection.UP_DOWN,
+                            sectionInversion = SectionInversion.FIRST_INVERSION,
+                            humanization = CompingHumanization(
+                                dropProbability = .2f,
+                                ghostProbability = .2f,
+                                octaveJumpProbability = .4f,
+                                extensionProbability = .4f
+                            ),
+                            fills = CompingFills(
+                                everyNBars = 6,
+                                fillType = FillType.TURNAROUND,
+                                skipProbability = .1f
+                            ),
+                        ),
+                    ),
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
+            // String pad: same engine on both sides
+            OrpheusEngine(
+                engineId = OrpheusEngineId.STRING,
                 volume = 0.30f,
-                pan = 0.30f,
-                density = 0.05f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.1f,
                 modLfoDepth = 0.7f,
                 modLfoShape = 0.4f,
@@ -246,18 +256,23 @@ class DogHouseVibe : VibeProvider {
                 noteRangeLow = 38,
                 noteRangeHigh = 57,
                 reverbBrightness = 0.65f,
-                glideRate = 0.4f
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.GRAIN,
-                engineSpace = OrpheusEngineId.GRAIN,
-                role = TrackRole.Melodic(),
+                glideRate = 0.4f,
+            ).let { strings ->
+                TrackVoice(
+                    engineEdm = strings,
+                    engineSpace = strings,
+                    role = TrackRole.Melodic(),
+                    pan = 0.30f,
+                    density = 0.05f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
+            // Grain texture: same engine on both sides
+            OrpheusEngine(
+                engineId = OrpheusEngineId.GRAIN,
                 volume = 0.30f,
-                pan = -0.30f,
-                density = 0.15f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.15f,
                 modLfoDepth = 0.6f,
                 modLfoShape = 0.5f,
@@ -270,18 +285,23 @@ class DogHouseVibe : VibeProvider {
                 noteRangeLow = 41,
                 noteRangeHigh = 60,
                 reverbBrightness = 0.7f,
-                glideRate = 0.35f
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.MODAL,
-                engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(),
+                glideRate = 0.35f,
+            ).let { grain ->
+                TrackVoice(
+                    engineEdm = grain,
+                    engineSpace = grain,
+                    role = TrackRole.Melodic(),
+                    pan = -0.30f,
+                    density = 0.15f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
+            // Modal/string wild card: engines differ in id only
+            OrpheusEngine(
+                engineId = OrpheusEngineId.MODAL,
                 volume = 0.20f,
-                pan = 0.00f,
-                density = 0.08f,
-                envelopeProfile = EnvelopeProfile.WILD,
-                macroMap = TrackMacroMap.WILD,
-                barStrategy = BarStrategy.REPEAT,
                 modLfoRate = 0.08f,
                 modLfoDepth = 0.5f,
                 modLfoShape = 0.6f,
@@ -294,8 +314,19 @@ class DogHouseVibe : VibeProvider {
                 noteRangeLow = 36,
                 noteRangeHigh = 58,
                 reverbBrightness = 0.5f,
-                glideRate = 0.3f
-            ),
+                glideRate = 0.3f,
+            ).let { wild ->
+                TrackVoice(
+                    engineEdm = wild,
+                    engineSpace = wild.copy(engineId = OrpheusEngineId.STRING),
+                    role = TrackRole.Melodic(),
+                    pan = 0.00f,
+                    density = 0.08f,
+                    envelopeProfile = EnvelopeProfile.WILD,
+                    macroMap = TrackMacroMap.WILD,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

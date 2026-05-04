@@ -8,6 +8,7 @@ import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -286,72 +287,104 @@ private fun generateCompLabVibe(
     progressionDriftRange = 0.7f,
     tracks = listOf(
         // Track 0: Kick
-        TrackVoice(
-            engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM, engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-            role = TrackRole.Percussive,
-            volume = 0.85f, density = 0.5f,
-            envelopeProfile = EnvelopeProfile.RHYTHM,
-            macroMap = TrackMacroMap.RHYTHM,
-            barStrategy = BarStrategy.REPEAT,
-        ),
+        OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+            TrackVoice(
+                engineEdm = kick,
+                engineSpace = kick,
+                role = TrackRole.Percussive,
+                density = 0.5f,
+                envelopeProfile = EnvelopeProfile.RHYTHM,
+                macroMap = TrackMacroMap.RHYTHM,
+                barStrategy = BarStrategy.REPEAT,
+            )
+        },
         // Track 1: Snare
-        TrackVoice(
-            engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM, engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-            role = TrackRole.Percussive,
-            volume = 0.65f, pan = -0.1f, density = 0.4f,
-            envelopeProfile = EnvelopeProfile.RHYTHM,
-            macroMap = TrackMacroMap.RHYTHM,
-            barStrategy = BarStrategy.REPEAT,
-        ),
+        OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.65f).let { snare ->
+            TrackVoice(
+                engineEdm = snare,
+                engineSpace = snare,
+                role = TrackRole.Percussive,
+                pan = -0.1f, density = 0.4f,
+                envelopeProfile = EnvelopeProfile.RHYTHM,
+                macroMap = TrackMacroMap.RHYTHM,
+                barStrategy = BarStrategy.REPEAT,
+            )
+        },
         // Track 2: Hihat
-        TrackVoice(
-            engineEdm = OrpheusEngineId.METALLIC_HI_HAT, engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-            role = TrackRole.Percussive,
-            volume = 0.55f, pan = 0.15f, density = 0.6f,
-            envelopeProfile = EnvelopeProfile.RHYTHM,
-            macroMap = TrackMacroMap.RHYTHM,
-            barStrategy = BarStrategy.REPEAT,
-        ),
+        OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.55f).let { hat ->
+            TrackVoice(
+                engineEdm = hat,
+                engineSpace = hat,
+                role = TrackRole.Percussive,
+                pan = 0.15f, density = 0.6f,
+                envelopeProfile = EnvelopeProfile.RHYTHM,
+                macroMap = TrackMacroMap.RHYTHM,
+                barStrategy = BarStrategy.REPEAT,
+            )
+        },
         // Track 3: Bass
-        TrackVoice(
-            engineEdm = OrpheusEngineId.VIRTUAL_ANALOG_VCF, engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
-            role = TrackRole.Melodic(),
-            volume = 0.7f, density = 0.5f,
-            envelopeProfile = EnvelopeProfile.MELODIC,
-            macroMap = TrackMacroMap.MELODIC,
-            noteRangeLow = 33, noteRangeHigh = 52,
-        ),
+        OrpheusEngine(
+            engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+            volume = 0.7f,
+            noteRangeLow = 33,
+            noteRangeHigh = 52,
+        ).let { bass ->
+            TrackVoice(
+                engineEdm = bass,
+                engineSpace = bass.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                role = TrackRole.Melodic(),
+                density = 0.5f,
+                envelopeProfile = EnvelopeProfile.MELODIC,
+                macroMap = TrackMacroMap.MELODIC,
+            )
+        },
         // Track 4: CHORDAL keys — the comping track with full tuning
-        TrackVoice(
-            engineEdm = chordEngineEdm, engineSpace = chordEngineSpace,
-            role = TrackRole.Chordal(comping = compingOverride),
-            volume = 0.55f, pan = -0.2f,
-            envelopeProfile = EnvelopeProfile.MELODIC,
-            macroMap = TrackMacroMap.MELODIC,
-            noteRangeLow = 36, noteRangeHigh = 72,  // was 48 low — let piano voicings go lower
-        ),
+        OrpheusEngine(
+            engineId = chordEngineEdm,
+            volume = 0.55f,
+            noteRangeLow = 36,
+            noteRangeHigh = 72,  // was 48 low — let piano voicings go lower
+        ).let { keys ->
+            TrackVoice(
+                engineEdm = keys,
+                engineSpace = keys.copy(engineId = chordEngineSpace),
+                role = TrackRole.Chordal(comping = compingOverride),
+                pan = -0.2f,
+                envelopeProfile = EnvelopeProfile.MELODIC,
+                macroMap = TrackMacroMap.MELODIC,
+            )
+        },
         // Tracks 5-7: silent placeholders (8-track requirement)
-        TrackVoice(
-            engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING_MACHINE,
-            role = TrackRole.Melodic(),
-            volume = 0.0f, density = 0.0f,
-            envelopeProfile = EnvelopeProfile.EFFECT,
-            macroMap = TrackMacroMap.EFFECT,
-        ),
-        TrackVoice(
-            engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING_MACHINE,
-            role = TrackRole.Melodic(),
-            volume = 0.0f, density = 0.0f,
-            envelopeProfile = EnvelopeProfile.EFFECT,
-            macroMap = TrackMacroMap.EFFECT,
-        ),
-        TrackVoice(
-            engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING_MACHINE,
-            role = TrackRole.Melodic(),
-            volume = 0.0f, density = 0.0f,
-            envelopeProfile = EnvelopeProfile.EFFECT,
-            macroMap = TrackMacroMap.EFFECT,
-        ),
+        OrpheusEngine(engineId = OrpheusEngineId.STRING_MACHINE, volume = 0.0f).let { silent ->
+            TrackVoice(
+                engineEdm = silent,
+                engineSpace = silent,
+                role = TrackRole.Melodic(),
+                density = 0.0f,
+                envelopeProfile = EnvelopeProfile.EFFECT,
+                macroMap = TrackMacroMap.EFFECT,
+            )
+        },
+        OrpheusEngine(engineId = OrpheusEngineId.STRING_MACHINE, volume = 0.0f).let { silent ->
+            TrackVoice(
+                engineEdm = silent,
+                engineSpace = silent,
+                role = TrackRole.Melodic(),
+                density = 0.0f,
+                envelopeProfile = EnvelopeProfile.EFFECT,
+                macroMap = TrackMacroMap.EFFECT,
+            )
+        },
+        OrpheusEngine(engineId = OrpheusEngineId.STRING_MACHINE, volume = 0.0f).let { silent ->
+            TrackVoice(
+                engineEdm = silent,
+                engineSpace = silent,
+                role = TrackRole.Melodic(),
+                density = 0.0f,
+                envelopeProfile = EnvelopeProfile.EFFECT,
+                macroMap = TrackMacroMap.EFFECT,
+            )
+        },
     ),
     stepCount = 16,
     tension = TensionProfile(

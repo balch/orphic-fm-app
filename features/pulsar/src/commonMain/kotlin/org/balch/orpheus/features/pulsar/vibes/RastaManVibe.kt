@@ -24,6 +24,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -151,32 +152,41 @@ class RastaManVibe : VibeProvider {
             // ═══════════════════════════════════════════════════════════
 
             // 0 KICK: One-drop — sparse, accent on beat 3 (the signature)
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM, engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.85f, pan = 0.00f, density = 0.18f,  // VERY sparse for one-drop feel
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f, density = 0.18f,  // VERY sparse for one-drop feel
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 1 SNARE: Rim-shot backbeat — 2 and 4
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM, engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.60f, pan = -0.10f, density = 0.30f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.60f).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    pan = -0.10f, density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 2 HH: Steady 8th notes — the Rasta pulse
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT, engineSpace = OrpheusEngineId.METALLIC_HI_HAT,
-                role = TrackRole.Percussive,
-                volume = 0.50f, pan = 0.15f, density = 0.55f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT,
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.50f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat,
+                    role = TrackRole.Percussive,
+                    pan = 0.15f, density = 0.55f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
 
             // ═══════════════════════════════════════════════════════════
             // 3-4: The voice of the groove — bass and melodica
@@ -184,18 +194,24 @@ class RastaManVibe : VibeProvider {
 
             // 3 BASS: PD warm/dark tone, ROOT_ONLY for that dub bass lock.
             // Bass is prominent in reggae — mixed loud, center, deep register with slide.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PHASE_DISTORTION, engineSpace = OrpheusEngineId.PHASE_DISTORTION,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
-                volume = 0.95f, pan = 0.00f, density = 0.40f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PHASE_DISTORTION,
+                volume = 0.95f,
                 harmonics = 0.18f, timbre = 0.22f, morph = 0.12f,  // darker, rounder dub tone
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 28, noteRangeHigh = 45,  // E1-A2 — deep sub bass territory
                 glideRate = 0.55f,  // slidey dub bass — notes smear into each other
                 reverbBrightness = 0.25f,
-            ),
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass,
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                    pan = 0.00f, density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // 4 LEAD: Roots horn-stand-in — lick-driven plucks crossfading to a slow pad.
             // At Energy=1: DX2 patch idx 14 = "Harpsich" (harpsichord pluck) — works as a
             // bright plucky lead in place of a real melodica. At Energy=0: DX3 patch idx 14
@@ -203,18 +219,24 @@ class RastaManVibe : VibeProvider {
             // Fills across the full pattern; lick mutation gives it melodic life.
             // (See references/fm_patches.md — harmonics=0.45 lands at index 14 in both
             // banks; this voice is harpsichord-pluck, not a true reedy melodica.)
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_2, engineSpace = OrpheusEngineId.SIX_OP_FM_3,
-                role = TrackRole.Melodic(lickMode = LickMode.Fill),
-                volume = 0.30f, pan = 0.20f, density = 0.30f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_2,
+                volume = 0.30f,
                 harmonics = 0.45f, timbre = 0.52f, morph = 0.24f,  // bright plucky lead → spacey pad
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 60, noteRangeHigh = 79,  // C4-G5 horn register
                 reverbBrightness = 0.6f, reverbSend = 0.3f, delaySend = 0.35f,
                 glideRate = 0.15f,
-            ),
+            ).let { lead ->
+                TrackVoice(
+                    engineEdm = lead,
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.SIX_OP_FM_3),
+                    role = TrackRole.Melodic(lickMode = LickMode.Fill),
+                    pan = 0.20f, density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
 
             // ═══════════════════════════════════════════════════════════
             // 5-6: The defining reggae chord elements
@@ -223,53 +245,65 @@ class RastaManVibe : VibeProvider {
             // 5 SKANK GUITAR: The iconic reggae chop — REGGAE_SKANK plays
             // chord stabs on beats 2 and 4 only. Slight humanization so the
             // skank feels played, not programmed. Occasional 8-bar fills.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.CHORD, engineSpace = OrpheusEngineId.CHORD,
-                role = TrackRole.Chordal(
-                    comping = ChordComping(
-                        style = CompingStyle.REGGAE_SKANK,
-                        sectionInversion = SectionInversion.ROOT_POSITION,
-                        humanization = CompingHumanization(
-                            dropProbability = 0.06f,       // skank rarely drops — too important
-                            octaveJumpProbability = 0.04f,
-                            extensionProbability = 0.08f,  // occasional 7th color
-                        ),
-                        fills = CompingFills(
-                            everyNBars = 8,
-                            fillType = FillType.ASCENDING_ARP,
-                            skipProbability = 0.5f,  // half the time skip — fills sparingly
-                        ),
-                    ),
-                ),
-                volume = 0.32f, pan = -0.30f, density = 0.40f,  // left side — rhythm guitar spot
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.CHORD,
+                volume = 0.32f,
                 noteRangeLow = 45, noteRangeHigh = 60,  // A2-C4 guitar mid-low register
                 reverbBrightness = 0.55f, reverbSend = 0.25f, delaySend = 0.30f,
-            ),
+            ).let { skank ->
+                TrackVoice(
+                    engineEdm = skank,
+                    engineSpace = skank,
+                    role = TrackRole.Chordal(
+                        comping = ChordComping(
+                            style = CompingStyle.REGGAE_SKANK,
+                            sectionInversion = SectionInversion.ROOT_POSITION,
+                            humanization = CompingHumanization(
+                                dropProbability = 0.06f,       // skank rarely drops — too important
+                                octaveJumpProbability = 0.04f,
+                                extensionProbability = 0.08f,  // occasional 7th color
+                            ),
+                            fills = CompingFills(
+                                everyNBars = 8,
+                                fillType = FillType.ASCENDING_ARP,
+                                skipProbability = 0.5f,  // half the time skip — fills sparingly
+                            ),
+                        ),
+                    ),
+                    pan = -0.30f, density = 0.40f,  // left side — rhythm guitar spot
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                )
+            },
             // 6 ORGAN BUBBLE: Syncopated 16ths bubbling underneath — FUNK_STABS
             // template hits the "ands" and inner 16ths, filling the gaps between
             // skank stabs. Kept tame — a gentle bubble, not a lead.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.CHORD, engineSpace = OrpheusEngineId.CHORD,
-                role = TrackRole.Chordal(
-                    comping = ChordComping(
-                        style = CompingStyle.FUNK_STABS,  // syncopated 16ths = bubbling organ
-                        sectionInversion = SectionInversion.FIRST_INVERSION,
-                        humanization = CompingHumanization(
-                            dropProbability = 0.35f,        // drop often — bubble is sparse
-                            ghostProbability = 0.08f,        // fewer extra hits
-                            octaveJumpProbability = 0.02f,   // basically never jump up
-                            extensionProbability = 0.10f,
-                        ),
-                    ),
-                ),
-                volume = 0.22f, pan = 0.25f, density = 0.28f,  // right side — organ spot, quieter
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.CHORD,
+                volume = 0.22f,
                 noteRangeLow = 48, noteRangeHigh = 62,  // C3-D4 warmer register
                 reverbBrightness = 0.50f, reverbSend = 0.30f, delaySend = 0.25f,
-            ),
+            ).let { organ ->
+                TrackVoice(
+                    engineEdm = organ,
+                    engineSpace = organ,
+                    role = TrackRole.Chordal(
+                        comping = ChordComping(
+                            style = CompingStyle.FUNK_STABS,  // syncopated 16ths = bubbling organ
+                            sectionInversion = SectionInversion.FIRST_INVERSION,
+                            humanization = CompingHumanization(
+                                dropProbability = 0.35f,        // drop often — bubble is sparse
+                                ghostProbability = 0.08f,        // fewer extra hits
+                                octaveJumpProbability = 0.02f,   // basically never jump up
+                                extensionProbability = 0.10f,
+                            ),
+                        ),
+                    ),
+                    pan = 0.25f, density = 0.28f,  // right side — organ spot, quieter
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                )
+            },
 
             // ═══════════════════════════════════════════════════════════
             // 7: Background pad / texture
@@ -277,19 +311,25 @@ class RastaManVibe : VibeProvider {
 
             // 7 TEXTURE: Warm ensemble pad, mostly atmosphere.
             // Low volume, long holds, heavy reverb — the warm Caribbean haze.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.STRING_MACHINE, engineSpace = OrpheusEngineId.STRING,
-                role = TrackRole.Melodic(),
-                volume = 0.25f, pan = -0.35f, density = 0.12f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.STRING_MACHINE,
+                volume = 0.25f,
                 modLfoRate = 0.05f, modLfoDepth = 0.4f, modLfoShape = 0.3f, modLfoCoupling = 0.2f,
                 holdProbability = 0.85f, holdLengthMin = 8, holdLengthMax = 24,
                 reverbSend = 0.55f, delaySend = 0.25f,
                 noteRangeLow = 48, noteRangeHigh = 67,
                 reverbBrightness = 0.55f,
-            ),
+            ).let { pad ->
+                TrackVoice(
+                    engineEdm = pad,
+                    engineSpace = pad.copy(engineId = OrpheusEngineId.STRING),
+                    role = TrackRole.Melodic(),
+                    pan = -0.35f, density = 0.12f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(

@@ -13,6 +13,7 @@ import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.GenreProfile
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
@@ -44,8 +45,8 @@ private fun sampleVibe(
     ),
     tracks = List(8) {
         TrackVoice(
-            engineEdm = OrpheusEngineId.VIRTUAL_ANALOG,
-            engineSpace = OrpheusEngineId.VIRTUAL_ANALOG,
+            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
             role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
         )
     },

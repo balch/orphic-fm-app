@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
@@ -156,59 +157,66 @@ class ArmyStompVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_8,
         progressionDriftRange = 0.25f,
         tracks = listOf(
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_BASS_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_BASS_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.90f,
-                pan = 0.00f,
-                density = 0.50f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                engineSpace = OrpheusEngineId.ANALOG_SNARE_DRUM,
-                role = TrackRole.Percussive,
-                volume = 0.55f,
-                pan = -0.10f,
-                density = 0.30f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.METALLIC_HI_HAT,
-                engineSpace = OrpheusEngineId.NOISE,
-                role = TrackRole.Percussive,
-                volume = 0.35f,
-                pan = 0.15f,
-                density = 0.25f,
-                envelopeProfile = EnvelopeProfile.RHYTHM,
-                macroMap = TrackMacroMap.RHYTHM,
-                barStrategy = BarStrategy.REPEAT
-            ),
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f).let { kick ->
+                TrackVoice(
+                    engineEdm = kick,
+                    engineSpace = kick,
+                    role = TrackRole.Percussive,
+                    pan = 0.00f,
+                    density = 0.50f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT
+                )
+            },
+            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.55f).let { snare ->
+                TrackVoice(
+                    engineEdm = snare,
+                    engineSpace = snare,
+                    role = TrackRole.Percussive,
+                    pan = -0.10f,
+                    density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT
+                )
+            },
+            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.35f).let { hat ->
+                TrackVoice(
+                    engineEdm = hat,
+                    engineSpace = hat.copy(engineId = OrpheusEngineId.NOISE),
+                    role = TrackRole.Percussive,
+                    pan = 0.15f,
+                    density = 0.25f,
+                    envelopeProfile = EnvelopeProfile.RHYTHM,
+                    macroMap = TrackMacroMap.RHYTHM,
+                    barStrategy = BarStrategy.REPEAT
+                )
+            },
             // Bass: disciplined march — ROOT_ONLY chord follow + REPEAT rhythm so
             // the bass locks to the chord root every stab. Range pinned to E2-B2
             // (40-47): noteRangeLow raised from E1 keeps it out of sub-bass mud,
             // noteRangeHigh dropped to B2 keeps it from climbing into the lead's
             // E3 floor (see Path B note on the squash lead below).
-            TrackVoice(
-                engineEdm = OrpheusEngineId.PHASE_DISTORTION,
-                engineSpace = OrpheusEngineId.SIX_OP_FM,
-                harmonics = .05f, // Mooger Low
-                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.PHASE_DISTORTION,
                 volume = 0.85f,
-                pan = 0.00f,
-                density = 0.40f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.REPEAT,
+                harmonics = .05f, // Mooger Low
                 noteRangeLow = 40,
                 noteRangeHigh = 47,  // B2 ceiling — pure bass register
-                reverbBrightness = 0.5f
-            ),
+                reverbBrightness = 0.5f,
+            ).let { bass ->
+                TrackVoice(
+                    engineEdm = bass,
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.SIX_OP_FM),
+                    role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                    pan = 0.00f,
+                    density = 0.40f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.REPEAT,
+                )
+            },
             // Squash lead: dual-VCF aesthetic, separated from the bass by SPACE
             // not SPECTRUM. The bass and lead share filter-sweep character but
             // live in different positions in the field:
@@ -219,33 +227,30 @@ class ArmyStompVibe : VibeProvider {
             // string crossfade. (A/B winner over the brass approach: tried DX3
             // idx 31 "Br trumpet" — clean spectral separation but lost the
             // unified filter-sweep palette that defines the vibe's character.)
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_2, // Fender
-                engineSpace = OrpheusEngineId.SIX_OP_FM_3, // Hammond
-                harmonics = .05f,
-                role = TrackRole.Melodic(lickMode = LickMode.Squash),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_2, // Fender
                 volume = 0.60f,
-                pan = 0.20f,
-                density = 0.20f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.CALL_RESPONSE,
+                harmonics = .05f,
                 noteRangeLow = 52,
                 noteRangeHigh = 67,
                 reverbBrightness = 0.7f,
-                glideRate = 0.05f
-            ), // Squash: CALL_RESPONSE owns bar 2
+                glideRate = 0.05f,
+            ).let { lead ->
+                TrackVoice(
+                    engineEdm = lead,
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.SIX_OP_FM_3), // Hammond
+                    role = TrackRole.Melodic(lickMode = LickMode.Squash),
+                    pan = 0.20f,
+                    density = 0.20f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                    barStrategy = BarStrategy.CALL_RESPONSE,
+                )
+            }, // Squash: CALL_RESPONSE owns bar 2
             // Track 5: Texture pad — density bumped so it can pulse under the breakdown.
-            TrackVoice(
-                engineEdm = OrpheusEngineId.GRAIN,
-                engineSpace = OrpheusEngineId.GRAIN,
-                role = TrackRole.Melodic(),
+            OrpheusEngine(
+                engineId = OrpheusEngineId.GRAIN,
                 volume = 0.30f,
-                pan = 0.30f,
-                density = 0.30f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.5f,
                 modLfoDepth = 0.3f,
                 modLfoShape = 0.3f,
@@ -257,18 +262,22 @@ class ArmyStompVibe : VibeProvider {
                 delaySend = 0.15f,
                 noteRangeLow = 36,
                 noteRangeHigh = 60,
-                reverbBrightness = 0.5f
-            ),
-            TrackVoice(
-                engineEdm = OrpheusEngineId.NOISE,
-                engineSpace = OrpheusEngineId.PARTICLE,
-                role = TrackRole.Percussive,
+                reverbBrightness = 0.5f,
+            ).let { pad ->
+                TrackVoice(
+                    engineEdm = pad,
+                    engineSpace = pad,
+                    role = TrackRole.Melodic(),
+                    pan = 0.30f,
+                    density = 0.30f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
+            OrpheusEngine(
+                engineId = OrpheusEngineId.NOISE,
                 volume = 0.30f,
-                pan = -0.30f,
-                density = 0.10f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.4f,
                 modLfoDepth = 0.25f,
                 modLfoShape = 0.4f,
@@ -280,8 +289,19 @@ class ArmyStompVibe : VibeProvider {
                 delaySend = 0.1f,
                 noteRangeLow = 36,
                 noteRangeHigh = 60,
-                reverbBrightness = 0.5f
-            ),
+                reverbBrightness = 0.5f,
+            ).let { fx ->
+                TrackVoice(
+                    engineEdm = fx,
+                    engineSpace = fx.copy(engineId = OrpheusEngineId.PARTICLE),
+                    role = TrackRole.Percussive,
+                    pan = -0.30f,
+                    density = 0.10f,
+                    envelopeProfile = EnvelopeProfile.EFFECT,
+                    macroMap = TrackMacroMap.EFFECT,
+                    barStrategy = BarStrategy.INDEPENDENT,
+                )
+            },
             // Track 7: CHORDAL mallet — subtle PAD during march sections, becomes
             // off-beat SKA_UPSTROKES stabs in the breakdown via section override.
             // OrpheusEngineId.SIX_OP_FM_2 with harmonics=0.54 selects patch idx 17 = "Marimba" — same
@@ -292,27 +312,34 @@ class ArmyStompVibe : VibeProvider {
             // (Iteration history: DX2/0.50 = "Xylophone" → too high and mallet-y for
             // ska. DX3/0.05 = "Hammond" → too organ-y, lost the ring. Marimba threads
             // both: ring + lower register + percussive chord stab.)
-            TrackVoice(
-                engineEdm = OrpheusEngineId.SIX_OP_FM_2, engineSpace = OrpheusEngineId.SIX_OP_FM_2,
-                role = TrackRole.Chordal(
-                    comping = ChordComping(
-                        style = CompingStyle.BLUES_SHUFFLE,
-                        fills = CompingFills(
-                            everyNBars = 4,
-                            fillType = FillType.DOUBLE_TIME,
-                            skipProbability = .4f
-                        ),
-                    ),
-                ),  // subtle in march
-                timbre = .5f,
+            OrpheusEngine(
+                engineId = OrpheusEngineId.SIX_OP_FM_2,
+                volume = 0.20f,
                 harmonics = 0.54f,  // DX2 idx 17 = "Marimba" — wooden ring, lower than xylo
+                timbre = .5f,
                 morph = .5f,
-                volume = 0.20f, pan = 0.15f, density = 0.18f,
-                envelopeProfile = EnvelopeProfile.MELODIC,
-                macroMap = TrackMacroMap.MELODIC,
-                noteRangeLow = 41, noteRangeHigh = 60,  // F2-C4 — deeper mallet register
+                noteRangeLow = 41,
+                noteRangeHigh = 60,  // F2-C4 — deeper mallet register
                 reverbBrightness = 0.5f,
-            ),
+            ).let { mallet ->
+                TrackVoice(
+                    engineEdm = mallet,
+                    engineSpace = mallet,
+                    role = TrackRole.Chordal(
+                        comping = ChordComping(
+                            style = CompingStyle.BLUES_SHUFFLE,
+                            fills = CompingFills(
+                                everyNBars = 4,
+                                fillType = FillType.DOUBLE_TIME,
+                                skipProbability = .4f
+                            ),
+                        ),
+                    ),  // subtle in march
+                    pan = 0.15f, density = 0.18f,
+                    envelopeProfile = EnvelopeProfile.MELODIC,
+                    macroMap = TrackMacroMap.MELODIC,
+                )
+            },
         ),
         stepCount = 32,
         tension = TensionProfile(
