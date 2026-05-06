@@ -25,9 +25,11 @@ import androidx.media.MediaBrowserServiceCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.diamondedge.logging.logging
 import org.balch.orpheus.core.media.ForegroundServiceController
-import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.models.Album
+import org.balch.orpheus.features.pulsar.models.Vibe
+import java.util.Locale
 
 /**
  * Single combined service for the DJ app that:
@@ -47,6 +49,10 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
     private var mediaSession: MediaSessionCompat? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var hasAudioFocus = false
+    // Set when a transient focus loss caused us to pause; cleared once we
+    // auto-resume on GAIN. Permanent LOSS leaves this false so the user must
+    // manually resume.
+    private var wasPlayingBeforeFocusLoss = false
     private var zeroToOneArt: Bitmap? = null
     private var rifArt: Bitmap? = null
     private var stealthRenderer: ProceduralArtRenderer? = null
@@ -86,6 +92,9 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         const val NOTIFICATION_ID = 1
         const val CHANNEL_ID = "djapp_audio_playback"
         private const val ROOT_ID = "djapp_root"
+        private const val ALBUM_PREFIX = "album_"
+        // mediaIds: ROOT_ID -> "album_<Album.name>" (browsable) -> "<vibe.name>" (playable)
+        // Stable schema lets PulsarVibePicker keep matching by vibe.name unchanged.
 
         private val ACTION_PLAY = ForegroundServiceController.ACTION_PLAY
         private val ACTION_PAUSE = ForegroundServiceController.ACTION_PAUSE
@@ -164,6 +173,12 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
             ACTION_SKIP_NEXT -> actionHandler?.invoke("skipNext")
             ACTION_SKIP_PREVIOUS -> actionHandler?.invoke("skipPrevious")
             ACTION_UPDATE_STATE_PLAYING -> {
+                // The PlaybackController-driven path lands here whenever the
+                // app transitions into Playing (auto-resume on Auto bind, in-app
+                // tap, etc.). Without acquiring focus here, other media apps
+                // (Spotify, Apple Music) never receive AUDIOFOCUS_LOSS and
+                // continue playing on top of us.
+                acquireAudioFocus()
                 isPlaying = true
                 updatePlaybackState(true)
             }
@@ -179,6 +194,11 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 currentTitle = title
                 primarySubtitle = subtitle
                 isPlaying = intentIsPlaying
+
+                // Metadata can race ahead of the state intent (PlaybackController
+                // emits both on play()) — cover that path so focus is acquired
+                // even if metadata wins the scheduling.
+                if (intentIsPlaying) acquireAudioFocus()
 
                 updateMediaSessionMetadata()
                 updateNotification()
@@ -213,25 +233,53 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         parentId: String,
         result: Result<MutableList<MediaBrowserCompat.MediaItem>>
     ) {
-        when (parentId) {
-            ROOT_ID -> {
-                val feature = pulsarFeature
-                if (feature == null) {
-                    log.warn { "PulsarFeature not available" }
-                    result.sendResult(mutableListOf())
-                    return
-                }
-                val items = feature.vibeList.map { vibe ->
+        val feature = pulsarFeature
+        if (feature == null) {
+            log.warn { "PulsarFeature not available for $parentId" }
+            result.sendResult(mutableListOf())
+            return
+        }
+        when {
+            parentId == ROOT_ID -> {
+                // Top level: one browsable folder per Album, ordered to match
+                // the in-app vibe spinner grouping.
+                val items = Album.values().mapNotNull { album ->
+                    val vibesInAlbum = feature.vibeList.filter { it.album == album }
+                    if (vibesInAlbum.isEmpty()) return@mapNotNull null
                     val description = MediaDescriptionCompat.Builder()
-                        .setMediaId(vibe.name)
-                        .setTitle(vibe.name)
-                        .setSubtitle("${vibe.bpm.toInt()} BPM")
+                        .setMediaId(ALBUM_PREFIX + album.name)
+                        .setTitle(album.title)
+                        .setSubtitle("${vibesInAlbum.size} vibes")
+                        .setIconBitmap(albumArt(album))
                         .build()
                     MediaBrowserCompat.MediaItem(
                         description,
-                        MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
+                        MediaBrowserCompat.MediaItem.FLAG_BROWSABLE
                     )
                 }
+                result.sendResult(items.toMutableList())
+            }
+            parentId.startsWith(ALBUM_PREFIX) -> {
+                val albumName = parentId.removePrefix(ALBUM_PREFIX)
+                val album = Album.values().firstOrNull { it.name == albumName }
+                if (album == null) {
+                    log.warn { "Unknown album id: $parentId" }
+                    result.sendResult(mutableListOf())
+                    return
+                }
+                val items = feature.vibeList
+                    .filter { it.album == album }
+                    .map { vibe ->
+                        val description = MediaDescriptionCompat.Builder()
+                            .setMediaId(vibe.name)
+                            .setTitle(vibe.name)
+                            .setSubtitle("${vibe.bpm.toInt()} BPM")
+                            .build()
+                        MediaBrowserCompat.MediaItem(
+                            description,
+                            MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
+                        )
+                    }
                 result.sendResult(items.toMutableList())
             }
             else -> {
@@ -239,6 +287,12 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 result.sendResult(mutableListOf())
             }
         }
+    }
+
+    private fun albumArt(album: Album): Bitmap? = when (album) {
+        Album.RIF -> rifArt
+        Album.ZERO_TO_ONE -> zeroToOneArt
+        Album.STEALTH -> zeroToOneArt // procedural per-title doesn't fit a folder thumbnail
     }
 
     // ─── MediaSession / notification / focus ───────────────────────────
@@ -274,14 +328,20 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
                     mediaId ?: return
                     log.info { "onPlayFromMediaId: $mediaId" }
-                    acquireAudioFocus()
-                    playFromMediaIdHandler?.invoke(mediaId)
-                    // Promote to foreground so the notification & background
-                    // playback stay alive past the initial bind from Auto.
-                    ContextCompat.startForegroundService(
-                        this@DjMediaBrowserService,
-                        Intent(this@DjMediaBrowserService, DjMediaBrowserService::class.java)
-                    )
+                    playMediaId(mediaId)
+                }
+
+                override fun onPlayFromSearch(query: String?, extras: Bundle?) {
+                    val vibe = resolveSearchQuery(query)
+                    log.info { "onPlayFromSearch: query='$query' resolved=${vibe?.name}" }
+                    if (vibe != null) playMediaId(vibe.name)
+                }
+
+                override fun onSkipToQueueItem(id: Long) {
+                    val vibes = pulsarFeature?.vibeList.orEmpty()
+                    val vibe = vibes.getOrNull(id.toInt())
+                    log.info { "onSkipToQueueItem: id=$id resolved=${vibe?.name}" }
+                    if (vibe != null) playMediaId(vibe.name)
                 }
             })
 
@@ -290,15 +350,85 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         sessionToken = mediaSession?.sessionToken
 
         updateMediaSessionMetadata()
+        publishQueue()
         updatePlaybackState(true)
     }
 
     /**
-     * Acquire audio focus. Other audio apps (Apple Music, Spotify, etc.) should
-     * pause when this is granted. We do NOT auto-pause on focus loss — if a
-     * phone call or navigation prompt ducks us, Android handles that
-     * transparently; a permanent loss will be surfaced via the listener log
-     * only.
+     * Common play path for any "start playing this vibe" trigger
+     * (mediaId tap, voice search, queue item tap). Acquires focus, fans the
+     * media id out to the existing PulsarVibePicker handler, and promotes us
+     * to a foreground service so playback survives the initial Auto bind.
+     */
+    private fun playMediaId(mediaId: String) {
+        acquireAudioFocus()
+        playFromMediaIdHandler?.invoke(mediaId)
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, DjMediaBrowserService::class.java)
+        )
+    }
+
+    /**
+     * Best-effort match of an Assistant query to a Vibe.
+     *  1. Empty / null query -> current vibe (or first if none).
+     *  2. Substring match against vibe name.
+     *  3. Substring match against album title -> first vibe in that album.
+     *  4. Nothing matched -> null (caller decides whether to fall back).
+     *
+     * Case- and locale-insensitive. Reviewers test queries like
+     * "Hey Google, play <vibe> on Orphic DJ".
+     */
+    private fun resolveSearchQuery(query: String?): Vibe? {
+        val vibes = pulsarFeature?.vibeList.orEmpty()
+        if (vibes.isEmpty()) return null
+        val q = query?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        if (q.isEmpty()) {
+            return vibes.firstOrNull { it.name == currentTitle } ?: vibes.first()
+        }
+        vibes.firstOrNull { it.name.lowercase(Locale.ROOT).contains(q) }?.let { return it }
+        Album.values().firstOrNull { it.title.lowercase(Locale.ROOT).contains(q) }?.let { album ->
+            return vibes.firstOrNull { it.album == album }
+        }
+        return null
+    }
+
+    /**
+     * Publish the full vibe list as the MediaSession queue. Auto's now-playing
+     * card surfaces this as the "playing next" carousel; reviewers expect a
+     * non-empty queue for any media-category app. Queue ids are stable indices
+     * into vibeList so [onSkipToQueueItem] can resolve back to a Vibe.
+     */
+    private fun publishQueue() {
+        val vibes = pulsarFeature?.vibeList ?: return
+        val items = vibes.mapIndexed { index, vibe ->
+            val description = MediaDescriptionCompat.Builder()
+                .setMediaId(vibe.name)
+                .setTitle(vibe.name)
+                .setSubtitle("${vibe.bpm.toInt()} BPM • ${vibe.album.title}")
+                .build()
+            MediaSessionCompat.QueueItem(description, index.toLong())
+        }
+        mediaSession?.setQueue(items)
+        mediaSession?.setQueueTitle("Vibes")
+    }
+
+    private fun currentQueueId(): Long {
+        val vibes = pulsarFeature?.vibeList ?: return -1L
+        val idx = vibes.indexOfFirst { it.name == currentTitle }
+        return if (idx >= 0) idx.toLong() else -1L
+    }
+
+    /**
+     * Acquire audio focus. Other audio apps (Apple Music, Spotify, etc.) pause
+     * when this is granted. The focus-change listener handles loss/gain per
+     * the table below — critical on Android Auto where ignoring nav prompts
+     * is a real safety issue.
+     *
+     *   LOSS                       — another media app took focus; pause and stay paused.
+     *   LOSS_TRANSIENT             — phone call/alarm; pause, auto-resume on GAIN.
+     *   LOSS_TRANSIENT_CAN_DUCK    — nav prompt; system auto-ducks our output, no action.
+     *   GAIN                       — resume only if a prior transient loss paused us.
      */
     private fun acquireAudioFocus() {
         if (hasAudioFocus) return
@@ -311,16 +441,46 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                     .build()
             )
             .setAcceptsDelayedFocusGain(true)
-            .setOnAudioFocusChangeListener { change ->
-                // Intentionally non-destructive: we log but don't pause.
-                log.debug { "Audio focus change: $change" }
-            }
+            .setOnAudioFocusChangeListener { change -> onAudioFocusChanged(change) }
             .build()
             .also { audioFocusRequest = it }
 
         val result = audioManager.requestAudioFocus(request)
         hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         log.info { "requestAudioFocus result=$result granted=$hasAudioFocus" }
+    }
+
+    private fun onAudioFocusChanged(change: Int) {
+        log.info { "Audio focus change: $change (wasPlaying=$wasPlayingBeforeFocusLoss isPlaying=$isPlaying)" }
+        val controller = try {
+            DjAppApplication.getGraph(this).playbackController
+        } catch (e: Exception) {
+            log.warn(e) { "PlaybackController unavailable on focus change; ignoring" }
+            return
+        }
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                // Permanent: another media app took over. Don't auto-resume.
+                hasAudioFocus = false
+                wasPlayingBeforeFocusLoss = false
+                controller.pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // Phone call / alarm — remember we were playing so GAIN resumes.
+                wasPlayingBeforeFocusLoss = isPlaying
+                controller.pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // System auto-ducks the mix; we keep playing at reduced volume.
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                hasAudioFocus = true
+                if (wasPlayingBeforeFocusLoss) {
+                    wasPlayingBeforeFocusLoss = false
+                    controller.play()
+                }
+            }
+        }
     }
 
     private fun abandonAudioFocus() {
@@ -383,6 +543,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         mediaSession?.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1f)
+                .setActiveQueueItemId(currentQueueId())
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
                     PlaybackStateCompat.ACTION_PAUSE or
@@ -390,7 +551,9 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                     PlaybackStateCompat.ACTION_PLAY_PAUSE or
                     PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
                     PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
-                    PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
+                    PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+                    PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
+                    PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM
                 )
                 .build()
         )
