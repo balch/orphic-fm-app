@@ -25,6 +25,15 @@ import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.RhythmPattern
+import org.balch.orpheus.features.pulsar.models.RootNote
+import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeProvider
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test

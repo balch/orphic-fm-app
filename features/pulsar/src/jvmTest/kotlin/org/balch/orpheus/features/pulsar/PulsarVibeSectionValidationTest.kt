@@ -1,5 +1,8 @@
 package org.balch.orpheus.features.pulsar
 
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.chords
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 

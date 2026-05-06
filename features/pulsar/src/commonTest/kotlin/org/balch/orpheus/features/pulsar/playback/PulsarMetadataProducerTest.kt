@@ -11,18 +11,18 @@ import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
-import org.balch.orpheus.features.pulsar.Album
-import org.balch.orpheus.features.pulsar.GenreProfile
-import org.balch.orpheus.features.pulsar.OrpheusEngine
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
-import org.balch.orpheus.features.pulsar.RhythmPattern
-import org.balch.orpheus.features.pulsar.RootNote
-import org.balch.orpheus.features.pulsar.ScaleType
-import org.balch.orpheus.features.pulsar.TrackRole
-import org.balch.orpheus.features.pulsar.TrackVoice
-import org.balch.orpheus.features.pulsar.Vibe
+import org.balch.orpheus.features.pulsar.models.Album
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.RhythmPattern
+import org.balch.orpheus.features.pulsar.models.RootNote
+import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.Vibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

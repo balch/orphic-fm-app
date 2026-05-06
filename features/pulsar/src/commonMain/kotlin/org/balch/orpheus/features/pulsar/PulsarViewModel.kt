@@ -49,6 +49,29 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.features.pulsar.models.ChordFollow
+import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.DuckingProfile
+import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.LickMode
+import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.PitchEvolution
+import org.balch.orpheus.features.pulsar.models.RhythmPattern
+import org.balch.orpheus.features.pulsar.models.RootNote
+import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.SectionInversion
+import org.balch.orpheus.features.pulsar.models.SoloBehavior
+import org.balch.orpheus.features.pulsar.models.SoloMarkovConfig
+import org.balch.orpheus.features.pulsar.models.SoloMode
+import org.balch.orpheus.features.pulsar.models.TrackMacroMap
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.chordComping
+import org.balch.orpheus.features.pulsar.models.chordFollow
+import org.balch.orpheus.features.pulsar.models.lickMode
 import kotlin.concurrent.Volatile
 
 @Serializable

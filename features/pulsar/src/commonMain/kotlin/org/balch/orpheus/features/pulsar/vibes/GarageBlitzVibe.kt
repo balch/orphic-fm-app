@@ -1,23 +1,23 @@
 package org.balch.orpheus.features.pulsar.vibes
 
 import org.balch.orpheus.core.audio.OrpheusEngineId
-import org.balch.orpheus.features.pulsar.BarStrategy
-import org.balch.orpheus.features.pulsar.ChordFollow
-import org.balch.orpheus.features.pulsar.EnvelopeProfile
-import org.balch.orpheus.features.pulsar.EnvelopeType
-import org.balch.orpheus.features.pulsar.GenreProfile
-import org.balch.orpheus.features.pulsar.OrpheusEngine
-import org.balch.orpheus.features.pulsar.ProgressionAnchor
-import org.balch.orpheus.features.pulsar.ProgressionStyle
-import org.balch.orpheus.features.pulsar.RhythmPattern
-import org.balch.orpheus.features.pulsar.RootNote
-import org.balch.orpheus.features.pulsar.ScaleType
-import org.balch.orpheus.features.pulsar.TensionProfile
-import org.balch.orpheus.features.pulsar.TrackMacroMap
-import org.balch.orpheus.features.pulsar.TrackRole
-import org.balch.orpheus.features.pulsar.TrackVoice
-import org.balch.orpheus.features.pulsar.Vibe
-import org.balch.orpheus.features.pulsar.VibeEffects
+import org.balch.orpheus.features.pulsar.models.BarStrategy
+import org.balch.orpheus.features.pulsar.models.ChordFollow
+import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
+import org.balch.orpheus.features.pulsar.models.EnvelopeType
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
+import org.balch.orpheus.features.pulsar.models.ProgressionStyle
+import org.balch.orpheus.features.pulsar.models.RhythmPattern
+import org.balch.orpheus.features.pulsar.models.RootNote
+import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.TensionProfile
+import org.balch.orpheus.features.pulsar.models.TrackMacroMap
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeEffects
 
 /**
  * Garage Blitz — raw two-note power-riff stomp.

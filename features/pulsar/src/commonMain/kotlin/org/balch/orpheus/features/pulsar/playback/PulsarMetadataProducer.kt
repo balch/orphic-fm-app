@@ -12,9 +12,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.playback.MetadataProducer
-import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.Vibe
+import org.balch.orpheus.features.pulsar.models.Album
+import org.balch.orpheus.features.pulsar.models.Vibe
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import orpheus.features.pulsar.generated.resources.Res
 
