@@ -42,8 +42,13 @@
 #undef LUT_BIPOLAR_FOLD
 #undef LUT_BIPOLAR_FOLD_SIZE
 #include "tides2/poly_slope_generator.h"
-#include "braids/macro_oscillator.h"
 #include "tides2/ramp/ramp_extractor.h"
+
+// Include MI Braids macro oscillator
+// Undefine Plaits resource macros that collide with Braids
+#undef LUT_FM_FREQUENCY_QUANTIZER
+#undef LUT_FM_FREQUENCY_QUANTIZER_SIZE
+#include "braids/macro_oscillator.h"
 
 #include "orpheus_automation.h"
 

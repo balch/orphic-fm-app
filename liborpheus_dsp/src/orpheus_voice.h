@@ -6,6 +6,10 @@
 
 #include "stmlib/utils/buffer_allocator.h"
 
+// Undefine Braids resource macros that collide with Plaits
+// (some TUs load braids/resources.h before plaits/resources.h)
+#undef LUT_FM_FREQUENCY_QUANTIZER
+#undef LUT_FM_FREQUENCY_QUANTIZER_SIZE
 #include "plaits/resources.h"
 
 #include "plaits/dsp/engine/additive_engine.h"

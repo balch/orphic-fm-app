@@ -1,5 +1,10 @@
 #pragma once
 #include "orpheus_graph.h"
+
+// Undefine Plaits resource macros that collide with Braids
+// (some TUs load plaits/resources.h before braids/resources.h)
+#undef LUT_FM_FREQUENCY_QUANTIZER
+#undef LUT_FM_FREQUENCY_QUANTIZER_SIZE
 #include "braids/macro_oscillator.h"
 
 // Forward decl for engine-aware unit processors
