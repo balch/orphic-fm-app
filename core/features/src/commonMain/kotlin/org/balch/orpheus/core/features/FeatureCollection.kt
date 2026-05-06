@@ -3,7 +3,6 @@ package org.balch.orpheus.core.features
 import androidx.compose.ui.input.key.Key
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.Provider
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.input.KeyBinding
@@ -21,7 +20,7 @@ import kotlin.reflect.KClass
 @SingleIn(FeatureScope::class)
 @Inject
 class FeatureCollection(
-    private val providers: Map<KClass<*>, Provider<SynthFeature<*, *>>>,
+    private val providers: Map<KClass<*>, () -> SynthFeature<*, *>>,
 ) : AutoCloseable {
     private val log = logging("FeatureCollection")
     private val cache = mutableMapOf<KClass<*>, SynthFeature<*, *>>()
