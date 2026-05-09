@@ -23,7 +23,7 @@ enum class MixerGroup(val tracks: IntArray) {
 data class MixerUiState(
     /**
      * Per-group fader *travel* 0..1; index aligns with MixerGroup.ordinal.
-     * Console-fader convention: 0.75 = unity (1×), 1.0 = +10 dB (~3.16×).
+     * Console-fader convention: 0.75 = unity (1×), 1.0 = +6 dB (~1.995×).
      * The C++ law in pulsar_fader_to_gain() turns travel into actual gain.
      * Default below is the "unity" point — overwritten almost immediately
      * by the echo flows from each band's controlFlow.

@@ -52,7 +52,7 @@ class PlaybackController(
 
     fun play() {
         if (_state.value == PlaybackState.Playing) return
-        log.debug { "play() (was ${_state.value})" }
+        log.info { "play() (was ${_state.value})" }
         _state.value = PlaybackState.Playing
         muteSink.apply(PlaybackState.Playing)
         mediaSessionManager.updatePlaybackState(true)
@@ -60,7 +60,7 @@ class PlaybackController(
 
     fun pause() {
         if (_state.value != PlaybackState.Playing) return
-        log.debug { "pause() (was Playing)" }
+        log.info { "pause() (was Playing)" }
         _state.value = PlaybackState.Paused
         muteSink.apply(PlaybackState.Paused)
         mediaSessionManager.updatePlaybackState(false)
@@ -68,7 +68,7 @@ class PlaybackController(
 
     fun stop() {
         if (_state.value == PlaybackState.Stopped) return
-        log.debug { "stop() (was ${_state.value})" }
+        log.info { "stop() (was ${_state.value})" }
         _state.value = PlaybackState.Stopped
         muteSink.apply(PlaybackState.Stopped)
         // Deactivate the media session synchronously so any downstream emissions

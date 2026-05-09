@@ -293,7 +293,12 @@ class ArmyStompVibe : VibeProvider {
             ).let { fx ->
                 TrackVoice(
                     engineEdm = fx,
-                    engineSpace = fx.copy(engineId = OrpheusEngineId.PAR),
+                    engineSpace = fx.copy(
+                        engineId = OrpheusEngineId.PAR,
+                        morph = 1f,
+                        timbre = .79f,
+                        harmonics = .81f,
+                    ),
                     role = TrackRole.Percussive,
                     pan = -0.30f,
                     density = 0.10f,

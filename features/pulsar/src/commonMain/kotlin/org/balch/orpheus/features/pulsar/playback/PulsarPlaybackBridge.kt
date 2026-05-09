@@ -45,10 +45,12 @@ class PulsarPlaybackBridge(
         //   - PULSAR_PLAYING port (gates beat generation in C++ — saves CPU when off)
         scope.launch {
             playbackController.state.collect { state ->
+                val playing = if (state == PlaybackState.Playing) 1 else 0
+                log.info { "state=$state → PULSAR_PLAYING=$playing" }
                 mediaSessionStateManager.setPulsarActive(state != PlaybackState.Stopped)
                 synthController.setPluginControl(
                     id = PulsarSymbol.PLAYING.controlId,
-                    value = IntValue(if (state == PlaybackState.Playing) 1 else 0),
+                    value = IntValue(playing),
                 )
             }
         }
@@ -59,7 +61,7 @@ class PulsarPlaybackBridge(
         scope.launch {
             playbackLifecycleManager.events.collect { event ->
                 if (event is PlaybackLifecycleEvent.StopAll) {
-                    log.debug { "Received StopAll — pausing via PlaybackController" }
+                    log.info { "Received StopAll — pausing via PlaybackController" }
                     playbackController.pause()
                 }
             }

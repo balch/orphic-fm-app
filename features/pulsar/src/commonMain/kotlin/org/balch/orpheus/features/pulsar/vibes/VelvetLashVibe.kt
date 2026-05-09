@@ -261,9 +261,9 @@ class VelvetLashVibe : VibeProvider {
             OrpheusEngine(
                 engineId = OrpheusEngineId.PAR,
                 volume = 0.45f,
-                harmonics = 0.55f,
-                timbre = 0.95f,
-                morph = 0.95f,
+                morph = 1f,
+                timbre = .61f,
+                harmonics = .67f,
                 reverbSend = 0.25f,
                 reverbBrightness = 0.75f, // Bright shimmer
             ).let { tambourine ->

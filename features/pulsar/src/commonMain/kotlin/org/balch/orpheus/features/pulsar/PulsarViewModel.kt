@@ -778,6 +778,7 @@ class PulsarViewModel(
      * Push the entire vibe recipe to C++. Called from setVibe action and restoreSavedState.
      */
     override fun applyVibe(vibe: Vibe) {
+        log.info { "applyVibe name=${vibe.name} bpm=${vibe.bpm} tracks=${vibe.tracks.size} sections=${vibe.arrangement?.sections?.size ?: 0}" }
         // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends
         vibeFlow.value = vibe
         // globalTempo will be set to vibe.bpm below — that is the 1.0× baseline

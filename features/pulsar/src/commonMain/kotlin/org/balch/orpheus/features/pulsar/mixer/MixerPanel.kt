@@ -396,12 +396,14 @@ private fun formatTwoDp(value: Float): String {
 /**
  * Console fader law — mirror of pulsar_fader_to_gain() in
  * orpheus_unit_pulsar.cpp. Maps fader *travel* (0..1) to amplitude gain
- * using a piecewise-linear-in-dB curve:
+ * using a piecewise-linear-in-dB curve modeled on a Penny & Giles broadcast
+ * fader (gentler than a Yamaha/Mackie law — 50% travel reads as half-loud,
+ * not heavily-cut):
  *   travel 0.00 → 0×    (silent below 0.05)
- *   travel 0.20 → -40 dB (~0.01×)
- *   travel 0.50 → -15 dB (~0.18×)
+ *   travel 0.05 → -40 dB (~0.01×)
+ *   travel 0.50 → -10 dB (~0.32×)
  *   travel 0.75 →   0 dB (1.00× — unity)
- *   travel 1.00 →  +10 dB (~3.16×)
+ *   travel 1.00 →  +6 dB (~1.99×)
  *
  * Used both for the live multiplier readout under each band label and for
  * the unity-notch position on the fader track. Keep in sync with the C++.
@@ -409,10 +411,9 @@ private fun formatTwoDp(value: Float): String {
 internal fun faderToGain(travel: Float): Float {
     if (travel <= 0.05f) return 0f
     val db = when {
-        travel >= 0.75f -> (travel - 0.75f) * 40f
-        travel >= 0.50f -> -15f + (travel - 0.50f) * 60f
-        travel >= 0.20f -> -40f + (travel - 0.20f) * (25f / 0.30f)
-        else            -> -60f + (travel - 0.05f) * (20f / 0.15f)
+        travel >= 0.75f -> (travel - 0.75f) * 24f
+        travel >= 0.50f -> -10f + (travel - 0.50f) * 40f
+        else            -> -40f + (travel - 0.05f) * (30f / 0.45f)
     }
     return 10f.pow(db / 20f)
 }
@@ -426,13 +427,16 @@ private fun formatMultiplier(gain: Float): String {
     return "${rounded}x"
 }
 
+/** Max gain at the top of the fader (travel = 1.0 → +6 dB ≈ 1.995×). */
+private const val MAX_GAIN = 1.995f
+
 /**
  * Smooth color for the multiplier readout: yellow when cut, green at unity,
  * red as it climbs above unity. Linear RGB lerp through three waypoints —
  * green is the "happy" middle so it pops visually as the user dials in.
  *   gain 0.00 → yellow (deeply cut / silent)
  *   gain 1.00 → green (unity)
- *   gain 3.16 → red (max boost, +10 dB)
+ *   gain 1.99 → red (max boost, +6 dB)
  */
 private fun multiplierColor(gain: Float): Color {
     val green = OrpheusColors.synthGreen
@@ -441,7 +445,7 @@ private fun multiplierColor(gain: Float): Color {
     return when {
         gain <= 0f -> yellow
         gain < 1f -> lerp(yellow, green, gain.coerceIn(0f, 1f))
-        else -> lerp(green, red, ((gain - 1f) / 2.16f).coerceIn(0f, 1f))
+        else -> lerp(green, red, ((gain - 1f) / (MAX_GAIN - 1f)).coerceIn(0f, 1f))
     }
 }
 

@@ -26,6 +26,12 @@ android {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
+
+    sourceSets {
+        getByName("debugRelease") {
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
+    }
 }
 
 dependencies {

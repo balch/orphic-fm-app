@@ -741,9 +741,9 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_root_note{0};      // 0=C, 11=B
     std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
     std::atomic<float> pulsar_mix{0.0f};       // output level 0-1 (Kotlin sets per-app default)
-    // Console-fader convention: stored 0..1 is fader *travel*. The Yamaha/
-    // Mackie-style law in pulsar_fader_to_gain() (orpheus_unit_pulsar.cpp)
-    // maps travel → actual gain: 0.75 = unity (1×), 1.0 = +10 dB (~3.16×),
+    // Console-fader convention: stored 0..1 is fader *travel*. The Penny &
+    // Giles-style law in pulsar_fader_to_gain() (orpheus_unit_pulsar.cpp)
+    // maps travel → actual gain: 0.75 = unity (1×), 1.0 = +6 dB (~1.995×),
     // 0.05 → silence. Defaults all sit at 0.75 so a fresh engine plays at
     // unity by default — drag a fader down to cut, push above to boost.
     std::atomic<float> pulsar_perc_mix{0.75f};  // PERC fader travel (0.75=unity)

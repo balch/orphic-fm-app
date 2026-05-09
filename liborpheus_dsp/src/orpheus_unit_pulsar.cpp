@@ -34,28 +34,25 @@ static inline float lerp_macro(float macro, const PulsarMacroTarget& t) {
 
 // Console fader law for the per-band MixerPanel gains. Stored value is the
 // fader's *travel* (0..1); this maps it to the actual amplitude multiplier
-// using a piecewise-linear-in-dB curve that matches a Yamaha/Mackie-style
-// console:
+// using a piecewise-linear-in-dB curve modeled on a Penny & Giles broadcast
+// fader (gentler than a Yamaha/Mackie law — 50% travel reads as half-loud,
+// not heavily-cut):
 //   travel  0.00 → -∞ dB   (silent below 0.05)
-//   travel  0.20 → -40 dB
-//   travel  0.50 → -15 dB
+//   travel  0.05 → -40 dB
+//   travel  0.50 → -10 dB
 //   travel  0.75 →   0 dB  (unity = 1.0×)
-//   travel  1.00 →  +10 dB (~3.16×)
-// The shape gives fine resolution near unity (15 dB across the top quarter
-// before unity) and coarse resolution near silence — same feel as a real
-// fader. Mirrored exactly in MixerPanel.kt::faderToGain so UI multiplier
-// readout matches DSP output.
+//   travel  1.00 →  +6 dB  (~1.995×)
+// Three linear-in-dB segments. Mirrored exactly in MixerPanel.kt::faderToGain
+// so the UI multiplier readout matches DSP output.
 static inline float pulsar_fader_to_gain(float travel) {
     if (travel <= 0.05f) return 0.0f;
     float db;
     if (travel >= 0.75f) {
-        db = (travel - 0.75f) * 40.0f;                        //   0 → +10 dB
+        db = (travel - 0.75f) * 24.0f;                        //   0 → +6 dB
     } else if (travel >= 0.50f) {
-        db = -15.0f + (travel - 0.50f) * 60.0f;               // -15 →   0 dB
-    } else if (travel >= 0.20f) {
-        db = -40.0f + (travel - 0.20f) * (25.0f / 0.30f);     // -40 → -15 dB
+        db = -10.0f + (travel - 0.50f) * 40.0f;               // -10 →   0 dB
     } else {
-        db = -60.0f + (travel - 0.05f) * (20.0f / 0.15f);     // -60 → -40 dB
+        db = -40.0f + (travel - 0.05f) * (30.0f / 0.45f);     // -40 → -10 dB
     }
     return std::pow(10.0f, db / 20.0f);
 }
@@ -1687,8 +1684,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Per-band user gains from the MixerPanel — multiplied AFTER section
         // volumes so the user can scale a band without sections clobbering
         // them. Stored ports are 0..1 fader *travel*; pulsar_fader_to_gain()
-        // applies the Yamaha/Mackie-style console law (unity at 0.75 travel,
-        // +10 dB at full, log-tapered cuts below). Atomic defaults all init
+        // applies the Penny & Giles-style console law (unity at 0.75 travel,
+        // +6 dB at full, log-tapered cuts below). Atomic defaults all init
         // to 0.75 so a fresh engine sounds identical to the legacy unity
         // behavior.
         float perc_mix  = engine->pulsar_perc_mix.load(std::memory_order_relaxed);
