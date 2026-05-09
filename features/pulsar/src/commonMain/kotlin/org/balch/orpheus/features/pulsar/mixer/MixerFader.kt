@@ -2,7 +2,9 @@ package org.balch.orpheus.features.pulsar.mixer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,20 +129,25 @@ internal fun MixerFader(
             .width((thumbWidth + 16).dp)
             .height(trackHeight.dp)
             .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        dragging = true
-                        dragOffset = (usableRange - offset.y).coerceIn(0f, usableRange)
-                        currentOnValueChange((dragOffset / usableRange).coerceIn(0f, 1f))
-                    },
-                    onDrag = { change, _ ->
+                // detectDragGestures waits for ~16dp of touch slop before firing
+                // onDragStart, so a pure tap never moves the thumb. Use
+                // awaitEachGesture + awaitFirstDown so the thumb snaps to the
+                // touch position the instant the finger lands, then drag()
+                // streams subsequent moves with no slop budget to spend.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    dragging = true
+                    dragOffset = (usableRange - down.position.y).coerceIn(0f, usableRange)
+                    currentOnValueChange((dragOffset / usableRange).coerceIn(0f, 1f))
+                    down.consume()
+
+                    drag(down.id) { change ->
                         change.consume()
                         dragOffset = (usableRange - change.position.y).coerceIn(0f, usableRange)
                         currentOnValueChange((dragOffset / usableRange).coerceIn(0f, 1f))
-                    },
-                    onDragEnd = { dragging = false },
-                    onDragCancel = { dragging = false },
-                )
+                    }
+                    dragging = false
+                }
             }
     ) {
         // 1. LED ladder — the SOURCE for the liquid effect. The track box hosts

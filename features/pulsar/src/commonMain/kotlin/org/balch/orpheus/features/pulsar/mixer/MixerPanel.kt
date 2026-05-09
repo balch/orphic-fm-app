@@ -47,10 +47,13 @@ private const val STOPPED_RELEASE_RATE = 35f  // not playing: ~65ms to silent �
 // 120Hz refresh (dt ≈ 8ms) produces attack = 1.0, so transients hit the new
 // peak in a single frame at any practical display rate.
 private const val ATTACK_RATE = 250f
-// Both meters use the same dB floor so the typical operating range fills a
-// meaningful chunk (~30-60%) of the LEDs and visual movement is consistent
-// across the panel. Tightened from -48 to match the DIST peak meter's range.
-private const val METER_FLOOR_DB = -24f
+// Band meter floor sits 12 dB below the DIST peak floor: vibes with sparse or
+// quiet auxiliary tracks (low track volume × naturally quiet engine output)
+// land around -25 to -32 dB post-volume, which would read dead at -24. -36 dB
+// keeps loud hits pinned at the top while quiet pads still register a few
+// LEDs. DIST keeps the tighter -24 floor — its post-saturation signal sits in
+// the comfortable range already and the tighter scale makes drive easier to read.
+private const val METER_FLOOR_DB = -36f
 private const val PEAK_METER_FLOOR_DB = -24f
 
 private data class GroupAccent(
@@ -342,8 +345,9 @@ private fun bufferPeak(buf: FloatArray, tailEntries: Int = PEAK_WINDOW_ENTRIES):
 
 /**
  * Map a linear amplitude (0..1) to a 0..1 display fraction using dB scaling
- * against [METER_FLOOR_DB] (-24dB): linear=1 → 1.0, linear=0.5 → ~0.75,
- * linear=0.25 → ~0.5, linear=0.1 → ~0.17, linear<=0.063 (-24dB) → 0.
+ * against [METER_FLOOR_DB] (-36dB): linear=1 → 1.0, linear=0.5 → ~0.83,
+ * linear=0.25 → ~0.67, linear=0.1 → ~0.44, linear=0.025 → ~0.11,
+ * linear<=0.0158 (-36dB) → 0.
  */
 private fun levelToDisplayFraction(linearLevel: Float): Float {
     if (linearLevel <= 0.0001f) return 0f
