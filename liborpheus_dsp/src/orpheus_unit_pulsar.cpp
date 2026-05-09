@@ -32,6 +32,34 @@ static inline float lerp_macro(float macro, const PulsarMacroTarget& t) {
     return t.min_value + macro * (t.max_value - t.min_value);
 }
 
+// Console fader law for the per-band MixerPanel gains. Stored value is the
+// fader's *travel* (0..1); this maps it to the actual amplitude multiplier
+// using a piecewise-linear-in-dB curve that matches a Yamaha/Mackie-style
+// console:
+//   travel  0.00 → -∞ dB   (silent below 0.05)
+//   travel  0.20 → -40 dB
+//   travel  0.50 → -15 dB
+//   travel  0.75 →   0 dB  (unity = 1.0×)
+//   travel  1.00 →  +10 dB (~3.16×)
+// The shape gives fine resolution near unity (15 dB across the top quarter
+// before unity) and coarse resolution near silence — same feel as a real
+// fader. Mirrored exactly in MixerPanel.kt::faderToGain so UI multiplier
+// readout matches DSP output.
+static inline float pulsar_fader_to_gain(float travel) {
+    if (travel <= 0.05f) return 0.0f;
+    float db;
+    if (travel >= 0.75f) {
+        db = (travel - 0.75f) * 40.0f;                        //   0 → +10 dB
+    } else if (travel >= 0.50f) {
+        db = -15.0f + (travel - 0.50f) * 60.0f;               // -15 →   0 dB
+    } else if (travel >= 0.20f) {
+        db = -40.0f + (travel - 0.20f) * (25.0f / 0.30f);     // -40 → -15 dB
+    } else {
+        db = -60.0f + (travel - 0.05f) * (20.0f / 0.15f);     // -60 → -40 dB
+    }
+    return std::pow(10.0f, db / 20.0f);
+}
+
 static inline float clamp01(float x) {
     return x < 0.0f ? 0.0f : (x > 1.0f ? 1.0f : x);
 }
@@ -1657,18 +1685,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             track_volume *= lick_bass_energy_boost(energy);
         }
         // Per-band user gains from the MixerPanel — multiplied AFTER section
-        // volumes so the user can scale a band without sections clobbering them.
-        // PERC is the existing pulsar_perc_mix (default 0.7); the others default
-        // to 1.0 (transparent) so vibes without a mixer-touched fader behave
-        // identically to before.
+        // volumes so the user can scale a band without sections clobbering
+        // them. Stored ports are 0..1 fader *travel*; pulsar_fader_to_gain()
+        // applies the Yamaha/Mackie-style console law (unity at 0.75 travel,
+        // +10 dB at full, log-tapered cuts below). Atomic defaults all init
+        // to 0.75 so a fresh engine sounds identical to the legacy unity
+        // behavior.
         float perc_mix  = engine->pulsar_perc_mix.load(std::memory_order_relaxed);
         float bass_gain = engine->pulsar_bass_gain.load(std::memory_order_relaxed);
         float keys_gain = engine->pulsar_keys_gain.load(std::memory_order_relaxed);
         float fx_gain   = engine->pulsar_fx_gain.load(std::memory_order_relaxed);
-        if (t <= 2)            track_volume *= perc_mix;
-        else if (t == 3)       track_volume *= bass_gain;
-        else if (t == 4)       track_volume *= keys_gain;
-        else /* t == 5,6,7 */  track_volume *= fx_gain;
+        if (t <= 2)            track_volume *= pulsar_fader_to_gain(perc_mix);
+        else if (t == 3)       track_volume *= pulsar_fader_to_gain(bass_gain);
+        else if (t == 4)       track_volume *= pulsar_fader_to_gain(keys_gain);
+        else /* t == 5,6,7 */  track_volume *= pulsar_fader_to_gain(fx_gain);
 
         // Track mute: zero volume but keep sequencer running
         bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0;

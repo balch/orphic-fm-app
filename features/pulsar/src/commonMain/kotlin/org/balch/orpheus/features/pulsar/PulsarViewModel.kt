@@ -90,7 +90,10 @@ data class PulsarUiState(
     val rootNote: Int = 2,
     val scaleIndex: Int = 0,
     val mix: Float = 1.0f,
-    val percMix: Float = 0.7f,
+    // Console-fader convention: stored 0..1 is fader travel. The C++ law
+    // maps 0.75 travel → unity (1×). Defaults to unity so a fresh load plays
+    // at the vibe's intrinsic balance — pull down to cut, push up to boost.
+    val percMix: Float = 0.75f,
     val envelopeMode: Int = 0,  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     val selectedTrack: Int? = null,
     val trackEnginesEdm: List<Int> = listOf(21, 22, 23, 9, 14, 14, 17, 20),

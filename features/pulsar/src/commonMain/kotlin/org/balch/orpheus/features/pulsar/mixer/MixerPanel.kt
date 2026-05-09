@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.log10
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 // Time-based exponential decay rates (per-second). exp(-rate * dt) gives the
@@ -256,6 +258,7 @@ private fun GroupStrip(
             meterLevel = if (muted) 0f else meterLevel,
             glowIntensity = if (muted) 0f else (meterLevel * gain).coerceIn(0f, 1f),
             dimmed = muted,
+            unityTravel = UNITY_TRAVEL,
         )
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -266,9 +269,14 @@ private fun GroupStrip(
             fontWeight = FontWeight.Bold,
             letterSpacing = 2.sp,
         )
+        // Live amplitude multiplier (0.75 fader → "1.00x"). Color smoothly
+        // transitions yellow → green → red as the user crosses unity, so a
+        // glance at the readout tells you whether the band is cut, at unity,
+        // or boosted. Muted bands keep the accent-tinted dim look.
+        val multiplier = faderToGain(gain)
         Text(
-            text = formatTwoDp(gain),
-            color = accent.color.copy(alpha = if (muted) 0.3f else 0.55f),
+            text = formatMultiplier(multiplier),
+            color = if (muted) accent.color.copy(alpha = 0.3f) else multiplierColor(multiplier),
             fontSize = 9.sp,
         )
     }
@@ -371,6 +379,58 @@ private fun peakToDisplayFraction(peakLinear: Float): Float {
 private fun formatTwoDp(value: Float): String {
     val rounded = (value * 100f).roundToInt() / 100.0
     return rounded.toString()
+}
+
+/**
+ * Console fader law — mirror of pulsar_fader_to_gain() in
+ * orpheus_unit_pulsar.cpp. Maps fader *travel* (0..1) to amplitude gain
+ * using a piecewise-linear-in-dB curve:
+ *   travel 0.00 → 0×    (silent below 0.05)
+ *   travel 0.20 → -40 dB (~0.01×)
+ *   travel 0.50 → -15 dB (~0.18×)
+ *   travel 0.75 →   0 dB (1.00× — unity)
+ *   travel 1.00 →  +10 dB (~3.16×)
+ *
+ * Used both for the live multiplier readout under each band label and for
+ * the unity-notch position on the fader track. Keep in sync with the C++.
+ */
+internal fun faderToGain(travel: Float): Float {
+    if (travel <= 0.05f) return 0f
+    val db = when {
+        travel >= 0.75f -> (travel - 0.75f) * 40f
+        travel >= 0.50f -> -15f + (travel - 0.50f) * 60f
+        travel >= 0.20f -> -40f + (travel - 0.20f) * (25f / 0.30f)
+        else            -> -60f + (travel - 0.05f) * (20f / 0.15f)
+    }
+    return 10f.pow(db / 20f)
+}
+
+/** Travel position of the unity (0 dB) point on the fader. Drives the notch. */
+internal const val UNITY_TRAVEL = 0.75f
+
+/** "1.00x" / "0.45x" / "2.50x" — readout under the band label. */
+private fun formatMultiplier(gain: Float): String {
+    val rounded = (gain * 100f).roundToInt() / 100.0
+    return "${rounded}x"
+}
+
+/**
+ * Smooth color for the multiplier readout: yellow when cut, green at unity,
+ * red as it climbs above unity. Linear RGB lerp through three waypoints —
+ * green is the "happy" middle so it pops visually as the user dials in.
+ *   gain 0.00 → yellow (deeply cut / silent)
+ *   gain 1.00 → green (unity)
+ *   gain 3.16 → red (max boost, +10 dB)
+ */
+private fun multiplierColor(gain: Float): Color {
+    val green = OrpheusColors.synthGreen
+    val yellow = OrpheusColors.mixerFxAmber
+    val red = OrpheusColors.mixerDistRed
+    return when {
+        gain <= 0f -> yellow
+        gain < 1f -> lerp(yellow, green, gain.coerceIn(0f, 1f))
+        else -> lerp(green, red, ((gain - 1f) / 2.16f).coerceIn(0f, 1f))
+    }
 }
 
 @Preview(widthDp = 480, heightDp = 320)

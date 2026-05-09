@@ -148,13 +148,15 @@ class MixerViewModel(
             stripTransient = {
                 // Per-band fader values are NOT owned by the mixer — they're echoes
                 // of dedicated gain ports (PERC_MIX, BASS_GAIN, KEYS_GAIN, FX_GAIN).
-                // PulsarViewModel persists PERC_MIX; the new gain ports default to
-                // 1.0 (transparent) on engine init. Only the DIST drive belongs to us.
+                // Console-fader convention: 0.75 = unity. The C++ atomics all
+                // default to 0.75, so the UI placeholders here match the "unity"
+                // point until the echo flows deliver real values. Only the DIST
+                // drive belongs to us; everything else is transient.
                 it.copy(
                     peak = 0f,
                     groupMuted = listOf(false, false, false, false),
                     playing = false,
-                    groupGains = listOf(1f, 1f, 1f, 1f),
+                    groupGains = listOf(0.75f, 0.75f, 0.75f, 0.75f),
                 )
             },
             onRestore = { saved ->

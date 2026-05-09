@@ -46,6 +46,11 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.roundToInt
 
+/** Tolerance (in fader travel units) for the unity snap detent. ±0.025 ≈ 2.5%
+ *  of throw, narrow enough to leave fine control near unity, wide enough to
+ *  feel like a deliberate detent rather than an accidental snap. */
+private const val UNITY_SNAP_TOLERANCE = 0.025f
+
 /**
  * Vertical fader with an integrated LED meter ladder rendered inside the track,
  * topped by a glowing band-tinted thumb. The thumb visually wraps the track edges
@@ -70,6 +75,9 @@ import kotlin.math.roundToInt
  * @param glassTint Color of the liquid glass overlay. Defaults to [accentColor].
  *   DIST overrides with red so the strip reads as "in the red."
  * @param glassTintAlpha Alpha of the glass tint (0..1). Higher = more colored glass.
+ * @param unityTravel If non-null, draws a horizontal tick across the track at
+ *   this travel position (0..1) — the unity (0 dB) reference for console-style
+ *   band faders. DIST leaves it null since drive has no unity convention.
  */
 @Composable
 internal fun MixerFader(
@@ -90,6 +98,7 @@ internal fun MixerFader(
     peakStyle: Boolean = false,
     glassTint: Color = accentColor,
     glassTintAlpha: Float = 0.15f,
+    unityTravel: Float? = null,
 ) {
     val density = LocalDensity.current
     val trackHeightPx = with(density) { trackHeight.dp.toPx() }
@@ -124,6 +133,12 @@ internal fun MixerFader(
         contrast = 1.3f,
     )
 
+    val unityNotchY: Int? = unityTravel?.let {
+        val notchHeightPx = with(density) { 2.dp.toPx() }
+        val unityCenter = (usableRange - it.coerceIn(0f, 1f) * usableRange) + thumbHeightPx / 2f
+        (unityCenter - notchHeightPx / 2f).roundToInt()
+    }
+
     Box(
         modifier = modifier
             .width((thumbWidth + 16).dp)
@@ -134,23 +149,59 @@ internal fun MixerFader(
                 // awaitEachGesture + awaitFirstDown so the thumb snaps to the
                 // touch position the instant the finger lands, then drag()
                 // streams subsequent moves with no slop budget to spend.
+                //
+                // Unity snap: when a unity-travel reference exists, any
+                // candidate value within UNITY_SNAP_TOLERANCE of it clamps to
+                // exactly the unity point — feels like a tactile detent. The
+                // finger has to travel past the band edge to "break free,"
+                // because the thumb stays pinned at unity until the finger
+                // leaves the tolerance window.
+                fun travelFromY(y: Float): Float {
+                    // Finger Y → thumb-top Y by subtracting half the thumb,
+                    // so the thumb CENTERS on the touch point. Without the
+                    // offset the thumb's *top* aligns with the finger,
+                    // visually placing the thumb half a thumb-height below
+                    // where the user expected.
+                    val thumbTopY = y - thumbHeightPx / 2f
+                    val raw = ((usableRange - thumbTopY) / usableRange).coerceIn(0f, 1f)
+                    val snapTo = unityTravel ?: return raw
+                    return if (kotlin.math.abs(raw - snapTo) <= UNITY_SNAP_TOLERANCE) snapTo else raw
+                }
+
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     dragging = true
-                    dragOffset = (usableRange - down.position.y).coerceIn(0f, usableRange)
-                    currentOnValueChange((dragOffset / usableRange).coerceIn(0f, 1f))
+                    val downTravel = travelFromY(down.position.y)
+                    dragOffset = downTravel * usableRange
+                    currentOnValueChange(downTravel)
                     down.consume()
 
                     drag(down.id) { change ->
                         change.consume()
-                        dragOffset = (usableRange - change.position.y).coerceIn(0f, usableRange)
-                        currentOnValueChange((dragOffset / usableRange).coerceIn(0f, 1f))
+                        val travel = travelFromY(change.position.y)
+                        dragOffset = travel * usableRange
+                        currentOnValueChange(travel)
                     }
                     dragging = false
                 }
             }
     ) {
-        // 1. LED ladder — the SOURCE for the liquid effect. The track box hosts
+        // 1. Unity notch (behind the track). Drawn BEFORE the LED ladder so
+        //    its center is covered by the track backdrop — only the tick
+        //    edges that extend past the track width show. Sized to extend
+        //    just 4 dp past the track on each side: enough to read as a
+        //    "scale mark on the chassis," small enough to stay subtle.
+        if (unityNotchY != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset { IntOffset(0, unityNotchY) }
+                    .size((trackWidth + 8).dp, 2.dp)
+                    .background(Color.White.copy(alpha = 0.35f * effectiveAlpha)),
+            )
+        }
+
+        // 2. LED ladder — the SOURCE for the liquid effect. The track box hosts
         //    the gradient backdrop; .liquefiable(state) marks it as the visual
         //    that the glass overlay will refract.
         Column(
@@ -198,7 +249,7 @@ internal fun MixerFader(
             }
         }
 
-        // 2. Glass overlay — sibling of the liquefiable source. Sits over the
+        // 3. Glass overlay — sibling of the liquefiable source. Sits over the
         //    track and refracts/tints the LEDs beneath. Same shape/size as the
         //    track; thumb passes over this and remains visually crisp.
         Box(
@@ -216,7 +267,7 @@ internal fun MixerFader(
                 )
         )
 
-        // 3. Glowing thumb — drawn LAST so it floats above the glass and stays
+        // 4. Glowing thumb — drawn LAST so it floats above the glass and stays
         //    crisp for interaction.
         Box(
             modifier = Modifier
@@ -271,24 +322,27 @@ private fun MixerFaderPreview() {
                     accentColor = OrpheusColors.neonCyan,
                     meterLevel = 0.18f,
                     glowIntensity = 0.15f,
+                    unityTravel = 0.75f,
                 )
             }
             FaderColumn("KEYS\nactive", OrpheusColors.synthGreen) {
                 MixerFader(
-                    value = 0.65f,
+                    value = 0.75f,
                     onValueChange = {},
                     accentColor = OrpheusColors.synthGreen,
                     meterLevel = 0.55f,
                     glowIntensity = 0.45f,
+                    unityTravel = 0.75f,
                 )
             }
             FaderColumn("PERC\nhot", OrpheusColors.mixerPercPink) {
                 MixerFader(
-                    value = 0.85f,
+                    value = 0.92f,
                     onValueChange = {},
                     accentColor = OrpheusColors.mixerPercPink,
                     meterLevel = 0.92f,
                     glowIntensity = 0.9f,
+                    unityTravel = 0.75f,
                 )
             }
             FaderColumn("GAIN\npeak", OrpheusColors.mixerDistRed) {

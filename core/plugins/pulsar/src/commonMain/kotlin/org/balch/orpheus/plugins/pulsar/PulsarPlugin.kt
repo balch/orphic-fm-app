@@ -47,7 +47,13 @@ class PulsarPlugin : DspPlugin {
     private var _rootNote = 2  // D
     private var _scaleIndex = 0  // Minor
     private var _mix = 1.0f
-    private var _percMix = 0.7f
+    // Console-fader convention: 0.75 = unity (see pulsar_fader_to_gain in
+    // orpheus_unit_pulsar.cpp). Match the C++ atomic defaults so the
+    // SynthController seeds the Mixer faders to unity on first read.
+    private var _percMix = 0.75f
+    private var _bassGain = 0.75f
+    private var _keysGain = 0.75f
+    private var _fxGain = 0.75f
     private var _envelopeMode = 0  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     private var _seed = 0
     private var _lickMutation = 0.5f
@@ -195,7 +201,16 @@ class PulsarPlugin : DspPlugin {
             floatType { default = 1.0f; min = 0f; max = 1f; get { _mix }; set { _mix = it } }
         }
         controlPort(PulsarSymbol.PERC_MIX) {
-            floatType { default = 0.7f; min = 0f; max = 1f; get { _percMix }; set { _percMix = it } }
+            floatType { default = 0.75f; min = 0f; max = 1f; get { _percMix }; set { _percMix = it } }
+        }
+        controlPort(PulsarSymbol.BASS_GAIN) {
+            floatType { default = 0.75f; min = 0f; max = 1f; get { _bassGain }; set { _bassGain = it } }
+        }
+        controlPort(PulsarSymbol.KEYS_GAIN) {
+            floatType { default = 0.75f; min = 0f; max = 1f; get { _keysGain }; set { _keysGain = it } }
+        }
+        controlPort(PulsarSymbol.FX_GAIN) {
+            floatType { default = 0.75f; min = 0f; max = 1f; get { _fxGain }; set { _fxGain = it } }
         }
         controlPort(PulsarSymbol.ENVELOPE_MODE) {
             intType { default = 0; get { _envelopeMode }; set { _envelopeMode = it } }
