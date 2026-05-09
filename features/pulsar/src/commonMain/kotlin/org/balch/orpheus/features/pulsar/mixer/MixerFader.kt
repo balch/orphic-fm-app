@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -124,14 +125,6 @@ internal fun MixerFader(
     // Per-fader liquid state: the LED ladder is the liquid source; a sibling
     // overlay reads from this state to refract/tint what's beneath the glass.
     val faderLiquidState = rememberLiquidState()
-    val glassScope = VisualizationLiquidScope(
-        refraction = 0.4f,
-        saturation = 1f,
-        dispersion = .5f,
-        curve = 0.05f,
-        edge = .01f,
-        contrast = 1.3f,
-    )
 
     val unityNotchY: Int? = unityTravel?.let {
         val notchHeightPx = with(density) { 2.dp.toPx() }
@@ -204,12 +197,20 @@ internal fun MixerFader(
         // 2. LED ladder — the SOURCE for the liquid effect. The track box hosts
         //    the gradient backdrop; .liquefiable(state) marks it as the visual
         //    that the glass overlay will refract.
+        //
+        // ORDER MATTERS: `.liquefiable(state)` must come BEFORE any draw
+        // modifiers (clip / background / border / padding). The library only
+        // records draw operations that happen *after* the liquefiable node —
+        // so if .background sits earlier in the chain, the gradient backdrop
+        // never reaches the glass overlay's sample buffer and the glass
+        // refracts (effectively) empty content.
         Column(
             verticalArrangement = Arrangement.spacedBy(1.dp),
             modifier = Modifier
                 .align(Alignment.Center)
                 .width(trackWidth.dp)
                 .height(trackHeight.dp)
+                .liquefiable(faderLiquidState)
                 .clip(RoundedCornerShape(5.dp))
                 .background(
                     Brush.verticalGradient(
@@ -220,7 +221,6 @@ internal fun MixerFader(
                     )
                 )
                 .border(1.dp, Color.White.copy(alpha = 0.05f * effectiveAlpha), RoundedCornerShape(5.dp))
-                .liquefiable(faderLiquidState)
                 .padding(horizontal = 2.dp, vertical = 2.dp),
         ) {
             // Top-down: index 0 is top of ladder.
@@ -259,8 +259,15 @@ internal fun MixerFader(
                 .height(trackHeight.dp)
                 .liquidVizEffects(
                     liquidState = faderLiquidState,
-                    scope = glassScope,
-                    frostAmount = 4.dp,
+                    scope = VisualizationLiquidScope(
+                        refraction = 0.3f,
+                        saturation = 1.5f,
+                        dispersion = 0.5f,
+                        curve = 0.1f,
+                        edge = .01f,
+                        contrast = .8f,
+                    ),
+                    frostAmount = 0.dp,
                     color = glassTint,
                     tintAlpha = glassTintAlpha * effectiveAlpha,
                     shape = RoundedCornerShape(5.dp),
@@ -378,8 +385,9 @@ private fun FaderColumn(
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         fader()
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
+            textAlign = TextAlign.Center,
             text = label,
             color = accent,
             fontSize = 10.sp,

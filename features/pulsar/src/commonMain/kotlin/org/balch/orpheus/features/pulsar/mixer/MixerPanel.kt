@@ -232,6 +232,52 @@ fun MixerPanel(
 }
 
 
+/**
+ * Shared layout shell for every channel in the mixer (PERC/BASS/KEYS/FX + DIST).
+ * Owns the pulse-dot → fader → label → value stack so the columns line up across
+ * the strip; per-channel data (fader behavior, value formatting, color logic)
+ * arrives via parameters and the [fader] slot.
+ *
+ * Arrangement.Top + explicit Spacers (instead of SpaceBetween) — the parent Row
+ * uses Alignment.Bottom, which makes the Row's height = tallest child. With
+ * SpaceBetween any extra slack the Row hands us was distributed as gaps between
+ * every child, producing the dead space between label and value visible in the
+ * production layout but not in the preview.
+ */
+@Composable
+private fun FaderStrip(
+    label: String,
+    labelColor: Color,
+    pulseColor: Color,
+    valueText: String,
+    valueColor: Color,
+    fader: @Composable () -> Unit,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(pulseColor),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        fader()
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = labelColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp,
+        )
+        Text(
+            text = valueText,
+            color = valueColor,
+            fontSize = 9.sp,
+        )
+    }
+}
+
 @Composable
 private fun GroupStrip(
     accent: GroupAccent,
@@ -240,46 +286,29 @@ private fun GroupStrip(
     muted: Boolean,
     onGainChange: (Float) -> Unit,
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Status pulse dot — brightness driven by dB-scaled meter level, dimmed when muted.
-        val pulseAlpha = if (muted) 0.1f else (0.3f + meterLevel * 0.7f).coerceAtMost(1f)
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(accent.color.copy(alpha = pulseAlpha)),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        MixerFader(
-            value = gain,
-            onValueChange = onGainChange,
-            accentColor = accent.color,
-            meterLevel = if (muted) 0f else meterLevel,
-            glowIntensity = if (muted) 0f else (meterLevel * gain).coerceIn(0f, 1f),
-            dimmed = muted,
-            unityTravel = UNITY_TRAVEL,
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = accent.label,
-            color = accent.color.copy(alpha = if (muted) 0.4f else 1f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp,
-        )
+    val multiplier = faderToGain(gain)
+    val pulseAlpha = if (muted) 0.1f else (0.3f + meterLevel * 0.7f).coerceAtMost(1f)
+    FaderStrip(
+        label = accent.label,
+        labelColor = accent.color.copy(alpha = if (muted) 0.4f else 1f),
+        pulseColor = accent.color.copy(alpha = pulseAlpha),
         // Live amplitude multiplier (0.75 fader → "1.00x"). Color smoothly
-        // transitions yellow → green → red as the user crosses unity, so a
-        // glance at the readout tells you whether the band is cut, at unity,
-        // or boosted. Muted bands keep the accent-tinted dim look.
-        val multiplier = faderToGain(gain)
-        Text(
-            text = formatMultiplier(multiplier),
-            color = if (muted) accent.color.copy(alpha = 0.3f) else multiplierColor(multiplier),
-            fontSize = 9.sp,
-        )
-    }
+        // transitions yellow → green → red across unity. Muted bands keep
+        // the accent-tinted dim look.
+        valueText = formatMultiplier(multiplier),
+        valueColor = if (muted) accent.color.copy(alpha = 0.3f) else multiplierColor(multiplier),
+        fader = {
+            MixerFader(
+                value = gain,
+                onValueChange = onGainChange,
+                accentColor = accent.color,
+                meterLevel = if (muted) 0f else meterLevel,
+                glowIntensity = if (muted) 0f else (meterLevel * gain).coerceIn(0f, 1f),
+                dimmed = muted,
+                unityTravel = UNITY_TRAVEL,
+            )
+        },
+    )
 }
 
 @Composable
@@ -290,42 +319,25 @@ private fun DistStrip(
 ) {
     val accent = OrpheusColors.seahawksGrey
     val peakFraction = peakToDisplayFraction(peak)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Status pulse dot driven by live engine peak (not drive setting).
-        val pulseAlpha = (0.3f + peakFraction * 0.7f).coerceAtMost(1f)
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(accent.copy(alpha = pulseAlpha)),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        MixerFader(
-            value = drive,
-            onValueChange = onDriveChange,
-            accentColor = accent,
-            meterLevel = peakFraction,
-            glowIntensity = (peakFraction * drive).coerceIn(0f, 1f),
-            glassTint = OrpheusColors.seahawksGrey,
-            peakStyle = true,
-            glassTintAlpha = 0.20f,
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "GAIN",
-            color = accent,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp,
-        )
-        Text(
-            text = formatTwoDp(drive),
-            color = accent.copy(alpha = 0.55f),
-            fontSize = 9.sp,
-        )
-    }
+    FaderStrip(
+        label = "GAIN",
+        labelColor = accent,
+        pulseColor = accent.copy(alpha = (0.3f + peakFraction * 0.7f).coerceAtMost(1f)),
+        valueText = formatTwoDp(drive),
+        valueColor = accent.copy(alpha = 0.55f),
+        fader = {
+            MixerFader(
+                value = drive,
+                onValueChange = onDriveChange,
+                accentColor = accent,
+                meterLevel = peakFraction,
+                glowIntensity = (peakFraction * drive).coerceIn(0f, 1f),
+                glassTint = OrpheusColors.seahawksGrey,
+                peakStyle = true,
+                glassTintAlpha = 0.20f,
+            )
+        },
+    )
 }
 
 // The C++ viz ring stores ~640ms of per-track peaks (480 entries × ~1.3ms per
