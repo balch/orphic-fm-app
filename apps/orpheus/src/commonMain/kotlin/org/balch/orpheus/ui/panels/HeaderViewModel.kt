@@ -75,6 +75,11 @@ interface HeaderFeature : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty
 
+    // Eagerly is load-bearing here: panelExpansionEventBus emissions and the
+    // restoreSavedExpansion() init coroutine fire before the HeaderPanel is
+    // composed; without an active subscriber the stateFlow would miss them.
+    // (uiIntents has replay=64 to bridge the same gap on its own channel,
+    // but the bus events do not — see comment near uiIntents.)
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 }

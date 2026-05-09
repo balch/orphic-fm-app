@@ -148,12 +148,17 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     val vibeList: List<Vibe>
         get() = emptyList()  // default for previews
 
-    val vibeFlow: kotlinx.coroutines.flow.StateFlow<Vibe>
+    val vibeFlow: StateFlow<Vibe>
 
     fun applyVibe(vibe: Vibe)
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
+    // Eagerly is load-bearing here: arrangementStateFlow's .map{} writes to
+    // the log on every section/solo transition, which is a side effect we do
+    // not want to re-fire on a WhileSubscribed restart. Pulsar is also the
+    // hub other features (e.g. Mixer) read from, so keeping the upstream
+    // continuously hot avoids cold-start flicker for those subscribers.
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 

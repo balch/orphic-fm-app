@@ -59,7 +59,12 @@ data class EvoPanelActions(
 }
 
 interface EvoFeature : SynthFeature<EvoUiState, EvoPanelActions> {
-     override val sharingStrategy: SharingStarted
+    // Eagerly is load-bearing here: _userIntents is a MutableSharedFlow with
+    // replay=0, and init blocks emit into it from controlFlow collectors that
+    // run unconditionally — those emissions would be lost if the stateIn was
+    // dormant. Switching to WhileSubscribed requires giving _userIntents a
+    // replay buffer (or routing via StateFlow instead).
+    override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 
     override val synthControl: SynthFeature.SynthControl

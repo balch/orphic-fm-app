@@ -69,6 +69,9 @@ private sealed interface PresetIntent {
 }
 
 interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
+    // Eagerly is load-bearing here: _userIntents is a MutableSharedFlow with
+    // replay=0 — user actions emitted while no panel is collecting state
+    // would drop. Switching to WhileSubscribed requires a replay buffer.
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 

@@ -93,6 +93,10 @@ private sealed interface SpeechIntent {
 }
 
 interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
+    // Eagerly is load-bearing here: speechEventBus.events is a SharedFlow with
+    // replay=0, so a TTS status event emitted while no panel is mounted would
+    // be lost. Until the bus carries replay buffers (or is converted to a
+    // StateFlow), the feature must stay hot from construction.
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 

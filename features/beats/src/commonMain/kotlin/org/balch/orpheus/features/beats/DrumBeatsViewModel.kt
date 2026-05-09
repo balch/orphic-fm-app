@@ -69,6 +69,9 @@ data class DrumBeatsPanelActions(
 }
 
 interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
+    // Eagerly is load-bearing here: uiIntents is a MutableSharedFlow with
+    // replay=0, so user-emitted intents during panel-less periods would drop.
+    // Switching to WhileSubscribed requires giving uiIntents a replay buffer.
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 

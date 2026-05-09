@@ -7,7 +7,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -97,8 +96,10 @@ private sealed interface LfoIntent {
 }
 
 interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
+    // Inherits SynthFeature default: WhileSubscribed(5_000). Upstream is pure
+    // controlFlow (StateFlow) merge — current values replay on resubscribe so
+    // state is reconstructed when the LFO panel is mounted again after a tab
+    // switch.
 
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
