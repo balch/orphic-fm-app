@@ -255,8 +255,8 @@ private class StubVibeProvider : VibeProvider {
         ),
         tracks = List(8) {
             TrackVoice(
-                engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
-                engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VA),
+                engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VA),
                 role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
             )
         },

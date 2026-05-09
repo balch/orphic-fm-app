@@ -39,9 +39,9 @@ class DrumPlugin(
         const val URI = DRUM_URI
         /** Default engines for each slot */
         val DEFAULT_ENGINES = arrayOf(
-            OrpheusEngineId.ANALOG_BASS_DRUM,
-            OrpheusEngineId.ANALOG_SNARE_DRUM,
-            OrpheusEngineId.METALLIC_HI_HAT
+            OrpheusEngineId.BD,
+            OrpheusEngineId.SD,
+            OrpheusEngineId.HH
         )
     }
 

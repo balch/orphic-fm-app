@@ -198,7 +198,7 @@ class DspSynthEngine(
             nativeBridge.nativeSetVoiceTimbre(voiceA, vp.getDuoSharpness(duo))
             nativeBridge.nativeSetVoiceTimbre(voiceA + 1, vp.getDuoSharpness(duo))
             // Speech engine: morph is per-voice envSpeed (word selection); otherwise duo morph
-            if (engineId == OrpheusEngineId.SPEECH.id) {
+            if (engineId == OrpheusEngineId.SPK.id) {
                 nativeBridge.nativeSetVoiceMorph(voiceA, vp.getEnvSpeed(voiceA))
                 nativeBridge.nativeSetVoiceMorph(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
             } else {
@@ -309,7 +309,7 @@ class DspSynthEngine(
                         nativeBridge.nativeSetVoiceDecay(index, value)
                         // Speech engine: envSpeed overrides morph for word selection
                         val duoIndex = index / 2
-                        if (pluginProvider.voicePlugin.getDuoEngine(duoIndex) == OrpheusEngineId.SPEECH.id) {
+                        if (pluginProvider.voicePlugin.getDuoEngine(duoIndex) == OrpheusEngineId.SPK.id) {
                             nativeBridge.nativeSetVoiceMorph(index, value)
                         }
                     }
@@ -336,7 +336,7 @@ class DspSynthEngine(
                         nativeBridge.nativeSetVoiceActive(voiceA, true)
                         nativeBridge.nativeSetVoiceActive(voiceA + 1, true)
                         // Speech engine: override C++ morph with per-voice envSpeed for word selection
-                        if (engineId == OrpheusEngineId.SPEECH.id) {
+                        if (engineId == OrpheusEngineId.SPK.id) {
                             val vp = pluginProvider.voicePlugin
                             nativeBridge.nativeSetVoiceMorph(voiceA, vp.getEnvSpeed(voiceA))
                             nativeBridge.nativeSetVoiceMorph(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
@@ -353,7 +353,7 @@ class DspSynthEngine(
                     "duo_morph" -> {
                         voiceManager.setDuoMorph(index, value as Float)
                         // Speech engine: morph is controlled by envSpeed, not duo_morph
-                        if (pluginProvider.voicePlugin.getDuoEngine(index) != OrpheusEngineId.SPEECH.id) {
+                        if (pluginProvider.voicePlugin.getDuoEngine(index) != OrpheusEngineId.SPK.id) {
                             val voiceA = index * 2
                             nativeBridge.nativeSetVoiceMorph(voiceA, value)
                             nativeBridge.nativeSetVoiceMorph(voiceA + 1, value)

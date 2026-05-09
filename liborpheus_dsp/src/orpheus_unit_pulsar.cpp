@@ -591,6 +591,31 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     } else {
         base_seed = static_cast<uint32_t>(seed_val) * 2654435761u;
     }
+    // Defense-in-depth: stir a fresh microsecond reading into base_seed so even
+    // re-loads of the SAME vibe at the same seed_counter value diverge slightly.
+    {
+        auto stir_us = static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        base_seed ^= stir_us * 0x85EBCA77u;
+    }
+
+    // Reset the mutation RNG immediately, BEFORE any consumer in this function
+    // (e.g. init_section_state passes mutation_seed by reference to randomize
+    // the initial section / bars-remaining). Without this, the new vibe's
+    // arrangement begins biased by whatever mid-render mutation state the
+    // previous vibe left behind.
+    state->mutation_seed = base_seed;
+
+    // Snap macro smoothers to the current engine atomics so the new vibe's
+    // very first render block uses new-vibe macros (no ~10ms cross-fade from
+    // the old vibe's smoothed values). Pattern decisions made on bar 1 read
+    // these directly.
+    state->smooth_energy     = engine->pulsar_energy.load(std::memory_order_relaxed);
+    state->smooth_complexity = engine->pulsar_complexity.load(std::memory_order_relaxed);
+    state->smooth_space      = engine->pulsar_space.load(std::memory_order_relaxed);
+    state->smooth_mood       = engine->pulsar_mood.load(std::memory_order_relaxed);
+
 
     // Read genre profile from atomics
     PulsarGenreProfile genre;
@@ -663,7 +688,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             engine->pulsar_track_arp_direction[t].load(std::memory_order_relaxed));
         ts.section_inversion = static_cast<SectionInversionId>(
             engine->pulsar_track_inversion[t].load(std::memory_order_relaxed));
-        ts.arp_note_count = 0;  // runtime state, initialized inactive
+        // Hard-reset per-track runtime state so the new vibe doesn't inherit
+        // mid-arpeggiation, mid-fill-cycle, or stale chordal-comping caches
+        // from the previous vibe. Subsequent role-specific branches below
+        // override bars_since_fill (chordal -> 1) and chordal_base_valid as
+        // needed; this is the safe baseline.
+        ts.arp_note_count = 0;
+        ts.arp_index = 0;
+        ts.arp_next_sample = 0;
+        std::memset(ts.arp_notes, 0, sizeof(ts.arp_notes));
+        ts.bars_since_fill = 0;
+        ts.chordal_base_valid = false;
         bool percussive = (role == TrackRole::PERCUSSIVE);
 
         // Read macro map from atomics
@@ -1192,7 +1227,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->last_root_note = root;
     state->last_scale_index = scale_idx;
     state->clock_accumulator = 0.0;
-    state->mutation_seed = base_seed;
+    // mutation_seed is reset earlier (before init_section_state consumes it).
     state->loop_count = 0;
     state->loops_since_reset = 0;
     std::memset(state->drunk_offsets, 0, sizeof(state->drunk_offsets));
@@ -1621,9 +1656,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Lick/bass tracks: boost in mid-energy zone
             track_volume *= lick_bass_energy_boost(energy);
         }
-        // Percussion group mix — scales tracks 0-2 (KICK, PERC, HIHAT)
-        float perc_mix = engine->pulsar_perc_mix.load(std::memory_order_relaxed);
-        if (t <= 2) track_volume *= perc_mix;
+        // Per-band user gains from the MixerPanel — multiplied AFTER section
+        // volumes so the user can scale a band without sections clobbering them.
+        // PERC is the existing pulsar_perc_mix (default 0.7); the others default
+        // to 1.0 (transparent) so vibes without a mixer-touched fader behave
+        // identically to before.
+        float perc_mix  = engine->pulsar_perc_mix.load(std::memory_order_relaxed);
+        float bass_gain = engine->pulsar_bass_gain.load(std::memory_order_relaxed);
+        float keys_gain = engine->pulsar_keys_gain.load(std::memory_order_relaxed);
+        float fx_gain   = engine->pulsar_fx_gain.load(std::memory_order_relaxed);
+        if (t <= 2)            track_volume *= perc_mix;
+        else if (t == 3)       track_volume *= bass_gain;
+        else if (t == 4)       track_volume *= keys_gain;
+        else /* t == 5,6,7 */  track_volume *= fx_gain;
 
         // Track mute: zero volume but keep sequencer running
         bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0;

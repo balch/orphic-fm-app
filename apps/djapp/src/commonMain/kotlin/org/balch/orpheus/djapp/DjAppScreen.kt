@@ -53,6 +53,8 @@ import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.mixer.MixerPanel
+import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
 import org.balch.orpheus.features.reverb.ReverbPanel
 import org.balch.orpheus.features.reverb.ReverbViewModel
 import org.balch.orpheus.features.timer.TimerPanel
@@ -84,6 +86,7 @@ fun DjAppScreen(
     val distortionFeature = DistortionViewModel.feature()
     val hornFeature = HornViewModel.feature()
     val timerFeature = TimerViewModel.feature()
+    val mixerFeature = MixerViewModel.feature()
 
     // Nav3 back stack — single-level tab switching
     val backStack = remember { NavBackStack<DjRoute>(DjTab) }
@@ -152,8 +155,10 @@ fun DjAppScreen(
                                         showCollapsedHeader = false,
                                         showExpandedTitle = false,
                                     )
-                                    DistortionPanel(
-                                        outVizFlow = synthEngine.masterOutVizFlow,
+                                    MixerPanel(
+                                        feature = mixerFeature,
+                                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                                        masterOutVizFlow = synthEngine.masterOutVizFlow,
                                         modifier = Modifier.fillMaxWidth(),
                                         isExpanded = true,
                                         onExpandedChange = {},

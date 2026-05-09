@@ -152,7 +152,7 @@ class RastaManVibe : VibeProvider {
             // ═══════════════════════════════════════════════════════════
 
             // 0 KICK: One-drop — sparse, accent on beat 3 (the signature)
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.85f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
                     engineSpace = kick,
@@ -164,7 +164,7 @@ class RastaManVibe : VibeProvider {
                 )
             },
             // 1 SNARE: Rim-shot backbeat — 2 and 4
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.60f).let { snare ->
+            OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.60f).let { snare ->
                 TrackVoice(
                     engineEdm = snare,
                     engineSpace = snare,
@@ -176,7 +176,7 @@ class RastaManVibe : VibeProvider {
                 )
             },
             // 2 HH: Steady 8th notes — the Rasta pulse
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.50f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.50f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -195,7 +195,7 @@ class RastaManVibe : VibeProvider {
             // 3 BASS: PD warm/dark tone, ROOT_ONLY for that dub bass lock.
             // Bass is prominent in reggae — mixed loud, center, deep register with slide.
             OrpheusEngine(
-                engineId = OrpheusEngineId.PHASE_DISTORTION,
+                engineId = OrpheusEngineId.PD,
                 volume = 0.95f,
                 harmonics = 0.18f, timbre = 0.22f, morph = 0.12f,  // darker, rounder dub tone
                 noteRangeLow = 28, noteRangeHigh = 45,  // E1-A2 — deep sub bass territory
@@ -220,7 +220,7 @@ class RastaManVibe : VibeProvider {
             // (See references/fm_patches.md — harmonics=0.45 lands at index 14 in both
             // banks; this voice is harpsichord-pluck, not a true reedy melodica.)
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_2,
+                engineId = OrpheusEngineId.DX2,
                 volume = 0.30f,
                 harmonics = 0.45f, timbre = 0.52f, morph = 0.24f,  // bright plucky lead → spacey pad
                 noteRangeLow = 60, noteRangeHigh = 79,  // C4-G5 horn register
@@ -229,7 +229,7 @@ class RastaManVibe : VibeProvider {
             ).let { lead ->
                 TrackVoice(
                     engineEdm = lead,
-                    engineSpace = lead.copy(engineId = OrpheusEngineId.SIX_OP_FM_3),
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.DX3),
                     role = TrackRole.Melodic(lickMode = LickMode.Fill),
                     pan = 0.20f, density = 0.30f,
                     envelopeProfile = EnvelopeProfile.MELODIC,
@@ -246,7 +246,7 @@ class RastaManVibe : VibeProvider {
             // chord stabs on beats 2 and 4 only. Slight humanization so the
             // skank feels played, not programmed. Occasional 8-bar fills.
             OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.32f,
                 noteRangeLow = 45, noteRangeHigh = 60,  // A2-C4 guitar mid-low register
                 reverbBrightness = 0.55f, reverbSend = 0.25f, delaySend = 0.30f,
@@ -279,7 +279,7 @@ class RastaManVibe : VibeProvider {
             // template hits the "ands" and inner 16ths, filling the gaps between
             // skank stabs. Kept tame — a gentle bubble, not a lead.
             OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.22f,
                 noteRangeLow = 48, noteRangeHigh = 62,  // C3-D4 warmer register
                 reverbBrightness = 0.50f, reverbSend = 0.30f, delaySend = 0.25f,
@@ -312,7 +312,7 @@ class RastaManVibe : VibeProvider {
             // 7 TEXTURE: Warm ensemble pad, mostly atmosphere.
             // Low volume, long holds, heavy reverb — the warm Caribbean haze.
             OrpheusEngine(
-                engineId = OrpheusEngineId.STRING_MACHINE,
+                engineId = OrpheusEngineId.ENS,
                 volume = 0.25f,
                 modLfoRate = 0.05f, modLfoDepth = 0.4f, modLfoShape = 0.3f, modLfoCoupling = 0.2f,
                 holdProbability = 0.85f, holdLengthMin = 8, holdLengthMax = 24,
@@ -322,7 +322,7 @@ class RastaManVibe : VibeProvider {
             ).let { pad ->
                 TrackVoice(
                     engineEdm = pad,
-                    engineSpace = pad.copy(engineId = OrpheusEngineId.STRING),
+                    engineSpace = pad.copy(engineId = OrpheusEngineId.STR),
                     role = TrackRole.Melodic(),
                     pan = -0.35f, density = 0.12f,
                     envelopeProfile = EnvelopeProfile.EFFECT,

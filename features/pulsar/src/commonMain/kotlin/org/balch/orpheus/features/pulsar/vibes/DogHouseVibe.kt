@@ -133,7 +133,7 @@ class DogHouseVibe : VibeProvider {
         progressionDriftRange = 0.12f,                    // subtle drift — preserve the blues shape
         tracks = listOf(
             // Kick: same engine on both sides
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.85f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
                     engineSpace = kick,
@@ -146,7 +146,7 @@ class DogHouseVibe : VibeProvider {
                 )
             },
             // Snare: same engine on both sides
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.60f).let { snare ->
+            OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.60f).let { snare ->
                 TrackVoice(
                     engineEdm = snare,
                     engineSpace = snare,
@@ -159,7 +159,7 @@ class DogHouseVibe : VibeProvider {
                 )
             },
             // Hat: same engine on both sides
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.55f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.55f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -174,7 +174,7 @@ class DogHouseVibe : VibeProvider {
             // Bass: REPEAT pattern so the riff is tight — chord transposition provides the only variation.
             // Engines differ in id only; all knobs shared.
             OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.75f,
                 noteRangeLow = 33,
                 noteRangeHigh = 52,
@@ -182,7 +182,7 @@ class DogHouseVibe : VibeProvider {
             ).let { bass ->
                 TrackVoice(
                     engineEdm = bass,
-                    engineSpace = bass.copy(engineId = OrpheusEngineId.STRING),
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.STR),
                     role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                     pan = 0.00f,
                     density = 0.40f,
@@ -198,7 +198,7 @@ class DogHouseVibe : VibeProvider {
             // At volume=0.28 played as Chordal/BLUES_SHUFFLE comping, this synth-bass tone
             // voices chords with a thick analog-FM character that sits well under the bass.
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM,
+                engineId = OrpheusEngineId.DX,
                 volume = 0.28f,
                 harmonics = 0.33f,  // DX bank idx 10 = "Syn-bass 2" — synth-bass voicing chords
                 timbre = 0.32f,     // modulator index — not too bright for blues
@@ -212,7 +212,7 @@ class DogHouseVibe : VibeProvider {
             ).let { keys ->
                 TrackVoice(
                     engineEdm = keys,
-                    engineSpace = keys.copy(engineId = OrpheusEngineId.GRAIN),
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.GRN),
                     pan = -0.25f,
                     density = 0.30f,
                     role = TrackRole.Chordal(
@@ -242,7 +242,7 @@ class DogHouseVibe : VibeProvider {
             },
             // String pad: same engine on both sides
             OrpheusEngine(
-                engineId = OrpheusEngineId.STRING,
+                engineId = OrpheusEngineId.STR,
                 volume = 0.30f,
                 modLfoRate = 0.1f,
                 modLfoDepth = 0.7f,
@@ -271,7 +271,7 @@ class DogHouseVibe : VibeProvider {
             },
             // Grain texture: same engine on both sides
             OrpheusEngine(
-                engineId = OrpheusEngineId.GRAIN,
+                engineId = OrpheusEngineId.GRN,
                 volume = 0.30f,
                 modLfoRate = 0.15f,
                 modLfoDepth = 0.6f,
@@ -300,7 +300,7 @@ class DogHouseVibe : VibeProvider {
             },
             // Modal/string wild card: engines differ in id only
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.20f,
                 modLfoRate = 0.08f,
                 modLfoDepth = 0.5f,
@@ -318,7 +318,7 @@ class DogHouseVibe : VibeProvider {
             ).let { wild ->
                 TrackVoice(
                     engineEdm = wild,
-                    engineSpace = wild.copy(engineId = OrpheusEngineId.STRING),
+                    engineSpace = wild.copy(engineId = OrpheusEngineId.STR),
                     role = TrackRole.Melodic(),
                     pan = 0.00f,
                     density = 0.08f,

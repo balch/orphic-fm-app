@@ -165,7 +165,7 @@ class TremoloTideVibe : VibeProvider {
         tracks = listOf(
             // 0: kick — sparse half-time. Boom on 1, ghost on 3.
             OrpheusEngine(
-                engineId = OrpheusEngineId.ANALOG_BASS_DRUM,
+                engineId = OrpheusEngineId.BD,
                 volume = 0.70f,
                 reverbSend = 0.1f,
             ).let { kick ->
@@ -182,7 +182,7 @@ class TremoloTideVibe : VibeProvider {
             },
             // 1: snare — soft brushes-feel backbeat on 2 and 4.
             OrpheusEngine(
-                engineId = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineId = OrpheusEngineId.SD,
                 volume = 0.50f,
                 harmonics = 0.30f,
                 timbre = 0.25f,    // duller, more brush-like
@@ -202,7 +202,7 @@ class TremoloTideVibe : VibeProvider {
             },
             // 2: hat / shaker — soft 8th feel, low velocity.
             OrpheusEngine(
-                engineId = OrpheusEngineId.METALLIC_HI_HAT,
+                engineId = OrpheusEngineId.HH,
                 volume = 0.35f,
                 reverbSend = 0.20f,
             ).let { hat ->
@@ -220,7 +220,7 @@ class TremoloTideVibe : VibeProvider {
             // 3: bass — sustained pedal note that glides between chord roots.
             //    Long notes, glideRate high, ROOT_ONLY locks to chord root.
             OrpheusEngine(
-                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineId = OrpheusEngineId.VCF,
                 volume = 0.78f,
                 harmonics = 0.25f,
                 timbre = 0.30f,
@@ -237,7 +237,7 @@ class TremoloTideVibe : VibeProvider {
             ).let { bass ->
                 TrackVoice(
                     engineEdm = bass,
-                    engineSpace = bass.copy(engineId = OrpheusEngineId.PHASE_DISTORTION),
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.PD),
                     role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                     pan = 0.00f,
                     density = 0.30f,
@@ -250,7 +250,7 @@ class TremoloTideVibe : VibeProvider {
             //    DX2 in EDM slot for plaintive bell-like attack;
             //    WTB in space slot for darker shimmer when energy is low.
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM,
+                engineId = OrpheusEngineId.DX,
                 volume = 0.25f,
                 morph = .74f,
                 timbre = .67f,
@@ -267,7 +267,7 @@ class TremoloTideVibe : VibeProvider {
             ).let { lead ->
                 TrackVoice(
                     engineEdm = lead,
-                    engineSpace = lead.copy(engineId = OrpheusEngineId.SIX_OP_FM_2),
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.DX2),
                     role = TrackRole.Melodic(lickMode = LickMode.Fill),
                     pan = 0.15f,
                     density = 0.20f,
@@ -292,7 +292,7 @@ class TremoloTideVibe : VibeProvider {
             //    JAZZ_COMP keeps the bed quiet outside the verse — verse
             //    flips it to PAD for held bedrock.
             OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.40f,
                 modLfoRate = 0.05f,
                 modLfoDepth = 0.35f,
@@ -310,7 +310,7 @@ class TremoloTideVibe : VibeProvider {
             ).let { chord ->
                 TrackVoice(
                     engineEdm = chord,
-                    engineSpace = chord.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    engineSpace = chord.copy(engineId = OrpheusEngineId.ENS),
                     role = TrackRole.Chordal(
                         chordFollow = ChordFollow.FOLLOW,
                         comping = ChordComping(
@@ -331,7 +331,7 @@ class TremoloTideVibe : VibeProvider {
             },
             // 6: counter-pad (strings) — provides motion above the ensemble bed.
             OrpheusEngine(
-                engineId = OrpheusEngineId.STRING,
+                engineId = OrpheusEngineId.STR,
                 volume = 0.42f,
                 modLfoRate = 0.07f,
                 modLfoDepth = 0.5f,
@@ -360,7 +360,7 @@ class TremoloTideVibe : VibeProvider {
             },
             // 7: resonant accent (modal) — sparse rings/pings for chorus accents.
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.25f,
                 harmonics = 0.55f,
                 timbre = 0.40f,

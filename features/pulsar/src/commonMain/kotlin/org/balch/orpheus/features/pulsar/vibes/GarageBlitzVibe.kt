@@ -389,8 +389,8 @@ private fun generateBaseVibe(
     progressionDriftRange = progressionDriftRange,
     tracks = listOf(
         TrackVoice(
-            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f),
-            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f),
+            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.90f),
+            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.90f),
             role = TrackRole.Percussive,
             pan = 0.00f,
             density = 0.60f,
@@ -398,8 +398,8 @@ private fun generateBaseVibe(
             macroMap = TrackMacroMap.RHYTHM
         ),
         TrackVoice(
-            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.70f),
-            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.70f),
+            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.70f),
+            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.70f),
             role = TrackRole.Percussive,
             pan = -0.10f,
             density = 0.45f,
@@ -407,8 +407,8 @@ private fun generateBaseVibe(
             macroMap = TrackMacroMap.RHYTHM
         ),
         TrackVoice(
-            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.65f),
-            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.65f),
+            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.65f),
+            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.65f),
             role = TrackRole.Percussive,
             pan = 0.15f,
             density = 0.80f,
@@ -420,14 +420,14 @@ private fun generateBaseVibe(
         // transposition and making the bass wander.
         TrackVoice(
             engineEdm = OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.65f,
                 noteRangeLow = 40,
                 noteRangeHigh = 55,
                 reverbBrightness = 0.5f,
             ),
             engineSpace = OrpheusEngine(
-                engineId = OrpheusEngineId.VIRTUAL_ANALOG,
+                engineId = OrpheusEngineId.VA,
                 volume = 0.65f,
                 noteRangeLow = 40,
                 noteRangeHigh = 55,
@@ -444,7 +444,7 @@ private fun generateBaseVibe(
         // transposition moves chords cleanly without Markov stacking on top.
         TrackVoice(
             engineEdm = OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.52f,
                 noteRangeLow = 48,
                 noteRangeHigh = 72,
@@ -452,7 +452,7 @@ private fun generateBaseVibe(
                 glideRate = 0.05f,
             ),
             engineSpace = OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.52f,
                 noteRangeLow = 48,
                 noteRangeHigh = 72,
@@ -468,7 +468,7 @@ private fun generateBaseVibe(
         ),
         TrackVoice(
             engineEdm = OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.50f,
                 modLfoRate = 0.5f,
                 modLfoDepth = 0.3f,
@@ -484,7 +484,7 @@ private fun generateBaseVibe(
                 reverbBrightness = 0.5f,
             ),
             engineSpace = OrpheusEngine(
-                engineId = OrpheusEngineId.STRING_MACHINE,
+                engineId = OrpheusEngineId.ENS,
                 volume = 0.50f,
                 modLfoRate = 0.5f,
                 modLfoDepth = 0.3f,
@@ -507,7 +507,7 @@ private fun generateBaseVibe(
         ),
         TrackVoice(
             engineEdm = OrpheusEngine(
-                engineId = OrpheusEngineId.NOISE,
+                engineId = OrpheusEngineId.NSE,
                 volume = 0.35f,
                 modLfoRate = 0.4f,
                 modLfoDepth = 0.25f,
@@ -523,7 +523,7 @@ private fun generateBaseVibe(
                 reverbBrightness = 0.5f,
             ),
             engineSpace = OrpheusEngine(
-                engineId = OrpheusEngineId.PARTICLE,
+                engineId = OrpheusEngineId.PAR,
                 volume = 0.35f,
                 modLfoRate = 0.4f,
                 modLfoDepth = 0.25f,
@@ -546,7 +546,7 @@ private fun generateBaseVibe(
         ),
         TrackVoice(
             engineEdm = OrpheusEngine(
-                engineId = OrpheusEngineId.CHIPTUNE,
+                engineId = OrpheusEngineId.NES,
                 volume = 0.20f,
                 modLfoRate = 0.6f,
                 modLfoDepth = 0.2f,
@@ -563,7 +563,7 @@ private fun generateBaseVibe(
                 glideRate = 0.05f,
             ),
             engineSpace = OrpheusEngine(
-                engineId = OrpheusEngineId.CHIPTUNE,
+                engineId = OrpheusEngineId.NES,
                 volume = 0.20f,
                 modLfoRate = 0.6f,
                 modLfoDepth = 0.2f,

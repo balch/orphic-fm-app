@@ -24,7 +24,7 @@ data class OrpheusEngine(
     val reverbBrightness: Float = 0.5f,
     val delayFeedback: Float? = null,
     val glideRate: Float = 0.0f,
-    val lpgMode: LpgMode = LpgMode.BYPASS,
+    val lpgMode: LpgMode = LpgMode.ENGINE_DEFAULT,
     val lpgDecay: Float = 0.5f,
     val lpgColour: Float = 0.5f,
 )

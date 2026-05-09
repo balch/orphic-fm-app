@@ -20,48 +20,48 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
     // Declaration order is stable — do not reorder without migrating preset/save data.
 
     // Drums (ordinals 0..3)
-    @SerialName("BD")  ANALOG_BASS_DRUM(21, "808 Bass Drum"),
-    @SerialName("SD")  ANALOG_SNARE_DRUM(22, "808 Snare Drum"),
-    @SerialName("HH")  METALLIC_HI_HAT(23, "808 Hi-Hat"),
-    @SerialName("FM_DRUM") FM_DRUM(21, "FM Drum"),  // aliases ANALOG_BASS_DRUM on C++ side
+    @SerialName("BD")  BD(21, "808 Bass Drum"),
+    @SerialName("SD")  SD(22, "808 Snare Drum"),
+    @SerialName("HH")  HH(23, "808 Hi-Hat"),
+    @SerialName("FM_DRUM") FM_DRUM(21, "FM Drum"),  // aliases BD on C++ side
 
     // Plaits v1 pitched (ordinals 4..16)
     @SerialName("FM")  FM(10, "FM Synthesis"),
-    @SerialName("NSE") NOISE(17, "Filtered Noise"),
-    @SerialName("WSH") WAVESHAPING(9, "Waveshaping"),
-    @SerialName("VA")  VIRTUAL_ANALOG(8, "Virtual Analog"),
-    @SerialName("ADD") ADDITIVE(12, "Additive"),
-    @SerialName("GRN") GRAIN(11, "Grain"),
-    @SerialName("STR") STRING(19, "String"),
-    @SerialName("MOD") MODAL(20, "Modal"),
-    @SerialName("PAR") PARTICLE(18, "Particle"),
-    @SerialName("SWM") SWARM(16, "Swarm"),
-    @SerialName("CHD") CHORD(14, "Chord"),
-    @SerialName("WTB") WAVETABLE(13, "Wavetable"),
-    @SerialName("SPK") SPEECH(15, "Speech"),
+    @SerialName("NSE") NSE(17, "Filtered Noise"),
+    @SerialName("WSH") WSH(9, "Waveshaping"),
+    @SerialName("VA")  VA(8, "Virtual Analog"),
+    @SerialName("ADD") ADD(12, "Additive"),
+    @SerialName("GRN") GRN(11, "Grain"),
+    @SerialName("STR") STR(19, "String"),
+    @SerialName("MOD") MOD(20, "Modal"),
+    @SerialName("PAR") PAR(18, "Particle"),
+    @SerialName("SWM") SWM(16, "Swarm"),
+    @SerialName("CHD") CHD(14, "Chord"),
+    @SerialName("WTB") WTB(13, "Wavetable"),
+    @SerialName("SPK") SPK(15, "Speech"),
 
     // Plaits v1.2 native-only (ordinals 17..24)
-    @SerialName("VCF") VIRTUAL_ANALOG_VCF(0, "Virtual Analog VCF"),
-    @SerialName("PD")  PHASE_DISTORTION(1, "Phase Distortion"),
-    @SerialName("DX")  SIX_OP_FM(2, "Six-Op FM"),
-    @SerialName("TRN") WAVE_TERRAIN(5, "Wave Terrain"),
-    @SerialName("ENS") STRING_MACHINE(6, "String Machine"),
-    @SerialName("NES") CHIPTUNE(7, "Chiptune"),
-    @SerialName("DX2") SIX_OP_FM_2(3, "Six-Op FM Bank 2"),
-    @SerialName("DX3") SIX_OP_FM_3(4, "Six-Op FM Bank 3"),
+    @SerialName("VCF") VCF(0, "Virtual Analog VCF"),
+    @SerialName("PD")  PD(1, "Phase Distortion"),
+    @SerialName("DX")  DX(2, "Six-Op FM"),
+    @SerialName("TRN") TRN(5, "Wave Terrain"),
+    @SerialName("ENS") ENS(6, "String Machine"),
+    @SerialName("NES") NES(7, "Chiptune"),
+    @SerialName("DX2") DX2(3, "Six-Op FM Bank 2"),
+    @SerialName("DX3") DX3(4, "Six-Op FM Bank 3"),
 
     // ── Braids — chord engines (ids 100..104) ──
-    @SerialName("BRAIDS_TRIPLE_SAW")        BRAIDS_TRIPLE_SAW(100, "Triple Saw"),
-    @SerialName("BRAIDS_TRIPLE_SQUARE")     BRAIDS_TRIPLE_SQUARE(101, "Triple Square"),
-    @SerialName("BRAIDS_TRIPLE_TRIANGLE")   BRAIDS_TRIPLE_TRIANGLE(102, "Triple Triangle"),
-    @SerialName("BRAIDS_TRIPLE_SINE")       BRAIDS_TRIPLE_SINE(103, "Triple Sine"),
-    @SerialName("BRAIDS_TRIPLE_RING_MOD")   BRAIDS_TRIPLE_RING_MOD(104, "Triple Ring Mod"),
+    @SerialName("TRIPLE_SAW")        TRIPLE_SAW(100, "Triple Saw"),
+    @SerialName("TRIPLE_SQUARE")     TRIPLE_SQUARE(101, "Triple Square"),
+    @SerialName("TRIPLE_TRIANGLE")   TRIPLE_TRIANGLE(102, "Triple Triangle"),
+    @SerialName("TRIPLE_SINE")       TRIPLE_SINE(103, "Triple Sine"),
+    @SerialName("TRIPLE_RING_MOD")   TRIPLE_RING_MOD(104, "Triple Ring Mod"),
 
     // ── Braids — character engines (ids 105..108) ──
-    @SerialName("BRAIDS_CSAW")              BRAIDS_CSAW(105, "CSAW"),
-    @SerialName("BRAIDS_TOY")               BRAIDS_TOY(106, "Toy"),
-    @SerialName("BRAIDS_VOWEL_FOF")         BRAIDS_VOWEL_FOF(107, "Vowel FOF"),
-    @SerialName("BRAIDS_QUESTION_MARK")     BRAIDS_QUESTION_MARK(108, "Question Mark"),
+    @SerialName("CSAW")              CSAW(105, "CSAW"),
+    @SerialName("TOY")               TOY(106, "Toy"),
+    @SerialName("VOWEL_FOF")         VOWEL_FOF(107, "Vowel FOF"),
+    @SerialName("QUESTION_MARK")     QUESTION_MARK(108, "Question Mark"),
 
     // OSC must come LAST so it doesn't shift any prior ordinal.
     // id=-1 is the sentinel for OSC mode — C++ voice routing checks engine_index < 0.
@@ -78,23 +78,23 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
 
     companion object {
         private val NATIVE_ONLY = setOf(
-            VIRTUAL_ANALOG_VCF, PHASE_DISTORTION, SIX_OP_FM,
-            WAVE_TERRAIN, STRING_MACHINE, CHIPTUNE,
-            SIX_OP_FM_2, SIX_OP_FM_3,
-            BRAIDS_TRIPLE_SAW, BRAIDS_TRIPLE_SQUARE, BRAIDS_TRIPLE_TRIANGLE,
-            BRAIDS_TRIPLE_SINE, BRAIDS_TRIPLE_RING_MOD,
-            BRAIDS_CSAW, BRAIDS_TOY, BRAIDS_VOWEL_FOF, BRAIDS_QUESTION_MARK,
+            VCF, PD, DX,
+            TRN, ENS, NES,
+            DX2, DX3,
+            TRIPLE_SAW, TRIPLE_SQUARE, TRIPLE_TRIANGLE,
+            TRIPLE_SINE, TRIPLE_RING_MOD,
+            CSAW, TOY, VOWEL_FOF, QUESTION_MARK,
         )
 
         private val CHORD_ENGINES = setOf(
-            BRAIDS_TRIPLE_SAW, BRAIDS_TRIPLE_SQUARE, BRAIDS_TRIPLE_TRIANGLE,
-            BRAIDS_TRIPLE_SINE, BRAIDS_TRIPLE_RING_MOD,
+            TRIPLE_SAW, TRIPLE_SQUARE, TRIPLE_TRIANGLE,
+            TRIPLE_SINE, TRIPLE_RING_MOD,
         )
 
         /**
          * Returns the first entry whose [id] equals [id], or null if none match.
-         * Note: [FM_DRUM] (id = 21) aliases [ANALOG_BASS_DRUM] and is not reachable
-         * via this lookup — [ANALOG_BASS_DRUM] is returned for id 21. The two
+         * Note: [FM_DRUM] (id = 21) aliases [BD] and is not reachable
+         * via this lookup — [BD] is returned for id 21. The two
          * resolve to the same C++ engine, so audio behavior is identical, but
          * round-trip identity from id is lost.
          */

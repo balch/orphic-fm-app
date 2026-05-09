@@ -1499,7 +1499,7 @@ class PulsarViewModel(
                 rhythmDensity = RhythmPattern.SPARSE.density,
             ),
             tracks = List(8) {
-                val engine = OrpheusEngine(engineId = OrpheusEngineId.VIRTUAL_ANALOG)
+                val engine = OrpheusEngine(engineId = OrpheusEngineId.VA)
                 TrackVoice(
                     engineEdm = engine,
                     engineSpace = engine,

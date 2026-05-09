@@ -711,6 +711,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_mix.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "perc_mix") == 0)
             engine->pulsar_perc_mix.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bass_gain") == 0)
+            engine->pulsar_bass_gain.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "keys_gain") == 0)
+            engine->pulsar_keys_gain.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "fx_gain") == 0)
+            engine->pulsar_fx_gain.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "envelope_mode") == 0)
             engine->pulsar_envelope_mode.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "seed") == 0)

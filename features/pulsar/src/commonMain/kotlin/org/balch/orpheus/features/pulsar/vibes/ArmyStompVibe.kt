@@ -157,7 +157,7 @@ class ArmyStompVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_8,
         progressionDriftRange = 0.25f,
         tracks = listOf(
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.90f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
                     engineSpace = kick,
@@ -169,7 +169,7 @@ class ArmyStompVibe : VibeProvider {
                     barStrategy = BarStrategy.REPEAT
                 )
             },
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.55f).let { snare ->
+            OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.55f).let { snare ->
                 TrackVoice(
                     engineEdm = snare,
                     engineSpace = snare,
@@ -181,10 +181,10 @@ class ArmyStompVibe : VibeProvider {
                     barStrategy = BarStrategy.REPEAT
                 )
             },
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.35f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.35f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
-                    engineSpace = hat.copy(engineId = OrpheusEngineId.NOISE),
+                    engineSpace = hat.copy(engineId = OrpheusEngineId.NSE),
                     role = TrackRole.Percussive,
                     pan = 0.15f,
                     density = 0.25f,
@@ -199,7 +199,7 @@ class ArmyStompVibe : VibeProvider {
             // noteRangeHigh dropped to B2 keeps it from climbing into the lead's
             // E3 floor (see Path B note on the squash lead below).
             OrpheusEngine(
-                engineId = OrpheusEngineId.PHASE_DISTORTION,
+                engineId = OrpheusEngineId.PD,
                 volume = 0.85f,
                 harmonics = .05f, // Mooger Low
                 noteRangeLow = 40,
@@ -208,7 +208,7 @@ class ArmyStompVibe : VibeProvider {
             ).let { bass ->
                 TrackVoice(
                     engineEdm = bass,
-                    engineSpace = bass.copy(engineId = OrpheusEngineId.SIX_OP_FM),
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.DX),
                     role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                     pan = 0.00f,
                     density = 0.40f,
@@ -228,7 +228,7 @@ class ArmyStompVibe : VibeProvider {
             // idx 31 "Br trumpet" — clean spectral separation but lost the
             // unified filter-sweep palette that defines the vibe's character.)
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_2, // Fender
+                engineId = OrpheusEngineId.DX2, // Fender
                 volume = 0.60f,
                 harmonics = .05f,
                 noteRangeLow = 52,
@@ -238,7 +238,7 @@ class ArmyStompVibe : VibeProvider {
             ).let { lead ->
                 TrackVoice(
                     engineEdm = lead,
-                    engineSpace = lead.copy(engineId = OrpheusEngineId.SIX_OP_FM_3), // Hammond
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.DX3), // Hammond
                     role = TrackRole.Melodic(lickMode = LickMode.Squash),
                     pan = 0.20f,
                     density = 0.20f,
@@ -249,7 +249,7 @@ class ArmyStompVibe : VibeProvider {
             }, // Squash: CALL_RESPONSE owns bar 2
             // Track 5: Texture pad — density bumped so it can pulse under the breakdown.
             OrpheusEngine(
-                engineId = OrpheusEngineId.GRAIN,
+                engineId = OrpheusEngineId.GRN,
                 volume = 0.30f,
                 modLfoRate = 0.5f,
                 modLfoDepth = 0.3f,
@@ -276,7 +276,7 @@ class ArmyStompVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.NOISE,
+                engineId = OrpheusEngineId.NSE,
                 volume = 0.30f,
                 modLfoRate = 0.4f,
                 modLfoDepth = 0.25f,
@@ -293,7 +293,7 @@ class ArmyStompVibe : VibeProvider {
             ).let { fx ->
                 TrackVoice(
                     engineEdm = fx,
-                    engineSpace = fx.copy(engineId = OrpheusEngineId.PARTICLE),
+                    engineSpace = fx.copy(engineId = OrpheusEngineId.PAR),
                     role = TrackRole.Percussive,
                     pan = -0.30f,
                     density = 0.10f,
@@ -313,7 +313,7 @@ class ArmyStompVibe : VibeProvider {
             // ska. DX3/0.05 = "Hammond" → too organ-y, lost the ring. Marimba threads
             // both: ring + lower register + percussive chord stab.)
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_2,
+                engineId = OrpheusEngineId.DX2,
                 volume = 0.20f,
                 harmonics = 0.54f,  // DX2 idx 17 = "Marimba" — wooden ring, lower than xylo
                 timbre = .5f,

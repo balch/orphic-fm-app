@@ -261,8 +261,8 @@ private fun generateCompLabVibe(
     chordsPerBar: Int = 2,
     // Chord track engines — defaults work as PAD/pad-like, piano-flavored
     // vibes override to monophonic engines that arp naturally into chords.
-    chordEngineEdm: OrpheusEngineId = OrpheusEngineId.CHORD,
-    chordEngineSpace: OrpheusEngineId = OrpheusEngineId.CHORD,
+    chordEngineEdm: OrpheusEngineId = OrpheusEngineId.CHD,
+    chordEngineSpace: OrpheusEngineId = OrpheusEngineId.CHD,
     arrangement: Arrangement? = null,
 ) = Vibe(
     name = name,
@@ -287,7 +287,7 @@ private fun generateCompLabVibe(
     progressionDriftRange = 0.7f,
     tracks = listOf(
         // Track 0: Kick
-        OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+        OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.85f).let { kick ->
             TrackVoice(
                 engineEdm = kick,
                 engineSpace = kick,
@@ -299,7 +299,7 @@ private fun generateCompLabVibe(
             )
         },
         // Track 1: Snare
-        OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.65f).let { snare ->
+        OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.65f).let { snare ->
             TrackVoice(
                 engineEdm = snare,
                 engineSpace = snare,
@@ -311,7 +311,7 @@ private fun generateCompLabVibe(
             )
         },
         // Track 2: Hihat
-        OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.55f).let { hat ->
+        OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.55f).let { hat ->
             TrackVoice(
                 engineEdm = hat,
                 engineSpace = hat,
@@ -324,14 +324,14 @@ private fun generateCompLabVibe(
         },
         // Track 3: Bass
         OrpheusEngine(
-            engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+            engineId = OrpheusEngineId.VCF,
             volume = 0.7f,
             noteRangeLow = 33,
             noteRangeHigh = 52,
         ).let { bass ->
             TrackVoice(
                 engineEdm = bass,
-                engineSpace = bass.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                engineSpace = bass.copy(engineId = OrpheusEngineId.VA),
                 role = TrackRole.Melodic(),
                 density = 0.5f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
@@ -355,7 +355,7 @@ private fun generateCompLabVibe(
             )
         },
         // Tracks 5-7: silent placeholders (8-track requirement)
-        OrpheusEngine(engineId = OrpheusEngineId.STRING_MACHINE, volume = 0.0f).let { silent ->
+        OrpheusEngine(engineId = OrpheusEngineId.ENS, volume = 0.0f).let { silent ->
             TrackVoice(
                 engineEdm = silent,
                 engineSpace = silent,
@@ -365,7 +365,7 @@ private fun generateCompLabVibe(
                 macroMap = TrackMacroMap.EFFECT,
             )
         },
-        OrpheusEngine(engineId = OrpheusEngineId.STRING_MACHINE, volume = 0.0f).let { silent ->
+        OrpheusEngine(engineId = OrpheusEngineId.ENS, volume = 0.0f).let { silent ->
             TrackVoice(
                 engineEdm = silent,
                 engineSpace = silent,
@@ -375,7 +375,7 @@ private fun generateCompLabVibe(
                 macroMap = TrackMacroMap.EFFECT,
             )
         },
-        OrpheusEngine(engineId = OrpheusEngineId.STRING_MACHINE, volume = 0.0f).let { silent ->
+        OrpheusEngine(engineId = OrpheusEngineId.ENS, volume = 0.0f).let { silent ->
             TrackVoice(
                 engineEdm = silent,
                 engineSpace = silent,

@@ -166,6 +166,12 @@ object OrpheusColors {
     val deepSpaceMid = Color(0xFF12121A)
     val deepSpaceGrey = Color(0xFF0D0D0D)
 
+    // MixerPanel band accents (DJApp)
+    val mixerPercPink = Color(0xFFFF37C8)
+    val mixerFxAmber = Color(0xFFFFB437)
+    val mixerDistRed = Color(0xFFFF3B3B)
+    val mixerMasterPurple = Color(0xFFC8A8FF)
+
     // GalaxyViz Colors
     val galaxyCore = Color(0xFFFF6030)
     val galaxyMid = Color(0xFFAA40AA)

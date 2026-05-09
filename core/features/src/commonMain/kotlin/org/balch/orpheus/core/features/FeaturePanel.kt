@@ -22,6 +22,7 @@ value class PanelId(val id: String) {
         val DELAY = PanelId("delay")
         val REVERB = PanelId("reverb")
         val DISTORTION = PanelId("distortion")
+        val MIXER = PanelId("mixer")
         val RESONATOR = PanelId("resonator")
         val CODE = PanelId("code")
         val AI = PanelId("ai")

@@ -117,7 +117,7 @@ class SixtiesRebelVibe : VibeProvider {
         progressionDriftRange = 0.15f,
         tracks = listOf(
             // 0: Kick - driving pulse
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.85f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
                     engineSpace = kick,
@@ -128,7 +128,7 @@ class SixtiesRebelVibe : VibeProvider {
             },
             // 1: Snare - crackling backbeat
             OrpheusEngine(
-                engineId = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineId = OrpheusEngineId.SD,
                 volume = 0.75f,
                 harmonics = 0.45f,
                 timbre = 0.60f,
@@ -143,7 +143,7 @@ class SixtiesRebelVibe : VibeProvider {
                 )
             },
             // 2: Hats - steady 8ths
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.55f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.55f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -154,7 +154,7 @@ class SixtiesRebelVibe : VibeProvider {
             },
             // 3: Bass - driving root notes
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM, // Solid bass
+                engineId = OrpheusEngineId.DX, // Solid bass
                 volume = 0.80f,
                 harmonics = 0.02f, // DX Idx 0: Solid bass
                 noteRangeLow = 40,
@@ -162,7 +162,7 @@ class SixtiesRebelVibe : VibeProvider {
             ).let { bass ->
                 TrackVoice(
                     engineEdm = bass,
-                    engineSpace = bass.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.VA),
                     role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                     density = 0.50f,
                     barStrategy = BarStrategy.REPEAT,
@@ -170,7 +170,7 @@ class SixtiesRebelVibe : VibeProvider {
             },
             // 4: Fuzz Lead - the signature lick
             OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING, // Gritty fuzz
+                engineId = OrpheusEngineId.WSH, // Gritty fuzz
                 volume = 0.65f,
                 harmonics = 0.75f, // Gritty harmonics
                 timbre = 0.70f,
@@ -192,13 +192,13 @@ class SixtiesRebelVibe : VibeProvider {
             },
             // 5: Acoustic Strums
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_2, // Guit acous
+                engineId = OrpheusEngineId.DX2, // Guit acous
                 volume = 0.50f,
                 harmonics = 0.35f, // DX2 Idx 11: Guit acous
             ).let { strums ->
                 TrackVoice(
                     engineEdm = strums,
-                    engineSpace = strums.copy(engineId = OrpheusEngineId.CHORD),
+                    engineSpace = strums.copy(engineId = OrpheusEngineId.CHD),
                     role = TrackRole.Chordal(
                         chordFollow = ChordFollow.FOLLOW,
                         comping = ChordComping(
@@ -213,14 +213,14 @@ class SixtiesRebelVibe : VibeProvider {
             },
             // 6: Piano - staccato accents
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_2, // Steinway
+                engineId = OrpheusEngineId.DX2, // Steinway
                 volume = 0.45f,
                 harmonics = 0.32f, // DX2 Idx 10: Steinway
                 reverbSend = 0.30f,
             ).let { piano ->
                 TrackVoice(
                     engineEdm = piano,
-                    engineSpace = piano.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                    engineSpace = piano.copy(engineId = OrpheusEngineId.VA),
                     role = TrackRole.Chordal(
                         chordFollow = ChordFollow.FOLLOW,
                         comping = ChordComping(style = CompingStyle.FUNK_STABS)
@@ -232,13 +232,13 @@ class SixtiesRebelVibe : VibeProvider {
             },
             // 7: Tambourine / Percussion
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.40f,
                 reverbSend = 0.25f,
             ).let { perc ->
                 TrackVoice(
                     engineEdm = perc,
-                    engineSpace = perc.copy(engineId = OrpheusEngineId.PARTICLE),
+                    engineSpace = perc.copy(engineId = OrpheusEngineId.PAR),
                     role = TrackRole.Percussive,
                     density = 0.30f,
                     barStrategy = BarStrategy.INDEPENDENT,

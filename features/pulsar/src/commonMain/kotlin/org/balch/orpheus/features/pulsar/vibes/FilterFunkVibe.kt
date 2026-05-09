@@ -121,7 +121,7 @@ class FilterFunkVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_4,
         progressionDriftRange = 0.15f,
         tracks = listOf(
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.90f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
                     engineSpace = kick,
@@ -133,10 +133,10 @@ class FilterFunkVibe : VibeProvider {
                     barStrategy = BarStrategy.REPEAT
                 )
             },
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.45f).let { snare ->
+            OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.45f).let { snare ->
                 TrackVoice(
                     engineEdm = snare,
-                    engineSpace = snare.copy(engineId = OrpheusEngineId.NOISE),
+                    engineSpace = snare.copy(engineId = OrpheusEngineId.NSE),
                     role = TrackRole.Percussive,
                     pan = -0.10f,
                     density = 0.25f,
@@ -145,7 +145,7 @@ class FilterFunkVibe : VibeProvider {
                     barStrategy = BarStrategy.MUTATE
                 )
             },
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.55f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.55f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -161,7 +161,7 @@ class FilterFunkVibe : VibeProvider {
             // the bass chases chord roots beat-by-beat (classic funk). noteRangeLow 33 → 40
             // lifts it to E2 for punchy funk bass instead of A1 sub.
             OrpheusEngine(
-                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineId = OrpheusEngineId.VCF,
                 volume = 0.85f,
                 noteRangeLow = 40,
                 noteRangeHigh = 52,
@@ -179,7 +179,7 @@ class FilterFunkVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineId = OrpheusEngineId.VCF,
                 volume = 0.50f,
                 noteRangeLow = 45,
                 noteRangeHigh = 64,
@@ -188,7 +188,7 @@ class FilterFunkVibe : VibeProvider {
             ).let { lead ->
                 TrackVoice(
                     engineEdm = lead,
-                    engineSpace = lead.copy(engineId = OrpheusEngineId.WAVESHAPING),
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.WSH),
                     role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                     pan = -0.20f,
                     density = 0.20f,
@@ -198,7 +198,7 @@ class FilterFunkVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.STRING_MACHINE,
+                engineId = OrpheusEngineId.ENS,
                 volume = 0.10f,
                 modLfoRate = 0.1f,
                 modLfoDepth = 0.7f,
@@ -216,7 +216,7 @@ class FilterFunkVibe : VibeProvider {
             ).let { keys ->
                 TrackVoice(
                     engineEdm = keys,
-                    engineSpace = keys.copy(engineId = OrpheusEngineId.WAVE_TERRAIN),
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.TRN),
                     role = TrackRole.Chordal(
                         comping = ChordComping(
                             style = CompingStyle.FUNK_STABS,
@@ -251,7 +251,7 @@ class FilterFunkVibe : VibeProvider {
             // frequency randomization. Keeping all three in the low-quarter
             // puts us in the "dust cloud of discrete grains" zone.
             OrpheusEngine(
-                engineId = OrpheusEngineId.PARTICLE,
+                engineId = OrpheusEngineId.PAR,
                 volume = 0.20f,
                 timbre = 0.28f,         // sparse particle density
                 morph = 0.25f,          // all-pass network = diffuse, grainy
@@ -273,7 +273,7 @@ class FilterFunkVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.GRAIN,
+                engineId = OrpheusEngineId.GRN,
                 volume = 0.15f,
                 modLfoRate = 0.08f,
                 modLfoDepth = 0.5f,

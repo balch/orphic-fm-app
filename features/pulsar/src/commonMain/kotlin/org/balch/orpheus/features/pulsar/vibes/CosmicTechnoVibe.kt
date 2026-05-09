@@ -86,10 +86,10 @@ class CosmicTechnoVibe : VibeProvider {
         progressionAnchor = ProgressionAnchor.EVERY_4,
         progressionDriftRange = 0.15f,
         tracks = listOf(
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.90f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.90f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
-                    engineSpace = kick.copy(engineId = OrpheusEngineId.MODAL),
+                    engineSpace = kick.copy(engineId = OrpheusEngineId.MOD),
                     role = TrackRole.Percussive,
                     pan = 0.00f,
                     density = 0.50f,
@@ -98,10 +98,10 @@ class CosmicTechnoVibe : VibeProvider {
                     barStrategy = BarStrategy.REPEAT,
                 )
             },
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.60f).let { snare ->
+            OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.60f).let { snare ->
                 TrackVoice(
                     engineEdm = snare,
-                    engineSpace = snare.copy(engineId = OrpheusEngineId.NOISE),
+                    engineSpace = snare.copy(engineId = OrpheusEngineId.NSE),
                     role = TrackRole.Percussive,
                     pan = -0.15f,
                     density = 0.35f,
@@ -110,7 +110,7 @@ class CosmicTechnoVibe : VibeProvider {
                     barStrategy = BarStrategy.MUTATE,
                 )
             },
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.65f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.65f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -125,7 +125,7 @@ class CosmicTechnoVibe : VibeProvider {
             // Bass: locked techno pocket — REPEAT + ROOT_ONLY. Raised noteRangeLow
             // from F#1 (30) to E2 (40) for punchy techno bass instead of rumble.
             OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.75f,
                 noteRangeLow = 40,
                 noteRangeHigh = 54,
@@ -133,7 +133,7 @@ class CosmicTechnoVibe : VibeProvider {
             ).let { bass ->
                 TrackVoice(
                     engineEdm = bass,
-                    engineSpace = bass.copy(engineId = OrpheusEngineId.STRING),
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.STR),
                     role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                     pan = 0.00f,
                     density = 0.40f,
@@ -145,7 +145,7 @@ class CosmicTechnoVibe : VibeProvider {
             // Keys (CHD chord engine): REPEAT rhythm so chord pads don't drift on top
             // of the progression's native chord changes. FOLLOW stays default (chords move).
             OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.55f,
                 noteRangeLow = 48,
                 noteRangeHigh = 72,
@@ -154,7 +154,7 @@ class CosmicTechnoVibe : VibeProvider {
             ).let { keys ->
                 TrackVoice(
                     engineEdm = keys,
-                    engineSpace = keys.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.ENS),
                     role = TrackRole.Melodic(),
                     pan = -0.25f,
                     density = 0.30f,
@@ -164,7 +164,7 @@ class CosmicTechnoVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.CHORD,
+                engineId = OrpheusEngineId.CHD,
                 volume = 0.40f,
                 modLfoRate = 0.5f,
                 modLfoDepth = 0.3f,
@@ -191,7 +191,7 @@ class CosmicTechnoVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.NOISE,
+                engineId = OrpheusEngineId.NSE,
                 volume = 0.30f,
                 modLfoRate = 0.4f,
                 modLfoDepth = 0.25f,
@@ -218,7 +218,7 @@ class CosmicTechnoVibe : VibeProvider {
                 )
             },
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.25f,
                 modLfoRate = 0.6f,
                 modLfoDepth = 0.2f,
@@ -236,7 +236,7 @@ class CosmicTechnoVibe : VibeProvider {
             ).let { wild ->
                 TrackVoice(
                     engineEdm = wild,
-                    engineSpace = wild.copy(engineId = OrpheusEngineId.STRING),
+                    engineSpace = wild.copy(engineId = OrpheusEngineId.STR),
                     role = TrackRole.Melodic(),
                     pan = 0.40f,
                     density = 0.08f,

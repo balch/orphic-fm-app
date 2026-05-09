@@ -23,6 +23,7 @@ data class AppPreferences(
     val lastReverbJson: String? = null,
     val lastHornJson: String? = null,
     val lastDistortionJson: String? = null,
+    val lastMixerJson: String? = null,
 )
 
 

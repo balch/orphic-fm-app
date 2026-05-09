@@ -131,7 +131,7 @@ class DeepSpaceVibe : VibeProvider {
             // 0 KICK: Sonar ping — the Leslie piano ping that opens Echoes
             // Modal resonator, sparse deep hits, iconic single-note punctuation
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.90f,
                 harmonics = 0.35f, timbre = 0.25f, morph = 0.55f,
                 noteRangeLow = 37, noteRangeHigh = 49,
@@ -148,7 +148,7 @@ class DeepSpaceVibe : VibeProvider {
             },
             // 1 PERC: Ride shimmer — light metallic texture, like distant cymbals
             OrpheusEngine(
-                engineId = OrpheusEngineId.STRING,
+                engineId = OrpheusEngineId.STR,
                 volume = 0.9f,
                 harmonics = 0.45f, timbre = 0.35f, morph = 0.15f,
                 noteRangeLow = 55, noteRangeHigh = 67,
@@ -165,7 +165,7 @@ class DeepSpaceVibe : VibeProvider {
             },
             // 2 HH: Wind/atmosphere — crystalline particle scatter, like wind through a canyon
             OrpheusEngine(
-                engineId = OrpheusEngineId.PARTICLE,
+                engineId = OrpheusEngineId.PAR,
                 volume = 0.9f,
                 harmonics = 1f, timbre = 0.5f, morph = 1f,
                 reverbBrightness = 0.75f, reverbSend = 0.3f, delaySend = 0.25f,
@@ -188,7 +188,7 @@ class DeepSpaceVibe : VibeProvider {
             // chordFollow = FIXED so the iconic C#-D#-E-F#-E-D#-C#-B riff plays
             // exactly as written — chord progression moves via the KEYS drone above.
             OrpheusEngine(
-                engineId = OrpheusEngineId.PHASE_DISTORTION,
+                engineId = OrpheusEngineId.PD,
                 volume = 0.22f,
                 harmonics = 0.5f, timbre = 0.55f, morph = 0.1f,
                 noteRangeLow = 37, noteRangeHigh = 49,
@@ -209,7 +209,7 @@ class DeepSpaceVibe : VibeProvider {
             // 4 KEYS: Evolving drone — VA (warm organ) at high energy, ENS (lush pad) at low
             // Long sustains with slow timbral drift. LFO sweeps harmonics/timbre for builds.
             OrpheusEngine(
-                engineId = OrpheusEngineId.VIRTUAL_ANALOG,
+                engineId = OrpheusEngineId.VA,
                 volume = 0.70f,
                 harmonics = 0.25f, timbre = 0.2f, morph = 0.1f,
                 noteRangeLow = 49, noteRangeHigh = 61,
@@ -220,7 +220,7 @@ class DeepSpaceVibe : VibeProvider {
             ).let { keys ->
                 TrackVoice(
                     engineEdm = keys,
-                    engineSpace = keys.copy(engineId = OrpheusEngineId.STRING_MACHINE),
+                    engineSpace = keys.copy(engineId = OrpheusEngineId.ENS),
                     density = 0.12f, role = TrackRole.Melodic(), pan = -0.1f,
                     envelopeProfile = EnvelopeProfile.DRONE,
                     macroMap = TrackMacroMap.MELODIC,
@@ -235,7 +235,7 @@ class DeepSpaceVibe : VibeProvider {
 
             // 5 PAD (Guitar): Gilmour guitar — resonant STR, high harmonics, delay+reverb
             OrpheusEngine(
-                engineId = OrpheusEngineId.STRING,
+                engineId = OrpheusEngineId.STR,
                 volume = 0.65f,
                 harmonics = 0.9f, timbre = 0.5f, morph = 0.1f,
                 noteRangeLow = 49, noteRangeHigh = 67,
@@ -255,7 +255,7 @@ class DeepSpaceVibe : VibeProvider {
             },
             // 6 TEXTURE: Seagull/void sounds — particle clouds for the atonal middle section
             OrpheusEngine(
-                engineId = OrpheusEngineId.PARTICLE,
+                engineId = OrpheusEngineId.PAR,
                 volume = 0.50f,
                 harmonics = 0.3f, timbre = 0.45f, morph = 0.25f,
                 noteRangeLow = 43, noteRangeHigh = 61,
@@ -275,7 +275,7 @@ class DeepSpaceVibe : VibeProvider {
             },
             // 7 FX: Echo repeats — delayed resonant pings that fade into the distance
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.40f,
                 harmonics = 0.5f, timbre = 0.4f, morph = 0.15f,
                 noteRangeLow = 55, noteRangeHigh = 73,

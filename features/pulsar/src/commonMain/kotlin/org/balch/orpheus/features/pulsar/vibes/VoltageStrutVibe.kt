@@ -154,7 +154,7 @@ class VoltageStrutVibe : VibeProvider {
             },
             // 1: electronic snare — funky backbeat with mutation, clappy edge.
             OrpheusEngine(
-                engineId = OrpheusEngineId.PHASE_DISTORTION,
+                engineId = OrpheusEngineId.PD,
                 volume = 0.70f,
                 harmonics = 0.55f,
                 timbre = 0.55f,
@@ -162,7 +162,7 @@ class VoltageStrutVibe : VibeProvider {
             ).let { snare ->
                 TrackVoice(
                     engineEdm = snare,
-                    engineSpace = snare.copy(engineId = OrpheusEngineId.NOISE),
+                    engineSpace = snare.copy(engineId = OrpheusEngineId.NSE),
                     role = TrackRole.Percussive,
                     pan = -0.10f,
                     density = 0.40f,
@@ -172,7 +172,7 @@ class VoltageStrutVibe : VibeProvider {
                 )
             },
             // 2: dense hats — busy 16ths with ghosts, MUTATE for funk variation.
-            OrpheusEngine(engineId = OrpheusEngineId.PARTICLE, volume = 0.65f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.PAR, volume = 0.65f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -186,7 +186,7 @@ class VoltageStrutVibe : VibeProvider {
             },
             // 3: MAIN BASS — waveshaping hook, plays the lick, follows the chord root.
             OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.80f,
                 harmonics = 0.55f,
                 timbre = 0.55f,
@@ -220,7 +220,7 @@ class VoltageStrutVibe : VibeProvider {
             // that the mallet patch provides at high register.) Crossfades to VA
             // (clean analog poly) when Energy drops for a softer space-side voice.
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_2,
+                engineId = OrpheusEngineId.DX2,
                 volume = 0.55f,
                 harmonics = 0.50f,  // DX2 idx 16 = "Xylophone" — glassy mallet at C4-G6
                 timbre = 0.55f,
@@ -234,7 +234,7 @@ class VoltageStrutVibe : VibeProvider {
             ).let { lead ->
                 TrackVoice(
                     engineEdm = lead,
-                    engineSpace = lead.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                    engineSpace = lead.copy(engineId = OrpheusEngineId.VA),
                     role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
                     pan = 0.05f,
                     density = 0.40f,
@@ -247,7 +247,7 @@ class VoltageStrutVibe : VibeProvider {
             // register = locked drone under the main hook. Density 0.55 gives it a
             // steady pulse (roughly 8ths) rather than a single sustained drone.
             OrpheusEngine(
-                engineId = OrpheusEngineId.VIRTUAL_ANALOG_VCF,
+                engineId = OrpheusEngineId.VCF,
                 volume = 0.55f,
                 harmonics = 0.30f,   // dark, round sub
                 timbre = 0.25f,
@@ -260,7 +260,7 @@ class VoltageStrutVibe : VibeProvider {
             ).let { sub ->
                 TrackVoice(
                     engineEdm = sub,
-                    engineSpace = sub.copy(engineId = OrpheusEngineId.PHASE_DISTORTION),
+                    engineSpace = sub.copy(engineId = OrpheusEngineId.PD),
                     role = TrackRole.Percussive,
                     pan = 0.00f,
                     density = 0.25f,
@@ -271,7 +271,7 @@ class VoltageStrutVibe : VibeProvider {
             },
             // 6: PERCUSSIVE FX — noise hits, ticks/snaps. No pad, no sustain.
             OrpheusEngine(
-                engineId = OrpheusEngineId.NOISE,
+                engineId = OrpheusEngineId.NSE,
                 volume = 0.40f,
                 harmonics = 0.60f,
                 timbre = 0.65f,
@@ -295,7 +295,7 @@ class VoltageStrutVibe : VibeProvider {
             },
             // 7: PERCUSSIVE FX — particle clicks, tuned-ish transients.
             OrpheusEngine(
-                engineId = OrpheusEngineId.GRAIN,
+                engineId = OrpheusEngineId.GRN,
                 volume = 0.55f,
                 harmonics = 0.45f,
                 timbre = 0.60f,

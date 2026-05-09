@@ -741,7 +741,10 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_root_note{0};      // 0=C, 11=B
     std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
     std::atomic<float> pulsar_mix{0.0f};       // output level 0-1 (Kotlin sets per-app default)
-    std::atomic<float> pulsar_perc_mix{0.7f};  // percussion group volume 0-1
+    std::atomic<float> pulsar_perc_mix{0.7f};   // percussion group volume 0-1
+    std::atomic<float> pulsar_bass_gain{1.0f};  // BASS (track 3) user gain — multiplies into pulsar_track_volume
+    std::atomic<float> pulsar_keys_gain{1.0f};  // KEYS (track 4) user gain
+    std::atomic<float> pulsar_fx_gain{1.0f};    // FX (tracks 5-7) user gain
     std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend
     std::atomic<int> pulsar_track_engine_edm[8]{};
     std::atomic<int> pulsar_track_engine_space[8]{};

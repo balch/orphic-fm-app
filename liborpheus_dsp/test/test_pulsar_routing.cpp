@@ -52,12 +52,15 @@ static bool test_pulsar_global_port_routing() {
     check_int_port(engine, "scale", 3, engine->pulsar_scale_index, pass);
     check_float_port(engine, "mix", 0.8f, engine->pulsar_mix, pass);
     check_float_port(engine, "perc_mix", 0.6f, engine->pulsar_perc_mix, pass);
+    check_float_port(engine, "bass_gain", 0.8f, engine->pulsar_bass_gain, pass);
+    check_float_port(engine, "keys_gain", 0.4f, engine->pulsar_keys_gain, pass);
+    check_float_port(engine, "fx_gain", 0.5f, engine->pulsar_fx_gain, pass);
     check_int_port(engine, "envelope_mode", 2, engine->pulsar_envelope_mode, pass);
     check_float_port(engine, "lick_mutation", 0.33f, engine->pulsar_lick_mutation, pass);
     check_int_port(engine, "step_count", 32, engine->pulsar_step_count, pass);
     check_int_port(engine, "playing", 1, engine->pulsar_playing, pass);
 
-    int routed = 13;
+    int routed = 16;
     printf("    %s: %d global ports verified\n", pass ? "PASS" : "FAIL", routed);
 
     orpheus_engine_destroy(engine);

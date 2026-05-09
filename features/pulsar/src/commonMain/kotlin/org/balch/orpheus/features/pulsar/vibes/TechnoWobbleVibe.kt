@@ -174,7 +174,7 @@ class TechnoWobbleVibe : VibeProvider {
         progressionDriftRange = 0.08f,                    // very tight — stays locked
         tracks = listOf(
             // Track 0: Kick — dead-straight four-on-the-floor, heavy
-            OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.95f).let { kick ->
+            OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.95f).let { kick ->
                 TrackVoice(
                     engineEdm = kick,
                     engineSpace = kick,
@@ -188,7 +188,7 @@ class TechnoWobbleVibe : VibeProvider {
             },
             // Track 1: Snare — processed, lo-fi thwack on 2 and 4
             OrpheusEngine(
-                engineId = OrpheusEngineId.ANALOG_SNARE_DRUM,
+                engineId = OrpheusEngineId.SD,
                 volume = 0.72f,
                 harmonics = 0.55f,  // slight noise boost for the processed snap
                 timbre = 0.45f,
@@ -208,7 +208,7 @@ class TechnoWobbleVibe : VibeProvider {
             },
             // Track 2: Hihat — minimal, scratchy. This is NOT techno — hats
             // are an accent color, not a driving force.
-            OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.40f).let { hat ->
+            OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.40f).let { hat ->
                 TrackVoice(
                     engineEdm = hat,
                     engineSpace = hat,
@@ -230,7 +230,7 @@ class TechnoWobbleVibe : VibeProvider {
             // physical-model decay envelope — BYPASS lets it ride at full volume
             // instead of being doubly attenuated.
             OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.85f,
                 harmonics = 0.42f,
                 timbre = 0.55f,
@@ -242,7 +242,7 @@ class TechnoWobbleVibe : VibeProvider {
             ).let { bass ->
                 TrackVoice(
                     engineEdm = bass,
-                    engineSpace = bass.copy(engineId = OrpheusEngineId.STRING, lpgMode = LpgMode.BYPASS),
+                    engineSpace = bass.copy(engineId = OrpheusEngineId.STR, lpgMode = LpgMode.BYPASS),
                     role = TrackRole.Melodic(
                         chordFollow = ChordFollow.ROOT_ONLY,
                         lickMode = LickMode.Fill,
@@ -259,7 +259,7 @@ class TechnoWobbleVibe : VibeProvider {
             // the kick, but with octave jumps and drops so it feels
             // unpredictable and aggressive — not a tidy chord pattern.
             OrpheusEngine(
-                engineId = OrpheusEngineId.WAVESHAPING,
+                engineId = OrpheusEngineId.WSH,
                 volume = 0.55f,
                 harmonics = 0.75f,   // heavy distortion character
                 timbre = 0.60f,
@@ -274,7 +274,7 @@ class TechnoWobbleVibe : VibeProvider {
             ).let { stab ->
                 TrackVoice(
                     engineEdm = stab,
-                    engineSpace = stab.copy(engineId = OrpheusEngineId.STRING),
+                    engineSpace = stab.copy(engineId = OrpheusEngineId.STR),
                     role = TrackRole.Chordal(
                         comping = ChordComping(
                             style = CompingStyle.ROCK_DOWNBEATS,
@@ -303,7 +303,7 @@ class TechnoWobbleVibe : VibeProvider {
             // Track 5: Pad — dark sustained string ensemble. Drones under
             // everything with slow LFO timbre drift. This is the bed.
             OrpheusEngine(
-                engineId = OrpheusEngineId.SIX_OP_FM_3,
+                engineId = OrpheusEngineId.DX3,
                 volume = 0.45f,
                 harmonics = 0.30f,   // dark
                 timbre = 0.25f,
@@ -337,7 +337,7 @@ class TechnoWobbleVibe : VibeProvider {
             // crackle and grain clouds as a musical element, not an accent.
             // Panned opposite the pad for width.
             OrpheusEngine(
-                engineId = OrpheusEngineId.GRAIN,
+                engineId = OrpheusEngineId.GRN,
                 volume = 0.30f,
                 harmonics = 0.55f,
                 timbre = 0.45f,
@@ -357,7 +357,7 @@ class TechnoWobbleVibe : VibeProvider {
             ).let { texture ->
                 TrackVoice(
                     engineEdm = texture,
-                    engineSpace = texture.copy(engineId = OrpheusEngineId.NOISE),
+                    engineSpace = texture.copy(engineId = OrpheusEngineId.NSE),
                     role = TrackRole.Percussive,
                     pan = 0.35f,
                     density = 0.18f,
@@ -370,7 +370,7 @@ class TechnoWobbleVibe : VibeProvider {
             // Metallic hits that surface occasionally. WILD macro map so it
             // gets swept unpredictably as the macros move.
             OrpheusEngine(
-                engineId = OrpheusEngineId.MODAL,
+                engineId = OrpheusEngineId.MOD,
                 volume = 0.25f,
                 harmonics = 0.65f,
                 timbre = 0.55f,
