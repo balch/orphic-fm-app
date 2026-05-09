@@ -14,27 +14,34 @@ plugins {
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
+fun execGit(vararg args: String): String? = try {
+    providers.exec {
+        commandLine("git", *args)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim().takeIf { it.isNotBlank() }
+} catch (_: Exception) {
+    null
+}
+
+// Git-derived version is used for distributable variants only (release, benchmark).
+// Debug variants pin to versionCode = 1 so installs aren't invalidated by every commit
+// or by switching branches where the rev-list count goes backwards.
+val gitVersionCode = execGit("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+val gitVersionName = execGit("describe", "--tags", "--always", "--dirty") ?: "1.0"
+
+// Build types that share debug semantics: pinned version + ".debug" applicationId
+// suffix so they coexist on-device with release.
+val debugLikeBuildTypes = setOf("debug", "debugRelease")
+
 android {
     compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
-
-    fun execGit(vararg args: String): String? = try {
-        providers.exec {
-            commandLine("git", *args)
-            isIgnoreExitValue = true
-        }.standardOutput.asText.get().trim().takeIf { it.isNotBlank() }
-    } catch (_: Exception) {
-        null
-    }
-
-    val gitVersionCode = execGit("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
-    val gitVersionName = execGit("describe", "--tags", "--always", "--dirty") ?: "1.0"
 
     defaultConfig {
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
         targetSdk = libs.findVersion("android-targetSdk").get().requiredVersion.toInt()
 
-        versionCode = gitVersionCode
-        versionName = gitVersionName
+        versionCode = 1
+        versionName = "dev"
 
         ndk {
             abiFilters += setOf("arm64-v8a", "x86_64")
@@ -59,6 +66,9 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -76,6 +86,7 @@ android {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
             signingConfig = signingConfigs.getByName("debug")
+            applicationIdSuffix = ".debug"
         }
         create("benchmark") {
             initWith(getByName("release"))
@@ -100,5 +111,24 @@ android {
 
     kotlin {
         jvmToolchain(17)
+    }
+
+    // debugRelease inherits debug's resource overrides (app label, launcher tint, etc.)
+    // so the two build types render identically on the launcher.
+    sourceSets {
+        getByName("debugRelease") {
+            res.srcDirs("src/debug/res")
+        }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        if (variant.buildType !in debugLikeBuildTypes) {
+            variant.outputs.forEach { output ->
+                output.versionCode.set(gitVersionCode)
+                output.versionName.set(gitVersionName)
+            }
+        }
     }
 }

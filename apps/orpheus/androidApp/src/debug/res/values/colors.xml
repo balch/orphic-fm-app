@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- DEBUG variant: vivid purple ring around the portrait so dev builds
+         are obviously distinct from release on the launcher. -->
+    <color name="ic_launcher_background">#5b1fb8</color>
+</resources>
