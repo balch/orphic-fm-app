@@ -72,6 +72,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickMode
+import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
 import kotlin.concurrent.Volatile
 
 @Serializable
@@ -119,6 +120,8 @@ data class PulsarPanelActions(
     val setTrackEngineEdm: (Int, Int) -> Unit = { _, _ -> },
     val setTrackEngineSpace: (Int, Int) -> Unit = { _, _ -> },
     val toggleTrackMute: (Int) -> Unit = {},
+    val songEndingEnabled: StateFlow<Boolean> = MutableStateFlow(false),
+    val onSetSongEndingEnabled: (Boolean) -> Unit = {},
 ) {
     companion object {
         val EMPTY = PulsarPanelActions()
@@ -151,9 +154,24 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     val vibeList: List<Vibe>
         get() = emptyList()  // default for previews
 
+    /**
+     * Cheap, ordered list of vibe display names. Reading this never forces a
+     * `Vibe` body to be constructed — useful for advancers, search, and any
+     * UI that just needs labels.
+     */
+    val vibeNames: List<String>
+        get() = emptyList()
+
     val vibeFlow: StateFlow<Vibe>
 
     fun applyVibe(vibe: Vibe)
+
+    /**
+     * Look up a vibe by display name and apply it. Only the matched provider's
+     * `Vibe` body is realized — other vibes stay deferred. Returns false and
+     * leaves state unchanged when the name doesn't match any vibe.
+     */
+    fun applyVibeByName(name: String): Boolean = false
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -225,9 +243,24 @@ class PulsarViewModel(
     private val scope: FeatureCoroutineScope,
     vibeProviders: Set<VibeProvider>,
     private val playbackMode: PulsarPlaybackMode,
+    private val songEndingPreferences: SongEndingPreferences,
 ) : PulsarFeature {
 
-    override val vibeList: List<Vibe> = vibeProviders.map { it.vibe }.sortedBy { it.name }
+    // Providers sorted by their cheap `name` accessor — no Vibe construction
+    // forced. The list itself stays around for lazy access; vibeList below
+    // realizes the actual Vibe data only on first iteration.
+    private val sortedProviders: List<VibeProvider> =
+        vibeProviders.sortedBy { it.name }
+
+    // Lazy: the full vibeList materializes only when first iterated (e.g.
+    // user opens the vibe dropdown or restoreSavedState looks up a name).
+    // Until then, only the initial vibeFlow.value vibe is constructed.
+    override val vibeList: List<Vibe> by lazy {
+        sortedProviders.map { it.vibe }
+    }
+
+    // Cheap accessor — never forces Vibe construction.
+    override val vibeNames: List<String> = sortedProviders.map { it.name }
 
     private val log = logging("PulsarVM")
 
@@ -465,7 +498,10 @@ class PulsarViewModel(
 
     private val selectedTrackFlow = MutableStateFlow<Int?>(null)
     private val _trackMutedFlow = MutableStateFlow(List(8) { false })
-    override val vibeFlow = MutableStateFlow(vibeList.first())
+    // Initial vibe = the first provider in class-name order. Forces ONE
+    // vibe at construction; the other 25 stay lazy until vibeList is
+    // iterated (e.g. by restoreSavedState or the dropdown).
+    override val vibeFlow = MutableStateFlow(sortedProviders.first().vibe)
     private val restoreComplete = CompletableDeferred<Unit>()
     private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
@@ -593,6 +629,10 @@ class PulsarViewModel(
             _trackMutedFlow.value = _trackMutedFlow.value.toMutableList().also { it[track] = newMuted }
             synthController.setPluginControl(muteSymbols[track].controlId, FloatValue(if (newMuted) 1f else 0f))
             log.debug { "Track $track ${if (newMuted) "muted" else "unmuted"}" }
+        },
+        songEndingEnabled = songEndingPreferences.enabledFlow,
+        onSetSongEndingEnabled = { value ->
+            scope.launch { songEndingPreferences.setEnabled(value) }
         },
     )
 
@@ -741,8 +781,11 @@ class PulsarViewModel(
         // (arrangement, tracks) take effect. Try vibeName first (new format),
         // fall back to saved vibe name (old format), then first vibe.
         val name = saved.vibeName.ifEmpty { saved.vibe.name }
-        val currentVibe = vibeList.firstOrNull { it.name == name } ?: vibeList.first()
-        applyVibe(currentVibe)
+        // Use provider.name (cheap) to look up by name without forcing all
+        // 26 vibes to materialize. Only the matched provider's `vibe` is built.
+        val provider = sortedProviders.firstOrNull { it.name == name }
+            ?: sortedProviders.first()
+        applyVibe(provider.vibe)
         // Then override with saved macro values
         energyId.value = FloatValue(saved.energy)
         complexityId.value = FloatValue(saved.complexity)
@@ -774,12 +817,19 @@ class PulsarViewModel(
     private fun compingStyleToInt(style: CompingStyle?): Int =
         style?.engineId ?: 0  // PAD (default for non-CHORDAL tracks — harmless)
 
+    override fun applyVibeByName(name: String): Boolean {
+        val provider = sortedProviders.firstOrNull { it.name == name } ?: return false
+        applyVibe(provider.vibe)
+        return true
+    }
+
     /**
      * Push the entire vibe recipe to C++. Called from setVibe action and restoreSavedState.
      */
     override fun applyVibe(vibe: Vibe) {
         log.info { "applyVibe name=${vibe.name} bpm=${vibe.bpm} tracks=${vibe.tracks.size} sections=${vibe.arrangement?.sections?.size ?: 0}" }
-        // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends
+        // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends.
+        // PulsarSongEnding observes vibeFlow and resets its own state on change.
         vibeFlow.value = vibe
         // globalTempo will be set to vibe.bpm below — that is the 1.0× baseline
         // for the section-BPM collector to compose multipliers against.

@@ -8,6 +8,8 @@ import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
+import org.balch.orpheus.features.pulsar.playback.PulsarSongAdvancer
+import org.balch.orpheus.features.pulsar.playback.PulsarSongEnding
 import org.balch.orpheus.util.ConsoleLogger
 
 /**
@@ -22,6 +24,12 @@ actual interface OrpheusGraph : ViewModelGraph {
     actual val consoleLogger: ConsoleLogger
     actual val globalTempo: GlobalTempo
     actual val controlHighlightEventBus: ControlHighlightEventBus
+
+    /** Eagerly touched in main.kt so its init {} collectors observe playback/arrangement at startup. */
+    val pulsarSongEnding: PulsarSongEnding
+
+    /** Eagerly touched in main.kt so its init {} collector subscribes to songEndingEvents at startup. */
+    val pulsarSongAdvancer: PulsarSongAdvancer
 
     @DependencyGraph.Factory
     fun interface Factory {

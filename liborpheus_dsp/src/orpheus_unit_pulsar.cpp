@@ -1248,6 +1248,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->arr_viz_section_index.store(-1, std::memory_order_relaxed);
     }
 
+    // Clear any stale outro request so a request from a prior vibe does not
+    // bleed into the new arrangement. Placed after arrangement loading so that
+    // it always runs regardless of whether arr_active is set.
+    engine->pulsar_arrangement_outro_request.store(0, std::memory_order_relaxed);
+
     state->current_vibe_generation = generation;
     state->last_root_note = root;
     state->last_scale_index = scale_idx;
@@ -1723,6 +1728,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                 // ── Section / Solo advancement ──
                 if (state->arrangement.active) {
+                    // Pull any pending outro request before advancing so the
+                    // boundary handler in advance_section() can re-route to
+                    // arr.outro_index this bar. Sticky once set; cleared by
+                    // load_vibe() on arrangement reload.
+                    const int outro_req = engine->pulsar_arrangement_outro_request.load(
+                        std::memory_order_relaxed);
+                    if (outro_req != 0 && !state->section_state.outro_triggered) {
+                        state->section_state.outro_triggered = true;
+                    }
+
                     bool section_changed = advance_section(
                         state->section_state, state->arrangement, state->mutation_seed);
 

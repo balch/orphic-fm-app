@@ -862,6 +862,7 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_section_count{0};
     std::atomic<int>   pulsar_arrangement_intro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
+    std::atomic<int>   pulsar_arrangement_outro_request{0};
     std::atomic<float> pulsar_section_data[8 * 21] = {};
     // Per-track section overrides. Stride: 8 sections × 8 tracks. -1 sentinel
     // means "no override — use the track's base value". Read at vibe load and

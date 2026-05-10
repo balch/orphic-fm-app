@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.balch.orpheus.core.audio.MasterVolumeRamp
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
@@ -182,7 +183,7 @@ private fun makeVm(
         dispatcherProvider = FakeDispatcherProvider,
         scope = scope,
     )
-    return TimerViewModel(engine, manager, mediaSessionStateManager, NoOpTimerWidgetNotifier(), scope, persistence)
+    return TimerViewModel(engine, MasterVolumeRamp(engine), manager, mediaSessionStateManager, NoOpTimerWidgetNotifier(), scope, persistence)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

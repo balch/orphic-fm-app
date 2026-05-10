@@ -82,9 +82,11 @@ class PulsarSectionProgressionPushTest {
         }
         val tempo = GlobalTempo(PushTestAudioEngine())
         val portRegistry = PortRegistry(emptySet())
+        val engine = PushTestSynthEngine(arrangementFlow)
+        val appScope = makeAppCoroutineScope(testDispatcher)
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = PushTestSynthEngine(arrangementFlow),
+            synthEngine = engine,
             globalTempo = tempo,
             appPreferencesRepository = PushTestPrefs(),
             presetLoader = PresetLoader(portRegistry, tempo, controller),
@@ -92,6 +94,7 @@ class PulsarSectionProgressionPushTest {
             scope = FeatureCoroutineScope(),
             vibeProviders = setOf(PushTestVibeProvider(vibe)),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
+            songEndingPreferences = StubSongEndingPreferences(),
         )
     }
 
@@ -203,7 +206,9 @@ private fun pushTestVibe(sections: List<Section>): Vibe = Vibe(
     arrangement = Arrangement(sections = sections),
 )
 
-private class PushTestVibeProvider(override val vibe: Vibe) : VibeProvider
+private class PushTestVibeProvider(override val vibe: Vibe) : VibeProvider {
+    override val name: String get() = vibe.name
+}
 
 private class PushTestAudioEngine : AudioEngine {
     override fun start() {}

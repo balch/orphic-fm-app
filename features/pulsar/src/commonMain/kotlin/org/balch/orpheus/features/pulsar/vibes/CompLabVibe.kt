@@ -34,214 +34,238 @@ import org.balch.orpheus.features.pulsar.models.VibeEffects
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompPadVibe : VibeProvider {
+    override val name: String = "Comp Pad"
     // PAD: sustained chords with section-level comping override demo.
     // verse=PAD default, chorus=FUNK_STABS+FIRST_INVERSION, breakdown=PAD+ROOT_ONLY chord-follow
-    override val vibe = generateCompLabVibe(
-        name = "Comp Pad",
-        compingOverride = ChordComping(
-            style = CompingStyle.PAD,
-            sectionInversion = SectionInversion.FOLLOW_STYLE,
-            humanization = CompingHumanization(
-                extensionProbability = 0.15f,  // subtle 9th/11th color
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Pad",
+            compingOverride = ChordComping(
+                style = CompingStyle.PAD,
+                sectionInversion = SectionInversion.FOLLOW_STYLE,
+                humanization = CompingHumanization(
+                    extensionProbability = 0.15f,  // subtle 9th/11th color
+                ),
+                fills = CompingFills(everyNBars = 16, fillType = FillType.ASCENDING_ARP, skipProbability = 0.5f),
             ),
-            fills = CompingFills(everyNBars = 16, fillType = FillType.ASCENDING_ARP, skipProbability = 0.5f),
-        ),
-        arrangement = Arrangement(
-            introIndex = 0,
-            sections = listOf(
-                Section(
-                    name = "verse",
-                    barsMin = 8, barsMax = 12,
-                    transitions = listOf(SectionTransition(targetIndex = 1, weight = 1.0f)),
-                    // verse stays on default PAD
-                ),
-                Section(
-                    name = "chorus",
-                    barsMin = 8, barsMax = 12,
-                    transitions = listOf(SectionTransition(targetIndex = 2, weight = 1.0f)),
-                    macroOverrides = MacroOverrides(energy = 1.3f),
-                    compingStyle = CompingStyle.FUNK_STABS,          // chorus turns to FUNK
-                    compingInversion = SectionInversion.FIRST_INVERSION,
-                ),
-                Section(
-                    name = "breakdown",
-                    barsMin = 4, barsMax = 8,
-                    transitions = listOf(SectionTransition(targetIndex = 0, weight = 1.0f)),
-                    macroOverrides = MacroOverrides(energy = 0.6f),
-                    compingStyle = CompingStyle.PAD,                  // breakdown back to pad
-                    chordFollow = ChordFollow.ROOT_ONLY,              // simpler harmony in breakdown
+            arrangement = Arrangement(
+                introIndex = 0,
+                sections = listOf(
+                    Section(
+                        name = "verse",
+                        barsMin = 8, barsMax = 12,
+                        transitions = listOf(SectionTransition(targetIndex = 1, weight = 1.0f)),
+                        // verse stays on default PAD
+                    ),
+                    Section(
+                        name = "chorus",
+                        barsMin = 8, barsMax = 12,
+                        transitions = listOf(SectionTransition(targetIndex = 2, weight = 1.0f)),
+                        macroOverrides = MacroOverrides(energy = 1.3f),
+                        compingStyle = CompingStyle.FUNK_STABS,          // chorus turns to FUNK
+                        compingInversion = SectionInversion.FIRST_INVERSION,
+                    ),
+                    Section(
+                        name = "breakdown",
+                        barsMin = 4, barsMax = 8,
+                        transitions = listOf(SectionTransition(targetIndex = 0, weight = 1.0f)),
+                        macroOverrides = MacroOverrides(energy = 0.6f),
+                        compingStyle = CompingStyle.PAD,                  // breakdown back to pad
+                        chordFollow = ChordFollow.ROOT_ONLY,              // simpler harmony in breakdown
+                    ),
                 ),
             ),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompRockVibe : VibeProvider {
+    override val name: String = "Comp Rock"
     // ROCK: electric piano grace-note + root (PD engine, 2-note DOWN arp)
     // arpDirection=DOWN with voicing=2 plays 5th → root, giving a piano
     // "grace note landing on root" feel without the climbing blip.
-    override val vibe = generateCompLabVibe(
-        name = "Comp Rock",
-        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
-        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
-        compingOverride = ChordComping(
-            style = CompingStyle.ROCK_DOWNBEATS,
-            sectionInversion = SectionInversion.ROOT_POSITION,
-            arpMode = ArpMode.ALWAYS,
-            arpSpeed = 0.6f,              // audibly rolled grace note, not blip
-            arpDirection = ArpDirection.DOWN,  // lands on root
-            humanization = CompingHumanization(
-                dropProbability = 0.10f,
-                octaveJumpProbability = 0.08f,
-                extensionProbability = 0.10f,
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Rock",
+            chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+            chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
+            compingOverride = ChordComping(
+                style = CompingStyle.ROCK_DOWNBEATS,
+                sectionInversion = SectionInversion.ROOT_POSITION,
+                arpMode = ArpMode.ALWAYS,
+                arpSpeed = 0.6f,              // audibly rolled grace note, not blip
+                arpDirection = ArpDirection.DOWN,  // lands on root
+                humanization = CompingHumanization(
+                    dropProbability = 0.10f,
+                    octaveJumpProbability = 0.08f,
+                    extensionProbability = 0.10f,
+                ),
+                fills = CompingFills(everyNBars = 4, fillType = FillType.ASCENDING_ARP),
             ),
-            fills = CompingFills(everyNBars = 4, fillType = FillType.ASCENDING_ARP),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompFunkVibe : VibeProvider {
+    override val name: String = "Comp Funk"
     // FUNK: clav-like PD root stabs, first inversion (voicing via extensions)
-    override val vibe = generateCompLabVibe(
-        name = "Comp Funk",
-        bpm = 100f,
-        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
-        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
-        compingOverride = ChordComping(
-            style = CompingStyle.FUNK_STABS,
-            sectionInversion = SectionInversion.FIRST_INVERSION,
-            arpMode = ArpMode.NEVER,
-            humanization = CompingHumanization(
-                dropProbability = 0.12f,
-                ghostProbability = 0.15f,
-                octaveJumpProbability = 0.05f,
-                extensionProbability = 0.15f,  // bumped for chord color
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Funk",
+            bpm = 100f,
+            chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+            chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
+            compingOverride = ChordComping(
+                style = CompingStyle.FUNK_STABS,
+                sectionInversion = SectionInversion.FIRST_INVERSION,
+                arpMode = ArpMode.NEVER,
+                humanization = CompingHumanization(
+                    dropProbability = 0.12f,
+                    ghostProbability = 0.15f,
+                    octaveJumpProbability = 0.05f,
+                    extensionProbability = 0.15f,  // bumped for chord color
+                ),
+                fills = CompingFills(everyNBars = 8, fillType = FillType.ASCENDING_ARP, skipProbability = 0.3f),
             ),
-            fills = CompingFills(everyNBars = 8, fillType = FillType.ASCENDING_ARP, skipProbability = 0.3f),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompSkaVibe : VibeProvider {
+    override val name: String = "Comp Ska"
     // SKA: high off-beats, second inversion for brightness, tight stabs
-    override val vibe = generateCompLabVibe(
-        name = "Comp Ska",
-        bpm = 130f,
-        compingOverride = ChordComping(
-            style = CompingStyle.SKA_UPSTROKES,
-            sectionInversion = SectionInversion.SECOND_INVERSION,
-            arpMode = ArpMode.AUTO,
-            arpSpeed = 0.95f,         // almost simultaneous — sharp chord
-            humanization = CompingHumanization(
-                dropProbability = 0.05f,       // ska should stay regular
-                octaveJumpProbability = 0.02f,
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Ska",
+            bpm = 130f,
+            compingOverride = ChordComping(
+                style = CompingStyle.SKA_UPSTROKES,
+                sectionInversion = SectionInversion.SECOND_INVERSION,
+                arpMode = ArpMode.AUTO,
+                arpSpeed = 0.95f,         // almost simultaneous — sharp chord
+                humanization = CompingHumanization(
+                    dropProbability = 0.05f,       // ska should stay regular
+                    octaveJumpProbability = 0.02f,
+                ),
+                fills = CompingFills(everyNBars = 8, fillType = FillType.ASCENDING_ARP, skipProbability = 0.6f),
             ),
-            fills = CompingFills(everyNBars = 8, fillType = FillType.ASCENDING_ARP, skipProbability = 0.6f),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompBluesVibe : VibeProvider {
+    override val name: String = "Comp Blues"
     // BLUES: electric piano root stabs on PD, heavy extensions for blues color
-    override val vibe = generateCompLabVibe(
-        name = "Comp Blues",
-        bpm = 92f,
-        rootNote = RootNote.E,
-        progressionStyle = ProgressionStyle.BLUES,
-        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
-        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
-        compingOverride = ChordComping(
-            style = CompingStyle.BLUES_SHUFFLE,
-            sectionInversion = SectionInversion.OPEN_VOICING,
-            arpMode = ArpMode.NEVER,
-            humanization = CompingHumanization(
-                dropProbability = 0.08f,
-                ghostProbability = 0.20f,
-                extensionProbability = 0.30f,  // heavy blues 7ths/9ths
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Blues",
+            bpm = 92f,
+            rootNote = RootNote.E,
+            progressionStyle = ProgressionStyle.BLUES,
+            chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+            chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
+            compingOverride = ChordComping(
+                style = CompingStyle.BLUES_SHUFFLE,
+                sectionInversion = SectionInversion.OPEN_VOICING,
+                arpMode = ArpMode.NEVER,
+                humanization = CompingHumanization(
+                    dropProbability = 0.08f,
+                    ghostProbability = 0.20f,
+                    extensionProbability = 0.30f,  // heavy blues 7ths/9ths
+                ),
+                fills = CompingFills(everyNBars = 4, fillType = FillType.ASCENDING_ARP),
             ),
-            fills = CompingFills(everyNBars = 4, fillType = FillType.ASCENDING_ARP),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompJazzVibe : VibeProvider {
+    override val name: String = "Comp Jazz"
     // JAZZ: PD piano root stabs, busy altered-tone comping via extensions
-    override val vibe = generateCompLabVibe(
-        name = "Comp Jazz",
-        bpm = 105f,
-        progressionStyle = ProgressionStyle.JAZZ,
-        scaleType = ScaleType.MINOR_PENTATONIC,
-        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
-        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
-        compingOverride = ChordComping(
-            style = CompingStyle.JAZZ_COMP,
-            sectionInversion = SectionInversion.OPEN_VOICING,
-            arpMode = ArpMode.NEVER,
-            humanization = CompingHumanization(
-                dropProbability = 0.15f,
-                ghostProbability = 0.18f,
-                octaveJumpProbability = 0.10f,
-                extensionProbability = 0.35f,  // tons of altered tones
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Jazz",
+            bpm = 105f,
+            progressionStyle = ProgressionStyle.JAZZ,
+            scaleType = ScaleType.MINOR_PENTATONIC,
+            chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+            chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
+            compingOverride = ChordComping(
+                style = CompingStyle.JAZZ_COMP,
+                sectionInversion = SectionInversion.OPEN_VOICING,
+                arpMode = ArpMode.NEVER,
+                humanization = CompingHumanization(
+                    dropProbability = 0.15f,
+                    ghostProbability = 0.18f,
+                    octaveJumpProbability = 0.10f,
+                    extensionProbability = 0.35f,  // tons of altered tones
+                ),
+                fills = CompingFills(everyNBars = 4, fillType = FillType.ASCENDING_ARP, skipProbability = 0.2f),
             ),
-            fills = CompingFills(everyNBars = 4, fillType = FillType.ASCENDING_ARP, skipProbability = 0.2f),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompReggaeVibe : VibeProvider {
+    override val name: String = "Comp Reggae"
     // REGGAE: skank on 2 and 4, second inversion for upper-register punch
-    override val vibe = generateCompLabVibe(
-        name = "Comp Reggae",
-        bpm = 78f,
-        rootNote = RootNote.A,
-        compingOverride = ChordComping(
-            style = CompingStyle.REGGAE_SKANK,
-            sectionInversion = SectionInversion.SECOND_INVERSION,
-            arpMode = ArpMode.AUTO,
-            arpSpeed = 0.95f,         // tight, simultaneous stab
-            humanization = CompingHumanization(
-                dropProbability = 0.04f,
-                octaveJumpProbability = 0.03f,
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Reggae",
+            bpm = 78f,
+            rootNote = RootNote.A,
+            compingOverride = ChordComping(
+                style = CompingStyle.REGGAE_SKANK,
+                sectionInversion = SectionInversion.SECOND_INVERSION,
+                arpMode = ArpMode.AUTO,
+                arpSpeed = 0.95f,         // tight, simultaneous stab
+                humanization = CompingHumanization(
+                    dropProbability = 0.04f,
+                    octaveJumpProbability = 0.03f,
+                ),
+                fills = CompingFills(everyNBars = 16, fillType = FillType.ASCENDING_ARP, skipProbability = 0.7f),
             ),
-            fills = CompingFills(everyNBars = 16, fillType = FillType.ASCENDING_ARP, skipProbability = 0.7f),
-        ),
     )
+    }
 }
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
 class CompGospelVibe : VibeProvider {
+    override val name: String = "Comp Gospel"
     // GOSPEL: gospel piano root stabs on PD, dense 8ths, chord color via extensions
-    override val vibe = generateCompLabVibe(
-        name = "Comp Gospel",
-        bpm = 96f,
-        rootNote = RootNote.G,
-        chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
-        chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
-        compingOverride = ChordComping(
-            style = CompingStyle.GOSPEL_STABS,
-            sectionInversion = SectionInversion.FIRST_INVERSION,
-            arpMode = ArpMode.NEVER,
-            humanization = CompingHumanization(
-                dropProbability = 0.08f,
-                ghostProbability = 0.15f,
-                extensionProbability = 0.25f,  // gospel 9ths
+    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+        generateCompLabVibe(
+            name = "Comp Gospel",
+            bpm = 96f,
+            rootNote = RootNote.G,
+            chordEngineEdm = OrpheusEngineId.PHASE_DISTORTION,
+            chordEngineSpace = OrpheusEngineId.PHASE_DISTORTION,
+            compingOverride = ChordComping(
+                style = CompingStyle.GOSPEL_STABS,
+                sectionInversion = SectionInversion.FIRST_INVERSION,
+                arpMode = ArpMode.NEVER,
+                humanization = CompingHumanization(
+                    dropProbability = 0.08f,
+                    ghostProbability = 0.15f,
+                    extensionProbability = 0.25f,  // gospel 9ths
+                ),
+                fills = CompingFills(everyNBars = 2, fillType = FillType.ASCENDING_ARP, skipProbability = 0.4f),
             ),
-            fills = CompingFills(everyNBars = 2, fillType = FillType.ASCENDING_ARP, skipProbability = 0.4f),
-        ),
     )
+    }
 }
 
  */

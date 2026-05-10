@@ -103,9 +103,11 @@ class PulsarBpmSyncTest {
     ): PulsarViewModel {
         val dispatchers = TestDispatcherProvider(testDispatcher)
         val portRegistry = PortRegistry(emptySet())
+        val engine = StubSynthEngine()
+        val appScope = makeAppCoroutineScope(testDispatcher)
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = StubSynthEngine(),
+            synthEngine = engine,
             globalTempo = globalTempo,
             appPreferencesRepository = StubPreferences(),
             presetLoader = PresetLoader(portRegistry, globalTempo, controller),
@@ -113,6 +115,7 @@ class PulsarBpmSyncTest {
             scope = scope,
             vibeProviders = setOf(StubVibeProvider()),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
+            songEndingPreferences = StubSongEndingPreferences(),
         )
     }
 
@@ -241,8 +244,9 @@ class PulsarBpmSyncTest {
 // don't exercise return zero/no-op.
 
 private class StubVibeProvider : VibeProvider {
+    override val name: String = "Test"
     override val vibe: Vibe = Vibe(
-        name = "Test",
+        name = name,
         bpm = 120f,
         rootNote = RootNote.C,
         scaleType = ScaleType.MINOR,

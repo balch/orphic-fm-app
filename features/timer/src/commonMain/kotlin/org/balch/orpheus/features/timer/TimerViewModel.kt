@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import org.balch.orpheus.core.audio.MasterVolumeRamp
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
@@ -89,6 +90,7 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class TimerViewModel(
     private val synthEngine: SynthEngine,
+    private val masterVolumeRamp: MasterVolumeRamp,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val widgetNotifier: TimerWidgetNotifier,

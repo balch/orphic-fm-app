@@ -247,6 +247,7 @@ fun PulsarPanel(
                     )
                 }
             }
+
         }
 
         // Row 2: Knobs flanking the step grid
@@ -370,7 +371,7 @@ fun PulsarPanel(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HorizontalRotaryKnob(
@@ -406,6 +407,27 @@ fun PulsarPanel(
                 labelSide = LabelSide.START,
                 valueFormatter = null,
             )
+
+            // Auto-end songs toggle: compact ENDS pill on this row so the
+            // top-row selectors always fit regardless of vibe-name length.
+            val songEndingEnabled by actions.songEndingEnabled.collectAsState()
+            Box(
+                modifier = Modifier
+                    .clickable { actions.onSetSongEndingEnabled(!songEndingEnabled) }
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    modifier = Modifier.width(42.dp),                    text = if (songEndingEnabled) "ENDS" else "PLAYS",
+                    color = OrpheusColors.cosmicPurple,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
         }
 
         // Row 4: Big macro knobs

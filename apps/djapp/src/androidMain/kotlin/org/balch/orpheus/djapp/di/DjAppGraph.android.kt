@@ -14,6 +14,8 @@ import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.lifecycle.DjAppLifecycleManager
 import org.balch.orpheus.features.pulsar.playback.PulsarPlaybackBridge
+import org.balch.orpheus.features.pulsar.playback.PulsarSongAdvancer
+import org.balch.orpheus.features.pulsar.playback.PulsarSongEnding
 
 @DependencyGraph(AppScope::class)
 actual interface DjAppGraph : ViewModelGraph {
@@ -31,6 +33,12 @@ actual interface DjAppGraph : ViewModelGraph {
 
     /** Eagerly initialized to observe PlaybackController state and drive Pulsar effects. */
     val pulsarPlaybackBridge: PulsarPlaybackBridge
+
+    /** Eagerly initialized so its init {} collectors observe playback/arrangement at startup. */
+    val pulsarSongEnding: PulsarSongEnding
+
+    /** Eagerly initialized so its init {} collector subscribes to songEndingEvents at startup. */
+    val pulsarSongAdvancer: PulsarSongAdvancer
 
     @DependencyGraph.Factory
     fun interface Factory {

@@ -155,6 +155,12 @@ data class Section(
  * @param introIndex Which section to start with (default 0; pass null for random weighted choice).
  * @param outroIndex Which section ends the arrangement (null = loops forever).
  * @param defaultSectionBars Default bar count if a section doesn't specify.
+ * @param minVibeSeconds Earliest playing-time at which the auto-end probability
+ *   can begin rolling. Below this the song never ends. Default 150 (2:30).
+ * @param maxVibeSeconds Playing-time at which auto-end is forced to fire on the
+ *   next bar. Default 300 (5:00). Must be in `minVibeSeconds..1800`.
+ * @param endStyle Master-volume tail across the final section. See [EndStyle].
+ *   Default ABRUPT.
  */
 @Serializable
 data class Arrangement(
@@ -162,10 +168,19 @@ data class Arrangement(
     val introIndex: Int? = 0,
     val outroIndex: Int? = null,
     val defaultSectionBars: Int = 8,
+    val minVibeSeconds: Int = 150,
+    val maxVibeSeconds: Int = 300,
+    val endStyle: EndStyle = EndStyle.ABRUPT,
 ) {
     init {
         require(sections.size <= MAX_SECTIONS) {
             "Arrangement sections size ${sections.size} exceeds MAX_SECTIONS=$MAX_SECTIONS"
+        }
+        require(minVibeSeconds in 30..1800) {
+            "Arrangement.minVibeSeconds must be 30..1800, got $minVibeSeconds"
+        }
+        require(maxVibeSeconds in minVibeSeconds..1800) {
+            "Arrangement.maxVibeSeconds must be in $minVibeSeconds..1800, got $maxVibeSeconds"
         }
     }
 

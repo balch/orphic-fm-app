@@ -8,6 +8,8 @@ import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.pulsar.playback.PulsarPlaybackBridge
+import org.balch.orpheus.features.pulsar.playback.PulsarSongAdvancer
+import org.balch.orpheus.features.pulsar.playback.PulsarSongEnding
 
 /**
  * JVM implementation of DjAppGraph.
@@ -33,6 +35,12 @@ actual interface DjAppGraph : ViewModelGraph {
 
     /** Eagerly touched in main.kt so its init {} collector subscribes at startup. */
     val pulsarPlaybackBridge: PulsarPlaybackBridge
+
+    /** Eagerly touched in main.kt so its init {} collectors observe playback/arrangement at startup. */
+    val pulsarSongEnding: PulsarSongEnding
+
+    /** Eagerly touched in main.kt so its init {} collector subscribes to songEndingEvents at startup. */
+    val pulsarSongAdvancer: PulsarSongAdvancer
 
     @DependencyGraph.Factory
     fun interface Factory {

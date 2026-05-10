@@ -459,6 +459,7 @@ enum class PulsarSymbol(
     ARRANGEMENT_SECTION_COUNT("arrangement_section_count"),
     ARRANGEMENT_INTRO_INDEX("arrangement_intro_index"),
     ARRANGEMENT_OUTRO_INDEX("arrangement_outro_index"),
+    ARRANGEMENT_OUTRO_REQUEST("arrangement_outro_request"),
     SECTION_DATA_START("section_data_start"),
     SECTION_TRANSITIONS_START("section_transitions_start"),
     TRACK_SOLO_BEHAVIOR_START("track_solo_behavior_start"),

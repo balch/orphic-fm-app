@@ -12,6 +12,8 @@ data class AppPreferences(
     val selectedAiModel: String? = null,
     /** Per-panel signal visualization toggle (disabled by default). */
     val signalVizEnabled: Boolean = false,
+    /** Master switch for Pulsar song-ending behavior (auto-end + advance). */
+    val pulsarSongEndingEnabled: Boolean = true,
     /** Serialized DJ UI state JSON for cross-session persistence. */
     val lastDjJson: String? = null,
     /** Serialized Pulsar UI state JSON for cross-session persistence. */

@@ -28,6 +28,20 @@ enum class EnvelopeType(val modeIndex: Int) {
     BLEND(2),
 }
 
+/**
+ * Shape of the master-volume tail across the final section when a song ends.
+ * @param rampBars Number of bars over which master volume ramps 1.0→0.0 at the
+ *   end of the final section. 0 = hard cut at the section boundary.
+ *   The fade always plays the LAST `rampBars` bars of the outro, leaving the
+ *   earlier bars at full volume so the listener registers the outro before
+ *   it dissolves.
+ */
+enum class EndStyle(val rampBars: Float) {
+    ABRUPT(0f),
+    FADE_FAST(.25f),
+    FADE_SLOW(1f),
+}
+
 enum class ScaleType(val scaleIndex: Int) {
     MINOR(0),
     MAJOR(1),

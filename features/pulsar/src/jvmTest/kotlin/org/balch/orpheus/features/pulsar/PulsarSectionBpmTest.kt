@@ -91,9 +91,11 @@ class PulsarSectionBpmTest {
             )
         }
         val portRegistry = PortRegistry(emptySet())
+        val engine = ArrangementStubEngine(arrangementFlow)
+        val appScope = makeAppCoroutineScope(testDispatcher)
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = ArrangementStubEngine(arrangementFlow),
+            synthEngine = engine,
             globalTempo = globalTempo,
             appPreferencesRepository = StubPrefs(),
             presetLoader = PresetLoader(portRegistry, globalTempo, controller),
@@ -101,6 +103,7 @@ class PulsarSectionBpmTest {
             scope = FeatureCoroutineScope(),
             vibeProviders = setOf(SectionedVibeProvider(vibe)),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
+            songEndingPreferences = StubSongEndingPreferences(),
         )
     }
 
@@ -212,7 +215,9 @@ private fun sectionedVibe(bpm: Float, mults: List<Float>): Vibe {
     )
 }
 
-private class SectionedVibeProvider(override val vibe: Vibe) : VibeProvider
+private class SectionedVibeProvider(override val vibe: Vibe) : VibeProvider {
+    override val name: String get() = vibe.name
+}
 
 private class StubAudioEngine : AudioEngine {
     override fun start() {}

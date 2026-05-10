@@ -1011,6 +1011,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_arrangement_intro_index.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "arrangement_outro_index") == 0)
             engine->pulsar_arrangement_outro_index.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "arrangement_outro_request") == 0)
+            engine->pulsar_arrangement_outro_request.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strncmp(symbol, "section_data_", 13) == 0) {
             int idx = std::atoi(symbol + 13);
             if (idx >= 0 && idx < 8 * 21)

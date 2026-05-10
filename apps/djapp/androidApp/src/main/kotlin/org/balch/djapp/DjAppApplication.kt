@@ -30,6 +30,15 @@ class DjAppApplication : Application() {
         // state and StopAll events from app launch. Decoupled from PulsarViewModel
         // to break the DI cycle that would otherwise stack-overflow Metro.
         graph.pulsarPlaybackBridge
+
+        // Eagerly initialize PulsarSongEnding so its init {} collectors observe
+        // playback state, the arrangement state flow, and the active vibe at
+        // startup. Same decoupling reason as PulsarPlaybackBridge.
+        graph.pulsarSongEnding
+
+        // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
+        // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
+        graph.pulsarSongAdvancer
     }
 
     companion object {
