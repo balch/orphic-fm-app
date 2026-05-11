@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
@@ -12,7 +13,6 @@ import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
-import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
@@ -82,6 +82,7 @@ class TremoloTideVibe : VibeProvider {
 
         Vibe(
             name = name,
+            album = Album.STEALTH,
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,  // long pads need TIDES tail; drums need AD attack
             rootNote = RootNote.B,
@@ -249,15 +250,22 @@ class TremoloTideVibe : VibeProvider {
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
-                // 4: tremolo lead — the iconic clean guitar voice. Plays the lick.
-                //    DX2 in EDM slot for plaintive bell-like attack;
-                //    WTB in space slot for darker shimmer when energy is low.
+                // 4: tremolo lead — the iconic surf-noir voice. Plays the lick.
+                //    EDM = DX2 idx 18 "Vibe 1" (electric vibraphone — plaintive,
+                //      bell-like, the closest FM-bank match to a tremolo'd clean guitar
+                //      sustained tone). Space = DX3 idx 19 "Etherial5a" (evolving pad
+                //      for the darker shimmer when energy drops).
+                //    Both slots opt in to harmonicsMacroRange = 0.04f so the section
+                //    macroOverrides automatically walk the lead voice: the chorus
+                //    mood × 1.30 nudges up to Glockenspl / Airy territory; the
+                //    breakdown mood × 0.85 nudges down to Marimba / Mal Poly.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX,
+                    engineId = OrpheusEngineId.DX2,
                     volume = 0.25f,
                     morph = .74f,
                     timbre = .67f,
-                    harmonics = 0.35f,
+                    harmonics = 0.551f,             // DX2 idx 18 "Vibe 1" — base
+                    harmonicsMacroRange = 0.04f,    // mood walks ±~1 patch around base
                     noteRangeLow = 55,
                     noteRangeHigh = 76,
                     holdProbability = 0.55f,
@@ -270,7 +278,11 @@ class TremoloTideVibe : VibeProvider {
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
-                        engineSpace = lead.copy(engineId = OrpheusEngineId.DX2),
+                        engineSpace = lead.copy(
+                            engineId = OrpheusEngineId.DX3,
+                            harmonics = 0.582f,         // DX3 idx 19 "Etherial5a"
+                            harmonicsMacroRange = 0.04f,// Mal Poly ↔ Etherial5a ↔ Airy
+                        ),
                         role = TrackRole.Melodic(lickMode = LickMode.Fill),
                         pan = 0.15f,
                         density = 0.20f,
@@ -332,7 +344,11 @@ class TremoloTideVibe : VibeProvider {
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
-                // 6: counter-pad (strings) — provides motion above the ensemble bed.
+                // 6: counter-pad (strings) — sustained background wash, NOT a melody
+                // doubler. Removed lickMode = Fill so the strings don't shadow the
+                // track 4 lead lick; instead they hang on long-held notes from the
+                // generated pattern, contributing the cathedral atmosphere rather
+                // than competing for the melodic foreground.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.STR,
                     volume = 0.42f,
@@ -353,7 +369,7 @@ class TremoloTideVibe : VibeProvider {
                     TrackVoice(
                         engineEdm = strings,
                         engineSpace = strings,
-                        role = TrackRole.Melodic(lickMode = LickMode.Fill),
+                        role = TrackRole.Melodic(),  // was lickMode = Fill — see comment above
                         pan = 0.30f,
                         density = 0.12f,
                         envelopeProfile = EnvelopeProfile.EFFECT,
@@ -361,7 +377,11 @@ class TremoloTideVibe : VibeProvider {
                         barStrategy = BarStrategy.INDEPENDENT,
                     )
                 },
-                // 7: resonant accent (modal) — sparse rings/pings for chorus accents.
+                // 7: resonant accent (modal) — sparse rings/pings, NOT a rhythm comp.
+                // Was REGGAE_SKANK (wrong genre for surf-noir — skanks are upbeat off-
+                // beat strums); switched to TrackRole.Melodic with very low density so
+                // the resonator fires occasional bell-like accents in its high register
+                // rather than driving a rhythmic pattern.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.MOD,
                     volume = 0.25f,
@@ -384,26 +404,12 @@ class TremoloTideVibe : VibeProvider {
                     TrackVoice(
                         engineEdm = accent,
                         engineSpace = accent,
-                        role = TrackRole.Chordal(
-                            chordFollow = ChordFollow.ROOT_ONLY,
-                            comping = ChordComping(
-                                style = CompingStyle.REGGAE_SKANK,
-                                fills = CompingFills(
-                                    everyNBars = 8,
-                                    skipProbability = .25f,
-                                    fillType = FillType.TURNAROUND
-                                ),
-                                humanization = CompingHumanization(
-                                    dropProbability = .05f,
-                                    ghostProbability = .2f,
-                                    octaveJumpProbability = .05f,
-                                    extensionProbability = .05f,
-                                )
-                            )
-                        ),
+                        role = TrackRole.Melodic(chordFollow = ChordFollow.FIXED),
                         pan = 0.00f,
+                        density = 0.08f,  // very sparse — occasional ring/ping
                         envelopeProfile = EnvelopeProfile.DRONE,
                         macroMap = TrackMacroMap.WILD,
+                        barStrategy = BarStrategy.INDEPENDENT,
                     )
                 },
             ),

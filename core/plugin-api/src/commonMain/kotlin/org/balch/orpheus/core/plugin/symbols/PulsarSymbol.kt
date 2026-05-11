@@ -98,6 +98,65 @@ enum class PulsarSymbol(
     TRACK_6_MORPH("track_6_morph"),
     TRACK_7_MORPH("track_7_morph"),
 
+    // Per-track pin flags: HARMONICS (8 entries, EDM slot)
+    TRACK_0_PIN_HARMONICS("track_0_pin_harmonics"),
+    TRACK_1_PIN_HARMONICS("track_1_pin_harmonics"),
+    TRACK_2_PIN_HARMONICS("track_2_pin_harmonics"),
+    TRACK_3_PIN_HARMONICS("track_3_pin_harmonics"),
+    TRACK_4_PIN_HARMONICS("track_4_pin_harmonics"),
+    TRACK_5_PIN_HARMONICS("track_5_pin_harmonics"),
+    TRACK_6_PIN_HARMONICS("track_6_pin_harmonics"),
+    TRACK_7_PIN_HARMONICS("track_7_pin_harmonics"),
+
+    // Per-track pin flags: TIMBRE (8 entries, EDM slot)
+    TRACK_0_PIN_TIMBRE("track_0_pin_timbre"),
+    TRACK_1_PIN_TIMBRE("track_1_pin_timbre"),
+    TRACK_2_PIN_TIMBRE("track_2_pin_timbre"),
+    TRACK_3_PIN_TIMBRE("track_3_pin_timbre"),
+    TRACK_4_PIN_TIMBRE("track_4_pin_timbre"),
+    TRACK_5_PIN_TIMBRE("track_5_pin_timbre"),
+    TRACK_6_PIN_TIMBRE("track_6_pin_timbre"),
+    TRACK_7_PIN_TIMBRE("track_7_pin_timbre"),
+
+    // Per-track pin flags: MORPH (8 entries, EDM slot)
+    TRACK_0_PIN_MORPH("track_0_pin_morph"),
+    TRACK_1_PIN_MORPH("track_1_pin_morph"),
+    TRACK_2_PIN_MORPH("track_2_pin_morph"),
+    TRACK_3_PIN_MORPH("track_3_pin_morph"),
+    TRACK_4_PIN_MORPH("track_4_pin_morph"),
+    TRACK_5_PIN_MORPH("track_5_pin_morph"),
+    TRACK_6_PIN_MORPH("track_6_pin_morph"),
+    TRACK_7_PIN_MORPH("track_7_pin_morph"),
+
+    // Per-track bounded LFO swing on pinned harmonics (8 entries, EDM slot)
+    TRACK_0_HARMONICS_MODULATION("track_0_harmonics_modulation"),
+    TRACK_1_HARMONICS_MODULATION("track_1_harmonics_modulation"),
+    TRACK_2_HARMONICS_MODULATION("track_2_harmonics_modulation"),
+    TRACK_3_HARMONICS_MODULATION("track_3_harmonics_modulation"),
+    TRACK_4_HARMONICS_MODULATION("track_4_harmonics_modulation"),
+    TRACK_5_HARMONICS_MODULATION("track_5_harmonics_modulation"),
+    TRACK_6_HARMONICS_MODULATION("track_6_harmonics_modulation"),
+    TRACK_7_HARMONICS_MODULATION("track_7_harmonics_modulation"),
+
+    // Per-track macro-driven DX patch walk (8 entries × 2 fields, EDM slot)
+    TRACK_0_HARMONICS_MACRO_SOURCE("track_0_harmonics_macro_source"),
+    TRACK_1_HARMONICS_MACRO_SOURCE("track_1_harmonics_macro_source"),
+    TRACK_2_HARMONICS_MACRO_SOURCE("track_2_harmonics_macro_source"),
+    TRACK_3_HARMONICS_MACRO_SOURCE("track_3_harmonics_macro_source"),
+    TRACK_4_HARMONICS_MACRO_SOURCE("track_4_harmonics_macro_source"),
+    TRACK_5_HARMONICS_MACRO_SOURCE("track_5_harmonics_macro_source"),
+    TRACK_6_HARMONICS_MACRO_SOURCE("track_6_harmonics_macro_source"),
+    TRACK_7_HARMONICS_MACRO_SOURCE("track_7_harmonics_macro_source"),
+
+    TRACK_0_HARMONICS_MACRO_RANGE("track_0_harmonics_macro_range"),
+    TRACK_1_HARMONICS_MACRO_RANGE("track_1_harmonics_macro_range"),
+    TRACK_2_HARMONICS_MACRO_RANGE("track_2_harmonics_macro_range"),
+    TRACK_3_HARMONICS_MACRO_RANGE("track_3_harmonics_macro_range"),
+    TRACK_4_HARMONICS_MACRO_RANGE("track_4_harmonics_macro_range"),
+    TRACK_5_HARMONICS_MACRO_RANGE("track_5_harmonics_macro_range"),
+    TRACK_6_HARMONICS_MACRO_RANGE("track_6_harmonics_macro_range"),
+    TRACK_7_HARMONICS_MACRO_RANGE("track_7_harmonics_macro_range"),
+
     // Per-track voice params: ENVELOPE (8 entries)
     TRACK_0_ENVELOPE("track_0_envelope"),
     TRACK_1_ENVELOPE("track_1_envelope"),
@@ -844,6 +903,65 @@ enum class PulsarSymbol(
     TRACK_5_MORPH_SPACE("track_5_morph_space"),
     TRACK_6_MORPH_SPACE("track_6_morph_space"),
     TRACK_7_MORPH_SPACE("track_7_morph_space"),
+
+    // Per-track pin flags: HARMONICS (8 entries, Space slot)
+    TRACK_0_PIN_HARMONICS_SPACE("track_0_pin_harmonics_space"),
+    TRACK_1_PIN_HARMONICS_SPACE("track_1_pin_harmonics_space"),
+    TRACK_2_PIN_HARMONICS_SPACE("track_2_pin_harmonics_space"),
+    TRACK_3_PIN_HARMONICS_SPACE("track_3_pin_harmonics_space"),
+    TRACK_4_PIN_HARMONICS_SPACE("track_4_pin_harmonics_space"),
+    TRACK_5_PIN_HARMONICS_SPACE("track_5_pin_harmonics_space"),
+    TRACK_6_PIN_HARMONICS_SPACE("track_6_pin_harmonics_space"),
+    TRACK_7_PIN_HARMONICS_SPACE("track_7_pin_harmonics_space"),
+
+    // Per-track pin flags: TIMBRE (8 entries, Space slot)
+    TRACK_0_PIN_TIMBRE_SPACE("track_0_pin_timbre_space"),
+    TRACK_1_PIN_TIMBRE_SPACE("track_1_pin_timbre_space"),
+    TRACK_2_PIN_TIMBRE_SPACE("track_2_pin_timbre_space"),
+    TRACK_3_PIN_TIMBRE_SPACE("track_3_pin_timbre_space"),
+    TRACK_4_PIN_TIMBRE_SPACE("track_4_pin_timbre_space"),
+    TRACK_5_PIN_TIMBRE_SPACE("track_5_pin_timbre_space"),
+    TRACK_6_PIN_TIMBRE_SPACE("track_6_pin_timbre_space"),
+    TRACK_7_PIN_TIMBRE_SPACE("track_7_pin_timbre_space"),
+
+    // Per-track pin flags: MORPH (8 entries, Space slot)
+    TRACK_0_PIN_MORPH_SPACE("track_0_pin_morph_space"),
+    TRACK_1_PIN_MORPH_SPACE("track_1_pin_morph_space"),
+    TRACK_2_PIN_MORPH_SPACE("track_2_pin_morph_space"),
+    TRACK_3_PIN_MORPH_SPACE("track_3_pin_morph_space"),
+    TRACK_4_PIN_MORPH_SPACE("track_4_pin_morph_space"),
+    TRACK_5_PIN_MORPH_SPACE("track_5_pin_morph_space"),
+    TRACK_6_PIN_MORPH_SPACE("track_6_pin_morph_space"),
+    TRACK_7_PIN_MORPH_SPACE("track_7_pin_morph_space"),
+
+    // Per-track bounded LFO swing on pinned harmonics (8 entries, Space slot)
+    TRACK_0_HARMONICS_MODULATION_SPACE("track_0_harmonics_modulation_space"),
+    TRACK_1_HARMONICS_MODULATION_SPACE("track_1_harmonics_modulation_space"),
+    TRACK_2_HARMONICS_MODULATION_SPACE("track_2_harmonics_modulation_space"),
+    TRACK_3_HARMONICS_MODULATION_SPACE("track_3_harmonics_modulation_space"),
+    TRACK_4_HARMONICS_MODULATION_SPACE("track_4_harmonics_modulation_space"),
+    TRACK_5_HARMONICS_MODULATION_SPACE("track_5_harmonics_modulation_space"),
+    TRACK_6_HARMONICS_MODULATION_SPACE("track_6_harmonics_modulation_space"),
+    TRACK_7_HARMONICS_MODULATION_SPACE("track_7_harmonics_modulation_space"),
+
+    // Per-track macro-driven DX patch walk (8 entries × 2 fields, Space slot)
+    TRACK_0_HARMONICS_MACRO_SOURCE_SPACE("track_0_harmonics_macro_source_space"),
+    TRACK_1_HARMONICS_MACRO_SOURCE_SPACE("track_1_harmonics_macro_source_space"),
+    TRACK_2_HARMONICS_MACRO_SOURCE_SPACE("track_2_harmonics_macro_source_space"),
+    TRACK_3_HARMONICS_MACRO_SOURCE_SPACE("track_3_harmonics_macro_source_space"),
+    TRACK_4_HARMONICS_MACRO_SOURCE_SPACE("track_4_harmonics_macro_source_space"),
+    TRACK_5_HARMONICS_MACRO_SOURCE_SPACE("track_5_harmonics_macro_source_space"),
+    TRACK_6_HARMONICS_MACRO_SOURCE_SPACE("track_6_harmonics_macro_source_space"),
+    TRACK_7_HARMONICS_MACRO_SOURCE_SPACE("track_7_harmonics_macro_source_space"),
+
+    TRACK_0_HARMONICS_MACRO_RANGE_SPACE("track_0_harmonics_macro_range_space"),
+    TRACK_1_HARMONICS_MACRO_RANGE_SPACE("track_1_harmonics_macro_range_space"),
+    TRACK_2_HARMONICS_MACRO_RANGE_SPACE("track_2_harmonics_macro_range_space"),
+    TRACK_3_HARMONICS_MACRO_RANGE_SPACE("track_3_harmonics_macro_range_space"),
+    TRACK_4_HARMONICS_MACRO_RANGE_SPACE("track_4_harmonics_macro_range_space"),
+    TRACK_5_HARMONICS_MACRO_RANGE_SPACE("track_5_harmonics_macro_range_space"),
+    TRACK_6_HARMONICS_MACRO_RANGE_SPACE("track_6_harmonics_macro_range_space"),
+    TRACK_7_HARMONICS_MACRO_RANGE_SPACE("track_7_harmonics_macro_range_space"),
 
     TRACK_0_MOD_LFO_RATE_SPACE("track_0_mod_lfo_rate_space"),
     TRACK_1_MOD_LFO_RATE_SPACE("track_1_mod_lfo_rate_space"),

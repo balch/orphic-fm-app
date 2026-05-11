@@ -24,6 +24,7 @@ import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -60,10 +61,11 @@ import org.balch.orpheus.features.pulsar.models.row
 class VelvetLeashVibe : VibeProvider {
     override val name: String = "Velvet Leash"
 
-    // VERSE: i — VII — VI — V walkdown (F#m → E → D → C#)
-    // Two bars per chord matches the intro tab phrasing: F#m×2, E×2, D×2, C#×2.
-    private val verseProgression = chords(0, 0, 6, 6, 5, 5, 4, 4)
-    private val verseChordsPerBar = 1
+    // VERSE: i — VII — VI — V walkdown (F#m → E → D → C#).
+    // One chord per musical bar — the marimba lick replays every bar, transposed
+    // by the active chord, so the walkdown is heard in the melody itself.
+    private val verseProgression = chords(0, 6, 5, 4)
+    private val verseChordsPerBar = 2
 
     // CHORUS: i — iv — i — V (F#m → Bm → F#m → C#)
     // Pushes off the IV/iv for the lift, then the V sets up the verse return.
@@ -94,10 +96,11 @@ class VelvetLeashVibe : VibeProvider {
                     barsMax = 2,
                 )
             ),
-            // 1: verse — full band on the i—VII—VI—V walkdown
+            // 1: verse — full band on the i—VII—VI—V walkdown.
+            //    4 pattern bars = 8 musical bars = 2 walkdown cycles (standard pop verse).
             Section(
                 name = "verse",
-                barsMin = 8, barsMax = 8,
+                barsMin = 4, barsMax = 4,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.55f),
                     SectionTransition(targetIndex = 3, weight = 0.30f),
@@ -121,10 +124,11 @@ class VelvetLeashVibe : VibeProvider {
                 customProgression = chorusProgression,
                 chordsPerBar = chorusChordsPerBar,
             ),
-            // 3: solo — band trades over the walkdown
+            // 3: solo — band trades over the walkdown.
+            //    4–8 pattern bars = 8–16 musical bars = 2–4 walkdown cycles.
             Section(
                 name = "solo",
-                barsMin = 8, barsMax = 16,
+                barsMin = 4, barsMax = 8,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.50f),
                     SectionTransition(targetIndex = 1, weight = 0.30f),
@@ -151,7 +155,7 @@ class VelvetLeashVibe : VibeProvider {
                 customProgression = introProgression,
                 chordsPerBar = introChordsPerBar,
             ),
-            // 0: intro — drums + sparse marimba state the hook
+            // 5: outro — restate the hook, fade fast (vibe.endStyle = FADE_FAST)
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 4,
@@ -174,9 +178,9 @@ class VelvetLeashVibe : VibeProvider {
 
     override val vibe by lazy {
         Vibe(
-            name = "Velvet Leash",
+            name = name,
             album = Album.RIF,
-            bpm = 84f,
+            bpm = 96f,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
@@ -185,45 +189,38 @@ class VelvetLeashVibe : VibeProvider {
             ),
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.F_SHARP,
-            scaleType = ScaleType.MINOR_PENTATONIC,
+            scaleType = ScaleType.MINOR,
             // ── THE LICK ──────────────────────────────────────────────────────
-            // 2-bar ascending bass hook, transcribed from the intro guitar tab.
+            // 1-bar mallet figure — replays every musical bar, transposed by the
+            // active chord (ChordFollow.FOLLOW). Over the i—VII—VI—V verse walkdown
+            // it lands on F#m, E, D, C# in sequence — same shape, descending root.
             //
             // Scale-degree map (F# natural minor / MINOR):
             //   0=F#(root)  1=G#(2nd)  2=A(b3)  3=B(4th)  4=C#(5th)  5=D(b6)  6=E(b7)
             //
-            // Bar 1 — ascend root→b3→4th→5th then return to root (over F#m)
-            // Bar 2 — same shape starting on the b7 (over E / bVII chord)
+            // Shape: root → b3 → 4th → 5th → root → root
             lick = Lick(
                 steps = listOf(
-                    // Bar 1: F# — A — B — C# — F# — F#
                     LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),  // F# (root)
                     LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),  // A  (b3)
                     LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.75f),  // B  (4th)
                     LickStep(scaleDegree = 4, duration = 1.0f, velocity = 0.90f),  // C# (5th)
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),  // F# (root)
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.80f),  // F# (root)
-                    // Bar 2: E — G# — A — B — E — E
-                    LickStep(scaleDegree = 6, duration = 1.0f, velocity = 0.80f),  // E  (b7)
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.75f),  // G# (2nd)
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.75f),  // A  (b3)
-                    LickStep(scaleDegree = 3, duration = 1.0f, velocity = 0.85f),  // B  (4th)
-                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.80f),  // E  (b7)
-                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.75f),  // E  (b7)
                 ),
-                loopLength = 16, // 2 bars in 4/4
+                loopLength = 0, // 4 beats of notes, no rest — wraps twice across the 32-step pattern
             ),
-            lickMutation = 0.20f, // Low — the hook should stay recognizable
+            lickMutation = 0.42f,
             band = Band(
                 members = listOf(
                     BandMember(
                         "Drums",
-                        listOf(0, 1, 2, 5),
+                        listOf(0, 1, 2),
                         alwaysActive = true,
                         creativity = 0.20f
                     ),
                     BandMember("Bass", listOf(3), creativity = 0.25f, drag = 0.06f),
-                    BandMember("Marimba", listOf(4), creativity = 0.40f),
+                    BandMember("Marimba", listOf(4, 5), creativity = 0.40f),
                     BandMember("Keys", listOf(6, 7), creativity = 0.35f),
                 ),
                 handoffMatrix = bandMatrix(
@@ -242,9 +239,9 @@ class VelvetLeashVibe : VibeProvider {
                 pullInBarsMin = 2, pullInBarsMax = 4,
                 barsPerLeadMin = 4, barsPerLeadMax = 8,
             ),
-            energy = 0.75f,
+            energy = 0.6f,
             complexity = 0.75f,
-            space = 0.75f,   // Dryish 60s production
+            space = 0.5f,   // Dryish 60s production
             mood = 0.40f,    // Sly / slightly dark — minor key with a smirk
             deep = 0.75f,
             genre = GenreProfile(
@@ -257,7 +254,10 @@ class VelvetLeashVibe : VibeProvider {
                 chordsPerBar = verseChordsPerBar,
                 customProgression = verseProgression,
             ),
-            progressionAnchor = ProgressionAnchor.EVERY_8, // Reset each 8-bar walkdown cycle (2 bars per chord)
+
+            // EVERY_4 resets every 4 patterns = every 16 musical bars (epic loop, lots of room for Markov drift)
+            // EVERY_2 resets every 2 patterns = exactly when the progression naturally cycles (tight, hypnotic — recommended for hook clarity)
+            progressionAnchor = ProgressionAnchor.EVERY_4,
             progressionDriftRange = 0.10f,                  // Tight — the walkdown is the hook
             tracks = listOf(
                 // 0: Kick — laid-back four-on-floor with a slight hold on 1
@@ -325,7 +325,7 @@ class VelvetLeashVibe : VibeProvider {
                         engineEdm = bass,
                         engineSpace = bass.copy(engineId = OrpheusEngineId.STR),
                         role = TrackRole.Melodic(
-                            chordFollow = ChordFollow.FOLLOW,
+                            chordFollow = ChordFollow.ROOT_ONLY,
                         ),
                         pan = 0.00f,
                         density = 0.15f,
@@ -340,7 +340,9 @@ class VelvetLeashVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.78f,
-                    harmonics = 0.54f,
+                    harmonics = 0.4596f,                            // DX2 idx 15 "Clav 3" — base
+                    harmonicsMacroSource = MacroSource.COMPLEXITY,  // busier sections shift mallet character
+                    harmonicsMacroRange = 0.04f,                    // ±~1 patch: Harpsich ↔ Clav 3 ↔ Xylophone
                     timbre = 0.5f,
                     morph = 0.55f,
                     noteRangeLow = 48,
@@ -370,23 +372,30 @@ class VelvetLeashVibe : VibeProvider {
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
-                // 5: Tambourine — 16th-note shimmer, the 60s production fingerprint
+                // 5: Tambourine — PAR (Particle) engine locked into its grains zone.
+                // PAR interpolates between a noise side (low h/t/m) and a grains side
+                // (high h, mid t, high m). We pin all three so the engine stays
+                // explicitly grain-y; the macros never push it into the noise region.
+                // No LFO needed — the rhythmic motion comes from BarStrategy.MUTATE.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PAR,
                     volume = 0.45f,
-                    morph = 1f,
-                    timbre = .61f,
-                    harmonics = .67f,
+                    harmonics = 1.0f,
+                    pinHarmonics = true,
+                    timbre = 0.5f,
+                    pinTimbre = true,
+                    morph = 1.0f,
+                    pinMorph = true,
                     reverbSend = 0.25f,
                     reverbBrightness = 0.75f, // Bright shimmer
                 ).let { tambourine ->
                     TrackVoice(
                         engineEdm = tambourine,
                         engineSpace = tambourine,
-                        role = TrackRole.Percussive,
+                        role = TrackRole.Chordal(chordFollow = ChordFollow.ROOT_ONLY),
                         pan = -0.25f,
-                        density = 0.55f,
-                        envelopeProfile = EnvelopeProfile.RHYTHM,
+                        density = 0.42f,
+                        envelopeProfile = EnvelopeProfile.EFFECT,
                         macroMap = TrackMacroMap.RHYTHM,
                         barStrategy = BarStrategy.MUTATE,
                     )
@@ -394,17 +403,20 @@ class VelvetLeashVibe : VibeProvider {
                 // 6: Keys — light chord stabs on the downbeats (rock comping)
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
-                    volume = 0.60f,
-                    harmonics = 0.32f,    // DX2 idx 10: Steinway-ish piano
-                    timbre = 0.45f,
-                    morph = 0.40f,
+                    volume = 0.2f,
+                    harmonics = 0.398f,
                     reverbSend = 0.30f,
                     noteRangeLow = 48,
                     noteRangeHigh = 72,
                 ).let { keys ->
                     TrackVoice(
                         engineEdm = keys,
-                        engineSpace = keys.copy(engineId = OrpheusEngineId.CHD),
+                        engineSpace = keys.copy(
+                            volume = .35f,
+                            harmonics = 0.398f,
+                            reverbSend = .7f,
+                            reverbBrightness = .7f,
+                        ),
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
                             comping = ChordComping(

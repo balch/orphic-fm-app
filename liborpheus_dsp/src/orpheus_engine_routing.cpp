@@ -764,6 +764,30 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_morph[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "morph_space") == 0)
                 engine->pulsar_track_morph_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "pin_harmonics") == 0)
+                engine->pulsar_track_pin_harmonics[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "pin_harmonics_space") == 0)
+                engine->pulsar_track_pin_harmonics_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "pin_timbre") == 0)
+                engine->pulsar_track_pin_timbre[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "pin_timbre_space") == 0)
+                engine->pulsar_track_pin_timbre_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "pin_morph") == 0)
+                engine->pulsar_track_pin_morph[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "pin_morph_space") == 0)
+                engine->pulsar_track_pin_morph_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_modulation") == 0)
+                engine->pulsar_track_harmonics_modulation[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_modulation_space") == 0)
+                engine->pulsar_track_harmonics_modulation_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_macro_source") == 0)
+                engine->pulsar_track_harmonics_macro_source[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_macro_source_space") == 0)
+                engine->pulsar_track_harmonics_macro_source_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_macro_range") == 0)
+                engine->pulsar_track_harmonics_macro_range[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_macro_range_space") == 0)
+                engine->pulsar_track_harmonics_macro_range_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "envelope") == 0)
                 engine->pulsar_track_envelope[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "role") == 0)

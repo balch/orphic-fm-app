@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
@@ -23,6 +24,7 @@ import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -71,6 +73,7 @@ class ArmyStompVibe : VibeProvider {
 
         Vibe(
             name = name,
+            album = Album.STEALTH,
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.E,
@@ -212,14 +215,16 @@ class ArmyStompVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
                     volume = 0.85f,
-                    harmonics = .05f, // Mooger Low
                     noteRangeLow = 40,
                     noteRangeHigh = 47,  // B2 ceiling — pure bass register
                     reverbBrightness = 0.5f,
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
-                        engineSpace = bass.copy(engineId = OrpheusEngineId.DX),
+                        engineSpace = bass.copy(
+                            engineId = OrpheusEngineId.DX,
+                            harmonics = .306f,
+                        ),
                         role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                         pan = 0.00f,
                         density = 0.40f,
@@ -239,9 +244,10 @@ class ArmyStompVibe : VibeProvider {
                 // idx 31 "Br trumpet" — clean spectral separation but lost the
                 // unified filter-sweep palette that defines the vibe's character.)
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX2, // Fender
+                    engineId = OrpheusEngineId.DX2,
                     volume = 0.60f,
-                    harmonics = .05f,
+                    harmonics = 0.153f,              // DX2 idx 5 "Clav E pno" — base
+                    harmonicsMacroRange = 0.03f,     // tight ±~1: Mark III ↔ Clav E pno ↔ Syn Clav
                     noteRangeLow = 52,
                     noteRangeHigh = 67,
                     reverbBrightness = 0.7f,
@@ -249,7 +255,11 @@ class ArmyStompVibe : VibeProvider {
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
-                        engineSpace = lead.copy(engineId = OrpheusEngineId.DX3), // Hammond
+                        engineSpace = lead.copy(
+                            engineId = OrpheusEngineId.DX3,
+                            harmonics = 0.031f,           // DX3 idx 1 "Hammond"
+                            harmonicsMacroRange = 0.03f,  // Click 124 ↔ Hammond ↔ E organ 3 (clamps at idx 0)
+                        ),
                         role = TrackRole.Melodic(lickMode = LickMode.Squash),
                         pan = 0.20f,
                         density = 0.20f,
@@ -331,7 +341,9 @@ class ArmyStompVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.20f,
-                    harmonics = 0.54f,  // DX2 idx 17 = "Marimba" — wooden ring, lower than xylo
+                    harmonics = 0.521f,                             // DX2 idx 17 "Marimba" — base
+                    harmonicsMacroSource = MacroSource.COMPLEXITY,  // busier sections → brighter mallet
+                    harmonicsMacroRange = 0.04f,                    // ±~1: Clav 3 ↔ Marimba ↔ Vibe 1
                     timbre = .5f,
                     morph = .5f,
                     noteRangeLow = 41,

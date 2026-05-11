@@ -76,6 +76,17 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
     val isChordEngine: Boolean
         get() = this in CHORD_ENGINES
 
+    /**
+     * Engine-enforced pinning of `harmonics`. Returns true for engines whose
+     * harmonics parameter is a quantized 32-step patch selector — values cannot
+     * interpolate meaningfully, so the vibe-set value must always be honored
+     * verbatim regardless of `OrpheusEngine.pinHarmonics`.
+     *
+     * Currently the DX-family engines (DX, DX2, DX3 — 6-op FM with sysex banks).
+     */
+    val forcePinHarmonics: Boolean
+        get() = this in DX_PATCH_ENGINES
+
     companion object {
         private val NATIVE_ONLY = setOf(
             VCF, PD, DX,
@@ -90,6 +101,8 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
             TRIPLE_SAW, TRIPLE_SQUARE, TRIPLE_TRIANGLE,
             TRIPLE_SINE, TRIPLE_RING_MOD,
         )
+
+        private val DX_PATCH_ENGINES = setOf(DX, DX2, DX3)
 
         /**
          * Returns the first entry whose [id] equals [id], or null if none match.

@@ -344,17 +344,15 @@ class DogHouseVibe : VibeProvider {
                     )
                 },
                 // Keys: reduced volume + density + REPEAT strategy so chord progression motion
-                // sits behind the drums/bass instead of dominating (restores pre-progression-wiring feel).
-                // OrpheusEngineId.SIX_OP_FM with harmonics=0.33 lands on patch index 10 = "Syn-bass 2" (DX bank
-                // is the bass+analog-synth bank, not E.piano — see references/fm_patches.md).
-                // At volume=0.28 played as Chordal/BLUES_SHUFFLE comping, this synth-bass tone
-                // voices chords with a thick analog-FM character that sits well under the bass.
+                // sits behind the drums/bass instead of dominating. EDM = DX patch 1 "Mooger Low"
+                // (deep analog-y synth-bass, complements the WSH bass). Space = GRN granular for
+                // a textural EDM↔Space crossfade. timbre/morph are macro-driven on both slots.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX,
-                    volume = 0.28f,
-                    harmonics = 0.33f,  // DX bank idx 10 = "Syn-bass 2" — synth-bass voicing chords
-                    timbre = 0.32f,     // modulator index — not too bright for blues
-                    morph = 0.31f,      // less feedback, cleaner attack
+                    volume = 0.20f,
+                    harmonics = 0.551f,          // DX idx 18 "Spiral" — base patch
+                    harmonicsMacroRange = 0.10f, // mood knob walks ±~3 patches around base
+                    // harmonicsMacroSource defaults to MOOD (matches pre-pin behavior)
                     noteRangeLow = 45,
                     noteRangeHigh = 65,
                     reverbBrightness = 0.5f,
@@ -364,7 +362,13 @@ class DogHouseVibe : VibeProvider {
                 ).let { keys ->
                     TrackVoice(
                         engineEdm = keys,
-                        engineSpace = keys.copy(engineId = OrpheusEngineId.GRN),
+                        engineSpace = keys.copy(
+                            engineId = OrpheusEngineId.GRN,
+                            reverbBrightness = 0.8f,
+                            delayFeedback = .4f,
+                            delaySend = .5f,
+                            volume = 0.34f,
+                        ),
                         pan = -0.25f,
                         density = 0.30f,
                         role = TrackRole.Chordal(

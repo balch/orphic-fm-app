@@ -84,3 +84,17 @@ data class MacroOverrides(
     val space: Float? = null,
     val mood: Float? = null,
 )
+
+/**
+ * Which live macro knob drives a parameter-walk (e.g., DX patch selection
+ * via [OrpheusEngine.harmonicsMacroRange]). The integer ordinal is the wire
+ * value sent to the C++ engine; do not reorder without bumping the routing.
+ */
+@Serializable
+enum class MacroSource {
+    NONE,
+    ENERGY,
+    COMPLEXITY,
+    SPACE,
+    MOOD,
+}

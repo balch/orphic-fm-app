@@ -162,7 +162,7 @@ class ModPioneerVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2, // Fender 1
                     volume = 0.55f,
-                    harmonics = 0.05f, // DX2 Idx 1: Fender 1
+                    harmonics = 0.4289f, // DX2 idx 14 (preserves current audible patch; pre-pin comment claimed "Fender 1"=idx 1 — flag for listen-test re-tune)
                     reverbSend = 0.20f,
                 ).let { stabs ->
                     TrackVoice(
@@ -183,7 +183,7 @@ class ModPioneerVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2, // Guit acous
                     volume = 0.45f,
-                    harmonics = 0.35f, // DX2 Idx 11: Guit acous
+                    harmonics = 0.4289f, // DX2 idx 14 (preserves current audible patch; pre-pin comment claimed "Guit acous"=idx 11 — flag for listen-test re-tune)
                 ).let { rhythm ->
                     TrackVoice(
                         engineEdm = rhythm,

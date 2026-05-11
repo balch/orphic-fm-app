@@ -225,7 +225,7 @@ class BellTollsVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = "Bell Tolls",
+            name = name,
             album = Album.RIF,
             bpm = 78f,  // classic roots reggae tempo
             arrangement = Arrangement(
@@ -361,24 +361,32 @@ class BellTollsVibe : VibeProvider {
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
-                // 4 LEAD: Roots horn-stand-in — lick-driven plucks crossfading to a slow pad.
-                // At Energy=1: DX2 patch idx 14 = "Harpsich" (harpsichord pluck) — works as a
-                // bright plucky lead in place of a real melodica. At Energy=0: DX3 patch idx 14
-                // = "*Planets" (PPG-style synth pad) for the more dub/spaced-out feel.
-                // Fills across the full pattern; lick mutation gives it melodic life.
-                // (See references/fm_patches.md — harmonics=0.45 lands at index 14 in both
-                // banks; this voice is harpsichord-pluck, not a true reedy melodica.)
+                // 4 LEAD: Roots horn-stand-in — lick-driven, dual DX with mood-driven
+                // patch walking so sections shift the horn's voice character automatically.
+                // EDM = DX2 idx 21 "Bells" (chromatic-percussion family); macro walk shifts
+                //   mood-up sections toward "Tub Bells"/"Gong 2" and mood-down sections
+                //   toward "Bell C"/"Glockenspl".
+                // Space = DX3 idx 19 "Etherial5a" (evolving pad family); macro walk shifts
+                //   toward "Airy"/"Boron A" in brighter moods and "Textures 6"/"Mal Poly" in
+                //   darker moods. The chorus section's mood=1.25 override automatically
+                //   selects a brighter bell + brighter pad for the lift; the dub section's
+                //   mood=1.1 nudges it slightly without overshooting.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.30f,
-                    harmonics = 0.45f, timbre = 0.52f, morph = 0.24f,  // bright plucky lead → spacey pad
+                    harmonics = 0.647f,             // DX2 idx 21 "Bells" — base
+                    harmonicsMacroRange = 0.05f,    // ±~1.5 patches: Glockenspl ↔ Bells ↔ Tub Bells
                     noteRangeLow = 60, noteRangeHigh = 79,  // C4-G5 horn register
                     reverbBrightness = 0.6f, reverbSend = 0.3f, delaySend = 0.35f,
                     glideRate = 0.15f,
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
-                        engineSpace = lead.copy(engineId = OrpheusEngineId.DX3),
+                        engineSpace = lead.copy(
+                            engineId = OrpheusEngineId.DX3,
+                            harmonics = 0.582f,           // DX3 idx 19 "Etherial5a"
+                            harmonicsMacroRange = 0.05f,  // Mal Poly ↔ Etherial5a ↔ Airy
+                        ),
                         role = TrackRole.Melodic(lickMode = LickMode.Fill),
                         pan = 0.20f, density = 0.30f,
                         envelopeProfile = EnvelopeProfile.MELODIC,

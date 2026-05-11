@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -224,7 +225,9 @@ class VoltageStrutVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.55f,
-                    harmonics = 0.50f,  // DX2 idx 16 = "Xylophone" — glassy mallet at C4-G6
+                    harmonics = 0.4902f,                           // DX2 idx 16 "Xylophone" — base
+                    harmonicsMacroSource = MacroSource.ENERGY,     // drop brightens, break dims
+                    harmonicsMacroRange = 0.05f,                   // ±~1.5 patches: Clav 3 ↔ Xylophone ↔ Marimba ↔ Vibe 1
                     timbre = 0.55f,
                     morph = 0.45f,
                     noteRangeLow = 60,

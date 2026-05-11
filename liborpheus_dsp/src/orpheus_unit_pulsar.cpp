@@ -1619,13 +1619,25 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.morph      = PULSAR_PICK(morph);
             ts.lpg_decay  = PULSAR_PICK(lpg_decay);
             ts.lpg_colour = PULSAR_PICK(lpg_colour);
+            ts.pin_harmonics = PULSAR_PICK(pin_harmonics) != 0;
+            ts.pin_timbre    = PULSAR_PICK(pin_timbre) != 0;
+            ts.pin_morph     = PULSAR_PICK(pin_morph) != 0;
+            ts.harmonics_modulation   = PULSAR_PICK(harmonics_modulation);
+            ts.harmonics_macro_source = PULSAR_PICK(harmonics_macro_source);
+            ts.harmonics_macro_range  = PULSAR_PICK(harmonics_macro_range);
         }
 
         // ── Apply macro modulation ──
         float mod_volume    = lerp_macro(energy, mm.energy_volume);
-        float mod_harmonics = lerp_macro(mood, mm.mood_harmonics);
-        float mod_timbre    = lerp_macro(mood, mm.mood_timbre);
-        float mod_morph     = lerp_macro(space, mm.space_decay);
+        float mod_harmonics = ts.pin_harmonics
+            ? ts.harmonics
+            : lerp_macro(mood, mm.mood_harmonics);
+        float mod_timbre = ts.pin_timbre
+            ? ts.timbre
+            : lerp_macro(mood, mm.mood_timbre);
+        float mod_morph = ts.pin_morph
+            ? ts.morph
+            : lerp_macro(space, mm.space_decay);
         float variation_amt = lerp_macro(complexity, mm.complexity_variation);
 
         // ── Evolution tension: modulate timbre/morph/harmonics based on phrase intensity ──
@@ -1646,8 +1658,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             state->tension_evo_smooth += evo_speed * (evo_target - state->tension_evo_smooth);
             float evo = state->tension_evo_smooth;
 
-            // Timbre sweep
-            if (state->tension.evo_timbre_prob > 0.001f) {
+            // Timbre sweep (only when not pinned)
+            if (!ts.pin_timbre && state->tension.evo_timbre_prob > 0.001f) {
                 uint32_t rng = step_hash(ts.playhead, t + 13, state->loop_count);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_timbre_prob) {
                     float lo = state->tension.evo_timbre_low;
@@ -1656,8 +1668,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
             }
 
-            // Morph sweep (only if specified)
-            if (state->tension.evo_morph_low >= 0.0f && state->tension.evo_morph_prob > 0.001f) {
+            // Morph sweep (only when not pinned, only if specified)
+            if (!ts.pin_morph && state->tension.evo_morph_low >= 0.0f && state->tension.evo_morph_prob > 0.001f) {
                 uint32_t rng = step_hash(ts.playhead, t + 17, state->loop_count);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_morph_prob) {
                     float lo = state->tension.evo_morph_low;
@@ -1666,8 +1678,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
             }
 
-            // Harmonics nudge (only if specified)
-            if (state->tension.evo_harm_low >= 0.0f && state->tension.evo_harm_prob > 0.001f) {
+            // Harmonics nudge (only when not pinned, only if specified)
+            if (!ts.pin_harmonics && state->tension.evo_harm_low >= 0.0f && state->tension.evo_harm_prob > 0.001f) {
                 uint32_t rng = step_hash(ts.playhead, t + 23, state->loop_count);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_harm_prob) {
                     float lo = state->tension.evo_harm_low;
@@ -2370,8 +2382,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Accent boost: high-velocity steps push harmonics/timbre
         if (accent_for_render > 0.7f) {
             float accent_boost = (accent_for_render - 0.7f) * 0.3f;
-            mod_harmonics = clamp01(mod_harmonics + accent_boost);
-            mod_timbre = clamp01(mod_timbre + accent_boost);
+            if (!ts.pin_harmonics) mod_harmonics = clamp01(mod_harmonics + accent_boost);
+            if (!ts.pin_timbre)    mod_timbre    = clamp01(mod_timbre + accent_boost);
         }
 
         // ── Dual LFO modulation for TEXTURE/FX tracks (5-7) and DRONE profile ──
@@ -2510,12 +2522,46 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (ei < 0) ei = 0;
             if (ei > 23) ei = 23;
             const EngineModRange& mr = kEngineModRanges[ei];
-            mod_harmonics = apply_mod(mod_harmonics, ts.mod_lfo_output[2], 1.0f,
-                                      mr.harmonics_min, mr.harmonics_max, mr.harmonics_safe);
-            mod_timbre = apply_mod(mod_timbre, ts.mod_lfo_output[0], 1.0f,
-                                   mr.timbre_min, mr.timbre_max, true);
-            mod_morph = apply_mod(mod_morph, ts.mod_lfo_output[1], 1.0f,
-                                  mr.morph_min, mr.morph_max, mr.morph_safe);
+            if (!ts.pin_harmonics) {
+                mod_harmonics = apply_mod(mod_harmonics, ts.mod_lfo_output[2], 1.0f,
+                                          mr.harmonics_min, mr.harmonics_max, mr.harmonics_safe);
+            } else if (ts.harmonics_modulation > 0.001f) {
+                // Pinned, but the vibe opts in to a bounded LFO swing around the
+                // pinned base. Only computed here because mod_lfo_output[2] is
+                // populated inside this LFO block.
+                mod_harmonics = ts.harmonics + ts.mod_lfo_output[2] * ts.harmonics_modulation;
+            }
+            if (!ts.pin_timbre) {
+                mod_timbre = apply_mod(mod_timbre, ts.mod_lfo_output[0], 1.0f,
+                                       mr.timbre_min, mr.timbre_max, true);
+            }
+            if (!ts.pin_morph) {
+                mod_morph = apply_mod(mod_morph, ts.mod_lfo_output[1], 1.0f,
+                                      mr.morph_min, mr.morph_max, mr.morph_safe);
+            }
+        }
+
+        // ── User-knob-driven DX patch walk ──
+        // Independent of the LFO block above (which is gated by track index /
+        // envelope profile). This lets a vibe author bring back the pre-pin
+        // feel where moving mood (or another macro) shifts DX patches without
+        // requiring the track to be a DRONE/texture slot. DX-family only —
+        // the quantizer is what makes small knob tweaks land on discrete
+        // "voices" instead of smoothly interpolating.
+        if (ts.pin_harmonics
+            && ts.engine_index >= 2 && ts.engine_index <= 4
+            && ts.harmonics_macro_range > 0.001f) {
+            // 0=NONE, 1=ENERGY, 2=COMPLEXITY, 3=SPACE, 4=MOOD (matches MacroSource.kt ordinals)
+            float macro_val = 0.5f;
+            switch (ts.harmonics_macro_source) {
+                case 1: macro_val = energy;     break;
+                case 2: macro_val = complexity; break;
+                case 3: macro_val = space;      break;
+                case 4: macro_val = mood;       break;
+                default: break;
+            }
+            // Centered on 0.5 → no walk at knob midpoint, ±range at extremes.
+            mod_harmonics += (macro_val - 0.5f) * 2.0f * ts.harmonics_macro_range;
         }
 
         // ── CHD engine inversion: override morph to select voicing registration ──
@@ -2576,6 +2622,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // shape; OrpheusVoice clamps engine_index to engines_.size()-1 = 23
         // (HiHat). Without this branch, Pulsar tracks set to a Braids id
         // would render HiHat instead of the chord/character engine.
+#ifdef ORPHEUS_TESTING
+        // Debug peek for tests — publish final mod values before render.
+        // Compiled in only when BUILD_TESTS=ON; production audio path pays zero cost.
+        engine->pulsar_track_mod_harmonics_debug[t].store(clamp01(mod_harmonics), std::memory_order_relaxed);
+        engine->pulsar_track_mod_timbre_debug[t].store(clamp01(mod_timbre), std::memory_order_relaxed);
+        engine->pulsar_track_mod_morph_debug[t].store(clamp01(mod_morph), std::memory_order_relaxed);
+#endif
+
         if (ts.engine_index >= 100 && ts.engine_index < 200) {
             unit_process_braids(ts.braids_voice, ts.braids_src_phase,
                                 ts.engine_index,

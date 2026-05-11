@@ -195,6 +195,12 @@ target_compile_definitions(orpheus_dsp PRIVATE TEST)
 
 # ── Desktop test executable (optional) ────────────
 option(BUILD_TESTS "Build test executable" OFF)
+# When BUILD_TESTS=ON, expose test-only hooks (debug peek atomics, etc.) from
+# the library itself. Production app builds leave this off so the audio path
+# pays no cost for test-only state.
+if(BUILD_TESTS)
+    target_compile_definitions(orpheus_dsp PRIVATE ORPHEUS_TESTING)
+endif()
 if(BUILD_TESTS)
     add_executable(orpheus_dsp_test
         test/test_main.cpp
@@ -240,6 +246,7 @@ if(BUILD_TESTS)
         test/test_pulsar_band_solo.cpp
         test/test_pulsar_lick_techniques.cpp
         test/test_pulsar_glide.cpp
+        test/test_pulsar_pinning.cpp
         test/test_markov_solo.cpp
         test/test_pulsar_analysis.cpp
         test/test_braids.cpp
@@ -251,6 +258,7 @@ if(BUILD_TESTS)
     )
     target_compile_definitions(orpheus_dsp_test PRIVATE
         TEST
+        ORPHEUS_TESTING
         TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
     )
 

@@ -65,6 +65,13 @@ class PulsarPlugin : DspPlugin {
     private var _trackHarmonics = FloatArray(8) { 0.5f }
     private var _trackTimbre = FloatArray(8) { 0.5f }
     private var _trackMorph = FloatArray(8) { 0.3f }
+    private var _trackPinHarmonics = IntArray(8) { 0 }
+    private var _trackPinTimbre = IntArray(8) { 0 }
+    private var _trackPinMorph = IntArray(8) { 0 }
+    private var _trackHarmonicsModulation = FloatArray(8) { 0f }
+    // Default source = 4 (MOOD) so an opt-in user only has to set the range.
+    private var _trackHarmonicsMacroSource = IntArray(8) { 4 }
+    private var _trackHarmonicsMacroRange = FloatArray(8) { 0f }
     private var _trackEnvelope = IntArray(8) { 0 }
     private var _trackRole = IntArray(8) { if (it < 3) 0 else 1 }
     private val _trackBarStrategy = IntArray(8) { 0 }
@@ -259,6 +266,41 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH.ordinal + t]) {
                 floatType { default = 0.3f; min = 0f; max = 1f; get { _trackMorph[t] }; set { _trackMorph[t] = it } }
+            }
+        }
+        // Per-track pin flags (EDM slot). Space-slot equivalents flow through
+        // orpheus_engine_routing.cpp directly without a plugin declaration,
+        // matching the convention used for HARMONICS/TIMBRE/MORPH _SPACE.
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_HARMONICS.ordinal + t]) {
+                intType { default = 0; get { _trackPinHarmonics[t] }; set { _trackPinHarmonics[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_TIMBRE.ordinal + t]) {
+                intType { default = 0; get { _trackPinTimbre[t] }; set { _trackPinTimbre[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_MORPH.ordinal + t]) {
+                intType { default = 0; get { _trackPinMorph[t] }; set { _trackPinMorph[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MODULATION.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackHarmonicsModulation[t] }; set { _trackHarmonicsModulation[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MACRO_SOURCE.ordinal + t]) {
+                intType { default = 4; get { _trackHarmonicsMacroSource[t] }; set { _trackHarmonicsMacroSource[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MACRO_RANGE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackHarmonicsMacroRange[t] }; set { _trackHarmonicsMacroRange[t] = it } }
             }
         }
         for (t in 0..7) {

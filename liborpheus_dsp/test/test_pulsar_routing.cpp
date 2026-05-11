@@ -117,6 +117,59 @@ static bool test_pulsar_per_track_port_routing() {
         check_int_port(engine, sym, t % 5, engine->pulsar_track_bar_strategy[t], pass);
         routed++;
 
+        // ── Pin patching: pin flags, modulation, macro source/range ──
+        // Verifies the 12 new per-track ports added with the pin-patching
+        // feature (6 fields × {EDM, Space} slot). A typo in any of the
+        // strcmp branches in orpheus_engine_routing.cpp would slip through
+        // without these checks.
+        snprintf(sym, sizeof(sym), "track_%d_pin_harmonics", t);
+        check_int_port(engine, sym, t % 2, engine->pulsar_track_pin_harmonics[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_pin_harmonics_space", t);
+        check_int_port(engine, sym, (t + 1) % 2, engine->pulsar_track_pin_harmonics_space[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_pin_timbre", t);
+        check_int_port(engine, sym, t % 2, engine->pulsar_track_pin_timbre[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_pin_timbre_space", t);
+        check_int_port(engine, sym, (t + 1) % 2, engine->pulsar_track_pin_timbre_space[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_pin_morph", t);
+        check_int_port(engine, sym, t % 2, engine->pulsar_track_pin_morph[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_pin_morph_space", t);
+        check_int_port(engine, sym, (t + 1) % 2, engine->pulsar_track_pin_morph_space[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_harmonics_modulation", t);
+        check_float_port(engine, sym, 0.05f + 0.01f * t, engine->pulsar_track_harmonics_modulation[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_harmonics_modulation_space", t);
+        check_float_port(engine, sym, 0.07f + 0.01f * t, engine->pulsar_track_harmonics_modulation_space[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_harmonics_macro_source", t);
+        check_int_port(engine, sym, (t % 4) + 1, engine->pulsar_track_harmonics_macro_source[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_harmonics_macro_source_space", t);
+        check_int_port(engine, sym, ((t + 1) % 4) + 1, engine->pulsar_track_harmonics_macro_source_space[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_harmonics_macro_range", t);
+        check_float_port(engine, sym, 0.02f + 0.005f * t, engine->pulsar_track_harmonics_macro_range[t], pass);
+        routed++;
+
+        snprintf(sym, sizeof(sym), "track_%d_harmonics_macro_range_space", t);
+        check_float_port(engine, sym, 0.04f + 0.005f * t, engine->pulsar_track_harmonics_macro_range_space[t], pass);
+        routed++;
+
         // Spot-check one macro pair per track
         snprintf(sym, sizeof(sym), "track_%d_macro_energy_vol_min", t);
         check_float_port(engine, sym, 0.1f * t, engine->pulsar_track_macros[t].energy_vol_min, pass);

@@ -307,14 +307,15 @@ class TechnoWobbleVibe : VibeProvider {
                 // everything with slow LFO timbre drift. This is the bed.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
-                    volume = 0.45f,
-                    harmonics = 0.30f,   // dark
-                    timbre = 0.25f,
-                    morph = 0.15f,
-                    modLfoRate = 0.04f,  // glacial drift
-                    modLfoDepth = 0.65f,
-                    modLfoShape = 0.2f,  // sine-ish, smooth
-                    modLfoCoupling = 0.4f,
+                    volume = 0.24f,             // EFFECT macroMap caps energyVolume at 0.5×, texture-ducking trims further
+                    harmonics = 0.582f,         // DX3 idx 19 "Etherial5a" base patch (auto-pinned)
+                    harmonicsModulation = 0.05f,// ±0.05 LFO swing → walks ~idx 17 "Mal Poly" ↔ idx 21 "Boron A" — pad-family neighborhood
+                    timbre = 0.25f,             // macro-driven at render, but kept as a reference value
+                    morph = 0.15f,              // macro-driven at render, but kept as a reference value
+                    modLfoRate = 0.04f,         // glacial drift
+                    modLfoDepth = 0.85f,        // pushed up from 0.65 — more audible breathing within "Etherial5a"
+                    modLfoShape = 0.2f,         // sine-ish, smooth
+                    modLfoCoupling = 0.6f,      // pushed up from 0.4 — more LFO energy routed to timbre/morph
                     holdProbability = 0.85f,  // hang forever
                     holdLengthMin = 8,
                     holdLengthMax = 24,
@@ -327,7 +328,11 @@ class TechnoWobbleVibe : VibeProvider {
                 ).let { pad ->
                     TrackVoice(
                         engineEdm = pad,
-                        engineSpace = pad,
+                        engineSpace = pad.copy(
+                            volume = 0.35f,
+                            reverbSend = .85f,
+                            reverbBrightness = .7f,
+                        ),
                         role = TrackRole.Melodic(),
                         pan = -0.35f,
                         density = 0.12f,     // very sparse hits but long-held

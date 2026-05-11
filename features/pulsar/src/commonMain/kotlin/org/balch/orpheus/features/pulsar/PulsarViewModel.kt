@@ -314,6 +314,24 @@ class PulsarViewModel(
     private val trackMorphIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH.ordinal + i].controlId)
     }
+    private val trackPinHarmonicsIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_HARMONICS.ordinal + i].controlId)
+    }
+    private val trackPinTimbreIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_TIMBRE.ordinal + i].controlId)
+    }
+    private val trackPinMorphIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_MORPH.ordinal + i].controlId)
+    }
+    private val trackHarmonicsModulationIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MODULATION.ordinal + i].controlId)
+    }
+    private val trackHarmonicsMacroSourceIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MACRO_SOURCE.ordinal + i].controlId)
+    }
+    private val trackHarmonicsMacroRangeIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MACRO_RANGE.ordinal + i].controlId)
+    }
     private val trackEnvelopeIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ENVELOPE.ordinal + i].controlId)
     }
@@ -467,6 +485,12 @@ class PulsarViewModel(
     private val trackHarmonicsSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_SPACE.ordinal + it].controlId) }
     private val trackTimbreSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_TIMBRE_SPACE.ordinal + it].controlId) }
     private val trackMorphSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_SPACE.ordinal + it].controlId) }
+    private val trackPinHarmonicsSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_HARMONICS_SPACE.ordinal + it].controlId) }
+    private val trackPinTimbreSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_TIMBRE_SPACE.ordinal + it].controlId) }
+    private val trackPinMorphSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PIN_MORPH_SPACE.ordinal + it].controlId) }
+    private val trackHarmonicsModulationSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MODULATION_SPACE.ordinal + it].controlId) }
+    private val trackHarmonicsMacroSourceSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MACRO_SOURCE_SPACE.ordinal + it].controlId) }
+    private val trackHarmonicsMacroRangeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_MACRO_RANGE_SPACE.ordinal + it].controlId) }
     private val trackModLfoRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_RATE_SPACE.ordinal + it].controlId) }
     private val trackModLfoDepthSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_DEPTH_SPACE.ordinal + it].controlId) }
     private val trackModLfoShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_SHAPE_SPACE.ordinal + it].controlId) }
@@ -861,6 +885,23 @@ class PulsarViewModel(
             trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
             trackMorphIds[i].value = FloatValue(edm.morph)
             trackMorphSpaceIds[i].value = FloatValue(spa.morph)
+            // Effective pin: vibe-author opt-in OR engine-enforced (DX-family
+            // harmonics is a quantized 32-step patch selector — never let the
+            // macro range slide between patches).
+            val pinEdmHarmonics = edm.pinHarmonics || edm.engineId.forcePinHarmonics
+            val pinSpaHarmonics = spa.pinHarmonics || spa.engineId.forcePinHarmonics
+            trackPinHarmonicsIds[i].value = IntValue(if (pinEdmHarmonics) 1 else 0)
+            trackPinHarmonicsSpaceIds[i].value = IntValue(if (pinSpaHarmonics) 1 else 0)
+            trackPinTimbreIds[i].value = IntValue(if (edm.pinTimbre) 1 else 0)
+            trackPinTimbreSpaceIds[i].value = IntValue(if (spa.pinTimbre) 1 else 0)
+            trackPinMorphIds[i].value = IntValue(if (edm.pinMorph) 1 else 0)
+            trackPinMorphSpaceIds[i].value = IntValue(if (spa.pinMorph) 1 else 0)
+            trackHarmonicsModulationIds[i].value = FloatValue(edm.harmonicsModulation)
+            trackHarmonicsModulationSpaceIds[i].value = FloatValue(spa.harmonicsModulation)
+            trackHarmonicsMacroSourceIds[i].value = IntValue(edm.harmonicsMacroSource.ordinal)
+            trackHarmonicsMacroSourceSpaceIds[i].value = IntValue(spa.harmonicsMacroSource.ordinal)
+            trackHarmonicsMacroRangeIds[i].value = FloatValue(edm.harmonicsMacroRange)
+            trackHarmonicsMacroRangeSpaceIds[i].value = FloatValue(spa.harmonicsMacroRange)
             trackEnvelopeIds[i].value = IntValue(tv.envelopeProfile.id)
             trackRoleIds[i].value = IntValue(tv.role.engineId)
             trackBarStrategyIds[i].value = IntValue(tv.barStrategy.id)

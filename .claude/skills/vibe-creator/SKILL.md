@@ -136,6 +136,9 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
   - **Important**: `DX` / `DX2` / `DX3` share a 6-op FM voice but load different 32-patch sysex banks. `harmonics` is a **patch selector** (quantized to 32 zones), not a tone control. **See `references/fm_patches.md`** for the bank tables before using a DX engine.
 - **`volume`** (default `0.8`): Track volume. Start ~0.8 for leads, 0.3-0.5 for texture.
 - **`harmonics` / `timbre` / `morph`** (default `0.5`): Plaits engine knobs, meaning varies per engine. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md`.** Always set explicitly on DX engines.
+- **`pinHarmonics` / `pinTimbre` / `pinMorph`** (default `false`): When `true`, the corresponding parameter is used verbatim at render time — bypasses the macro map's range, evolution drift, accent boost, and slow-LFO modulation. Per-engine playability floor still applies. Use this to lock a tone color from vibe code (paste-from-Orpheus workflow). **DX-family (`DX`/`DX2`/`DX3`) auto-pin harmonics** — their `harmonics` is a quantized patch selector and the loader forces `pinHarmonics = true` on them regardless of the field's value. When pinning DX harmonics, set `harmonics = patchIndex / (32f * 1.02f)` to land cleanly inside the desired bucket — the `1.02f` factor mirrors the DX engine's internal scaling.
+- **`harmonicsModulation`** (default `0.0f`): Optional opt-in escape hatch for *pinned* harmonics. When non-zero, the slow LFO is allowed to walk harmonics by ±this much around the pinned base, giving a bounded patch-walking texture effect that's otherwise locked out by the pin contract. The walk depth is `harmonicsModulation × modLfoDepth × texture_curve`, so the LFO depth still controls the overall amplitude. A useful value for DX-family pads is `0.03f`–`0.10f` (walks within a tonal-family neighborhood); above `0.20f` the patches start drifting unpredictably. See `references/fm_patches.md` for the full discussion.
+- **`harmonicsMacroSource` / `harmonicsMacroRange`** (default `MOOD` / `0.0f`): User-knob-driven DX patch walk. **DX-family only.** When `harmonicsMacroRange > 0`, the live macro selected by `harmonicsMacroSource` (default `MOOD`) walks harmonics across `[base − range, base + range]` as the user moves the knob. At the macro's midpoint (`0.5f`) the walk is zero — the pinned base patch plays. This restores the pre-pin feel where a small mood tweak shifted DX voices on the same rhythm. Independent of `harmonicsModulation` (LFO-driven) — they sum. Typical values: `0.05f` ≈ ±2 patches per full knob sweep, `0.10f` ≈ ±3 patches. See `references/fm_patches.md` for the discussion.
 - **`modLfoRate` / `modLfoDepth` / `modLfoShape` / `modLfoCoupling`**: Slow-modulation parameters for pad/texture voices. `rate` 0.03-0.1 is glacial; `depth` 0.3-0.7 audible. `depth = 0` (default) disables.
 - **`holdProbability` / `holdLengthMin` / `holdLengthMax`**: Sustained/tied notes. `0.8+` for pads, `0` (default) for drums.
 - **`delaySend` / `reverbSend`** (default `0.0`): Per-voice sends to the vibe's effects. Leads moderate, pads generous, drums usually dry.
@@ -225,6 +228,36 @@ Optional but recommended — adds a Markov section graph on top of the vibe.
 - Use the `Arrangement.SIMPLE`, `WITH_SOLOS`, `FULL`, `JAM` presets for quick starts.
 
 A typical 5-section arrangement: intro -> verse/groove -> chorus/peak -> solo -> breakdown -> outro. Use macroOverrides to distinguish (chorus: energy=1.3, complexity=1.3; breakdown: energy=0.4, space=1.5).
+
+### Section macroOverrides × `harmonicsMacroRange` = automatic per-section DX voices
+
+When a DX-family engine has `harmonicsMacroRange > 0`, the section's `macroOverrides` multiplier on the selected macro feeds directly into the per-section harmonics walk. **This means sections become tonal contexts on DX engines for free — no per-section patch declaration needed.** Example pattern on `BellTollsVibe.kt` track 4 horn:
+
+```kotlin
+OrpheusEngine(
+    engineId = OrpheusEngineId.DX2,
+    harmonics = 0.647f,           // DX2 idx 21 "Bells" — the BASE patch
+    harmonicsMacroRange = 0.05f,  // ±~1.5 patches around base
+    // harmonicsMacroSource defaults to MOOD
+)
+```
+
+With this setup and the vibe's mood baseline of 0.7, sections do:
+- intro (`mood = 0.9 × 0.7 = 0.63`) — slight darken
+- groove (baseline mood = 0.7) — centered near base
+- chorus (`mood × 1.25 → ~0.875`) — walks UP → "Tub Bells" / "Gong 2"
+- dub (`mood × 1.1`) — small upward shift
+
+Same engine, **different audible patch per section, driven purely by the section's macroOverride**. Pick the base patch as the *centerpoint* of a tonal family (e.g., the bell-y end of DX2, the pad-y end of DX3) and let sections walk you across the neighborhood.
+
+The same pattern works with `COMPLEXITY` source — see `ArmyStompVibe.kt` track 7 mallet, where `breakdown` (complexity × 2.0) drives the marimba up into bright "Vibe 1" / "Glockenspl" territory exactly when the section needs the extra energy.
+
+**Recommended ranges for section-driven voice change:**
+- `0.03f` — ±~1 patch, subtle (good for disciplined leads where you want voice variation without losing the lock)
+- `0.04f`–`0.05f` — ±~1–2 patches, audibly different per section while staying in a tonal family
+- `0.08f`–`0.10f` — ±~3 patches, dramatic voice swings (use sparingly; risks the chorus sounding like a different instrument from the verse)
+
+This pattern only works on `DX`/`DX2`/`DX3` engines (the quantizer is what makes the smooth macro sweep land on discrete voices). On continuous engines it does nothing.
 
 ## Translation recipes — reference -> parameter choices
 

@@ -774,6 +774,37 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_timbre_space[8]{};
     std::atomic<float> pulsar_track_morph[8]{};
     std::atomic<float> pulsar_track_morph_space[8]{};
+    // Per-track pin flags (one per param per slot). 0 = not pinned (default,
+    // current macroMap-driven behavior); non-zero = use ts.harmonics/timbre/morph
+    // verbatim, bypassing macros/evolution/accent/LFO. See orpheus_unit_pulsar.cpp.
+    std::atomic<int> pulsar_track_pin_harmonics[8]{};
+    std::atomic<int> pulsar_track_pin_harmonics_space[8]{};
+    std::atomic<int> pulsar_track_pin_timbre[8]{};
+    std::atomic<int> pulsar_track_pin_timbre_space[8]{};
+    std::atomic<int> pulsar_track_pin_morph[8]{};
+    std::atomic<int> pulsar_track_pin_morph_space[8]{};
+    // Per-track bounded LFO swing on pinned harmonics. 0.0 = fully pinned (default).
+    // Non-zero allows the slow LFO to walk harmonics by this amount around the
+    // pinned base, even when the harmonics atomic is force-pinned (DX-family).
+    // See OrpheusEngine.harmonicsModulation in Kotlin.
+    std::atomic<float> pulsar_track_harmonics_modulation[8]{};
+    std::atomic<float> pulsar_track_harmonics_modulation_space[8]{};
+    // User-knob-driven patch walk on DX-family auto-pinned harmonics.
+    // *_source: which live macro drives the walk (0=NONE, 1=ENERGY, 2=COMPLEXITY, 3=SPACE, 4=MOOD).
+    // *_range:  half-width of the swing around the pinned base; 0 = no walk.
+    // Only effective on DX/DX2/DX3 engines (engine_index 2..4).
+    std::atomic<int>   pulsar_track_harmonics_macro_source[8]{};
+    std::atomic<int>   pulsar_track_harmonics_macro_source_space[8]{};
+    std::atomic<float> pulsar_track_harmonics_macro_range[8]{};
+    std::atomic<float> pulsar_track_harmonics_macro_range_space[8]{};
+#ifdef ORPHEUS_TESTING
+    // Debug peek: the final mod_X value sent to voice.Render() each block.
+    // Written by unit_process_pulsar; read by tests. Compiled in only when
+    // BUILD_TESTS=ON so production builds pay zero cost.
+    std::atomic<float> pulsar_track_mod_harmonics_debug[8]{};
+    std::atomic<float> pulsar_track_mod_timbre_debug[8]{};
+    std::atomic<float> pulsar_track_mod_morph_debug[8]{};
+#endif
     std::atomic<int>   pulsar_track_envelope[8]{};
     std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL
     std::atomic<int>   pulsar_track_bar_strategy[8]{};  // BarStrategy enum (0-4)

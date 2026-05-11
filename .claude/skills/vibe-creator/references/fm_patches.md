@@ -38,26 +38,26 @@ p->envelope_control = parameters.morph;    // DX7-style envelope rate/level scal
 
 ### The harmonics → patch math
 
-The quantizer divides input `harmonics * 1.02` into 32 zones. To target patch index N, set:
+The quantizer math is `patch = round(harmonics * 1.02 * 32) = round(harmonics * 32.64)`, clamped to `[0, 31]`. **The bucket centerpoint for patch index N is `N / 32.64`.** That is the value that lands cleanly inside bucket N — it has the largest margin to either neighbor. To target patch N, set:
 
 ```
-harmonics ≈ (N + 0.5) / 32.64
+harmonics = N / 32.64
 ```
 
-Center values pre-computed:
+Centerpoint values pre-computed (3-decimal-rounded, all safe-inside-bucket):
 
 | Idx | Harm | Idx | Harm | Idx | Harm | Idx | Harm |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 0.02 | 8 | 0.26 | 16 | 0.51 | 24 | 0.75 |
-| 1 | 0.05 | 9 | 0.29 | 17 | 0.54 | 25 | 0.78 |
-| 2 | 0.08 | 10 | 0.32 | 18 | 0.57 | 26 | 0.81 |
-| 3 | 0.11 | 11 | 0.35 | 19 | 0.60 | 27 | 0.84 |
-| 4 | 0.14 | 12 | 0.38 | 20 | 0.63 | 28 | 0.87 |
-| 5 | 0.17 | 13 | 0.41 | 21 | 0.66 | 29 | 0.90 |
-| 6 | 0.20 | 14 | 0.44 | 22 | 0.69 | 30 | 0.93 |
-| 7 | 0.23 | 15 | 0.47 | 23 | 0.72 | 31 | 0.97 |
+| 0 | 0.000 | 8 | 0.245 | 16 | 0.490 | 24 | 0.735 |
+| 1 | 0.031 | 9 | 0.276 | 17 | 0.521 | 25 | 0.766 |
+| 2 | 0.061 | 10 | 0.306 | 18 | 0.551 | 26 | 0.797 |
+| 3 | 0.092 | 11 | 0.337 | 19 | 0.582 | 27 | 0.827 |
+| 4 | 0.123 | 12 | 0.368 | 20 | 0.613 | 28 | 0.858 |
+| 5 | 0.153 | 13 | 0.398 | 21 | 0.643 | 29 | 0.888 |
+| 6 | 0.184 | 14 | 0.429 | 22 | 0.674 | 30 | 0.919 |
+| 7 | 0.214 | 15 | 0.460 | 23 | 0.705 | 31 | 0.950 |
 
-Note: 0.005f hysteresis on the quantizer prevents accidental zone-flips from float jitter — values within ~0.5% of a zone boundary won't snap.
+Bucket N spans `harmonics ∈ [(N − 0.5) / 32.64, (N + 0.5) / 32.64)` — about a 0.0306-wide window per patch. The hysteresis quantizer adds 0.005f stickiness so float jitter won't flip patches near boundaries, but **don't write boundary values**: a number like `(N + 0.5) / 32.64` is the *right edge* of bucket N and rounds into N+1 with normal float arithmetic. Always pick the centerpoint above.
 
 ## Bank → Engine mapping
 
@@ -81,38 +81,38 @@ Source: `fm_patches.py:51-91`. Caps reflect uppercase notes from the original.
 
 | Idx | Harm | Patch | Source ROM |
 |---:|---:|---|---|
-| 0 | 0.02 | Solid bass | MISC/0 |
-| 1 | 0.05 | Mooger Low | MISC/21 |
-| 2 | 0.08 | LeaderTape | MISC/2 |
-| 3 | 0.11 | Morhol TB1 | Guit_Clav5/19 |
-| 4 | 0.14 | Bass 3 | ROM1B/30 |
-| 5 | 0.17 | Bill bass | KV04B/23 |
-| 6 | 0.20 | Bass 1 | ROM1A/14 |
-| 7 | 0.23 | Elec Bass | Guit_Clav5/2 |
-| 8 | 0.26 | S.Bas 27.7 | MISC/1 |
-| 9 | 0.29 | Resonances | Guit_Clav2/30 |
-| 10 | 0.32 | Syn-bass 2 | ROM2B/15 |
-| 11 | 0.35 | Prc synth1 | ROM3A/15 |
-| 12 | 0.38 | Croma 2 | Guit_Clav4/11 |
-| 13 | 0.41 | Analog 4 (squarewavy brass) | MISC/3 |
-| 14 | 0.44 | Analog A | KV04A/0 |
-| 15 | 0.47 | Analog 6 (sawy) | MISC/4 |
-| 16 | 0.51 | CS-80 | Guit_Clav4/18 |
-| 17 | 0.54 | Insert 1 (BRASSY) | Guit_Clav4/22 |
-| 18 | 0.57 | Spiral | Guit_Clav2/31 |
-| 19 | 0.60 | Dx-Trott bass | Guit_Clav4/9 |
-| 20 | 0.63 | GasHaus | MISC/5 |
-| 21 | 0.66 | Ring ding | Guit_Clav3/31 |
-| 22 | 0.69 | Papagayo | Guit_Clav4/29 |
-| 23 | 0.72 | Wineglass | KV04B/14 |
-| 24 | 0.75 | Amytal (throaty pad) | Guit_Clav2/17 |
-| 25 | 0.78 | Fairlight | Guit_Clav4/2 |
-| 26 | 0.81 | PPG Vol 1 | PPGVOCAL/0 |
-| 27 | 0.84 | PPG Vol 2 | PPGVOCAL/1 |
-| 28 | 0.87 | *Fairl. 3 | PPGVOCAL/26 |
-| 29 | 0.90 | *Vocoder 2 | PPGVOCAL/19 |
-| 30 | 0.93 | * Sequence | PPGVOCAL/21 |
-| 31 | 0.97 | Bounce 4 | MISC/13 |
+| 0 | 0.000 | Solid bass | MISC/0 |
+| 1 | 0.031 | Mooger Low | MISC/21 |
+| 2 | 0.061 | LeaderTape | MISC/2 |
+| 3 | 0.092 | Morhol TB1 | Guit_Clav5/19 |
+| 4 | 0.123 | Bass 3 | ROM1B/30 |
+| 5 | 0.153 | Bill bass | KV04B/23 |
+| 6 | 0.184 | Bass 1 | ROM1A/14 |
+| 7 | 0.214 | Elec Bass | Guit_Clav5/2 |
+| 8 | 0.245 | S.Bas 27.7 | MISC/1 |
+| 9 | 0.276 | Resonances | Guit_Clav2/30 |
+| 10 | 0.306 | Syn-bass 2 | ROM2B/15 |
+| 11 | 0.337 | Prc synth1 | ROM3A/15 |
+| 12 | 0.368 | Croma 2 | Guit_Clav4/11 |
+| 13 | 0.398 | Analog 4 (squarewavy brass) | MISC/3 |
+| 14 | 0.429 | Analog A | KV04A/0 |
+| 15 | 0.460 | Analog 6 (sawy) | MISC/4 |
+| 16 | 0.490 | CS-80 | Guit_Clav4/18 |
+| 17 | 0.521 | Insert 1 (BRASSY) | Guit_Clav4/22 |
+| 18 | 0.551 | Spiral | Guit_Clav2/31 |
+| 19 | 0.582 | Dx-Trott bass | Guit_Clav4/9 |
+| 20 | 0.613 | GasHaus | MISC/5 |
+| 21 | 0.643 | Ring ding | Guit_Clav3/31 |
+| 22 | 0.674 | Papagayo | Guit_Clav4/29 |
+| 23 | 0.705 | Wineglass | KV04B/14 |
+| 24 | 0.735 | Amytal (throaty pad) | Guit_Clav2/17 |
+| 25 | 0.766 | Fairlight | Guit_Clav4/2 |
+| 26 | 0.797 | PPG Vol 1 | PPGVOCAL/0 |
+| 27 | 0.827 | PPG Vol 2 | PPGVOCAL/1 |
+| 28 | 0.858 | *Fairl. 3 | PPGVOCAL/26 |
+| 29 | 0.888 | *Vocoder 2 | PPGVOCAL/19 |
+| 30 | 0.919 | * Sequence | PPGVOCAL/21 |
+| 31 | 0.950 | Bounce 4 | MISC/13 |
 
 **DX is the right pick for**: bass tracks needing FM grit, retro-digital lead synths, vocoder/PPG-style metallic synths.
 
@@ -122,38 +122,38 @@ Source: `fm_patches.py:92-133`.
 
 | Idx | Harm | Patch | Source ROM |
 |---:|---:|---|---|
-| 0 | 0.02 | E piano 1 | ROM1A/10 |
-| 1 | 0.05 | Fender 1 | Guit_Clav3/22 |
-| 2 | 0.08 | WintrRhodes | MISC/6 |
-| 3 | 0.11 | RS-EP C | KV04B/18 |
-| 4 | 0.14 | Mark III | MISC/7 |
-| 5 | 0.17 | Clav E pno | ROM4B/0 |
-| 6 | 0.20 | Syn Clav | Guit_Clav1/13 |
-| 7 | 0.23 | Clavinet | KV04B/20 |
-| 8 | 0.26 | Piano 5 | ROM1B/1 |
-| 9 | 0.29 | Grd Piano | Guit_Clav5/3 |
-| 10 | 0.32 | Steinway | Guit_Clav1/21 |
-| 11 | 0.35 | Guit acous | Guit_Clav5/16 |
-| 12 | 0.38 | Sitar | ROM1B/21 |
-| 13 | 0.41 | Koto | ROM1A/22 |
-| 14 | 0.44 | Harpsich | ROM3A/1 |
-| 15 | 0.47 | Clav 3 | ROM1B/11 |
-| 16 | 0.51 | Xylophone | ROM2A/23 |
-| 17 | 0.54 | Marimba | ROM3A/6 |
-| 18 | 0.57 | Vibe 1 | ROM1A/20 |
-| 19 | 0.60 | Glockenspl | ROM2A/21 |
-| 20 | 0.63 | Bell C | KV04B/15 |
-| 21 | 0.66 | Bells | ROM4A/20 |
-| 22 | 0.69 | Tub Bells | ROM1A/25 |
-| 23 | 0.72 | Gong 2 | ROM2A/26 |
-| 24 | 0.75 | Kettle | SYN9/8 |
-| 25 | 0.78 | Mid drum 3 | SYN9/27 |
-| 26 | 0.81 | Ori Drum | SYN9/10 |
-| 27 | 0.84 | Wood 6 | SYN9/3 |
-| 28 | 0.87 | Latin Drum | SYN9/17 |
-| 29 | 0.90 | Cimbal | SYN9/24 |
-| 30 | 0.93 | SYNDM 25.8 | MISC/8 |
-| 31 | 0.97 | B Drm-Snar | ROM2B/21 |
+| 0 | 0.000 | E piano 1 | ROM1A/10 |
+| 1 | 0.031 | Fender 1 | Guit_Clav3/22 |
+| 2 | 0.061 | WintrRhodes | MISC/6 |
+| 3 | 0.092 | RS-EP C | KV04B/18 |
+| 4 | 0.123 | Mark III | MISC/7 |
+| 5 | 0.153 | Clav E pno | ROM4B/0 |
+| 6 | 0.184 | Syn Clav | Guit_Clav1/13 |
+| 7 | 0.214 | Clavinet | KV04B/20 |
+| 8 | 0.245 | Piano 5 | ROM1B/1 |
+| 9 | 0.276 | Grd Piano | Guit_Clav5/3 |
+| 10 | 0.306 | Steinway | Guit_Clav1/21 |
+| 11 | 0.337 | Guit acous | Guit_Clav5/16 |
+| 12 | 0.368 | Sitar | ROM1B/21 |
+| 13 | 0.398 | Koto | ROM1A/22 |
+| 14 | 0.429 | Harpsich | ROM3A/1 |
+| 15 | 0.460 | Clav 3 | ROM1B/11 |
+| 16 | 0.490 | Xylophone | ROM2A/23 |
+| 17 | 0.521 | Marimba | ROM3A/6 |
+| 18 | 0.551 | Vibe 1 | ROM1A/20 |
+| 19 | 0.582 | Glockenspl | ROM2A/21 |
+| 20 | 0.613 | Bell C | KV04B/15 |
+| 21 | 0.643 | Bells | ROM4A/20 |
+| 22 | 0.674 | Tub Bells | ROM1A/25 |
+| 23 | 0.705 | Gong 2 | ROM2A/26 |
+| 24 | 0.735 | Kettle | SYN9/8 |
+| 25 | 0.766 | Mid drum 3 | SYN9/27 |
+| 26 | 0.797 | Ori Drum | SYN9/10 |
+| 27 | 0.827 | Wood 6 | SYN9/3 |
+| 28 | 0.858 | Latin Drum | SYN9/17 |
+| 29 | 0.888 | Cimbal | SYN9/24 |
+| 30 | 0.919 | SYNDM 25.8 | MISC/8 |
+| 31 | 0.950 | B Drm-Snar | ROM2B/21 |
 
 **DX2 is the right pick for**: chordal/keyboard tracks (E.piano, clav, piano), chromatic percussion (xylophone, vibes, bells), tuned drums for ethnic/world feels (kettle, latin drum). **Not** for generic "FM lead".
 
@@ -163,38 +163,38 @@ Source: `fm_patches.py:134-169`.
 
 | Idx | Harm | Patch | Source ROM |
 |---:|---:|---|---|
-| 0 | 0.02 | Click 124 | Guit_Clav3/1 |
-| 1 | 0.05 | Hammond | MISC/22 |
-| 2 | 0.08 | E organ 3 | ROM1B/13 |
-| 3 | 0.11 | 60s organ | ROM3B/14 |
-| 4 | 0.14 | Optic 28 | Guit_Clav3/19 |
-| 5 | 0.17 | Pipes 1 | ROM1A/17 |
-| 6 | 0.20 | Pipes 3 | ROM1B/17 |
-| 7 | 0.23 | Pipes 2 | ROM3B/15 |
-| 8 | 0.26 | JX-33-P | MISC/9 |
-| 9 | 0.29 | Soundtrack | Guit_Clav4/20 |
-| 10 | 0.32 | Ice pad 2 | MISC/11 |
-| 11 | 0.35 | M1 PADS | MISC/12 |
-| 12 | 0.38 | CARLOS 2 | MISC/14 |
-| 13 | 0.41 | Soft touch | MISC/16 |
-| 14 | 0.44 | *Planets | PPGVOCAL/30 |
-| 15 | 0.47 | Cirrus | MISC/17 |
-| 16 | 0.51 | ENTRIX | MISC/18 |
-| 17 | 0.54 | Mal Poly | Guit_Clav4/27 |
-| 18 | 0.57 | Textures 6 | MISC/20 |
-| 19 | 0.60 | Etherial5a | MISC/10 |
-| 20 | 0.63 | Airy | MISC/15 |
-| 21 | 0.66 | Boron A | MISC/19 |
-| 22 | 0.69 | Vangelis 1 | Guit_Clav4/5 |
-| 23 | 0.72 | Strings C | KV04B/5 |
-| 24 | 0.75 | Strings 3 | ROM1A/5 |
-| 25 | 0.78 | Strings 2 | ROM1A/4 |
-| 26 | 0.81 | Strings 7 | ROM2A/9 |
-| 27 | 0.84 | Full strin | Guit_Clav1/7 |
-| 28 | 0.87 | Syn orch | Guit_Clav1/2 |
-| 29 | 0.90 | **Brass 1** | ROM1A/0 |
-| 30 | 0.93 | **Brass 6 BC** | ROM2A/13 |
-| 31 | 0.97 | **Br trumpet** | ROM3A/5 |
+| 0 | 0.000 | Click 124 | Guit_Clav3/1 |
+| 1 | 0.031 | Hammond | MISC/22 |
+| 2 | 0.061 | E organ 3 | ROM1B/13 |
+| 3 | 0.092 | 60s organ | ROM3B/14 |
+| 4 | 0.123 | Optic 28 | Guit_Clav3/19 |
+| 5 | 0.153 | Pipes 1 | ROM1A/17 |
+| 6 | 0.184 | Pipes 3 | ROM1B/17 |
+| 7 | 0.214 | Pipes 2 | ROM3B/15 |
+| 8 | 0.245 | JX-33-P | MISC/9 |
+| 9 | 0.276 | Soundtrack | Guit_Clav4/20 |
+| 10 | 0.306 | Ice pad 2 | MISC/11 |
+| 11 | 0.337 | M1 PADS | MISC/12 |
+| 12 | 0.368 | CARLOS 2 | MISC/14 |
+| 13 | 0.398 | Soft touch | MISC/16 |
+| 14 | 0.429 | *Planets | PPGVOCAL/30 |
+| 15 | 0.460 | Cirrus | MISC/17 |
+| 16 | 0.490 | ENTRIX | MISC/18 |
+| 17 | 0.521 | Mal Poly | Guit_Clav4/27 |
+| 18 | 0.551 | Textures 6 | MISC/20 |
+| 19 | 0.582 | Etherial5a | MISC/10 |
+| 20 | 0.613 | Airy | MISC/15 |
+| 21 | 0.643 | Boron A | MISC/19 |
+| 22 | 0.674 | Vangelis 1 | Guit_Clav4/5 |
+| 23 | 0.705 | Strings C | KV04B/5 |
+| 24 | 0.735 | Strings 3 | ROM1A/5 |
+| 25 | 0.766 | Strings 2 | ROM1A/4 |
+| 26 | 0.797 | Strings 7 | ROM2A/9 |
+| 27 | 0.827 | Full strin | Guit_Clav1/7 |
+| 28 | 0.858 | Syn orch | Guit_Clav1/2 |
+| 29 | 0.888 | **Brass 1** | ROM1A/0 |
+| 30 | 0.919 | **Brass 6 BC** | ROM2A/13 |
+| 31 | 0.950 | **Br trumpet** | ROM3A/5 |
 
 **DX3 is the right pick for**: tonewheel organs, church-pipe leads, ambient/cinematic pads, string ensembles, brass-section stabs and trumpet leads. *This* is the FM lead bank for melodic instrument voicings.
 
@@ -202,20 +202,20 @@ Source: `fm_patches.py:134-169`.
 
 | You want | Engine | Harmonics | Notes |
 |---|---|---:|---|
-| FM bass (gritty, classic) | `Engine.DX` | 0.02–0.30 | Idx 0–9, especially 0 (Solid bass), 4 (Bass 3), 8 (S.Bas 27.7). |
-| FM bass (sub-y / squarewavy) | `Engine.DX` | 0.41 | Idx 13 — "Analog 4 squarewavy brass". |
-| Vocoder/PPG metallic | `Engine.DX` | 0.81–0.93 | Idx 26–30. |
-| Wurly / Rhodes / E.piano | `Engine.DX2` | 0.02–0.23 | Idx 0–7; 0.02 = E.piano 1, 0.08 = WintrRhodes. |
-| Acoustic piano | `Engine.DX2` | 0.26–0.32 | Idx 8–10 (Piano 5, Grd Piano, Steinway). |
-| Sitar / koto / harpsi (exotic plucked) | `Engine.DX2` | 0.38–0.44 | Idx 12–14. |
-| Mallets (xylo / marimba / vibes) | `Engine.DX2` | 0.51–0.57 | Idx 16–18. |
-| Bells / glockenspiel / tubular | `Engine.DX2` | 0.60–0.69 | Idx 19–22. |
-| Tonewheel organ / Hammond | `Engine.DX3` | 0.05 | Idx 1. |
-| Church pipes / pipe lead | `Engine.DX3` | 0.17–0.23 | Idx 5–7. |
-| Cinematic pad (ambient, planet-y) | `Engine.DX3` | 0.32–0.66 | Idx 10–21. Wide range — pick by ear. |
-| String section | `Engine.DX3` | 0.72–0.87 | Idx 23–28. |
-| **Brass section** | `Engine.DX3` | **0.90–0.93** | Idx 29–30 (Brass 1, Brass 6 BC). |
-| **Solo trumpet** | `Engine.DX3` | **0.97** | Idx 31 (Br trumpet). The "trumpets sound" voice. |
+| FM bass (gritty, classic) | `Engine.DX` | 0.000–0.276 | Idx 0–9, especially 0 (Solid bass), 4 (Bass 3), 8 (S.Bas 27.7). |
+| FM bass (sub-y / squarewavy) | `Engine.DX` | 0.398 | Idx 13 — "Analog 4 squarewavy brass". |
+| Vocoder/PPG metallic | `Engine.DX` | 0.797–0.919 | Idx 26–30. |
+| Wurly / Rhodes / E.piano | `Engine.DX2` | 0.000–0.214 | Idx 0–7; 0.000 = E.piano 1, 0.061 = WintrRhodes. |
+| Acoustic piano | `Engine.DX2` | 0.245–0.306 | Idx 8–10 (Piano 5, Grd Piano, Steinway). |
+| Sitar / koto / harpsi (exotic plucked) | `Engine.DX2` | 0.368–0.429 | Idx 12–14. |
+| Mallets (xylo / marimba / vibes) | `Engine.DX2` | 0.490–0.551 | Idx 16–18. |
+| Bells / glockenspiel / tubular | `Engine.DX2` | 0.582–0.674 | Idx 19–22. |
+| Tonewheel organ / Hammond | `Engine.DX3` | 0.031 | Idx 1. |
+| Church pipes / pipe lead | `Engine.DX3` | 0.153–0.214 | Idx 5–7. |
+| Cinematic pad (ambient, planet-y) | `Engine.DX3` | 0.306–0.643 | Idx 10–21. Wide range — pick by ear. |
+| String section | `Engine.DX3` | 0.705–0.858 | Idx 23–28. |
+| **Brass section** | `Engine.DX3` | **0.888–0.919** | Idx 29–30 (Brass 1, Brass 6 BC). |
+| **Solo trumpet** | `Engine.DX3` | **0.950** | Idx 31 (Br trumpet). The "trumpets sound" voice. |
 
 ## What `timbre` and `morph` do on top of the patch
 
@@ -249,9 +249,34 @@ After (correct brass selection):
 
 ```kotlin
 engineEdm = Engine.DX3,
-timbre = 0.60f,        // slightly bright for brass edge
-harmonics = 0.97f,     // patch 31 = "Br trumpet" — fits the "trumpets sound" theme
-morph = 0.50f,         // neutral envelope rate
+harmonics = 0.950f,    // patch 31 = "Br trumpet" — fits the "trumpets sound" theme (auto-pinned)
+// timbre / morph: leave unset; macroMap.moodTimbre + spaceDecay drive them.
+// To lock them, add pinTimbre = true / pinMorph = true.
 ```
 
-A common antipattern is leaving `harmonics` unset (default 0.0) when using `DX/DX2/DX3` — that always selects patch 0, which is rarely what you want. Always set `harmonics` explicitly on SixOp engines, even if it's just `harmonics = 0.5f`.
+A common antipattern is leaving `harmonics` unset (default 0.5) when using `DX/DX2/DX3` — that lands on patch 16 (random middle of the bank), which is rarely what you want. **Always set `harmonics` explicitly on SixOp engines** using a centerpoint from the table above. The DX-family engines auto-pin harmonics regardless of `pinHarmonics`, so the value you write is what plays.
+
+### Optional: bounded patch walk via `harmonicsModulation`
+
+If you want texture-evolution that walks across nearby patches (a controlled version of what was happening pre-pin), opt in with `harmonicsModulation`:
+
+```kotlin
+OrpheusEngine(
+    engineId = OrpheusEngineId.DX3,
+    harmonics = 0.582f,            // base patch (idx 19 "Etherial5a")
+    harmonicsModulation = 0.05f,   // ±0.05 LFO swing → walks idx 17..21
+    modLfoDepth = 0.85f,           // controls swing amplitude (LFO depth)
+    modLfoRate = 0.04f,            // glacial drift
+)
+```
+
+The LFO is bipolar `[-1, +1]` already scaled by `modLfoDepth × texture_curve`, then multiplied by `harmonicsModulation` and added to the pinned base. Default `0.0f` = fully pinned (no walk). A bucket spans ~0.0306 in harmonics-space, so:
+
+| `harmonicsModulation` | LFO walks across | Typical use |
+|---|---|---|
+| `0.03f` | ±1 patch | Subtle breathing within the neighborhood |
+| `0.05f` | ±2 patches | Audible walk within a tonal family |
+| `0.10f` | ±3 patches | Wide walk across related characters |
+| `0.20f+` | ±6 patches | Drifty / unpredictable — likely too wild |
+
+Only effective when harmonics is pinned (DX-family auto-pin or explicit `pinHarmonics = true`). On non-pinned tracks, harmonics already gets LFO modulation through the standard macroMap path — this field is the escape hatch for the otherwise-locked DX path.

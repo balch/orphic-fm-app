@@ -211,6 +211,19 @@ struct PulsarTrackState {
     float volume;
     float pan;
     float harmonics, timbre, morph;
+    // Effective pin flags resolved from per-slot atomics + DX engine enforcement.
+    // True = bypass all modulation (lerp_macro, evolution, accent, LFO) for that param.
+    bool pin_harmonics;
+    bool pin_timbre;
+    bool pin_morph;
+    // When pin_harmonics is true, this is the LFO-swing depth applied around
+    // the pinned harmonics value. 0 = fully pinned (no motion).
+    float harmonics_modulation;
+    // User-knob-driven patch walk on DX-family auto-pinned harmonics.
+    //   harmonics_macro_source: which macro drives the walk (NONE/ENERGY/COMPLEXITY/SPACE/MOOD)
+    //   harmonics_macro_range:  half-width of the swing around the pinned base; 0 = no walk
+    int   harmonics_macro_source;
+    float harmonics_macro_range;
     float gate_timer;
     bool voice_active;
     PulsarTrackMacroMap macro_map;

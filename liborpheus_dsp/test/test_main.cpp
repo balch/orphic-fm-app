@@ -76,6 +76,7 @@ static TestSuite suites[] = {
     {"markov_solo",     run_markov_solo_tests,     true},
     {"analysis",        run_pulsar_analysis_tests, false},  // manual: writes WAV files
     {"braids",          run_braids_tests,          true},
+    {"pulsar_pinning",  run_pulsar_pinning_tests,  true},
 };
 
 static constexpr int kNumSuites = sizeof(suites) / sizeof(suites[0]);
