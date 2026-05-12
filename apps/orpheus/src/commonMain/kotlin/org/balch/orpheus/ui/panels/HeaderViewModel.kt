@@ -13,14 +13,13 @@ import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -74,14 +73,6 @@ interface HeaderFeature : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
 
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty
-
-    // Eagerly is load-bearing here: panelExpansionEventBus emissions and the
-    // restoreSavedExpansion() init coroutine fire before the HeaderPanel is
-    // composed; without an active subscriber the stateFlow would miss them.
-    // (uiIntents has replay=64 to bridge the same gap on its own channel,
-    // but the bus events do not — see comment near uiIntents.)
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
 }
 
 private sealed class HeaderIntent {
@@ -160,26 +151,30 @@ class HeaderViewModel(
 
     private val initialState = buildInitialState(defaultPanelSet)
 
-    override val stateFlow: StateFlow<HeaderPanelUiState> =
-        merge(uiIntents, busIntents, panelSetIntents)
-            .scan(initialState) { state, intent ->
-                when (intent) {
-                    is HeaderIntent.Single -> {
-                        log.debug { "HeaderViewModel: setExpanded(${intent.panelId.id}, ${intent.expanded})" }
-                        state.copy(
-                            expandedPanels = state.expandedPanels.put(intent.panelId, intent.expanded)
-                        )
-                    }
-                    is HeaderIntent.ApplySet -> {
-                        buildInitialState(intent.panelSet)
+    private val _state = MutableStateFlow(initialState)
+    override val stateFlow: StateFlow<HeaderPanelUiState> = _state.asStateFlow()
+
+    init {
+        // Always-on reducer: drives state mutation independent of UI
+        // subscription. The merged intent stream is collected here instead of
+        // inside `stateIn(Eagerly, ...)` so that bus events and
+        // restoreSavedExpansion()'s replayed intents always reach the reducer.
+        scope.launch(dispatcherProvider.io) {
+            merge(uiIntents, busIntents, panelSetIntents)
+                .scan(initialState) { state, intent ->
+                    when (intent) {
+                        is HeaderIntent.Single -> {
+                            log.debug { "HeaderViewModel: setExpanded(${intent.panelId.id}, ${intent.expanded})" }
+                            state.copy(
+                                expandedPanels = state.expandedPanels.put(intent.panelId, intent.expanded)
+                            )
+                        }
+                        is HeaderIntent.ApplySet -> buildInitialState(intent.panelSet)
                     }
                 }
-            }
-            .stateIn(
-                scope = scope,
-                started = this.sharingStrategy,
-                initialValue = initialState
-            )
+                .collect { _state.value = it }
+        }
+    }
 
     override val visiblePanels: List<FeaturePanel>
         get() {

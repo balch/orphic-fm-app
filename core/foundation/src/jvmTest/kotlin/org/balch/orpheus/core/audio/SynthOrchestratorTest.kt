@@ -78,6 +78,24 @@ class SynthOrchestratorTest {
     }
 
     @Test
+    fun `start is idempotent across multiple call sites`() = runTest {
+        // After moving engine start to DjMediaBrowserService.onCreate, both
+        // the service AND DjApp's LaunchedEffect can call start() on the same
+        // process. The second call must be a no-op — calling engine.start()
+        // twice on miniaudio would error out, so the orchestrator's isStarted
+        // guard is the contract that makes the multi-call-site safe.
+        val h = createOrchestrator()
+
+        h.orchestrator.start()
+        val startCountAfterFirst = h.engine.startCount
+        h.orchestrator.start()
+
+        assertTrue(h.engine.started, "Engine should still be started")
+        assertEquals(1, h.engine.startCount, "engine.start() should fire exactly once")
+        assertEquals(startCountAfterFirst, h.engine.startCount, "Second start call must be a no-op")
+    }
+
+    @Test
     fun `stop shuts down engine`() = runTest {
         val h = createOrchestrator()
         h.orchestrator.start()
@@ -136,6 +154,10 @@ private fun assertEquals(expected: PlaybackState, actual: PlaybackState, message
     if (expected != actual) throw AssertionError("Expected $expected but was $actual. $message")
 }
 
+private fun assertEquals(expected: Int, actual: Int, message: String = "") {
+    if (expected != actual) throw AssertionError("Expected $expected but was $actual. $message")
+}
+
 // ─── Minimal Fakes ────────────────────────────────────────────────────────────
 
 private class FakeMetadata : MetadataProducer {
@@ -155,10 +177,11 @@ private fun testScope() = AppCoroutineScope(TestDispatchers(UnconfinedTestDispat
 
 private class FakeSynthEngine : SynthEngine {
     var started = false
+    var startCount = 0
     private var _volume = 0.7f
     val volume get() = _volume
 
-    override fun start() { started = true }
+    override fun start() { started = true; startCount++ }
     override fun stop() { started = false }
     override fun getMasterVolume(): Float = _volume
     override fun setMasterVolume(amount: Float) { _volume = amount }

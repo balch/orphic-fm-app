@@ -8,15 +8,11 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -59,14 +55,6 @@ data class EvoPanelActions(
 }
 
 interface EvoFeature : SynthFeature<EvoUiState, EvoPanelActions> {
-    // Eagerly is load-bearing here: _userIntents is a MutableSharedFlow with
-    // replay=0, and init blocks emit into it from controlFlow collectors that
-    // run unconditionally — those emissions would be lost if the stateIn was
-    // dormant. Switching to WhileSubscribed requires giving _userIntents a
-    // replay buffer (or routing via StateFlow instead).
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
-
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
 
@@ -114,126 +102,115 @@ class EvoViewModel(
 
     private val log = logging("EvoViewModel")
 
-    // Sort strategies alphabetically by name
     private val sortedStrategies = strategies.sortedBy { it.name }
+    private fun strategyByName(name: String): AudioEvolutionStrategy =
+        sortedStrategies.first { it.name == name }
 
-    private val _userIntents = MutableSharedFlow<EvoIntent>(
-        replay = 0,
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+    // Authoritative state lives in these flows. The public stateFlow is a pure
+    // projection — there's no scan/reducer, no intent bus. Actions write here
+    // directly; init {} collectors observe these and drive side effects.
+    private val _selectedStrategyName = MutableStateFlow(sortedStrategies.first().name)
+    private val _isEnabled = MutableStateFlow(false)
+    private val _knob1 = MutableStateFlow(0.5f)
+    private val _knob2 = MutableStateFlow(0.5f)
 
-    override val stateFlow: StateFlow<EvoUiState> = flow {
-        val initial = EvoUiState(
-            selectedStrategy = sortedStrategies.first(),
+    override val stateFlow: StateFlow<EvoUiState> = combine(
+        _selectedStrategyName,
+        _isEnabled,
+        _knob1,
+        _knob2,
+    ) { name, enabled, k1, k2 ->
+        EvoUiState(
+            selectedStrategy = strategyByName(name),
             strategies = sortedStrategies,
-            isEnabled = false
+            isEnabled = enabled,
+            knob1Value = k1,
+            knob2Value = k2,
         )
-        emit(initial)
-        _userIntents
-            .scan(initial) { state, intent ->
-                val newState = reduce(state, intent)
-                applyToEngine(state, newState, intent)
-                newState
-            }
-            .collect { emit(it) }
-    }
-    .flowOn(dispatcherProvider.io)
-    .stateIn(
+    }.stateIn(
         scope = scope,
-        started = this.sharingStrategy,
+        started = SynthFeature.sharingStrategy,
         initialValue = EvoUiState(
             selectedStrategy = sortedStrategies.first(),
             strategies = sortedStrategies,
-            isEnabled = false
-        )
+            isEnabled = false,
+            knob1Value = 0.5f,
+            knob2Value = 0.5f,
+        ),
     )
 
     private var evoJob: Job? = null
 
     override val actions = EvoPanelActions(
-        setStrategy = { _userIntents.tryEmit(EvoIntent.Strategy(it)) },
-        setEnabled = { _userIntents.tryEmit(EvoIntent.Enabled(it)) },
-        setKnob1 = { _userIntents.tryEmit(EvoIntent.Knob1(it)) },
-        setKnob2 = { _userIntents.tryEmit(EvoIntent.Knob2(it)) }
+        setStrategy = { _selectedStrategyName.value = it.name },
+        setEnabled = { _isEnabled.value = it },
+        setKnob1 = { _knob1.value = it.coerceIn(0f, 1f) },
+        setKnob2 = { _knob2.value = it.coerceIn(0f, 1f) },
     )
 
     init {
         log.debug { "Initialized with ${sortedStrategies.size} strategies: ${sortedStrategies.map { it.name }}" }
 
-        // Subscribe to MIDI CC changes for evo knobs
+        // MIDI CC bridge: external port changes flow into the UI knob state.
         scope.launch(dispatcherProvider.default) {
-            synthController.controlFlow(EvoSymbol.DEPTH.controlId).collect { value ->
-                _userIntents.tryEmit(EvoIntent.Knob1(value.asFloat()))
+            synthController.controlFlow(EvoSymbol.DEPTH.controlId).collect { v ->
+                _knob1.value = v.asFloat().coerceIn(0f, 1f)
             }
         }
         scope.launch(dispatcherProvider.default) {
-            synthController.controlFlow(EvoSymbol.RATE.controlId).collect { value ->
-                _userIntents.tryEmit(EvoIntent.Knob2(value.asFloat()))
+            synthController.controlFlow(EvoSymbol.RATE.controlId).collect { v ->
+                _knob2.value = v.asFloat().coerceIn(0f, 1f)
             }
         }
-    }
 
-    private fun reduce(state: EvoUiState, intent: EvoIntent): EvoUiState =
-        when (intent) {
-            is EvoIntent.Strategy -> {
-                if (state.selectedStrategy == intent.strategy) state
-                else state.copy(
-                    selectedStrategy = intent.strategy,
-                    knob1Value = 0.5f,
-                    knob2Value = 0.5f
-                )
-            }
-            is EvoIntent.Enabled -> state.copy(isEnabled = intent.enabled)
-            is EvoIntent.Knob1 -> state.copy(knob1Value = intent.value.coerceIn(0f, 1f))
-            is EvoIntent.Knob2 -> state.copy(knob2Value = intent.value.coerceIn(0f, 1f))
-            is EvoIntent.Restore -> intent.state
-        }
-
-    private fun applyToEngine(oldState: EvoUiState, newState: EvoUiState, intent: EvoIntent) {
-        when (intent) {
-            is EvoIntent.Strategy -> {
-                val old = oldState.selectedStrategy
-                if (old == intent.strategy) return
-
-                log.debug { "Switching strategy: ${old.name} → ${intent.strategy.name}" }
-                old.onDeactivate()
-                intent.strategy.onActivate()
-
-                // Reset knobs on strategy change
-                intent.strategy.setKnob1(0.5f)
-                intent.strategy.setKnob2(0.5f)
-
-                // Restart loop if running
-                if (newState.isEnabled) {
-                    startEvolutionLoop()
+        // Strategy lifecycle: when the selection changes, deactivate the prior
+        // strategy, activate the new one, reset knobs to mid-range, and restart
+        // the loop if currently running. The construction-time emission is
+        // skipped (activeStrategy stays null) to match the prior behavior of
+        // not activating any strategy until the user does something.
+        scope.launch {
+            var activeStrategy: String? = null
+            _selectedStrategyName.collect { name ->
+                val prev = activeStrategy
+                if (prev == name) return@collect
+                if (prev != null) {
+                    strategyByName(prev).onDeactivate()
+                    strategyByName(name).onActivate()
+                    _knob1.value = 0.5f
+                    _knob2.value = 0.5f
+                    log.debug { "Strategy switched: $prev → $name" }
+                    if (_isEnabled.value) startEvolutionLoop()
                 }
+                activeStrategy = name
             }
-            is EvoIntent.Enabled -> {
-                log.debug { "Evolution ${if (intent.enabled) "enabled" else "disabled"} with ${newState.selectedStrategy.name}" }
-                mediaSessionStateManager.setEvoActive(intent.enabled)
+        }
 
-                if (intent.enabled) {
-                    newState.selectedStrategy.onActivate()
+        // Knob value (or strategy switch) → active strategy parameter.
+        // Replaces the old applyToEngine side effect inside the scan reducer.
+        scope.launch(dispatcherProvider.default) {
+            combine(_selectedStrategyName, _knob1) { name, v -> name to v }
+                .collect { (name, v) -> strategyByName(name).setKnob1(v) }
+        }
+        scope.launch(dispatcherProvider.default) {
+            combine(_selectedStrategyName, _knob2) { name, v -> name to v }
+                .collect { (name, v) -> strategyByName(name).setKnob2(v) }
+        }
+
+        // Enable toggle: evolution loop + media-session activity. .drop(1)
+        // skips the construction-time false emission so we don't fire a stale
+        // mediaSessionStateManager.setEvoActive(false) at startup.
+        scope.launch {
+            _isEnabled.drop(1).collect { enabled ->
+                mediaSessionStateManager.setEvoActive(enabled)
+                val current = strategyByName(_selectedStrategyName.value)
+                log.debug { "Evolution ${if (enabled) "enabled" else "disabled"} with ${current.name}" }
+                if (enabled) {
+                    current.onActivate()
                     startEvolutionLoop()
                 } else {
                     stopEvolutionLoop()
-                    newState.selectedStrategy.onDeactivate()
+                    current.onDeactivate()
                 }
-            }
-            is EvoIntent.Knob1 -> {
-                newState.selectedStrategy.setKnob1(intent.value.coerceIn(0f, 1f))
-            }
-            is EvoIntent.Knob2 -> {
-                newState.selectedStrategy.setKnob2(intent.value.coerceIn(0f, 1f))
-            }
-            is EvoIntent.Restore -> {
-                oldState.selectedStrategy.onDeactivate()
-                intent.state.selectedStrategy.onActivate()
-                intent.state.selectedStrategy.setKnob1(intent.state.knob1Value)
-                intent.state.selectedStrategy.setKnob2(intent.state.knob2Value)
-                mediaSessionStateManager.setEvoActive(intent.state.isEnabled)
-                if (intent.state.isEnabled) startEvolutionLoop() else stopEvolutionLoop()
             }
         }
     }
@@ -310,10 +287,3 @@ class EvoViewModel(
     }
 }
 
-private sealed interface EvoIntent {
-    data class Strategy(val strategy: AudioEvolutionStrategy) : EvoIntent
-    data class Enabled(val enabled: Boolean) : EvoIntent
-    data class Knob1(val value: Float) : EvoIntent
-    data class Knob2(val value: Float) : EvoIntent
-    data class Restore(val state: EvoUiState) : EvoIntent
-}

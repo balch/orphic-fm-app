@@ -215,10 +215,11 @@ class BellTollsVibe : VibeProvider {
                 name = "outro",
                 barsMin = 4, barsMax = 4,
                 macroOverrides = MacroOverrides(
-                    energy = .2f, complexity = 0.25f, space = 0.2f, mood = .2f,
+                    energy = 0.4f, complexity = 0.5f, space = 1.8f, mood = 1.1f,
                 ),
-                chordsPerBar = 3,
-                customProgression = chords(0, 0, 6, 6)
+                chordFollow = ChordFollow.FIXED,  // everything drones on A
+                compingInversion = SectionInversion.SECOND_INVERSION,
+                customProgression = chords(0)
             ),
         )
     }

@@ -78,11 +78,200 @@ class TremoloTideVibe : VibeProvider {
     private val tideFallBars = 6   // chorus -> verse / breakdown — slow exhale
     private val tideOutBars = 8    // breakdown drift — almost gone
 
+    private val sectionList by lazy {
+        listOf(
+            // 0: intro — just bass + pads + lead. Drums sit out.
+            Section(
+                name = "intro",
+                barsMin = 4, barsMax = 8,
+                transitions = listOf(
+                    SectionTransition(
+                        targetIndex = 1,
+                        weight = 1.0f,
+                        transitionBars = tideRiseBars
+                    ),
+                ),
+                macroOverrides = MacroOverrides(
+                    energy = 0.25f, complexity = 0.4f, space = 1.4f,
+                ),
+            ),
+            // 1: verse — full band, subdued. The pocket.
+            //    Track 5 (chordal pad) gets promoted to a sustained DRONE
+            //    here — held bedrock under the lead. Other sections leave
+            //    the override off, so the pad reverts to its light comping
+            //    base.
+            Section(
+                name = "verse",
+                barsMin = 8, barsMax = 16,
+                transitions = listOf(
+                    SectionTransition(
+                        targetIndex = 2,
+                        weight = 0.55f,
+                        transitionBars = tideRiseBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 3,
+                        weight = 0.30f,
+                        transitionBars = tideFallBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 4,
+                        weight = 0.15f,
+                        transitionBars = tideOutBars
+                    ),
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = null,  // verse is the baseline
+                // Track 5 is Chordal, so its rhythm comes from compingStyle —
+                trackOverrides = mapOf(
+                    5 to TrackSectionOverride(
+                        envelopeProfile = EnvelopeProfile.DRONE,
+                    ),
+                ),
+            ),
+            // 2: chorus — the swell. Lift on bVII; everything wider/wetter.
+            Section(
+                name = "chorus",
+                barsMin = 6, barsMax = 10,
+                transitions = listOf(
+                    SectionTransition(
+                        targetIndex = 1,
+                        weight = 0.50f,
+                        transitionBars = tideFallBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 3,
+                        weight = 0.30f,
+                        transitionBars = tideRiseBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 4,
+                        weight = 0.20f,
+                        transitionBars = tideOutBars
+                    ),
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = MacroOverrides(
+                    energy = 1.30f, complexity = 1.20f, space = 1.20f, mood = 1.30f,
+                ),
+                customProgression = chorusProgression,
+                chordsPerBar = chordsPerBar,
+                // No compingStyle override — let track 5 keep PAD wash and track 7
+                // keep its REGGAE_SKANK accent, so the bed stays under the lift.
+                compingInversion = SectionInversion.OPEN_VOICING,
+                // The lift arc: late-peaking shimmer that rides the held bVII.
+                // Higher evolution probabilities push timbre/morph/harmonics
+                // to wander wider during the chorus than the verse baseline.
+                // octaveShift + chromaticPassing inject upward melodic motion;
+                // a touch of spurtChance lets the lead accent the hang on bVII.
+                // Faster releaseSpeed snaps tension back as we exit toward verse.
+                tensionOverride = TensionProfile(
+                    spurtChance = 0.18f,
+                    innerBars = 8, outerBars = 24, outerDepth = 0.5f,
+                    volume = 0.40f,
+                    tonal = TonalTension(
+                        octaveShift = true,
+                        chromaticPassing = 0.15f,
+                        halfLick = true,
+                    ),
+                    timing = 0.10f,
+                    evolution = EvolutionTension(
+                        timbreLow = 0.40f, timbreHigh = 0.75f, timbreProbability = 0.75f,
+                        attackPoint = 0.70f,    // peak late — earned, not handed
+                        releaseSpeed = 0.50f,   // snap back home for verse handoff
+                    ),
+                ),
+            ),
+            // 3: solo — lead-and-pads jam. Bass + sparse drums hold pocket.
+            Section(
+                name = "solo",
+                barsMin = 8, barsMax = 16,
+                transitions = listOf(
+                    SectionTransition(
+                        targetIndex = 2,
+                        weight = 0.45f,
+                        transitionBars = tideRiseBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 1,
+                        weight = 0.35f,
+                        transitionBars = tideFallBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 4,
+                        weight = 0.20f,
+                        transitionBars = tideOutBars
+                    ),
+                ),
+                recencyDecay = 0.4f,
+                macroOverrides = MacroOverrides(
+                    energy = 0.85f, complexity = 1.60f, space = 1.40f, mood = 1.20f,
+                ),
+                soloMode = SoloMode.Jam(probability = 0.75f),
+            ),
+            // 4: breakdown / outro drift — fade toward silence.
+            Section(
+                name = "breakdown",
+                barsMin = 6, barsMax = 10,
+                transitions = listOf(
+                    SectionTransition(
+                        targetIndex = 1,
+                        weight = 0.65f,
+                        transitionBars = tideRiseBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 2,
+                        weight = 0.35f,
+                        transitionBars = tideRiseBars
+                    ),
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = MacroOverrides(
+                    energy = 0.30f, complexity = 0.50f, space = 1.60f, mood = 0.85f,
+                ),
+                chordFollow = ChordFollow.FIXED,
+                // Held-breath arc: nothing sparks, nothing develops. Tension
+                // sits flat for almost the entire section, then a slow late
+                // attack signals the rise out. Steady timing + minimal
+                // evolution keep the section perfectly still.
+                tensionOverride = TensionProfile(
+                    spurtChance = 0.02f,            // almost never accent
+                    innerBars = 16, outerBars = 32, outerDepth = 0.3f,
+                    volume = 0.20f,
+                    tonal = TonalTension(
+                        octaveShift = false,
+                        chromaticPassing = 0.02f,
+                        halfLick = true,
+                    ),
+                    timing = 0.05f,                 // steady, almost frozen
+                    evolution = EvolutionTension(
+                        timbreLow = 0.30f, timbreHigh = 0.45f, timbreProbability = 0.30f,
+                        attackPoint = 0.85f,        // peak right at the exit edge
+                        releaseSpeed = 0.15f,       // slow exhale
+                    ),
+                ),
+                trackOverrides = mapOf(
+                    5 to TrackSectionOverride(
+                        compingStyle = CompingStyle.ROCK_DOWNBEATS,
+                        envelopeProfile = EnvelopeProfile.RHYTHM,
+                        volume = .5f,
+                        holdProbability = 0f
+                    ),
+                ),
+            ),
+        )
+    }
+
     override val vibe: Vibe by lazy {
 
         Vibe(
             name = name,
             album = Album.STEALTH,
+            arrangement = Arrangement(
+                introIndex = 0,
+                outroIndex = sectionList.lastIndex,
+                sections = sectionList
+            ),
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,  // long pads need TIDES tail; drums need AD attack
             rootNote = RootNote.B,
@@ -251,20 +440,12 @@ class TremoloTideVibe : VibeProvider {
                     )
                 },
                 // 4: tremolo lead — the iconic surf-noir voice. Plays the lick.
-                //    EDM = DX2 idx 18 "Vibe 1" (electric vibraphone — plaintive,
-                //      bell-like, the closest FM-bank match to a tremolo'd clean guitar
-                //      sustained tone). Space = DX3 idx 19 "Etherial5a" (evolving pad
-                //      for the darker shimmer when energy drops).
-                //    Both slots opt in to harmonicsMacroRange = 0.04f so the section
-                //    macroOverrides automatically walk the lead voice: the chorus
-                //    mood × 1.30 nudges up to Glockenspl / Airy territory; the
-                //    breakdown mood × 0.85 nudges down to Marimba / Mal Poly.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX2,
+                    engineId = OrpheusEngineId.DX,
                     volume = 0.25f,
                     morph = .74f,
                     timbre = .67f,
-                    harmonics = 0.551f,             // DX2 idx 18 "Vibe 1" — base
+                    harmonics = 0.492f,
                     harmonicsMacroRange = 0.04f,    // mood walks ±~1 patch around base
                     noteRangeLow = 55,
                     noteRangeHigh = 76,
@@ -279,9 +460,7 @@ class TremoloTideVibe : VibeProvider {
                     TrackVoice(
                         engineEdm = lead,
                         engineSpace = lead.copy(
-                            engineId = OrpheusEngineId.DX3,
-                            harmonics = 0.582f,         // DX3 idx 19 "Etherial5a"
-                            harmonicsMacroRange = 0.04f,// Mal Poly ↔ Etherial5a ↔ Airy
+                            engineId = OrpheusEngineId.DX2,
                         ),
                         role = TrackRole.Melodic(lickMode = LickMode.Fill),
                         pan = 0.15f,
@@ -437,143 +616,6 @@ class TremoloTideVibe : VibeProvider {
                 reverbBrightness = 0.72f,     // bright top despite dark mood
                 deepFloor = 0.3f,
             ),
-            arrangement = Arrangement(
-                introIndex = 0,
-                sections = listOf(
-                    // 0: intro — just bass + pads + lead. Drums sit out.
-                    Section(
-                        name = "intro",
-                        barsMin = 4, barsMax = 8,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = tideRiseBars),
-                        ),
-                        macroOverrides = MacroOverrides(
-                            energy = 0.25f, complexity = 0.4f, space = 1.4f,
-                        ),
-                    ),
-                    // 1: verse — full band, subdued. The pocket.
-                    //    Track 5 (chordal pad) gets promoted to a sustained DRONE
-                    //    here — held bedrock under the lead. Other sections leave
-                    //    the override off, so the pad reverts to its light comping
-                    //    base.
-                    Section(
-                        name = "verse",
-                        barsMin = 8, barsMax = 16,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 2, weight = 0.55f, transitionBars = tideRiseBars),
-                            SectionTransition(targetIndex = 3, weight = 0.30f, transitionBars = tideFallBars),
-                            SectionTransition(targetIndex = 4, weight = 0.15f, transitionBars = tideOutBars),
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = null,  // verse is the baseline
-                        // Track 5 is Chordal, so its rhythm comes from compingStyle —
-                        trackOverrides = mapOf(
-                            5 to TrackSectionOverride(
-                                envelopeProfile = EnvelopeProfile.DRONE,
-                            ),
-                        ),
-                    ),
-                    // 2: chorus — the swell. Lift on bVII; everything wider/wetter.
-                    Section(
-                        name = "chorus",
-                        barsMin = 6, barsMax = 10,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.50f, transitionBars = tideFallBars),
-                            SectionTransition(targetIndex = 3, weight = 0.30f, transitionBars = tideRiseBars),
-                            SectionTransition(targetIndex = 4, weight = 0.20f, transitionBars = tideOutBars),
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = MacroOverrides(
-                            energy = 1.30f, complexity = 1.20f, space = 1.20f, mood = 1.30f,
-                        ),
-                        customProgression = chorusProgression,
-                        chordsPerBar = chordsPerBar,
-                        // No compingStyle override — let track 5 keep PAD wash and track 7
-                        // keep its REGGAE_SKANK accent, so the bed stays under the lift.
-                        compingInversion = SectionInversion.OPEN_VOICING,
-                        // The lift arc: late-peaking shimmer that rides the held bVII.
-                        // Higher evolution probabilities push timbre/morph/harmonics
-                        // to wander wider during the chorus than the verse baseline.
-                        // octaveShift + chromaticPassing inject upward melodic motion;
-                        // a touch of spurtChance lets the lead accent the hang on bVII.
-                        // Faster releaseSpeed snaps tension back as we exit toward verse.
-                        tensionOverride = TensionProfile(
-                            spurtChance = 0.18f,
-                            innerBars = 8, outerBars = 24, outerDepth = 0.5f,
-                            volume = 0.40f,
-                            tonal = TonalTension(
-                                octaveShift = true,
-                                chromaticPassing = 0.15f,
-                                halfLick = true,
-                            ),
-                            timing = 0.10f,
-                            evolution = EvolutionTension(
-                                timbreLow = 0.40f, timbreHigh = 0.75f, timbreProbability = 0.75f,
-                                attackPoint = 0.70f,    // peak late — earned, not handed
-                                releaseSpeed = 0.50f,   // snap back home for verse handoff
-                            ),
-                        ),
-                    ),
-                    // 3: solo — lead-and-pads jam. Bass + sparse drums hold pocket.
-                    Section(
-                        name = "solo",
-                        barsMin = 8, barsMax = 16,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 2, weight = 0.45f, transitionBars = tideRiseBars),
-                            SectionTransition(targetIndex = 1, weight = 0.35f, transitionBars = tideFallBars),
-                            SectionTransition(targetIndex = 4, weight = 0.20f, transitionBars = tideOutBars),
-                        ),
-                        recencyDecay = 0.4f,
-                        macroOverrides = MacroOverrides(
-                            energy = 0.85f, complexity = 1.60f, space = 1.40f, mood = 1.20f,
-                        ),
-                        soloMode = SoloMode.Jam(probability = 0.75f),
-                    ),
-                    // 4: breakdown / outro drift — fade toward silence.
-                    Section(
-                        name = "breakdown",
-                        barsMin = 6, barsMax = 10,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.65f, transitionBars = tideRiseBars),
-                            SectionTransition(targetIndex = 2, weight = 0.35f, transitionBars = tideRiseBars),
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = MacroOverrides(
-                            energy = 0.30f, complexity = 0.50f, space = 1.60f, mood = 0.85f,
-                        ),
-                        chordFollow = ChordFollow.FIXED,
-                        // Held-breath arc: nothing sparks, nothing develops. Tension
-                        // sits flat for almost the entire section, then a slow late
-                        // attack signals the rise out. Steady timing + minimal
-                        // evolution keep the section perfectly still.
-                        tensionOverride = TensionProfile(
-                            spurtChance = 0.02f,            // almost never accent
-                            innerBars = 16, outerBars = 32, outerDepth = 0.3f,
-                            volume = 0.20f,
-                            tonal = TonalTension(
-                                octaveShift = false,
-                                chromaticPassing = 0.02f,
-                                halfLick = true,
-                            ),
-                            timing = 0.05f,                 // steady, almost frozen
-                            evolution = EvolutionTension(
-                                timbreLow = 0.30f, timbreHigh = 0.45f, timbreProbability = 0.30f,
-                                attackPoint = 0.85f,        // peak right at the exit edge
-                                releaseSpeed = 0.15f,       // slow exhale
-                            ),
-                        ),
-                        trackOverrides = mapOf(
-                            5 to TrackSectionOverride(
-                                compingStyle = CompingStyle.ROCK_DOWNBEATS,
-                                envelopeProfile = EnvelopeProfile.RHYTHM,
-                                volume = .5f,
-                                holdProbability = 0f
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-    )
-
+        )
     }
 }

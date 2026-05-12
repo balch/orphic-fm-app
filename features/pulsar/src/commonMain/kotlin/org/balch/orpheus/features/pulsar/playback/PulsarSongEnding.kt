@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.MasterVolumeRamp
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.TimerFadeStatusProvider
@@ -161,10 +160,10 @@ class PulsarSongEnding(
             && finalSectionIndex >= 0
             && state.sectionIndex == finalSectionIndex
             && !rampStarted) {
-            val arr = pulsarFeature.vibeFlow.value.arrangement
-            val rampBars = (arr?.endStyle?.rampBars ?: 0f)
+            val endStyle = pulsarFeature.vibeFlow.value.arrangement?.endStyle
+            val rampBars = (endStyle?.rampBars ?: 0f)
                 .coerceAtMost((state.barsTotal - 2).coerceAtLeast(1).toFloat())
-            if (rampBars > 0f) {
+            if (rampBars > 0f && endStyle != null) {
                 val barsRemaining = state.barsTotal - state.barsElapsed
                 // Fade lives in the LAST ceil(rampBars) bars of the outro.
                 val triggerAt = ceil(rampBars.toDouble()).toInt()
@@ -177,13 +176,10 @@ class PulsarSongEnding(
                     val rampMs = (rampBars.toDouble() * barDurationMs).toLong()
                         .coerceAtLeast(100L)
                     rampJob = scope.launch {
-                        // Ease-in keeps the music near full volume through most
-                        // of the fade then drops sharply at the end — sounds
-                        // like a graceful exit instead of an abrupt linear cut.
                         ramp.rampMasterVolumeTo(
                             target = 0f,
                             durationMs = rampMs,
-                            curve = FadeCurve.EASE_IN,
+                            curve = endStyle.curve,
                         )
                     }
                     log.info { "master ramp started: bars=$rampBars duration=${rampMs}ms" }

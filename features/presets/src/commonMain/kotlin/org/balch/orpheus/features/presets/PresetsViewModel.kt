@@ -10,12 +10,10 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
@@ -69,12 +67,6 @@ private sealed interface PresetIntent {
 }
 
 interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
-    // Eagerly is load-bearing here: _userIntents is a MutableSharedFlow with
-    // replay=0 — user actions emitted while no panel is collecting state
-    // would drop. Switching to WhileSubscribed requires a replay buffer.
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
-
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty
 }
@@ -112,7 +104,11 @@ class PresetsViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
+    private val _state = MutableStateFlow<PresetUiState>(PresetUiState.Loading)
+    override val stateFlow: StateFlow<PresetUiState> = _state.asStateFlow()
+
     init {
+        // Bootstrap: load presets, apply the last-used one, then prime the reducer.
         scope.launch(dispatcherProvider.io) {
             val initial = loadPresets()
             // Session restore: Apply last selected preset once when the ViewModel is first created.
@@ -120,30 +116,28 @@ class PresetsViewModel(
             initial.selectedPreset?.let { presetLoader.applyPreset(it) }
             _userIntents.emit(PresetIntent.RefreshPresets(initial.presets, initial.selectedPreset?.name))
         }
-    }
-
-    override val stateFlow: StateFlow<PresetUiState> =
-        _userIntents
-            .onEach { handleSideEffects(it) }
-            .scan(PresetUiState.Loading as PresetUiState) { state, intent ->
-                if (state is PresetUiState.Loading && intent is PresetIntent.RefreshPresets) {
-                    PresetUiState.Loaded(
-                        presets = intent.presets,
-                        selectedPreset = intent.presets.find { it.name == intent.selectName },
-                        factoryPresetNames = presetsRepository.getFactoryPresetNames()
-                    )
-                } else if (state is PresetUiState.Loaded) {
-                    reduce(state, intent)
-                } else {
-                    state
+        // Always-on reducer. The intent bus has replay=0 so we collect inside
+        // scope.launch (not in a stateIn pipeline) — that way side effects fire
+        // and state mutates regardless of whether the panel is composed.
+        scope.launch(dispatcherProvider.io) {
+            _userIntents
+                .onEach { handleSideEffects(it) }
+                .scan(PresetUiState.Loading as PresetUiState) { state, intent ->
+                    if (state is PresetUiState.Loading && intent is PresetIntent.RefreshPresets) {
+                        PresetUiState.Loaded(
+                            presets = intent.presets,
+                            selectedPreset = intent.presets.find { it.name == intent.selectName },
+                            factoryPresetNames = presetsRepository.getFactoryPresetNames()
+                        )
+                    } else if (state is PresetUiState.Loaded) {
+                        reduce(state, intent)
+                    } else {
+                        state
+                    }
                 }
-            }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = scope,
-                started = this.sharingStrategy,
-                initialValue = PresetUiState.Loading
-            )
+                .collect { _state.value = it }
+        }
+    }
 
 
     // ═══════════════════════════════════════════════════════════

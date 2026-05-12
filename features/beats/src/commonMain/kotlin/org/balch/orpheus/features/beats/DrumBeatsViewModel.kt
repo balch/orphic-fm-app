@@ -10,13 +10,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
@@ -69,12 +67,6 @@ data class DrumBeatsPanelActions(
 }
 
 interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
-    // Eagerly is load-bearing here: uiIntents is a MutableSharedFlow with
-    // replay=0, so user-emitted intents during panel-less periods would drop.
-    // Switching to WhileSubscribed requires giving uiIntents a replay buffer.
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
-
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
 
@@ -196,21 +188,24 @@ class DrumBeatsViewModel(
         setMix = mixFlow.floatSetter()
     )
 
-    override val stateFlow: StateFlow<BeatsUiState> =
-        merge(controlIntents, uiIntents)
-            .scan(BeatsUiState()) { state, intent ->
-                val newState = reduce(state, intent)
-                applySideEffects(intent)
-                newState
-            }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = scope,
-                started = this.sharingStrategy,
-                initialValue = BeatsUiState()
-            )
+    private val _state = MutableStateFlow(BeatsUiState())
+    override val stateFlow: StateFlow<BeatsUiState> = _state.asStateFlow()
 
     init {
+        // Always-on reducer. Drives both state mutation (_state) and the
+        // pattern-generator side effects regardless of UI subscription —
+        // without this, a tick emitted while no panel is composed would be
+        // lost (uiIntents has replay=0, controlFlow MIDI is also fire-and-
+        // forget).
+        scope.launch(dispatcherProvider.io) {
+            merge(controlIntents, uiIntents)
+                .scan(BeatsUiState()) { state, intent ->
+                    val newState = reduce(state, intent)
+                    applySideEffects(intent)
+                    newState
+                }
+                .collect { _state.value = it }
+        }
         // Sync GlobalTempo -> BPM port
         scope.launch(dispatcherProvider.io) {
             globalTempo.bpm.collect { bpm ->

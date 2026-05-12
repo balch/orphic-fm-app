@@ -10,8 +10,8 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
@@ -174,14 +173,6 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     fun applyVibeByName(name: String): Boolean = false
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
-
-    // Eagerly is load-bearing here: arrangementStateFlow's .map{} writes to
-    // the log on every section/solo transition, which is a side effect we do
-    // not want to re-fire on a WhileSubscribed restart. Pulsar is also the
-    // hub other features (e.g. Mixer) read from, so keeping the upstream
-    // continuously hot avoids cold-start flicker for those subscribers.
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
 
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
@@ -578,40 +569,46 @@ class PulsarViewModel(
         }
     }
 
-    override val arrangementStateFlow: StateFlow<PulsarArrangementState> =
-        synthEngine.pulsarArrangementStateFlow
-            .filterNotNull()
-            .map { state ->
-                // Enrich with band member names if band solos are configured
-                val vibe = vibeFlow.value
-                val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
-                val memberNames = vibe.band?.members?.map { it.name }
-                val enriched = if (memberNames != null) {
-                    state.copy(
-                        bandSolo = true,
-                        bandMemberNames = memberNames,
-                    )
-                } else state
+    private val _arrangementState = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
+    override val arrangementStateFlow: StateFlow<PulsarArrangementState> = _arrangementState.asStateFlow()
 
-                val sectionName = section?.name ?: "section-${state.sectionIndex}"
-                if (enriched.soloActive && enriched.soloTrack >= 0) {
-                    val name = if (enriched.bandSolo) {
-                        enriched.bandMemberNames.getOrElse(enriched.soloTrack) { "?" }
+    init {
+        // Always-on enrichment of the C++ arrangement state. Runs regardless of
+        // UI subscription so per-section BPM and per-track override collectors
+        // (below) see fresh data — and so media-session consumers (Android Auto)
+        // stay current without a panel being rendered. Idle when the engine
+        // emits nothing, so battery cost is event-driven, not subscription-driven.
+        scope.launch(dispatcherProvider.io) {
+            synthEngine.pulsarArrangementStateFlow
+                .filterNotNull()
+                .map { state ->
+                    // Enrich with band member names if band solos are configured
+                    val vibe = vibeFlow.value
+                    val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
+                    val memberNames = vibe.band?.members?.map { it.name }
+                    val enriched = if (memberNames != null) {
+                        state.copy(
+                            bandSolo = true,
+                            bandMemberNames = memberNames,
+                        )
+                    } else state
+
+                    val sectionName = section?.name ?: "section-${state.sectionIndex}"
+                    if (enriched.soloActive && enriched.soloTrack >= 0) {
+                        val name = if (enriched.bandSolo) {
+                            enriched.bandMemberNames.getOrElse(enriched.soloTrack) { "?" }
+                        } else {
+                            PULSAR_TRACK_NAMES.getOrElse(enriched.soloTrack) { "?" }
+                        }
+                        log.debug { "Solo active: $name section=$sectionName" }
                     } else {
-                        PULSAR_TRACK_NAMES.getOrElse(enriched.soloTrack) { "?" }
+                        log.debug { "Section: $sectionName bar=${state.barsElapsed}/${state.barsTotal}" }
                     }
-                    log.debug { "Solo active: $name section=$sectionName" }
-                } else {
-                    log.debug { "Section: $sectionName bar=${state.barsElapsed}/${state.barsTotal}" }
+                    enriched
                 }
-                enriched
-            }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = scope,
-                started = sharingStrategy,
-                initialValue = ARRANGEMENT_STATE_UNKNOWN
-            )
+                .collect { _arrangementState.value = it }
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════
     // Actions
@@ -688,52 +685,55 @@ class PulsarViewModel(
         }.toTypedArray(),
     )
 
-    override val stateFlow: StateFlow<PulsarUiState> =
-        controlIntents
-            .scan(PulsarUiState(
-                bpm = globalTempo.getBpm().toFloat(),
-                vibe = vibeFlow.value,
-            )) { state, intent ->
-                when (intent) {
-                    is PulsarIntent.Playing -> state.copy(playing = intent.value)
-                    is PulsarIntent.GlobalPaused -> state.copy(globalPaused = intent.value)
-                    is PulsarIntent.VibeChange -> state.copy(vibe = intent.value, vibeName = intent.value.name)
-                    is PulsarIntent.Energy -> state.copy(energy = intent.value)
-                    is PulsarIntent.Complexity -> state.copy(complexity = intent.value)
-                    is PulsarIntent.Space -> state.copy(space = intent.value)
-                    is PulsarIntent.Mood -> state.copy(mood = intent.value)
-                    is PulsarIntent.Bpm -> state.copy(bpm = intent.value)
-                    is PulsarIntent.Deep -> state.copy(deep = intent.value)
-                    is PulsarIntent.RootNote -> state.copy(rootNote = intent.value)
-                    is PulsarIntent.Scale -> state.copy(scaleIndex = intent.value)
-                    is PulsarIntent.Mix -> state.copy(mix = intent.value)
-                    is PulsarIntent.PercMix -> state.copy(percMix = intent.value)
-                    is PulsarIntent.EnvelopeMode -> state.copy(envelopeMode = intent.value)
-                    is PulsarIntent.SelectedTrack -> state.copy(selectedTrack = intent.value)
-                    is PulsarIntent.TrackEngineEdm -> state.copy(
-                        trackEnginesEdm = state.trackEnginesEdm.toMutableList().also {
-                            it[intent.track] = intent.engine
-                        }
-                    )
-                    is PulsarIntent.TrackEngineSpace -> state.copy(
-                        trackEnginesSpace = state.trackEnginesSpace.toMutableList().also {
-                            it[intent.track] = intent.engine
-                        }
-                    )
-                    is PulsarIntent.TrackMuteList -> state.copy(trackMuted = intent.muteList)
-                }
-            }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = scope,
-                started = sharingStrategy,
-                initialValue = PulsarUiState(
-                    bpm = globalTempo.getBpm().toFloat(),
-                    vibe = vibeFlow.value
-                )
-            )
+    private val _state = MutableStateFlow(PulsarUiState(
+        bpm = globalTempo.getBpm().toFloat(),
+        vibe = vibeFlow.value,
+    ))
+    override val stateFlow: StateFlow<PulsarUiState> = _state.asStateFlow()
 
-    // Sync GlobalTempo -> BPM port (must be after stateFlow so Eagerly collection is active)
+    init {
+        // Always-on reducer: drives state mutation independent of UI
+        // subscription. MIDI / AI / preset intents reach the scan reducer even
+        // when no panel is rendering (e.g. Android Auto background playback).
+        // Idle when no intents emit — battery cost is the same as Eagerly here
+        // because the upstream port flows are event-driven.
+        scope.launch(dispatcherProvider.io) {
+            controlIntents
+                .scan(_state.value) { state, intent ->
+                    when (intent) {
+                        is PulsarIntent.Playing -> state.copy(playing = intent.value)
+                        is PulsarIntent.GlobalPaused -> state.copy(globalPaused = intent.value)
+                        is PulsarIntent.VibeChange -> state.copy(vibe = intent.value, vibeName = intent.value.name)
+                        is PulsarIntent.Energy -> state.copy(energy = intent.value)
+                        is PulsarIntent.Complexity -> state.copy(complexity = intent.value)
+                        is PulsarIntent.Space -> state.copy(space = intent.value)
+                        is PulsarIntent.Mood -> state.copy(mood = intent.value)
+                        is PulsarIntent.Bpm -> state.copy(bpm = intent.value)
+                        is PulsarIntent.Deep -> state.copy(deep = intent.value)
+                        is PulsarIntent.RootNote -> state.copy(rootNote = intent.value)
+                        is PulsarIntent.Scale -> state.copy(scaleIndex = intent.value)
+                        is PulsarIntent.Mix -> state.copy(mix = intent.value)
+                        is PulsarIntent.PercMix -> state.copy(percMix = intent.value)
+                        is PulsarIntent.EnvelopeMode -> state.copy(envelopeMode = intent.value)
+                        is PulsarIntent.SelectedTrack -> state.copy(selectedTrack = intent.value)
+                        is PulsarIntent.TrackEngineEdm -> state.copy(
+                            trackEnginesEdm = state.trackEnginesEdm.toMutableList().also {
+                                it[intent.track] = intent.engine
+                            }
+                        )
+                        is PulsarIntent.TrackEngineSpace -> state.copy(
+                            trackEnginesSpace = state.trackEnginesSpace.toMutableList().also {
+                                it[intent.track] = intent.engine
+                            }
+                        )
+                        is PulsarIntent.TrackMuteList -> state.copy(trackMuted = intent.muteList)
+                    }
+                }
+                .flowOn(dispatcherProvider.io)
+                .collect { _state.value = it }
+        }
+    }
+
     init {
         scope.launch(dispatcherProvider.io) {
             globalTempo.bpm.collect { bpm ->

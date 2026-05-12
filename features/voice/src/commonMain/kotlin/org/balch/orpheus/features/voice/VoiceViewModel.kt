@@ -10,15 +10,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
@@ -47,9 +45,6 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 
 
 interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
-
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
 
@@ -315,21 +310,22 @@ class VoiceViewModel(
             action = KeyAction.Trigger { KeyboardInputHandler.handleOctaveKey(Key.X); true }))
     }
 
-    override val stateFlow: StateFlow<VoiceUiState> =
-        merge(controlIntents, uiIntents)
-            .scan(VoiceUiState()) { state, intent ->
-                val newState = reduceVoiceState(state, intent)
-                applySideEffects(newState, intent)
-                newState
-            }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = scope,
-                started = this.sharingStrategy,
-                initialValue = VoiceUiState()
-            )
+    private val _state = MutableStateFlow(VoiceUiState())
+    override val stateFlow: StateFlow<VoiceUiState> = _state.asStateFlow()
 
     init {
+        // Always-on reducer + side effects. The reducer lives in scope.launch
+        // (not inside stateIn) so peak/pulse/hold/bend events emitted while no
+        // panel is composed still update state and drive engine effects.
+        scope.launch(dispatcherProvider.io) {
+            merge(controlIntents, uiIntents)
+                .scan(VoiceUiState()) { state, intent ->
+                    val newState = reduceVoiceState(state, intent)
+                    applySideEffects(newState, intent)
+                    newState
+                }
+                .collect { _state.value = it }
+        }
         scope.launch(dispatcherProvider.io) {
             // Pulse events
             launch {

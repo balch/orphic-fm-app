@@ -416,7 +416,7 @@ class MediaPipeViewModel(
             .flowOn(dispatcherProvider.default)
             .stateIn(
                 scope = scope,
-                started = sharingStrategy,
+                started = SynthFeature.sharingStrategy,
                 initialValue = MediaPipeUiState(),
             )
 

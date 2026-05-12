@@ -122,18 +122,25 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         createNotificationChannel()
         setupMediaSession()
 
-        // Warm the Pulsar stack so by the time Auto/Assistant sends a
-        // playback command, action handlers are wired through
-        // MediaSessionManager. AUTO_BROWSER keeps the session alive
-        // independent of the mute/playing state.
+        // Warm the audio engine + Pulsar stack so by the time Auto/Assistant
+        // sends a playback command, the engine is running and action handlers
+        // are wired through MediaSessionManager.
+        //
+        // Engine start happens HERE (not in the Compose UI) so Android Auto
+        // works without launching MainActivity. SynthOrchestrator.start() is
+        // idempotent — DjApp's LaunchedEffect also calls it on the launcher
+        // path where no service is bound yet, and the second call is a no-op.
+        //
+        // AUTO_BROWSER keeps the session alive independent of mute/play state.
         // Logged at error level: if this fails, Auto play commands silently
         // do nothing, so the failure needs to be loud in logcat.
         try {
             val graph = DjAppApplication.getGraph(this)
+            graph.synthOrchestrator.start()
             graph.mediaSessionStateManager.setAutoBrowserActive(true)
             pulsarFeature // trigger ViewModel init (wires MediaSessionActionHandler)
         } catch (e: Exception) {
-            log.error(e) { "Failed to warm up Pulsar stack — Auto play commands will be no-ops" }
+            log.error(e) { "Failed to warm up audio engine — Auto play commands will be no-ops" }
         }
 
         log.info { "DjMediaBrowserService created" }

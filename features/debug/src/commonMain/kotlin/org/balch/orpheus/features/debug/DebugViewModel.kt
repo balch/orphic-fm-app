@@ -70,7 +70,7 @@ class DebugViewModel(
         )
     }.stateIn(
         scope = scope,
-        started = this.sharingStrategy,
+        started = SynthFeature.sharingStrategy,
         initialValue = DebugUiState(0f, 0f,)
     )
 

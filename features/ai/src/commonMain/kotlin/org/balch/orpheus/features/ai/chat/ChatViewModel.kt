@@ -60,7 +60,7 @@ class ChatViewModel(
         .map { it.messages }
         .stateIn(
             scope = scope,
-            started = this.sharingStrategy,
+            started = SynthFeature.sharingStrategy,
             initialValue = emptyList()
         )
 
@@ -71,7 +71,7 @@ class ChatViewModel(
         .map { it is AgentState.Loading || it.messages.lastOrNull()?.type == ChatMessageType.Loading }
         .stateIn(
             scope = scope,
-            started = this.sharingStrategy,
+            started = SynthFeature.sharingStrategy,
             initialValue = true
         )
 
@@ -92,7 +92,7 @@ class ChatViewModel(
         )
     }.stateIn(
         scope = scope,
-        started = this.sharingStrategy,
+        started = SynthFeature.sharingStrategy,
         initialValue = ChatUiState()
     )
 

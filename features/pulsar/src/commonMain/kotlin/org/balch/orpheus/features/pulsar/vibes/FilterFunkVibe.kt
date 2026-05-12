@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -16,6 +17,7 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.EndStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
@@ -44,15 +46,94 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
+import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
 
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FilterFunkVibe : VibeProvider {
     override val name: String = "Filter Funk"
+
+    private val sectionList by lazy {
+        listOf(
+            // 0: groove — main funk pocket, tight 16ths
+            Section(
+                name = "groove",
+                barsMin = 8, barsMax = 16,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 1, weight = 0.4f),
+                    SectionTransition(targetIndex = 2, weight = 0.35f),
+                    SectionTransition(targetIndex = 3, weight = 0.25f),
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = null,  // groove IS the baseline
+            ),
+            // 1: build — rising energy, more complexity, filter opens up
+            Section(
+                name = "build",
+                barsMin = 4, barsMax = 8,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 2, weight = 0.6f),
+                    SectionTransition(targetIndex = 0, weight = 0.2f),
+                    SectionTransition(targetIndex = 3, weight = 0.2f),
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = MacroOverrides(
+                    energy = 1.3f, complexity = 1.5f, space = 0.8f, mood = 1.3f,
+                ),
+            ),
+            // 2: interlude — round-robin short solos, each instrument takes a turn
+            Section(
+                name = "interlude",
+                barsMin = 8, barsMax = 16,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 0, weight = 0.5f),
+                    SectionTransition(targetIndex = 3, weight = 0.3f),
+                    SectionTransition(targetIndex = 1, weight = 0.2f),
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = MacroOverrides(
+                    energy = 0.8f, complexity = 1.2f, space = 1.3f, mood = 1.1f,
+                ),
+                soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
+            ),
+            // 3: drop — stripped to kick + bass droning on G for impact on return
+            Section(
+                name = "drop",
+                barsMin = 2, barsMax = 4,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 0, weight = 0.8f),
+                    SectionTransition(targetIndex = 1, weight = 0.2f),
+                ),
+                recencyDecay = 0.4f,
+                macroOverrides = MacroOverrides(
+                    energy = 0.3f, complexity = 0.2f, space = 0.4f, mood = 0.6f,
+                ),
+                chordFollow = ChordFollow.FIXED,  // bass locks to G during the drop
+            ),
+            // 4: outro — low-energy wind-down on a fixed 2-chord progression
+            Section(
+                name = "outro",
+                barsMin = 4, barsMax = 6,
+                macroOverrides = MacroOverrides(
+                    energy = 0.5f, complexity = 0.1f, space = 0.6f, mood = 1.6f,
+                ),
+                chordFollow = ChordFollow.FIXED,
+                customProgression = chords(0, 3)
+            ),
+        )
+    }
+
     override val vibe: Vibe by lazy {
         Vibe(
             name = name,
+            album = Album.STEALTH,
+            arrangement = Arrangement(
+                introIndex = 0,
+                sections = sectionList,
+                outroIndex = sectionList.lastIndex,
+                endStyle = EndStyle.ABRUPT,
+            ),
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.G,
@@ -106,10 +187,10 @@ class FilterFunkVibe : VibeProvider {
                 pullInBarsMin = 2, pullInBarsMax = 4,
                 barsPerLeadMin = 2, barsPerLeadMax = 6,
             ),
-            energy = 0.55f,
+            energy = 0.51f,
             complexity = 0.25f,
             space = 0.4f,
-            mood = 0.35f,
+            mood = 0.45f,
             genre = GenreProfile(
                 swingAmount = 0.03f,
                 ghostProbability = 0.15f,
@@ -181,8 +262,8 @@ class FilterFunkVibe : VibeProvider {
                     )
                 },
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.VCF,
-                    volume = 0.50f,
+                    engineId = OrpheusEngineId.TRIPLE_RING_MOD,
+                    volume = .5f,
                     noteRangeLow = 45,
                     noteRangeHigh = 64,
                     reverbBrightness = 0.5f,
@@ -190,7 +271,9 @@ class FilterFunkVibe : VibeProvider {
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
-                        engineSpace = lead.copy(engineId = OrpheusEngineId.WSH),
+                        engineSpace = lead.copy(
+                            engineId = OrpheusEngineId.WSH,
+                        ),
                         role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                         pan = -0.20f,
                         density = 0.20f,
@@ -326,66 +409,6 @@ class FilterFunkVibe : VibeProvider {
                 reverbDamping = 0.4f,
                 reverbBrightness = 0.7f,
             ),
-            arrangement = Arrangement(
-                introIndex = 0,
-                sections = listOf(
-                    // 0: groove — main funk pocket, tight 16ths
-                    Section(
-                        name = "groove",
-                        barsMin = 8, barsMax = 16,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.4f),
-                            SectionTransition(targetIndex = 2, weight = 0.35f),
-                            SectionTransition(targetIndex = 3, weight = 0.25f),
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = null,  // groove IS the baseline
-                    ),
-                    // 1: build — rising energy, more complexity, filter opens up
-                    Section(
-                        name = "build",
-                        barsMin = 4, barsMax = 8,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 2, weight = 0.6f),
-                            SectionTransition(targetIndex = 0, weight = 0.2f),
-                            SectionTransition(targetIndex = 3, weight = 0.2f),
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = MacroOverrides(
-                            energy = 1.3f, complexity = 1.5f, space = 0.8f, mood = 1.3f,
-                        ),
-                    ),
-                    // 2: interlude — round-robin short solos, each instrument takes a turn
-                    Section(
-                        name = "interlude",
-                        barsMin = 8, barsMax = 16,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 0, weight = 0.5f),
-                            SectionTransition(targetIndex = 3, weight = 0.3f),
-                            SectionTransition(targetIndex = 1, weight = 0.2f),
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = MacroOverrides(
-                            energy = 0.8f, complexity = 1.2f, space = 1.3f, mood = 1.1f,
-                        ),
-                        soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
-                    ),
-                    // 3: drop — stripped to kick + bass droning on G for impact on return
-                    Section(
-                        name = "drop",
-                        barsMin = 2, barsMax = 4,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 0, weight = 0.8f),
-                            SectionTransition(targetIndex = 1, weight = 0.2f),
-                        ),
-                        recencyDecay = 0.4f,
-                        macroOverrides = MacroOverrides(
-                            energy = 0.3f, complexity = 0.2f, space = 0.4f, mood = 0.6f,
-                        ),
-                        chordFollow = ChordFollow.FIXED,  // bass locks to G during the drop
-                    ),
-                ),
-            ),
-    )
+        )
     }
 }

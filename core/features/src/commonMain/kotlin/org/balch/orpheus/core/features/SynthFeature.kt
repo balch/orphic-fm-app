@@ -9,15 +9,26 @@ import org.balch.orpheus.core.input.KeyBinding
 /**
  * A feature that exposes state as a StateFlow and stable actions.
  * Child composables should collect state at the leaf level for optimal recomposition.
+ *
+ * ## Sharing strategy
+ *
+ * Use [SynthFeature.sharingStrategy] (a single app-wide constant) when calling
+ * `stateIn(...)` on the feature's [stateFlow]. There is no per-feature override:
+ * `WhileSubscribed(5_000)` is the only acceptable strategy because [stateFlow]
+ * must be a **pure projection** over authoritative state — typically a
+ * `combine(...)` of `SynthController.controlFlow(...)` port flows plus any
+ * UI-only `MutableStateFlow`s the feature owns.
+ *
+ * If you reach for `Eagerly`, you have side effects inside the `stateIn`
+ * pipeline. Move them into always-on `scope.launch { ... }` collectors in the
+ * `init {}` block — those run regardless of UI subscription and don't fight
+ * the projection's lifecycle. See `EvoViewModel` for the canonical shape.
  */
 interface SynthFeature<S, A> {
     val stateFlow: StateFlow<S>
     val actions: A
 
     val synthControl: SynthControl
-
-    val sharingStrategy: SharingStarted
-        get() = SharingStarted.WhileSubscribed(5_000)
 
     /**
      * Key bindings for this feature.
@@ -26,6 +37,19 @@ interface SynthFeature<S, A> {
      */
     val keyBindings: List<KeyBinding>
         get() = emptyList()
+
+    companion object {
+        /**
+         * The single sharing strategy every SynthFeature must use.
+         *
+         * Held on the companion (not as an overridable interface property) so
+         * features can't drift back to `Eagerly` to paper over architectural
+         * coupling. If your feature feels like it needs hotter sharing, the
+         * fix is moving the side effects out of the projection — not changing
+         * this constant.
+         */
+        val sharingStrategy: SharingStarted = SharingStarted.WhileSubscribed(5_000)
+    }
 
     /**
      * Self-registering documentation descriptor for a feature panel.

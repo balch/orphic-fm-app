@@ -44,7 +44,14 @@ fun DjApp(graph: DjAppGraph, onTogglePlayback: () -> Unit = {}) {
             val vizState by vizFeature.stateFlow.collectAsState()
             val liquidEffects = vizState.liquidEffects
 
-            // Start audio engine and enable viz
+            // Start audio engine and enable viz.
+            //
+            // Engine start is idempotent (SynthOrchestrator.isStarted guard).
+            // Android Auto also starts the engine from DjMediaBrowserService
+            // .onCreate so audio works when no Activity is composed. On the
+            // launcher path (no service bound yet) this LaunchedEffect is the
+            // start trigger. On the JVM/iOS desktop paths there is no service,
+            // so this is the only call.
             LaunchedEffect(Unit) {
                 withContext(Dispatchers.Default) {
                     graph.synthOrchestrator.start()

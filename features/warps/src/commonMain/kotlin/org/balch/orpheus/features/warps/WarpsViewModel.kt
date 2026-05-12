@@ -164,7 +164,7 @@ class WarpsViewModel(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = scope,
-                started = this.sharingStrategy,
+                started = SynthFeature.sharingStrategy,
                 initialValue = WarpsUiState()
             )
 

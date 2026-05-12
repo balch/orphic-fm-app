@@ -327,7 +327,7 @@ class DjViewModel(
             .flowOn(dispatchers.default)
             .stateIn(
                 scope = scope,
-                started = this.sharingStrategy,
+                started = SynthFeature.sharingStrategy,
                 initialValue = DjUiState()
             )
 

@@ -10,8 +10,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
@@ -349,7 +349,7 @@ class AiOptionsViewModel(
         .map { it.messages }
         .stateIn(
             scope = scope,
-            started = this.sharingStrategy,
+            started = SynthFeature.sharingStrategy,
             initialValue = emptyList()
         )
 
@@ -807,15 +807,24 @@ class AiOptionsViewModel(
     private val _isReplActive = MutableStateFlow(false)
     private val _showChatDialog = MutableStateFlow(false)
 
-    override val currentMode: StateFlow<PlaybackMode> =
-        combine(_isDroneActive, _isSoloActive, _isReplActive) { drone, solo, repl ->
-            when {
-                drone -> PlaybackMode.DRONE
-                solo -> PlaybackMode.SOLO
-                repl -> PlaybackMode.REPL
-                else -> PlaybackMode.USER
-            }
-        }.stateIn(scope, SharingStarted.Eagerly, PlaybackMode.USER)
+    // Always-live mode projection: read by OrpheusMetadataProducer to drive
+    // media-session notifications, which must reflect mode immediately even
+    // when no UI is collecting (e.g. background playback, Android Auto).
+    private val _currentMode = MutableStateFlow(PlaybackMode.USER)
+    override val currentMode: StateFlow<PlaybackMode> = _currentMode.asStateFlow()
+
+    init {
+        scope.launch(dispatcherProvider.default) {
+            combine(_isDroneActive, _isSoloActive, _isReplActive) { drone, solo, repl ->
+                when {
+                    drone -> PlaybackMode.DRONE
+                    solo -> PlaybackMode.SOLO
+                    repl -> PlaybackMode.REPL
+                    else -> PlaybackMode.USER
+                }
+            }.collect { _currentMode.value = it }
+        }
+    }
 
     // ============================================================
     // API Key Management
@@ -887,7 +896,7 @@ class AiOptionsViewModel(
         )
     }.stateIn(
         scope = scope,
-        started = this.sharingStrategy,
+        started = SynthFeature.sharingStrategy,
         initialValue = AiOptionsUiState(
             availableModels = availableModels,
             aiStatusMessages = aiStatusMessages,

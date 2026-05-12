@@ -11,13 +11,11 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
@@ -93,13 +91,6 @@ private sealed interface SpeechIntent {
 }
 
 interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
-    // Eagerly is load-bearing here: speechEventBus.events is a SharedFlow with
-    // replay=0, so a TTS status event emitted while no panel is mounted would
-    // be lost. Until the bus carries replay buffers (or is converted to a
-    // StateFlow), the feature must stay hot from construction.
-    override val sharingStrategy: SharingStarted
-        get() = SharingStarted.Eagerly
-
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
 
@@ -208,19 +199,20 @@ class SpeechViewModel(
         voicesLoadedFlow.map { SpeechIntent.VoicesLoaded(it) }
     )
 
-    override val stateFlow: StateFlow<SpeechUiState> =
-        controlIntents
-            .scan(SpeechUiState(ttsAvailable = ttsGenerator.isAvailable)) { state, intent ->
-                reduce(state, intent)
-            }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = scope,
-                started = this.sharingStrategy,
-                initialValue = SpeechUiState(ttsAvailable = ttsGenerator.isAvailable)
-            )
+    private val _state = MutableStateFlow(SpeechUiState(ttsAvailable = ttsGenerator.isAvailable))
+    override val stateFlow: StateFlow<SpeechUiState> = _state.asStateFlow()
 
     init {
+        // Always-on reducer. speechEventBus.events has replay=0 so the
+        // collector must be launched here (not gated by stateIn) — otherwise
+        // TTS status events emitted while no panel is composed would be lost.
+        scope.launch(dispatcherProvider.io) {
+            controlIntents
+                .scan(SpeechUiState(ttsAvailable = ttsGenerator.isAvailable)) { state, intent ->
+                    reduce(state, intent)
+                }
+                .collect { _state.value = it }
+        }
         scope.launch {
             val voices = ttsGenerator.listVoices()
             voicesLoadedFlow.value = voices

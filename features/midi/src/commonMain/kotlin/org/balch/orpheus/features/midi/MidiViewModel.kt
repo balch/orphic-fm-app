@@ -79,7 +79,7 @@ class MidiViewModel(
         )
     }.stateIn(
         scope = scope,
-        started = this.sharingStrategy,
+        started = SynthFeature.sharingStrategy,
         initialValue = MidiUiState()
     )
 
