@@ -155,11 +155,97 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
 - **`pan`**: Stereo position -1.0 to 1.0.
 - **`density`**: Probability that a step gets a note, 0-1.
 - **`envelopeProfile`**: Per-track envelope shape — `RHYTHM`, `MELODIC`, `EFFECT`, `WILD`, `DRONE`. See `references/envelopes.md` for solo/ducking specifics.
-- **`macroMap`**: `TrackMacroMap.RHYTHM`/`MELODIC`/`EFFECT`/`WILD`. Match to `envelopeProfile` unless you have a reason not to.
+- **`macroMap`**: `TrackMacroMap.RHYTHM`/`MELODIC`/`EFFECT`/`WILD`, or a custom `TrackMacroMap(...)` you build inline. Match to `envelopeProfile` unless you have a reason not to. The macro map is **how the four live knobs reshape per-track parameters at render time** — and on every parameter it covers, the value written on `OrpheusEngine` is *overwritten* unless the matching `pinHarmonics`/`pinTimbre`/`pinMorph` is set. See the next subsection for when to write your own.
 - **`barStrategy`**: `REPEAT`, `MUTATE`, `FILL`, `CALL_RESPONSE`, `INDEPENDENT`.
 - **`evolutionWeight`** (default `-1` = auto): How much tension-driven evolution affects this track.
 - **`soloBehavior`** / **`duckingProfile`**: Optional. See `PulsarVibe.kt` KDoc.
 - **`evolution`**: `Evolution(rhythmic, pitch)` — optional Markov drift. `PitchEvolution.Contour` for melodic, `PitchEvolution.Voicing` for chordal.
+
+### Custom `TrackMacroMap` — when the presets don't fit
+
+`TrackMacroMap` is a plain `data class` with seven `MacroTarget(min, max)` fields. The four presets (`RHYTHM`/`MELODIC`/`EFFECT`/`WILD`) cover most cases, but you can instantiate your own inline in the `TrackVoice(...)` block when the preset ranges fight your design.
+
+**What the seven fields actually do at render time** (from `orpheus_unit_pulsar.cpp:1631-1641` and `1555`):
+
+| Field | Macro that drives it | Effect on render |
+|---|---|---|
+| `energyVolume` | Energy | Per-track output gain multiplier. |
+| `energyDensity` | Energy | Per-step note-trigger probability. |
+| `complexitySwing` | Complexity | Note timing offset (track 0 only — drives the bar swing). |
+| `complexityVariation` | Complexity | Step-pattern mutation amount. |
+| `spaceDecay` | **Space** (not mood!) | Drives `morph` when `pinMorph = false`. |
+| `moodHarmonics` | Mood | Drives `harmonics` when `pinHarmonics = false`. |
+| `moodTimbre` | Mood | Drives `timbre` when `pinTimbre = false`. **Also gates auto evolution weight** — see gotchas. |
+
+Interpolation is linear: `value = min + macro × (max − min)`. So `MacroTarget(0.8f, 0.2f)` (min > max) is a valid **inverted** response — the parameter shrinks as the macro grows.
+
+**When to write a custom map (in order of how often you'll reach for it):**
+
+1. **The preset's tonal range is wrong for the engine.** A `MOD` modal voice tuned for dark cathedral bells wants `moodHarmonics = MacroTarget(0.05f, 0.20f)`, not `RHYTHM`'s `0.3-0.6` or `MELODIC`'s `0.3-0.7`. Custom map lets you keep mood-knob expressiveness inside the *right* tonal neighborhood.
+2. **You want a parameter locked but still want evolution.** `MacroTarget(0.42f, 0.42f)` collapses the lerp to a constant — equivalent to pinning that knob *for the macro*, but tension-evolution drift (the `EvolutionTension` sweeps in lines 1662-1689) still applies. Pinning kills both.
+3. **You want to opt the track out of tension-evolution entirely.** Set `moodTimbre = MacroTarget(0f, 0f)`. The auto-rule on line 1647 (`evo_weight = (mm.mood_timbre.max_value > 0.001f) ? 1.0f : 0.0f`) zeros the evolution weight when the moodTimbre max is ≤ 0.001, so the entire EvolutionTension cycle becomes a no-op for that track. Drone/pad tracks that should never breathe with tension want this.
+4. **You want an inverted relationship.** A breakdown-FX track that should *quiet down* as energy rises: `energyVolume = MacroTarget(0.8f, 0.2f)`. (`EFFECT` already attenuates volume but not by inverting.) Same trick for a hat that opens up as space rises but closes down as mood goes bright.
+5. **You want a much narrower range than any preset.** A bass track where mood should *only* shift timbre between 0.45 and 0.55 (subtle): `moodTimbre = MacroTarget(0.45f, 0.55f)`. None of the presets are that tight.
+
+**Where to write it:**
+
+Inline at the `TrackVoice` site, or as a `private val` at the top of the vibe file if multiple tracks share it. The map is plain data — it serializes through DI to C++ as 14 floats and there is no runtime cost to a custom map vs a preset.
+
+**Preferred form for small overrides: `.copy(...)` on a preset.** `TrackMacroMap` is a Kotlin `data class`, so you get `copy()` for free. This is the right hammer when you only need to adjust 1-3 fields — you keep the preset's intent for everything else and surface only the deltas:
+
+```kotlin
+// Lock harmonics/timbre/morph to the engine's authored tonal color
+// while keeping RHYTHM's energy + complexity behavior intact.
+TrackVoice(
+    engineEdm = kick,
+    engineSpace = kick,
+    macroMap = TrackMacroMap.RHYTHM.copy(
+        moodHarmonics = MacroTarget(0.30f, 0.30f),  // locks harmonics; tension-evo still active
+        moodTimbre    = MacroTarget(0.60f, 0.60f),  // locks timbre
+        spaceDecay    = MacroTarget(0.70f, 0.70f),  // locks morph
+    ),
+    // ...
+)
+```
+
+`SunPilgrimVibe.kt` and `SunCourseVibe.kt` use this form on every track to make the hand-tuned `OrpheusEngine` tonal values actually audible. Note that `moodTimbre.max` is still `> 0.001f` (it's the locked value itself), so the auto-evo-weight rule still enables tension-evolution drift — the harmonics/timbre/morph are locked to the macro but free to be modulated by tension. Setting `moodTimbre = MacroTarget(0f, 0f)` is the only way to *also* opt out of evolution; any non-zero lock keeps evolution on.
+
+**Full-instantiation form** is for tracks that diverge from every preset:
+
+```kotlin
+TrackVoice(
+    engineEdm = bass,
+    engineSpace = bass,
+    macroMap = TrackMacroMap(
+        energyVolume = MacroTarget(0.6f, 1.0f),
+        energyDensity = MacroTarget(0.35f, 0.7f),
+        complexitySwing = MacroTarget(0.0f, 0.05f),
+        complexityVariation = MacroTarget(0.0f, 0.1f),
+        spaceDecay = MacroTarget(0.4f, 0.4f),       // morph locked, but still tension-evolvable
+        moodHarmonics = MacroTarget(0.05f, 0.20f),  // dark-bell neighborhood
+        moodTimbre = MacroTarget(0.30f, 0.55f),     // narrow mood window
+    ),
+    // ...
+)
+```
+
+**Custom map vs. pinning — which to reach for:**
+
+| Goal | Use |
+|---|---|
+| Lock the rendered value AND lock tension-evolution AND lock LFO walk | `pinTimbre = true` (etc.) |
+| Lock the rendered value but keep tension-evolution drift | Custom map with `min == max` |
+| Restrict the live-macro range but keep all modulation active | Custom map with narrowed `(min, max)` |
+| Disable tension-evolution timbre sweeps only | Custom map with `moodTimbre = MacroTarget(0f, 0f)` |
+| Override only on DX harmonics (32-patch selector) | Pin is forced on automatically — set the patch index and forget |
+
+**Gotchas:**
+
+- **`morph` is driven by `spaceDecay`, not by `moodMorph`** — there is no `moodMorph` field. The naming is asymmetric. If you want morph to follow mood, you cannot get there with a custom map; you must pin morph and modulate it some other way (LFO, tension evolution).
+- **`complexitySwing` is read only from track 0** (`orpheus_unit_pulsar.cpp:1555`) — setting it on tracks 1-7 has no effect on swing. Other macro fields read per-track normally.
+- **`pushMacroMap` pushes 14 floats** even though the inline comment in `PulsarViewModel.kt:1133` says "16". Just a stale comment.
+- The auto-evo-weight rule means that any custom map where `moodTimbre.max <= 0.001f` silently disables tension-driven harmonics/timbre/morph drift for the whole track. If you want a track that's tension-still on timbre but tension-active on harmonics, you have to set `evolutionWeight` explicitly on the `TrackVoice` (not `-1`).
+- No existing committed vibe writes a custom map (as of this writing) — you'd be first. That's fine, the schema supports it, but it means there is no reference example to crib from yet.
 
 ### `TrackRole.Chordal` sub-tuning (`ChordComping`)
 

@@ -26,6 +26,7 @@ import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -307,9 +308,11 @@ class TechnoWobbleVibe : VibeProvider {
                 // everything with slow LFO timbre drift. This is the bed.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
-                    volume = 0.24f,             // EFFECT macroMap caps energyVolume at 0.5×, texture-ducking trims further
-                    harmonics = 0.582f,         // DX3 idx 19 "Etherial5a" base patch (auto-pinned)
-                    harmonicsModulation = 0.05f,// ±0.05 LFO swing → walks ~idx 17 "Mal Poly" ↔ idx 21 "Boron A" — pad-family neighborhood
+                    volume = 0.40f,             // EFFECT macroMap energyVolume(0.2-0.5) scales this; lands ~0.17 in grind, ~0.20 in stab, ~0.12 in pulse/drift. Fall has its own volume=0.55 trackOverride that supersedes this.
+                    harmonics = 0.490f,         // DX3 idx 16 "ENTRIX" — cinematic synth-pad centerpoint of the bank (auto-pinned)
+                    harmonicsModulation = 0.12f,// ±0.12 LFO sweep — long held notes hear ~4 patches walk across their duration; replicates the "end of fall" patch-sweep character in any section where notes hold long enough
+                    harmonicsMacroRange = 0.30f,// Section-driven cinematic-pad arc: fall whispers in *Planets/Soft touch (atmospheric), grind sits at ENTRIX/Mal Poly (mid-pad core), stab climbs to Etherial5a/Airy/Boron A (lush airy peak). Stays entirely in the synth-pad family.
+                    harmonicsMacroSource = MacroSource.MOOD, // explicit (default)
                     timbre = 0.25f,             // macro-driven at render, but kept as a reference value
                     morph = 0.15f,              // macro-driven at render, but kept as a reference value
                     modLfoRate = 0.04f,         // glacial drift
