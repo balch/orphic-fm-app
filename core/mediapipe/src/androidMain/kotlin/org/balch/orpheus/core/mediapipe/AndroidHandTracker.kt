@@ -188,9 +188,12 @@ class AndroidHandTracker(
         isStopping = true // Signal before close — prevents in-flight frames from calling recognizeAsync
         lifecycleOwner?.stop()
         lifecycleOwner = null
-        gestureRecognizer?.close()
+        // MediaPipe's close() invokes waitUntilGraphDone() which re-throws any persisted
+        // graph error onto the caller's thread. If the graph was poisoned during streaming,
+        // we don't want that to take down the app on shutdown — log and continue.
+        try { gestureRecognizer?.close() } catch (e: Throwable) { log.warn(e) { "gestureRecognizer.close() failed" } }
         gestureRecognizer = null
-        handLandmarker?.close()
+        try { handLandmarker?.close() } catch (e: Throwable) { log.warn(e) { "handLandmarker.close() failed" } }
         handLandmarker = null
         useGestureRecognizer = false
         analysisExecutor.shutdown()
@@ -270,7 +273,12 @@ class AndroidHandTracker(
 
         publishCameraFrame(mirrored)
 
-        val mpImage = BitmapImageBuilder(mirrored).build()
+        // MediaPipe's recognizeAsync/detectAsync are async — they queue the MPImage and
+        // return immediately. The shared `reusableMirrorBitmap` is mutated by the next
+        // frame's mirrorHorizontal() call, which would race the in-flight recognizer and
+        // trip "Packet isn't the sole owner of the holder" (poisoning the graph). Copy
+        // so MediaPipe owns its input exclusively.
+        val mpImage = BitmapImageBuilder(mirrored.copy(Bitmap.Config.ARGB_8888, false)).build()
         if (useGestureRecognizer) {
             gestureRecognizer?.recognizeAsync(mpImage, timestampMs) ?: return
         } else {
