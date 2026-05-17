@@ -77,6 +77,13 @@ static TestSuite suites[] = {
     {"analysis",        run_pulsar_analysis_tests, false},  // manual: writes WAV files
     {"braids",          run_braids_tests,          true},
     {"pulsar_pinning",  run_pulsar_pinning_tests,  true},
+    {"chaos",           run_chaos_tests,           true},
+    {"chaos_lorenz",    run_chaos_lorenz_tests,    true},
+    {"chaos_rossler",   run_chaos_rossler_tests,   true},
+    {"chaos_duffing",   run_chaos_duffing_tests,   true},
+    {"chaos_henon",     run_chaos_henon_tests,     true},
+    {"chaos_chua",      run_chaos_chua_tests,      true},
+    {"pulsar_chaos",    run_pulsar_chaos_tests,    true},
 };
 
 static constexpr int kNumSuites = sizeof(suites) / sizeof(suites[0]);

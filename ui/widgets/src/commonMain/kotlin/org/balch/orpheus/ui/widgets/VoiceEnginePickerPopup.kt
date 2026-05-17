@@ -131,6 +131,20 @@ val VOICE_PICKER_V3_CONFIG = PickerConfig(
     centerOrdinal = -1,
 )
 
+// ── Chaos / fractal engines (quad-click ring) ──
+
+val VOICE_PICKER_V4_CONFIG = PickerConfig(
+    ring = listOf(
+        PickerEntry("LRZ", 200, OrpheusColors.engineBlue),
+        PickerEntry("ROS", 201, OrpheusColors.synthGreen),
+        PickerEntry("DUF", 202, OrpheusColors.warmGlow),
+        PickerEntry("HEN", 203, OrpheusColors.engineYellow),
+        PickerEntry("CHU", 204, OrpheusColors.neonMagenta),
+    ),
+    centerLabel = "CHA",
+    centerOrdinal = -1,
+)
+
 // ── Drum engines (OrpheusEngineId ordinals, skipping 3=FMD) ──
 
 private val DRUM_RING = listOf(
@@ -221,6 +235,8 @@ fun engineLabel(engineId: Int): String = when (engineId) {
     100 -> "3SAW"; 101 -> "3SQR"; 102 -> "3TRI"; 103 -> "3SIN"; 104 -> "3RM"
     // Braids character engines (105..108)
     105 -> "CSAW"; 106 -> "TOY"; 107 -> "VOW"; 108 -> "?"
+    // Chaos / fractal engines (200..204)
+    200 -> "LRZ"; 201 -> "ROS"; 202 -> "DUF"; 203 -> "HEN"; 204 -> "CHU"
     else -> "?"
 }
 
@@ -255,6 +271,7 @@ fun EnginePickerButton(
     config: PickerConfig = VOICE_PICKER_CONFIG,
     v2Config: PickerConfig? = null,
     v3Config: PickerConfig? = null,
+    v4Config: PickerConfig? = null,
     gestureKey: Any = Unit,
     glowEnergy: Float = 0f,
     size: Dp = 28.dp,
@@ -335,6 +352,7 @@ fun EnginePickerButton(
                         lastDownTimeMs = nowMs
 
                         activeConfig = when {
+                            consecutiveClicks >= 4 && v4Config != null -> v4Config
                             consecutiveClicks >= 3 && v3Config != null -> v3Config
                             consecutiveClicks >= 2 && v2Config != null -> v2Config
                             else -> config

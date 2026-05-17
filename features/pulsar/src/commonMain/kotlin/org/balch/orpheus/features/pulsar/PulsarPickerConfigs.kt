@@ -58,6 +58,17 @@ private val PULSAR_V3_RING = listOf(
 
 val PULSAR_V3_PICKER = PickerConfig(PULSAR_V3_RING, "CHD", -1)
 
+// Chaos / fractal engines (quad-click ring, ids 200..204).
+private val PULSAR_V4_RING = listOf(
+    PickerEntry("LRZ", 200, OrpheusColors.engineBlue),
+    PickerEntry("ROS", 201, OrpheusColors.synthGreen),
+    PickerEntry("DUF", 202, OrpheusColors.warmGlow),
+    PickerEntry("HEN", 203, OrpheusColors.engineYellow),
+    PickerEntry("CHU", 204, OrpheusColors.neonMagenta),
+)
+
+val PULSAR_V4_PICKER = PickerConfig(PULSAR_V4_RING, "CHA", -1)
+
 /** Kick track: full ring, BD center */
 val PULSAR_KICK_PICKER = PickerConfig(PULSAR_FULL_RING, "BD", 21)
 
@@ -103,5 +114,7 @@ fun pulsarEngineLabel(engineIndex: Int): String = when (engineIndex) {
     100 -> "3SAW"; 101 -> "3SQR"; 102 -> "3TRI"; 103 -> "3SIN"; 104 -> "3RM"
     // Braids character engines (105..108)
     105 -> "CSAW"; 106 -> "TOY"; 107 -> "VOW"; 108 -> "?"
+    // Chaos / fractal engines (200..204)
+    200 -> "LRZ"; 201 -> "ROS"; 202 -> "DUF"; 203 -> "HEN"; 204 -> "CHU"
     else -> "E$engineIndex"
 }

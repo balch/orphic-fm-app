@@ -1,5 +1,6 @@
 #include "orpheus_units.h"
 #include "orpheus_engine.h"
+#include "orpheus_unit_chaos.h"
 #include "pulsar_pattern_gen.h"
 #include "pulsar_bar_strategy.h"
 #include "pulsar_chord_progression.h"
@@ -2638,6 +2639,21 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 clamp01(mod_timbre),
                                 clamp01(mod_morph),
                                 sample_rate, track_buffer, num_frames);
+        } else if (ts.engine_index >= kChaosEngineMin && ts.engine_index <= kChaosEngineMax) {
+            // Chaos engines (200..204): per-track ChaosVoiceState driven by the
+            // shared chaos kernel. Without this branch the engine_index would
+            // fall through to plaits::Voice::Render which clamps unknown ids to
+            // its last engine (HiHat).
+            chaos::process_chaos_block(
+                ts.chaos_state,
+                ts.engine_index,
+                clamp01(mod_harmonics),
+                clamp01(mod_timbre),
+                clamp01(mod_morph),
+                note_for_render,
+                sample_rate,
+                track_buffer,
+                num_frames);
         } else {
             ts.voice.Render(
                 ts.engine_index,

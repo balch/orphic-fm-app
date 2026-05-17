@@ -1,6 +1,7 @@
 #include "orpheus_units.h"
 #include "orpheus_units_common.h"
 #include "orpheus_engine.h"
+#include "orpheus_unit_chaos.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -559,6 +560,13 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 engine_index,
                                 note, harmonics, timbre, morph,
                                 sr, out, num_frames);
+        } else if (engine_index >= kChaosEngineMin && engine_index <= kChaosEngineMax) {
+            // Chaos voices write carrier+MORPH-blended chaos into `out` here,
+            // then fall through to the shared ADSR/peak/voice_levels tail below
+            // so they receive the same envelope handling as Plaits voices.
+            // Pass FM/LFO-modulated harmonics/morph so LFO→HARMONICS/MORPH
+            // routes through to the chaos kernel (matching Plaits/Braids paths).
+            unit_process_chaos(u, engine, num_frames, sr, harmonics, morph);
         } else {
             voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, accent,
                          out, num_frames);

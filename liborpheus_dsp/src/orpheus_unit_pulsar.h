@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orpheus_voice.h"
+#include "orpheus_unit_chaos.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
 #include "stmlib/dsp/filter.h"
@@ -204,6 +205,10 @@ struct PulsarTrackState {
     // Resampler residue carried across host blocks for the 96k→host linear-interp
     // path. See orpheus_engine.h::braids_src_phase for rationale.
     float braids_src_phase = 0.0f;
+    // Per-track chaos voice trajectory. Used when engine_index is in
+    // [kChaosEngineMin, kChaosEngineMax]. Default-initialized to the canonical
+    // seed (x=0.1, y=0, z=0) so the first block evolves into the attractor.
+    ChaosVoiceState chaos_state;
     PulsarStep steps[kMaxPulsarSteps];
     int step_count;
     int playhead;

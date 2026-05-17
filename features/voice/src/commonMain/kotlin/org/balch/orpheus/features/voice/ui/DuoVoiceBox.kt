@@ -40,6 +40,7 @@ import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VOICE_PICKER_V2_CONFIG
 import org.balch.orpheus.ui.widgets.VOICE_PICKER_V3_CONFIG
+import org.balch.orpheus.ui.widgets.VOICE_PICKER_V4_CONFIG
 import org.balch.orpheus.ui.widgets.engineLabel
 
 @Composable
@@ -264,6 +265,7 @@ fun DuoVoiceBox(
                     label = engineLabel(duoEngine),
                     v2Config = if (hasNativeEngine) VOICE_PICKER_V2_CONFIG else null,
                     v3Config = if (hasNativeEngine) VOICE_PICKER_V3_CONFIG else null,
+                    v4Config = if (hasNativeEngine) VOICE_PICKER_V4_CONFIG else null,
                     gestureKey = voiceA / 2,
                     glowEnergy = glowEnergy,
                     showExternalSelection = aiVoiceEngineHighlight,

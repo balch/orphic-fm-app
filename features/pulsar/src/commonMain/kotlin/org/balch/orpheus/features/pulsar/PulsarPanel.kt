@@ -347,6 +347,7 @@ fun PulsarPanel(
                     config = PULSAR_TRACK_PICKERS[selected],
                     v2Config = PULSAR_V2_PICKER,
                     v3Config = PULSAR_V3_PICKER,
+                    v4Config = PULSAR_V4_PICKER,
                     size = 36.dp,
                     onExpandedChange = { pickerOpen = it },
                 )
@@ -364,6 +365,7 @@ fun PulsarPanel(
                     config = PULSAR_TRACK_PICKERS[selected],
                     v2Config = PULSAR_V2_PICKER,
                     v3Config = PULSAR_V3_PICKER,
+                    v4Config = PULSAR_V4_PICKER,
                     size = 36.dp,
                     onExpandedChange = { pickerOpen = it },
                 )

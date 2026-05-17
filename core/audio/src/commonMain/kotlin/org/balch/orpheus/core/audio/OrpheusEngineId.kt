@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
  * - 0..7    : Plaits v1.2 (engine2) — native-only
  * - 8..23   : Plaits v1 (engine1) — sparse; matches existing kEngineMap[] values
  * - 100..108: Braids
+ * - 200..204: Chaos / fractal (Lorenz/Rössler/Duffing/Hénon/Chua) — native-only
  */
 @Serializable
 enum class OrpheusEngineId(val id: Int, val displayName: String) {
@@ -63,6 +64,13 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
     @SerialName("VOWEL_FOF")         VOWEL_FOF(107, "Vowel FOF"),
     @SerialName("QUESTION_MARK")     QUESTION_MARK(108, "Question Mark"),
 
+    // ── Chaos / fractal engines (ids 200..204) ──
+    @SerialName("LRZ") LRZ(200, "Chaos · Lorenz"),
+    @SerialName("ROS") ROS(201, "Chaos · Rössler"),
+    @SerialName("DUF") DUF(202, "Chaos · Duffing"),
+    @SerialName("HEN") HEN(203, "Chaos · Hénon"),
+    @SerialName("CHU") CHU(204, "Chaos · Chua"),
+
     // OSC must come LAST so it doesn't shift any prior ordinal.
     // id=-1 is the sentinel for OSC mode — C++ voice routing checks engine_index < 0.
     @SerialName("OSC") OSC(-1, "OSC"),
@@ -95,6 +103,7 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
             TRIPLE_SAW, TRIPLE_SQUARE, TRIPLE_TRIANGLE,
             TRIPLE_SINE, TRIPLE_RING_MOD,
             CSAW, TOY, VOWEL_FOF, QUESTION_MARK,
+            LRZ, ROS, DUF, HEN, CHU,
         )
 
         private val CHORD_ENGINES = setOf(

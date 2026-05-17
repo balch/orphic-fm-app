@@ -151,6 +151,12 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_pulsar_reverb.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
+    "src/orpheus_unit_chaos.cpp"
+    "src/chaos/lorenz.cpp"
+    "src/chaos/rossler.cpp"
+    "src/chaos/duffing.cpp"
+    "src/chaos/henon.cpp"
+    "src/chaos/chua.cpp"
 )
 
 # ── Library target ────────────────────────────────
@@ -171,6 +177,7 @@ target_include_directories(orpheus_dsp PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 target_include_directories(orpheus_dsp PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${COMPAT_DIR}"
     "${EURORACK_DIR}"
 )
@@ -250,10 +257,18 @@ if(BUILD_TESTS)
         test/test_markov_solo.cpp
         test/test_pulsar_analysis.cpp
         test/test_braids.cpp
+        test/test_chaos.cpp
+        test/chaos_tests/test_lorenz.cpp
+        test/chaos_tests/test_rossler.cpp
+        test/chaos_tests/test_duffing.cpp
+        test/chaos_tests/test_henon.cpp
+        test/chaos_tests/test_chua.cpp
+        test/test_pulsar_chaos.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/test"
         "${EURORACK_DIR}"
     )
     target_compile_definitions(orpheus_dsp_test PRIVATE

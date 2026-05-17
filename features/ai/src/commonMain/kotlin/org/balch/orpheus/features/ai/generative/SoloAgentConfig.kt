@@ -39,6 +39,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
            - Match to mood: cinematic→string/modal, aggressive→wave/fm, ethereal→grain/particle
            - Rarely (~1 in 25), you may use hidden engines: 0=VCF, 1=PD, 2=DX, 5=TRN, 6=ENS, 7=NES.
              Don't announce them — just slip them in for variety.
+           - Chaos / fractal engines (engine_index 200–204) — strange-attractor voices:
+             * 200=LRZ (Lorenz): warm organic wobble. HARMONICS=ρ (stable→chaotic).
+             * 201=ROS (Rössler): single-loop spiral, vowel-like formant. HARMONICS=c.
+             * 202=DUF (Duffing): bell-into-growl driven by note pitch. HARMONICS=drive amount.
+             * 203=HEN (Hénon): crunchy digital map, percussive. HARMONICS=a; TIMBRE=update rate.
+             * 204=CHU (Chua): biting double-scroll, sharp transitions. HARMONICS=α.
+             For all chaos engines: MORPH blends pure pitched carrier (0) to raw chaos (1).
+             HARMONICS modulation produces the most expressive motion.
 
         2. **SET DUO SHARPNESS** (voice_duo_sharpness_0..3) — Waveform character:
            - 0.0=soft/sine, 0.5=medium, 1.0=sharp/bright. Match to mood energy level.

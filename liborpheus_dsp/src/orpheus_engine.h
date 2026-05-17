@@ -58,6 +58,7 @@
 #include "orpheus_unit_bass.h"
 #include "orpheus_unit_pulsar.h"
 #include "orpheus_turntable.h"
+#include "orpheus_unit_chaos.h"
 
 #include <atomic>
 #include <cstring>
@@ -261,6 +262,9 @@ struct OrpheusEngine {
         float prev_output = 0.0f;
     };
     VoiceOscState voice_osc_state[kNumVoices];
+
+    // Chaos engine per-voice state (engine_index 200–204)
+    ChaosVoiceState chaos_state[kNumVoices];
 
     // ── Per-voice Braids MacroOscillator ──────────────
     // Used when engine_index >= 100 (Braids range). Init'd in orpheus_engine_create.

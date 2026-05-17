@@ -149,6 +149,16 @@ class OrpheusAgentConfig(
         - The drum engines (drum_bd_engine, drum_sd_engine, drum_hh_engine) use a different
           numbering (0=BD, 1=SD, 2=HH, 4=FM, 5=Noise, 6=Waveshaping, 7=VA, etc.)
 
+        ### CHAOS / FRACTAL ENGINES (engine_index 200–204)
+        Strange-attractor voices for organic motion and gritty textures:
+        - 200=LRZ (Lorenz): warm organic wobble. HARMONICS=ρ (stable→chaotic).
+        - 201=ROS (Rössler): single-loop spiral, vowel-like formant. HARMONICS=c.
+        - 202=DUF (Duffing): bell-into-growl driven by note pitch. HARMONICS=drive amount.
+        - 203=HEN (Hénon): crunchy digital map, percussive. HARMONICS=a; TIMBRE=update rate.
+        - 204=CHU (Chua): biting double-scroll, sharp transitions. HARMONICS=α.
+        For all chaos engines: MORPH blends pure pitched carrier (0) to raw chaos (1).
+        HARMONICS modulation produces the most expressive motion.
+
         ### FLUX (Random Melody Generator)
         Random pitch sequence and modulation voltage generator:
         - flux_steps (0.0-1.0): Number of steps in the random sequence

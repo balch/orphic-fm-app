@@ -20,6 +20,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.audio)
             implementation(projects.core.pluginApi)
+            implementation(libs.kotlinx.datetime)
         }
         jvmTest.dependencies {
             implementation(libs.kotlin.test)
