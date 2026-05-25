@@ -18,7 +18,7 @@ data class AppPreferences(
     val pulsarSongEndingEnabled: Boolean = true,
     /**
      * Default song-to-song transition for Pulsar. Overridden per-vibe via
-     * `Arrangement.transitionOut` when authored. Default: TAPE at 1000ms.
+     * `Arrangement.transitionOut` when authored. Default: TAPE with style default handoff.
      */
     val pulsarTransitionDefault: TransitionSpec = TransitionStyle.default,
     /** Serialized DJ UI state JSON for cross-session persistence. */

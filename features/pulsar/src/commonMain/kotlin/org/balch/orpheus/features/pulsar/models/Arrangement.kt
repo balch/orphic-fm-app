@@ -2,6 +2,7 @@ package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.serialization.IntRangeSerializer
 
 /**
  * A weighted edge in the section graph.
@@ -156,10 +157,10 @@ data class Section(
  * @param introIndex Which section to start with (default 0; pass null for random weighted choice).
  * @param outroIndex Which section ends the arrangement (null = loops forever).
  * @param defaultSectionBars Default bar count if a section doesn't specify.
- * @param minVibeSeconds Earliest playing-time at which the auto-end probability
- *   can begin rolling. Below this the song never ends. Default 150 (2:30).
- * @param maxVibeSeconds Playing-time at which auto-end is forced to fire on the
- *   next bar. Default 300 (5:00). Must be in `minVibeSeconds..1800`.
+ * @param lengthSeconds Range of vibe playing-time in seconds. The lower bound is
+ *   the earliest time the auto-end probability can begin rolling (song never ends
+ *   before it). The upper bound forces auto-end on the next bar. Default 150..300
+ *   (2:30–5:00). Both endpoints must be in 15..1800.
  * @param transitionOut Per-vibe transition-out spec. Null = inherit global default
  *   from `AppPreferences.pulsarTransitionDefault`. When set, the vibe owns the
  *   entire spec — no partial overrides.
@@ -170,15 +171,13 @@ data class Arrangement(
     val introIndex: Int? = 0,
     val outroIndex: Int? = null,
     val defaultSectionBars: Int = 8,
-    val minVibeSeconds: Int = 150,
-    val maxVibeSeconds: Int = 300,
-    /**
-     * Per-vibe transition-out spec. Null = inherit global default from
-     * [AppPreferences.pulsarTransitionDefault]. When set, the vibe owns
-     * the entire spec — no partial overrides.
-     */
+    @Serializable(with = IntRangeSerializer::class)
+    val lengthSeconds: IntRange = 150..300,
     val transitionOut: TransitionSpec? = null,
 ) {
+    val minVibeSeconds: Int get() = lengthSeconds.first
+    val maxVibeSeconds: Int get() = lengthSeconds.last
+
     init {
         require(sections.size <= MAX_SECTIONS) {
             "Arrangement sections size ${sections.size} exceeds MAX_SECTIONS=$MAX_SECTIONS"
@@ -193,6 +192,5 @@ data class Arrangement(
 
     companion object {
         const val MAX_SECTIONS = 8
-
     }
 }

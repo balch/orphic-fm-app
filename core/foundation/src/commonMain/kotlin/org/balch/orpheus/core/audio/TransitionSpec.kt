@@ -19,7 +19,7 @@ import kotlinx.serialization.Serializable
  *   - FADE: full transition duration; fade-out is H/2, fade-in is H/2 (default 350)
  *   - CROSSFADE: full overlap duration; outgoing drops to 0.5 over H/2,
  *     incoming starts at H/2, vol returns to 1.0 over the second H/2 (default 400)
- *   - TAPE: tape-stop duration (default 300); followed by 100ms fade-in
+ *   - TAPE: tape-stop duration (default 500); followed by 100ms fade-in
  *   - SCRATCH: stutter gate duration over the song boundary (default 500)
  *   - FILTER: full filter sweep duration (default 500); allpass LFO ramps with envelope
  *   - RANDOM: ignored (inherits from chosen substyle)
@@ -33,6 +33,13 @@ data class TransitionSpec(
     val handoffMs: Int? = null,
     val randomPool: List<TransitionStyle> = emptyList(),
 ) {
+    val effectiveHandoffMs: Int
+        get() = if (style.canHandoff) {
+            (handoffMs ?: style.defaultHandoffMs).coerceIn(style.handoffRange)
+        } else {
+            0
+        }
+
     init {
         handoffMs?.let { require(it in 0..5_000) { "handoffMs must be 0..5000, got $it" } }
         require(TransitionStyle.RANDOM !in randomPool) {

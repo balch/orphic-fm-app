@@ -126,7 +126,7 @@ class PulsarSongAdvancerTest {
     @Test
     fun `uses per-vibe transitionOut when set`() = runTest {
         // vibeA has its own GAP override; the global default is FADE — runner should see GAP.
-        val vibeAOverride = TransitionSpec(TransitionStyle.GAP, handoffMs = 100)
+        val vibeAOverride = TransitionSpec(TransitionStyle.GAP, handoffMs = 300)
         val baseVibeA = mkMinimalVibe("A")
         val vibeA = baseVibeA.copy(
             arrangement = baseVibeA.arrangement?.copy(transitionOut = vibeAOverride),
@@ -151,7 +151,7 @@ class PulsarSongAdvancerTest {
 
         assertEquals(1, runner.specs.size)
         assertEquals(TransitionStyle.GAP, runner.specs.single().style)
-        assertEquals(100, runner.specs.single().handoffMs)
+        assertEquals(300, runner.specs.single().handoffMs)
         assertEquals("B", feature.vibeFlow.value.name)
     }
 }

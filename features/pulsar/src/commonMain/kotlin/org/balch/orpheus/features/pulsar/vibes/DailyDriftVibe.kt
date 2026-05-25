@@ -534,8 +534,7 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
             introIndex = 0,
             outroIndex = sectionList.lastIndex,
             sections = sectionList,
-            minVibeSeconds = 40,
-            maxVibeSeconds = 60,
+            lengthSeconds = 40..60,
         ),
     )
 }

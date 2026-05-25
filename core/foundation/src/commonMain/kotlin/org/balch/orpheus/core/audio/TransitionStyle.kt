@@ -29,19 +29,22 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class TransitionStyle(
     val isSafe: Boolean,
-    val canHandoff: Boolean = true,
     val isVisible: Boolean = isSafe,
+    val canHandoff: Boolean = true,
+    val handoffRange: IntRange = 200..2000,
+    val defaultHandoffMs: Int = 500,
 ) {
     CUT(isSafe = true, canHandoff = false),
-    GAP(isSafe = true),
-    FADE(isSafe = true),
-    CROSSFADE(isSafe = true),
-    TAPE(isSafe = true),
-    SCRATCH(isSafe = true),
-    FILTER(isSafe = true),
-    RANDOM(isSafe = false, isVisible = true, canHandoff = false), ;
+    GAP(isSafe = true, handoffRange = 200..1500, defaultHandoffMs = 500),
+    FADE(isSafe = true, handoffRange = 150..1000, defaultHandoffMs = 350),
+    CROSSFADE(isSafe = true, handoffRange = 200..1200, defaultHandoffMs = 400),
+    TAPE(isSafe = true, handoffRange = 150..800, defaultHandoffMs = 500),
+    SCRATCH(isSafe = true, handoffRange = 250..1200, defaultHandoffMs = 500),
+    FILTER(isSafe = true, handoffRange = 300..1500, defaultHandoffMs = 500),
+    RANDOM(isSafe = false, isVisible = true, canHandoff = false),
+    ;
 
     companion object {
-        val default: TransitionSpec = TransitionSpec(TAPE, handoffMs = 1000)
+        val default: TransitionSpec = TransitionSpec(TAPE)
     }
 }

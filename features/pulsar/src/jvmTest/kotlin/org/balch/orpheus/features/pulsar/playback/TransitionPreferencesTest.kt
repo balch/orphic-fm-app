@@ -43,7 +43,7 @@ class TransitionPreferencesTest {
         val prefs = TransitionPreferencesImpl(repo, testScope())
         advanceUntilIdle()
         assertEquals(TransitionStyle.TAPE, prefs.defaultFlow.value.style)
-        assertEquals(1000, prefs.defaultFlow.value.handoffMs)
+        assertEquals(null, prefs.defaultFlow.value.handoffMs)
     }
 
     @Test

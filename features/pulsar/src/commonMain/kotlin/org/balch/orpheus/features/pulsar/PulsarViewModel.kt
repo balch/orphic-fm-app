@@ -700,11 +700,14 @@ class PulsarViewModel(
         transitionSpec = transitionPreferences.defaultFlow,
         onSetTransitionStyle = { style ->
             val current = transitionPreferences.defaultFlow.value
-            scope.launch { transitionPreferences.setDefault(current.copy(style = style)) }
+            val clampedMs = current.handoffMs?.coerceIn(style.handoffRange)
+                ?.takeIf { style.canHandoff }
+            scope.launch { transitionPreferences.setDefault(current.copy(style = style, handoffMs = clampedMs)) }
         },
         onSetTransitionHandoffMs = { ms ->
             val current = transitionPreferences.defaultFlow.value
-            scope.launch { transitionPreferences.setDefault(current.copy(handoffMs = ms)) }
+            val clamped = ms.coerceIn(current.style.handoffRange)
+            scope.launch { transitionPreferences.setDefault(current.copy(handoffMs = clamped)) }
         },
         onSetTransitionRandomPool = { pool ->
             val current = transitionPreferences.defaultFlow.value

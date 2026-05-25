@@ -56,7 +56,6 @@ private data class StyleMeta(
     val label: String,
     val glyph: String,
     val description: String,
-    val defaultHandoffMs: Int,
 )
 
 private val META: Map<TransitionStyle, StyleMeta> = mapOf(
@@ -64,49 +63,41 @@ private val META: Map<TransitionStyle, StyleMeta> = mapOf(
         label = "CUT",
         glyph = "✂",
         description = "Instant swap. No fade.",
-        defaultHandoffMs = 0,
     ),
     TransitionStyle.GAP to StyleMeta(
         label = "GAP",
         glyph = "⋯",
         description = "Silent gap between Vibes.",
-        defaultHandoffMs = 500,
     ),
     TransitionStyle.FADE to StyleMeta(
         label = "FADE",
         glyph = "▽",
         description = "Symmetric fade-out and fade-in.",
-        defaultHandoffMs = 350,
     ),
     TransitionStyle.CROSSFADE to StyleMeta(
         label = "XFADE",
         glyph = "⇌",
         description = "Overlap outgoing tail with incoming.",
-        defaultHandoffMs = 400,
     ),
     TransitionStyle.TAPE to StyleMeta(
         label = "TAPE",
         glyph = "⏪",
         description = "Tape-stop ramp before the next Vibe.",
-        defaultHandoffMs = 300,
     ),
     TransitionStyle.SCRATCH to StyleMeta(
         label = "SCRATCH",
         glyph = "💿",
         description = "Beat-synced stutter gate across the transition.",
-        defaultHandoffMs = 500,
     ),
     TransitionStyle.FILTER to StyleMeta(
         label = "FILTER",
         glyph = "🌀",
         description = "Allpass filter sweep with Leslie.",
-        defaultHandoffMs = 500,
     ),
     TransitionStyle.RANDOM to StyleMeta(
         label = "RANDOM",
         glyph = "⚄",
         description = "Pick a random style each time.",
-        defaultHandoffMs = 0,
     ),
 )
 
@@ -121,7 +112,6 @@ private val PLAYS_META = StyleMeta(
     label = "PLAYS",
     glyph = "▶",
     description = "Vibes loop forever; no auto-advance.",
-    defaultHandoffMs = 0,
 )
 private const val PLAYS_DESCRIPTION = "Vibes loop forever; no auto-advance."
 
@@ -152,9 +142,7 @@ fun TransitionSettingsSheet(
 ) {
     val sheetState = rememberModalBottomSheetState()
     val visibleStyles = remember { TransitionStyle.entries.filter { it.isVisible } }
-    val handoffMs = remember(spec) {
-        spec.handoffMs ?: spec.style.meta.defaultHandoffMs
-    }
+    val handoffMs = remember(spec) { spec.effectiveHandoffMs }
 
     // Inactivity timer: any user interaction increments interactionTick, which
     // restarts the LaunchedEffect's delay. After inactivityTimeoutMs of no
@@ -248,6 +236,7 @@ private fun TransitionSheetContent(
 
             HandoffSection(
                 handoffMs = handoffMs,
+                handoffRange = spec.style.handoffRange,
                 enabled = enabled && spec.style.canHandoff,
                 onHandoffMsChange = onHandoffMsChange,
             )
@@ -277,11 +266,15 @@ private fun CosmicDragHandle() {
 @Composable
 private fun HandoffSection(
     handoffMs: Int,
+    handoffRange: IntRange,
     enabled: Boolean,
     onHandoffMsChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val accent = OrpheusColors.cosmicPurple
+    val globalMin = GLOBAL_HANDOFF_MIN.toFloat()
+    val globalMax = GLOBAL_HANDOFF_MAX.toFloat()
+    val globalSpan = globalMax - globalMin
 
     Column(modifier = modifier.alpha(if (enabled) 1f else 0.35f)) {
         Row(
@@ -294,18 +287,17 @@ private fun HandoffSection(
             SectionLabel("HANDOFF")
 
             HorizontalFader(
-                value = ((handoffMs - HANDOFF_MS_RANGE.start) /
-                    (HANDOFF_MS_RANGE.endInclusive - HANDOFF_MS_RANGE.start))
-                    .coerceIn(0f, 1f),
+                value = ((handoffMs - globalMin) / globalSpan).coerceIn(0f, 1f),
                 onValueChange = { v ->
-                    val ms = HANDOFF_MS_RANGE.start + v *
-                        (HANDOFF_MS_RANGE.endInclusive - HANDOFF_MS_RANGE.start)
-                    onHandoffMsChange(snapHandoffMs(ms))
+                    val ms = globalMin + v * globalSpan
+                    onHandoffMsChange(snapHandoffMs(ms, handoffRange))
                 },
                 color = accent,
                 rightLabel = "${handoffMs}ms",
                 trackWidth = 120,
                 enabled = enabled,
+                secondaryRange = ((handoffRange.first - globalMin) / globalSpan)..
+                    ((handoffRange.last - globalMin) / globalSpan),
             )
         }
     }
@@ -396,11 +388,13 @@ private fun StyleChip(
 
 // ─── Constants & helpers ─────────────────────────────────────────────────────
 
-private val HANDOFF_MS_RANGE = 100f..2000f
 private const val HANDOFF_SNAP_MS = 50
 
-private fun snapHandoffMs(raw: Float): Int =
-    ((raw / HANDOFF_SNAP_MS).toInt() * HANDOFF_SNAP_MS).coerceIn(100, 2000)
+private fun snapHandoffMs(raw: Float, range: IntRange): Int =
+    ((raw / HANDOFF_SNAP_MS).toInt() * HANDOFF_SNAP_MS).coerceIn(range.first, range.last)
+
+private const val GLOBAL_HANDOFF_MIN = 100
+private const val GLOBAL_HANDOFF_MAX = 2000
 
 /** Sheet auto-dismisses after this many ms of no user interaction. */
 private const val INACTIVITY_TIMEOUT_MS: Long = 5_000L
@@ -421,7 +415,7 @@ private fun PreviewHost(spec: TransitionSpec, enabled: Boolean = true) {
                 spec = spec,
                 enabled = enabled,
                 visibleStyles = TransitionStyle.entries.filter { it.isVisible },
-                handoffMs = spec.handoffMs ?: spec.style.meta.defaultHandoffMs,
+                handoffMs = spec.effectiveHandoffMs,
                 onSetEnabled = {},
                 onStyleChange = {},
                 onHandoffMsChange = {},

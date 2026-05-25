@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +44,8 @@ import kotlin.math.roundToInt
  * - **Drag** horizontally to adjust [value] in 0.0–1.0.
  * - Optional [thumbLabel] text is rendered inside the metallic thumb.
  * - Optional [rightLabel] text appears to the right of the track.
+ * - Optional [secondaryRange] draws a dim highlight on the track between the
+ *   two normalized endpoints (0.0–1.0), useful for showing valid bounds.
  */
 @Composable
 fun HorizontalFader(
@@ -54,6 +57,7 @@ fun HorizontalFader(
     rightLabel: String = "",
     trackWidth: Int = 90,
     enabled: Boolean = true,
+    secondaryRange: ClosedFloatingPointRange<Float>? = null,
 ) {
     val density = LocalDensity.current
     val trackHeightDp = 8
@@ -98,6 +102,16 @@ fun HorizontalFader(
                         cornerRadius = cornerRadius,
                         style = androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()),
                     )
+                    if (secondaryRange != null) {
+                        val sStart = thumbWidthPx / 2f + secondaryRange.start * usableRange
+                        val sEnd = thumbWidthPx / 2f + secondaryRange.endInclusive * usableRange
+                        drawRoundRect(
+                            color = color.copy(alpha = 0.35f * activeAlpha),
+                            topLeft = Offset(sStart, trackTop),
+                            size = Size((sEnd - sStart).coerceAtLeast(0f), trackHeightPx),
+                            cornerRadius = cornerRadius,
+                        )
+                    }
                     val thumbCenterX = thumbWidthPx / 2f + value * usableRange
                     drawRoundRect(
                         color = color.copy(alpha = 0.25f * activeAlpha),
@@ -169,6 +183,8 @@ fun HorizontalFader(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = color.copy(alpha = activeAlpha),
+                modifier = Modifier.width(48.dp),
+                textAlign = TextAlign.End,
             )
         }
     }

@@ -9,10 +9,10 @@ class AppPreferencesTransitionTest {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Test
-    fun `default transition is TAPE at 1000ms`() {
+    fun `default transition is TAPE with null handoffMs`() {
         val prefs = AppPreferences()
         assertEquals(TransitionStyle.TAPE, prefs.pulsarTransitionDefault.style)
-        assertEquals(1000, prefs.pulsarTransitionDefault.handoffMs)
+        assertEquals(null, prefs.pulsarTransitionDefault.handoffMs)
     }
 
     @Test

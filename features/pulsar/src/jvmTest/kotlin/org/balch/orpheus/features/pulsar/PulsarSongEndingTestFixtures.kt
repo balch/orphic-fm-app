@@ -183,8 +183,7 @@ internal fun mkMinimalVibe(
     arrangement = org.balch.orpheus.features.pulsar.models.Arrangement(
         sections = listOf(org.balch.orpheus.features.pulsar.models.Section(name = "loop")),
         transitionOut = transitionOut,
-        minVibeSeconds = minVibeSeconds,
-        maxVibeSeconds = maxVibeSeconds,
+        lengthSeconds = minVibeSeconds..maxVibeSeconds,
     ),
 )
 

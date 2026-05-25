@@ -162,16 +162,17 @@ class PulsarTransitionRunnerTest {
     }
 
     @Test
-    fun `SCRATCH arms tape stop then applies new vibe`() = runTest {
+    fun `TAPE arms tape stop then applies new vibe`() = runTest {
         val engine = RecordingEngine()
         engine.now = { testScheduler.currentTime }
         val runner = makeRunner(engine)
         val applyAt = mutableListOf<Long>()
+        val defaultMs = TransitionStyle.TAPE.defaultHandoffMs
         val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.TAPE)) { applyAt += testScheduler.currentTime } }
         advanceUntilIdle()
         job.join()
-        assertEquals(listOf(0L to 300), engine.tapeStops)
-        assertEquals(listOf(300L), applyAt)
+        assertEquals(listOf(0L to defaultMs), engine.tapeStops)
+        assertEquals(listOf(defaultMs.toLong()), applyAt)
         // Two fades: a 1-sample snap-to-0 (so the fader's current_ is at 0 when
         // the new vibe arrives — MasterTapeStop only ramps playback rate, not
         // the fader), then the 100ms fade-in back to 1.
@@ -188,6 +189,7 @@ class PulsarTransitionRunnerTest {
         engine.now = { testScheduler.currentTime }
         val runner = makeRunner(engine)
         val applyAt = mutableListOf<Long>()
+        val defaultMs = TransitionStyle.TAPE.defaultHandoffMs
         val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.TAPE)) { applyAt += testScheduler.currentTime } }
         advanceUntilIdle()
         job.join()
@@ -197,8 +199,8 @@ class PulsarTransitionRunnerTest {
         assertEquals(1f, engine.fades[0].target, "must restore to unity first")
         assertEquals(1, engine.fades[0].durationMs)
         // Tape-stop fires AFTER the unity restore.
-        assertEquals(listOf(0L to 300), engine.tapeStops)
-        assertEquals(listOf(300L), applyAt)
+        assertEquals(listOf(0L to defaultMs), engine.tapeStops)
+        assertEquals(listOf(defaultMs.toLong()), applyAt)
         // Then the snap-to-0 and the 100ms fade-in.
         assertEquals(0f, engine.fades[1].target)
         assertEquals(1, engine.fades[1].durationMs)

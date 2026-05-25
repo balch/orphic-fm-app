@@ -67,14 +67,15 @@ class PulsarTransitionRunnerImpl(
         }
         try {
             _activeStyle.value = spec.style
+            val ms = spec.effectiveHandoffMs
             when (spec.style) {
                 TransitionStyle.CUT       -> runCut(applyNext)
-                TransitionStyle.GAP       -> runGap(spec.handoffMs ?: DEFAULT_GAP_MS, applyNext)
-                TransitionStyle.FADE      -> runFade(spec.handoffMs ?: DEFAULT_FADE_MS, applyNext)
-                TransitionStyle.CROSSFADE -> runCrossfade(spec.handoffMs ?: DEFAULT_CROSSFADE_MS, applyNext)
-                TransitionStyle.TAPE      -> runTape(spec.handoffMs ?: DEFAULT_TAPE_MS, applyNext)
-                TransitionStyle.SCRATCH   -> runScratch(spec.handoffMs ?: DEFAULT_SCRATCH_MS, applyNext)
-                TransitionStyle.FILTER    -> runFilter(spec.handoffMs ?: DEFAULT_FILTER_MS, applyNext)
+                TransitionStyle.GAP       -> runGap(ms, applyNext)
+                TransitionStyle.FADE      -> runFade(ms, applyNext)
+                TransitionStyle.CROSSFADE -> runCrossfade(ms, applyNext)
+                TransitionStyle.TAPE      -> runTape(ms, applyNext)
+                TransitionStyle.SCRATCH   -> runScratch(ms, applyNext)
+                TransitionStyle.FILTER    -> runFilter(ms, applyNext)
                 TransitionStyle.RANDOM    -> error("RANDOM handled above")
             }
         } finally {
@@ -184,7 +185,8 @@ class PulsarTransitionRunnerImpl(
             TransitionStyle.entries.filter { it.isSafe }
         }
         val chosen = random(pool)
-        runTransition(spec.copy(style = chosen), applyNext)
+        val handoff = if (chosen.canHandoff) chosen.handoffRange.random() else null
+        runTransition(spec.copy(style = chosen, handoffMs = handoff), applyNext)
     }
 
     private fun setPulsarPlaying(playing: Boolean) {
@@ -196,12 +198,6 @@ class PulsarTransitionRunnerImpl(
     }
 
     private companion object {
-        const val DEFAULT_GAP_MS = 500
-        const val DEFAULT_FADE_MS = 350
-        const val DEFAULT_CROSSFADE_MS = 400
-        const val DEFAULT_TAPE_MS = 300
-        const val DEFAULT_SCRATCH_MS = 500
-        const val DEFAULT_FILTER_MS = 500
         const val DECLICK_MS = 80
         const val TAPE_FADE_IN_MS = 100
         const val SMART_SKIP_VOL = 0.05f

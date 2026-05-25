@@ -10,7 +10,8 @@ class TransitionSpecSerializationTest {
     @Test
     fun `every TransitionStyle round-trips`() {
         for (style in TransitionStyle.entries) {
-            val spec = TransitionSpec(style = style, handoffMs = 250)
+            val ms = if (style.canHandoff) style.defaultHandoffMs else 250
+            val spec = TransitionSpec(style = style, handoffMs = ms)
             val encoded = json.encodeToString(TransitionSpec.serializer(), spec)
             val decoded = json.decodeFromString(TransitionSpec.serializer(), encoded)
             assertEquals(spec, decoded, "round-trip failed for $style")

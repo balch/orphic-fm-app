@@ -14,8 +14,7 @@ private fun minimalArrangement(
     transitionOut: TransitionSpec? = null,
 ): Arrangement = Arrangement(
     sections = listOf(Section(name = "loop")),
-    minVibeSeconds = minVibeSeconds,
-    maxVibeSeconds = maxVibeSeconds,
+    lengthSeconds = minVibeSeconds..maxVibeSeconds,
     transitionOut = transitionOut,
 )
 
