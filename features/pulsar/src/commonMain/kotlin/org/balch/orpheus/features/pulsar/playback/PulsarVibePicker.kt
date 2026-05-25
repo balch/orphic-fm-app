@@ -13,7 +13,15 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
  */
 @SingleIn(AppScope::class)
 @Inject
-class PulsarVibePicker(private val pulsarFeature: PulsarFeature) : PlayFromMediaIdHandler {
+class PulsarVibePicker(
+    // Lazy provider breaks the DI cycle: PulsarFeature → PulsarViewModel →
+    // PulsarSongEnding → PlaybackController → PlayFromMediaIdHandler (= this)
+    // → PulsarFeature. PulsarFeature is only touched inside onPlay(), so a
+    // plain `by lazy` defers resolution to the first runtime callback.
+    pulsarFeatureProvider: () -> PulsarFeature,
+) : PlayFromMediaIdHandler {
+    private val pulsarFeature: PulsarFeature by lazy(pulsarFeatureProvider)
+
     override fun onPlay(mediaId: String) {
         pulsarFeature.vibeList.firstOrNull { it.name == mediaId }
             ?.let { pulsarFeature.applyVibe(it) }

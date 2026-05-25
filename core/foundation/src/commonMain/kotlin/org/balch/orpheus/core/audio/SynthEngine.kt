@@ -97,6 +97,38 @@ interface SynthEngine {
     fun setDistortionMix(amount: Float) // 0=clean, 1=distorted (post-delay)
     fun setMasterVolume(amount: Float)
 
+    /**
+     * Sample-accurate master-volume fade. Runs in the audio thread at zero
+     * Kotlin cost during the ramp. Replaces the polling [MasterVolumeRamp]
+     * for any caller that doesn't need step-by-step observability.
+     *
+     * @param target Destination gain in [0, 1].
+     * @param durationMs Wall-clock duration; converted to samples internally.
+     * @param curve Easing curve; see [FadeCurve].
+     */
+    fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve = FadeCurve.LINEAR)
+
+    /**
+     * Arm a single-shot tape-stop on the master bus. Output decays to silence
+     * (via varispeed + amplitude clamp) over [durationMs]. Disarmed automatically
+     * when complete.
+     */
+    fun masterTapeStop(durationMs: Int)
+
+    /**
+     * Arm a single-shot vinyl scratch noise on the master bus. Mixed additively
+     * into the output: band-pass-filtered noise with a frequency sweep and
+     * exponential amplitude decay. Disarmed when complete.
+     */
+    fun masterScratch(durationMs: Int)
+
+    /**
+     * Arm a DJ-style LPF sweep on the master bus. Sweeps a resonant low-pass
+     * filter from open to ~80Hz at the midpoint and back, with increasing
+     * drive and comb reverb. In-place (modifies audio). Disarmed when complete.
+     */
+    fun masterDjSweep(durationMs: Int)
+
     // Delay Controls
     fun setDelayTime(index: Int, time: Float) // 0 or 1
     fun setDelayFeedback(amount: Float)

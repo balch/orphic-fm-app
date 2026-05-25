@@ -166,6 +166,36 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetMasterVolume(
 }
 
 JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterFade(
+        JNIEnv *env, jobject thiz, jfloat target, jint samples, jint curve) {
+    sEngine.masterFade(target, samples, curve);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterTapeStop(
+        JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterTapeStop(samples);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterScratch(
+        JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterScratch(samples);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterDjSweep(
+        JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterDjSweep(samples);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterVolumeNow(
+        JNIEnv *env, jobject thiz) {
+    return sEngine.masterVolumeNow();
+}
+
+JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetDrive(
         JNIEnv *env, jobject thiz, jfloat value) {
     sEngine.setDrive(value);

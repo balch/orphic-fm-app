@@ -70,6 +70,22 @@ void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v);
 void orpheus_engine_set_vibrato_rate(OrpheusEngine* engine, float hz);
 void orpheus_engine_set_bend(OrpheusEngine* engine, float v);
 
+// ── Master-bus fade and tape-stop (song transitions) ──
+/** Sample-accurate master fade. curve: 0=LINEAR, 1=EASE_IN, 2=EASE_OUT, 3=LOG. */
+void orpheus_engine_master_fade(OrpheusEngine* engine, float target, int samples, int curve);
+
+/** Arm single-shot tape-stop on master bus. */
+void orpheus_engine_master_tape_stop(OrpheusEngine* engine, int samples);
+
+/** Arm single-shot vinyl scratch noise on master bus (additive). */
+void orpheus_engine_master_scratch(OrpheusEngine* engine, int samples);
+
+/** Arm DJ LPF sweep on master bus (in-place filter + drive + comb reverb). */
+void orpheus_engine_master_dj_sweep(OrpheusEngine* engine, int samples);
+
+/** Read the current master volume (post-fader, instantaneous). */
+float orpheus_engine_master_volume_now(OrpheusEngine* engine);
+
 // ── Monitoring (polled at ~60fps from UI thread) ─
 typedef struct {
     float peak_left;

@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.Serializable
-import org.balch.orpheus.core.audio.FadeCurve
 
 enum class Album(val title: String) {
     STEALTH("Stealth"),
@@ -27,24 +26,6 @@ enum class EnvelopeType(val modeIndex: Int) {
     AD(0),
     TIDES(1),
     BLEND(2),
-}
-
-/**
- * Shape of the master-volume tail across the final section when a song ends.
- * @param rampBars Number of bars over which master volume ramps 1.0→0.0 at the
- *   end of the final section. 0 = hard cut at the section boundary.
- *   The fade always plays the LAST `rampBars` bars of the outro, leaving the
- *   earlier bars at full volume so the listener registers the outro before
- *   it dissolves.
- * @param curve Easing applied across the fade. `EASE_IN` (t²) holds volume
- *   near full then drops at the tail — works for short fades. `LINEAR` keeps
- *   a constant amplitude slope — needed for longer fades so the first half
- *   is audibly fading instead of imperceptibly drooping.
- */
-enum class EndStyle(val rampBars: Float, val curve: FadeCurve) {
-    ABRUPT(0f, FadeCurve.LINEAR),
-    FADE_FAST(.1f, FadeCurve.EASE_IN),
-    FADE_SLOW(.5f, FadeCurve.LINEAR),
 }
 
 enum class ScaleType(val scaleIndex: Int) {

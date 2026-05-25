@@ -578,8 +578,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)
             engine->master_pan.store(value, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "master_vol") == 0)
+        else if (std::strcmp(symbol, "master_vol") == 0) {
             engine->master_volume.store(value, std::memory_order_relaxed);
+            // Snap the fader so non-ramped sets take effect immediately
+            // (cancels any in-flight master_fade).
+            engine->master_fader_l.reset(value);
+            engine->master_fader_r.reset(value);
+        }
         else if (std::strncmp(symbol, "voice_pan_", 10) == 0) {
             int idx = std::atoi(symbol + 10);
             if (idx >= 0 && idx < kNumVoices) {

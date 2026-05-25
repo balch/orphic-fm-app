@@ -146,6 +146,31 @@ JNI_FN(nativeSetMasterVolume)(JNIEnv *env, jobject thiz, jfloat value) {
 }
 
 JNIEXPORT void JNICALL
+JNI_FN(nativeMasterFade)(JNIEnv *env, jobject thiz, jfloat target, jint samples, jint curve) {
+    sEngine.masterFade(target, samples, curve);
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeMasterTapeStop)(JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterTapeStop(samples);
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeMasterScratch)(JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterScratch(samples);
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeMasterDjSweep)(JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterDjSweep(samples);
+}
+
+JNIEXPORT jfloat JNICALL
+JNI_FN(nativeMasterVolumeNow)(JNIEnv *env, jobject thiz) {
+    return sEngine.masterVolumeNow();
+}
+
+JNIEXPORT void JNICALL
 JNI_FN(nativeSetDrive)(JNIEnv *env, jobject thiz, jfloat value) {
     sEngine.setDrive(value);
 }

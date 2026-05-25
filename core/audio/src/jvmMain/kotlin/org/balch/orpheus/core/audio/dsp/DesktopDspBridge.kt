@@ -91,6 +91,11 @@ class DesktopDspBridge {
     external fun nativeSetVoiceHold(index: Int, level: Float)
     external fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     external fun nativeSetMasterVolume(value: Float)
+    external fun nativeMasterFade(target: Float, samples: Int, curve: Int)
+    external fun nativeMasterTapeStop(samples: Int)
+    external fun nativeMasterScratch(samples: Int)
+    external fun nativeMasterDjSweep(samples: Int)
+    external fun nativeMasterVolumeNow(): Float
     external fun nativeSetDrive(value: Float)
     external fun nativeSetDelayMix(value: Float)
     external fun nativeSetVibrato(value: Float)

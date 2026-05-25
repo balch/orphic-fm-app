@@ -152,6 +152,11 @@ set(ORPHEUS_SRC
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
     "src/orpheus_unit_chaos.cpp"
+    "src/orpheus_master_fader.cpp"
+    "src/orpheus_master_tape_stop.cpp"
+    "src/orpheus_master_scratch.cpp"
+    "src/orpheus_master_dj_sweep.cpp"
+    "src/orpheus_master_leslie.cpp"
     "src/chaos/lorenz.cpp"
     "src/chaos/rossler.cpp"
     "src/chaos/duffing.cpp"
@@ -264,6 +269,12 @@ if(BUILD_TESTS)
         test/chaos_tests/test_henon.cpp
         test/chaos_tests/test_chua.cpp
         test/test_pulsar_chaos.cpp
+        test/test_master_fader.cpp
+        test/test_master_tape_stop.cpp
+        test/test_master_scratch.cpp
+        test/test_master_leslie.cpp
+        test/test_master_fader_pulsar_routing.cpp
+        test/test_master_tape_stop_pulsar_routing.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

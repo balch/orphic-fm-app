@@ -1,21 +1,24 @@
 package org.balch.orpheus.features.pulsar.playback
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
 import org.balch.orpheus.features.pulsar.MutablePrefs
-import org.balch.orpheus.features.pulsar.NoopTimerFadeStatusProvider
 import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
+import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
-import org.balch.orpheus.features.pulsar.makeMasterVolumeRamp
 import org.balch.orpheus.features.pulsar.makeStubPlaybackController
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import kotlin.test.Test
@@ -55,20 +58,34 @@ class PulsarSongEndingIntegrationTest {
         val playbackController = makeStubPlaybackController(scope)
 
         val songEnding = PulsarSongEnding(
-            pulsarFeature = feature,
+            pulsarFeatureProvider = { feature },
             playbackController = playbackController,
             preferences = prefs,
+            transitionPreferences = StubTransitionPreferences(),
             synthController = synthController,
-            synthEngine = engine,
-            ramp = makeMasterVolumeRamp(engine),
-            timerFadeStatusProvider = NoopTimerFadeStatusProvider,
             scope = scope,
         ).apply {
             nowMillis = { testScheduler.currentTime }
             random = { _, _ -> 0f }
         }
-        val advancer = PulsarSongAdvancer(feature, songEnding, engine, synthController, scope)
-            .apply { interTrackGapMs = 0 }
+        // Inline runner that just invokes applyNext (CUT-style) so the integration
+        // test doesn't have to wait through fade/gap timelines. Per-style timeline
+        // behavior is covered by `PulsarSongAdvancerIntegrationTest`; here we only
+        // need to confirm SongEnded reaches the advancer and the next vibe applies.
+        val runner = object : PulsarTransitionRunner {
+            override val activeStyle: StateFlow<TransitionStyle?> =
+                MutableStateFlow(null)
+
+            override suspend fun runTransition(
+                spec: TransitionSpec,
+                applyNext: suspend () -> Unit,
+            ) {
+                applyNext()
+            }
+        }
+        val advancer = PulsarSongAdvancer(
+            feature, songEnding, StubTransitionPreferences(), runner, scope,
+        )
 
         val collected = mutableListOf<SongEndingEvent>()
         val collectorJob = launch { songEnding.songEndingEvents.collect { collected += it } }
@@ -97,7 +114,11 @@ class PulsarSongEndingIntegrationTest {
         assertEquals("Second", feature.vibeFlow.value.name, "advancer flipped to next vibe")
         // After the advance, PulsarSongEnding's vibe-change collector resets
         // per-song state for the new vibe — endingTriggered must be false again.
-        assertEquals(false, songEnding.endingTriggeredForTest, "song-ending state reset for new vibe")
+        assertEquals(
+            false,
+            songEnding.endingTriggeredForTest,
+            "song-ending state reset for new vibe"
+        )
         assertTrue(advancer.enabled)
 
         collectorJob.cancel()

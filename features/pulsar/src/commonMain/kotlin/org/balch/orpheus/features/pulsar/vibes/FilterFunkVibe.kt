@@ -17,7 +17,6 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
-import org.balch.orpheus.features.pulsar.models.EndStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
@@ -132,7 +131,6 @@ class FilterFunkVibe : VibeProvider {
                 introIndex = 0,
                 sections = sectionList,
                 outroIndex = sectionList.lastIndex,
-                endStyle = EndStyle.ABRUPT,
             ),
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,

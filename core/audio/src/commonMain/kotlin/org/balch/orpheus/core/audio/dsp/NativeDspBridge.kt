@@ -17,6 +17,11 @@ interface NativeDspBridge {
     fun nativeSetVoiceActive(index: Int, active: Boolean)
     fun nativeSetVoiceHold(index: Int, level: Float)
     fun nativeSetMasterVolume(value: Float)
+    fun nativeMasterFade(target: Float, samples: Int, curve: Int)
+    fun nativeMasterTapeStop(samples: Int)
+    fun nativeMasterScratch(samples: Int)
+    fun nativeMasterDjSweep(samples: Int)
+    fun nativeMasterVolumeNow(): Float
     fun nativeSetDrive(value: Float)
     fun nativeSetDelayMix(value: Float)
     fun nativeSetVibrato(value: Float)

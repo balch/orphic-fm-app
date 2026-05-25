@@ -11,7 +11,6 @@ import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordFollow
-import org.balch.orpheus.features.pulsar.models.EndStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.Evolution
@@ -177,7 +176,6 @@ class SpaceDroneVibe : VibeProvider {
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
                 sections = sectionList,
-                endStyle = EndStyle.FADE_SLOW,
             ),
             energy = 0.30f,
             complexity = 0.40f,

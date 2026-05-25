@@ -34,6 +34,11 @@ import orpheus_dsp.orpheus_engine_get_viz
 import orpheus_dsp.orpheus_engine_is_tts_playing
 import orpheus_dsp.orpheus_engine_load_patch
 import orpheus_dsp.orpheus_engine_load_tts_audio
+import orpheus_dsp.orpheus_engine_master_dj_sweep
+import orpheus_dsp.orpheus_engine_master_fade
+import orpheus_dsp.orpheus_engine_master_scratch
+import orpheus_dsp.orpheus_engine_master_tape_stop
+import orpheus_dsp.orpheus_engine_master_volume_now
 import orpheus_dsp.orpheus_engine_play_tts
 import orpheus_dsp.orpheus_engine_process_deinterleaved
 import orpheus_dsp.orpheus_engine_set_automation
@@ -351,6 +356,26 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
 
     override fun nativeSetMasterVolume(value: Float) {
         engine?.let { orpheus_engine_set_master_volume(it, value) }
+    }
+
+    override fun nativeMasterFade(target: Float, samples: Int, curve: Int) {
+        engine?.let { orpheus_engine_master_fade(it, target, samples, curve) }
+    }
+
+    override fun nativeMasterTapeStop(samples: Int) {
+        engine?.let { orpheus_engine_master_tape_stop(it, samples) }
+    }
+
+    override fun nativeMasterScratch(samples: Int) {
+        engine?.let { orpheus_engine_master_scratch(it, samples) }
+    }
+
+    override fun nativeMasterDjSweep(samples: Int) {
+        engine?.let { orpheus_engine_master_dj_sweep(it, samples) }
+    }
+
+    override fun nativeMasterVolumeNow(): Float {
+        return engine?.let { orpheus_engine_master_volume_now(it) } ?: 0f
     }
 
     override fun nativeSetDrive(value: Float) {

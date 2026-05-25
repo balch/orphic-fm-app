@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -63,7 +65,6 @@ internal val TrackColors = listOf(
 private const val NUM_TRACKS = 8
 private const val MAX_STEPS = 32
 private const val MAX_PARTICLES = 50
-private const val SIGNAL_HISTORY_SIZE = 128  // ~2 seconds at 60fps
 
 private class GridParticle {
     var x = 0f; var y = 0f; var vx = 0f; var vy = 0f
@@ -117,6 +118,9 @@ fun PulsarStepGrid(
     onTrackSelected: (Int?) -> Unit = {},
     arrangementState: PulsarArrangementState? = null,
     arrangement: Arrangement? = null,
+    activeTransition: TransitionStyle? = null,
+    finalSectionIndex: Int = -1,
+    pendingTransition: TransitionStyle? = null,
     modifier: Modifier = Modifier,
 ) {
     val cellGap = 2f
@@ -480,17 +484,48 @@ fun PulsarStepGrid(
             arrangement?.sections?.getOrNull(sectionIndex)?.name
         }
 
-        if (sectionName != null) {
-            val currentBar = arrangementState.barsElapsed + 1
-            val barText = "$currentBar/${arrangementState.barsTotal}"
-            val soloText = if (arrangementState.soloActive && arrangementState.soloTrack >= 0) {
-                val name = if (arrangementState.bandSolo) {
-                    arrangementState.bandMemberNames.getOrElse(arrangementState.soloTrack) { "?" }
-                } else {
-                    PULSAR_TRACK_NAMES.getOrElse(arrangementState.soloTrack) { "?" }
+        if (sectionName != null || activeTransition != null) {
+            // While a transition is firing the overlay reads "\u25b8 STYLE" in
+            // cosmicPurple \u2014 louder than the normal section/bar text because
+            // it's the moment the user is most likely curious about.
+            //
+            // Otherwise: "section bar X/Y [\u25b8 solo]" in white, with a trailing
+            // " \u2014 STYLE" suffix in cosmicPurple when the current section is
+            // the final section and a transition is pending. AnnotatedString
+            // lets the suffix carry its own color inline.
+            val overlay: androidx.compose.ui.text.AnnotatedString =
+                androidx.compose.ui.text.buildAnnotatedString {
+                    val accent = OrpheusColors.cosmicPurple
+                    val base = Color.White.copy(alpha = 0.9f)
+                    if (activeTransition != null) {
+                        pushStyle(SpanStyle(color = accent))
+                        append("\u25b8 ${activeTransition.name}")
+                        pop()
+                    } else {
+                        val currentBar = (arrangementState?.barsElapsed ?: 0) + 1
+                        val barText = "$currentBar/${arrangementState?.barsTotal ?: 0}"
+                        val soloText = if (arrangementState != null && arrangementState.soloActive && arrangementState.soloTrack >= 0) {
+                            val name = if (arrangementState.bandSolo) {
+                                arrangementState.bandMemberNames.getOrElse(arrangementState.soloTrack) { "?" }
+                            } else {
+                                PULSAR_TRACK_NAMES.getOrElse(arrangementState.soloTrack) { "?" }
+                            }
+                            " \u25b8 $name"
+                        } else ""
+                        pushStyle(SpanStyle(color = base))
+                        append("$sectionName $barText$soloText")
+                        pop()
+                        val isFinal = arrangementState != null
+                            && finalSectionIndex >= 0
+                            && arrangementState.sectionIndex == finalSectionIndex
+                            && pendingTransition != null
+                        if (isFinal) {
+                            pushStyle(SpanStyle(color = accent))
+                            append(" \u2014 ${pendingTransition.name}")
+                            pop()
+                        }
+                    }
                 }
-                " \u25b8 $name"
-            } else ""
 
             Box(
                 modifier = Modifier
@@ -503,8 +538,7 @@ fun PulsarStepGrid(
                     .padding(horizontal = 6.dp, vertical = 3.dp),
             ) {
                 Text(
-                    text = "$sectionName $barText$soloText",
-                    color = Color.White.copy(alpha = 0.9f),
+                    text = overlay,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                     maxLines = 1,

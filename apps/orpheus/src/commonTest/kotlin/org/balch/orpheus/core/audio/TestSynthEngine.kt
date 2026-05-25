@@ -81,6 +81,10 @@ open class TestSynthEngine : SynthEngine {
 
     // Setters
     override fun setMasterVolume(value: Float) { _masterVolume = value }
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { _masterVolume = target }
+    override fun masterTapeStop(durationMs: Int) { _masterVolume = 0f }
+    override fun masterScratch(durationMs: Int) { /* additive noise — no volume change */ }
+    override fun masterDjSweep(durationMs: Int) { /* in-place filter — no volume change */ }
     override fun setDrive(value: Float) { _drive = value }
     override fun setDistortionMix(value: Float) { _distortionMix = value }
     override fun setVoiceTune(index: Int, tune: Float) { _voiceTunes[index] = tune }

@@ -72,23 +72,30 @@ private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherPr
 class PulsarMetadataProducerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun testScope() = AppCoroutineScope(TestDispatchers(UnconfinedTestDispatcher()))
+    private fun testDispatchers(): DispatcherProvider =
+        TestDispatchers(UnconfinedTestDispatcher())
 
     @Test fun `title is initial vibe name`() = runTest {
         val feature = FakePulsarFeature(sampleVibe(name = "Initial Vibe"))
-        val producer = PulsarMetadataProducer(feature, testScope())
+        val producer = testDispatchers().let { d ->
+            PulsarMetadataProducer({ feature }, AppCoroutineScope(d), d)
+        }
         assertEquals("Initial Vibe", producer.titleFlow.value)
     }
 
     @Test fun `subtitle is initial album title`() = runTest {
         val feature = FakePulsarFeature(sampleVibe(album = Album.ZERO_TO_ONE))
-        val producer = PulsarMetadataProducer(feature, testScope())
+        val producer = testDispatchers().let { d ->
+            PulsarMetadataProducer({ feature }, AppCoroutineScope(d), d)
+        }
         assertEquals(Album.ZERO_TO_ONE.title, producer.subtitleFlow.value)
     }
 
     @Test fun `title updates when vibe changes`() = runTest {
         val feature = FakePulsarFeature(sampleVibe(name = "First"))
-        val producer = PulsarMetadataProducer(feature, testScope())
+        val producer = testDispatchers().let { d ->
+            PulsarMetadataProducer({ feature }, AppCoroutineScope(d), d)
+        }
         feature.vibeFlow.value = sampleVibe(name = "Second")
         assertEquals("Second", producer.titleFlow.value)
     }

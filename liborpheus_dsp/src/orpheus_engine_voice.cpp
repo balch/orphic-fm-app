@@ -106,9 +106,13 @@ void orpheus_engine_trigger_drum(OrpheusEngine* engine,
 }
 
 void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v) {
-    // Volume is applied in unit_process_master_out (after pan, before clip)
-    // matching JSyn's StereoPlugin chain: pan → volume → peak → clip
+    // Volume is applied via MasterFader inside unit_process_master_out
+    // (chain: pan -> tape_stop -> fader -> peak -> limiter).
     engine->master_volume.store(v);
+    // Also snap the fader so non-ramped sets take effect immediately
+    // (cancels any in-flight master_fade).
+    engine->master_fader_l.reset(v);
+    engine->master_fader_r.reset(v);
 }
 
 void orpheus_engine_set_drive(OrpheusEngine* engine, float v) {

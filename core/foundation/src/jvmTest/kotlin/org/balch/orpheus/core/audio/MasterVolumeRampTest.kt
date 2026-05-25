@@ -7,81 +7,77 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.plugin.PortValue
-import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MasterVolumeRampTest {
 
     @Test
-    fun `ramp from 1 to 0 across 1000ms in 100ms steps`() = runTest {
+    fun `ramp delegates to engine fadeMasterVolume with correct args`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val engine = FakeEngine(initial = 1.0f)
         val ramp = MasterVolumeRamp(engine)
 
         val job = launch(dispatcher) {
-            ramp.rampMasterVolumeTo(target = 0f, durationMs = 1000L, stepMs = 100L)
+            ramp.rampMasterVolumeTo(target = 0f, durationMs = 500L, curve = FadeCurve.LOG)
         }
         advanceTimeBy(1L)
-        assertEquals(1.0f, engine.volume, "first write should be initial value")
-
-        advanceTimeBy(500L)
-        assertTrue(abs(engine.volume - 0.5f) < 0.06f, "midpoint volume=${engine.volume}")
+        assertEquals(1, engine.fades.size, "should arm engine fader exactly once")
+        assertEquals(FadeCurve.LOG, engine.fades[0].curve)
+        assertEquals(500, engine.fades[0].durationMs)
+        assertEquals(0f, engine.fades[0].target)
 
         advanceTimeBy(600L)
         job.join()
-        assertEquals(0f, engine.volume)
+        assertTrue(engine.volume == 0f, "engine should reflect target after duration; was ${engine.volume}")
     }
 
     @Test
-    fun `ramp respects current value as the starting point`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val engine = FakeEngine(initial = 0.5f)
-        val ramp = MasterVolumeRamp(engine)
-        val job = launch(dispatcher) {
-            ramp.rampMasterVolumeTo(target = 0f, durationMs = 200L, stepMs = 100L)
-        }
-        advanceTimeBy(1L)
-        assertEquals(0.5f, engine.volume)
-        advanceTimeBy(250L)
-        job.join()
-        assertEquals(0f, engine.volume)
-    }
-
-    @Test
-    fun `EASE_IN holds volume high through the midpoint`() = runTest {
+    fun `default curve is LINEAR`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val engine = FakeEngine(initial = 1.0f)
         val ramp = MasterVolumeRamp(engine)
         val job = launch(dispatcher) {
-            ramp.rampMasterVolumeTo(
-                target = 0f,
-                durationMs = 1000L,
-                stepMs = 100L,
-                curve = FadeCurve.EASE_IN,
-            )
+            ramp.rampMasterVolumeTo(target = 0.5f, durationMs = 100L)
         }
-        // After 500 ms (halfway): linear would be 0.5; ease-in (t²) is 0.75.
-        advanceTimeBy(501L)
-        assertTrue(
-            abs(engine.volume - 0.75f) < 0.06f,
-            "ease-in midpoint volume=${engine.volume} (expected ~0.75)",
-        )
-        // Past the duration: lands at 0 just like linear.
-        advanceTimeBy(550L)
-        job.join()
-        assertEquals(0f, engine.volume)
+        advanceTimeBy(1L)
+        assertEquals(1, engine.fades.size)
+        assertEquals(FadeCurve.LINEAR, engine.fades[0].curve)
+        job.cancel()
+    }
+
+    @Test
+    fun `requires positive durationMs`() = runTest {
+        val engine = FakeEngine(initial = 1.0f)
+        val ramp = MasterVolumeRamp(engine)
+        try {
+            ramp.rampMasterVolumeTo(target = 0f, durationMs = 0L)
+            fail("expected IllegalArgumentException for durationMs=0")
+        } catch (e: IllegalArgumentException) {
+            // ok
+        }
     }
 }
 
 private class FakeEngine(initial: Float = 1.0f) : SynthEngine {
     @Volatile var volume: Float = initial
 
+    data class FadeCall(val target: Float, val durationMs: Int, val curve: FadeCurve)
+    val fades = mutableListOf<FadeCall>()
+
     override fun start() = Unit
     override fun stop() = Unit
     override fun setMasterVolume(amount: Float) { volume = amount }
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) {
+        fades += FadeCall(target, durationMs, curve)
+        volume = target // simulate sample-accurate fade completion
+    }
+    override fun masterTapeStop(durationMs: Int) { volume = 0f }
+    override fun masterScratch(durationMs: Int) {}
+    override fun masterDjSweep(durationMs: Int) {}
     override fun getMasterVolume(): Float = volume
 
     // Stubs — never called by MasterVolumeRamp

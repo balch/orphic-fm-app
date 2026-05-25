@@ -154,6 +154,14 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         freq_slot.allocated = true;
     }
 
+    // Seed the master fader from the default master_volume (0.7) so the very
+    // first audio frame plays at the expected gain. MasterFader defaults its
+    // internal current_ to 1.0; without this snap, the first block would be
+    // ~3 dB hotter than intended.
+    float v0 = engine->master_volume.load(std::memory_order_relaxed);
+    engine->master_fader_l.reset(v0);
+    engine->master_fader_r.reset(v0);
+
     return engine;
 }
 
@@ -560,6 +568,39 @@ void orpheus_engine_process_deinterleaved(OrpheusEngine* engine,
         left[i]  = scratch[i * 2];
         right[i] = scratch[i * 2 + 1];
     }
+}
+
+// ── Master-bus fade and tape-stop (song transitions) ──────────
+void orpheus_engine_master_fade(OrpheusEngine* engine, float target, int samples, int curve) {
+    if (!engine) return;
+    auto c = static_cast<orpheus::FadeCurve>(curve);
+    engine->master_fader_l.arm(target, samples, c);
+    engine->master_fader_r.arm(target, samples, c);
+}
+
+void orpheus_engine_master_tape_stop(OrpheusEngine* engine, int samples) {
+    if (!engine) return;
+    engine->master_tape_stop_l.arm(samples);
+    engine->master_tape_stop_r.arm(samples);
+}
+
+void orpheus_engine_master_scratch(OrpheusEngine* engine, int samples) {
+    if (!engine) return;
+    engine->master_scratch_l.arm(samples, engine->sample_rate, 0);
+    engine->master_scratch_r.arm(samples, engine->sample_rate, 0x55555555u);
+}
+
+void orpheus_engine_master_dj_sweep(OrpheusEngine* engine, int samples) {
+    if (!engine) return;
+    engine->master_dj_sweep_l.arm(samples, engine->sample_rate, 0);
+    engine->master_dj_sweep_r.arm(samples, engine->sample_rate, 7);
+    engine->master_leslie_l.arm(samples, engine->sample_rate);
+    engine->master_leslie_r.arm(samples, engine->sample_rate);
+}
+
+float orpheus_engine_master_volume_now(OrpheusEngine* engine) {
+    if (!engine) return 0.0f;
+    return engine->master_fader_l.current();
 }
 
 }  // extern "C"

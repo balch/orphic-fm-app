@@ -183,6 +183,22 @@ void OboeEngine::triggerDrum(int drumIndex, float accent) {
 void OboeEngine::setMasterVolume(float v) {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_master_volume(e, v);
 }
+void OboeEngine::masterFade(float target, int samples, int curve) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_fade(e, target, samples, curve);
+}
+void OboeEngine::masterTapeStop(int samples) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_tape_stop(e, samples);
+}
+void OboeEngine::masterScratch(int samples) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_scratch(e, samples);
+}
+void OboeEngine::masterDjSweep(int samples) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_dj_sweep(e, samples);
+}
+float OboeEngine::masterVolumeNow() {
+    auto* e = dsp_engine_.load(std::memory_order_acquire);
+    return e ? orpheus_engine_master_volume_now(e) : 0.0f;
+}
 void OboeEngine::setDrive(float v) {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_drive(e, v);
 }

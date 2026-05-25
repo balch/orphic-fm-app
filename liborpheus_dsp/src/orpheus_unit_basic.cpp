@@ -207,15 +207,18 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     // Pulsar output is now routed through the graph (delay/reverb sends + master),
     // not summed here. See DefaultWiringGraph.kt for wiring.
 
-    // Signal chain: global_mute → pan → volume → peak measurement → limiter → output
+    // Signal chain: global_mute → pan → tape_stop → fader (volume) → peak → limiter → output
+    // MasterFader replaces the legacy smooth_master_volume one-pole; MasterTapeStop is
+    // inert (pass-through) unless armed via orpheus_engine_master_tape_stop().
     float pan_target = engine->master_pan.load(std::memory_order_relaxed);
-    float vol_target = engine->master_volume.load(std::memory_order_relaxed);
     float coeff = smooth_coeff(sr);
 
     // Global mute: smooth toward 0 (muted) or 1 (unmuted) for click-free transitions
     float mute_target = engine->global_muted.load(std::memory_order_relaxed) != 0 ? 0.0f : 1.0f;
 
-    // Fast early-out: if fully muted and target is still muted, zero output
+    // Fast early-out: if fully muted and target is still muted, zero output.
+    // Still advance tape_stop write heads so an arm immediately after unmute
+    // doesn't read uninitialised silence-then-noise from the ring.
     if (engine->smooth_global_mute < 0.0001f && mute_target < 0.5f) {
         engine->smooth_global_mute = 0.0f;
         std::memset(output_buffer, 0, n * 2 * sizeof(float));
@@ -225,7 +228,42 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         return;
     }
 
-    // Feed-forward limiter coefficients
+    // Scratch L/R buffers for the tape_stop → fader chain.
+    // Sized to kMaxFrames (=512) which bounds n; ~4 KB total on stack.
+    float scratch_l[kMaxFrames];
+    float scratch_r[kMaxFrames];
+
+    // Pass 1: pan + global mute → scratch L/R (pre-tape_stop/fader).
+    // Volume is no longer applied here — the fader handles it next.
+    for (int i = 0; i < n; i++) {
+        engine->smooth_global_mute += coeff * (mute_target - engine->smooth_global_mute);
+        float mute_gain = engine->smooth_global_mute;
+
+        engine->smooth_master_pan += coeff * (pan_target - engine->smooth_master_pan);
+        float mp_angle = ((engine->smooth_master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
+        scratch_l[i] = in_l[i] * std::cos(mp_angle) * mute_gain;
+        scratch_r[i] = in_r[i] * std::sin(mp_angle) * mute_gain;
+    }
+
+    // Master-bus chain: tape_stop → fader → dj_sweep → leslie → scratch.
+    // All inert (passthrough / unity / silent) unless armed.
+    engine->master_tape_stop_l.process(scratch_l, static_cast<size_t>(n));
+    engine->master_tape_stop_r.process(scratch_r, static_cast<size_t>(n));
+    engine->master_fader_l.process(scratch_l, static_cast<size_t>(n));
+    engine->master_fader_r.process(scratch_r, static_cast<size_t>(n));
+    engine->master_dj_sweep_l.process(scratch_l, static_cast<size_t>(n));
+    engine->master_dj_sweep_r.process(scratch_r, static_cast<size_t>(n));
+    engine->master_leslie_l.process(scratch_l, static_cast<size_t>(n));
+    engine->master_leslie_r.process(scratch_r, static_cast<size_t>(n));
+    engine->master_scratch_l.process(scratch_l, static_cast<size_t>(n));
+    engine->master_scratch_r.process(scratch_r, static_cast<size_t>(n));
+
+    // Keep the legacy smooth_master_volume mirror in sync with the fader's
+    // instantaneous gain. Other readers (diagnostics, future code) may still
+    // sample this field; cheap to update once per block.
+    engine->smooth_master_volume = engine->master_fader_l.current();
+
+    // Pass 2: peak measurement → feed-forward limiter → soft-sat → interleaved out.
     constexpr float kLimiterThreshold = 0.9f;
     float attack_coeff  = 1.0f - std::exp(-1.0f / (0.0001f * sr));
     float release_coeff = 1.0f - std::exp(-1.0f / (0.100f * sr));
@@ -234,26 +272,10 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     float pk_l = 0.0f, pk_r = 0.0f;
 
     for (int i = 0; i < n; i++) {
-        // Global mute (smoothed)
-        engine->smooth_global_mute += coeff * (mute_target - engine->smooth_global_mute);
-        float mute_gain = engine->smooth_global_mute;
+        float l = scratch_l[i];
+        float r = scratch_r[i];
 
-        // Pan (constant-power, per-sample smoothed)
-        engine->smooth_master_pan += coeff * (pan_target - engine->smooth_master_pan);
-        float mp_angle = ((engine->smooth_master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
-        float l = in_l[i] * std::cos(mp_angle);
-        float r = in_r[i] * std::sin(mp_angle);
-
-        // Volume (smoothed)
-        engine->smooth_master_volume += coeff * (vol_target - engine->smooth_master_volume);
-        l *= engine->smooth_master_volume;
-        r *= engine->smooth_master_volume;
-
-        // Apply global mute
-        l *= mute_gain;
-        r *= mute_gain;
-
-        // Peak measurement (pre-limiter)
+        // Peak measurement (pre-limiter, post-fader)
         float al = std::fabs(l);
         float ar = std::fabs(r);
         if (al > pk_l) pk_l = al;

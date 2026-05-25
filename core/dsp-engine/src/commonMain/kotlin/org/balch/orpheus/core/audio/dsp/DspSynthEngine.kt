@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
@@ -575,8 +576,24 @@ class DspSynthEngine(
         nativeBridge.nativeSetMasterVolume(amount)
         setPort(StereoSymbol.MASTER_VOL, PortValue.FloatValue(amount))
     }
-    override fun getMasterVolume(): Float =
-        getPort(StereoSymbol.MASTER_VOL)?.asFloat() ?: 0.7f
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) {
+        val samples = (durationMs * audioEngine.sampleRate / 1000f).toInt()
+        nativeBridge.nativeMasterFade(target, samples, curve.ordinal)
+    }
+    override fun masterTapeStop(durationMs: Int) {
+        val samples = (durationMs * audioEngine.sampleRate / 1000f).toInt()
+        nativeBridge.nativeMasterTapeStop(samples)
+    }
+    override fun masterScratch(durationMs: Int) {
+        val samples = (durationMs * audioEngine.sampleRate / 1000f).toInt()
+        nativeBridge.nativeMasterScratch(samples)
+    }
+    override fun masterDjSweep(durationMs: Int) {
+        val samples = (durationMs * audioEngine.sampleRate / 1000f).toInt()
+        nativeBridge.nativeMasterDjSweep(samples)
+    }
+    // Native fader is the source of truth for current master volume — no Kotlin caching.
+    override fun getMasterVolume(): Float = nativeBridge.nativeMasterVolumeNow()
 
     override fun setVoicePan(index: Int, pan: Float) {
         if (index in 0 until 12) {

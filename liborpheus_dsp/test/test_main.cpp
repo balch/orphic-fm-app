@@ -84,6 +84,12 @@ static TestSuite suites[] = {
     {"chaos_henon",     run_chaos_henon_tests,     true},
     {"chaos_chua",      run_chaos_chua_tests,      true},
     {"pulsar_chaos",    run_pulsar_chaos_tests,    true},
+    {"master_fader",    run_master_fader_tests,    true},
+    {"master_tape_stop", run_master_tape_stop_tests, true},
+    {"master_scratch",  run_master_scratch_tests,   true},
+    {"master_leslie",   run_master_leslie_tests,    true},
+    {"master_fader_pulsar", run_master_fader_pulsar_routing_tests, true},
+    {"master_tape_stop_pulsar", run_master_tape_stop_pulsar_routing_tests, true},
 };
 
 static constexpr int kNumSuites = sizeof(suites) / sizeof(suites[0]);

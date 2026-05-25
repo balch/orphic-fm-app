@@ -4,13 +4,15 @@ import androidx.compose.ui.graphics.decodeToImageBitmap
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.models.Album
@@ -35,19 +37,29 @@ import orpheus.features.pulsar.generated.resources.Res
 @SingleIn(AppScope::class)
 @Inject
 class PulsarMetadataProducer(
-    pulsarFeature: PulsarFeature,
+    // Lazy provider breaks the static DI cycle (PulsarFeature → PulsarViewModel
+    // → PulsarSongEnding → PlaybackController → MetadataProducer → here).
+    // But that alone is not enough — invoking the provider on a Default-pool
+    // worker while AWT is still building the Metro graph deadlocks two threads
+    // on adjacent BaseDoubleCheck locks. Launching on `dispatcherProvider.main`
+    // queues the resolution past AWT's current composition event, so by the
+    // time the provider fires, the graph is fully built and no other thread
+    // is contending for those locks.
+    pulsarFeatureProvider: () -> PulsarFeature,
     scope: AppCoroutineScope,
+    dispatcherProvider: DispatcherProvider,
 ) : MetadataProducer {
 
-    override val titleFlow: StateFlow<String> =
-        pulsarFeature.vibeFlow
-            .map { it.name }
-            .stateIn(scope, SharingStarted.Eagerly, pulsarFeature.vibeFlow.value.name)
+    // Defaults match PlaybackController.snapshotOf's title.ifEmpty { "Orpheus" }
+    // fallback, so the brief window before the init coroutine fires looks the
+    // same as the empty-title case the snapshot code already handles.
+    private val _title = MutableStateFlow("Orpheus")
+    private val _subtitle = MutableStateFlow("")
+    private val _artwork = MutableStateFlow<ByteArray?>(null)
 
-    override val subtitleFlow: StateFlow<String> =
-        pulsarFeature.vibeFlow
-            .map { it.album.title }
-            .stateIn(scope, SharingStarted.Eagerly, pulsarFeature.vibeFlow.value.album.title)
+    override val titleFlow: StateFlow<String> = _title.asStateFlow()
+    override val subtitleFlow: StateFlow<String> = _subtitle.asStateFlow()
+    override val artworkPngFlow: StateFlow<ByteArray?> = _artwork.asStateFlow()
 
     private val log = com.diamondedge.logging.logging("PulsarMetadataProducer")
     // Guarded by [cacheLock]. Today the upstream Flow has a single collector
@@ -93,11 +105,26 @@ class PulsarMetadataProducer(
         return webpBytes.decodeToImageBitmap().toPngBytes()
     }
 
-    // Initial value is null (not pre-rendered) so test environments without
-    // Skia loaded — and platforms where toPngBytes() is a no-op — don't pay
-    // for an upfront render. The first downstream emission populates it.
-    override val artworkPngFlow: StateFlow<ByteArray?> =
-        pulsarFeature.vibeFlow
-            .map { renderArtworkBytes(it) }
-            .stateIn(scope, SharingStarted.Eagerly, null)
+    init {
+        // Outer launch on Main: deferred behind AWT's current composition pass,
+        // so pulsarFeatureProvider() resolves only after the graph is built.
+        scope.launch(dispatcherProvider.main) {
+            val pulsarFeature = pulsarFeatureProvider()
+            // Title/subtitle are pure mappings — single collect on default.
+            launch(dispatcherProvider.default) {
+                pulsarFeature.vibeFlow.collect { vibe ->
+                    _title.value = vibe.name
+                    _subtitle.value = vibe.album.title
+                }
+            }
+            // Artwork uses collectLatest so a rapid vibe change cancels an
+            // in-flight render — matches the prior `stateIn` + slow `map`
+            // semantics, which would also discard intermediates.
+            launch(dispatcherProvider.default) {
+                pulsarFeature.vibeFlow.collectLatest { vibe ->
+                    _artwork.value = renderArtworkBytes(vibe)
+                }
+            }
+        }
+    }
 }

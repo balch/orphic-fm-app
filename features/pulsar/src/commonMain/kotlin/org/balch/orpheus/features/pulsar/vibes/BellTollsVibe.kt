@@ -15,7 +15,6 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
-import org.balch.orpheus.features.pulsar.models.EndStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
@@ -233,7 +232,6 @@ class BellTollsVibe : VibeProvider {
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
                 sections = sectionList,
-                endStyle = EndStyle.FADE_SLOW,
                 minVibeSeconds = 180,
                 maxVibeSeconds = 300,
             ),

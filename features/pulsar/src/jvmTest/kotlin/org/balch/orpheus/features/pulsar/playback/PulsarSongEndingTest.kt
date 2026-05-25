@@ -13,13 +13,10 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
 import org.balch.orpheus.features.pulsar.MutablePrefs
-import org.balch.orpheus.features.pulsar.MutableTimerFadeStatusProvider
-import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
+import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
-import org.balch.orpheus.features.pulsar.makeMasterVolumeRamp
 import org.balch.orpheus.features.pulsar.makeStubPlaybackController
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
-import org.balch.orpheus.features.pulsar.models.EndStyle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -134,90 +131,6 @@ class PulsarSongEndingTest {
     }
 
     @Test
-    fun `ramp scheduled in the bar containing the fade-start point`() = runTest {
-        val harness = TestHarness(
-            this,
-            random = { _, _ -> 0f },
-            // FADE_FAST = 0.25 bars → fade lives entirely inside the last bar.
-            initialVibe = mkMinimalVibe("Test", endStyle = EndStyle.FADE_FAST),
-        )
-        harness.prefs.enabledFlow.value = true
-        harness.playbackController.play()
-        advanceTimeBy(160_000L)
-
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
-        runCurrent()
-
-        // bar 0 of 8 in the final section: barsRemaining=8, fade not yet.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
-        runCurrent()
-        assertEquals(false, harness.songEnding.rampStartedForTest)
-
-        // bar 6 of 8: barsRemaining=2, ceil(0.25)=1 → still not yet.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 6, 8, false, -1, 0)
-        runCurrent()
-        assertEquals(false, harness.songEnding.rampStartedForTest)
-
-        // bar 7 of 8 (last bar): barsRemaining=1 = ceil(0.25) → fade kicks in.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 7, 8, false, -1, 0)
-        runCurrent()
-        assertEquals(true, harness.songEnding.rampStartedForTest)
-    }
-
-    @Test
-    fun `ramp deferred while timer is FADING`() = runTest {
-        val harness = TestHarness(
-            this,
-            random = { _, _ -> 0f },
-            initialVibe = mkMinimalVibe("Test", endStyle = EndStyle.FADE_FAST),
-        )
-        harness.timerFadeStatusProvider.fading = true
-        harness.prefs.enabledFlow.value = true
-        harness.playbackController.play()
-        advanceTimeBy(160_000L)
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
-        runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
-        runCurrent()
-        // bar 7 of 8 (last bar): would normally fire FADE_FAST=0.25; timer FADING blocks it.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 7, 8, false, -1, 0)
-        runCurrent()
-        assertEquals(false, harness.songEnding.rampStartedForTest)
-    }
-
-    @Test
-    fun `FADE_SLOW fades only the last bar in a short outro`() = runTest {
-        val harness = TestHarness(
-            this,
-            random = { _, _ -> 0f },
-            // FADE_SLOW = 1.0 bar; cap = max(barsTotal-2, 1) = 2 → effective = 1.0.
-            initialVibe = mkMinimalVibe("Test", endStyle = EndStyle.FADE_SLOW),
-        )
-        harness.prefs.enabledFlow.value = true
-        harness.playbackController.play()
-        advanceTimeBy(160_000L)
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
-        runCurrent()
-        // bars 0..2 of 4 in the final section: still full volume.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 4, false, -1, 0)
-        runCurrent()
-        assertEquals(false, harness.songEnding.rampStartedForTest, "no fade at bar 0")
-
-        harness.feature.arrangement.value = PulsarArrangementState(5, 1, 4, false, -1, 0)
-        runCurrent()
-        assertEquals(false, harness.songEnding.rampStartedForTest, "no fade at bar 1")
-
-        harness.feature.arrangement.value = PulsarArrangementState(5, 2, 4, false, -1, 0)
-        runCurrent()
-        assertEquals(false, harness.songEnding.rampStartedForTest, "no fade at bar 2")
-
-        // bar 3 of 4 (last bar): barsRemaining=1 = ceil(1.0) → fade kicks in.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 3, 4, false, -1, 0)
-        runCurrent()
-        assertEquals(true, harness.songEnding.rampStartedForTest, "fade at last bar")
-    }
-
-    @Test
     fun `SongEnded emitted when terminal outro section loops back to bar 0`() = runTest {
         val harness = TestHarness(this, random = { _, _ -> 0f })
         harness.prefs.enabledFlow.value = true
@@ -288,7 +201,6 @@ private class TestHarness(
 ) {
     val feature = FakePulsarFeature(vibeList = listOf(initialVibe), initial = initialVibe)
     val prefs = MutablePrefs()
-    val timerFadeStatusProvider = MutableTimerFadeStatusProvider()
     val synthController: SynthController = SynthController().apply {
         val ports = mutableMapOf<String, PortValue>()
         setDelegates(
@@ -296,19 +208,15 @@ private class TestHarness(
             getter = { id -> ports["${id.uri}:${id.symbol}"] },
         )
     }
-    val stubEngine = SongEndingStubSynthEngine()
-    val ramp = makeMasterVolumeRamp(stubEngine)
     private val scope = makeAppCoroutineScope(UnconfinedTestDispatcher(testScope.testScheduler))
     val playbackController = makeStubPlaybackController(scope)
 
     val songEnding = PulsarSongEnding(
-        pulsarFeature = feature,
+        pulsarFeatureProvider = { feature },
         playbackController = playbackController,
         preferences = prefs,
+        transitionPreferences = StubTransitionPreferences(),
         synthController = synthController,
-        synthEngine = stubEngine,
-        ramp = ramp,
-        timerFadeStatusProvider = timerFadeStatusProvider,
         scope = scope,
     ).apply {
         nowMillis = { testScope.testScheduler.currentTime }

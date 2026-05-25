@@ -1,6 +1,8 @@
 package org.balch.orpheus.core.preferences
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 
 @Serializable
 data class AppPreferences(
@@ -14,6 +16,11 @@ data class AppPreferences(
     val signalVizEnabled: Boolean = false,
     /** Master switch for Pulsar song-ending behavior (auto-end + advance). */
     val pulsarSongEndingEnabled: Boolean = true,
+    /**
+     * Default song-to-song transition for Pulsar. Overridden per-vibe via
+     * `Arrangement.transitionOut` when authored. Default: TAPE at 1000ms.
+     */
+    val pulsarTransitionDefault: TransitionSpec = TransitionStyle.default,
     /** Serialized DJ UI state JSON for cross-session persistence. */
     val lastDjJson: String? = null,
     /** Serialized Pulsar UI state JSON for cross-session persistence. */

@@ -88,9 +88,10 @@ class OrpheusMetadataProducerTest {
         album: Album = Album.STEALTH,
         evoActive: Boolean = false,
     ): Harness {
-        val scope = AppCoroutineScope(TestDispatcherProvider(UnconfinedTestDispatcher()))
+        val dispatchers = TestDispatcherProvider(UnconfinedTestDispatcher())
+        val scope = AppCoroutineScope(dispatchers)
         val pulsarFeature = FakePulsarFeature(sampleVibe(vibeName, bpm, album))
-        val pulsarMetadata = PulsarMetadataProducer(pulsarFeature, scope)
+        val pulsarMetadata = PulsarMetadataProducer({ pulsarFeature }, scope, dispatchers)
         val aiFeature = FakeAiFeature(mode)
         val mediaState = MediaSessionStateManager(scope).apply { setEvoActive(evoActive) }
         val producer = OrpheusMetadataProducer(aiFeature, pulsarMetadata, mediaState, scope)

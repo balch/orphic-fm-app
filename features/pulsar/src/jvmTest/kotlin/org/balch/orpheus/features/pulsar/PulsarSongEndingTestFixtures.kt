@@ -4,12 +4,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import org.balch.orpheus.core.audio.MasterVolumeRamp
+import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.TimerFadeStatusProvider
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
@@ -30,6 +31,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
+import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 
 /**
  * Shared no-op stubs for the new song-ending dependencies that
@@ -52,13 +54,39 @@ internal class StubSongEndingPreferences : SongEndingPreferences {
     override suspend fun setEnabled(value: Boolean) { enabledFlow.value = value }
 }
 
-internal object NoopTimerFadeStatusProvider : TimerFadeStatusProvider {
-    override fun isFading(): Boolean = false
+internal class StubTransitionPreferences(
+    initial: TransitionSpec = TransitionStyle.default,
+) : TransitionPreferences {
+    override val defaultFlow: MutableStateFlow<TransitionSpec> = MutableStateFlow(initial)
+    override suspend fun setDefault(value: TransitionSpec) { defaultFlow.value = value }
 }
 
-/** Mutable [TimerFadeStatusProvider] for tests that need to flip the fading flag. */
-internal class MutableTimerFadeStatusProvider(@Volatile var fading: Boolean = false) : TimerFadeStatusProvider {
-    override fun isFading(): Boolean = fading
+/**
+ * CUT-style stub runner — runTransition invokes applyNext synchronously with
+ * no fades or delays. Used by ViewModel-construction tests that don't care
+ * about transition timing but need to satisfy the PulsarTransitionRunner DI
+ * dependency.
+ */
+internal class StubTransitionRunner : org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner {
+    override val activeStyle: MutableStateFlow<TransitionStyle?> = MutableStateFlow(null)
+    override suspend fun runTransition(spec: TransitionSpec, applyNext: suspend () -> Unit) {
+        applyNext()
+    }
+}
+
+/** Inert stub SongEndingEventSource — never emits, indexes stay at defaults. */
+internal class StubSongEndingEventSource :
+    org.balch.orpheus.features.pulsar.playback.SongEndingEventSource {
+    override val songEndingEvents:
+        kotlinx.coroutines.flow.SharedFlow<org.balch.orpheus.features.pulsar.playback.SongEndingEvent> =
+        kotlinx.coroutines.flow.MutableSharedFlow()
+    override val finalSectionIndex: kotlinx.coroutines.flow.StateFlow<Int> =
+        MutableStateFlow(-1)
+    override val endingTriggered: kotlinx.coroutines.flow.StateFlow<Boolean> =
+        MutableStateFlow(false)
+    override val resolvedTransitionStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle> =
+        MutableStateFlow(TransitionStyle.FADE)
+    override fun armOutro() { /* no-op for VM-construction tests */ }
 }
 
 /**
@@ -115,20 +143,25 @@ internal fun makeStubPlaybackController(scope: AppCoroutineScope): PlaybackContr
         playFromMediaIdHandler = null,
     )
 
-internal fun makeMasterVolumeRamp(engine: SynthEngine): MasterVolumeRamp =
-    MasterVolumeRamp(engine)
-
 /**
  * Minimal valid [Vibe] for tests that only care about identity (name) and the
- * default song-ending parameters (`minVibeSeconds=150`, `maxVibeSeconds=300`,
- * `endStyle=ABRUPT`). Mirrors the per-file `mkVibe` helper that
- * `PulsarSongAdvancerTest` uses; lifted here so the song-ending integration
- * test can share it.
+ * song-ending parameters. Fixture defaults are 150/300 (the historical
+ * production defaults the existing tests were written against) — pass
+ * [minVibeSeconds]/[maxVibeSeconds] to override. This decouples tests from
+ * whatever the current production `Arrangement` defaults happen to be, so a
+ * tuning change to those defaults doesn't silently break unit-test
+ * assertions about trigger timing.
+ *
+ * Pass [transitionOut] to control the per-vibe transition spec (outroBars,
+ * curve, style). Default null = inherit the [TransitionPreferences] default.
+ * Mirrors the per-file `mkVibe` helper that `PulsarSongAdvancerTest` uses;
+ * lifted here so the song-ending integration test can share it.
  */
 internal fun mkMinimalVibe(
     name: String,
-    endStyle: org.balch.orpheus.features.pulsar.models.EndStyle =
-        org.balch.orpheus.features.pulsar.models.EndStyle.ABRUPT,
+    transitionOut: TransitionSpec? = null,
+    minVibeSeconds: Int = 150,
+    maxVibeSeconds: Int = 300,
 ): Vibe = Vibe(
     name = name,
     tracks = List(8) {
@@ -149,7 +182,9 @@ internal fun mkMinimalVibe(
     ),
     arrangement = org.balch.orpheus.features.pulsar.models.Arrangement(
         sections = listOf(org.balch.orpheus.features.pulsar.models.Section(name = "loop")),
-        endStyle = endStyle,
+        transitionOut = transitionOut,
+        minVibeSeconds = minVibeSeconds,
+        maxVibeSeconds = maxVibeSeconds,
     ),
 )
 
@@ -172,12 +207,16 @@ internal class MutablePrefs : SongEndingPreferences {
  * `SongEndingStubSynthEngine` to avoid colliding with the file-private
  * `StubSynthEngine` in `PulsarBpmSyncTest.kt`.
  */
-internal class SongEndingStubSynthEngine : SynthEngine {
+internal open class SongEndingStubSynthEngine : SynthEngine {
     @Volatile private var masterVolume: Float = 1.0f
 
     override fun start() = Unit
     override fun stop() = Unit
     override fun setMasterVolume(amount: Float) { masterVolume = amount }
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { masterVolume = target }
+    override fun masterTapeStop(durationMs: Int) { masterVolume = 0f }
+    override fun masterScratch(durationMs: Int) {}
+    override fun masterDjSweep(durationMs: Int) {}
     override fun getMasterVolume(): Float = masterVolume
 
     override fun setVoiceTune(index: Int, tune: Float) = Unit

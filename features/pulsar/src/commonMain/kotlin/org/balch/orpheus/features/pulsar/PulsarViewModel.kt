@@ -27,6 +27,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
@@ -71,7 +73,10 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickMode
+import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
+import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
+import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 import kotlin.concurrent.Volatile
 
 @Serializable
@@ -121,6 +126,40 @@ data class PulsarPanelActions(
     val toggleTrackMute: (Int) -> Unit = {},
     val songEndingEnabled: StateFlow<Boolean> = MutableStateFlow(false),
     val onSetSongEndingEnabled: (Boolean) -> Unit = {},
+    val transitionSpec: StateFlow<TransitionSpec> = MutableStateFlow(TransitionStyle.default),
+    val onSetTransitionStyle: (TransitionStyle) -> Unit = {},
+    val onSetTransitionHandoffMs: (Int) -> Unit = {},
+    val onSetTransitionRandomPool: (List<TransitionStyle>) -> Unit = {},
+    val onOpenTransitionSettings: () -> Unit = {},
+    /** Currently-running transition style, or null when no transition is in flight. */
+    val activeTransition: StateFlow<TransitionStyle?> = MutableStateFlow(null),
+    /**
+     * The transition style that will fire for the current vibe. For RANDOM,
+     * this is the pre-rolled substyle from [SongEndingEventSource] — never
+     * RANDOM itself. Used by the step-grid final-section suffix so the user
+     * sees what the random roll actually picked. The pill itself stays on the
+     * user's configured style (e.g., shows "RANDOM" when RANDOM is selected).
+     */
+    val resolvedTransitionStyle: StateFlow<TransitionStyle> =
+        MutableStateFlow(TransitionStyle.FADE),
+    /**
+     * Index of the song's final section once the outro has been captured, or
+     * `-1` when no outro is pending. The step-grid status overlay uses this
+     * to suffix the section description with the upcoming transition style
+     * while the final section is playing.
+     */
+    val finalSectionIndex: StateFlow<Int> = MutableStateFlow(-1),
+    /**
+     * True from the moment the outro is armed (auto-trigger or manual long-press)
+     * until the song ends and state resets on the next vibe change. The pill
+     * uses this to highlight the armed state.
+     */
+    val outroArmed: StateFlow<Boolean> = MutableStateFlow(false),
+    /**
+     * Long-press handler — arms the outro immediately. Equivalent to the
+     * auto-trigger firing now, regardless of playing time or random roll.
+     */
+    val onArmOutro: () -> Unit = {},
 ) {
     companion object {
         val EMPTY = PulsarPanelActions()
@@ -235,6 +274,9 @@ class PulsarViewModel(
     vibeProviders: Set<VibeProvider>,
     private val playbackMode: PulsarPlaybackMode,
     private val songEndingPreferences: SongEndingPreferences,
+    private val transitionPreferences: TransitionPreferences,
+    private val transitionRunner: PulsarTransitionRunner,
+    private val songEndingEventSource: SongEndingEventSource,
 ) : PulsarFeature {
 
     // Providers sorted by their cheap `name` accessor — no Vibe construction
@@ -655,6 +697,26 @@ class PulsarViewModel(
         onSetSongEndingEnabled = { value ->
             scope.launch { songEndingPreferences.setEnabled(value) }
         },
+        transitionSpec = transitionPreferences.defaultFlow,
+        onSetTransitionStyle = { style ->
+            val current = transitionPreferences.defaultFlow.value
+            scope.launch { transitionPreferences.setDefault(current.copy(style = style)) }
+        },
+        onSetTransitionHandoffMs = { ms ->
+            val current = transitionPreferences.defaultFlow.value
+            scope.launch { transitionPreferences.setDefault(current.copy(handoffMs = ms)) }
+        },
+        onSetTransitionRandomPool = { pool ->
+            val current = transitionPreferences.defaultFlow.value
+            scope.launch { transitionPreferences.setDefault(current.copy(randomPool = pool)) }
+        },
+        // Task 21 will replace this no-op with the bottom-sheet opener.
+        onOpenTransitionSettings = { },
+        activeTransition = transitionRunner.activeStyle,
+        resolvedTransitionStyle = songEndingEventSource.resolvedTransitionStyle,
+        finalSectionIndex = songEndingEventSource.finalSectionIndex,
+        outroArmed = songEndingEventSource.endingTriggered,
+        onArmOutro = { songEndingEventSource.armOutro() },
     )
 
     // ═══════════════════════════════════════════════════════════

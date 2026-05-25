@@ -8,11 +8,10 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.balch.orpheus.core.controller.SynthController
-import org.balch.orpheus.core.plugin.PortValue
-import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
-import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
+import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import kotlin.test.Test
@@ -24,26 +23,36 @@ class PulsarSongAdvancerTest {
     private class FakeSongEndingEventSource : SongEndingEventSource {
         val emitter = MutableSharedFlow<SongEndingEvent>(extraBufferCapacity = 8)
         override val songEndingEvents: SharedFlow<SongEndingEvent> = emitter.asSharedFlow()
+        override val finalSectionIndex: kotlinx.coroutines.flow.StateFlow<Int> =
+            kotlinx.coroutines.flow.MutableStateFlow(-1)
+        override val endingTriggered: kotlinx.coroutines.flow.StateFlow<Boolean> =
+            kotlinx.coroutines.flow.MutableStateFlow(false)
+        val resolvedStyleFlow = kotlinx.coroutines.flow.MutableStateFlow(TransitionStyle.FADE)
+        override val resolvedTransitionStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle> =
+            resolvedStyleFlow
+        override fun armOutro() {}
     }
 
-    /** In-memory SynthController stub. Enough surface for advancer tests. */
-    private fun stubSynthController(): SynthController = SynthController().apply {
-        val ports = mutableMapOf<String, PortValue>()
-        setDelegates(
-            setter = { id, value -> ports["${id.uri}:${id.symbol}"] = value; true },
-            getter = { id -> ports["${id.uri}:${id.symbol}"] },
-        )
+    /** Records calls into the runner so tests can assert on resolved [TransitionSpec]. */
+    private class RecordingRunner : PulsarTransitionRunner {
+        val specs = mutableListOf<TransitionSpec>()
+        override val activeStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle?> =
+            kotlinx.coroutines.flow.MutableStateFlow(null)
+        override suspend fun runTransition(spec: TransitionSpec, applyNext: suspend () -> Unit) {
+            specs += spec
+            applyNext()
+        }
     }
 
-    /** Default fixture: zero gap so tests that don't care about timing run instantly. */
+    /** Default fixture: CUT-style runner so applyNext runs immediately, no virtual delays. */
     private fun makeAdvancer(
         feature: FakePulsarFeature,
         source: FakeSongEndingEventSource,
-        engine: SongEndingStubSynthEngine = SongEndingStubSynthEngine(),
-        controller: SynthController = stubSynthController(),
+        prefs: StubTransitionPreferences = StubTransitionPreferences(),
+        runner: PulsarTransitionRunner = RecordingRunner(),
     ): PulsarSongAdvancer = PulsarSongAdvancer(
-        feature, source, engine, controller, makeAppCoroutineScope(),
-    ).apply { interTrackGapMs = 0 }
+        feature, source, prefs, runner, makeAppCoroutineScope(),
+    )
 
     @Test
     fun `advances to next vibe in list on SongEnded`() = runTest {
@@ -94,42 +103,55 @@ class PulsarSongAdvancerTest {
     }
 
     @Test
-    fun `gap halts beats and silence then advances at gap end`() = runTest {
+    fun `uses global default transition spec when vibe has no override`() = runTest {
         val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"))
         val feature = FakePulsarFeature(vibes, vibes[0])
         val source = FakeSongEndingEventSource()
-        val engine = SongEndingStubSynthEngine()
-        val controller = stubSynthController()
-        // Wire the advancer onto the runTest scheduler so delay is virtualized.
-        val advancer = PulsarSongAdvancer(
-            feature, source, engine, controller,
-            makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-        ).apply { interTrackGapMs = 2_000L }
+        val prefs = StubTransitionPreferences(initial = TransitionSpec(TransitionStyle.CROSSFADE))
+        val runner = RecordingRunner()
+        val advancer = PulsarSongAdvancer(feature, source, prefs, runner, makeAppCoroutineScope())
         @Suppress("UNUSED_EXPRESSION") advancer
 
+        // Mirror what PulsarSongEnding would set in production: the advancer
+        // now reads the resolved style from source, not from prefs/vibe.
+        source.resolvedStyleFlow.value = TransitionStyle.CROSSFADE
         source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
-        // Just after emit: muted, beats halted, still on A.
+        advanceUntilIdle()
+
+        assertEquals(1, runner.specs.size)
+        assertEquals(TransitionStyle.CROSSFADE, runner.specs.single().style)
+        assertEquals("B", feature.vibeFlow.value.name)
+    }
+
+    @Test
+    fun `uses per-vibe transitionOut when set`() = runTest {
+        // vibeA has its own GAP override; the global default is FADE — runner should see GAP.
+        val vibeAOverride = TransitionSpec(TransitionStyle.GAP, handoffMs = 100)
+        val baseVibeA = mkMinimalVibe("A")
+        val vibeA = baseVibeA.copy(
+            arrangement = baseVibeA.arrangement?.copy(transitionOut = vibeAOverride),
+        )
+        val vibes = listOf(vibeA, mkMinimalVibe("B"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        val source = FakeSongEndingEventSource()
+        val prefs = StubTransitionPreferences(initial = TransitionSpec(TransitionStyle.FADE))
+        val runner = RecordingRunner()
+        // Wire the advancer onto the runTest scheduler so any internal delays virtualize.
+        val advancer = PulsarSongAdvancer(
+            feature, source, prefs, runner,
+            makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler)),
+        )
+        @Suppress("UNUSED_EXPRESSION") advancer
+
+        // Mirror PulsarSongEnding's resolution: vibe A overrides to GAP.
+        source.resolvedStyleFlow.value = TransitionStyle.GAP
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
         advanceTimeBy(10L)
-        assertEquals("A", feature.vibeFlow.value.name, "vibe should not flip during gap")
-        assertEquals(0f, engine.getMasterVolume(), "gap should silence master volume")
-        assertEquals(
-            PortValue.IntValue(0),
-            controller.getPluginControl(PulsarSymbol.PLAYING.controlId),
-            "PULSAR_PLAYING should be 0 during gap so beats halt",
-        )
+        advanceUntilIdle()
 
-        // Just before gap completes: still A.
-        advanceTimeBy(1_980L)
-        assertEquals("A", feature.vibeFlow.value.name, "vibe should still hold at 1.99s")
-
-        // Past the gap: vibe advances, volume restores, beats resume.
-        advanceTimeBy(50L)
-        assertEquals("B", feature.vibeFlow.value.name, "vibe should advance after gap")
-        assertEquals(1.0f, engine.getMasterVolume(), "volume restored to unity")
-        assertEquals(
-            PortValue.IntValue(1),
-            controller.getPluginControl(PulsarSymbol.PLAYING.controlId),
-            "PULSAR_PLAYING should be 1 after applyVibe",
-        )
+        assertEquals(1, runner.specs.size)
+        assertEquals(TransitionStyle.GAP, runner.specs.single().style)
+        assertEquals(100, runner.specs.single().handoffMs)
+        assertEquals("B", feature.vibeFlow.value.name)
     }
 }

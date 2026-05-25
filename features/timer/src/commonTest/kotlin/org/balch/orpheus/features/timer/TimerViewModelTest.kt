@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.MasterVolumeRamp
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
@@ -37,6 +38,10 @@ private class FakeSynthEngine : SynthEngine {
 
     override fun getMasterVolume(): Float = _masterVolume
     override fun setMasterVolume(amount: Float) { _masterVolume = amount }
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { _masterVolume = target }
+    override fun masterTapeStop(durationMs: Int) { _masterVolume = 0f }
+    override fun masterScratch(durationMs: Int) {}
+    override fun masterDjSweep(durationMs: Int) {}
 
     // Stubs — these should never be called in timer tests
     override fun start() = Unit

@@ -8,8 +8,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -152,6 +154,7 @@ private fun <T> EnumDropdown(
  * 3. Voice detail strip (only when track selected)
  * 4. Macro knobs: ENERGY, COMPLEXITY, SPACE, MOOD, DELAY, REVERB
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PulsarPanel(
     pulsar: PulsarFeature,
@@ -257,6 +260,10 @@ fun PulsarPanel(
         ) {
 
             // Center: Step grid — weight(1f) fills remaining Row space, max capped inside
+            val activeTransition by actions.activeTransition.collectAsState()
+            val finalSectionIdx by actions.finalSectionIndex.collectAsState()
+            val songEndingOn by actions.songEndingEnabled.collectAsState()
+            val resolvedStyle by actions.resolvedTransitionStyle.collectAsState()
             PulsarStepGrid(
                 vizData = vizData,
                 trackVizFlows = trackVizFlows,
@@ -268,6 +275,11 @@ fun PulsarPanel(
                 onTrackSelected = actions.selectTrack,
                 arrangementState = arrangementState,
                 arrangement = state.vibe.arrangement,
+                activeTransition = activeTransition,
+                finalSectionIndex = finalSectionIdx,
+                // resolvedStyle has RANDOM already pre-rolled to a concrete
+                // substyle, so the suffix never reads "verse 3/8 — RANDOM".
+                pendingTransition = if (songEndingOn) resolvedStyle else null,
                 modifier = Modifier
                     .width(360.dp)
                     .height(120.dp)
@@ -374,7 +386,7 @@ fun PulsarPanel(
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Bottom,
         ) {
             HorizontalRotaryKnob(
                 value = state.percMix,
@@ -410,24 +422,69 @@ fun PulsarPanel(
                 valueFormatter = null,
             )
 
-            // Auto-end songs toggle: compact ENDS pill on this row so the
-            // top-row selectors always fit regardless of vibe-name length.
+            // Auto-end + transition style pill: shows active style when enabled,
+            // PLAYS when not. Tap opens the transition settings sheet. Long-press
+            // arms the outro immediately — equivalent to the auto-trigger firing
+            // now, regardless of playing-time or random roll. When armed, the
+            // pill background tints to cosmicPurple so the user knows their
+            // long-press took effect; resets when the next vibe loads.
             val songEndingEnabled by actions.songEndingEnabled.collectAsState()
-            Box(
-                modifier = Modifier
-                    .clickable { actions.onSetSongEndingEnabled(!songEndingEnabled) }
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
+            val transitionSpec by actions.transitionSpec.collectAsState()
+            val outroArmed by actions.outroArmed.collectAsState()
+            // Pill reflects the user's PICKED mode (RANDOM stays RANDOM) — the
+            // resolved substyle shows up in the step-grid final-section suffix
+            // and is what actually fires.
+            val pillLabel = if (songEndingEnabled) transitionSpec.style.name else "PLAYS"
+            var showTransitionSheet by remember { mutableStateOf(false) }
+            val pillBg = if (outroArmed) {
+                OrpheusColors.cosmicPurple.copy(alpha = 0.35f)
+            } else {
+                OrpheusColors.darkVoid.copy(alpha = 0.6f)
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    modifier = Modifier.width(42.dp),                    text = if (songEndingEnabled) "ENDS" else "PLAYS",
+                    text = "ENDING",
                     color = OrpheusColors.cosmicPurple,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
+                )
+                Box(
+                    modifier = Modifier
+                        .combinedClickable(
+                            onClick = { showTransitionSheet = true },
+                            onLongClick = { actions.onArmOutro() },
+                        )
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(pillBg)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        modifier = Modifier.widthIn(min = 60.dp),
+                        text = pillLabel,
+                        color = OrpheusColors.cosmicPurple,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                }
+            }
+
+            if (showTransitionSheet) {
+                TransitionSettingsSheet(
+                    spec = transitionSpec,
+                    enabled = songEndingEnabled,
+                    onDismiss = { showTransitionSheet = false },
+                    onSetEnabled = actions.onSetSongEndingEnabled,
+                    onStyleChange = actions.onSetTransitionStyle,
+                    onHandoffMsChange = actions.onSetTransitionHandoffMs,
                 )
             }
         }

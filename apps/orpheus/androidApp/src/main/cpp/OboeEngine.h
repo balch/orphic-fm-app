@@ -41,6 +41,11 @@ public:
     void setVoiceHold(int index, float level);
     void triggerDrum(int drumIndex, float accent);
     void setMasterVolume(float v);
+    void masterFade(float target, int samples, int curve);
+    void masterTapeStop(int samples);
+    void masterScratch(int samples);
+    void masterDjSweep(int samples);
+    float masterVolumeNow();
     void setDrive(float v);
     void setDelayMix(float v);
     void setVibrato(float v);

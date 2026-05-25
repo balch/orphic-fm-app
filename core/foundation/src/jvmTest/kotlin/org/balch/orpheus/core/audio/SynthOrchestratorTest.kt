@@ -185,6 +185,10 @@ private class FakeSynthEngine : SynthEngine {
     override fun stop() { started = false }
     override fun getMasterVolume(): Float = _volume
     override fun setMasterVolume(amount: Float) { _volume = amount }
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { _volume = target }
+    override fun masterTapeStop(durationMs: Int) { _volume = 0f }
+    override fun masterScratch(durationMs: Int) {}
+    override fun masterDjSweep(durationMs: Int) {}
 
     // ── Stubs (never called by SynthOrchestrator) ──
     override fun setVoiceTune(index: Int, tune: Float) = Unit

@@ -5,16 +5,18 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.audio.MasterVolumeRamp
-import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.TimerFadeStatusProvider
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.playback.PlaybackController
@@ -25,66 +27,109 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.util.currentTimeMillis
 import kotlin.concurrent.Volatile
-import kotlin.math.ceil
 
 /**
- * Owns the song-ending lifecycle: tracks playing-time, evaluates the
- * trigger ramp at each bar boundary, schedules the master-volume fade,
- * and emits [SongEndingEvent].
+ * Owns the song-ending lifecycle: tracks playing-time, evaluates the random
+ * trigger at each bar boundary, captures the final section once the C++
+ * Markov picker rolls there, and emits [SongEndingEvent] for the advancer.
  *
  * Lives outside [PulsarFeature]/[org.balch.orpheus.features.pulsar.PulsarViewModel]
  * for the same reason [PulsarPlaybackBridge] does: injecting
- * [PlaybackController] into the ViewModel creates a Metro DI cycle
- * (PulsarViewModel → PlaybackController → MetadataProducer →
- *  PulsarMetadataProducer → PulsarFeature → PulsarViewModel).
+ * [PlaybackController] into the ViewModel creates a Metro DI cycle.
  *
- * Eagerly instantiated via the platform DI graphs so the collectors
- * start at app launch.
+ * Eagerly instantiated via the platform DI graphs so the collectors start at
+ * app launch.
  */
 /**
- * Read-only event source for song-ending events. Implemented by
+ * Read-only event source + observable state for song-ending. Implemented by
  * [PulsarSongEnding] in production; a fake implementation is used in tests
  * that exercise [PulsarSongAdvancer] without booting the full song-ending
  * pipeline.
  */
 interface SongEndingEventSource {
     val songEndingEvents: SharedFlow<SongEndingEvent>
+
+    /**
+     * Index of the section identified as the song's final section, or `-1`
+     * when no outro has been triggered for the current song. Observable so the
+     * UI can mark the in-flight final section with the upcoming transition
+     * style (e.g., "verse 3/8 — TAPE").
+     */
+    val finalSectionIndex: StateFlow<Int>
+
+    /**
+     * True from the moment the outro is armed (either by the random/maxVibe
+     * trigger or by a manual [armOutro] call) until the song ends and state
+     * resets on the next vibe change. UI shows this as a highlighted pill so
+     * the user knows their manual arm took effect.
+     */
+    val endingTriggered: StateFlow<Boolean>
+
+    /**
+     * The transition style that will fire when this vibe ends. For concrete
+     * styles this mirrors the configured style; for `RANDOM` it's the pre-rolled
+     * substyle (re-rolled once per vibe change), so the pill/suffix never show
+     * "RANDOM" when a real pick has already been made. [PulsarSongAdvancer]
+     * also reads this when building the spec passed to the runner, so the
+     * displayed style is always the one that fires.
+     */
+    val resolvedTransitionStyle: StateFlow<TransitionStyle>
+
+    /**
+     * Manually arm the outro — equivalent to the auto-trigger firing. The
+     * next C++ section change becomes the song's final section. No-op if
+     * the outro is already armed for the current song. Doesn't require
+     * `enabled = true` — manual arming is an explicit user intent.
+     */
+    fun armOutro()
 }
 
 @SingleIn(AppScope::class)
 @Inject
 @ContributesBinding(AppScope::class)
 class PulsarSongEnding(
-    private val pulsarFeature: PulsarFeature,
+    // Lazy provider: PulsarFeature is implemented by PulsarViewModel, which
+    // takes SongEndingEventSource (this class) as a constructor parameter.
+    // Resolving PulsarFeature eagerly here forms a DI cycle that crashes the
+    // app at launch with StackOverflowError. All uses live inside
+    // scope.launch { ... } so we can defer resolution until after the graph
+    // is fully built.
+    pulsarFeatureProvider: () -> PulsarFeature,
     private val playbackController: PlaybackController,
     private val preferences: SongEndingPreferences,
+    private val transitionPreferences: TransitionPreferences,
     private val synthController: SynthController,
-    private val synthEngine: SynthEngine,
-    private val ramp: MasterVolumeRamp,
-    private val timerFadeStatusProvider: TimerFadeStatusProvider,
     private val scope: AppCoroutineScope,
 ) : SongEndingEventSource {
+    private val pulsarFeature: PulsarFeature by lazy(pulsarFeatureProvider)
     private val log = logging("PulsarSongEnding")
 
     private val _events = MutableSharedFlow<SongEndingEvent>(extraBufferCapacity = 4)
     /** Hot stream of song-ending events. [PulsarSongAdvancer] subscribes for auto-advance. */
     override val songEndingEvents: SharedFlow<SongEndingEvent> = _events.asSharedFlow()
 
+    // Test hook for deterministic RANDOM resolution. Production uses
+    // `List.random()`; tests inject a picker that returns a known element.
+    internal var randomPicker: (List<TransitionStyle>) -> TransitionStyle = { it.random() }
+
+    // Default to FADE so the panel has a sensible value to display before the
+    // first vibeFlow emission (matches the pre-existing PulsarPanelActions
+    // default spec).
+    private val _resolvedTransitionStyle = MutableStateFlow(TransitionStyle.FADE)
+    override val resolvedTransitionStyle: StateFlow<TransitionStyle> =
+        _resolvedTransitionStyle.asStateFlow()
+
     @Volatile private var playingMillis: Long = 0L
     // Long.MIN_VALUE = "not currently ticking" (sentinel chosen so a real
     // wall-clock or test-scheduler value of 0 still counts as ticking).
     @Volatile private var lastTickMillis: Long = NOT_TICKING
-    @Volatile private var endingTriggered: Boolean = false
-    @Volatile private var finalSectionIndex: Int = -1
+    private val _endingTriggered = MutableStateFlow(false)
+    override val endingTriggered: StateFlow<Boolean> = _endingTriggered.asStateFlow()
+    private val _finalSectionIndex = MutableStateFlow(-1)
+    override val finalSectionIndex: StateFlow<Int> = _finalSectionIndex.asStateFlow()
     @Volatile private var lastObservedSectionIndex: Int = -1
     @Volatile private var lastObservedBarsElapsed: Int = -1
-    @Volatile private var rampStarted: Boolean = false
     @Volatile private var songEndedEmitted: Boolean = false
-
-    // Tracks the in-flight fade-out so a vibe change (manual skip OR auto-
-    // advance) can interrupt it. Without cancellation the ramp keeps writing
-    // decreasing volume into the next vibe — fading it in to silence.
-    @Volatile private var rampJob: Job? = null
 
     // Hooks for tests; production paths use real wall-clock + Random.
     internal var nowMillis: () -> Long = { currentTimeMillis() }
@@ -118,6 +163,35 @@ class PulsarSongEnding(
                 .drop(1)
                 .collect { onVibeChanged() }
         }
+        // Pre-roll the transition style per vibe so the UI shows the actually
+        // selected style (not "RANDOM") and so [PulsarSongAdvancer] uses the
+        // same pick when firing. Re-resolves on vibe change or when the user
+        // edits the configured spec.
+        scope.launch {
+            combine(
+                pulsarFeature.vibeFlow.distinctUntilChangedBy { it.name },
+                transitionPreferences.defaultFlow,
+            ) { vibe, defaultSpec ->
+                val spec = vibe.arrangement?.transitionOut ?: defaultSpec
+                resolveStyle(spec)
+            }.collect { resolved ->
+                _resolvedTransitionStyle.value = resolved
+            }
+        }
+    }
+
+    /**
+     * Resolve [TransitionSpec.style] to a concrete (non-RANDOM) style. For
+     * RANDOM, picks from `spec.randomPool` or — if empty — every style with
+     * `TransitionStyle.isSafe = true`. [TransitionSpec]'s init block guarantees
+     * the pool never contains RANDOM, so the recursion is bounded at one step.
+     */
+    private fun resolveStyle(spec: TransitionSpec): TransitionStyle {
+        if (spec.style != TransitionStyle.RANDOM) return spec.style
+        val pool = spec.randomPool.ifEmpty {
+            TransitionStyle.entries.filter { it.isSafe }
+        }
+        return randomPicker(pool)
     }
 
     private fun onArrangementTick(state: PulsarArrangementState) {
@@ -127,10 +201,10 @@ class PulsarSongEnding(
         // section transitioned out (normal arrangement) or because the section
         // looped back to bar 0 (terminal section with no transitions, which the
         // C++ Markov picker re-enters indefinitely).
-        if (endingTriggered && finalSectionIndex >= 0 && !songEndedEmitted) {
-            val transitionedOut = lastObservedSectionIndex == finalSectionIndex
-                && state.sectionIndex != finalSectionIndex
-            val sectionLooped = state.sectionIndex == finalSectionIndex
+        if (_endingTriggered.value && _finalSectionIndex.value >= 0 && !songEndedEmitted) {
+            val transitionedOut = lastObservedSectionIndex == _finalSectionIndex.value
+                && state.sectionIndex != _finalSectionIndex.value
+            val sectionLooped = state.sectionIndex == _finalSectionIndex.value
                 && lastObservedBarsElapsed >= 0
                 && state.barsElapsed < lastObservedBarsElapsed
             if (transitionedOut || sectionLooped) {
@@ -143,53 +217,16 @@ class PulsarSongEnding(
 
         // Final-section detection: the first sectionIndex change after we
         // triggered is the final section.
-        if (endingTriggered && finalSectionIndex < 0
+        if (_endingTriggered.value && _finalSectionIndex.value < 0
             && lastObservedSectionIndex >= 0
             && state.sectionIndex != lastObservedSectionIndex) {
-            finalSectionIndex = state.sectionIndex
-            log.info { "final section captured: $finalSectionIndex" }
+            _finalSectionIndex.value = state.sectionIndex
+            log.info { "final section captured: ${_finalSectionIndex.value}" }
         }
 
-        // Ramp scheduling: when we're inside the final section and within the
-        // bar that contains the fade start point, kick off the master-volume
-        // fade. rampBars is fractional (e.g. 0.25 = quarter-bar fade). Cap so
-        // the outro plays at full volume for at least 2 bars before the fade
-        // starts — short outros that can't honor that floor still get at
-        // least one bar of fade.
-        if (endingTriggered
-            && finalSectionIndex >= 0
-            && state.sectionIndex == finalSectionIndex
-            && !rampStarted) {
-            val endStyle = pulsarFeature.vibeFlow.value.arrangement?.endStyle
-            val rampBars = (endStyle?.rampBars ?: 0f)
-                .coerceAtMost((state.barsTotal - 2).coerceAtLeast(1).toFloat())
-            if (rampBars > 0f && endStyle != null) {
-                val barsRemaining = state.barsTotal - state.barsElapsed
-                // Fade lives in the LAST ceil(rampBars) bars of the outro.
-                val triggerAt = ceil(rampBars.toDouble()).toInt()
-                if (barsRemaining <= triggerAt && !timerFadeStatusProvider.isFading()) {
-                    rampStarted = true
-                    val vibe = pulsarFeature.vibeFlow.value
-                    // One C++ "bar" = one full pattern wrap = `stepCount` 16th-notes.
-                    // stepCount=16 → one musical bar; stepCount=32 → two musical bars.
-                    val barDurationMs = 60_000.0 * vibe.stepCount / (vibe.bpm.toDouble() * 4.0)
-                    val rampMs = (rampBars.toDouble() * barDurationMs).toLong()
-                        .coerceAtLeast(100L)
-                    rampJob = scope.launch {
-                        ramp.rampMasterVolumeTo(
-                            target = 0f,
-                            durationMs = rampMs,
-                            curve = endStyle.curve,
-                        )
-                    }
-                    log.info { "master ramp started: bars=$rampBars duration=${rampMs}ms" }
-                }
-            }
-        }
-
-        // Trigger evaluation (only fires once per song). Reads min/max/endStyle
-        // from the active arrangement; vibes without an arrangement never end.
-        if (!endingTriggered && preferences.enabledFlow.value) {
+        // Trigger evaluation (only fires once per song). Reads min/max from the
+        // active arrangement; vibes without an arrangement never end.
+        if (!_endingTriggered.value && preferences.enabledFlow.value) {
             val arr = pulsarFeature.vibeFlow.value.arrangement
             if (arr != null) {
                 val minS = arr.minVibeSeconds
@@ -211,8 +248,19 @@ class PulsarSongEnding(
         lastObservedBarsElapsed = state.barsElapsed
     }
 
+    /**
+     * Manual outro arm — exposed via [SongEndingEventSource.armOutro]. Routes
+     * through the same internal `triggerOutro()` so the UI path and the
+     * auto-trigger path produce identical state.
+     */
+    override fun armOutro() {
+        if (_endingTriggered.value) return
+        log.info { "armOutro() invoked manually" }
+        triggerOutro()
+    }
+
     private fun triggerOutro() {
-        endingTriggered = true
+        _endingTriggered.value = true
         synthController.setPluginControl(
             PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
             IntValue(1),
@@ -226,30 +274,23 @@ class PulsarSongEnding(
      * Reset all song-ending state. Driven internally by the [pulsarFeature.vibeFlow]
      * collector so a vibe switch automatically clears playing-time, the trigger flag,
      * and the C++ outro request.
+     *
+     * Volume management during transitions is owned exclusively by
+     * [PulsarTransitionRunner] — both the auto-advance path
+     * ([PulsarSongAdvancer]) and the manual-skip path ([PulsarSkipHandler])
+     * route through it. This method only resets bookkeeping.
      */
     private fun onVibeChanged() {
-        // If we're mid-fade when the vibe switches, kill the in-flight ramp
-        // and restore master volume so the new vibe isn't silenced. Guarded
-        // on rampStarted so non-outro vibe changes don't clobber a user-set
-        // master volume. PulsarSongAdvancer already restores volume on its
-        // auto-advance path; doing it here too is idempotent there but the
-        // only safety net for manual skip during outro.
-        if (rampStarted) {
-            rampJob?.cancel()
-            synthEngine.setMasterVolume(1.0f)
-        }
-        rampJob = null
         playingMillis = 0L
         lastTickMillis = if (playbackController.state.value == PlaybackState.Playing) {
             nowMillis()
         } else {
             NOT_TICKING
         }
-        endingTriggered = false
-        finalSectionIndex = -1
+        _endingTriggered.value = false
+        _finalSectionIndex.value = -1
         lastObservedSectionIndex = -1
         lastObservedBarsElapsed = -1
-        rampStarted = false
         songEndedEmitted = false
         // Defensive: tell C++ to drop any stale outro request from the previous vibe.
         synthController.setPluginControl(
@@ -276,7 +317,6 @@ class PulsarSongEnding(
 
     // ─── Test-only accessors ────────────────────────────────────────────────
     internal val playingMillisForTest: Long get() = playingMillisLive()
-    internal val endingTriggeredForTest: Boolean get() = endingTriggered
-    internal val finalSectionIndexForTest: Int get() = finalSectionIndex
-    internal val rampStartedForTest: Boolean get() = rampStarted
+    internal val endingTriggeredForTest: Boolean get() = _endingTriggered.value
+    internal val finalSectionIndexForTest: Int get() = _finalSectionIndex.value
 }

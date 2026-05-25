@@ -59,6 +59,11 @@
 #include "orpheus_unit_pulsar.h"
 #include "orpheus_turntable.h"
 #include "orpheus_unit_chaos.h"
+#include "orpheus_master_fader.h"
+#include "orpheus_master_tape_stop.h"
+#include "orpheus_master_scratch.h"
+#include "orpheus_master_dj_sweep.h"
+#include "orpheus_master_leslie.h"
 
 #include <atomic>
 #include <cstring>
@@ -103,6 +108,19 @@ struct OrpheusEngine {
     // Master controls
     std::atomic<float> master_volume{0.7f};
     std::atomic<float> master_pan{0.0f};       // -1..+1, 0 = center
+
+    // Master-bus fade, tape-stop, and scratch primitives. All inert by default.
+    // Chain order: master mix -> tape_stop -> fader (L and R) -> scratch (additive) -> limiter.
+    orpheus::MasterFader master_fader_l;
+    orpheus::MasterFader master_fader_r;
+    orpheus::MasterTapeStop master_tape_stop_l;
+    orpheus::MasterTapeStop master_tape_stop_r;
+    orpheus::MasterScratch master_scratch_l;
+    orpheus::MasterScratch master_scratch_r;
+    orpheus::MasterDjSweep master_dj_sweep_l;
+    orpheus::MasterDjSweep master_dj_sweep_r;
+    orpheus::MasterLeslie master_leslie_l;
+    orpheus::MasterLeslie master_leslie_r;
 
     // Per-voice stereo pan (-1..+1, constant-power)
     // Defaults match Kotlin: 0-1 center, 2-3 left(-0.3), 4-5 right(0.3), 6 left(-0.7), 7 right(0.7), 8-11 center

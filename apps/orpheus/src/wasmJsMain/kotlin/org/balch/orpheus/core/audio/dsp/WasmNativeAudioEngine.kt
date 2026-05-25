@@ -87,8 +87,55 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeSetVoiceHold(index: Int, level: Float) =
         jsSendVoiceHoldCmd(index, level)
 
-    override fun nativeSetMasterVolume(value: Float) =
+    private var lastMasterVolume: Float = 0.7f
+    private var fadeTimerId: Int = 0
+
+    override fun nativeSetMasterVolume(value: Float) {
+        lastMasterVolume = value
         workerProxy.setMasterVolume(value)
+    }
+
+    private fun scheduleFade(target: Float, durationMs: Int) {
+        if (fadeTimerId != 0) jsClearInterval(fadeTimerId)
+        val steps = (durationMs / FADE_STEP_MS).coerceIn(1, 50)
+        val start = lastMasterVolume
+        var step = 0
+        fadeTimerId = jsSetInterval(FADE_STEP_MS) {
+            step++
+            val t = (step.toFloat() / steps).coerceAtMost(1f)
+            val v = start + (target - start) * t
+            lastMasterVolume = v
+            workerProxy.setMasterVolume(v)
+            if (step >= steps) {
+                jsClearInterval(fadeTimerId)
+                fadeTimerId = 0
+            }
+        }
+    }
+
+    // WASM Worker doesn't yet pipe fade/tape-stop commands to the C++ engine.
+    // Approximate with a stepped ramp via JS setTimeout for basic smoothing.
+    override fun nativeMasterFade(target: Float, samples: Int, curve: Int) {
+        val durationMs = (samples.toFloat() / (workerProxy.sampleRate.coerceAtLeast(1)).toFloat() * 1000f).toInt()
+        scheduleFade(target, durationMs.coerceAtLeast(1))
+    }
+
+    override fun nativeMasterTapeStop(samples: Int) {
+        val durationMs = (samples.toFloat() / (workerProxy.sampleRate.coerceAtLeast(1)).toFloat() * 1000f).toInt()
+        scheduleFade(0f, durationMs.coerceAtLeast(1))
+    }
+
+    override fun nativeMasterScratch(samples: Int) {
+        // WASM Worker doesn't yet support the scratch noise generator.
+        // No-op: the scratch is purely additive so skipping it is silent.
+    }
+
+    override fun nativeMasterDjSweep(samples: Int) {
+        // WASM Worker doesn't yet support the DJ sweep filter.
+        // No-op: sweep is in-place, so skipping it passes audio through clean.
+    }
+
+    override fun nativeMasterVolumeNow(): Float = lastMasterVolume
 
     override fun nativeSetDrive(value: Float) =
         workerProxy.setDrive(value)
@@ -151,5 +198,6 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
 
     companion object {
         private val log = logging("WasmNativeAudioEngine")
+        private const val FADE_STEP_MS = 10
     }
 }

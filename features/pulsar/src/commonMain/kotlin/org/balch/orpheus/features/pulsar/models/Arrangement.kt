@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.audio.TransitionSpec
 
 /**
  * A weighted edge in the section graph.
@@ -159,8 +160,9 @@ data class Section(
  *   can begin rolling. Below this the song never ends. Default 150 (2:30).
  * @param maxVibeSeconds Playing-time at which auto-end is forced to fire on the
  *   next bar. Default 300 (5:00). Must be in `minVibeSeconds..1800`.
- * @param endStyle Master-volume tail across the final section. See [EndStyle].
- *   Default ABRUPT.
+ * @param transitionOut Per-vibe transition-out spec. Null = inherit global default
+ *   from `AppPreferences.pulsarTransitionDefault`. When set, the vibe owns the
+ *   entire spec — no partial overrides.
  */
 @Serializable
 data class Arrangement(
@@ -170,14 +172,19 @@ data class Arrangement(
     val defaultSectionBars: Int = 8,
     val minVibeSeconds: Int = 150,
     val maxVibeSeconds: Int = 300,
-    val endStyle: EndStyle = EndStyle.FADE_FAST,
+    /**
+     * Per-vibe transition-out spec. Null = inherit global default from
+     * [AppPreferences.pulsarTransitionDefault]. When set, the vibe owns
+     * the entire spec — no partial overrides.
+     */
+    val transitionOut: TransitionSpec? = null,
 ) {
     init {
         require(sections.size <= MAX_SECTIONS) {
             "Arrangement sections size ${sections.size} exceeds MAX_SECTIONS=$MAX_SECTIONS"
         }
-        require(minVibeSeconds in 30..1800) {
-            "Arrangement.minVibeSeconds must be 30..1800, got $minVibeSeconds"
+        require(minVibeSeconds in 15..1800) {
+            "Arrangement.minVibeSeconds must be 15..1800, got $minVibeSeconds"
         }
         require(maxVibeSeconds in minVibeSeconds..1800) {
             "Arrangement.maxVibeSeconds must be in $minVibeSeconds..1800, got $maxVibeSeconds"

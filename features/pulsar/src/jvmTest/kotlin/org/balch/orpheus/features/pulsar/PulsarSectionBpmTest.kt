@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
@@ -104,6 +105,9 @@ class PulsarSectionBpmTest {
             vibeProviders = setOf(SectionedVibeProvider(vibe)),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
             songEndingPreferences = StubSongEndingPreferences(),
+            transitionPreferences = StubTransitionPreferences(),
+            transitionRunner = StubTransitionRunner(),
+            songEndingEventSource = StubSongEndingEventSource(),
         )
     }
 
@@ -279,6 +283,10 @@ private class ArrangementStubEngine(
     override fun setDrive(amount: Float) = Unit
     override fun setDistortionMix(amount: Float) = Unit
     override fun setMasterVolume(amount: Float) = Unit
+    override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) = Unit
+    override fun masterTapeStop(durationMs: Int) = Unit
+    override fun masterScratch(durationMs: Int) = Unit
+    override fun masterDjSweep(durationMs: Int) = Unit
     override fun setDelayTime(index: Int, time: Float) = Unit
     override fun setDelayFeedback(amount: Float) = Unit
     override fun setDelayMix(amount: Float) = Unit

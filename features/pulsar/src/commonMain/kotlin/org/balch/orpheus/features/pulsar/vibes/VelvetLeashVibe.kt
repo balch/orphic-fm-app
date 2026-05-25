@@ -14,7 +14,6 @@ import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
-import org.balch.orpheus.features.pulsar.models.EndStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
@@ -155,7 +154,7 @@ class VelvetLeashVibe : VibeProvider {
                 customProgression = introProgression,
                 chordsPerBar = introChordsPerBar,
             ),
-            // 5: outro — restate the hook, fade fast (vibe.endStyle = FADE_FAST)
+            // 5: outro — restate the hook, fade out (inherits global default transition)
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 4,
@@ -185,7 +184,6 @@ class VelvetLeashVibe : VibeProvider {
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
                 sections = sectionList,
-                endStyle = EndStyle.FADE_FAST,
             ),
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.F_SHARP,

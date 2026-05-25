@@ -132,6 +132,21 @@ void DesktopEngine::triggerDrum(int drumIndex, float accent) {
 void DesktopEngine::setMasterVolume(float v) {
     if (dsp_engine_) orpheus_engine_set_master_volume(dsp_engine_, v);
 }
+void DesktopEngine::masterFade(float target, int samples, int curve) {
+    if (dsp_engine_) orpheus_engine_master_fade(dsp_engine_, target, samples, curve);
+}
+void DesktopEngine::masterTapeStop(int samples) {
+    if (dsp_engine_) orpheus_engine_master_tape_stop(dsp_engine_, samples);
+}
+void DesktopEngine::masterScratch(int samples) {
+    if (dsp_engine_) orpheus_engine_master_scratch(dsp_engine_, samples);
+}
+void DesktopEngine::masterDjSweep(int samples) {
+    if (dsp_engine_) orpheus_engine_master_dj_sweep(dsp_engine_, samples);
+}
+float DesktopEngine::masterVolumeNow() {
+    return dsp_engine_ ? orpheus_engine_master_volume_now(dsp_engine_) : 0.0f;
+}
 void DesktopEngine::setDrive(float v) {
     if (dsp_engine_) orpheus_engine_set_drive(dsp_engine_, v);
 }
