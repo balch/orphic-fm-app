@@ -62,7 +62,7 @@
 #include "orpheus_master_fader.h"
 #include "orpheus_master_tape_stop.h"
 #include "orpheus_master_scratch.h"
-#include "orpheus_master_dj_sweep.h"
+#include "orpheus_master_filter.h"
 #include "orpheus_master_leslie.h"
 
 #include <atomic>
@@ -109,16 +109,16 @@ struct OrpheusEngine {
     std::atomic<float> master_volume{0.7f};
     std::atomic<float> master_pan{0.0f};       // -1..+1, 0 = center
 
-    // Master-bus fade, tape-stop, and scratch primitives. All inert by default.
-    // Chain order: master mix -> tape_stop -> fader (L and R) -> scratch (additive) -> limiter.
+    // Master-bus fade, tape-stop, filter, leslie, and stutter primitives. All inert by default.
+    // Chain order: master mix -> tape_stop -> fader -> filter -> leslie -> stutter -> limiter.
     orpheus::MasterFader master_fader_l;
     orpheus::MasterFader master_fader_r;
     orpheus::MasterTapeStop master_tape_stop_l;
     orpheus::MasterTapeStop master_tape_stop_r;
     orpheus::MasterScratch master_scratch_l;
     orpheus::MasterScratch master_scratch_r;
-    orpheus::MasterDjSweep master_dj_sweep_l;
-    orpheus::MasterDjSweep master_dj_sweep_r;
+    orpheus::MasterFilter master_filter_l;
+    orpheus::MasterFilter master_filter_r;
     orpheus::MasterLeslie master_leslie_l;
     orpheus::MasterLeslie master_leslie_r;
 

@@ -20,7 +20,7 @@ interface NativeDspBridge {
     fun nativeMasterFade(target: Float, samples: Int, curve: Int)
     fun nativeMasterTapeStop(samples: Int)
     fun nativeMasterScratch(samples: Int)
-    fun nativeMasterDjSweep(samples: Int)
+    fun nativeMasterFilter(samples: Int)
     fun nativeMasterVolumeNow(): Float
     fun nativeSetDrive(value: Float)
     fun nativeSetDelayMix(value: Float)

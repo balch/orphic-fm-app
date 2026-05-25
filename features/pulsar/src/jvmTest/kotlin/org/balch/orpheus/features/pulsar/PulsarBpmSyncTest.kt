@@ -313,7 +313,7 @@ private class StubSynthEngine : SynthEngine {
     override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) = Unit
     override fun masterTapeStop(durationMs: Int) = Unit
     override fun masterScratch(durationMs: Int) = Unit
-    override fun masterDjSweep(durationMs: Int) = Unit
+    override fun masterFilter(durationMs: Int) = Unit
     override fun setDelayTime(index: Int, time: Float) = Unit
     override fun setDelayFeedback(amount: Float) = Unit
     override fun setDelayMix(amount: Float) = Unit

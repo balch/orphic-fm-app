@@ -81,7 +81,7 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
         bridge.nativeMasterFade(target, samples, curve)
     override fun nativeMasterTapeStop(samples: Int) = bridge.nativeMasterTapeStop(samples)
     override fun nativeMasterScratch(samples: Int) = bridge.nativeMasterScratch(samples)
-    override fun nativeMasterDjSweep(samples: Int) = bridge.nativeMasterDjSweep(samples)
+    override fun nativeMasterFilter(samples: Int) = bridge.nativeMasterFilter(samples)
     override fun nativeMasterVolumeNow(): Float = bridge.nativeMasterVolumeNow()
     override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
     override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)

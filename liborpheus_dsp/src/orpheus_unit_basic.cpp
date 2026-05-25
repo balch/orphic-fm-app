@@ -245,18 +245,21 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         scratch_r[i] = in_r[i] * std::sin(mp_angle) * mute_gain;
     }
 
-    // Master-bus chain: tape_stop → fader → dj_sweep → leslie → scratch.
+    // Master-bus chain: tape_stop → fader → filter → leslie → stutter.
     // All inert (passthrough / unity / silent) unless armed.
     engine->master_tape_stop_l.process(scratch_l, static_cast<size_t>(n));
     engine->master_tape_stop_r.process(scratch_r, static_cast<size_t>(n));
     engine->master_fader_l.process(scratch_l, static_cast<size_t>(n));
     engine->master_fader_r.process(scratch_r, static_cast<size_t>(n));
-    engine->master_dj_sweep_l.process(scratch_l, static_cast<size_t>(n));
-    engine->master_dj_sweep_r.process(scratch_r, static_cast<size_t>(n));
+    engine->master_filter_l.process(scratch_l, static_cast<size_t>(n));
+    engine->master_filter_r.process(scratch_r, static_cast<size_t>(n));
     engine->master_leslie_l.process(scratch_l, static_cast<size_t>(n));
     engine->master_leslie_r.process(scratch_r, static_cast<size_t>(n));
-    engine->master_scratch_l.process(scratch_l, static_cast<size_t>(n));
-    engine->master_scratch_r.process(scratch_r, static_cast<size_t>(n));
+    float bp = engine->beat_phase.load(std::memory_order_relaxed);
+    float stutter_bpm = engine->clock_bpm.load(std::memory_order_relaxed);
+    if (stutter_bpm < 20.0f) stutter_bpm = 120.0f;
+    engine->master_scratch_l.process(scratch_l, static_cast<size_t>(n), bp, stutter_bpm);
+    engine->master_scratch_r.process(scratch_r, static_cast<size_t>(n), bp, stutter_bpm);
 
     // Keep the legacy smooth_master_volume mirror in sync with the fader's
     // instantaneous gain. Other readers (diagnostics, future code) may still

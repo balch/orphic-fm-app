@@ -41,7 +41,7 @@ private class FakeSynthEngine : SynthEngine {
     override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { _masterVolume = target }
     override fun masterTapeStop(durationMs: Int) { _masterVolume = 0f }
     override fun masterScratch(durationMs: Int) {}
-    override fun masterDjSweep(durationMs: Int) {}
+    override fun masterFilter(durationMs: Int) {}
 
     // Stubs — these should never be called in timer tests
     override fun start() = Unit

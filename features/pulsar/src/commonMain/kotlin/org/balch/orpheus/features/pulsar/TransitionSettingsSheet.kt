@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,7 +69,7 @@ private val META: Map<TransitionStyle, StyleMeta> = mapOf(
     TransitionStyle.GAP to StyleMeta(
         label = "GAP",
         glyph = "⋯",
-        description = "Silent gap between songs.",
+        description = "Silent gap between Vibes.",
         defaultHandoffMs = 500,
     ),
     TransitionStyle.FADE to StyleMeta(
@@ -86,19 +87,19 @@ private val META: Map<TransitionStyle, StyleMeta> = mapOf(
     TransitionStyle.TAPE to StyleMeta(
         label = "TAPE",
         glyph = "⏪",
-        description = "Tape-stop ramp before the next song.",
+        description = "Tape-stop ramp before the next Vibe.",
         defaultHandoffMs = 300,
     ),
     TransitionStyle.SCRATCH to StyleMeta(
         label = "SCRATCH",
         glyph = "💿",
-        description = "Vinyl scratch over the song boundary.",
+        description = "Beat-synced stutter gate across the transition.",
         defaultHandoffMs = 500,
     ),
-    TransitionStyle.DJ to StyleMeta(
-        label = "DJ",
-        glyph = "🎧",
-        description = "LPF sweep with drive and reverb wash.",
+    TransitionStyle.FILTER to StyleMeta(
+        label = "FILTER",
+        glyph = "🌀",
+        description = "Allpass filter sweep with Leslie.",
         defaultHandoffMs = 500,
     ),
     TransitionStyle.RANDOM to StyleMeta(
@@ -113,16 +114,16 @@ private val TransitionStyle.meta: StyleMeta get() = META.getValue(this)
 
 /**
  * Synthetic chip metadata for the PLAYS option. Not a real `TransitionStyle` —
- * selecting PLAYS clears the song-ending enabled flag instead of choosing a
+ * selecting PLAYS clears the Vibe-ending enabled flag instead of choosing a
  * transition. Lives in the UI layer so the data model stays clean.
  */
 private val PLAYS_META = StyleMeta(
     label = "PLAYS",
     glyph = "▶",
-    description = "Songs loop forever; no auto-advance.",
+    description = "Vibes loop forever; no auto-advance.",
     defaultHandoffMs = 0,
 )
-private const val PLAYS_DESCRIPTION = "Songs loop forever; no auto-advance."
+private const val PLAYS_DESCRIPTION = "Vibes loop forever; no auto-advance."
 
 /**
  * Bottom-sheet UI for editing the global transition spec. Opened by tapping the
@@ -133,7 +134,7 @@ private const val PLAYS_DESCRIPTION = "Songs loop forever; no auto-advance."
  * Layout:
  *  - Header — section label "STYLE" + one-line description of the selected style
  *  - Style chooser — PLAYS (which maps to `enabled = false`) plus one chip per
- *    `TransitionStyle.isVisible`. Selecting PLAYS disables song-ending entirely;
+ *    `TransitionStyle.isVisible`. Selecting PLAYS disables Vibe-ending entirely;
  *    selecting any other style implicitly re-enables it.
  *  - MORPH row — title + handoff knob (100..2000 ms, snaps to 50 ms; disabled
  *    when the selected style's `canHandoff == false`)
@@ -223,8 +224,10 @@ private fun TransitionSheetContent(
                     text = description,
                     color = OrpheusColors.onSurfaceDark.copy(alpha = 0.55f),
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 4.dp),
+                    modifier = Modifier.padding(start = 24.dp),
                     maxLines = 2,
+                    lineHeight = 14.sp,
+                    textAlign = TextAlign.End,
                 )
             }
             StyleChips(
@@ -336,7 +339,7 @@ private fun StyleChips(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         maxItemsInEachRow = 3,
     ) {
-        // PLAYS — virtual chip at position 0 representing "song-ending disabled."
+        // PLAYS — virtual chip at position 0 representing "Vibe-ending disabled."
         // Tapping it short-circuits the whole transition flow and clears the
         // selection on any real style.
         StyleChip(

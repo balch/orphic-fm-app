@@ -588,9 +588,9 @@ class DspSynthEngine(
         val samples = (durationMs * audioEngine.sampleRate / 1000f).toInt()
         nativeBridge.nativeMasterScratch(samples)
     }
-    override fun masterDjSweep(durationMs: Int) {
+    override fun masterFilter(durationMs: Int) {
         val samples = (durationMs * audioEngine.sampleRate / 1000f).toInt()
-        nativeBridge.nativeMasterDjSweep(samples)
+        nativeBridge.nativeMasterFilter(samples)
     }
     // Native fader is the source of truth for current master volume — no Kotlin caching.
     override fun getMasterVolume(): Float = nativeBridge.nativeMasterVolumeNow()

@@ -161,8 +161,8 @@ JNI_FN(nativeMasterScratch)(JNIEnv *env, jobject thiz, jint samples) {
 }
 
 JNIEXPORT void JNICALL
-JNI_FN(nativeMasterDjSweep)(JNIEnv *env, jobject thiz, jint samples) {
-    sEngine.masterDjSweep(samples);
+JNI_FN(nativeMasterFilter)(JNIEnv *env, jobject thiz, jint samples) {
+    sEngine.masterFilter(samples);
 }
 
 JNIEXPORT jfloat JNICALL

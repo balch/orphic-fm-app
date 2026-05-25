@@ -141,8 +141,8 @@ void DesktopEngine::masterTapeStop(int samples) {
 void DesktopEngine::masterScratch(int samples) {
     if (dsp_engine_) orpheus_engine_master_scratch(dsp_engine_, samples);
 }
-void DesktopEngine::masterDjSweep(int samples) {
-    if (dsp_engine_) orpheus_engine_master_dj_sweep(dsp_engine_, samples);
+void DesktopEngine::masterFilter(int samples) {
+    if (dsp_engine_) orpheus_engine_master_filter(dsp_engine_, samples);
 }
 float DesktopEngine::masterVolumeNow() {
     return dsp_engine_ ? orpheus_engine_master_volume_now(dsp_engine_) : 0.0f;

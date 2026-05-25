@@ -20,8 +20,8 @@ import kotlinx.serialization.Serializable
  *   - CROSSFADE: full overlap duration; outgoing drops to 0.5 over H/2,
  *     incoming starts at H/2, vol returns to 1.0 over the second H/2 (default 400)
  *   - TAPE: tape-stop duration (default 300); followed by 100ms fade-in
- *   - SCRATCH: scratch noise duration over the new song start (default 250)
- *   - DJ: full sweep duration (default 500); LPF closes at midpoint, opens again
+ *   - SCRATCH: stutter gate duration over the song boundary (default 500)
+ *   - FILTER: full filter sweep duration (default 500); allpass LFO ramps with envelope
  *   - RANDOM: ignored (inherits from chosen substyle)
  * @param randomPool Only consulted when `style == RANDOM`. Empty = fall back
  *   to every style with `TransitionStyle.isSafe == true`. Vibes that want

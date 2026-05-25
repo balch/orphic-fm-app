@@ -74,7 +74,7 @@ class PulsarTransitionRunnerImpl(
                 TransitionStyle.CROSSFADE -> runCrossfade(spec.handoffMs ?: DEFAULT_CROSSFADE_MS, applyNext)
                 TransitionStyle.TAPE      -> runTape(spec.handoffMs ?: DEFAULT_TAPE_MS, applyNext)
                 TransitionStyle.SCRATCH   -> runScratch(spec.handoffMs ?: DEFAULT_SCRATCH_MS, applyNext)
-                TransitionStyle.DJ        -> runDjSweep(spec.handoffMs ?: DEFAULT_DJ_MS, applyNext)
+                TransitionStyle.FILTER    -> runFilter(spec.handoffMs ?: DEFAULT_FILTER_MS, applyNext)
                 TransitionStyle.RANDOM    -> error("RANDOM handled above")
             }
         } finally {
@@ -141,19 +141,18 @@ class PulsarTransitionRunnerImpl(
     }
 
     /**
-     * DJ-style LPF sweep with drive and comb reverb. The C++ MasterDjSweep
-     * sweeps a resonant low-pass filter from open (20kHz) to ~80Hz at the
-     * midpoint and back. Drive and reverb wash increase proportionally.
-     * Like SCRATCH, it spans the transition boundary — the filter closes
+     * 4-stage allpass filter sweep with LFO and Leslie. The C++ MasterFilter
+     * sweeps allpass stages from open to deep at the midpoint and back.
+     * Like SCRATCH, it spans the transition boundary — the filter deepens
      * over the outgoing song, we swap at the midpoint, and it opens back
      * up over the beginning of the new song.
      */
-    private suspend fun runDjSweep(handoffMs: Int, applyNext: suspend () -> Unit) {
+    private suspend fun runFilter(handoffMs: Int, applyNext: suspend () -> Unit) {
         val half = handoffMs / 2
         if (engine.getMasterVolume() < UNITY_THRESHOLD) {
             engine.fadeMasterVolume(1f, 1, FadeCurve.LINEAR)
         }
-        engine.masterDjSweep(handoffMs)
+        engine.masterFilter(handoffMs)
         engine.fadeMasterVolume(0.5f, half, FadeCurve.LINEAR)
         delay(half.toLong())
         applyNext()
@@ -162,10 +161,10 @@ class PulsarTransitionRunnerImpl(
     }
 
     /**
-     * Needle scratch over the transition boundary. The C++ MasterScratch
-     * accelerates the read head forward monotonically (single rising pitch
-     * sweep with vinyl friction noise). Like CROSSFADE, the fader dips to 0.5
-     * so the scratched audio blends with the reverb tail across the swap.
+     * Beat-synced stutter gate over the transition boundary. The C++ MasterScratch
+     * gates the audio with a beat-synced division ramp. Like CROSSFADE, the fader
+     * dips to 0.5 so the stutter-gated audio blends with the reverb tail across
+     * the swap.
      */
     private suspend fun runScratch(handoffMs: Int, applyNext: suspend () -> Unit) {
         val half = handoffMs / 2
@@ -202,7 +201,7 @@ class PulsarTransitionRunnerImpl(
         const val DEFAULT_CROSSFADE_MS = 400
         const val DEFAULT_TAPE_MS = 300
         const val DEFAULT_SCRATCH_MS = 500
-        const val DEFAULT_DJ_MS = 1000
+        const val DEFAULT_FILTER_MS = 500
         const val DECLICK_MS = 80
         const val TAPE_FADE_IN_MS = 100
         const val SMART_SKIP_VOL = 0.05f

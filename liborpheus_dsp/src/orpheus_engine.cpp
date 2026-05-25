@@ -590,10 +590,10 @@ void orpheus_engine_master_scratch(OrpheusEngine* engine, int samples) {
     engine->master_scratch_r.arm(samples, engine->sample_rate, 0x55555555u);
 }
 
-void orpheus_engine_master_dj_sweep(OrpheusEngine* engine, int samples) {
+void orpheus_engine_master_filter(OrpheusEngine* engine, int samples) {
     if (!engine) return;
-    engine->master_dj_sweep_l.arm(samples, engine->sample_rate, 0);
-    engine->master_dj_sweep_r.arm(samples, engine->sample_rate, 7);
+    engine->master_filter_l.arm(samples, engine->sample_rate, 0);
+    engine->master_filter_r.arm(samples, engine->sample_rate, 7);
     engine->master_leslie_l.arm(samples, engine->sample_rate);
     engine->master_leslie_r.arm(samples, engine->sample_rate);
 }

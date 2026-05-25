@@ -116,18 +116,17 @@ interface SynthEngine {
     fun masterTapeStop(durationMs: Int)
 
     /**
-     * Arm a single-shot vinyl scratch noise on the master bus. Mixed additively
-     * into the output: band-pass-filtered noise with a frequency sweep and
-     * exponential amplitude decay. Disarmed when complete.
+     * Arm a beat-synced stutter gate on the master bus. Gates the audio with
+     * a beat-synced division ramp and exponential amplitude decay. Disarmed
+     * when complete.
      */
     fun masterScratch(durationMs: Int)
 
     /**
-     * Arm a DJ-style LPF sweep on the master bus. Sweeps a resonant low-pass
-     * filter from open to ~80Hz at the midpoint and back, with increasing
-     * drive and comb reverb. In-place (modifies audio). Disarmed when complete.
+     * Arm a 4-stage allpass filter sweep with LFO and Leslie on the master bus.
+     * In-place (modifies audio). Disarmed when complete.
      */
-    fun masterDjSweep(durationMs: Int)
+    fun masterFilter(durationMs: Int)
 
     // Delay Controls
     fun setDelayTime(index: Int, time: Float) // 0 or 1

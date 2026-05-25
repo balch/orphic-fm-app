@@ -192,8 +192,8 @@ void OboeEngine::masterTapeStop(int samples) {
 void OboeEngine::masterScratch(int samples) {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_scratch(e, samples);
 }
-void OboeEngine::masterDjSweep(int samples) {
-    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_dj_sweep(e, samples);
+void OboeEngine::masterFilter(int samples) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_master_filter(e, samples);
 }
 float OboeEngine::masterVolumeNow() {
     auto* e = dsp_engine_.load(std::memory_order_acquire);

@@ -77,7 +77,7 @@ private class FakeEngine(initial: Float = 1.0f) : SynthEngine {
     }
     override fun masterTapeStop(durationMs: Int) { volume = 0f }
     override fun masterScratch(durationMs: Int) {}
-    override fun masterDjSweep(durationMs: Int) {}
+    override fun masterFilter(durationMs: Int) {}
     override fun getMasterVolume(): Float = volume
 
     // Stubs — never called by MasterVolumeRamp

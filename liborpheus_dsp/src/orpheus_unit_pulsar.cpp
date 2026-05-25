@@ -2910,6 +2910,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         out_r[i] = soft_limit(out_r[i]);
     }
 
+    // ── Publish beat_phase for master-bus stutter sync ──
+    {
+        int ph = state->tracks[0].playhead;
+        float step_frac = static_cast<float>(state->clock_accumulator / samples_per_step);
+        float bp = (static_cast<float>(ph % 4) + step_frac) / 4.0f;
+        if (bp >= 1.0f) bp -= 1.0f;
+        engine->beat_phase.store(bp, std::memory_order_relaxed);
+        engine->clock_bpm.store(bpm, std::memory_order_relaxed);
+    }
+
     // ── Copy to graph output buffers for effects routing ──
     std::memcpy(u->output_buffers[OPORT_OUT], out_l, num_frames * sizeof(float));
     std::memcpy(u->output_buffers[OPORT_OUT_RIGHT], out_r, num_frames * sizeof(float));

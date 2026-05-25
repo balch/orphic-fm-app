@@ -30,7 +30,7 @@ class PulsarTransitionRunnerTest {
         val fades = mutableListOf<FadeCall>()
         val tapeStops = mutableListOf<Pair<Long, Int>>()
         val scratches = mutableListOf<Pair<Long, Int>>()
-        val djSweeps = mutableListOf<Pair<Long, Int>>()
+        val filters = mutableListOf<Pair<Long, Int>>()
         var now: () -> Long = { 0L }
 
         init {
@@ -50,8 +50,8 @@ class PulsarTransitionRunnerTest {
             scratches += now() to durationMs
         }
 
-        override fun masterDjSweep(durationMs: Int) {
-            djSweeps += now() to durationMs
+        override fun masterFilter(durationMs: Int) {
+            filters += now() to durationMs
         }
     }
 
@@ -241,7 +241,7 @@ class PulsarTransitionRunnerTest {
                 TransitionStyle.CROSSFADE,
                 TransitionStyle.TAPE,
                 TransitionStyle.SCRATCH,
-                TransitionStyle.DJ,
+                TransitionStyle.FILTER,
             ),
             seen[0],
         )
@@ -302,28 +302,28 @@ class PulsarTransitionRunnerTest {
     }
 
     @Test
-    fun `DJ arms sweep and dips fader like CROSSFADE`() = runTest {
+    fun `FILTER arms sweep and dips fader like CROSSFADE`() = runTest {
         val engine = RecordingEngine()
         engine.now = { testScheduler.currentTime }
         val runner = makeRunner(engine)
         val applyAt = mutableListOf<Long>()
-        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.DJ)) { applyAt += testScheduler.currentTime } }
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.FILTER)) { applyAt += testScheduler.currentTime } }
         advanceUntilIdle()
         job.join()
-        assertEquals(listOf(0L to 1000), engine.djSweeps, "DJ sweep armed at t=0 for default 1000ms")
-        assertEquals(listOf(500L), applyAt, "vibe swap at midpoint")
+        assertEquals(listOf(0L to 500), engine.filters, "filter armed at t=0 for default 500ms")
+        assertEquals(listOf(250L), applyAt, "vibe swap at midpoint")
         assertEquals(2, engine.fades.size, "dip to 0.5 then back to 1")
         assertEquals(0.5f, engine.fades[0].target)
         assertEquals(1f, engine.fades[1].target)
     }
 
     @Test
-    fun `DJ restores volume to unity if fader is below threshold`() = runTest {
+    fun `FILTER restores volume to unity if fader is below threshold`() = runTest {
         val engine = RecordingEngine(initialVolume = 0.0f)
         engine.now = { testScheduler.currentTime }
         val runner = makeRunner(engine)
         val applyAt = mutableListOf<Long>()
-        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.DJ)) { applyAt += testScheduler.currentTime } }
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.FILTER)) { applyAt += testScheduler.currentTime } }
         advanceUntilIdle()
         job.join()
         // 3 fades: snap-to-1, dip-to-0.5, rise-to-1

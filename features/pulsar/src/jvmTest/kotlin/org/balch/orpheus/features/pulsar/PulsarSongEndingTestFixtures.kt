@@ -216,7 +216,7 @@ internal open class SongEndingStubSynthEngine : SynthEngine {
     override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { masterVolume = target }
     override fun masterTapeStop(durationMs: Int) { masterVolume = 0f }
     override fun masterScratch(durationMs: Int) {}
-    override fun masterDjSweep(durationMs: Int) {}
+    override fun masterFilter(durationMs: Int) {}
     override fun getMasterVolume(): Float = masterVolume
 
     override fun setVoiceTune(index: Int, tune: Float) = Unit

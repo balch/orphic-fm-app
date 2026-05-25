@@ -34,8 +34,8 @@ import orpheus_dsp.orpheus_engine_get_viz
 import orpheus_dsp.orpheus_engine_is_tts_playing
 import orpheus_dsp.orpheus_engine_load_patch
 import orpheus_dsp.orpheus_engine_load_tts_audio
-import orpheus_dsp.orpheus_engine_master_dj_sweep
 import orpheus_dsp.orpheus_engine_master_fade
+import orpheus_dsp.orpheus_engine_master_filter
 import orpheus_dsp.orpheus_engine_master_scratch
 import orpheus_dsp.orpheus_engine_master_tape_stop
 import orpheus_dsp.orpheus_engine_master_volume_now
@@ -370,8 +370,8 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         engine?.let { orpheus_engine_master_scratch(it, samples) }
     }
 
-    override fun nativeMasterDjSweep(samples: Int) {
-        engine?.let { orpheus_engine_master_dj_sweep(it, samples) }
+    override fun nativeMasterFilter(samples: Int) {
+        engine?.let { orpheus_engine_master_filter(it, samples) }
     }
 
     override fun nativeMasterVolumeNow(): Float {

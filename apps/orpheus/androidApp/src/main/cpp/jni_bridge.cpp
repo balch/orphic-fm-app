@@ -184,9 +184,9 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterScratch(
 }
 
 JNIEXPORT void JNICALL
-Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterDjSweep(
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeMasterFilter(
         JNIEnv *env, jobject thiz, jint samples) {
-    sEngine.masterDjSweep(samples);
+    sEngine.masterFilter(samples);
 }
 
 JNIEXPORT jfloat JNICALL

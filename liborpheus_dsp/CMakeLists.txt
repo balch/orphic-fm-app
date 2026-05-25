@@ -155,7 +155,7 @@ set(ORPHEUS_SRC
     "src/orpheus_master_fader.cpp"
     "src/orpheus_master_tape_stop.cpp"
     "src/orpheus_master_scratch.cpp"
-    "src/orpheus_master_dj_sweep.cpp"
+    "src/orpheus_master_filter.cpp"
     "src/orpheus_master_leslie.cpp"
     "src/chaos/lorenz.cpp"
     "src/chaos/rossler.cpp"

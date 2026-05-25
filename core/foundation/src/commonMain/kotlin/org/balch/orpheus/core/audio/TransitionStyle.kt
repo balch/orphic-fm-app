@@ -21,8 +21,8 @@ import kotlinx.serialization.Serializable
  * - [FADE] — symmetric fade-out → swap → fade-in. Default 350ms total.
  * - [CROSSFADE] — single-voice emulated crossfade; outgoing reverb tail provides overlap.
  * - [TAPE] — tape-stop varispeed on master, then quick fade-in for incoming.
- * - [SCRATCH] — vinyl scratch noise over the beginning of the next song.
- * - [DJ] — DJ-style resonant LPF sweep with drive and reverb wash.
+ * - [SCRATCH] — beat-synced stutter gate over the song boundary.
+ * - [FILTER] — 4-stage allpass filter sweep with LFO.
  * - [RANDOM] — pick a safe substyle (any style with `isSafe = true`) when
  *   `TransitionSpec.randomPool` is empty; otherwise pick from the explicit pool.
  */
@@ -38,7 +38,7 @@ enum class TransitionStyle(
     CROSSFADE(isSafe = true),
     TAPE(isSafe = true),
     SCRATCH(isSafe = true),
-    DJ(isSafe = true),
+    FILTER(isSafe = true),
     RANDOM(isSafe = false, isVisible = true, canHandoff = false), ;
 
     companion object {

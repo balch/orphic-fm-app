@@ -44,7 +44,7 @@ public:
     void masterFade(float target, int samples, int curve);
     void masterTapeStop(int samples);
     void masterScratch(int samples);
-    void masterDjSweep(int samples);
+    void masterFilter(int samples);
     float masterVolumeNow();
     void setDrive(float v);
     void setDelayMix(float v);

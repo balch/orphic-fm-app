@@ -94,7 +94,7 @@ class DesktopDspBridge {
     external fun nativeMasterFade(target: Float, samples: Int, curve: Int)
     external fun nativeMasterTapeStop(samples: Int)
     external fun nativeMasterScratch(samples: Int)
-    external fun nativeMasterDjSweep(samples: Int)
+    external fun nativeMasterFilter(samples: Int)
     external fun nativeMasterVolumeNow(): Float
     external fun nativeSetDrive(value: Float)
     external fun nativeSetDelayMix(value: Float)

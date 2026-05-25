@@ -80,8 +80,8 @@ void orpheus_engine_master_tape_stop(OrpheusEngine* engine, int samples);
 /** Arm single-shot vinyl scratch noise on master bus (additive). */
 void orpheus_engine_master_scratch(OrpheusEngine* engine, int samples);
 
-/** Arm DJ LPF sweep on master bus (in-place filter + drive + comb reverb). */
-void orpheus_engine_master_dj_sweep(OrpheusEngine* engine, int samples);
+/** Arm filter sweep on master bus (4-stage allpass cascade). */
+void orpheus_engine_master_filter(OrpheusEngine* engine, int samples);
 
 /** Read the current master volume (post-fader, instantaneous). */
 float orpheus_engine_master_volume_now(OrpheusEngine* engine);

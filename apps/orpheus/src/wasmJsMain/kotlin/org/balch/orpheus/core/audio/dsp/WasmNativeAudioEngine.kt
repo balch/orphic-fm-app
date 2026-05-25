@@ -130,8 +130,8 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
         // No-op: the scratch is purely additive so skipping it is silent.
     }
 
-    override fun nativeMasterDjSweep(samples: Int) {
-        // WASM Worker doesn't yet support the DJ sweep filter.
+    override fun nativeMasterFilter(samples: Int) {
+        // WASM Worker doesn't yet support the filter sweep.
         // No-op: sweep is in-place, so skipping it passes audio through clean.
     }
 
