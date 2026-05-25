@@ -29,8 +29,8 @@ data class MixerUiState(
      * by the echo flows from each band's controlFlow.
      */
     val groupGains: List<Float> = listOf(0.75f, 0.75f, 0.75f, 0.75f),
-    /** Distortion drive 0..1. */
-    val drive: Float = 0f,
+    /** Distortion drive 0..1. Default 0.30 for new users. */
+    val drive: Float = 0.30f,
     /** Master peak meter (0..1+, transient). */
     val peak: Float = 0f,
     /** True when every track in the group is muted (derived from PulsarFeature). */

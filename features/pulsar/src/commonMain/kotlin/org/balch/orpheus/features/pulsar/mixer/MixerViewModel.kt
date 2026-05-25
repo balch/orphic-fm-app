@@ -27,6 +27,8 @@ import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
 
+private const val DEFAULT_DRIVE = 0.30f
+
 /** Internal MVI intents for the Mixer panel. */
 private sealed interface MixerIntent {
     data class GainChange(val group: MixerGroup, val value: Float) : MixerIntent
@@ -167,6 +169,10 @@ class MixerViewModel(
                 mixId.value = FloatValue(drive)
             },
         )
+        // Default drive for new users — persistence.bind() restore is async,
+        // so this value sticks for new users and gets overwritten for existing ones.
+        driveId.value = FloatValue(DEFAULT_DRIVE)
+        mixId.value = FloatValue(DEFAULT_DRIVE)
     }
 
     private fun onGroupGainChanged(group: MixerGroup, value: Float) {
