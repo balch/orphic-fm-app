@@ -33,6 +33,8 @@ data class AppPreferences(
     val lastHornJson: String? = null,
     val lastDistortionJson: String? = null,
     val lastMixerJson: String? = null,
+    /** When true, a new random visualization is selected on each vibe transition. */
+    val randomVizMode: Boolean = true,
 )
 
 

@@ -35,12 +35,12 @@ enum class TransitionStyle(
     val defaultHandoffMs: Int = 500,
 ) {
     CUT(isSafe = true, canHandoff = false),
-    GAP(isSafe = true, handoffRange = 200..1500, defaultHandoffMs = 500),
-    FADE(isSafe = true, handoffRange = 150..1000, defaultHandoffMs = 350),
-    CROSSFADE(isSafe = true, handoffRange = 200..1200, defaultHandoffMs = 400),
-    TAPE(isSafe = true, handoffRange = 150..800, defaultHandoffMs = 500),
+    GAP(isSafe = true, handoffRange = 200..2000, defaultHandoffMs = 500),
+    FADE(isSafe = true, handoffRange = 150..1800, defaultHandoffMs = 350),
+    CROSSFADE(isSafe = true, handoffRange = 200..1800, defaultHandoffMs = 400),
+    TAPE(isSafe = true, handoffRange = 150..2000, defaultHandoffMs = 500),
     SCRATCH(isSafe = true, handoffRange = 250..1200, defaultHandoffMs = 500),
-    FILTER(isSafe = true, handoffRange = 300..1500, defaultHandoffMs = 500),
+    FILTER(isSafe = true, handoffRange = 300..1800, defaultHandoffMs = 500),
     RANDOM(isSafe = false, isVisible = true, canHandoff = false),
     ;
 

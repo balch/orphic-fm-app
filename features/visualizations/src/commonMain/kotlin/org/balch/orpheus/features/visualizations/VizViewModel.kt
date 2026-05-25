@@ -36,6 +36,7 @@ data class VizUiState(
     val knob2Value: Float = 0.5f,
     val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects,
     val signalVizEnabled: Boolean = false,
+    val isRandomVizMode: Boolean = false,
 )
 
 data class VizPanelActions(
@@ -43,6 +44,8 @@ data class VizPanelActions(
     val onKnob1Change: (Float) -> Unit,
     val onKnob2Change: (Float) -> Unit,
     val onToggleSignalViz: (Boolean) -> Unit,
+    val onSetRandomMode: (Boolean) -> Unit = {},
+    val onSelectRandomViz: () -> Unit = {},
 ) {
     companion object {
         val EMPTY = VizPanelActions(
@@ -79,6 +82,8 @@ class VizViewModel(
         onKnob1Change = ::onKnob1Change,
         onKnob2Change = ::onKnob2Change,
         onToggleSignalViz = ::onToggleSignalViz,
+        onSetRandomMode = ::setRandomMode,
+        onSelectRandomViz = ::selectRandomVisualization,
     )
 
     // Sorted list: Off first, then alphabetical by name
@@ -109,10 +114,19 @@ class VizViewModel(
 
         scope.launch(dispatcherProvider.default) {
             val prefs = appPreferencesRepository.load()
-            _uiState.update { it.copy(signalVizEnabled = prefs.signalVizEnabled) }
-            prefs.lastVizId?.let { id ->
-                sortedVisualizations.find { it.id == id }?.let { viz ->
-                    selectVisualization(viz, save = false)
+            _uiState.update {
+                it.copy(
+                    signalVizEnabled = prefs.signalVizEnabled,
+                    isRandomVizMode = prefs.randomVizMode,
+                )
+            }
+            if (prefs.randomVizMode) {
+                selectRandomVisualization()
+            } else {
+                prefs.lastVizId?.let { id ->
+                    sortedVisualizations.find { it.id == id }?.let { viz ->
+                        selectVisualization(viz, save = false)
+                    }
                 }
             }
         }
@@ -138,21 +152,20 @@ class VizViewModel(
 
     /**
      * Select a new visualization by instance.
+     * When [save] is true (explicit user pick), random mode is disabled.
      */
     fun selectVisualization(viz: Visualization, save: Boolean = true) {
         if (_currentViz.value == viz) return
 
         scope.launch(dispatcherProvider.default) {
-            // Perform activation/deactivation on background thread
             _currentViz.value.onDeactivate()
             viz.onActivate()
 
             dynamicEffectsJob?.cancel()
             dynamicEffectsJob = null
-            
+
             _currentViz.value = viz
 
-            // Handle dynamic effects
             if (viz is DynamicVisualization) {
                 dynamicEffectsJob = scope.launch(dispatcherProvider.default) {
                     viz.liquidEffectsFlow.collect { effects ->
@@ -164,13 +177,30 @@ class VizViewModel(
             updateState()
 
             if (save) {
-                appPreferencesRepository.update { it.copy(lastVizId = viz.id) }
+                _uiState.update { it.copy(isRandomVizMode = false) }
+                appPreferencesRepository.update {
+                    it.copy(lastVizId = viz.id, randomVizMode = false)
+                }
             }
         }
     }
 
     fun selectVisualization(viz: Visualization) {
         selectVisualization(viz, save = true)
+    }
+
+    private fun setRandomMode(enabled: Boolean) {
+        _uiState.update { it.copy(isRandomVizMode = enabled) }
+        scope.launch(dispatcherProvider.default) {
+            appPreferencesRepository.update { it.copy(randomVizMode = enabled) }
+        }
+        if (enabled) selectRandomVisualization()
+    }
+
+    private fun selectRandomVisualization() {
+        val candidates = sortedVisualizations.filter { it.id != "off" && it != _currentViz.value }
+        val pick = candidates.randomOrNull() ?: sortedVisualizations.firstOrNull { it.id != "off" } ?: return
+        selectVisualization(pick, save = false)
     }
 
     fun onKnob1Change(value: Float) {

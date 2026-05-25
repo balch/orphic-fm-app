@@ -56,6 +56,7 @@ import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
@@ -86,7 +87,7 @@ private fun <T> EnumDropdown(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.7f),
+            color = color.lighten(),
             fontSize = 9.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -222,7 +223,7 @@ fun PulsarPanel(
                 Text(
                     text = "ENV",
                     style = MaterialTheme.typography.labelSmall,
-                    color = OrpheusColors.cosmicPurple.copy(alpha = 0.7f),
+                    color = OrpheusColors.cosmicPurple.lighten(),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -394,7 +395,7 @@ fun PulsarPanel(
                 label = "PERC",
                 controlId = PulsarSymbol.PERC_MIX.controlId.key,
                 size = 28.dp,
-                progressColor = OrpheusColors.cosmicPurple,
+                progressColor = OrpheusColors.cosmicPurple.lighten(),
                 labelSide = LabelSide.START,
                 valueFormatter = null,
             )
@@ -406,7 +407,7 @@ fun PulsarPanel(
                 controlId = PulsarSymbol.BPM.controlId.key,
                 range = 40f..300f,
                 size = 36.dp,
-                progressColor = OrpheusColors.cosmicPurple,
+                progressColor = OrpheusColors.cosmicPurple.lighten(),
                 labelSide = LabelSide.START,
                 valueFormatter = { "${it.toInt()}" },
             )
@@ -417,7 +418,7 @@ fun PulsarPanel(
                 label = "DEEP",
                 controlId = PulsarSymbol.DEEP.controlId.key,
                 size = 28.dp,
-                progressColor = OrpheusColors.cosmicPurple,
+                progressColor = OrpheusColors.cosmicPurple.lighten(),
                 labelSide = LabelSide.START,
                 valueFormatter = null,
             )
@@ -447,7 +448,7 @@ fun PulsarPanel(
             ) {
                 Text(
                     text = "ENDING",
-                    color = OrpheusColors.cosmicPurple,
+                    color = OrpheusColors.cosmicPurple.lighten(),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,

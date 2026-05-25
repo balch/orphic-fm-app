@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -253,7 +255,7 @@ private fun DjAppHeaderRow(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppTitleTreatment(
@@ -262,6 +264,15 @@ private fun DjAppHeaderRow(
             effects = effects,
             showSizeEffects = false,
             horizontalPadding = horizontalPadding,
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Text(
+            text = "Viz:",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.9f),
+            maxLines = 1,
         )
 
         // Viz dropdown
@@ -297,11 +308,15 @@ private fun DjAppHeaderRow(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = if (vizState.selectedViz.id == "off") "Viz: Select..." else vizState.selectedViz.name,
+                        text = when {
+                            vizState.isRandomVizMode -> "Random"
+                            else -> vizState.selectedViz.name
+                        },
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = if (vizState.selectedViz.id == "off") 0.5f else 0.9f),
+                        color = Color.White.copy(alpha = 0.9f),
                         maxLines = 1,
                         modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center
                     )
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = vizDropdownExpanded)
                 }
@@ -323,6 +338,19 @@ private fun DjAppHeaderRow(
                     }
                 ).background(OrpheusColors.panelSurface),
             ) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            "Random",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (vizState.isRandomVizMode) OrpheusColors.neonCyan else Color.White,
+                        )
+                    },
+                    onClick = {
+                        vizActions.onSetRandomMode(true)
+                        vizDropdownExpanded = false
+                    },
+                )
                 vizState.visualizations.forEach { viz ->
                     DropdownMenuItem(
                         text = {

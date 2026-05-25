@@ -13,6 +13,8 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.audio.dsp.DspSynthEngine
 import org.balch.orpheus.core.features.LocalSynthFeatures
@@ -20,6 +22,8 @@ import org.balch.orpheus.core.features.SynthFeatureRegistry
 import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.djapp.di.DjAppGraph
+import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
@@ -72,6 +76,19 @@ fun DjApp(graph: DjAppGraph, onTogglePlayback: () -> Unit = {}) {
                             PortValue.FloatValue(0.7f))
                     }
                 }
+            }
+
+            // Pick a new random visualization on each vibe transition
+            val pulsarFeature: PulsarFeature = registry.feature<PulsarViewModel, PulsarFeature>()
+            LaunchedEffect(Unit) {
+                pulsarFeature.vibeFlow
+                    .distinctUntilChangedBy { it.name }
+                    .drop(1)
+                    .collect {
+                        if (vizFeature.stateFlow.value.isRandomVizMode) {
+                            vizFeature.actions.onSelectRandomViz()
+                        }
+                    }
             }
 
             // Enable per-panel signal viz when Orphoscope is active

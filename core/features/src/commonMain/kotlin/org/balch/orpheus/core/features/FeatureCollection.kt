@@ -33,7 +33,6 @@ class FeatureCollection(
             val provider = providers[key]
                 ?: error("No SynthFeature provider registered for ${key.simpleName} (${key.qualifiedName})")
             provider()
-                ?: error("SynthFeature provider for ${key.simpleName} (${key.qualifiedName}) returned null")
         } as T
 
     /** All features (triggers lazy creation of any not yet cached). */
