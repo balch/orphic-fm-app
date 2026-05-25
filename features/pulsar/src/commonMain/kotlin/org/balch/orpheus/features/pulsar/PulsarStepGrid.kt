@@ -32,7 +32,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,7 @@ import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.lighten
 import kotlin.random.Random
 
 /** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX */
@@ -493,9 +496,9 @@ fun PulsarStepGrid(
             // " \u2014 STYLE" suffix in cosmicPurple when the current section is
             // the final section and a transition is pending. AnnotatedString
             // lets the suffix carry its own color inline.
-            val overlay: androidx.compose.ui.text.AnnotatedString =
-                androidx.compose.ui.text.buildAnnotatedString {
-                    val accent = OrpheusColors.cosmicPurple
+            val overlay: AnnotatedString =
+                buildAnnotatedString {
+                    val accent = OrpheusColors.cosmicPurple.lighten()
                     val base = Color.White.copy(alpha = 0.9f)
                     if (activeTransition != null) {
                         pushStyle(SpanStyle(color = accent))

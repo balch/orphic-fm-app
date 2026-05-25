@@ -155,7 +155,17 @@ class VizViewModel(
      * When [save] is true (explicit user pick), random mode is disabled.
      */
     fun selectVisualization(viz: Visualization, save: Boolean = true) {
-        if (_currentViz.value == viz) return
+        if (_currentViz.value == viz) {
+            if (save && _uiState.value.isRandomVizMode) {
+                _uiState.update { it.copy(isRandomVizMode = false) }
+                scope.launch(dispatcherProvider.default) {
+                    appPreferencesRepository.update {
+                        it.copy(lastVizId = viz.id, randomVizMode = false)
+                    }
+                }
+            }
+            return
+        }
 
         scope.launch(dispatcherProvider.default) {
             _currentViz.value.onDeactivate()
