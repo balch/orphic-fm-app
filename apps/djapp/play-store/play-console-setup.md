@@ -20,7 +20,7 @@ Have these to hand:
 - [ ] Feature graphic: `apps/djapp/play-store/assets/feature-graphic-1024x500.png`
 - [ ] Phone screenshots (≥2; see §3 below for capture instructions)
 - [ ] Privacy policy URL: `https://orphic.fm/dj/privacy/` (confirm it's live)
-- [ ] Release-signed AAB at `apps/djapp/androidApp/build/outputs/bundle/release/androidApp-release.aab`
+- [ ] Release-signed AAB at `apps/djapp/androidApp/build/outputs/bundle/release/djapp-release.aab`
 
 ---
 
@@ -325,7 +325,7 @@ Store within ~15 minutes.
 1. Left rail → **Test → Closed testing → `closed-beta-1`**.
 2. **Create new release**.
 3. **App bundles**: drag-drop
-   `apps/djapp/androidApp/build/outputs/bundle/release/androidApp-release.aab`.
+   `apps/djapp/androidApp/build/outputs/bundle/release/djapp-release.aab`.
 4. Play parses it. Confirm:
    - Package: `org.balch.djapp` ✓
    - Version code: (current `git rev-list --count HEAD` value)

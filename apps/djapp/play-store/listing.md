@@ -106,14 +106,12 @@ Enjoy the Vibes.
 ## Tags — up to 5
 
 Play uses these for categorization and surfacing in related-apps. The list
-Play offers is fixed; you pick from a dropdown. Strong matches for Orphic DJ:
+Play offers is fixed; you pick from a dropdown.
+
+**Selected:**
 
 - `Music`
 - `Music & Audio`
-- `Audio Player`
-
-DO NOT pick `DJ` if your app doesn't actually let users mix tracks — we don't,
-so leaving it off is more honest and reduces review friction.
 
 ---
 
@@ -122,22 +120,18 @@ so leaving it off is more honest and reduces review friction.
 Shown next to the version number. Keep it short — most users glance at the
 first 80 chars.
 
-**For v1.0.0 (first release):**
+**v1.0.0:**
 
-> _"v1.0.0 — Orphic DJ — throwing against the wall to see what sticks."_
-
-Examples that read well for v1.0.0:
-
-- _"First public release. Hello, beat-driven roadtrips."_
-- _"v1.0.0 — Orphic DJ enters early access. Feedback welcome."_
+> v1.0.0 — Orphic DJ — throwing against the wall to see what sticks.
 
 ---
 
-## What I still need from you
+## Checklist
 
-- [ ] Short description (one of the example structures above, or your own — 80 chars)
-- [ ] Full description (~600–1200 chars; longer is fine, just rarely better)
-- [ ] Release notes for v1.0.0
-- [ ] Pick which tags from the menu above
-- [ ] Confirm primary category is `Music & Audio` (vs. `Tools`?)
-- [ ] Decide whether to include the GitHub repo link in the description
+- [x] Short description — finalized above
+- [x] Full description — finalized above
+- [x] Release notes for v1.0.0 — finalized above
+- [x] Tags — `Music`, `Music & Audio`
+- [x] Primary category — `Music & Audio`
+- [x] GitHub repo link — not included
+- [x] Screenshots — 7 captured in `assets/screenshots/`

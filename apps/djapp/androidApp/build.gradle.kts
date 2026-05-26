@@ -11,6 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "org.balch.djapp"
+        base.archivesName = "djapp"
 
         externalNativeBuild {
             cmake {
