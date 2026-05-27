@@ -23,6 +23,7 @@ kotlin {
     android {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
+        withHostTest {}
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_21)

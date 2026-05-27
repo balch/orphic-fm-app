@@ -132,3 +132,9 @@ androidComponents {
         }
     }
 }
+
+val versionTag = gitVersionName.removePrefix("v").replace(Regex("-\\d+-g[0-9a-f]+(-dirty)?"), "")
+afterEvaluate {
+    val archivesBase = base.archivesName.get()
+    base.archivesName.set("$archivesBase-v$versionTag")
+}
