@@ -1,7 +1,12 @@
 package org.balch.orpheus.features.pulsar.playback
 
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import java.io.ByteArrayOutputStream
 
-// Android consumes the ImageBitmap directly inside the foreground service
-// (asAndroidBitmap → setLargeIcon). No PNG encode required.
-actual fun ImageBitmap.toPngBytes(): ByteArray? = null
+actual fun ImageBitmap.toPngBytes(): ByteArray? {
+    val stream = ByteArrayOutputStream()
+    asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, stream)
+    return stream.toByteArray()
+}

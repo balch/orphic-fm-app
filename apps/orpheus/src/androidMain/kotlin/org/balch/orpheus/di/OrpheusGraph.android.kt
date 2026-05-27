@@ -9,7 +9,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.lifecycle.AndroidAppLifecycleManager
-import org.balch.orpheus.core.media.ForegroundServiceController
+import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
@@ -31,6 +31,7 @@ actual interface OrpheusGraph : ViewModelGraph {
     actual val consoleLogger: ConsoleLogger
     actual val globalTempo: GlobalTempo
     actual val controlHighlightEventBus: ControlHighlightEventBus
+    val mediaSessionManager: MediaSessionManager
     val mediaSessionStateManager: MediaSessionStateManager
 
     /**
@@ -55,7 +56,6 @@ actual interface OrpheusGraph : ViewModelGraph {
     fun interface Factory {
         fun create(
             @Provides application: Application,
-            @Provides foregroundServiceController: ForegroundServiceController
         ): OrpheusGraph
     }
 }

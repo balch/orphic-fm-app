@@ -46,7 +46,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
-            implementation(libs.androidx.media)
+            implementation(libs.media3.session)
             implementation(libs.androidx.profileinstaller)
         }
         commonMain.dependencies {

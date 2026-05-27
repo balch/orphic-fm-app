@@ -5,6 +5,7 @@ import ai.koog.agents.core.agent.GraphAIAgent.FeatureContext
 import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.agent.entity.AIAgentGraphStrategy
 import ai.koog.agents.features.eventHandler.feature.handleEvents
+import ai.koog.http.client.HttpClientFactoryResolver
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
@@ -267,11 +268,11 @@ class OrpheusAgent(
             // Error handling handler
             handleEvents {
                 onAgentExecutionFailed { ctx ->
-                    if (ctx.throwable is CancellationException) {
+                    if (ctx.error is CancellationException) {
                         logger.debug { "Agent execution cancelled" }
                     } else {
-                        logger.error(ctx.throwable) { "Error running agent" }
-                        send(errorMessageAsState(ctx.throwable, "Something went wrong..."))
+                        logger.error(ctx.error) { "Error running agent" }
+                        send(errorMessageAsState(ctx.error, "Something went wrong..."))
                     }
                 }
                 onToolCallFailed { context -> logger.e { "Tool call failed: ${context.toolName} : ${context.message}" } }
@@ -323,10 +324,11 @@ class OrpheusAgent(
         installFeatures: FeatureContext.() -> Unit = {},
     ): AIAgent<String, String> {
         val aiProvider = deriveAiProviderFromKey(key = apiKey)
+        val httpFactory = HttpClientFactoryResolver.resolve()
         val llmClient: LLMClient = when (aiProvider) {
-            AiProvider.Google -> GoogleLLMClient(apiKey)
-            AiProvider.Anthropic -> AnthropicLLMClient(apiKey)
-            AiProvider.OpenAI -> OpenAILLMClient(apiKey)
+            AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
+            AiProvider.Anthropic -> AnthropicLLMClient(apiKey, httpClientFactory = httpFactory)
+            AiProvider.OpenAI -> OpenAILLMClient(apiKey, httpClientFactory = httpFactory)
             else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
         }
         val executor = MultiLLMPromptExecutor(llmClient)
@@ -352,4 +354,5 @@ class OrpheusAgent(
         messages.add(ChatMessage(text = text, type = type))
         _agentState.value = AgentState.Chatting(messages.toList())
     }
+
 }

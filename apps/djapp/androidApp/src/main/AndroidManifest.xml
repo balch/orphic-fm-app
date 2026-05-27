@@ -25,14 +25,11 @@
         </activity>
 
         <service
-            android:name=".DjMediaBrowserService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
+            android:name=".DjMediaLibraryService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
             </intent-filter>
         </service>
     </application>

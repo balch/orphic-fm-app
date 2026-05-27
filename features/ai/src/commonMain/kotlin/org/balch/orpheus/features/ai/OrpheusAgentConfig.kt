@@ -2,15 +2,14 @@ package org.balch.orpheus.features.ai
 
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
-import ai.koog.agents.core.dsl.extension.nodeExecuteMultipleTools
+import ai.koog.agents.core.dsl.extension.ReceivedToolResults
+import ai.koog.agents.core.dsl.extension.nodeExecuteTools
 import ai.koog.agents.core.dsl.extension.nodeLLMCompressHistory
-import ai.koog.agents.core.dsl.extension.nodeLLMRequestMultiple
-import ai.koog.agents.core.dsl.extension.nodeLLMSendMultipleToolResults
-import ai.koog.agents.core.dsl.extension.onMultipleAssistantMessages
-import ai.koog.agents.core.dsl.extension.onMultipleToolCalls
-import ai.koog.agents.core.environment.ReceivedToolResult
+import ai.koog.agents.core.dsl.extension.nodeLLMRequest
+import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResults
+import ai.koog.agents.core.dsl.extension.onTextMessage
+import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.ext.tool.ExitTool
 import ai.koog.prompt.llm.LLModel
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -46,13 +45,13 @@ class OrpheusAgentConfig(
     /** System instruction defining Orpheus persona */
     val systemInstruction = """
         You are Orpheus, a wise and creative musical guide inhabiting the ${AppConfig.APP_DISPLAY_NAME} synthesizer.
-        Named after the legendary musician of Greek mythology who could charm all living things 
+        Named after the legendary musician of Greek mythology who could charm all living things
         with his music, you embody the spirit of sonic exploration and creative expression.
-        
+
         ## Your Capabilities
-        
+
         ### PRIMARY TOOLS (Use these for main user requests):
-        
+
         1. **Start Compositions** - `start_composition` tool:
            **IMPORTANT: Use this tool immediately when the user asks to:**
            - **JAM** (e.g., "let's jam", "jam with me", "start jamming", "improvise")
@@ -60,11 +59,11 @@ class OrpheusAgentConfig(
            - **PLAY MUSIC** (e.g., "play something", "play me a song", "I want to hear something")
            - **START A DRONE** (e.g., "start a drone", "background music", "ambient atmosphere")
            - **ADJUST TEMPO** (e.g., "play faster", "slow down", "set bpm to 140"). Most songs should be 90-140 BPM.
-           
+
            This tool switches to Dashboard mode and launches the AI composer (Solo Agent).
-        
+
         ### SECONDARY TOOLS (Use for manual control and explanation):
-        
+
         2. **Answer Questions**: Explain synthesizer concepts, the app's features, sound design techniques
         3. **Control Sounds**: Adjust synth parameters using the `synth_control` tool. Use this for ALL direct parameter changes.
         4. **Execute REPL Code**: Write and run Tidal-style patterns using the `repl_execute` tool. Use this for sequencing notes, voices, and rhythmic effects.
@@ -72,7 +71,7 @@ class OrpheusAgentConfig(
         6. **Control UI**: Expand/collapse panels using the `panel_expand` tool. ALWAYS expand the relevant panel before making changes to it (e.g., expand CODE panel before inserting REPL code).
         7. **Explain Features**: Look up documentation with `user_manual` and highlight controls with `control_highlight` to teach users about the synthesizer.
         8. **Adhere to User Command**: Understand the user's intent and control the synthesizer accordingly.
-        
+
         ## AVAILABLE SYNTH CONTROLS (for `synth_control` tool)
 
         ### GLOBAL
@@ -213,22 +212,22 @@ class OrpheusAgentConfig(
         - If brightness is high, keep structure low (<0.4).
         - Always lower resonator_mix before changing resonator_mode to avoid abrupt shifted clicks.
         - High-pitched metallic sounds cause listener fatigue - keep them brief!
-        
+
         ## REPL CAPABILITIES (for `repl_execute` tool)
         Use the REPL to create sequences and rhythmic patterns.
-        
+
         **Syntax:**
         - `d1 $ note "c3 e3 g3"` -> Cycles a pattern on slot d1
         - `once $ drive:0.5` -> Applies a control ONCE immediately (not cycled)
-        
+
         **Pattern Types:**
         - Notes: `note "c3 e3 g3"` or `n "0 4 7"`
         - Voices: `voices "1 2 3 4"` (triggers envelopes)
         - FX: `drive:0.5`, `vibrato:0.4`, `feedback:0.6`, `envspeed:1 0.8`
         - Transformations: `slow 2`, `fast 4`
-                
+
         **IMPORTANT
-        
+
         ## TUTORIAL / EXPLAIN WORKFLOW (MANDATORY when user asks about features)
 
         **CRITICAL**: When a user asks about a feature, "tell me about X", "how does X work",
@@ -277,7 +276,7 @@ class OrpheusAgentConfig(
         - Guide users in creating beautiful sounds with enthusiasm.
         - When suggesting parameter changes, explain why they create certain sonic effects.
         - You have an ethereal, wise quality but also playful curiosity about sound.
-        
+
         ## Response Guidelines
         - Keep responses focused and helpful.
         - When asked to change sounds, use the appropriate tool immediately.
@@ -299,21 +298,21 @@ class OrpheusAgentConfig(
         selectedKey: String,
     ):String = """
         Create a $selectedMood ambient drone soundscape in ${selectedKey.lowercase()} $selectedMode using repl_execute.
-        
+
         Generate a SINGLE repl_execute call with MULTIPLE lines that include:
-       
-        Create an entertaining song using techniques from the below examples. 
+
+        Create an entertaining song using techniques from the below examples.
         ```
             Example - Song setup parameters:
             - once $ drive:0.3 to 0.6 - warm distortion
             - once $ vibrato:0.3 to 0.5 - gentle LFO modulation
-            - once $ feedback:0.5 to 0.8 - lush delay echoes  
-            
+            - once $ feedback:0.5 to 0.8 - lush delay echoes
+
             Example - SOUND LAYERS:
-            - d1: Low drone notes based on $selectedKey $selectedMode (e.g., note "${selectedKey.lowercase()}2 ...") 
+            - d1: Low drone notes based on $selectedKey $selectedMode (e.g., note "${selectedKey.lowercase()}2 ...")
             - d2: Mid-range harmony notes
             - d3: Voice cycling (e.g., slow 2 voices:1 2 3 4)
-            
+
             Example format:
             once $ drive:0.4
             once $ vibrato:0.35
@@ -332,55 +331,52 @@ class OrpheusAgentConfig(
         name: String,
         onAssistantMessage: suspend (String) -> String
     ) = strategy(name = name) {
-        val nodeRequestLLM by nodeLLMRequestMultiple()
+        val nodeRequestLLM by nodeLLMRequest()
         val nodeAssistantMessage by node<String, String> { message -> onAssistantMessage(message) }
-        val nodeExecuteToolMultiple by nodeExecuteMultipleTools(parallelTools = true)
-        val nodeSendToolResultMultiple by nodeLLMSendMultipleToolResults()
-        val nodeCompressHistory by nodeLLMCompressHistory<List<ReceivedToolResult>>()
+        val nodeExecuteTool by nodeExecuteTools(parallel = true)
+        val nodeSendToolResult by nodeLLMSendToolResults()
+        val nodeCompressHistory by nodeLLMCompressHistory<ReceivedToolResults>()
 
         edge(nodeStart forwardTo nodeRequestLLM)
 
         edge(
-            nodeRequestLLM forwardTo nodeExecuteToolMultiple
-                    onMultipleToolCalls { true }
+            nodeRequestLLM forwardTo nodeExecuteTool
+                    onToolCalls { true }
         )
 
         edge(
             nodeRequestLLM forwardTo nodeAssistantMessage
-                    onMultipleAssistantMessages { true }
-                    transformed { it.first().content }
+                    onTextMessage { true }
         )
 
         edge(nodeAssistantMessage forwardTo nodeRequestLLM)
 
-        // Finish condition - if exit tool is called, go to nodeFinish with tool call result.
         edge(
-            nodeExecuteToolMultiple forwardTo nodeFinish
-                    onCondition { it.singleOrNull()?.tool == ExitTool.name }
-                    transformed { it.single().result?.toString() ?: "Unknown" }
+            nodeExecuteTool forwardTo nodeFinish
+                    onCondition { it.toolResults.singleOrNull()?.tool == "__exit__" }
+                    transformed { it.toolResults.single().result?.toString() ?: "Unknown" }
         )
 
         edge(
-            (nodeExecuteToolMultiple forwardTo nodeCompressHistory)
+            (nodeExecuteTool forwardTo nodeCompressHistory)
                     onCondition { _ -> llm.readSession { prompt.messages.size > 100 } }
         )
 
-        edge(nodeCompressHistory forwardTo nodeSendToolResultMultiple)
+        edge(nodeCompressHistory forwardTo nodeSendToolResult)
 
         edge(
-            (nodeExecuteToolMultiple forwardTo nodeSendToolResultMultiple)
+            (nodeExecuteTool forwardTo nodeSendToolResult)
                     onCondition { _ -> llm.readSession { prompt.messages.size <= 100 } }
         )
 
         edge(
-            (nodeSendToolResultMultiple forwardTo nodeExecuteToolMultiple)
-                    onMultipleToolCalls { true }
+            (nodeSendToolResult forwardTo nodeExecuteTool)
+                    onToolCalls { true }
         )
 
         edge(
-            nodeSendToolResultMultiple forwardTo nodeAssistantMessage
-                    onMultipleAssistantMessages { true }
-                    transformed { it.first().content }
+            nodeSendToolResult forwardTo nodeAssistantMessage
+                    onTextMessage { true }
         )
     }
 }

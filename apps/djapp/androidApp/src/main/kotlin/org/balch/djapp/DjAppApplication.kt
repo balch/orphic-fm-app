@@ -2,8 +2,11 @@ package org.balch.djapp
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.djapp.di.DjAppGraph
+import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarViewModel
 
 class DjAppApplication : Application() {
 
@@ -14,7 +17,20 @@ class DjAppApplication : Application() {
         super.onCreate()
         graph = createGraphFactory<DjAppGraph.Factory>().create(
             this,
-            DjForegroundServiceControllerImpl(this),
+        )
+
+        graph.mediaSessionManager.setServiceIntent(
+            Intent(this, DjMediaLibraryService::class.java)
+        )
+        graph.mediaSessionManager.setLibraryCallback(
+            DjLibraryCallback(
+                featureProvider = {
+                    try {
+                        graph.featureGraphHolder.featureGraph.featureCollection
+                            .getFeature<PulsarFeature>(PulsarViewModel::class)
+                    } catch (_: Exception) { null }
+                },
+            )
         )
 
         // Eagerly initialize lifecycle manager to register activity callbacks.

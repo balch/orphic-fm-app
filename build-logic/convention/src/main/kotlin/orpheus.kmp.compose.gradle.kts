@@ -15,6 +15,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose_reports")
+    metricsDestination = layout.buildDirectory.dir("compose_metrics")
+}
+
 // Access version catalog
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 

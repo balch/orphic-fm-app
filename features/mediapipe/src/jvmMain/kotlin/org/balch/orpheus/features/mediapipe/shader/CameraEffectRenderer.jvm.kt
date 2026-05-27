@@ -2,6 +2,7 @@ package org.balch.orpheus.features.mediapipe.shader
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.asComposeShader
 import androidx.compose.ui.graphics.asSkiaBitmap
 import org.jetbrains.skia.FilterTileMode
 import org.jetbrains.skia.Image
@@ -54,7 +55,7 @@ actual class CameraEffectRenderer {
         builder.child("cameraImage", imageShader)
 
         val shader = builder.makeShader()
-        return ShaderBrush(shader)
+        return ShaderBrush(shader.asComposeShader())
     }
 
     actual fun dispose() {

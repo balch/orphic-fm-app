@@ -5,6 +5,7 @@ import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.tools.ToolRegistry
+import ai.koog.http.client.HttpClientFactoryResolver
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
@@ -469,9 +470,10 @@ class SynthControlAgent(
 
                 val aiProvider = aiModelProvider.selectedModel.value.aiProvider
 
+                val httpFactory = HttpClientFactoryResolver.resolve()
                 val llmClient: LLMClient = when (aiProvider) {
-                    AiProvider.Google -> GoogleLLMClient(apiKey)
-                    AiProvider.Anthropic -> AnthropicLLMClient(apiKey)
+                    AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
+                    AiProvider.Anthropic -> AnthropicLLMClient(apiKey, httpClientFactory = httpFactory)
                     else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
                 }
                 val executor = MultiLLMPromptExecutor(llmClient)

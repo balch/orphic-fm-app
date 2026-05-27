@@ -30,6 +30,7 @@ kotlin {
 
             // AI/koog
             api(libs.koog.agents)
+            api(libs.koog.google.client)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.serialization.json)
             implementation(libs.ktor.client.content.negotiation)

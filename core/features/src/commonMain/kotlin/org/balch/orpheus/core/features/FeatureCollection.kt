@@ -32,14 +32,21 @@ class FeatureCollection(
             log.debug { "Creating feature for ${key.simpleName}" }
             val provider = providers[key]
                 ?: error("No SynthFeature provider registered for ${key.simpleName} (${key.qualifiedName})")
-            provider()
+            provider() ?: error("Provider for ${key.simpleName} returned null")
         } as T
 
     /** All features (triggers lazy creation of any not yet cached). */
     val allFeatures: Collection<SynthFeature<*, *>> by lazy {
         log.info { "FeatureCollection: creating all ${providers.size} features" }
-        providers.keys.forEach { getFeature<SynthFeature<*, *>>(it) }
-        cache.values
+        providers.keys.forEach { key ->
+            try {
+                getFeature<SynthFeature<*, *>>(key)
+            } catch (e: Exception) {
+                log.error(e) { "Failed to create feature for ${key.simpleName}" }
+            }
+        }
+        @Suppress("USELESS_CAST")
+        cache.values.filter { (it as Any?) != null }
     }
 
     /** Pre-built key action map from all features' key bindings. */

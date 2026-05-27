@@ -1,6 +1,7 @@
 package org.balch.orpheus
 
 import android.app.Application
+import android.content.Intent
 import com.diamondedge.logging.KmLogging
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.di.OrpheusGraph
@@ -21,16 +22,16 @@ class OrpheusApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Create the foreground service controller (app-module implementation)
-        val foregroundServiceController = ForegroundServiceControllerImpl(this)
-        
         // Create the DI graph ONCE at Application level with Application
         // This survives Activity recreation on configuration changes
         graph = createGraphFactory<OrpheusGraph.Factory>().create(
             this,
-            foregroundServiceController
         )
-        
+
+        graph.mediaSessionManager.setServiceIntent(
+            Intent(this, OrpheusMediaSessionService::class.java)
+        )
+
         // Wire up logging to UI
         KmLogging.addLogger(graph.consoleLogger)
         

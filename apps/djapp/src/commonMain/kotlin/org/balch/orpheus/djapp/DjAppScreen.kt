@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,11 +15,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,6 +67,8 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.darken
+import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -240,22 +240,17 @@ fun DjAppScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DjAppHeaderRow(
     vizFeature: VizFeature,
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = 8.dp,
 ) {
-    val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
-    val vizState by vizFeature.stateFlow.collectAsState()
-    val vizActions = vizFeature.actions
-    var vizDropdownExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppTitleTreatment(
@@ -266,109 +261,108 @@ private fun DjAppHeaderRow(
             horizontalPadding = horizontalPadding,
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        VizDropdown(vizFeature = vizFeature)
+    }
+}
 
-        Text(
-            text = "Viz:",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.9f),
-            maxLines = 1,
-        )
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VizDropdown(vizFeature: VizFeature) {
+    val liquidState = LocalLiquidState.current
+    val effects = LocalLiquidEffects.current
+    val vizState by vizFeature.stateFlow.collectAsState()
+    val vizActions = vizFeature.actions
+    var expanded by remember { mutableStateOf(false) }
 
-        // Viz dropdown
-        ExposedDropdownMenuBox(
-            expanded = vizDropdownExpanded,
-            onExpandedChange = { vizDropdownExpanded = it },
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(120.dp)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .then(
-                        if (liquidState != null) {
-                            Modifier.liquidVizEffects(
-                                liquidState = liquidState,
-                                scope = effects.top,
-                                frostAmount = 4.dp,
-                                color = OrpheusColors.panelSurface,
-                                shape = RoundedCornerShape(8.dp),
-                            )
-                        } else {
-                            Modifier.background(OrpheusColors.panelSurface)
-                        }
-                    )
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                    .clickable { vizDropdownExpanded = !vizDropdownExpanded }
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = when {
-                            vizState.isRandomVizMode -> "Random"
-                            else -> vizState.selectedViz.name
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center
-                    )
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = vizDropdownExpanded)
-                }
-            }
-            ExposedDropdownMenu(
-                expanded = vizDropdownExpanded,
-                onDismissRequest = { vizDropdownExpanded = false },
-                modifier = (
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+    ) {
+        Box(
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .height(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(
                     if (liquidState != null) {
                         Modifier.liquidVizEffects(
                             liquidState = liquidState,
                             scope = effects.top,
                             frostAmount = 8.dp,
-                            color = OrpheusColors.panelSurface,
+                            color = OrpheusColors.panelSurface.darken(),
                             shape = RoundedCornerShape(8.dp),
                         )
                     } else {
                         Modifier.background(OrpheusColors.panelSurface)
                     }
-                ).background(OrpheusColors.panelSurface),
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    text = "Viz: " + when {
+                        vizState.isRandomVizMode -> "Random"
+                        else -> vizState.selectedViz.name
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = effects.title.titleColor.lighten(),
+                    maxLines = 1
+                )
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
+        }
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = (
+                if (liquidState != null) {
+                    Modifier.liquidVizEffects(
+                        liquidState = liquidState,
+                        scope = effects.top,
+                        frostAmount = 8.dp,
+                        color = OrpheusColors.panelSurface,
+                        shape = RoundedCornerShape(8.dp),
+                    )
+                } else {
+                    Modifier.background(OrpheusColors.panelSurface)
+                }
+            ).background(OrpheusColors.panelSurface),
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        "Random",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (vizState.isRandomVizMode) OrpheusColors.neonCyan else Color.White,
+                    )
+                },
+                onClick = {
+                    vizActions.onSetRandomMode(true)
+                    expanded = false
+                },
+            )
+            vizState.visualizations.forEach { viz ->
                 DropdownMenuItem(
                     text = {
                         Text(
-                            "Random",
+                            viz.name,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (vizState.isRandomVizMode) OrpheusColors.neonCyan else Color.White,
+                            color = Color.White,
                         )
                     },
                     onClick = {
-                        vizActions.onSetRandomMode(true)
-                        vizDropdownExpanded = false
+                        vizActions.onSelectViz(viz)
+                        expanded = false
                     },
                 )
-                vizState.visualizations.forEach { viz ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                viz.name,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White,
-                            )
-                        },
-                        onClick = {
-                            vizActions.onSelectViz(viz)
-                            vizDropdownExpanded = false
-                        },
-                    )
-                }
             }
         }
-
     }
 }
 

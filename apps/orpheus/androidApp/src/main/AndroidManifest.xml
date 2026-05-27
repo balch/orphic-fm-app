@@ -27,9 +27,13 @@
         <profileable android:shell="true"
             tools:targetApi="29" />
         <service
-            android:name=".AudioForegroundService"
+            android:name=".OrpheusMediaSessionService"
             android:foregroundServiceType="mediaPlayback"
-            android:exported="false"/>
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
             
         <activity
             android:exported="true"

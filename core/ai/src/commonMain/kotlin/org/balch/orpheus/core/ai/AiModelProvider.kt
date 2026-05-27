@@ -27,13 +27,12 @@ enum class AiModel(
     val llmModel: LLModel,
 ) {
     HAIKU("Haiku", "Haiku 4.5", AiProvider.Anthropic, AnthropicModels.Haiku_4_5),
-    SONNET("Sonnet", "Sonnet 4.5", AiProvider.Anthropic, AnthropicModels.Sonnet_4_5),
-    OPUS("opus", "Opus 4.6", AiProvider.Anthropic, Claude_Opus_4_6),
-    FLASH_25("flash_25", "Flash 2.5", AiProvider.Google, GoogleModels.Gemini2_5Flash),
-    PRO_25("pro_25", "Pro 2.5", AiProvider.Google, GoogleModels.Gemini2_5Pro),
+    SONNET("Sonnet", "Sonnet 4.6", AiProvider.Anthropic, AnthropicModels.Sonnet_4_6),
+    OPUS("opus", "Opus 4.7", AiProvider.Anthropic, AnthropicModels.Opus_4_7),
     PRO_30("pro_30", "Pro 3.0", AiProvider.Google, GoogleModels.Gemini3_Pro_Preview),
-    FLASH_30("flash_30", "Flash 3.0", AiProvider.Google, Gemini3_Flash_Preview),
-    PRO_31("pro_31", "Pro 3.1", AiProvider.Google, Gemini3_1_Pro_Preview);
+    FLASH_30("flash_30", "Flash 3.0", AiProvider.Google, GoogleModels.Gemini3_Flash_Preview),
+    PRO_31("pro_31", "Pro 3.1", AiProvider.Google, Gemini3_1ProPreview),
+    FLASH_35("flash_35", "Flash 3.5", AiProvider.Google, Gemini3_5FlashPreview);
     companion object {
         val DEFAULT = FLASH_30
         

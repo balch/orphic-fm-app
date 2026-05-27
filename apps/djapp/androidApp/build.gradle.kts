@@ -44,7 +44,7 @@ dependencies {
     implementation(project(":core:plugins:horn"))
     implementation(project(":core:plugins:distortion"))
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.media)
+    implementation(libs.media3.session)
     implementation(libs.kmlogging)
     implementation(libs.metrox.viewmodel.compose)
     implementation(libs.compose.ui.tooling.preview)
