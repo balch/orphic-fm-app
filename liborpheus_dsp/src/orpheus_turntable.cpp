@@ -81,10 +81,10 @@ void playback_deck(TurntableDeck* deck, float target_velocity,
 
         float raw = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
 
-        // Anti-alias: stronger filtering at higher speeds.
+        // Anti-alias: one-pole LPF at Nyquist/velocity (BLT-derived coefficient).
         float abs_vel = std::fabs(deck->smoothed_velocity);
         if (abs_vel > 1.0f) {
-            float alpha = 1.0f / abs_vel;
+            float alpha = kPi / (abs_vel + kPi);
             lpf_state += alpha * (raw - lpf_state);
             out[i] = lpf_state;
         } else {
