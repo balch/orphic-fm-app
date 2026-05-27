@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -269,7 +270,12 @@ private fun DjAppHeaderRow(
 private fun VizDropdown(vizFeature: VizFeature) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
-    val vizState by vizFeature.stateFlow.collectAsState()
+    val fullState by vizFeature.stateFlow.collectAsState()
+    // Only recompose when dropdown-relevant fields change — not on every
+    // liquidEffects/knob frame during playback.
+    val vizName by remember { derivedStateOf { fullState.selectedViz.name } }
+    val isRandom by remember { derivedStateOf { fullState.isRandomVizMode } }
+    val visualizations by remember { derivedStateOf { fullState.visualizations } }
     val vizActions = vizFeature.actions
     var expanded by remember { mutableStateOf(false) }
 
@@ -311,8 +317,8 @@ private fun VizDropdown(vizFeature: VizFeature) {
             ) {
                 Text(
                     text = "Viz: " + when {
-                        vizState.isRandomVizMode -> "Random"
-                        else -> vizState.selectedViz.name
+                        isRandom -> "Random"
+                        else -> vizName
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = effects.title.titleColor.lighten(),
@@ -343,7 +349,7 @@ private fun VizDropdown(vizFeature: VizFeature) {
                     Text(
                         "Random",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (vizState.isRandomVizMode) OrpheusColors.neonCyan else Color.White,
+                        color = if (isRandom) OrpheusColors.neonCyan else Color.White,
                     )
                 },
                 onClick = {
@@ -351,7 +357,7 @@ private fun VizDropdown(vizFeature: VizFeature) {
                     expanded = false
                 },
             )
-            vizState.visualizations.forEach { viz ->
+            visualizations.forEach { viz ->
                 DropdownMenuItem(
                     text = {
                         Text(
