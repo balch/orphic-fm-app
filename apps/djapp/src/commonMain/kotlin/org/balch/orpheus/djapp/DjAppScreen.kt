@@ -2,7 +2,6 @@ package org.balch.orpheus.djapp
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -297,7 +296,6 @@ private fun VizDropdown(vizFeature: VizFeature) {
                     }
                 )
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                .clickable { expanded = !expanded }
                 .padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
