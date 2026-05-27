@@ -280,26 +280,32 @@ private fun VizDropdown(vizFeature: VizFeature) {
         Box(
             modifier = Modifier
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                .height(36.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .then(
-                    if (liquidState != null) {
-                        Modifier.liquidVizEffects(
-                            liquidState = liquidState,
-                            scope = effects.top,
-                            frostAmount = 8.dp,
-                            color = OrpheusColors.panelSurface.darken(),
-                            shape = RoundedCornerShape(8.dp),
-                        )
-                    } else {
-                        Modifier.background(OrpheusColors.panelSurface)
-                    }
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp),
+                .height(36.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
+            // Glass background layer — separate from the click target so the
+            // liquid shader doesn't consume pointer events during playback.
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(8.dp))
+                    .then(
+                        if (liquidState != null) {
+                            Modifier.liquidVizEffects(
+                                liquidState = liquidState,
+                                scope = effects.top,
+                                frostAmount = 8.dp,
+                                color = OrpheusColors.panelSurface.darken(),
+                                shape = RoundedCornerShape(8.dp),
+                            )
+                        } else {
+                            Modifier.background(OrpheusColors.panelSurface)
+                        }
+                    )
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            )
             Row(
+                modifier = Modifier.padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
