@@ -50,11 +50,6 @@
 -dontwarn dev.atsushieno.panama.libremidi.**
 -keep class dev.atsushieno.panama.libremidi.** { *; }
 
-# Keep JSyn audio synthesis library - required for audio device manager initialization
--keep class com.jsyn.** { *; }
--keepclassmembers class com.jsyn.** { *; }
--keep class com.softsynth.** { *; }
-
 # Keep CoreMIDI4J library - required for MIDI device detection on macOS
 # Uses JNI and Java Service Provider Interface (SPI)
 -keep class uk.co.xfactorylibrarians.coremidi4j.** { *; }

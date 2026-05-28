@@ -168,6 +168,12 @@ actual class MediaSessionManager {
         this.handler = handler
     }
 
+    // iOS handles audio focus / interruption through AVAudioSession at the
+    // app-bridge layer — these hooks are no-ops here.
+    actual fun requestPlaybackFocus(): Boolean = true
+
+    actual fun notifyUserPaused() {}
+
     @OptIn(BetaInteropApi::class)
     private fun pushToNative(metadata: PlaybackMetadata) {
         // Merge into the existing dict so updates to title/subtitle don't

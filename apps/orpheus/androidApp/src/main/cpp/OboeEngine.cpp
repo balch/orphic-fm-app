@@ -22,6 +22,8 @@ oboe::Result OboeEngine::openStream() {
         ->setFormatConversionAllowed(true)
         ->setChannelCount(2)
         ->setDirection(oboe::Direction::Output)
+        ->setUsage(oboe::Usage::Media)
+        ->setContentType(oboe::ContentType::Music)
         ->setDataCallback(this)
         ->setErrorCallback(this);
     return builder.openStream(mStream);

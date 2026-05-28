@@ -4,6 +4,7 @@ package org.balch.djapp
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.DefaultMediaNotificationProvider
@@ -41,14 +42,29 @@ class DjMediaLibraryService : MediaLibraryService() {
         val graph = DjAppApplication.getGraph(this)
         session = graph.mediaSessionManager.buildLibrarySession(this)
         addSession(session!!)
-        try {
-            graph.synthOrchestrator.start()
-            graph.mediaSessionStateManager.setAutoBrowserActive(true)
-            pulsarFeature
-        } catch (e: Exception) {
-            log.error(e) { "Failed to warm up audio engine" }
-        }
+        // Neither call below can throw: setAutoBrowserActive is a StateFlow
+        // write, and pulsarFeature is a `by lazy` whose body catches internally
+        // and returns null. (Previously this guarded synthOrchestrator.start(),
+        // which moved to onStartCommand.)
+        graph.mediaSessionStateManager.setAutoBrowserActive(true)
+        pulsarFeature
         log.info { "DjMediaLibraryService created" }
+    }
+
+    // Engine start lives here, not in onCreate. The service can be bound for
+    // pure introspection (system MediaBrowser, Android Auto discovery) without
+    // becoming a foreground service — bind triggers onCreate but not
+    // onStartCommand. Opening an Oboe stream in that bind-only window produces
+    // Android 17 "AudioHardening level: partial" warnings (audio active, no
+    // FGS). onStartCommand only fires on startForegroundService, so the engine
+    // is guaranteed to start inside the FGS grace window.
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        try {
+            DjAppApplication.getGraph(this).synthOrchestrator.start()
+        } catch (e: Exception) {
+            log.error(e) { "Failed to start synth engine on service start" }
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {

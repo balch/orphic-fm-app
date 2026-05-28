@@ -65,6 +65,19 @@ actual class MediaSessionManager {
         this.handler = handler
     }
 
+    // No audio-focus model on JVM desktop — playback always proceeds. The
+    // `focusGrantOverride` and `userPausedCount` fields below are test seams
+    // (internal visibility, not exposed beyond core:foundation): production
+    // code never reads or writes them.
+    internal var focusGrantOverride: Boolean = true
+    internal var userPausedCount: Int = 0
+
+    actual fun requestPlaybackFocus(): Boolean = focusGrantOverride
+
+    actual fun notifyUserPaused() {
+        userPausedCount++
+    }
+
     actual fun updateMetadata(metadata: PlaybackMetadata) {
         latestMetadata = metadata
         if (!isActive) return

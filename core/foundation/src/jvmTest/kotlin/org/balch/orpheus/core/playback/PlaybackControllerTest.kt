@@ -36,16 +36,24 @@ private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherPr
 @OptIn(ExperimentalCoroutinesApi::class)
 private fun testScope() = AppCoroutineScope(TestDispatchers(UnconfinedTestDispatcher()))
 
+private data class Built(
+    val controller: PlaybackController,
+    val muteCalls: MutableList<PlaybackState>,
+    val ssm: MediaSessionStateManager,
+    val msm: MediaSessionManager,
+)
+
 private fun build(
     metadata: MetadataProducer = FakeMetadata(),
     overlay: OverlaySubtitleProducer? = null,
     skip: SkipHandler? = null,
     playFromId: PlayFromMediaIdHandler? = null,
     muteCalls: MutableList<PlaybackState> = mutableListOf(),
-): Triple<PlaybackController, MutableList<PlaybackState>, MediaSessionStateManager> {
+    focusGranted: Boolean = true,
+): Built {
     val scope = testScope()
     val ssm = MediaSessionStateManager(scope)
-    val msm = MediaSessionManager()
+    val msm = MediaSessionManager().apply { focusGrantOverride = focusGranted }
     val plm = PlaybackLifecycleManager()
     val sink = MuteSink { state -> muteCalls.add(state) }
     val controller = PlaybackController(
@@ -59,19 +67,19 @@ private fun build(
         skipHandler = skip,
         playFromMediaIdHandler = playFromId,
     )
-    return Triple(controller, muteCalls, ssm)
+    return Built(controller, muteCalls, ssm, msm)
 }
 
 class PlaybackControllerTest {
 
     @Test fun `initial state is Stopped`() = runTest {
-        val (c, _, _) = build()
+        val c = build().controller
         assertEquals(PlaybackState.Stopped, c.state.value)
     }
 
     @Test fun `play transitions to Playing and applies mute sink`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
-        val (c, _, _) = build(muteCalls = muteCalls)
+        val c = build(muteCalls = muteCalls).controller
         c.play()
         assertEquals(PlaybackState.Playing, c.state.value)
         assertEquals(listOf<PlaybackState>(PlaybackState.Playing), muteCalls)
@@ -79,7 +87,7 @@ class PlaybackControllerTest {
 
     @Test fun `pause from Playing transitions to Paused`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
-        val (c, _, _) = build(muteCalls = muteCalls)
+        val c = build(muteCalls = muteCalls).controller
         c.play()
         c.pause()
         assertEquals(PlaybackState.Paused, c.state.value)
@@ -88,7 +96,7 @@ class PlaybackControllerTest {
 
     @Test fun `pause from Stopped is a no-op`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
-        val (c, _, _) = build(muteCalls = muteCalls)
+        val c = build(muteCalls = muteCalls).controller
         c.pause()
         assertEquals(PlaybackState.Stopped, c.state.value)
         assertTrue(muteCalls.isEmpty())
@@ -96,7 +104,7 @@ class PlaybackControllerTest {
 
     @Test fun `stop from Playing transitions to Stopped`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
-        val (c, _, _) = build(muteCalls = muteCalls)
+        val c = build(muteCalls = muteCalls).controller
         c.play()
         c.stop()
         assertEquals(PlaybackState.Stopped, c.state.value)
@@ -108,7 +116,7 @@ class PlaybackControllerTest {
 
     @Test fun `stop from Paused transitions to Stopped`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
-        val (c, _, _) = build(muteCalls = muteCalls)
+        val c = build(muteCalls = muteCalls).controller
         c.play()
         c.pause()
         c.stop()
@@ -125,14 +133,14 @@ class PlaybackControllerTest {
 
     @Test fun `skipHandler invoked on onSkipNext command`() = runTest {
         val skips = mutableListOf<SkipDirection>()
-        val (c, _, _) = build(skip = SkipHandler { skips.add(it) })
+        val c = build(skip = SkipHandler { skips.add(it) }).controller
         c.onSkipNext()
         c.onSkipPrevious()
         assertEquals(listOf<SkipDirection>(SkipDirection.NEXT, SkipDirection.PREVIOUS), skips)
     }
 
     @Test fun `skipHandler null does not crash on skip command`() = runTest {
-        val (c, _, _) = build(skip = null)
+        val c = build(skip = null).controller
         c.onSkipNext() // should be no-op, not NPE
         c.onSkipPrevious()
     }
@@ -145,7 +153,7 @@ class PlaybackControllerTest {
     // to recover. With state as the single source of truth, the flag is
     // gone and the equivalent sequence cleanly round-trips.
     @Test fun `system pause followed by system play round-trips cleanly`() = runTest {
-        val (c, _, _) = build()
+        val c = build().controller
         c.play()           // Playing
         c.onPause()        // Paused (simulating notification pause)
         c.onPlay()         // Playing (simulating notification play)
@@ -153,7 +161,7 @@ class PlaybackControllerTest {
     }
 
     @Test fun `auto-start on session needed when Stopped`() = runTest {
-        val (c, _, ssm) = build()
+        val (c, _, ssm) = build().let { Triple(it.controller, it.muteCalls, it.ssm) }
         assertEquals(PlaybackState.Stopped, c.state.value)
         // Triggering any source becoming active flips isMediaSessionNeeded → true.
         // The controller's init coroutine observes that and calls play() because
@@ -175,7 +183,7 @@ class PlaybackControllerTest {
         val overlayProducer = object : OverlaySubtitleProducer {
             override val overlayFlow = MutableStateFlow<String?>("OVERLAY")
         }
-        val (c, _, _) = build(overlay = overlayProducer)
+        val c = build(overlay = overlayProducer).controller
         // Activate the controller so metadata flows
         c.play()
         // Verify the controller reaches Playing state — the overlay logic ran without error.
@@ -188,4 +196,97 @@ class PlaybackControllerTest {
     // calls, which the JVM actual doesn't support without test infra changes
     // (injecting a fake/spy). Skipped for now; the distinctUntilChanged() operator
     // is a stdlib primitive and is covered by its own library tests.
+
+    // ── Audio-focus interaction ────────────────────────────────────────────
+
+    // Before the fix, play() set state=Playing and unmuted the sink BEFORE
+    // mediaSessionManager.activate() resolved audio focus — on a denied
+    // request the engine bled audio with no foreground service backing it.
+    @Test fun `play is a no-op when audio focus is denied`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val built = build(focusGranted = false, muteCalls = muteCalls)
+        built.controller.play()
+        assertEquals(PlaybackState.Stopped, built.controller.state.value)
+        assertTrue(muteCalls.isEmpty(), "muteSink should not be applied on focus denial")
+    }
+
+    @Test fun `play proceeds when audio focus is granted`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val built = build(focusGranted = true, muteCalls = muteCalls)
+        built.controller.play()
+        assertEquals(PlaybackState.Playing, built.controller.state.value)
+        assertEquals(listOf<PlaybackState>(PlaybackState.Playing), muteCalls)
+    }
+
+    // After a denied request, the user must be able to retry — verify state
+    // remained clean (no Paused interloper) and a subsequent grant works.
+    @Test fun `play retried after focus is regranted`() = runTest {
+        val built = build(focusGranted = false)
+        built.controller.play()
+        assertEquals(PlaybackState.Stopped, built.controller.state.value)
+        built.msm.focusGrantOverride = true
+        built.controller.play()
+        assertEquals(PlaybackState.Playing, built.controller.state.value)
+    }
+
+    // pause() must signal user-intent to the focus controller (clears the
+    // pausedByTransient flag) so a later AUDIOFOCUS_GAIN does not ghost-resume
+    // playback against the user's wishes.
+    @Test fun `pause notifies user-paused even on no-op transitions`() = runTest {
+        val built = build()
+        // From Stopped — already not Playing, but the user may have just been
+        // paused by a transient loss and is tapping pause to acknowledge.
+        built.controller.pause()
+        assertEquals(1, built.msm.userPausedCount)
+
+        // From Playing — same signal.
+        built.controller.play()
+        val before = built.msm.userPausedCount
+        built.controller.pause()
+        assertEquals(before + 1, built.msm.userPausedCount)
+    }
+
+    @Test fun `stop notifies user-paused`() = runTest {
+        val built = build()
+        built.controller.play()
+        val before = built.msm.userPausedCount
+        built.controller.stop()
+        assertTrue(
+            built.msm.userPausedCount > before,
+            "stop() must notify user-paused so the focus controller drops any pending auto-resume",
+        )
+    }
+
+    // The transient-loss path bypasses the user-pause signal so that a
+    // matching AUDIOFOCUS_GAIN can still auto-resume. Verify state changes
+    // happen but notifyUserPaused is NOT called.
+    @Test fun `onPauseFromFocusLoss pauses without notifying user-paused`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val built = build(muteCalls = muteCalls)
+        built.controller.play()
+        val before = built.msm.userPausedCount
+
+        built.controller.onPauseFromFocusLoss()
+
+        assertEquals(PlaybackState.Paused, built.controller.state.value)
+        assertEquals(
+            listOf<PlaybackState>(PlaybackState.Playing, PlaybackState.Paused),
+            muteCalls,
+        )
+        assertEquals(
+            before,
+            built.msm.userPausedCount,
+            "onPauseFromFocusLoss must NOT clear pausedByTransient — auto-resume on GAIN depends on it",
+        )
+    }
+
+    @Test fun `onPauseFromFocusLoss is a no-op when not Playing`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val built = build(muteCalls = muteCalls)
+        // From Stopped
+        built.controller.onPauseFromFocusLoss()
+        assertEquals(PlaybackState.Stopped, built.controller.state.value)
+        assertTrue(muteCalls.isEmpty())
+        assertEquals(0, built.msm.userPausedCount)
+    }
 }

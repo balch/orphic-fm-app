@@ -53,12 +53,25 @@ class PlaybackController(
     fun play() {
         if (_state.value == PlaybackState.Playing) return
         log.info { "play() (was ${_state.value})" }
+        // Synchronously gate on audio focus BEFORE unmuting. On Android, a
+        // denied request used to leak audio out through an unmuted sink with
+        // no foreground service; rolling back to a no-op keeps the previous
+        // state and lets the user retry. Non-Android actuals return true.
+        if (!mediaSessionManager.requestPlaybackFocus()) {
+            log.warn { "play() blocked — audio focus denied; staying ${_state.value}" }
+            return
+        }
         _state.value = PlaybackState.Playing
         muteSink.apply(PlaybackState.Playing)
+        mediaSessionManager.activate()
         mediaSessionManager.updatePlaybackState(true)
     }
 
     fun pause() {
+        // Always signal user-intent, even on no-op. If a transient focus loss
+        // had already paused us, the user tapping pause again here is their
+        // way of saying "stay paused, don't auto-resume on focus gain."
+        mediaSessionManager.notifyUserPaused()
         if (_state.value != PlaybackState.Playing) return
         log.info { "pause() (was Playing)" }
         _state.value = PlaybackState.Paused
@@ -67,6 +80,7 @@ class PlaybackController(
     }
 
     fun stop() {
+        mediaSessionManager.notifyUserPaused()
         if (_state.value == PlaybackState.Stopped) return
         log.info { "stop() (was ${_state.value})" }
         _state.value = PlaybackState.Stopped
@@ -91,6 +105,19 @@ class PlaybackController(
     override fun onSkipNext() { skipHandler?.onSkip(SkipDirection.NEXT) }
     override fun onSkipPrevious() { skipHandler?.onSkip(SkipDirection.PREVIOUS) }
     override fun onPlayFromMediaId(mediaId: String) { playFromMediaIdHandler?.onPlay(mediaId) }
+
+    /**
+     * Platform-initiated transient pause (e.g., Android AUDIOFOCUS_LOSS_TRANSIENT).
+     * Same effect as pause() on local state, but does NOT call notifyUserPaused —
+     * pausedByTransient must stay set so the matching AUDIOFOCUS_GAIN auto-resumes.
+     */
+    override fun onPauseFromFocusLoss() {
+        if (_state.value != PlaybackState.Playing) return
+        log.info { "onPauseFromFocusLoss (was Playing)" }
+        _state.value = PlaybackState.Paused
+        muteSink.apply(PlaybackState.Paused)
+        mediaSessionManager.updatePlaybackState(false)
+    }
 
     private val overlayFlow: StateFlow<String?> =
         overlayProducer?.overlayFlow ?: MutableStateFlow(null)

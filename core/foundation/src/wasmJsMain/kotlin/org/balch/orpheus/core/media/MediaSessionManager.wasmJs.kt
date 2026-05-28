@@ -82,6 +82,11 @@ actual class MediaSessionManager {
     actual fun setActionHandler(handler: MediaSessionActionHandler) {
         this.handler = handler
     }
+
+    // No explicit focus model in the browser MediaSession API.
+    actual fun requestPlaybackFocus(): Boolean = true
+
+    actual fun notifyUserPaused() {}
     
     actual fun updateMetadata(metadata: PlaybackMetadata) {
         try {

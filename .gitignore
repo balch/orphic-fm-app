@@ -63,3 +63,6 @@ apps/djapp/iosApp/Podfile.lock
 keystore.properties
 *.keystore
 *.jks
+
+# Local R8 / Perfetto analysis artifacts
+tmp/

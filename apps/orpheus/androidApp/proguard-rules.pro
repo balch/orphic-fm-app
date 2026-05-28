@@ -25,21 +25,11 @@
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable
 
-# JSyn audio synthesis library
--keep class com.jsyn.** { *; }
--keepclassmembers class com.jsyn.** { *; }
--keep class com.softsynth.** { *; }
-
-# Suppress warnings from JSyn's desktop-only features (AWT, Swing, JavaSound)
+# Suppress warnings for desktop-only classes referenced transitively (AWT, Swing, JavaSound)
 -dontwarn java.awt.**
 -dontwarn javax.swing.**
 -dontwarn javax.sound.sampled.**
 -dontwarn javax.sound.midi.**
-
-# Keep javax.sound.midi SPI if present (JSyn might use it)
--keep class javax.sound.midi.** { *; }
--keep class javax.sound.midi.spi.** { *; }
--keep class * extends javax.sound.midi.spi.MidiDeviceProvider { *; }
 
 # Suppress warnings for missing classes in Android release builds
 # These are JVM/Desktop-only classes used by Ktor, Netty, and reactive libraries
