@@ -61,7 +61,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class SpaceDroneVibe : VibeProvider {
-    override val name: String = "Space Drone"
+    override val name: String = "Space & Drums"
 
     private val defaultChordsPerBar = 1
     private val defaultProgression = chords(0, 0, 0, 3)
