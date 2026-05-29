@@ -99,12 +99,15 @@ class MediaSessionStateManager(private val scope: AppCoroutineScope) {
                 }
                 needed to source
             }.collect { (needed, source) ->
+                // Update activeSource FIRST so a downstream collector observing the
+                // isMediaSessionNeeded flip already sees the correct source (e.g.
+                // PlaybackController's AUTO_BROWSER auto-start exclusion reads it).
+                if (_activeSource.value != source) {
+                    _activeSource.value = source
+                }
                 if (_isMediaSessionNeeded.value != needed) {
                     log.debug { "MediaSession needed: $needed (source: $source)" }
                     _isMediaSessionNeeded.value = needed
-                }
-                if (_activeSource.value != source) {
-                    _activeSource.value = source
                 }
             }
         }

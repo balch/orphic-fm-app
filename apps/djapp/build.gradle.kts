@@ -63,6 +63,9 @@ kotlin {
             implementation(libs.slf4j.api)
             implementation(libs.logback.classic)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
 

@@ -10,6 +10,7 @@ import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.lifecycle.DjAppLifecycleManager
@@ -31,6 +32,9 @@ actual interface DjAppGraph : ViewModelGraph {
 
     /** Eagerly initialized so init {} block subscribes to flows at startup. */
     val playbackController: PlaybackController
+
+    /** Now-playing artwork/title source — read by the home-screen widget. */
+    val metadataProducer: MetadataProducer
 
     /** Eagerly initialized to observe PlaybackController state and drive Pulsar effects. */
     val pulsarPlaybackBridge: PulsarPlaybackBridge

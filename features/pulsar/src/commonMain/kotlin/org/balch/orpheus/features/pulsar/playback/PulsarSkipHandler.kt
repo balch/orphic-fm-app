@@ -7,16 +7,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.core.playback.SkipHandler
 import org.balch.orpheus.features.pulsar.PulsarFeature
 
 /**
- * Cycles through Pulsar's vibe list on system skip-next/previous commands.
- * Uses a fixed quick-fade transition rather than the per-vibe transitionOut —
- * "I want to move now" is a different intent from "this song is over."
+ * Cycles through Pulsar's vibe list on system skip-next/previous commands
+ * (Bluetooth / headset next-track buttons, OS media-notification controls).
+ * Uses the user-configured global default transition spec
+ * ([TransitionPreferences.defaultFlow]) — the same style the in-app picker
+ * sets — rather than the per-vibe `transitionOut`, since "I want to move now"
+ * is a different intent from "this song is over."
  *
  * Rapid taps cancel the in-flight transition via [collectLatest] on a
  * [MutableStateFlow] — each new emission cancels the previous
@@ -27,6 +29,7 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 class PulsarSkipHandler(
     pulsarFeatureProvider: () -> PulsarFeature,
     private val transitionRunner: PulsarTransitionRunner,
+    private val transitionPreferences: TransitionPreferences,
     private val scope: AppCoroutineScope,
 ) : SkipHandler {
 
@@ -37,7 +40,7 @@ class PulsarSkipHandler(
         scope.launch {
             skipTarget.drop(1).collectLatest { nextName ->
                 if (nextName.isNotEmpty()) {
-                    transitionRunner.runTransition(TransitionStyle.default) {
+                    transitionRunner.runTransition(transitionPreferences.defaultFlow.value) {
                         pulsarFeature.applyVibeByName(nextName)
                     }
                 }

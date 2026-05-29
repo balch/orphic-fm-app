@@ -48,5 +48,10 @@ dependencies {
     implementation(libs.kmlogging)
     implementation(libs.metrox.viewmodel.compose)
     implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.androidx.glance.appwidget)
+    // Glance preview tooling — debug-only so it never ships in release. The
+    // @Preview composables live in src/debug (org.balch.djapp.widget).
+    debugImplementation(libs.androidx.glance.preview)
+    debugImplementation(libs.androidx.glance.appwidget.preview)
     debugImplementation(libs.compose.ui.tooling)
 }

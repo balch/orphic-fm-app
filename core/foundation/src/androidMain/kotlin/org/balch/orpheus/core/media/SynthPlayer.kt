@@ -35,6 +35,18 @@ class SynthPlayer(
     var onSkipNext: (() -> Unit)? = null
     var onSkipPrevious: (() -> Unit)? = null
 
+    // External-command callbacks. These fire ONLY from the handle* overrides
+    // below, which SimpleBasePlayer invokes solely in response to a connected
+    // MediaController (notification, Bluetooth, Android Auto). They are NOT
+    // triggered by our own updatePlayState()/updateMetadata() pushes, which set
+    // state fields directly and call invalidateState(). Driving the app's
+    // PlaybackController from a Player.Listener instead would echo every
+    // self-push back as a fake user command — a feedback loop that flips
+    // play/pause (and the current media item) hundreds of times a second.
+    var onSetPlayWhenReady: ((Boolean) -> Unit)? = null
+    var onStop: (() -> Unit)? = null
+    var onPlayFromMediaId: ((String) -> Unit)? = null
+
     // STREAM_MUSIC max can change with output routing (BT, car HU, headset),
     // so rebuild DeviceInfo on every getState() rather than caching at
     // construction. DeviceInfo.equals compares the fields, so Media3 won't
@@ -70,6 +82,7 @@ class SynthPlayer(
                         COMMAND_STOP,
                         COMMAND_SEEK_TO_NEXT,
                         COMMAND_SEEK_TO_PREVIOUS,
+                        COMMAND_SET_MEDIA_ITEM,
                         COMMAND_GET_METADATA,
                         COMMAND_GET_CURRENT_MEDIA_ITEM,
                         COMMAND_GET_DEVICE_VOLUME,
@@ -97,11 +110,30 @@ class SynthPlayer(
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         playing = playWhenReady
+        // External command (notification / Bluetooth / Auto) — drive the app's
+        // PlaybackController. Self-pushes never reach here (see updatePlayState).
+        onSetPlayWhenReady?.invoke(playWhenReady)
         return Futures.immediateVoidFuture()
     }
 
     override fun handleStop(): ListenableFuture<*> {
         playing = false
+        onStop?.invoke()
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleSetMediaItems(
+        mediaItems: MutableList<MediaItem>,
+        startIndex: Int,
+        startPositionMs: Long,
+    ): ListenableFuture<*> {
+        // A connected controller selected a library item (e.g. tapping a vibe
+        // in Android Auto). mediaId convention is the vibe name — see
+        // DjLibraryCallback / PulsarVibePicker.
+        val idx = startIndex.takeIf { it in mediaItems.indices } ?: 0
+        mediaItems.getOrNull(idx)?.mediaId
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { onPlayFromMediaId?.invoke(it) }
         return Futures.immediateVoidFuture()
     }
 
@@ -176,7 +208,11 @@ class SynthPlayer(
     }
 
     companion object {
-        // android.media.AudioManager constants that aren't in older SDKs as public symbols.
+        // Best-effort device-volume sync. These are undocumented framework
+        // action/extra strings, NOT public AudioManager symbols. They fire on
+        // AOSP and most OEM builds; a device that drops the broadcast simply
+        // leaves the notification's volume slider stale until the next
+        // invalidateState() — acceptable for a nicety, not a correctness path.
         private const val VOLUME_CHANGED_ACTION = "android.media.VOLUME_CHANGED_ACTION"
         private const val EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE"
     }

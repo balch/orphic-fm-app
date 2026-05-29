@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.AudioActivitySource
 import org.balch.orpheus.core.media.MediaSessionActionHandler
 import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -186,10 +187,20 @@ class PlaybackController(
                     // actual. Idempotent on platforms whose actuals already
                     // cache + replay (iOS / JVM).
                     pushMetadata(metadataSnapshotFlow.value)
-                    // If a system command (Auto bind, Bluetooth) needs us active
-                    // while we're Stopped, transition to Playing so audio starts.
-                    if (_state.value == PlaybackState.Stopped) play()
-                    else mediaSessionManager.updatePlaybackState(_state.value == PlaybackState.Playing)
+                    // If a system command (Bluetooth, headset, Pulsar/Timer) needs
+                    // us active while we're Stopped, transition to Playing so audio
+                    // starts. EXCEPTION: a bare AUTO_BROWSER bind means a MediaBrowser
+                    // client (Android Auto) is just enumerating the library — keep the
+                    // session active for browsing but do NOT auto-start audio; the
+                    // user pressing play in the browse UI routes through onPlay()→play()
+                    // normally.
+                    if (_state.value == PlaybackState.Stopped &&
+                        mediaSessionStateManager.activeSource.value != AudioActivitySource.AUTO_BROWSER
+                    ) {
+                        play()
+                    } else {
+                        mediaSessionManager.updatePlaybackState(_state.value == PlaybackState.Playing)
+                    }
                 } else {
                     mediaSessionManager.deactivate()
                 }

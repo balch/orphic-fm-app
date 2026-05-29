@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import dev.zacsweers.metro.createGraphFactory
+import org.balch.djapp.widget.DjWidgetUpdater
 import org.balch.orpheus.djapp.di.DjAppGraph
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -55,6 +56,9 @@ class DjAppApplication : Application() {
         // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
         // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
         graph.pulsarSongAdvancer
+
+        // Keep the home-screen widget in sync with playback / vibe / timer state.
+        DjWidgetUpdater(this, graph).start()
     }
 
     companion object {

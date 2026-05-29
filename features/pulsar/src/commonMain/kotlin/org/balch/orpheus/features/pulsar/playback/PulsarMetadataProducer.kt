@@ -31,8 +31,13 @@ import orpheus.features.pulsar.generated.resources.Res
  *    re-encoded as PNG for cross-platform consumption (macOS NSImage on older
  *    OSes won't decode WebP directly).
  *
- * Cached per vibe name so repeat metadata pushes reuse the same byte array
- * (PlaybackController's distinctUntilChanged uses reference equality).
+ * Cached per vibe name so repeat metadata pushes reuse the *same* ByteArray
+ * instance. This is load-bearing: PlaybackController de-dupes metadata via the
+ * StateFlow's built-in equal-emission dropping (there is no distinctUntilChanged
+ * operator anymore), and its snapshot compares artwork by reference, so a
+ * fresh-but-identical array on every push would defeat the de-dupe and re-emit
+ * artwork on each tick. Keep returning the cached instance per vibe — do not
+ * copy/re-encode the bytes on the cache-hit path.
  */
 @SingleIn(AppScope::class)
 @Inject

@@ -6,8 +6,6 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
@@ -93,6 +91,26 @@ actual class MediaSessionManager(
     actual fun updatePlaybackState(isPlaying: Boolean) {
         mainHandler.post {
             if (!isActive) return@post
+            // The foreground service is started lazily here — the single moment
+            // we actually begin playback — rather than in activate(). This keeps
+            // a browse-only bind (Android Auto enumerating the library) from
+            // promising a startForeground() we never deliver. startForegroundService
+            // → onStartCommand starts the synth engine inside the FGS grace window,
+            // and Media3 promotes to foreground when it sees playWhenReady flip
+            // true just below.
+            if (isPlaying && !doStartService()) {
+                // FGS start refused (e.g. a background restriction). Don't leave
+                // the app wedged in "Playing" with no service/engine — roll back
+                // to a consistent Stopped via the action handler. (Finding 1C.)
+                log.warn { "FGS start failed — rolling back activation" }
+                rollbackFailedActivation()
+                return@post
+            }
+            // We're (re)entering playback — cancel any armed transient watchdog
+            // so a manual resume during a transient loss doesn't get torn down
+            // later. (doActivate early-returns when already active, so this is
+            // the only place the resume-to-playing path cancels the watchdog.)
+            if (isPlaying) mainHandler.removeCallbacks(transientWatchdog)
             synthPlayer?.updatePlayState(isPlaying)
         }
     }
@@ -130,26 +148,26 @@ actual class MediaSessionManager(
 
     // ── AudioFocusController.Listener ──────────────────────────────
 
+    // Called on the main looper (the AudioFocusController registers its OS focus
+    // listener with a main-looper Handler), so run inline rather than re-posting —
+    // matching doLossPermanentLocked, which is deliberately inline to avoid a
+    // post-vs-GAIN interleave window.
     override fun onPauseTransient() {
-        mainHandler.post {
-            if (!isActive) return@post
-            synthPlayer?.updatePlayState(false)
-            // Route through onPauseFromFocusLoss so the controller does NOT
-            // signal user-intent back to the focus controller — pausedByTransient
-            // must stay set for the next AUDIOFOCUS_GAIN to auto-resume.
-            handler?.onPauseFromFocusLoss()
-            mainHandler.removeCallbacks(transientWatchdog)
-            mainHandler.postDelayed(transientWatchdog, transientWatchdogMs)
-        }
+        if (!isActive) return
+        synthPlayer?.updatePlayState(false)
+        // Route through onPauseFromFocusLoss so the controller does NOT
+        // signal user-intent back to the focus controller — pausedByTransient
+        // must stay set for the next AUDIOFOCUS_GAIN to auto-resume.
+        handler?.onPauseFromFocusLoss()
+        mainHandler.removeCallbacks(transientWatchdog)
+        mainHandler.postDelayed(transientWatchdog, transientWatchdogMs)
     }
 
     override fun onResumePlayback() {
-        mainHandler.post {
-            if (!isActive) return@post
-            mainHandler.removeCallbacks(transientWatchdog)
-            synthPlayer?.updatePlayState(true)
-            handler?.onPlay()
-        }
+        if (!isActive) return
+        mainHandler.removeCallbacks(transientWatchdog)
+        synthPlayer?.updatePlayState(true)
+        handler?.onPlay()
     }
 
     override fun onLossPermanent() {
@@ -192,63 +210,41 @@ actual class MediaSessionManager(
         val player = SynthPlayer(application)
         synthPlayer = player
 
-        player.addListener(object : Player.Listener {
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (playWhenReady) handler?.onPlay() else handler?.onPause()
-            }
-
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val mediaId = mediaItem?.mediaId ?: return
-                handler?.onPlayFromMediaId(mediaId)
-            }
-        })
-
+        // Drive the controller ONLY from genuine external commands, which arrive
+        // through SynthPlayer's handle* overrides. A Player.Listener would also
+        // fire for our own updatePlaybackState()/updateMetadata() pushes (both
+        // call invalidateState()), echoing every self-push back as a fake user
+        // play/pause — a ~250 Hz feedback loop that stutters the beat clock.
+        player.onSetPlayWhenReady = { playWhenReady ->
+            if (playWhenReady) handler?.onPlay() else handler?.onPause()
+        }
+        player.onStop = { handler?.onStop() }
+        player.onPlayFromMediaId = { mediaId -> handler?.onPlayFromMediaId(mediaId) }
         player.onSkipNext = { handler?.onSkipNext() }
         player.onSkipPrevious = { handler?.onSkipPrevious() }
     }
 
     private fun doActivate() {
-        val wasActive = isActive
-        if (!wasActive) {
-            log.info { "Activating media session" }
-            ensurePlayer()
-            audioFocusController.setListener(this)
-        }
-        // ALWAYS re-request focus — even when already active. After a transient
-        // loss isActive stays true but hasFocusFlag is false; without this call
-        // a user-initiated play during the transient state would never re-take
-        // focus. request() is idempotent (early-returns on hasFocusFlag=true).
-        if (!audioFocusController.request()) {
-            log.warn { "Audio focus DENIED — aborting activation (Android 17 would silently fail playback)" }
-            if (!wasActive) {
-                // Symmetric cleanup for failed initial activation.
-                audioFocusController.setListener(null)
-                releaseSynthPlayer()
-            }
-            return
-        }
-        // Refocus succeeded — cancel any pending transient watchdog so it
-        // doesn't fire later and tear down a session we just brought back up.
+        if (isActive) return
+        log.info { "Activating media session" }
+        ensurePlayer()
+        audioFocusController.setListener(this)
+        // We're (re)activating — cancel any pending transient watchdog.
         mainHandler.removeCallbacks(transientWatchdog)
-        if (wasActive) return
         isActive = true
-        if (!doStartService()) {
-            // Most likely cause: background restriction on Android 12+ when a
-            // MediaBrowser bind transitively triggered activation without an
-            // FGS-launch exemption. Roll back so we don't sit in an "active"
-            // state with no foreground service backing the audio.
-            log.warn { "doStartService failed — rolling back activation" }
-            audioFocusController.abandon()
-            audioFocusController.setListener(null)
-            releaseSynthPlayer()
-            isActive = false
-        }
+        // NOTE: activation does NOT acquire audio focus or start the foreground
+        // service. Focus is taken synchronously by PlaybackController.play() via
+        // requestPlaybackFocus() (so a denial rolls back before unmuting), and
+        // the FGS is started lazily in updatePlaybackState(true) — the only place
+        // we actually begin playback. Activating for a browse-only bind (Android
+        // Auto enumerating the library) must NOT grab focus from other apps or
+        // promise a startForeground() we'd never deliver while merely browsing.
     }
 
     // Invariant: by the time this returns, both synthPlayer == null AND
     // isActive == false. The early-return on synthPlayer == null is safe
     // because every teardown path (doDeactivate, doLossPermanentLocked, and
-    // doActivate's focus-denied / FGS-failed bail-outs) releases the player.
+    // updatePlaybackState's FGS-failed rollback) releases the player.
     private fun doDeactivate() {
         if (synthPlayer == null) return
         log.info { "Deactivating media session" }
@@ -267,8 +263,25 @@ actual class MediaSessionManager(
         mediaSession = null
         synthPlayer?.onSkipNext = null
         synthPlayer?.onSkipPrevious = null
+        synthPlayer?.onSetPlayWhenReady = null
+        synthPlayer?.onStop = null
+        synthPlayer?.onPlayFromMediaId = null
         synthPlayer?.release()
         synthPlayer = null
+    }
+
+    // Called from updatePlaybackState(true) when the FGS start is refused. Tears
+    // down the half-started session and resets the single source of truth so a
+    // subsequent play() can retry instead of short-circuiting on a stale Playing
+    // state. Mirrors the teardown the old doActivate FGS-failed branch performed,
+    // plus the handler?.onStop() reset. (Finding 1C.)
+    private fun rollbackFailedActivation() {
+        mainHandler.removeCallbacks(transientWatchdog)
+        audioFocusController.abandon()
+        audioFocusController.setListener(null)
+        releaseSynthPlayer()
+        isActive = false
+        handler?.onStop()
     }
 
     /** Returns true if the FGS is up (or was already up); false on a thrown

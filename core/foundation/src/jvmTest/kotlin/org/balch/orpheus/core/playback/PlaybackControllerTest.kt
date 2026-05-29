@@ -172,6 +172,21 @@ class PlaybackControllerTest {
         assertEquals(PlaybackState.Playing, c.state.value)
     }
 
+    // A bare Android Auto / MediaBrowser browse-bind (setAutoBrowserActive) flips
+    // isMediaSessionNeeded → true, but the user is only browsing the library — it
+    // must NOT auto-start audio. (Only the AUTO_BROWSER source is excluded; other
+    // sources like Pulsar/Timer still auto-start — see the test above.)
+    @Test fun `auto-browser bind keeps session active without auto-starting playback`() = runTest {
+        val (c, _, ssm) = build().let { Triple(it.controller, it.muteCalls, it.ssm) }
+        assertEquals(PlaybackState.Stopped, c.state.value)
+        ssm.setAutoBrowserActive(true)
+        // The session IS kept active for browsing (isMediaSessionNeeded flips
+        // true) — that is the whole point of the AUTO_BROWSER source...
+        assertTrue(ssm.isMediaSessionNeeded.value, "auto-browser bind must keep the session needed")
+        // ...but audio must NOT auto-start (unlike Pulsar/Timer sources).
+        assertEquals(PlaybackState.Stopped, c.state.value)
+    }
+
     // NOTE: The "overlay subtitle wins when present" behavior is exercised by the
     // metadata combine logic in PlaybackController (overlayFlow takes priority over
     // primarySubtitle in the combine block). Full assertion would require a spy on
@@ -190,12 +205,12 @@ class PlaybackControllerTest {
         assertEquals(PlaybackState.Playing, c.state.value)
     }
 
-    // NOTE: The "metadata updates are distinct-until-changed (no spam)" behavior
-    // is enforced by the distinctUntilChanged() call in PlaybackController.init.
-    // Asserting it directly would require counting MediaSessionManager.updateMetadata
-    // calls, which the JVM actual doesn't support without test infra changes
-    // (injecting a fake/spy). Skipped for now; the distinctUntilChanged() operator
-    // is a stdlib primitive and is covered by its own library tests.
+    // NOTE: The "metadata updates don't spam" behavior now relies on StateFlow's
+    // built-in dropping of equal-by-equals emissions (the metadataSnapshotFlow is
+    // a StateFlow; there is no longer a distinctUntilChanged() operator). Asserting
+    // it directly would require counting MediaSessionManager.updateMetadata calls,
+    // which the JVM actual doesn't support without injecting a fake/spy. Skipped
+    // for now.
 
     // ── Audio-focus interaction ────────────────────────────────────────────
 
