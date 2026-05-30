@@ -172,7 +172,7 @@ data class Arrangement(
     val outroIndex: Int? = null,
     val defaultSectionBars: Int = 8,
     @Serializable(with = IntRangeSerializer::class)
-    val lengthSeconds: IntRange = 150..300,
+    val lengthSeconds: IntRange = 150..240,
     val transitionOut: TransitionSpec? = null,
 ) {
     val minVibeSeconds: Int get() = lengthSeconds.first

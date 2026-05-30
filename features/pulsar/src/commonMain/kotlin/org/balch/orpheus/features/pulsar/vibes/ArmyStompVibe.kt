@@ -52,6 +52,183 @@ import org.balch.orpheus.features.pulsar.models.row
 class ArmyStompVibe : VibeProvider {
     override val name: String = "Army Stomp"
 
+    private val sectionList by lazy {
+        listOf(
+            // 0: march — tight, disciplined, locked drums.
+            // march -> charge:    HARD CUT — trumpets sound, the battle begins.
+            // march -> solo:      marchSwell (smooth pull-out into the spotlight).
+            // march -> breakdown: HARD CUT — sudden chaos, no warning.
+            // march -> drift:     dreamDrift (the army leaves the ground).
+            Section(
+                name = "march",
+                barsMin = 6, barsMax = 8,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 1, weight = 0.4f),  // charge — hard cut
+                    SectionTransition(
+                        targetIndex = 2,
+                        weight = 0.25f,
+                        transitionBars = marchSwellBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 3,
+                        weight = 0.35f
+                    ), // breakdown — hard cut
+                ),
+                macroOverrides = MacroOverrides(complexity = 0.7f, space = 0.6f),
+            ),
+            // 1: charge — high energy, more fills, aggressive.
+            // charge -> march:     HARD CUT — snap back to discipline.
+            // charge -> solo:      marchSwell (energy yields to spotlight).
+            // charge -> breakdown: HARD CUT — continuous intensity, just more chaos.
+            Section(
+                name = "charge",
+                barsMin = 4, barsMax = 8,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 0, weight = 0.3f),  // march — hard cut
+                    SectionTransition(
+                        targetIndex = 2,
+                        weight = 0.5f,
+                        transitionBars = marchSwellBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 3,
+                        weight = 0.2f
+                    ),  // breakdown — hard cut
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = MacroOverrides(
+                    energy = 1.5f, complexity = 1.5f, space = 0.4f, mood = 1.3f,
+                ),
+                soloMode = SoloMode.LongFill(probability = 0.4f),
+                customProgression = chords(0, 3, 5, 6),
+                chordsPerBar = 2,
+            ),
+            // 2: solo — extended spotlight, VCF bass or keys rip.
+            // solo -> march / charge / breakdown: marchSwell (climb out of the solo).
+            Section(
+                name = "solo",
+                barsMin = 6, barsMax = 10,
+                transitions = listOf(
+                    SectionTransition(
+                        targetIndex = 0,
+                        weight = 0.4f,
+                        transitionBars = marchSwellBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 3,
+                        weight = 0.4f,
+                        transitionBars = marchSwellBars
+                    ),
+                    SectionTransition(
+                        targetIndex = 1,
+                        weight = 0.2f,
+                        transitionBars = marchSwellBars
+                    ),
+                ),
+                recencyDecay = 0.4f,
+                macroOverrides = MacroOverrides(
+                    energy = 0.8f, complexity = 1.3f, space = 1.3f, mood = 1.2f,
+                ),
+                soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
+            ),
+            // 3: breakdown — CHAOS. Crazy drums, bass stabs on root, keys SKA
+            // off-stabs, texture pulses. In-your-face, tight, not stripped.
+            // breakdown -> charge: HARD CUT — continuous intensity into more attack.
+            // breakdown -> march:  marchSwell (chaos cools back to discipline).
+            // breakdown -> drift:  dreamDrift (chaos dissolves into the dream).
+            Section(
+                name = "breakdown",
+                barsMin = 4, barsMax = 6,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 1, weight = 1f),  // charge — hard cut
+                ),
+                // Energy cranked for crazy drum fills/variation; space pulled in tight
+                // for the in-your-face feel. Complexity maxed drives the drum chaos.
+                macroOverrides = MacroOverrides(
+                    energy = 1.5f, complexity = 2.0f, space = 0.3f, mood = 1.3f,
+                ),
+                chordFollow = ChordFollow.ROOT_ONLY,  // bass stabs locked to root
+                compingStyle = CompingStyle.SKA_UPSTROKES,  // keys = off-beat stabs
+                compingInversion = SectionInversion.FIRST_INVERSION,  // lifted voicing for brightness
+            ),
+            // 4: drift — STYLE CHANGE. The army stops marching and starts wandering.
+            // Bass breaks out of ROOT_ONLY and plays melodic lines; whole thing
+            // feels suspended. Transitions back to march via charge most of the time.
+            // drift -> march / charge: dreamDrift (the army re-engages slowly).
+            // drift -> solo:           marchSwell (atmospheric handoff between two
+            //                          spacious sections — short ramp is enough).
+            Section(
+                name = "awol",
+                barsMin = 4, barsMax = 4,
+                recencyDecay = 0.6f,
+                // Dreamy, spacious, more complex — feels like the march left the ground
+                macroOverrides = MacroOverrides(
+                    energy = 0.4f, complexity = 1.8f, space = 1.8f, mood = 1.8f,
+                ),
+                // FOLLOW (not ROOT_ONLY) lets the bass walk with the i-iv cycle
+                // instead of pedaling on E — that's the "army wandering" sound.
+                chordFollow = ChordFollow.FOLLOW,
+                compingStyle = CompingStyle.BLUES_SHUFFLE,
+                // Loosen the keyboard's stabs: drop ~a third of them, let some
+                // jump octaves, occasionally add an extension. The march keys
+                // are tight and disciplined; drift keys should feel like a
+                // tired pianist noodling at dawn.
+                compingHumanization = CompingHumanization(
+                    dropProbability = 0.35f,
+                    ghostProbability = .1f,
+                    octaveJumpProbability = 0.30f,
+                    extensionProbability = 0.40f,
+                ),
+                customProgression = chords(0, 3, 0, 3),
+                chordsPerBar = 1,
+                // Languid drift arc — sized to the section. drift is now a fixed
+                // 4-bar section, and the engine ZEROES the timbre-evolution arc on
+                // every section entry (tension_evo_smooth resets; the underlying
+                // tension_intensity sawtooth free-runs on a global bar counter). So
+                // for the drift evolution to actually be heard, its inner cycle must
+                // COMPLETE inside those 4 bars: innerBars = 4 gives exactly one
+                // build-and-release per visit. outerBars = 0 because a 24-bar
+                // super-cycle is meaningless inside a single 4-bar visit — it only
+                // made each visit sound different depending on where the global
+                // counter happened to land.
+                //
+                // attackPoint dropped 0.60 -> 0.35: the sawtooth peaks at
+                // (inner-1)/inner, so with innerBars = 4 it tops out at 0.75, never
+                // near 1.0. A 0.60 gate would leave only (0.75-0.60)/0.40 ≈ 0.38 of
+                // evolution range — barely a wiggle. 0.35 lets the timbre/morph
+                // genuinely drift across the back half of the section while keeping
+                // the slow-attack feel.
+                //
+                // octaveShift + halfLick + heavier chromaticPassing make the
+                // melodic figure wander instead of marching.
+                tensionOverride = TensionProfile(
+                    spurtChance = 0.05f,
+                    innerBars = 4, outerBars = 0, outerDepth = 0.5f,
+                    volume = 0.30f,
+                    tonal = TonalTension(
+                        octaveShift = true,
+                        halfLick = true,
+                        chromaticPassing = 0.30f,
+                    ),
+                    timing = 0.35f,
+                    evolution = EvolutionTension(
+                        timbreLow = 0.30f,
+                        timbreHigh = 0.70f,
+                        timbreProbability = 0.70f,
+                        morphLow = 0.40f,
+                        morphHigh = 0.70f,
+                        morphProbability = 0.50f,
+                        harmonicsLow = 0.35f,
+                        harmonicsHigh = 0.55f,
+                        harmonicsProbability = 0.30f,
+                        attackPoint = 0.35f,
+                        releaseSpeed = 0.30f,
+                    ),
+                ),
+            ),
+        )
+    }
+
     // Per-edge transitionBars precedent: name the *musical role* the ramp serves,
     // not the bar count. Military marches mostly want HARD cuts (the default 0)
     // for snap and discipline — only ramp when the music genuinely needs to
@@ -67,14 +244,18 @@ class ArmyStompVibe : VibeProvider {
     // default of 0 (hard cut) — the trumpets sound, the battle begins, the
     // chaos hits. That punchiness IS the vibe.
     private val marchSwellBars = 2
-    private val dreamDriftBars = 4
 
     override val vibe: Vibe by lazy {
-
         Vibe(
             name = name,
             album = Album.STEALTH,
             bpm = 110f,
+            arrangement = Arrangement(
+                introIndex = 0,
+                outroIndex = sectionList.lastIndex,
+                sections = sectionList,
+                lengthSeconds = 40..70,
+            ),
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.E,
             scaleType = ScaleType.MINOR,
@@ -392,195 +573,6 @@ class ArmyStompVibe : VibeProvider {
                 reverbSize = 0.3f,
                 reverbDamping = 0.4f,
                 reverbBrightness = 0.5f,
-            ),
-            arrangement = Arrangement(
-                introIndex = 0,
-                sections = listOf(
-                    // 0: march — tight, disciplined, locked drums.
-                    // march -> charge:    HARD CUT — trumpets sound, the battle begins.
-                    // march -> solo:      marchSwell (smooth pull-out into the spotlight).
-                    // march -> breakdown: HARD CUT — sudden chaos, no warning.
-                    // march -> drift:     dreamDrift (the army leaves the ground).
-                    Section(
-                        name = "march",
-                        barsMin = 8, barsMax = 16,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.4f),  // charge — hard cut
-                            SectionTransition(
-                                targetIndex = 2,
-                                weight = 0.25f,
-                                transitionBars = marchSwellBars
-                            ),
-                            SectionTransition(
-                                targetIndex = 3,
-                                weight = 0.15f
-                            ), // breakdown — hard cut
-                            SectionTransition(
-                                targetIndex = 4,
-                                weight = 0.2f,
-                                transitionBars = dreamDriftBars
-                            ),
-                        ),
-                        macroOverrides = MacroOverrides(complexity = 0.7f, space = 0.6f),
-                    ),
-                    // 1: charge — high energy, more fills, aggressive.
-                    // charge -> march:     HARD CUT — snap back to discipline.
-                    // charge -> solo:      marchSwell (energy yields to spotlight).
-                    // charge -> breakdown: HARD CUT — continuous intensity, just more chaos.
-                    Section(
-                        name = "charge",
-                        barsMin = 4, barsMax = 8,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 0, weight = 0.3f),  // march — hard cut
-                            SectionTransition(
-                                targetIndex = 2,
-                                weight = 0.5f,
-                                transitionBars = marchSwellBars
-                            ),
-                            SectionTransition(
-                                targetIndex = 3,
-                                weight = 0.2f
-                            ),  // breakdown — hard cut
-                        ),
-                        recencyDecay = 0.5f,
-                        macroOverrides = MacroOverrides(
-                            energy = 1.5f, complexity = 1.5f, space = 0.4f, mood = 1.3f,
-                        ),
-                        soloMode = SoloMode.LongFill(probability = 0.4f),
-                        customProgression = chords(0, 3, 5, 6),
-                        chordsPerBar = 2,
-                    ),
-                    // 2: solo — extended spotlight, VCF bass or keys rip.
-                    // solo -> march / charge / breakdown: marchSwell (climb out of the solo).
-                    Section(
-                        name = "solo",
-                        barsMin = 8, barsMax = 12,
-                        transitions = listOf(
-                            SectionTransition(
-                                targetIndex = 0,
-                                weight = 0.4f,
-                                transitionBars = marchSwellBars
-                            ),
-                            SectionTransition(
-                                targetIndex = 3,
-                                weight = 0.4f,
-                                transitionBars = marchSwellBars
-                            ),
-                            SectionTransition(
-                                targetIndex = 1,
-                                weight = 0.2f,
-                                transitionBars = marchSwellBars
-                            ),
-                        ),
-                        recencyDecay = 0.4f,
-                        macroOverrides = MacroOverrides(
-                            energy = 0.8f, complexity = 1.3f, space = 1.3f, mood = 1.2f,
-                        ),
-                        soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
-                    ),
-                    // 3: breakdown — CHAOS. Crazy drums, bass stabs on root, keys SKA
-                    // off-stabs, texture pulses. In-your-face, tight, not stripped.
-                    // breakdown -> charge: HARD CUT — continuous intensity into more attack.
-                    // breakdown -> march:  marchSwell (chaos cools back to discipline).
-                    // breakdown -> drift:  dreamDrift (chaos dissolves into the dream).
-                    Section(
-                        name = "breakdown",
-                        barsMin = 4, barsMax = 8,
-                        transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.6f),  // charge — hard cut
-                            SectionTransition(
-                                targetIndex = 0,
-                                weight = 0.3f,
-                                transitionBars = marchSwellBars
-                            ),
-                            SectionTransition(
-                                targetIndex = 4,
-                                weight = 0.1f,
-                                transitionBars = dreamDriftBars
-                            ),
-                        ),
-                        // Energy cranked for crazy drum fills/variation; space pulled in tight
-                        // for the in-your-face feel. Complexity maxed drives the drum chaos.
-                        macroOverrides = MacroOverrides(
-                            energy = 1.5f, complexity = 2.0f, space = 0.3f, mood = 1.3f,
-                        ),
-                        chordFollow = ChordFollow.ROOT_ONLY,  // bass stabs locked to root
-                        compingStyle = CompingStyle.SKA_UPSTROKES,  // keys = off-beat stabs
-                        compingInversion = SectionInversion.FIRST_INVERSION,  // lifted voicing for brightness
-                    ),
-                    // 4: drift — STYLE CHANGE. The army stops marching and starts wandering.
-                    // Bass breaks out of ROOT_ONLY and plays melodic lines; whole thing
-                    // feels suspended. Transitions back to march via charge most of the time.
-                    // drift -> march / charge: dreamDrift (the army re-engages slowly).
-                    // drift -> solo:           marchSwell (atmospheric handoff between two
-                    //                          spacious sections — short ramp is enough).
-                    Section(
-                        name = "drift",
-                        barsMin = 6, barsMax = 10,
-                        transitions = listOf(
-                            SectionTransition(
-                                targetIndex = 0,
-                                weight = 0.5f,
-                                transitionBars = dreamDriftBars
-                            ),
-                            SectionTransition(targetIndex = 1, weight = 0.3f, transitionBars = 0),
-                            SectionTransition(
-                                targetIndex = 2,
-                                weight = 0.2f,
-                                transitionBars = marchSwellBars
-                            ),
-                        ),
-                        recencyDecay = 0.6f,
-                        // Dreamy, spacious, more complex — feels like the march left the ground
-                        macroOverrides = MacroOverrides(
-                            energy = 0.2f, complexity = 1.8f, space = 1.6f, mood = 1.4f,
-                        ),
-                        // FOLLOW (not ROOT_ONLY) lets the bass walk with the i-iv cycle
-                        // instead of pedaling on E — that's the "army wandering" sound.
-                        chordFollow = ChordFollow.FOLLOW,
-                        compingStyle = CompingStyle.ROCK_DOWNBEATS,
-                        // Loosen the keyboard's stabs: drop ~a third of them, let some
-                        // jump octaves, occasionally add an extension. The march keys
-                        // are tight and disciplined; drift keys should feel like a
-                        // tired pianist noodling at dawn.
-                        compingHumanization = CompingHumanization(
-                            dropProbability = 0.35f,
-                            ghostProbability = 0.20f,
-                            octaveJumpProbability = 0.30f,
-                            extensionProbability = 0.40f,
-                        ),
-                        customProgression = chords(0, 3, 0, 3),
-                        chordsPerBar = 1,
-                        // Long languid arc — slow attack into a late peak, slow release.
-                        // octaveShift + halfLick + heavier chromaticPassing make the
-                        // melodic figure wander instead of marching. Evolution probs
-                        // crank to keep the timbre/morph drifting through the section.
-                        tensionOverride = TensionProfile(
-                            spurtChance = 0.05f,
-                            innerBars = 8, outerBars = 24, outerDepth = 0.5f,
-                            volume = 0.30f,
-                            tonal = TonalTension(
-                                octaveShift = true,
-                                halfLick = true,
-                                chromaticPassing = 0.30f,
-                            ),
-                            timing = 0.35f,
-                            evolution = EvolutionTension(
-                                timbreLow = 0.30f,
-                                timbreHigh = 0.70f,
-                                timbreProbability = 0.70f,
-                                morphLow = 0.40f,
-                                morphHigh = 0.70f,
-                                morphProbability = 0.50f,
-                                harmonicsLow = 0.35f,
-                                harmonicsHigh = 0.55f,
-                                harmonicsProbability = 0.30f,
-                                attackPoint = 0.60f,
-                                releaseSpeed = 0.30f,
-                            ),
-                        ),
-                    ),
-                ),
             ),
         )
     }

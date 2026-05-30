@@ -946,6 +946,71 @@ static bool test_section_macro_subbar_lerp() {
     return ok;
 }
 
+// randomize_section_bars must keep the chosen length within [bars_min, bars_max]
+// and must keep the minimum reachable (idx == 0 maps to bars_min). The top edge
+// needs a guard because pattern_rand01 returns [0, 1] *inclusive* of 1.0, which
+// would otherwise push idx to stop_count and overshoot bars_max by one step.
+static bool test_randomize_section_bars_bounds() {
+    printf("\n=== Test: randomize_section_bars includes min, never exceeds max ===\n");
+    bool ok = true;
+
+    // Contract sweep: range 6..8 step 1 — both ends reachable, never out of bounds.
+    {
+        SectionParam sec;
+        sec.bars_min = 6; sec.bars_max = 8; sec.bar_step = 1;
+        uint32_t seed = 0xC0FFEE;
+        bool saw_min = false, saw_max = false, in_bounds = true;
+        for (int i = 0; i < 200000; i++) {
+            int b = randomize_section_bars(sec, seed);
+            if (b < 6 || b > 8) in_bounds = false;
+            if (b == 6) saw_min = true;
+            if (b == 8) saw_max = true;
+        }
+        bool case_ok = saw_min && saw_max && in_bounds;
+        printf("  6..8 step1: saw_min=%s saw_max=%s in_bounds=%s -- %s\n",
+               saw_min ? "yes" : "no", saw_max ? "yes" : "no",
+               in_bounds ? "yes" : "no", case_ok ? "PASS" : "FAIL");
+        ok = ok && case_ok;
+    }
+
+    // Equal min==max (e.g. the 4-bar drift/awol section): always returns the min.
+    {
+        SectionParam sec;
+        sec.bars_min = 4; sec.bars_max = 4; sec.bar_step = 1;
+        uint32_t seed = 0x1234;
+        bool always_min = true;
+        for (int i = 0; i < 1000; i++)
+            if (randomize_section_bars(sec, seed) != 4) always_min = false;
+        printf("  4..4: always returns 4 = %s -- %s\n",
+               always_min ? "yes" : "no", always_min ? "PASS" : "FAIL");
+        ok = ok && always_min;
+    }
+
+    // Deterministic top-edge clamp: find a seed whose first xorshift fills the low
+    // 23 bits (so pattern_rand01 returns exactly 1.0), then confirm the result is
+    // clamped to bars_max (8) rather than overshooting to bars_max + step (9).
+    {
+        uint32_t hot_seed = 0;
+        bool found = false;
+        for (uint32_t cand = 1; cand != 0; cand++) {
+            uint32_t t = cand;
+            if ((pattern_rand(t) & 0x7FFFFF) == 0x7FFFFF) { hot_seed = cand; found = true; break; }
+            if (cand > 50000000u) break;  // safety; a hit exists far sooner
+        }
+        SectionParam sec;
+        sec.bars_min = 6; sec.bars_max = 8; sec.bar_step = 1;  // stop_count = 3
+        uint32_t seed = hot_seed;
+        int b = randomize_section_bars(sec, seed);
+        bool case_ok = found && (b == 8);
+        printf("  forced rand01=1.0 (seed=%u): bars=%d (expect 8, not 9) found=%s -- %s\n",
+               hot_seed, b, found ? "yes" : "no", case_ok ? "PASS" : "FAIL");
+        ok = ok && case_ok;
+    }
+
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -964,6 +1029,7 @@ bool run_pulsar_sections_tests() {
     tally(test_section_macro_crossfade());
     tally(test_section_comping_humanization_override_loads());
     tally(test_section_macro_subbar_lerp());
+    tally(test_randomize_section_bars_bounds());
     printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -51,8 +51,12 @@ inline int randomize_section_bars(const SectionParam& sec, uint32_t& seed) {
     //   stop_count = floor((bars_max - bars_min) / step) + 1
     int stop_count = (sec.bars_max - sec.bars_min) / step + 1;
     if (stop_count <= 1) return sec.bars_min;
-    // pattern_rand01 returns [0, 1), so the cast lands in [0, stop_count - 1].
+    // pattern_rand01 returns [0, 1] *inclusive* of 1.0 (it divides by 0x7FFFFF,
+    // not 0x800000), so the cast can land on stop_count itself. Clamp the top
+    // edge — without this, the rare 1.0 roll overshoots bars_max by one step.
+    // idx == 0 still maps to bars_min, so the minimum length stays reachable.
     int idx = static_cast<int>(pattern_rand01(seed) * stop_count);
+    if (idx >= stop_count) idx = stop_count - 1;
     return sec.bars_min + idx * step;
 }
 
