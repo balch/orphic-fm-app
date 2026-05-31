@@ -64,5 +64,9 @@ keystore.properties
 *.keystore
 *.jks
 
+# Play Store service-account key (Gradle Play Publisher)
+/.secrets/
+apps/djapp/play-store/.secrets/*.json
+
 # Local R8 / Perfetto analysis artifacts
 tmp/

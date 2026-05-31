@@ -1,5 +1,6 @@
 plugins {
     id("orpheus.android.app")
+    alias(libs.plugins.play.publisher)
 }
 
 android {
@@ -33,6 +34,34 @@ android {
             manifest.srcFile("src/debug/AndroidManifest.xml")
         }
     }
+}
+
+// Google Play Developer API publishing (Gradle Play Publisher).
+// Run: ./gradlew :apps:djapp:androidApp:publishReleaseBundle
+play {
+    // Service-account JSON is gitignored. Drop the key at the path below to enable
+    // publishing; if it's absent, GPP falls back to the ANDROID_PUBLISHER_CREDENTIALS
+    // env var (CI). Only publish* tasks need it — normal builds are unaffected.
+    // Looks for a *.json key (any name — Google's default download is e.g.
+    // orphic-dj-<hash>.json) in either the repo-root or module .secrets dir, preferring
+    // one named play-service-account.json if present. If none is found GPP falls back to
+    // the ANDROID_PUBLISHER_CREDENTIALS env var (CI). Only publish* tasks need it.
+    val serviceAccountKey = listOf(
+        rootProject.file(".secrets"),
+        rootProject.file("apps/djapp/play-store/.secrets"),
+    )
+        .flatMap { it.listFiles()?.toList().orEmpty() }
+        .filter { it.extension == "json" }
+        .let { keys -> keys.firstOrNull { it.name == "play-service-account.json" } ?: keys.firstOrNull() }
+    if (serviceAccountKey != null) {
+        serviceAccountCredentials.set(serviceAccountKey)
+    }
+    // Default upload target: the internal testing track — no review delay, and it
+    // exercises the in-app-update flow for internal testers. Override per-invocation
+    // with `-Ptrack=...` is not wired; edit here or pass via a future property if needed.
+    track.set("internal")
+    // Upload the .aab, never per-ABI APKs.
+    defaultToAppBundles.set(true)
 }
 
 dependencies {

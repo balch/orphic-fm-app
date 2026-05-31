@@ -159,3 +159,4 @@ metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 buildkonfig = { id = "com.codingfeline.buildkonfig", version.ref = "buildkonfig" }
 androidTest = { id = "com.android.test", version.ref = "agp" }
 versions-plugin = { id = "com.github.ben-manes.versions", version = "0.54.0" }
+play-publisher = { id = "com.github.triplet.play", version = "4.0.0" }
