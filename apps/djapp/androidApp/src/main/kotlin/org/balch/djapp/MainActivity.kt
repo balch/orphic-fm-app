@@ -5,6 +5,8 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -38,10 +40,18 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            DjApp(graph) {
-                val controller = graph.playbackController
-                if (controller.state.value == PlaybackState.Playing) controller.pause()
-                else controller.play()
+            DjApp(
+                graph = graph,
+                onTogglePlayback = {
+                    val controller = graph.playbackController
+                    if (controller.state.value == PlaybackState.Playing) controller.pause()
+                    else controller.play()
+                },
+            ) {
+                InAppUpdateHost(
+                    manager = graph.inAppUpdateManager,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }

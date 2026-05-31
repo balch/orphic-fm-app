@@ -13,6 +13,7 @@ import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.core.update.InAppUpdateManager
 import org.balch.orpheus.djapp.lifecycle.DjAppLifecycleManager
 import org.balch.orpheus.features.pulsar.playback.PulsarPlaybackBridge
 import org.balch.orpheus.features.pulsar.playback.PulsarSongAdvancer
@@ -29,6 +30,9 @@ actual interface DjAppGraph : ViewModelGraph {
 
     /** Eagerly initialized to register lifecycle callbacks. */
     val djAppLifecycleManager: DjAppLifecycleManager
+
+    /** Google Play in-app update manager (Android only). */
+    val inAppUpdateManager: InAppUpdateManager
 
     /** Eagerly initialized so init {} block subscribes to flows at startup. */
     val playbackController: PlaybackController

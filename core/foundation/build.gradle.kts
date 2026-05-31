@@ -47,6 +47,9 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation(libs.media3.session)
+                implementation(libs.androidx.activity)
+                implementation(libs.play.app.update)
+                implementation(libs.play.app.update.ktx)
             }
         }
         val wasmJsMain by getting {

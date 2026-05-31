@@ -22,9 +22,12 @@ fun MainViewController() = ComposeUIViewController {
     // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
     remember { graph.pulsarSongAdvancer }
 
-    DjApp(graph) {
-        val controller = graph.playbackController
-        if (controller.state.value == PlaybackState.Playing) controller.pause()
-        else controller.play()
-    }
+    DjApp(
+        graph = graph,
+        onTogglePlayback = {
+            val controller = graph.playbackController
+            if (controller.state.value == PlaybackState.Playing) controller.pause()
+            else controller.play()
+        },
+    )
 }

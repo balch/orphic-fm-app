@@ -38,6 +38,9 @@ android {
 dependencies {
     implementation(projects.apps.djapp)
     implementation(project(":core:foundation"))
+    implementation(project(":ui:widgets"))
+    implementation(libs.androidx.lifecycle.runtimeCompose)
+    implementation(libs.compose.foundation)
     implementation(project(":core:plugins:pulsar"))
     implementation(project(":core:plugins:dj"))
     implementation(project(":core:plugins:reverb"))

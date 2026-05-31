@@ -39,11 +39,14 @@ fun main() {
             title = "Orphic DJ",
             state = rememberWindowState(width = 360.dp, height = 780.dp),
         ) {
-            DjApp(graph) {
-                val controller = graph.playbackController
-                if (controller.state.value == PlaybackState.Playing) controller.pause()
-                else controller.play()
-            }
+            DjApp(
+                graph = graph,
+                onTogglePlayback = {
+                    val controller = graph.playbackController
+                    if (controller.state.value == PlaybackState.Playing) controller.pause()
+                    else controller.play()
+                },
+            )
         }
     }
 }

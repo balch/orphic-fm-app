@@ -1,6 +1,7 @@
 package org.balch.orpheus.djapp
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -35,7 +36,11 @@ import org.balch.orpheus.ui.viz.LocalSignalVizGlow
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
-fun DjApp(graph: DjAppGraph, onTogglePlayback: () -> Unit = {}) {
+fun DjApp(
+    graph: DjAppGraph,
+    onTogglePlayback: () -> Unit = {},
+    updateOverlay: @Composable BoxScope.() -> Unit = {},
+) {
     CompositionLocalProvider(
         LocalMetroViewModelFactory provides graph.metroViewModelFactory,
     ) {
@@ -128,6 +133,9 @@ fun DjApp(graph: DjAppGraph, onTogglePlayback: () -> Unit = {}) {
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
+
+                        // In-app update banner (Android wires a host here; no-op elsewhere)
+                        updateOverlay()
                     }
                 }
             }
