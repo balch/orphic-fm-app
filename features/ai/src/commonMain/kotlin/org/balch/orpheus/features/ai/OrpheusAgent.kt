@@ -5,7 +5,7 @@ import ai.koog.agents.core.agent.GraphAIAgent.FeatureContext
 import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.agent.entity.AIAgentGraphStrategy
 import ai.koog.agents.features.eventHandler.feature.handleEvents
-import ai.koog.http.client.HttpClientFactoryResolver
+import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
@@ -324,7 +324,7 @@ class OrpheusAgent(
         installFeatures: FeatureContext.() -> Unit = {},
     ): AIAgent<String, String> {
         val aiProvider = deriveAiProviderFromKey(key = apiKey)
-        val httpFactory = HttpClientFactoryResolver.resolve()
+        val httpFactory = KtorKoogHttpClient.Factory()
         val llmClient: LLMClient = when (aiProvider) {
             AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
             AiProvider.Anthropic -> AnthropicLLMClient(apiKey, httpClientFactory = httpFactory)

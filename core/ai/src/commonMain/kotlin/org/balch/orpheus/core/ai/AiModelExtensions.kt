@@ -4,7 +4,7 @@ import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 
-private val geminiCapabilities = listOf(
+private val geminiCapabilities: List<LLMCapability> = listOf(
     LLMCapability.Temperature,
     LLMCapability.Completion,
     LLMCapability.MultipleChoices,

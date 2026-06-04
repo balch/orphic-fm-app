@@ -26,7 +26,7 @@ android {
 }
 
 dependencies {
-    implementation(projects.apps.orpheus)
+    implementation(projects.apps.orpheus.shared)
     implementation(project(":core:foundation"))
     implementation(project(":core:mediapipe"))
     implementation(project(":features:mediapipe"))

@@ -21,7 +21,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DIST_DIR="$REPO_ROOT/apps/orpheus/build/dist/wasmJs/productionExecutable"
+DIST_DIR="$REPO_ROOT/apps/orpheus/webApp/build/dist/wasmJs/productionExecutable"
 TARGET_REPO="${DEPLOY_REPO:-git@github.com:balch/orphic-fm.git}"
 TARGET_BRANCH="${DEPLOY_BRANCH:-main}"
 
@@ -67,7 +67,7 @@ if [[ "$SKIP_BUILD" != true ]]; then
     echo "Building WASM production distribution..."
     # Ensure the copyWasmDsp source dir exists (may be absent in a fresh checkout)
     mkdir -p "$REPO_ROOT/liborpheus_dsp/platform/wasm/build"
-    "$REPO_ROOT/gradlew" -p "$REPO_ROOT" :apps:orpheus:wasmJsBrowserDistribution
+    "$REPO_ROOT/gradlew" -p "$REPO_ROOT" :apps:orpheus:webApp:wasmJsBrowserDistribution
     restore_local_properties
 fi
 

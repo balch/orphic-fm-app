@@ -67,7 +67,7 @@ play {
 }
 
 dependencies {
-    implementation(projects.apps.djapp)
+    implementation(projects.apps.djapp.shared)
     implementation(project(":core:foundation"))
     implementation(project(":ui:widgets"))
     implementation(libs.androidx.lifecycle.runtimeCompose)

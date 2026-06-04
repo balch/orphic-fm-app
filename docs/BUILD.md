@@ -43,17 +43,17 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 
 ```bash
 # Desktop (C++ DSP engine via JNI + miniaudio)
-./gradlew buildDesktopNative && ./gradlew :apps:orpheus:run
+./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
 
 # iOS Simulator
-./gradlew :apps:orpheus:linkDebugFrameworkIosSimulatorArm64
+./gradlew :apps:orpheus:shared:linkDebugFrameworkIosSimulatorArm64
 cd apps/iosApp && xcodegen generate && open OrpheusApp.xcodeproj
 
 # WASM dev server (opens browser at localhost:8080)
-./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun
+./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun
 
 # WASM in orphic.fm site (serves at localhost:4001/synth/)
 ./scripts/dev-site.sh
@@ -70,10 +70,10 @@ The audio engine is the C++ DSP library (`liborpheus_desktop.dylib` on macOS) lo
 ./gradlew buildDesktopNative
 
 # Run desktop app
-./gradlew :apps:orpheus:run
+./gradlew :apps:orpheus:desktopApp:run
 
 # Package for distribution (requires full JDK with jpackage)
-./gradlew :apps:orpheus:packageReleaseDistributionForCurrentOS
+./gradlew :apps:orpheus:desktopApp:packageReleaseDistributionForCurrentOS
 ```
 
 The native library is built from `liborpheus_dsp/` using `liborpheus_dsp/platform/jvm/CMakeLists.txt`.
@@ -101,7 +101,7 @@ The C++ DSP engine is compiled as a static library for iOS arm64 (device) and si
 
 ```bash
 # Build the Kotlin framework for simulator
-./gradlew :apps:orpheus:linkDebugFrameworkIosSimulatorArm64
+./gradlew :apps:orpheus:shared:linkDebugFrameworkIosSimulatorArm64
 
 # Generate Xcode project and open it
 cd apps/iosApp
@@ -116,7 +116,7 @@ xcrun simctl install booted \
 xcrun simctl launch booted org.balch.orpheus.app
 
 # Build for device (requires signing)
-./gradlew :apps:orpheus:linkDebugFrameworkIosArm64
+./gradlew :apps:orpheus:shared:linkDebugFrameworkIosArm64
 ```
 
 The iOS CMake build is configured in `liborpheus_dsp/platform/ios/CMakeLists.txt`. The Gradle build tasks `buildIosDeviceNative` and `buildIosSimNative` handle CMake invocation automatically.
@@ -139,10 +139,10 @@ emmake make -j$(nproc)
 
 # Copy to app resources
 cp orpheus_dsp.js orpheus_dsp.wasm \
-   ../../../../apps/orpheus/src/wasmJsMain/resources/
+   ../../../../apps/orpheus/webApp/src/wasmJsMain/resources/
 
 # Run dev server
-./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun
+./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun
 ```
 
 The Gradle build has a `copyWasmDsp` task that copies WASM artifacts from the Emscripten build output to the processed resources directory automatically.
@@ -256,12 +256,12 @@ build-logic/         Convention plugins for consistent KMP module config
 ```bash
 # Compile check (no run)
 ./gradlew compileKotlinJvm
-./gradlew :apps:orpheus:compileKotlinWasmJs
-./gradlew :apps:orpheus:compileKotlinIosSimulatorArm64
+./gradlew :apps:orpheus:shared:compileKotlinWasmJs
+./gradlew :apps:orpheus:shared:compileKotlinIosSimulatorArm64
 
 # iOS framework (simulator / device)
-./gradlew :apps:orpheus:linkDebugFrameworkIosSimulatorArm64
-./gradlew :apps:orpheus:linkDebugFrameworkIosArm64
+./gradlew :apps:orpheus:shared:linkDebugFrameworkIosSimulatorArm64
+./gradlew :apps:orpheus:shared:linkDebugFrameworkIosArm64
 
 # Single plugin build
 ./gradlew :core:plugins:<name>:build

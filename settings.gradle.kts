@@ -35,8 +35,11 @@ plugins {
 }
 
 include(":apps:orpheus:androidApp")
-include(":apps:orpheus")
-include(":apps:djapp")
+include(":apps:orpheus:shared")
+include(":apps:orpheus:desktopApp")
+include(":apps:orpheus:webApp")
+include(":apps:djapp:shared")
+include(":apps:djapp:desktopApp")
 include(":apps:djapp:androidApp")
 include(":apps:macrobenchmark")
 include(":core:ai")

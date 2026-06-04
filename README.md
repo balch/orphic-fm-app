@@ -113,18 +113,18 @@ The **iOS** target links the C++ DSP engine as a static library via Kotlin/Nativ
 
 ```bash
 # Desktop (C++ DSP engine via JNI + miniaudio)
-./gradlew buildDesktopNative && ./gradlew :apps:orpheus:run
+./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
 
 # iOS (build framework, then open Xcode project)
-./gradlew :apps:orpheus:linkDebugFrameworkIosSimulatorArm64
+./gradlew :apps:orpheus:shared:linkDebugFrameworkIosSimulatorArm64
 cd apps/iosApp && xcodegen generate
 open OrpheusApp.xcodeproj
 
 # WASM dev server (opens browser at localhost:8080)
-./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun
+./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun
 
 # WASM in orphic.fm site (serves at localhost:4001/synth/)
 ./scripts/dev-site.sh
@@ -133,7 +133,7 @@ open OrpheusApp.xcodeproj
 ./scripts/deploy-gh-pages.sh
 
 # Desktop release (dmg/msi/deb depending on OS)
-./gradlew :apps:orpheus:packageReleaseDistributionForCurrentOS
+./gradlew :apps:orpheus:desktopApp:packageReleaseDistributionForCurrentOS
 ```
 
 See **[BUILD.md](docs/BUILD.md)** for prerequisites, platform details, C++ DSP builds, Emscripten setup, and configuration. See **[TESTS.md](docs/TESTS.md)** for testing strategies, C++ test suites, and cross-platform verification.

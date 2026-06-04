@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.asComposeShader
 import org.balch.orpheus.ui.viz.Blob
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
@@ -79,7 +80,7 @@ actual class MetaballsRenderer {
         builder.uniform("colors", colorsData)
         
         val shader = builder.makeShader()
-        return ShaderBrush(shader)
+        return ShaderBrush(shader.asComposeShader())
     }
 }
 

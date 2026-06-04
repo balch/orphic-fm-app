@@ -5,7 +5,7 @@ import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.http.client.HttpClientFactoryResolver
+import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
@@ -470,7 +470,7 @@ class SynthControlAgent(
 
                 val aiProvider = aiModelProvider.selectedModel.value.aiProvider
 
-                val httpFactory = HttpClientFactoryResolver.resolve()
+                val httpFactory = KtorKoogHttpClient.Factory()
                 val llmClient: LLMClient = when (aiProvider) {
                     AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
                     AiProvider.Anthropic -> AnthropicLLMClient(apiKey, httpClientFactory = httpFactory)

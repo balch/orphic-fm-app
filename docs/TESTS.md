@@ -74,7 +74,7 @@ This reports RMS delta, peak delta, and spectral similarity per engine.
 ### WASM Compile Check
 
 ```bash
-./gradlew :apps:orpheus:compileKotlinWasmJs
+./gradlew :apps:orpheus:shared:compileKotlinWasmJs
 ```
 
 ### Android Instrumented Tests
@@ -106,9 +106,9 @@ Structured test plans for manual verification of each feature. Each plan has num
 
 To verify audio parity across platforms:
 
-1. **Desktop JSyn** (reference): `./gradlew :apps:orpheus:run`
-2. **Desktop C++**: `./gradlew buildDesktopNative && ./gradlew :apps:orpheus:run -Dorpheus.engine=cpp`
-3. **WASM**: `./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun`
+1. **Desktop JSyn** (reference): `./gradlew :apps:orpheus:desktopApp:run`
+2. **Desktop C++**: `./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run -Dorpheus.engine=cpp`
+3. **WASM**: `./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun`
 
 Play the same patch on each platform and compare:
 - Voice timbre and tuning
@@ -122,7 +122,7 @@ Use Playwright MCP or browser DevTools to debug the running WASM app:
 
 ```bash
 # Start dev server
-./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun
+./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun
 ```
 
 - Open `http://localhost:8080/` in Chrome
