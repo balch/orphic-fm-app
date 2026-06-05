@@ -62,6 +62,12 @@ play {
     //   ./gradlew :apps:djapp:androidApp:promoteReleaseArtifact \
     //       --from-track internal --promote-track closed-beta-1
     track.set((findProperty("playTrack") as String?) ?: "internal")
+    // In-app-update priority (0..5) for this release, opt-in via -PplayUpdatePriority=N.
+    // Drives UpdatePolicy's Immediate-vs-Flexible decision on the client: 5 forces an
+    // un-deferrable "force download" Immediate update; 4 needs 3+ days staleness; 1..3 stay
+    // Flexible. Unset -> GPP omits the field and Play treats it as 0 (the normal case), so
+    // routine releases are unaffected. See core/foundation .../core/update/UpdatePolicy.kt.
+    (findProperty("playUpdatePriority") as String?)?.toInt()?.let { updatePriority.set(it) }
     // Upload the .aab, never per-ABI APKs.
     defaultToAppBundles.set(true)
 }
