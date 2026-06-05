@@ -1,16 +1,14 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 /**
- * Convention plugin for Kotlin Multiplatform library modules with KSP and Metro support.
+ * Convention plugin for Kotlin Multiplatform library modules with Metro support.
  * This plugin configures:
  * - Kotlin Multiplatform with Android library, JVM targets
- * - KSP for annotation processing
  * - Metro for dependency injection
  */
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
-    id("com.google.devtools.ksp")
     id("dev.zacsweers.metro")
     id("org.jetbrains.kotlin.plugin.serialization")
 }

@@ -152,19 +152,38 @@ actual class MediaSessionManager(
     // listener with a main-looper Handler), so run inline rather than re-posting —
     // matching doLossPermanentLocked, which is deliberately inline to avoid a
     // post-vs-GAIN interleave window.
-    override fun onPauseTransient() {
-        if (!isActive) return
+    override fun onPauseTransient(): Boolean {
+        if (!isActive) return false
         synthPlayer?.updatePlayState(false)
         // Route through onPauseFromFocusLoss so the controller does NOT
         // signal user-intent back to the focus controller — pausedByTransient
-        // must stay set for the next AUDIOFOCUS_GAIN to auto-resume.
-        handler?.onPauseFromFocusLoss()
-        mainHandler.removeCallbacks(transientWatchdog)
-        mainHandler.postDelayed(transientWatchdog, transientWatchdogMs)
+        // must stay set for the next AUDIOFOCUS_GAIN to auto-resume. Its return
+        // value reports whether this actually interrupted LIVE playback; the
+        // focus controller uses it to arm auto-resume only then.
+        val wasPlaying = handler?.onPauseFromFocusLoss() ?: false
+        // Arm the 10-minute escalation watchdog only when we genuinely paused
+        // live playback. A session that was already (user-)paused but still
+        // holds focus has nothing to escalate from — and the watchdog would
+        // otherwise silently tear down a session the user is intentionally
+        // keeping paused.
+        // isActive is still true here: we validated it at the top of this method
+        // and everything since (onPauseFromFocusLoss is synchronous) runs inline
+        // on the main looper, so no queued deactivate() can flip it mid-method.
+        // Even if the watchdog later fires after a deactivate, doLossPermanentLocked
+        // guards on isActive, so a stale escalation is a no-op.
+        if (wasPlaying) {
+            mainHandler.removeCallbacks(transientWatchdog)
+            mainHandler.postDelayed(transientWatchdog, transientWatchdogMs)
+        }
+        return wasPlaying
     }
 
     override fun onResumePlayback() {
         if (!isActive) return
+        // Cancel the escalation watchdog SYNCHRONOUSLY here. handler.onPlay()
+        // below also reaches updatePlaybackState(true), which cancels it again —
+        // but only from a posted runnable. This inline cancel is the one that
+        // closes the GAIN-vs-watchdog race; the later one is a harmless backstop.
         mainHandler.removeCallbacks(transientWatchdog)
         synthPlayer?.updatePlayState(true)
         handler?.onPlay()

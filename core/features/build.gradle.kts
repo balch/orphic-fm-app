@@ -1,7 +1,6 @@
 plugins {
     id("orpheus.kmp.compose")
     alias(libs.plugins.metro)
-    alias(libs.plugins.ksp)
 }
 
 kotlin {

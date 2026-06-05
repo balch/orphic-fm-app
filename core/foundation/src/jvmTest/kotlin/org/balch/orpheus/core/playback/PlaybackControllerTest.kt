@@ -12,6 +12,7 @@ import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 private class FakeMetadata(
@@ -274,15 +275,21 @@ class PlaybackControllerTest {
 
     // The transient-loss path bypasses the user-pause signal so that a
     // matching AUDIOFOCUS_GAIN can still auto-resume. Verify state changes
-    // happen but notifyUserPaused is NOT called.
-    @Test fun `onPauseFromFocusLoss pauses without notifying user-paused`() = runTest {
+    // happen, notifyUserPaused is NOT called, and the method reports back that
+    // it actually interrupted live playback (true) — the signal the Android
+    // AudioFocusController uses to arm pausedByTransient.
+    @Test fun `onPauseFromFocusLoss pauses from Playing and reports interruption`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
         val built = build(muteCalls = muteCalls)
         built.controller.play()
         val before = built.msm.userPausedCount
 
-        built.controller.onPauseFromFocusLoss()
+        val interrupted = built.controller.onPauseFromFocusLoss()
 
+        assertTrue(
+            interrupted,
+            "onPauseFromFocusLoss must return true when it paused live playback so GAIN auto-resumes",
+        )
         assertEquals(PlaybackState.Paused, built.controller.state.value)
         assertEquals(
             listOf<PlaybackState>(PlaybackState.Playing, PlaybackState.Paused),
@@ -295,13 +302,43 @@ class PlaybackControllerTest {
         )
     }
 
-    @Test fun `onPauseFromFocusLoss is a no-op when not Playing`() = runTest {
+    @Test fun `onPauseFromFocusLoss is a no-op and reports no interruption when not Playing`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
         val built = build(muteCalls = muteCalls)
         // From Stopped
-        built.controller.onPauseFromFocusLoss()
+        val interrupted = built.controller.onPauseFromFocusLoss()
+        assertFalse(
+            interrupted,
+            "onPauseFromFocusLoss must return false when nothing was playing so GAIN does NOT auto-resume",
+        )
         assertEquals(PlaybackState.Stopped, built.controller.state.value)
         assertTrue(muteCalls.isEmpty())
         assertEquals(0, built.msm.userPausedCount)
+    }
+
+    // Regression for the [user-pause -> transient-loss -> gain] auto-resume bug:
+    // after the user pauses (e.g. widget Pause) we still hold audio focus, so a
+    // later transient loss (another app's autoplay video) arrives while Paused.
+    // onPauseFromFocusLoss must report false so the AudioFocusController does NOT
+    // arm pausedByTransient — otherwise the matching AUDIOFOCUS_GAIN resumes
+    // playback against the user's intent.
+    @Test fun `onPauseFromFocusLoss reports no interruption when already user-paused`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val built = build(muteCalls = muteCalls)
+        built.controller.play()
+        built.controller.pause() // user pauses (widget), still holding focus
+        muteCalls.clear()
+
+        val interrupted = built.controller.onPauseFromFocusLoss()
+
+        assertFalse(
+            interrupted,
+            "a transient loss while already user-paused must NOT arm auto-resume",
+        )
+        assertEquals(PlaybackState.Paused, built.controller.state.value)
+        assertTrue(
+            muteCalls.isEmpty(),
+            "no mute transition should occur — we were already Paused",
+        )
     }
 }

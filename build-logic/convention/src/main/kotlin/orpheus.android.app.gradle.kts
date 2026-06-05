@@ -8,7 +8,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
     id("dev.zacsweers.metro")
 }
 

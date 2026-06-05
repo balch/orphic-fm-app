@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     id("orpheus.kmp.compose")
-    alias(libs.plugins.ksp)
     alias(libs.plugins.metro)
 }
 

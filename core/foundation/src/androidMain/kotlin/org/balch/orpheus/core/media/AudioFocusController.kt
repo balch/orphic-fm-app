@@ -30,8 +30,14 @@ class AudioFocusController(
     interface Listener {
         /** Called after a transient loss when focus is regained. Resume playback. */
         fun onResumePlayback()
-        /** Called on LOSS_TRANSIENT. Pause; the FGS should stay up. */
-        fun onPauseTransient()
+        /**
+         * Called on LOSS_TRANSIENT. Pause if playing; the FGS should stay up.
+         * Returns true iff this actually interrupted LIVE playback — the focus
+         * controller arms auto-resume only then. A transient loss that lands
+         * while already paused (user paused but we still hold focus) returns
+         * false so the matching GAIN does NOT resume against the user's intent.
+         */
+        fun onPauseTransient(): Boolean
         /** Called on LOSS (permanent). Pause, stop FGS, do not auto-resume. */
         fun onLossPermanent()
     }
@@ -64,9 +70,24 @@ class AudioFocusController(
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 hasFocusFlag = false
-                pausedByTransient = true
-                log.info { "LOSS_TRANSIENT — pausing" }
-                listener?.onPauseTransient()
+                // Arm auto-resume ONLY if we actually interrupted live playback.
+                // Because we keep holding focus while paused, a transient loss can
+                // arrive when the user has already paused (e.g. they hit Pause in
+                // the widget, then another app's autoplay video grabs focus). In
+                // that case onPauseTransient() returns false and we must NOT arm
+                // pausedByTransient — otherwise the matching AUDIOFOCUS_GAIN would
+                // resume playback against the user's intent.
+                val wasPlaying = listener?.onPauseTransient() ?: false
+                // Latch, don't assign: once a transient that interrupted live
+                // playback has armed auto-resume, a SECOND transient arriving
+                // before the GAIN (we're now already paused, so onPauseTransient
+                // returns false) must NOT disarm it — otherwise the matching
+                // AUDIOFOCUS_GAIN would leave the user's music silenced.
+                if (wasPlaying) pausedByTransient = true
+                log.info {
+                    if (wasPlaying) "LOSS_TRANSIENT — paused live playback, will auto-resume on GAIN"
+                    else "LOSS_TRANSIENT while not playing — no auto-resume armed"
+                }
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 // No app action — system auto-ducks because CONTENT_TYPE_MUSIC.

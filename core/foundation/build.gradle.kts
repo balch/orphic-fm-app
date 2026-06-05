@@ -2,7 +2,6 @@ plugins {
     id("orpheus.kmp.compose")
     alias(libs.plugins.metro)
     alias(libs.plugins.kotlinSerialization)
-    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -18,6 +17,23 @@ kotlin {
     sourceSets {
         val jvmTest by getting {
             dependencies {
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+        // Robolectric host tests for the Android-only AudioFocusController /
+        // MediaSessionManager: drives the real OnAudioFocusChangeListener so the
+        // focus-event → auto-resume arming (pausedByTransient) and the transient
+        // escalation watchdog are covered end-to-end on the JVM.
+        //
+        // NOTE: these tests pin @Config(sdk = [34]) because Robolectric (see the
+        // `robolectric` version in libs.versions.toml) ships no shadow set for
+        // this module's compileSdk. If you bump compileSdk or Robolectric, keep
+        // the @Config SDK at a level Robolectric actually bundles (and >= minSdk).
+        val androidHostTest by getting {
+            dependencies {
+                implementation(libs.robolectric)
+                implementation(libs.junit)
+                implementation(libs.kotlin.testJunit)
                 implementation(libs.kotlinx.coroutines.test)
             }
         }

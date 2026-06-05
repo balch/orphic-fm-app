@@ -67,6 +67,12 @@ interface MediaSessionActionHandler {
      * (e.g., incoming phone call). Implementations should pause WITHOUT
      * signalling user intent back to the focus controller — pausedByTransient
      * must stay set so the next AUDIOFOCUS_GAIN auto-resumes.
+     *
+     * Returns true iff this call actually interrupted LIVE playback (i.e. we
+     * were Playing). The focus controller arms auto-resume only on a true
+     * return: a transient loss that arrives while we are already paused (the
+     * user paused but we still hold focus) must NOT arm a resume, or the
+     * matching AUDIOFOCUS_GAIN would play against the user's intent.
      */
-    fun onPauseFromFocusLoss() {}
+    fun onPauseFromFocusLoss(): Boolean = false
 }

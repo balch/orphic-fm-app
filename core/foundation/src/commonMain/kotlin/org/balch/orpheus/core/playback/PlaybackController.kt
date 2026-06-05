@@ -112,12 +112,16 @@ class PlaybackController(
      * Same effect as pause() on local state, but does NOT call notifyUserPaused —
      * pausedByTransient must stay set so the matching AUDIOFOCUS_GAIN auto-resumes.
      */
-    override fun onPauseFromFocusLoss() {
-        if (_state.value != PlaybackState.Playing) return
+    override fun onPauseFromFocusLoss(): Boolean {
+        // Not Playing → nothing to interrupt. Returning false tells the focus
+        // controller NOT to arm auto-resume, so a transient loss that lands
+        // while we are already (user-)paused won't resume on the next GAIN.
+        if (_state.value != PlaybackState.Playing) return false
         log.info { "onPauseFromFocusLoss (was Playing)" }
         _state.value = PlaybackState.Paused
         muteSink.apply(PlaybackState.Paused)
         mediaSessionManager.updatePlaybackState(false)
+        return true
     }
 
     private val overlayFlow: StateFlow<String?> =
