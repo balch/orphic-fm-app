@@ -61,6 +61,7 @@ import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import kotlin.time.Duration.Companion.milliseconds
 
 private val NoteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 private val ScaleNames = listOf(
@@ -302,7 +303,7 @@ fun PulsarPanel(
             val spaceEngine = state.trackEnginesSpace[selected]
             LaunchedEffect(selected, edmEngine, spaceEngine, pickerOpen) {
                 if (!pickerOpen) {
-                    delay(10_000L)
+                    delay(10_000L.milliseconds)
                     actions.selectTrack(null)
                 }
             }

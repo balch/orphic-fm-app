@@ -697,7 +697,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         if (std::strcmp(symbol, "playing") == 0)
             engine->pulsar_playing.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "vibe_generation") == 0)
-            engine->pulsar_vibe_generation.store(static_cast<int>(value), std::memory_order_relaxed);
+            // PT-1: release store so all per-track/tension/genre/band param
+            // atomics written BEFORE the generation bump are visible to the
+            // audio thread's acquire load before load_vibe reads them. Mirrors
+            // arrangement_generation's release/acquire fence below.
+            engine->pulsar_vibe_generation.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strcmp(symbol, "energy") == 0)
             engine->pulsar_energy.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "complexity") == 0)

@@ -280,6 +280,117 @@ static bool test_long_fill_no_handoff() {
     return pass;
 }
 
+// ── Task 1.1: SEED-4 — never let an always-active member be the initial lead ──
+static bool test_always_active_never_initial_lead() {
+    printf("\n=== Test: Always-active member never the initial lead (SEED-4) ===\n");
+
+    BandSoloConfigParam c{};
+    c.member_count = 3;
+    c.members[0].always_active = true;  c.members[0].track_count = 1; c.members[0].tracks[0] = 0; // drums
+    c.members[1].always_active = false; c.members[1].track_count = 1; c.members[1].tracks[0] = 3; // bass
+    c.members[2].always_active = false; c.members[2].track_count = 1; c.members[2].tracks[0] = 4; // lead
+
+    int drum_leads = 0;
+    for (uint32_t s = 1; s <= 4000; ++s) {
+        uint32_t seed = s;
+        if (select_initial_lead(c, seed) == 0) drum_leads++;
+    }
+
+    bool pass = (drum_leads == 0);  // drums must never be picked when melodic members exist
+    printf("  drum_leads=%d over 4000 rolls (expect 0) -- %s\n", drum_leads, pass ? "OK" : "FAIL");
+    printf("  Always-active never initial lead: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ── Task 1.2: BAND-02 — uniform fallback must exclude the current lead ──
+static bool test_empty_handoff_row_does_not_reselect_current_lead() {
+    printf("\n=== Test: Empty handoff row does not re-select current lead (BAND-02) ===\n");
+
+    BandSoloConfigParam c{};
+    c.member_count = 3;
+    for (int m = 0; m < 3; m++) { c.members[m].track_count = 1; c.members[m].tracks[0] = m; }
+    // handoff_matrix is all zeros (default), forcing the fallback path for any lead.
+
+    BandSoloState st{};
+    st.lead_member = 1;  // current lead = member 1
+
+    int self = 0;
+    for (uint32_t s = 1; s <= 4000; ++s) {
+        uint32_t seed = s;
+        if (select_next_lead(c, st, seed) == 1) self++;
+    }
+
+    bool pass = (self == 0);  // fallback must hand OFF, never re-pick the current lead
+    printf("  self re-picks=%d over 4000 rolls (expect 0) -- %s\n", self, pass ? "OK" : "FAIL");
+    printf("  Empty handoff row does not re-select current lead: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ── Task 1.3: Bound variance — bias initial lead toward improvisational members ──
+static bool test_initial_lead_biased_by_creativity() {
+    printf("\n=== Test: Initial lead biased by creativity (bound variance) ===\n");
+
+    BandSoloConfigParam c{};
+    c.member_count = 3;
+    c.members[0].always_active = true;  c.members[0].track_count = 1; c.members[0].tracks[0] = 0;
+    c.members[1].always_active = false; c.members[1].track_count = 1; c.members[1].tracks[0] = 3; c.members[1].creativity = 0.3f; // bass
+    c.members[2].always_active = false; c.members[2].track_count = 1; c.members[2].tracks[0] = 4; c.members[2].creativity = 0.6f; // lead
+
+    int lead = 0, bass = 0;
+    for (uint32_t s = 1; s <= 6000; ++s) {
+        uint32_t seed = s;
+        int w = select_initial_lead(c, seed);
+        if (w == 2) lead++;
+        else if (w == 1) bass++;
+    }
+
+    // Require a MEANINGFUL bias, not an RNG-noise coin-flip tie: the creative
+    // member's lead share must clearly exceed the bass member's. With equal
+    // weights this margin is ~0; with creativity weighting it is ~10%+.
+    bool pass = (lead > bass + 200);  // higher-creativity member should lead more often
+    printf("  lead(creativity 0.6)=%d  bass(creativity 0.3)=%d (expect lead > bass+200) -- %s\n",
+           lead, bass, pass ? "OK" : "FAIL");
+    printf("  Initial lead biased by creativity: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ── #7: never-led members start as "least-recent" so the first handoff
+//        actually prefers them (not collapsed to the recency floor) ──────
+static bool test_start_band_solo_seeds_recency_for_never_led() {
+    printf("\n=== Test: start_band_solo seeds bars_since_lead so never-led members are due (#7) ===\n");
+
+    BandSoloConfigParam config{};
+    config.member_count = 3;
+    for (int m = 0; m < 3; m++) { config.members[m].track_count = 1; config.members[m].tracks[0] = m; config.members[m].always_active = false; }
+
+    SectionParam section{};
+    section.solo_mode = SoloModeId::LICK_BUILDER;
+    section.solo_probability = 1.0f;
+
+    BandSoloState state{};
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    uint32_t seed = 24680;
+    start_band_solo(state, config, section, tracks, seed);
+
+    // The installed lead must read as just-led (0); every other (never-led)
+    // member must read as least-recent (the recency cap), so the first handoff's
+    // recency weighting prefers them instead of treating 0 as "just led".
+    bool lead_zero = (state.bars_since_lead[state.lead_member] == 0);
+    bool others_due = true;
+    for (int m = 0; m < config.member_count; m++) {
+        if (m == state.lead_member) continue;
+        if (state.bars_since_lead[m] < 32) others_due = false;
+    }
+
+    printf("  lead=%d bars_since_lead[lead]=%d others>=32=%s\n",
+           state.lead_member, state.bars_since_lead[state.lead_member],
+           others_due ? "YES" : "NO");
+
+    bool pass = lead_zero && others_due;
+    printf("  start_band_solo recency seeding: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 static bool test_personality_modifiers() {
     printf("\n=== Test: Personality modifiers (loudness affects volume) ===\n");
 
@@ -332,6 +443,10 @@ bool run_pulsar_band_solo_tests() {
     tally(test_pull_in_mechanic());
     tally(test_pull_in_duration_and_dropout());
     tally(test_long_fill_no_handoff());
+    tally(test_always_active_never_initial_lead());
+    tally(test_empty_handoff_row_does_not_reselect_current_lead());
+    tally(test_initial_lead_biased_by_creativity());
+    tally(test_start_band_solo_seeds_recency_for_never_led());
     tally(test_personality_modifiers());
     printf("\nPulsar band solo tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);

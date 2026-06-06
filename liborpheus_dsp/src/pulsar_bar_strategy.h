@@ -385,3 +385,40 @@ inline void apply_bar_strategy(
     // Double the step count to cover both bars
     ts.step_count = bar1_len * 2;
 }
+
+// ── Render a lick into a melodic track, honoring CALL_RESPONSE phrasing ──
+//
+// Single source of truth for "lick -> track steps", shared by the déjà-vu
+// pattern reset and the LickBuilder solo render (SOLO-1). CALL_RESPONSE builds a
+// two-bar question/answer across the full step_count; every other bar strategy
+// just loops the lick — the non-CR strategies shape *generated* patterns, not
+// single-line lick renders, which is why the load and déjà-vu paths treat lick
+// tracks the same way. The caller owns the lick buffer, the mutation amount, the
+// seed, and the note range, so the same recipe renders either the static vibe
+// lick (déjà-vu, mutation = eff_mutation) or the live, already-mutated solo lick
+// (SOLO-1, mutation = 0). The per-track seed salt (^ track*7919u) lives here so
+// every call site stays consistent.
+inline void render_lick_into_track(
+    PulsarTrackState& ts, int track_index,
+    const PulsarLickStep* lick, int lick_length, float lick_mutation,
+    uint8_t root, const PulsarScale& scale, uint32_t seed,
+    BarStrategy bar_strategy, int step_count,
+    int lick_octave,
+    uint8_t note_range_low, uint8_t note_range_high,
+    int lick_loop_length)
+{
+    ts.step_count = step_count;
+    if (bar_strategy == BarStrategy::CALL_RESPONSE) {
+        bar_strategy_call_response(ts.steps, step_count,
+                                   lick, lick_length, lick_mutation,
+                                   root, scale, seed ^ (static_cast<uint32_t>(track_index) * 7919u),
+                                   lick_octave, note_range_low, note_range_high,
+                                   lick_loop_length);
+    } else {
+        generate_lick_pattern(ts.steps, ts.step_count,
+                              lick, lick_length, lick_mutation,
+                              root, scale, seed ^ (static_cast<uint32_t>(track_index) * 7919u),
+                              0, lick_octave, note_range_low, note_range_high,
+                              lick_loop_length);
+    }
+}

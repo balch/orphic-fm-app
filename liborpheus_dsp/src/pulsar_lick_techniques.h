@@ -35,9 +35,16 @@ inline void init_live_lick(
 // Mutate the live lick in place based on a member's creativity trait.
 // Called once per bar when a LickBuilder lead is active.
 // creativity: 0 = faithful, 1 = wild reinterpretation
+//
+// MUT-4: when `base_degrees` is supplied, each evolving degree is clamped to
+// stay within +/- `max_degree_drift` scale degrees of the section-entry value.
+// This bounds the octave-jump idiom so the live lick can't run away now that it
+// is audibly rendered into the leading member's tracks (SOLO-1). Passing
+// base_degrees == nullptr preserves the legacy unbounded behavior.
 inline void mutate_live_lick(
     int8_t* degrees, float* durations, float* velocities, int length,
-    float creativity, uint32_t& seed
+    float creativity, uint32_t& seed,
+    const int8_t* base_degrees = nullptr, int max_degree_drift = 14
 ) {
     if (length <= 0) return;
 
@@ -69,6 +76,20 @@ inline void mutate_live_lick(
         if (roll < creativity * 0.1f) {
             int octave = (pattern_rand01(seed) > 0.5f) ? 7 : -7;
             degrees[i] = static_cast<int8_t>(degrees[i] + octave);
+        }
+
+        // MUT-4: clamp drift against the section-entry snapshot.
+        if (base_degrees) {
+            int lo = base_degrees[i] - max_degree_drift;
+            int hi = base_degrees[i] + max_degree_drift;
+            int d = degrees[i];
+            if (d < lo) d = lo;
+            if (d > hi) d = hi;
+            // Bound to int8_t range so the cast can't wrap past the drift clamp:
+            // base ± max_degree_drift can exceed [-128,127] for extreme bases.
+            if (d < -128) d = -128;
+            if (d > 127) d = 127;
+            degrees[i] = static_cast<int8_t>(d);
         }
     }
 }

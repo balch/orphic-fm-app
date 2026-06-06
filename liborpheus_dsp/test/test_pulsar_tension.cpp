@@ -1,8 +1,10 @@
 #include "test_harness.h"
+#include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 // ── Unit tests for tension system math (no engine needed) ──
 
@@ -259,6 +261,84 @@ static bool test_random_spurt_fires() {
     return ok;
 }
 
+// ── TENS-2: evolution smoother decays over multiple bars (releaseSpeed) ──
+//
+// The evo smoother must step ONCE PER BAR (not per audio block) so a high
+// releaseSpeed produces an audible multi-bar decay. With the old per-block
+// stepping the smoother converged within a few ms, so when tension_intensity
+// dropped (e.g. at the inner-cycle wrap) tension_evo_smooth followed almost
+// instantly — releaseSpeed had no observable effect.
+static bool test_tension_evo_release_speed_decays_over_bars() {
+    printf("\n=== Test: TENS-2 evo smoother decays over multiple bars (releaseSpeed) ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.7f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+    // Tension: inner cycle of 8 bars, no outer cycle. Intensity ramps
+    // 0 -> 7/8 over 8 bars then wraps to 0 (a sharp target drop).
+    engine->pulsar_tension_inner_bars.store(8, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+    engine->pulsar_tension_evo_attack_point.store(0.0f, std::memory_order_relaxed);  // evo_intensity == intensity
+    engine->pulsar_tension_evo_release_speed.store(0.85f, std::memory_order_relaxed); // slow decay
+    engine->pulsar_tension_evo_timbre_prob.store(1.0f, std::memory_order_relaxed);
+    for (int t = 0; t < 8; t++)
+        engine->pulsar_track_evo_weight[t].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_seed.store(99, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    // Capture (intensity, evo_smooth) once per bar (on loop_count change).
+    std::vector<float> bar_intensity, bar_evo;
+    int last_loop = -1;
+    for (int i = 0; i < 4000 && bar_evo.size() < 40; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            last_loop = ps->loop_count;
+            bar_intensity.push_back(ps->tension_intensity);
+            bar_evo.push_back(ps->tension_evo_smooth);
+        }
+    }
+
+    // Find a bar where intensity dropped sharply from the previous bar (the
+    // inner-cycle wrap, e.g. ~0.875 -> 0). At that bar the smoother must still
+    // be well above the new low intensity (it LAGS = multi-bar decay).
+    bool found_drop = false;
+    bool laggy = false;
+    int decay_bars = 0;
+    for (size_t b = 2; b < bar_intensity.size(); b++) {
+        if (bar_intensity[b - 1] > 0.5f && bar_intensity[b] < 0.15f) {
+            found_drop = true;
+            // evo_smooth should still hold substantial value at the drop bar
+            // (per-block stepping would have collapsed it to ~intensity).
+            if (bar_evo[b] > 0.25f) laggy = true;
+            // Count how many subsequent bars it takes to decay below 0.1.
+            for (size_t k = b; k < bar_evo.size(); k++) {
+                if (bar_evo[k] < 0.1f) break;
+                decay_bars++;
+            }
+            break;
+        }
+    }
+
+    printf("  captured %zu bars; found_drop=%s evo_at_drop_lags=%s decay_bars=%d\n",
+           bar_evo.size(), found_drop ? "YES" : "NO", laggy ? "YES" : "NO", decay_bars);
+
+    bool pass = found_drop && laggy && decay_bars >= 2;
+    printf("  TENS-2 evo release decay: %s\n", pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_pulsar_tension_tests() {
     printf("\n========== PULSAR TENSION TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -277,6 +357,7 @@ bool run_pulsar_tension_tests() {
     tally(test_bounded_drift_clamp());
     tally(test_original_lick_immutable());
     tally(test_random_spurt_fires());
+    tally(test_tension_evo_release_speed_decays_over_bars());
     printf("\nPulsar tension tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

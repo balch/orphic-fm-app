@@ -1417,6 +1417,135 @@ bool run_pulsar_tests() {
         orpheus_engine_destroy(eng_b);
     }
 
+    // ── Test: SEED-1 — explicit (non-zero) seed is byte-reproducible ──
+    {
+        printf("  Test SEED-1: explicit seed produces identical arrangement walk across loads\n");
+
+        // Captures the per-bar section-index path for one engine driven with a
+        // fixed non-zero seed through a probabilistic 2-section arrangement.
+        auto capture_section_path = [](int64_t seed) {
+            OrpheusEngine* e = orpheus_engine_create(48000.0f);
+            GraphUnit u;
+            std::memset(&u, 0, sizeof(u));
+            u.type = UNIT_PULSAR;
+            u.enabled = true;
+
+            e->pulsar_playing.store(1, std::memory_order_relaxed);
+            e->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+            setup_cosmic_techno(e);
+            // setup_jam_arrangement uses weighted transitions (s0->{0:0.6,1:0.4})
+            // so the section walk is seed-driven, not deterministic.
+            setup_jam_arrangement(e);
+            e->pulsar_seed.store(seed, std::memory_order_relaxed);
+            e->clock_bpm.store(240.0f, std::memory_order_relaxed);
+            trigger_vibe_load(e);
+
+            std::vector<int> path;
+            int last = -2;
+            // ~100 bars of audio at 240 BPM, 512-sample blocks.
+            for (int i = 0; i < 5000; i++) {
+                unit_process_pulsar(&u, e, 512, 48000.0f);
+                int cur = e->pulsar_state
+                    ? e->pulsar_state->section_state.current_section : -1;
+                if (cur != last) { path.push_back(cur); last = cur; }
+            }
+            orpheus_engine_destroy(e);
+            return path;
+        };
+
+        auto first  = capture_section_path(42);
+        auto second = capture_section_path(42);
+
+        bool reproducible = (first == second);
+        bool nontrivial = first.size() >= 3;  // arrangement actually walked
+
+        printf("    first.size=%zu second.size=%zu reproducible=%s nontrivial=%s\n",
+               first.size(), second.size(),
+               reproducible ? "YES" : "NO", nontrivial ? "YES" : "NO");
+
+        if (reproducible && nontrivial) {
+            printf("    PASS: explicit seed 42 reproduces the same section walk\n");
+            pass++;
+        } else {
+            printf("    FAIL: explicit seed did not reproduce (re-stir randomized it?)\n");
+            fail++;
+        }
+    }
+
+    // ── Test: SEED-1 random path (seed==0) still varies across loads ──
+    {
+        printf("  Test SEED-1b: seed==0 (random) still re-stirs mutation_seed\n");
+
+        // Directly inspect the post-load mutation_seed: the µs re-stir must make
+        // it differ across random (seed==0) loads. This is a more robust check
+        // than comparing short, collision-prone section walks.
+        auto capture_seed = []() {
+            OrpheusEngine* e = orpheus_engine_create(48000.0f);
+            GraphUnit u;
+            std::memset(&u, 0, sizeof(u));
+            u.type = UNIT_PULSAR;
+            u.enabled = true;
+            e->pulsar_playing.store(1, std::memory_order_relaxed);
+            e->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+            setup_cosmic_techno(e);
+            e->pulsar_seed.store(0, std::memory_order_relaxed);  // random
+            e->clock_bpm.store(240.0f, std::memory_order_relaxed);
+            trigger_vibe_load(e);
+            // First process call runs the lazy-init load_vibe; run a couple
+            // blocks then re-load so the re-stir path runs with a fresh µs read.
+            unit_process_pulsar(&u, e, 512, 48000.0f);
+            trigger_vibe_load(e);
+            unit_process_pulsar(&u, e, 512, 48000.0f);
+            uint32_t s = e->pulsar_state ? e->pulsar_state->mutation_seed : 0u;
+            orpheus_engine_destroy(e);
+            return s;
+        };
+
+        // Collect several seeds; the re-stir must produce at least two distinct
+        // values across loads (random path is not byte-frozen).
+        uint32_t seeds[6];
+        for (int i = 0; i < 6; i++) seeds[i] = capture_seed();
+        bool varies = false;
+        for (int i = 1; i < 6; i++) if (seeds[i] != seeds[0]) { varies = true; break; }
+
+        if (varies) {
+            printf("    PASS: random seed re-stir varies mutation_seed across loads\n");
+            pass++;
+        } else {
+            printf("    FAIL: random path did not vary (re-stir gate too aggressive?)\n");
+            fail++;
+        }
+    }
+
+    // ── Test: BAND-01 — pack_band_matrix re-packs stride-N to stride-8 ──
+    {
+        printf("  Test BAND-01: pack_band_matrix re-packs stride-N row-major to stride-8\n");
+
+        // Kotlin packs a 3x3 row-major stride-3 source; consumers read stride-8.
+        float src[9] = { 11,12,13,  21,22,23,  31,32,33 };
+        float dst[kMaxBandMembers * kMaxBandMembers];
+        for (auto& d : dst) d = -1.0f;  // poison to prove zeroing
+        pack_band_matrix(dst, src, 3);
+
+        bool row0_ok = (dst[0 * 8 + 0] == 11.0f) && (dst[0 * 8 + 1] == 12.0f) && (dst[0 * 8 + 2] == 13.0f);
+        bool row1_ok = (dst[1 * 8 + 0] == 21.0f) && (dst[1 * 8 + 1] == 22.0f) && (dst[1 * 8 + 2] == 23.0f);
+        bool row2_ok = (dst[2 * 8 + 0] == 31.0f) && (dst[2 * 8 + 1] == 32.0f) && (dst[2 * 8 + 2] == 33.0f);
+        bool unused_zeroed = (dst[3 * 8 + 0] == 0.0f) && (dst[2 * 8 + 3] == 0.0f) && (dst[0 * 8 + 7] == 0.0f);
+
+        printf("    row0={%.0f,%.0f,%.0f} -- %s\n", dst[0], dst[1], dst[2], row0_ok ? "OK" : "FAIL");
+        printf("    row1={%.0f,%.0f,%.0f} -- %s\n", dst[8], dst[9], dst[10], row1_ok ? "OK" : "FAIL");
+        printf("    row2={%.0f,%.0f,%.0f} -- %s\n", dst[16], dst[17], dst[18], row2_ok ? "OK" : "FAIL");
+        printf("    unused rows/cols zeroed -- %s\n", unused_zeroed ? "OK" : "FAIL");
+
+        if (row0_ok && row1_ok && row2_ok && unused_zeroed) {
+            printf("    PASS: stride-N -> stride-8 re-pack correct\n");
+            pass++;
+        } else {
+            printf("    FAIL: re-pack incorrect\n");
+            fail++;
+        }
+    }
+
     printf("\nPulsar: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);
 }

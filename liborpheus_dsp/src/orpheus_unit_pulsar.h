@@ -631,6 +631,10 @@ struct PulsarState {
     float live_lick_velocities[32] = {};
     int live_lick_length = 0;
     bool live_lick_active = false;
+    // MUT-4: section-entry snapshot of the lick degrees. mutate_live_lick clamps
+    // each evolving degree against this so the octave-jump idiom can't run away
+    // now that the live lick is audibly rendered (SOLO-1).
+    int8_t live_lick_base_degrees[32] = {};
 
     // Arrangement read-back (written by audio thread, read by viz polling)
     // relaxed atomics: zero overhead on ARM/x86 for aligned ints, standards-compliant
@@ -653,3 +657,17 @@ struct PulsarState {
 struct GraphUnit;
 
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+
+// Re-pack a Kotlin-packed (stride-N, row-major) NxN matrix into the engine's
+// fixed stride-kMaxBandMembers layout the consumers read. Zeros unused rows so
+// a previous vibe with more members can't leak (band_solo_config is persistent).
+// Declared inline in the header so both the audio thread (load_vibe) and the
+// C++ test harness can call it directly.
+inline void pack_band_matrix(float* dst /*[kMaxBandMembers*kMaxBandMembers]*/,
+                             const float* src_packed /*[N*N]*/, int n) {
+    for (int i = 0; i < kMaxBandMembers * kMaxBandMembers; i++) dst[i] = 0.0f;
+    if (n < 1 || n > kMaxBandMembers) return;
+    for (int from = 0; from < n; from++)
+        for (int to = 0; to < n; to++)
+            dst[from * kMaxBandMembers + to] = src_packed[from * n + to];
+}

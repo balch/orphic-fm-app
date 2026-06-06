@@ -414,7 +414,7 @@ class TechnoWobbleVibe : VibeProvider {
             ),
             stepCount = 32,  // 32-step patterns support the 8-bar hypnotic loop
             tension = TensionProfile(
-                innerBars = 8, outerBars = 32, outerDepth = 0.7f,  // long arcs
+                innerBars = 8, outerBars = 32, outerDepth = 0.8f,  // long arcs — deeper outer swing (TW-4)
                 volume = 0.30f,        // subtle volume tension — keep it relentless
                 tonal = TonalTension(
                     octaveShift = false,   // bass stays in the deep
@@ -425,7 +425,7 @@ class TechnoWobbleVibe : VibeProvider {
                     timbreLow = 0.25f, timbreHigh = 0.70f, timbreProbability = 0.85f,  // breathing distortion
                     morphLow = 0.30f,  morphHigh = 0.65f, morphProbability = 0.6f,
                     harmonicsLow = 0.40f, harmonicsHigh = 0.75f, harmonicsProbability = 0.5f,
-                    attackPoint = 0.6f,    // build past midpoint — slow inevitability
+                    attackPoint = 0.4f,    // build earlier so the evolution arc opens sooner (TW-4)
                     releaseSpeed = 0.25f,  // slow decay — hang in the tension
                 ),
                 spurtChance = 0.08f,   // occasional bursts — not jittery
@@ -443,6 +443,7 @@ class TechnoWobbleVibe : VibeProvider {
             ),
             arrangement = Arrangement(
                 introIndex = 0,
+                outroIndex = 4,   // drift (last section) is the terminal outro (TW-6)
                 sections = listOf(
                     // 0: pulse — opens with kick + pad only. Dread builds.
                     // pulse -> grind: chorusLift (smooth climb into the verse).
@@ -466,7 +467,7 @@ class TechnoWobbleVibe : VibeProvider {
                         transitions = listOf(
                             SectionTransition(targetIndex = 2, weight = 0.5f, transitionBars = chorusLiftBars),
                             SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = chorusDropBars),
-                            SectionTransition(targetIndex = 4, weight = 0.2f),  // 0-bar = hard outro entry
+                            SectionTransition(targetIndex = 4, weight = 0.05f),  // 0-bar = hard outro entry; rare (SEC-5) — don't drop straight into the outro
                         ),
                         recencyDecay = 0.6f,
                         macroOverrides = null,  // grind IS the baseline
@@ -556,8 +557,8 @@ class TechnoWobbleVibe : VibeProvider {
                         ),
                     ),
                     // 4: drift — the ending. Everything decays, pad holds, kick fades.
-                    // True outro: empty transitions terminate the arrangement.
-                    // drift -> grind: chorusLift (loop re-entry rises smoothly).
+                    // True outro: empty transitions terminate the arrangement (TW-6).
+                    // Reached as the arrangement's outroIndex; the song ends here.
                     Section(
                         name = "drift",
                         barsMin = 3, barsMax = 4,
@@ -565,9 +566,7 @@ class TechnoWobbleVibe : VibeProvider {
                             energy = 0.25f, space = 1.7f, mood = 0.9f,
                         ),
                         chordFollow = ChordFollow.ROOT_ONLY,
-                        transitions = listOf(
-                                SectionTransition(targetIndex = 1, weight = 1f, transitionBars = chorusLiftBars),
-                        ),
+                        transitions = emptyList(),   // terminal — see Arrangement.outroIndex = 4 (TW-6)
                         compingHumanization = cleanHumanization,
                         // Drift is the deliberate decay. Kick fades, lead becomes
                         // sparse held decays, pad holds nearly forever, MOD wildcard

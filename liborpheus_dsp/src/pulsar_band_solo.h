@@ -25,12 +25,22 @@ inline int select_initial_lead(
     float total = 0.0f;
 
     for (int i = 0; i < config.member_count; i++) {
-        // Prefer non-always-active members as initial lead
-        weights[i] = config.members[i].always_active ? 0.1f : 1.0f;
+        // Bound the roll toward improvisational intent: creative members lead more
+        // often. always_active (drums) never lead. Floor keeps every member possible.
+        weights[i] = config.members[i].always_active
+            ? 0.0f
+            : (0.3f + config.members[i].creativity);
         total += weights[i];
     }
 
-    if (total <= 0.0f) return 0;
+    if (total <= 0.0f) {
+        // Degenerate: every member is always_active, so no melodic member exists
+        // to lead. Someone must be the nominal lead; pick uniformly rather than
+        // always member 0 so the choice at least varies. (The "always_active never
+        // leads" guarantee is vacuous when there is no non-always-active member.)
+        if (config.member_count <= 0) return 0;
+        return static_cast<int>(pattern_rand01(seed) * config.member_count) % config.member_count;
+    }
 
     float roll = pattern_rand01(seed) * total;
     float cumulative = 0.0f;
@@ -69,10 +79,23 @@ inline int select_next_lead(
     }
 
     if (total <= 0.0f) {
-        // Fallback: uniform among non-always-active
+        // Fallback: hand OFF — never re-pick the current lead; prefer least-recent.
         for (int i = 0; i < config.member_count; i++) {
-            weights[i] = config.members[i].always_active ? 0.1f : 1.0f;
+            if (i == from) { weights[i] = 0.0f; continue; }
+            float base = config.members[i].always_active ? 0.0f : 1.0f;
+            int bars_ago = state.bars_since_lead[i];
+            float recency = 1.0f;
+            const float kDecay = 0.85f;
+            for (int p = 0; p < bars_ago && p < 32; p++) recency *= kDecay;
+            weights[i] = base * (0.05f + 0.95f * (1.0f - recency));
             total += weights[i];
+        }
+        if (total <= 0.0f) {  // degenerate (e.g. all always-active): allow any non-self
+            for (int i = 0; i < config.member_count; i++) {
+                if (i == from) continue;
+                weights[i] = 1.0f;
+                total += 1.0f;
+            }
         }
     }
 
@@ -218,14 +241,19 @@ inline void start_band_solo(
     int lead_bars = bars_min + static_cast<int>(pattern_rand01(seed) * range) % range;
 
     for (int m = 0; m < config.member_count; m++) {
-        state.bars_since_lead[m] = 0;
         state.member_bars_remaining[m] = 0;
 
         if (m == state.lead_member) {
             state.member_role[m] = MemberSoloRole::LEADING;
             state.member_bars_remaining[m] = lead_bars;
+            state.bars_since_lead[m] = 0;   // just became lead
         } else {
             state.member_role[m] = MemberSoloRole::SUPPORT;
+            // Never-led members are "due": seed bars_since_lead at the recency
+            // decay cap (32) so the first handoff's recency weighting — and the
+            // empty-row fallback — actually prefer them, instead of treating
+            // bars_since_lead==0 as "just led" and collapsing everyone to the floor.
+            state.bars_since_lead[m] = 32;
         }
     }
 
