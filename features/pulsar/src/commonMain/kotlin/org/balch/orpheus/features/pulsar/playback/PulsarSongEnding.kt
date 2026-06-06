@@ -204,7 +204,14 @@ class PulsarSongEnding(
         if (_endingTriggered.value && _finalSectionIndex.value >= 0 && !songEndedEmitted) {
             val transitionedOut = lastObservedSectionIndex == _finalSectionIndex.value
                 && state.sectionIndex != _finalSectionIndex.value
+            // The `lastObservedSectionIndex == finalSectionIndex` guard ensures we
+            // only count a TRUE loop (bar 0 re-entry while already in the final
+            // section) — not the bars-reset that happens when we first ENTER the
+            // final section from another one. Without it, capturing
+            // finalSectionIndex ahead of arrival (see triggerOutro) would fire a
+            // premature SongEnded on the entry bar.
             val sectionLooped = state.sectionIndex == _finalSectionIndex.value
+                && lastObservedSectionIndex == _finalSectionIndex.value
                 && lastObservedBarsElapsed >= 0
                 && state.barsElapsed < lastObservedBarsElapsed
             if (transitionedOut || sectionLooped) {
@@ -261,12 +268,24 @@ class PulsarSongEnding(
 
     private fun triggerOutro() {
         _endingTriggered.value = true
+        // When the arrangement names a dedicated outro section, the C++ engine
+        // pins current_section to outro_index at the next boundary and re-routes
+        // there every boundary after (the outro request is sticky). Capture it as
+        // the final section NOW. The change-based capture in onArrangementTick()
+        // only fires on a section-index CHANGE, which never happens when we arm
+        // while already in the outro section (e.g. Tremolo Tide's breakdown, whose
+        // outroIndex == lastIndex) — leaving finalSectionIndex at -1 forever, so
+        // SongEnded never fires and the section loops endlessly.
+        val outroIndex = pulsarFeature.vibeFlow.value.arrangement?.outroIndex ?: -1
+        if (outroIndex >= 0) {
+            _finalSectionIndex.value = outroIndex
+        }
         synthController.setPluginControl(
             PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
             IntValue(1),
         )
         val name = pulsarFeature.vibeFlow.value.name
-        log.info { "outro triggered for $name" }
+        log.info { "outro triggered for $name (finalSection=${_finalSectionIndex.value})" }
         _events.tryEmit(SongEndingEvent.OutroTriggered(name))
     }
 

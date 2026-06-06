@@ -8,6 +8,8 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
@@ -189,6 +191,150 @@ class PulsarSongEndingTest {
         assertTrue(collected.any { it is SongEndingEvent.SongEnded }, "SongEnded emitted")
         job.cancel()
     }
+
+    // ─── Regression: arming while already IN the outro section ──────────────────
+    // Repro for the "Tremolo Tide keeps repeating breakdown" bug. When a vibe's
+    // outroIndex points at a section that is also reachable during normal play
+    // (e.g. breakdown), the C++ engine pins current_section to outroIndex once
+    // armed and never leaves it. If the user arms the outro while the song is
+    // ALREADY in that section, the section index never changes, so the
+    // change-based finalSectionIndex capture never fires — and SongEnded never
+    // emits, so the section loops forever with no ending indicator.
+
+    @Test
+    fun `arming outro while already in outro section captures finalSectionIndex immediately`() = runTest {
+        val vibe = mkVibeWithOutro("Tide", sectionCount = 2, outroIndex = 1)
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.playbackController.play()
+
+        // Song is currently in the outro section (1), part-way through.
+        harness.feature.arrangement.value = PulsarArrangementState(1, 2, 6, false, -1, 0)
+        runCurrent()
+
+        // User presses ENDING while already in section 1.
+        harness.songEnding.armOutro()
+        runCurrent()
+
+        assertEquals(
+            1, harness.songEnding.finalSectionIndexForTest,
+            "outroIndex must be captured immediately — no section-index change will ever occur",
+        )
+    }
+
+    @Test
+    fun `SongEnded fires when outro armed while already in outroIndex section then loops`() = runTest {
+        val vibe = mkVibeWithOutro("Tide", sectionCount = 2, outroIndex = 1)
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.playbackController.play()
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        // In the outro section (1), mid-way.
+        harness.feature.arrangement.value = PulsarArrangementState(1, 2, 6, false, -1, 0)
+        runCurrent()
+        // Arm while in section 1.
+        harness.songEnding.armOutro()
+        runCurrent()
+        // Section 1 keeps playing (index never changes — engine pins it here).
+        harness.feature.arrangement.value = PulsarArrangementState(1, 4, 6, false, -1, 0)
+        runCurrent()
+        // Section 1 loops back to bar 0 of itself.
+        harness.feature.arrangement.value = PulsarArrangementState(1, 0, 6, false, -1, 0)
+        runCurrent()
+
+        assertTrue(
+            collected.any { it is SongEndingEvent.SongEnded },
+            "SongEnded must fire when the armed outro section loops, even if armed while already in it",
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun `no premature SongEnded on entry into outro section when armed elsewhere`() = runTest {
+        val vibe = mkVibeWithOutro("Tide", sectionCount = 2, outroIndex = 1)
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.playbackController.play()
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        // In section 0, several bars in.
+        harness.feature.arrangement.value = PulsarArrangementState(0, 5, 8, false, -1, 0)
+        runCurrent()
+        // Arm while NOT in the outro section.
+        harness.songEnding.armOutro()
+        runCurrent()
+        // Engine routes into the outro section (1): barsElapsed resets to 0. This
+        // must NOT be mistaken for a loop of the final section.
+        harness.feature.arrangement.value = PulsarArrangementState(1, 0, 6, false, -1, 0)
+        runCurrent()
+
+        assertTrue(
+            collected.none { it is SongEndingEvent.SongEnded },
+            "entering the final section is not the same as the final section looping",
+        )
+        job.cancel()
+    }
+
+    // ─── Invariant: RANDOM never resolves to a non-style ────────────────────────
+    // "PLAYS" is NOT a TransitionStyle — it's only the pill's label when song-
+    // ending is disabled. The RANDOM resolver picks from the safe styles, which
+    // excludes RANDOM itself. This locks that invariant so a future enum/pool
+    // change can't let RANDOM resolve to RANDOM (or any unsafe value).
+
+    @Test
+    fun `RANDOM transition resolves to a safe concrete style and never offers RANDOM`() = runTest {
+        val harness = TestHarness(this, initialVibe = mkMinimalVibe("Init"))
+        var offeredPool: List<TransitionStyle> = emptyList()
+        harness.songEnding.randomPicker = { pool -> offeredPool = pool; pool.first() }
+
+        // Apply a vibe whose transition-out is RANDOM (empty pool => safe-styles fallback).
+        harness.feature.applyVibe(
+            mkMinimalVibe("Rnd", transitionOut = TransitionSpec(TransitionStyle.RANDOM)),
+        )
+        advanceUntilIdle()
+
+        assertTrue(offeredPool.isNotEmpty(), "random candidate pool must not be empty")
+        assertTrue(
+            TransitionStyle.RANDOM !in offeredPool,
+            "RANDOM must never be a candidate for itself (no recursion, no PLAYS)",
+        )
+        assertTrue(offeredPool.all { it.isSafe }, "every candidate must be a safe, concrete style")
+        assertEquals(
+            TransitionStyle.entries.filter { it.isSafe }.size,
+            offeredPool.size,
+            "empty randomPool must fall back to exactly the safe-style set",
+        )
+        assertTrue(
+            harness.songEnding.resolvedTransitionStyle.value != TransitionStyle.RANDOM,
+            "resolved style must be concrete, never RANDOM",
+        )
+    }
+}
+
+/**
+ * Build a [Vibe] whose arrangement names a dedicated [outroIndex] across
+ * [sectionCount] sections. Mirrors how production vibes set
+ * `outroIndex = sectionList.lastIndex`.
+ */
+private fun mkVibeWithOutro(
+    name: String,
+    sectionCount: Int,
+    outroIndex: Int,
+): org.balch.orpheus.features.pulsar.models.Vibe {
+    val base = mkMinimalVibe(name)
+    val arr = requireNotNull(base.arrangement)
+    return base.copy(
+        arrangement = arr.copy(
+            sections = List(sectionCount) {
+                org.balch.orpheus.features.pulsar.models.Section(name = "s$it")
+            },
+            outroIndex = outroIndex,
+        ),
+    )
 }
 
 // ─── Test harness ────────────────────────────────────────────────────────────
