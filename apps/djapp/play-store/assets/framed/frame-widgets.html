@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; background: #0A0814; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; }
+
+  .frame {
+    position: relative;
+    width: 1080px;
+    height: 1920px;
+    padding: 96px 70px 90px;
+    background:
+      radial-gradient(90% 48% at 50% 7%, rgba(54, 224, 208, 0.10), transparent 60%),
+      radial-gradient(95% 50% at 50% 96%, rgba(224, 64, 251, 0.12), transparent 60%),
+      url("backdrop.png") center / cover no-repeat,
+      #0A0814;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .caption { text-align: center; width: 100%; }
+  .headline {
+    color: #FFFFFF; font-size: 70px; font-weight: 800; line-height: 1.06;
+    letter-spacing: -1.5px; margin: 0; text-shadow: 0 2px 24px rgba(0,0,0,0.45);
+  }
+  .accent {
+    width: 104px; height: 6px; border-radius: 4px; margin: 30px auto 26px;
+    background: linear-gradient(90deg, #36E0D0 0%, #B14CFF 50%, #FF5DC8 100%);
+    box-shadow: 0 0 24px rgba(177, 76, 255, 0.55);
+  }
+  .subhead {
+    color: #C9C4E8; font-size: 35px; font-weight: 500; line-height: 1.32;
+    margin: 0 auto; max-width: 880px;
+  }
+
+  /* Layered, rotated widget cards floating on the gradient. */
+  .stage { position: absolute; inset: 0; }
+  .card {
+    position: absolute;
+    filter:
+      drop-shadow(0 36px 70px rgba(0, 0, 0, 0.68))
+      drop-shadow(0 0 46px rgba(54, 224, 208, 0.10));
+  }
+
+  /* DogHouse — back card, tilted left */
+  #dh {
+    width: 690px;
+    top: 720px; left: 110px;
+    transform: rotate(-7deg);
+    z-index: 1;
+  }
+  /* Compact RIF — front card, tilted right, overlapping the back card */
+  #rif {
+    width: 770px;
+    top: 1090px; left: 225px;
+    transform: rotate(6deg);
+    z-index: 2;
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="caption">
+      <h1 class="headline">Glance, tap, vibe</h1>
+      <div class="accent"></div>
+      <p class="subhead">Control playback right from your home screen</p>
+    </div>
+    <div class="stage">
+      <img id="dh"  class="card" src="card-doghouse.png" alt="" />
+      <img id="rif" class="card" src="card-rif.png" alt="" />
+    </div>
+  </div>
+</body>
+</html>

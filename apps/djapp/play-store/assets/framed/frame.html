@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0A0814;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  * { box-sizing: border-box; }
+
+  .frame {
+    width: 1080px;
+    height: 1920px;
+    padding: 96px 70px 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background:
+      radial-gradient(120% 80% at 50% -8%, rgba(54, 224, 208, 0.18), transparent 55%),
+      radial-gradient(120% 90% at 50% 112%, rgba(224, 64, 251, 0.18), transparent 55%),
+      linear-gradient(180deg, #0C0A1C 0%, #0A0814 52%, #0D0A1E 100%);
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .caption { text-align: center; width: 100%; }
+
+  .headline {
+    color: #FFFFFF;
+    font-size: 70px;
+    font-weight: 800;
+    line-height: 1.06;
+    letter-spacing: -1.5px;
+    white-space: pre-line;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
+    margin: 0;
+  }
+
+  .accent {
+    width: 104px;
+    height: 6px;
+    border-radius: 4px;
+    margin: 30px auto 26px;
+    background: linear-gradient(90deg, #36E0D0 0%, #B14CFF 50%, #FF5DC8 100%);
+    box-shadow: 0 0 24px rgba(177, 76, 255, 0.55);
+  }
+
+  .subhead {
+    color: #C9C4E8;
+    font-size: 35px;
+    font-weight: 500;
+    line-height: 1.32;
+    letter-spacing: 0.2px;
+    margin: 0 auto;
+    max-width: 880px;
+  }
+
+  .shot-wrap {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    margin-top: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .shot {
+    max-height: 100%;
+    max-width: 80%;
+    border-radius: 46px;
+    border: 1.5px solid rgba(255, 255, 255, 0.10);
+    box-shadow:
+      0 44px 96px rgba(0, 0, 0, 0.60),
+      0 0 60px rgba(54, 224, 208, 0.10);
+  }
+
+  /* Widget frames: the source PNG is already a rounded, transparent-corner
+     card, so it floats on the gradient with a shape-following drop shadow. */
+  .shot.widget {
+    max-width: 88%;
+    max-height: 80%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    filter:
+      drop-shadow(0 30px 64px rgba(0, 0, 0, 0.62))
+      drop-shadow(0 0 42px rgba(54, 224, 208, 0.12));
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="caption">
+      <h1 class="headline" id="headline"></h1>
+      <div class="accent"></div>
+      <p class="subhead" id="subhead"></p>
+    </div>
+    <div class="shot-wrap">
+      <img class="shot" id="shot" alt="" />
+    </div>
+  </div>
+
+  <script>
+    // Each entry produces one 1080x1920 Play Store frame.
+    const FRAMES = [
+      {
+        img: "../screenshots/01-hero.png",
+        headline: "Four knobs.\nInfinite music.",
+        subhead: "Energy · Complexity · Mood · Space",
+      },
+      {
+        img: "../screenshots/03-vibe-picker.png",
+        headline: "A dozen vibes,\nendless variations",
+        subhead: "From upbeat grooves to deep ambient drones",
+      },
+      {
+        img: "../screenshots/02-active-mix.png",
+        headline: "Ride the mix, live",
+        subhead: "Balance every track in real time",
+      },
+      {
+        img: "../screenshots/07-extra.png",
+        headline: "Drop effects\non the fly",
+        subhead: "Delay, reverb, filters — your DJ module",
+      },
+      {
+        img: "../screenshots/04-timer.png",
+        headline: "Drift off with\nthe sleep timer",
+        subhead: "For bedtime, focus blocks, or a long drive",
+      },
+      {
+        // 5: widget candidate — RIF, compact (wide) card.
+        img: "../screenshots/08-widget-rif-compact.png",
+        widget: true,
+        headline: "Glance, tap, vibe",
+        subhead: "A home-screen widget — see what's playing, control it instantly",
+      },
+      {
+        // 6: widget candidate — RIF, tall card (big artwork).
+        img: "../screenshots/08-widget-rif-tall.png",
+        widget: true,
+        headline: "Glance, tap, vibe",
+        subhead: "A home-screen widget — see what's playing, control it instantly",
+      },
+      {
+        // 7: widget candidate — Dog House, tall card.
+        img: "../screenshots/08-widget-doghouse.png",
+        widget: true,
+        headline: "Glance, tap, vibe",
+        subhead: "A home-screen widget — see what's playing, control it instantly",
+      },
+    ];
+
+    const idx = Math.max(0, parseInt((location.hash || "#0").slice(1), 10) || 0);
+    const f = FRAMES[idx] || FRAMES[0];
+    document.getElementById("headline").textContent = f.headline;
+    document.getElementById("subhead").textContent = f.subhead;
+    const shot = document.getElementById("shot");
+    if (f.widget) shot.classList.add("widget");
+    shot.src = f.img;
+  </script>
+</body>
+</html>
