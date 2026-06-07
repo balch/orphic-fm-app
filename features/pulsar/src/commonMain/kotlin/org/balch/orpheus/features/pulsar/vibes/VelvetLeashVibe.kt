@@ -37,6 +37,7 @@ import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
@@ -107,7 +108,16 @@ class VelvetLeashVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
             ),
-            // 2: chorus — i—iv—i—V lift, two chords per bar
+            // 2: chorus — i—iv—i—V lift, two chords per bar.
+            //    The marimba hook PEDALS on the tonic here (per-track FIXED) rather
+            //    than FOLLOWing i—iv—i—V. With FOLLOW, the chord offset is added then
+            //    folded into the marimba's lowest octave, so the iv (+5) and V (+7)
+            //    leaps fold to a lurching up-a-4th / down-a-4th contour — that's the
+            //    "disjointed" feel. Pedaling the hook on i keeps it stable while the
+            //    keys + bass carry the harmonic motion underneath.
+            //    A low-mutation LickBuilder hands the pedaled hook to the lead member
+            //    (marimba wins — highest melodic creativity) so the chorus gets a
+            //    clear, developing focal melody while the rest of the band ducks.
             Section(
                 name = "chorus",
                 barsMin = 4, barsMax = 8,
@@ -118,10 +128,14 @@ class VelvetLeashVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
-                    energy = 1.25f, complexity = 1.20f, space = 0.85f, mood = 1.15f,
+                    energy = 1.25f, complexity = 1.05f, space = 0.85f, mood = 1.15f,
                 ),
                 customProgression = chorusProgression,
                 chordsPerBar = chorusChordsPerBar,
+                soloMode = SoloMode.LickBuilder(probability = 0.85f, mutationRate = 0.30f),
+                trackOverrides = mapOf(
+                    4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
+                ),
             ),
             // 3: solo — band trades over the walkdown.
             //    4–8 pattern bars = 8–16 musical bars = 2–4 walkdown cycles.

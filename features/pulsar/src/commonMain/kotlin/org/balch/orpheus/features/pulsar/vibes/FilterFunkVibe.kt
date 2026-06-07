@@ -40,6 +40,7 @@ import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
@@ -67,7 +68,15 @@ class FilterFunkVibe : VibeProvider {
                 recencyDecay = 0.5f,
                 macroOverrides = null,  // groove IS the baseline
             ),
-            // 1: build — rising energy, more complexity, filter opens up
+            // 1: build — rising energy, more complexity, filter opens up.
+            //    The lead PEDALS the hook here (track 4 → per-track FIXED) instead of
+            //    FOLLOWing the POP I—V—vi—IV chords. With FOLLOW, the active chord
+            //    offset is added then folded into the lead's lowest octave, so the
+            //    V (+7) and IV (+5) leaps fold to a lurching up-a-4th / down-a-4th
+            //    contour four times a bar — the "disjointed" feel at the song's peak.
+            //    Pedaling keeps the hook in-key while bass + keys carry the motion.
+            //    A low-mutation LickBuilder hands the pedaled hook to the lead member
+            //    so the build gets a recognizable, developing focal melody.
             Section(
                 name = "build",
                 barsMin = 4, barsMax = 8,
@@ -79,6 +88,10 @@ class FilterFunkVibe : VibeProvider {
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
                     energy = 1.3f, complexity = 1.5f, space = 0.8f, mood = 1.3f,
+                ),
+                soloMode = SoloMode.LickBuilder(probability = 0.7f, mutationRate = 0.30f),
+                trackOverrides = mapOf(
+                    4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
                 ),
             ),
             // 2: interlude — round-robin short solos, each instrument takes a turn

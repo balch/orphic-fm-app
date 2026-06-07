@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
@@ -95,7 +96,18 @@ class ArmyStompVibe : VibeProvider {
                 macroOverrides = MacroOverrides(
                     energy = 1.5f, complexity = 1.5f, space = 0.4f, mood = 1.3f,
                 ),
-                soloMode = SoloMode.LongFill(probability = 0.4f),
+                // The Squash lead PEDALS the hook here (per-track FIXED) instead of
+                // FOLLOWing the i-iv-VI-VII progression. With FOLLOW, the chord offset
+                // is added then folded into the lead's lowest octave, so the lead-off
+                // i->iv (+5) 4th leap folds to a lurching up-a-4th contour — that's the
+                // "disjointed" feel. Pinning the lead to FIXED keeps the hook stable and
+                // in-key while the ROOT_ONLY bass + keys carry the harmonic motion.
+                // A low-mutation LickBuilder then hands the pedaled hook to the leading
+                // band member so the high-energy charge gets a developing focal melody.
+                soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.30f),
+                trackOverrides = mapOf(
+                    4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
+                ),
                 customProgression = chords(0, 3, 5, 6),
                 chordsPerBar = 2,
             ),

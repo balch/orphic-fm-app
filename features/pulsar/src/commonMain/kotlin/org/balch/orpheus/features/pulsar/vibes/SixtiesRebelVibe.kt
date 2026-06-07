@@ -27,6 +27,7 @@ import org.balch.orpheus.features.pulsar.models.SoloMode
 import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
@@ -282,13 +283,27 @@ class SixtiesRebelVibe : VibeProvider {
                             SectionTransition(3, 0.4f)
                         ),
                     ),
+                    // chorus — i—V—i—IV lift, two chords per bar.
+                    //   The fuzz riff PEDALS on the tonic here (per-track FIXED) rather
+                    //   than FOLLOWing i—V—i—IV. With FOLLOW, the chord offset is added
+                    //   then folded into the lead's lowest octave, so the V (+4) and IV
+                    //   (+3) leaps fold to a lurching up-a-4th / down-a-4th contour —
+                    //   that's the "disjointed" feel. Pedaling the riff on i keeps its
+                    //   signature shape while the strums + piano + bass carry the motion.
+                    //   A low-mutation LickBuilder hands the pedaled riff to the lead
+                    //   member (the Guitar wins — highest melodic creativity) so the
+                    //   chorus reads as a clear, developing hook.
                     Section(
                         name = "chorus",
                         barsMin = 4, barsMax = 4,
                         transitions = listOf(SectionTransition(1, 1f)),
-                        macroOverrides = MacroOverrides(energy = .5f, complexity = 2.0f, mood = .4f),
+                        macroOverrides = MacroOverrides(energy = .5f, complexity = 1.3f, mood = .4f),
                         customProgression = chorusProgression,
                         chordsPerBar = chorusChordsPerBar,
+                        soloMode = SoloMode.LickBuilder(probability = 0.85f, mutationRate = 0.30f),
+                        trackOverrides = mapOf(
+                            4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
+                        ),
                     ),
                     Section(
                         name = "solo",

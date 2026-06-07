@@ -159,6 +159,17 @@ class TremoloTideVibe : VibeProvider {
                 // No compingStyle override — let track 5 keep PAD wash and track 7
                 // keep its REGGAE_SKANK accent, so the bed stays under the lift.
                 compingInversion = SectionInversion.OPEN_VOICING,
+                // Pedal the tremolo lead's held-tonic hook (track 4) on the tonic
+                // here rather than FOLLOWing i — bVII — bVII — iv. With FOLLOW the
+                // chord offset is added then folded into the lead's lowest octave,
+                // so the bVII (+10) and iv (+5) leaps fold to a lurching up-a-4th /
+                // down-a-4th contour — the "disjointed" hang. Anchoring it FIXED
+                // keeps the sustain stable and in-key while the bass + chordal pad
+                // (track 5) + resonant accent carry the harmonic motion underneath,
+                // reading more like the intended wicked-game hold than a lurch.
+                trackOverrides = mapOf(
+                    4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
+                ),
                 // The lift arc: late-peaking shimmer that rides the held bVII.
                 // Higher evolution probabilities push timbre/morph/harmonics
                 // to wander wider during the chorus than the verse baseline.

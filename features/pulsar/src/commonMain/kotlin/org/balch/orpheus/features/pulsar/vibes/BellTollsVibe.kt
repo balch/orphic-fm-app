@@ -38,6 +38,7 @@ import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
@@ -134,6 +135,15 @@ class BellTollsVibe : VibeProvider {
             // SKA_UPSTROKES for a busier off-beat feel. Classic reggae lift.
             // chorus -> groove / solo: skankLift (gentle return / lead-in).
             // chorus -> dub: dubFade (long descent into the breakdown).
+            //   The melodica hook PEDALS on the tonic here (per-track FIXED) rather
+            //   than FOLLOWing the 0—5—6—0 chorus chords. With FOLLOW, the chord
+            //   offset is added then folded into the melodica's lowest octave, so the
+            //   degree-5 leap (and the 6—0 drop) folds to a lurching up-a-leap /
+            //   back-down contour twice per bar — the "disjointed" feel. Pedaling the
+            //   hook on A keeps it stable while skank + organ + bass carry the 0—5—6—0
+            //   motion underneath. A low-mutation LickBuilder hands the pedaled hook
+            //   to the lead member (melodica wins — highest melodic creativity) so the
+            //   chorus gains a clear, developing focal melody on the lift.
             Section(
                 name = "chorus",
                 barsMin = 4, barsMax = 4,
@@ -152,12 +162,16 @@ class BellTollsVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
-                    energy = 1.3f, complexity = 1.2f, mood = 1.25f,
+                    energy = 1.3f, complexity = 1.05f, mood = 1.25f,
                 ),
                 compingStyle = CompingStyle.SKA_UPSTROKES,   // busier off-beats
                 compingInversion = SectionInversion.FIRST_INVERSION,
                 chordsPerBar = chorusChordsPerBar,
-                customProgression = chorusProgression
+                customProgression = chorusProgression,
+                soloMode = SoloMode.LickBuilder(probability = 0.85f, mutationRate = 0.30f),
+                trackOverrides = mapOf(
+                    4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
+                ),
             ),
             // 3 DUB: The reggae breakdown — bass drones, everything bathed in
             // reverb and delay. Drummer keeps time but everyone else floats.
