@@ -288,7 +288,7 @@ class PulsarTransitionRunnerTest {
     }
 
     @Test
-    fun `SCRATCH arms effect and dips fader like CROSSFADE`() = runTest {
+    fun `SCRATCH arms needle-skip, swaps at midpoint, holds unity`() = runTest {
         val engine = RecordingEngine()
         engine.now = { testScheduler.currentTime }
         val runner = makeRunner(engine)
@@ -298,9 +298,24 @@ class PulsarTransitionRunnerTest {
         job.join()
         assertEquals(listOf(0L to 500), engine.scratches, "scratch armed at t=0 for default 500ms")
         assertEquals(listOf(250L), applyAt, "vibe swap at midpoint")
-        assertEquals(2, engine.fades.size, "dip to 0.5 then back to 1")
-        assertEquals(0.5f, engine.fades[0].target)
-        assertEquals(1f, engine.fades[1].target)
+        assertTrue(engine.fades.isEmpty(), "needle-skip holds unity, no fader dips (got ${engine.fades})")
+    }
+
+    @Test
+    fun `SCRATCH restores volume to unity if fader is below threshold`() = runTest {
+        val engine = RecordingEngine(initialVolume = 0.0f) // outroBars already faded us out
+        engine.now = { testScheduler.currentTime }
+        val runner = makeRunner(engine)
+        val applyAt = mutableListOf<Long>()
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.SCRATCH)) { applyAt += testScheduler.currentTime } }
+        advanceUntilIdle()
+        job.join()
+        // One fade only: the 1-sample snap back to unity before the skip arms.
+        assertEquals(1, engine.fades.size, "expected a single snap-to-unity (got ${engine.fades})")
+        assertEquals(1f, engine.fades[0].target, "must restore to unity first")
+        assertEquals(1, engine.fades[0].durationMs)
+        assertEquals(listOf(0L to 500), engine.scratches, "scratch armed after the unity restore")
+        assertEquals(listOf(250L), applyAt, "vibe swap at midpoint")
     }
 
     @Test

@@ -15,6 +15,7 @@ import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runs a song-to-song transition. Each [TransitionStyle] is implemented by one
@@ -90,13 +91,13 @@ class PulsarTransitionRunnerImpl(
     /** Quick declick fade-out, pause beats, silent gap, swap, fade-in, resume. */
     private suspend fun runGap(gapMs: Int, applyNext: suspend () -> Unit) {
         engine.fadeMasterVolume(0f, DECLICK_MS, FadeCurve.LINEAR)
-        delay(DECLICK_MS.toLong())
+        delay(DECLICK_MS.toLong().milliseconds)
         setPulsarPlaying(false)
         applyNext()
-        delay(gapMs.toLong())
+        delay(gapMs.toLong().milliseconds)
         setPulsarPlaying(true)
         engine.fadeMasterVolume(1f, DECLICK_MS, FadeCurve.LINEAR)
-        delay(DECLICK_MS.toLong())
+        delay(DECLICK_MS.toLong().milliseconds)
     }
 
     private suspend fun runFade(handoffMs: Int, applyNext: suspend () -> Unit) {
@@ -104,14 +105,14 @@ class PulsarTransitionRunnerImpl(
         if (engine.getMasterVolume() < SMART_SKIP_VOL) {
             applyNext()
             engine.fadeMasterVolume(1f, half, FadeCurve.LINEAR)
-            delay(half.toLong())
+            delay(half.toLong().milliseconds)
             return
         }
         engine.fadeMasterVolume(0f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay(half.toLong().milliseconds)
         applyNext()
         engine.fadeMasterVolume(1f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay(half.toLong().milliseconds)
     }
 
     private suspend fun runCrossfade(handoffMs: Int, applyNext: suspend () -> Unit) {
@@ -120,10 +121,10 @@ class PulsarTransitionRunnerImpl(
             engine.fadeMasterVolume(1f, 1, FadeCurve.LINEAR)
         }
         engine.fadeMasterVolume(0.5f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay(half.toLong().milliseconds)
         applyNext()
         engine.fadeMasterVolume(1f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay(half.toLong().milliseconds)
     }
 
     /**
@@ -134,11 +135,11 @@ class PulsarTransitionRunnerImpl(
             engine.fadeMasterVolume(1f, 1, FadeCurve.LINEAR)
         }
         engine.masterTapeStop(handoffMs)
-        delay(handoffMs.toLong())
+        delay(handoffMs.toLong().milliseconds)
         engine.fadeMasterVolume(0f, 1, FadeCurve.LINEAR)
         applyNext()
         engine.fadeMasterVolume(1f, TAPE_FADE_IN_MS, FadeCurve.LINEAR)
-        delay(TAPE_FADE_IN_MS.toLong())
+        delay(TAPE_FADE_IN_MS.toLong().milliseconds)
     }
 
     /**
@@ -155,29 +156,29 @@ class PulsarTransitionRunnerImpl(
         }
         engine.masterFilter(handoffMs)
         engine.fadeMasterVolume(0.5f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay(half.toLong().milliseconds)
         applyNext()
         engine.fadeMasterVolume(1f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay(half.toLong().milliseconds)
     }
 
     /**
-     * Beat-synced stutter gate over the transition boundary. The C++ MasterScratch
-     * gates the audio with a beat-synced division ramp. Like CROSSFADE, the fader
-     * dips to 0.5 so the stutter-gated audio blends with the reverb tail across
-     * the swap.
+     * Vinyl needle-skip across the transition boundary. The C++ MasterScratch
+     * drags the audio (a fast pitch-down scrape), stutter-loops a slice with a
+     * click at each groove jump, then drops back to live audio on the next beat.
+     * The drop lands on the *new* song because applyNext() swaps the vibe at the
+     * midpoint, before the C++ drop. Unlike CROSSFADE, the fader stays at unity:
+     * the skip IS the gesture and must be heard.
      */
     private suspend fun runScratch(handoffMs: Int, applyNext: suspend () -> Unit) {
-        val half = handoffMs / 2
         if (engine.getMasterVolume() < UNITY_THRESHOLD) {
             engine.fadeMasterVolume(1f, 1, FadeCurve.LINEAR)
         }
         engine.masterScratch(handoffMs)
-        engine.fadeMasterVolume(0.5f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        val half = handoffMs / 2
+        delay(half.toLong().milliseconds)
         applyNext()
-        engine.fadeMasterVolume(1f, half, FadeCurve.LINEAR)
-        delay(half.toLong())
+        delay((handoffMs - half).toLong().milliseconds)
     }
 
     private suspend fun runRandom(spec: TransitionSpec, applyNext: suspend () -> Unit) {
