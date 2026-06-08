@@ -108,17 +108,22 @@ android {
         }
     }
 
-    kotlin {
-        jvmToolchain(17)
-    }
-
     // debugRelease inherits debug's resource overrides (app label, launcher tint, etc.)
     // so the two build types render identically on the launcher.
     sourceSets {
         getByName("debugRelease") {
-            res.srcDirs("src/debug/res")
+            res.directories.add("src/debug/res")
         }
     }
+}
+
+// JVM toolchain for the app's Kotlin compilation. AGP 9's built-in Kotlin registers the
+// project `kotlin` extension (KotlinAndroidProjectExtension), but no type-safe `kotlin {}`
+// accessor is generated for this precompiled script plugin. A bare nested `kotlin { }` block
+// compiles (it binds to Project.kotlin via outer scope) yet the IDE flags `jvmToolchain` as
+// unresolved — configure it through the typed extension API so compiler and IDE both resolve.
+extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension> {
+    jvmToolchain(17)
 }
 
 androidComponents {
