@@ -1,6 +1,5 @@
-Performance & battery release.
+Rhythm coherence release.
 
-• Visualizers now fully pause while the app is backgrounded — a big drop in background CPU and battery use during playback.
-• Smoother panel visuals: the signal scope redraws ~50% less often (60→30fps) and renders up to 80% fewer points.
-• Fixed a rare crash when switching background visualizers.
-• Steadier turntable waveforms after audio output changes.
+• Generated beats hold together far better — drums and percussion stay locked to the groove instead of drifting into busy, disjointed patterns as you raise complexity.
+• Per-track variation now respects each track's role, so tight rhythm parts stay tight while lead parts stay free to roam.
+• Re-tuned several Vibes (Deep Space, Velvet Leash, Tremolo Tide, Army Stomp) for steadier grooves.
