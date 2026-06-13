@@ -1,0 +1,6 @@
+Performance & battery release.
+
+• Visualizers now fully pause while the app is backgrounded — a big drop in background CPU and battery use during playback.
+• Smoother panel visuals: the signal scope redraws ~50% less often (60→30fps) and renders up to 80% fewer points.
+• Fixed a rare crash when switching background visualizers.
+• Steadier turntable waveforms after audio output changes.
