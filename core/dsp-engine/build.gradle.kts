@@ -51,5 +51,9 @@ kotlin {
             implementation(libs.kotlinx.collections.immutable)
             implementation(libs.kotlinx.atomicfu)
         }
+
+        jvmTest.dependencies {
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
