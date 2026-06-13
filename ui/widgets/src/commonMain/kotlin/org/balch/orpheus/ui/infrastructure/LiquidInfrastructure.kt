@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidScope
 import io.github.fletchmckee.liquid.LiquidState
+import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.liquid
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -98,6 +99,8 @@ val LocalDialogLiquidState = compositionLocalOf<LiquidState?> { null }
  */
 val LocalLiquidEffects = compositionLocalOf { VisualizationLiquidEffects.Default }
 
+private val isLiquidEnabled: Boolean = true
+
 /**
  * Applies liquid glassmorphism effect or falls back to solid background.
  */
@@ -112,7 +115,7 @@ fun Modifier.liquidVizEffects(
 ): Modifier {
     val baseModifier = this.clip(shape)
     
-    return if (liquidState != null) {
+    return if (liquidState != null && isLiquidEnabled) {
         baseModifier.liquid(liquidState) {
             frost = frostAmount
             this.shape = shape
@@ -129,3 +132,12 @@ fun Modifier.liquidVizEffects(
         baseModifier.background(color.copy(alpha = tintAlpha))
     }
 }
+
+fun Modifier.liquefiableVizEffects(
+    liquidState: LiquidState?,
+): Modifier =
+    if (liquidState != null && isLiquidEnabled) {
+        this.liquefiable(liquidState)
+    } else {
+        this
+    }

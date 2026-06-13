@@ -24,6 +24,7 @@ class OboeAudioBridge {
     external fun nativeGetSampleRate(): Int
     external fun nativeGetFramesPerBuffer(): Int
     external fun nativeGetCpuLoad(): Double
+    external fun nativeGetXRunCount(): Int
 
     // ── Parameter control (called from UI thread) ─
     external fun nativeSetPort(uri: String, symbol: String, value: Float)

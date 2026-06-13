@@ -86,6 +86,7 @@ bool OboeEngine::isRunning() const { return mIsRunning.load(); }
 int32_t OboeEngine::getSampleRate() const { return mStream ? mStream->getSampleRate() : 0; }
 int32_t OboeEngine::getFramesPerBuffer() const { return mStream ? mStream->getFramesPerBurst() : 0; }
 double OboeEngine::getCpuLoad() const { return mCpuLoad.load(); }
+int32_t OboeEngine::getXRunCount() const { return mXRunCount.load(std::memory_order_relaxed); }
 
 oboe::DataCallbackResult OboeEngine::onAudioReady(
         oboe::AudioStream* stream, void* audioData, int32_t numFrames) {
@@ -104,6 +105,11 @@ oboe::DataCallbackResult OboeEngine::onAudioReady(
     double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
     double budget = static_cast<double>(numFrames) / stream->getSampleRate() * 1e6;
     mCpuLoad.store(us / budget);
+
+    // Mirror the stream's underrun counter (lock-free read of an internal
+    // AAudio counter). Polled from Kotlin's monitor loop — no logging here.
+    auto xruns = stream->getXRunCount();
+    if (xruns) mXRunCount.store(xruns.value(), std::memory_order_relaxed);
 
     return oboe::DataCallbackResult::Continue;
 }

@@ -19,5 +19,9 @@ kotlin {
         commonMain.dependencies {
              // Core deps provided by convention
         }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }

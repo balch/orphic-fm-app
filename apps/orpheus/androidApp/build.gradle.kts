@@ -44,6 +44,7 @@ dependencies {
     implementation(project(":core:plugins:looper"))
     implementation(project(":core:plugins:perstringbender"))
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.media3.session)
     implementation(libs.kmlogging)
     implementation(libs.metrox.viewmodel.compose)

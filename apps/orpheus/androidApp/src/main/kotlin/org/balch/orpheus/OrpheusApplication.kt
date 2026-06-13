@@ -2,7 +2,11 @@ package org.balch.orpheus
 
 import android.app.Application
 import android.content.Intent
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.diamondedge.logging.KmLogging
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.di.OrpheusGraph
 
@@ -15,7 +19,9 @@ import org.balch.orpheus.di.OrpheusGraph
  * configuration change, losing all singleton state.
  */
 class OrpheusApplication : Application() {
-    
+
+    private val log = logging("OrpheusApplication")
+
     lateinit var graph: OrpheusGraph
         private set
     
@@ -57,5 +63,21 @@ class OrpheusApplication : Application() {
         // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
         // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
         graph.pulsarSongAdvancer
+
+        // Pause UI-feeding polls (60Hz Pulsar viz, turntable viz, 5Hz meters)
+        // while the app is backgrounded so Android doesn't kill us for
+        // excessive background CPU. Audio playback and the arrangement poll
+        // (song auto-advance / media metadata) keep running.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                log.info { "App foregrounded — resuming UI polling" }
+                graph.synthEngine.setUiVisible(true)
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                log.info { "App backgrounded — pausing UI polling" }
+                graph.synthEngine.setUiVisible(false)
+            }
+        })
     }
 }

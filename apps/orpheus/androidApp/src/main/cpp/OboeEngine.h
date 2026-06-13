@@ -23,6 +23,7 @@ public:
     int32_t getSampleRate() const;
     int32_t getFramesPerBuffer() const;
     double getCpuLoad() const;
+    int32_t getXRunCount() const;
 
     // Direct C++ DSP engine access
     OrpheusEngine* getDspEngine() { return dsp_engine_.load(std::memory_order_acquire); }
@@ -83,6 +84,10 @@ private:
     int32_t mCreatedSampleRate = 0;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};
+    // Cumulative underrun count for the current stream, mirrored out of the
+    // audio callback. Exclusive MMAP underruns are only visible to the client
+    // (AudioFlinger never sees them), so this is the sole source of truth.
+    std::atomic<int32_t> mXRunCount{0};
     std::function<void()> mEngineRecreatedCallback;
 };
 

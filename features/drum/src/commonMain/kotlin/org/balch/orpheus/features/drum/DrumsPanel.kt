@@ -46,7 +46,6 @@ fun DrumsPanel(
 ) {
     val state by drumFeature.stateFlow.collectAsState()
     val actions = drumFeature.actions
-    val drumOutViz by drumOutVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "808",
@@ -58,7 +57,7 @@ fun DrumsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = drumOutViz, color = OrpheusColors.ninersRed)
+            SignalTrace(data = drumOutVizFlow, color = OrpheusColors.ninersRed)
         }
     ) {
         Column(

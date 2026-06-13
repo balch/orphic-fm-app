@@ -85,10 +85,6 @@ fun DuoLfoPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val vizData by vizFlow.collectAsState()
-    val vizCh1 by vizCh1Flow.collectAsState()
-    val vizCh2 by vizCh2Flow.collectAsState()
-    val vizCh3 by vizCh3Flow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "LFO",
@@ -100,10 +96,10 @@ fun DuoLfoPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = vizCh3, color = OrpheusColors.neonMagenta, alpha = 0.25f)  // pitch
-            SignalTrace(data = vizCh2, color = OrpheusColors.warpsGreen, alpha = 0.25f)   // harmonics
-            SignalTrace(data = vizCh1, color = OrpheusColors.warmGlow, alpha = 0.25f)     // morph
-            SignalTrace(data = vizData, color = OrpheusColors.neonCyan, alpha = 0.25f)    // timbre
+            SignalTrace(data = vizCh3Flow, color = OrpheusColors.neonMagenta, alpha = 0.25f)  // pitch
+            SignalTrace(data = vizCh2Flow, color = OrpheusColors.warpsGreen, alpha = 0.25f)   // harmonics
+            SignalTrace(data = vizCh1Flow, color = OrpheusColors.warmGlow, alpha = 0.25f)     // morph
+            SignalTrace(data = vizFlow, color = OrpheusColors.neonCyan, alpha = 0.25f)    // timbre
         }
     ) {
         val learnState = LocalLearnModeState.current

@@ -33,6 +33,7 @@ import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.LocalSignalVizEnabled
 import org.balch.orpheus.ui.viz.LocalSignalVizGlow
@@ -88,12 +89,12 @@ fun App(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .liquefiable(dialogLiquidState)
+                                .liquefiableVizEffects(dialogLiquidState)
                         ) {
                             VizBackground(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .liquefiable(liquidState),
+                                    .liquefiableVizEffects(liquidState),
                                 selectedViz = vizState.selectedViz
                             )
 

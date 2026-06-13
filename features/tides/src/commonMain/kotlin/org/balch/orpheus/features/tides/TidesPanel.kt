@@ -73,10 +73,6 @@ fun TidesPanel(
 ) {
     val state by tides.stateFlow.collectAsState()
     val actions = tides.actions
-    val vizCh0 by vizCh0Flow.collectAsState()
-    val vizCh1 by vizCh1Flow.collectAsState()
-    val vizCh2 by vizCh2Flow.collectAsState()
-    val vizCh3 by vizCh3Flow.collectAsState()
 
     CollapsibleColumnPanel(
         modifier = modifier,
@@ -88,10 +84,10 @@ fun TidesPanel(
         initialExpanded = true,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = vizCh3, color = OrpheusColors.neonMagenta, alpha = 0.25f)
-            SignalTrace(data = vizCh2, color = OrpheusColors.neonCyan, alpha = 0.25f)
-            SignalTrace(data = vizCh1, color = OrpheusColors.warmGlow, alpha = 0.25f)
-            SignalTrace(data = vizCh0, color = OrpheusColors.neonOrange, alpha = 0.25f)
+            SignalTrace(data = vizCh3Flow, color = OrpheusColors.neonMagenta, alpha = 0.25f)
+            SignalTrace(data = vizCh2Flow, color = OrpheusColors.neonCyan, alpha = 0.25f)
+            SignalTrace(data = vizCh1Flow, color = OrpheusColors.warmGlow, alpha = 0.25f)
+            SignalTrace(data = vizCh0Flow, color = OrpheusColors.neonOrange, alpha = 0.25f)
         },
     ) {
         // Row 1: Selector buttons

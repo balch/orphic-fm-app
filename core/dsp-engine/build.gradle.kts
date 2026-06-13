@@ -49,6 +49,7 @@ kotlin {
             api(projects.core.plugins.perstringbender)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.collections.immutable)
+            implementation(libs.kotlinx.atomicfu)
         }
     }
 }

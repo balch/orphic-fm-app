@@ -8,7 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -166,52 +165,68 @@ class SignalMonitorViz(
 
             // Zoom: 0 = full 5sec history, 1 = last ~50 samples (waveform detail)
             val visibleSamples = (480 * (1f - _zoom * 0.9f)).toInt().coerceAtLeast(30)
+            val drawW = w - margin * 2
 
-            // Draw each channel overlaid at center — skip empty (bypassed) channels
+            // Draw each channel overlaid at center — skip empty (bypassed) channels.
+            // Two stroke passes (glow halo + crisp trace) plus an in-place sub-range
+            // walk (no per-frame copyOfRange) keep this full-screen scope cheap to
+            // record: the old 4-pass + array-copy path dominated UI-thread draw time
+            // (see gfxinfo "slow issue draw commands"). HeartbeatViz is the reference
+            // for the cheaper read-in-draw-scope style.
             channels.forEachIndexed { idx, channel ->
                 val fullData = allData[idx]
                 if (fullData.isEmpty()) return@forEachIndexed
-                // Apply zoom — show only the most recent visibleSamples
-                val data = if (fullData.size > visibleSamples) {
-                    fullData.copyOfRange(fullData.size - visibleSamples, fullData.size)
-                } else fullData
 
-                // Check if signal is silent (bypassed) — skip flat lines
+                // Zoom = walk only the most recent visibleSamples, in place.
+                val startIdx = if (fullData.size > visibleSamples)
+                    fullData.size - visibleSamples else 0
+                val visibleCount = fullData.size - startIdx
+
+                // Skip silent (bypassed) channels — flat lines add cost, not signal.
                 var peak = 0f
-                for (v in data) { val a = kotlin.math.abs(v); if (a > peak) peak = a }
+                for (i in startIdx until fullData.size) {
+                    val a = kotlin.math.abs(fullData[i])
+                    if (a > peak) peak = a
+                }
                 if (peak < 0.001f) return@forEachIndexed
+
+                // Decimate to at most MAX_DRAW_POINTS — at full zoom-out 480 samples
+                // tessellate into a needlessly dense stroke the screen can't resolve.
+                val stride = (visibleCount / MAX_DRAW_POINTS).coerceAtLeast(1)
+                val pointCount = (visibleCount + stride - 1) / stride
+                val step = drawW / (pointCount - 1).coerceAtLeast(1)
 
                 val path = paths[idx]
                 path.reset()
-                val drawW = w - margin * 2
-                val step = drawW / data.size.coerceAtLeast(1)
-
-                data.forEachIndexed { i, v ->
-                    val x = margin + i * step
-                    val y = mid - v.coerceIn(-1f, 1f) * amplitude
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                var p = 0
+                var i = startIdx
+                while (i < fullData.size) {
+                    val x = margin + p * step
+                    val y = mid - fullData[i].coerceIn(-1f, 1f) * amplitude
+                    if (p == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    p++
+                    i += stride
                 }
 
-                // Wide glow halo
-                val glowAlpha = 0.03f + _glow * 0.10f
-                drawPath(path, channel.color.copy(alpha = glowAlpha), style = Stroke(8f))
-
-                // Medium glow
-                val midGlowAlpha = 0.06f + _glow * 0.12f
-                drawPath(path, channel.color.copy(alpha = midGlowAlpha), style = Stroke(3f))
-
-                // Crisp main trace
-                val traceAlpha = 0.25f + _glow * 0.45f
-                drawPath(path, channel.color.copy(alpha = traceAlpha), style = Stroke(1.5f))
-
-                // Additive bloom core
+                // Pass 1 — wide glow halo.
                 drawPath(
                     path,
-                    channel.color.copy(alpha = 0.08f + _glow * 0.15f),
-                    style = Stroke(0.75f),
-                    blendMode = BlendMode.Plus
+                    channel.color.copy(alpha = 0.04f + _glow * 0.12f),
+                    style = Stroke(6f),
+                )
+                // Pass 2 — crisp main trace.
+                drawPath(
+                    path,
+                    channel.color.copy(alpha = 0.30f + _glow * 0.45f),
+                    style = Stroke(1.5f),
                 )
             }
         }
+    }
+
+    companion object {
+        // A full-screen scope can't resolve more than ~96 points across its
+        // width, so decimate beyond this to cap stroke-tessellation cost.
+        private const val MAX_DRAW_POINTS = 96
     }
 }

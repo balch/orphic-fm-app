@@ -46,7 +46,6 @@ fun FluxPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
-    val cvViz by cvVizFlow.collectAsState()
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "FLUX",
@@ -57,7 +56,7 @@ fun FluxPanel(
         expandedTitle = "Warbles",
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = cvViz, color = OrpheusColors.metallicBlueLight)
+            SignalTrace(data = cvVizFlow, color = OrpheusColors.metallicBlueLight)
         }
     ) {
         val state by flux.stateFlow.collectAsState()

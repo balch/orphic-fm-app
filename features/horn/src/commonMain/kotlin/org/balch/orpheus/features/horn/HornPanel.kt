@@ -83,10 +83,6 @@ fun HornPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val inViz by inVizFlow.collectAsState()
-    val outViz by outVizFlow.collectAsState()
-    val hornPhaseViz by hornPhaseVizFlow.collectAsState()
-    val wooferPhaseViz by wooferPhaseVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "HORN",
@@ -98,10 +94,10 @@ fun HornPanel(
         initialExpanded = false,
         modifier = modifier,
         backgroundContent = {
-            SignalTrace(data = inViz, color = Color(0xFFFF6644))         // bright orange-red for input
-            SignalTrace(data = outViz, color = Color(0xFFFF2222))        // bright red for output
-            SignalTrace(data = hornPhaseViz, color = CrimsonHorn)        // horn rotor phase (fast sawtooth)
-            SignalTrace(data = wooferPhaseViz, color = CrimsonWoofer)    // woofer rotor phase (slow sawtooth)
+            SignalTrace(data = inVizFlow, color = Color(0xFFFF6644))         // bright orange-red for input
+            SignalTrace(data = outVizFlow, color = Color(0xFFFF2222))        // bright red for output
+            SignalTrace(data = hornPhaseVizFlow, color = CrimsonHorn)        // horn rotor phase (fast sawtooth)
+            SignalTrace(data = wooferPhaseVizFlow, color = CrimsonWoofer)    // woofer rotor phase (slow sawtooth)
         }
     ) {
         // ── Physics-based rotor animation ──────────────────────────────────

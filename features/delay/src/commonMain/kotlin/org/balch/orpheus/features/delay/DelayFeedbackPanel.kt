@@ -36,9 +36,6 @@ fun DelayFeedbackPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val inViz by inVizFlow.collectAsState()
-    val fbViz by fbVizFlow.collectAsState()
-    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "DELAY",
@@ -50,9 +47,9 @@ fun DelayFeedbackPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = inViz, color = OrpheusColors.warmGlow.copy(alpha = 0.6f))
-            SignalTrace(data = fbViz, color = OrpheusColors.warmGlow.copy(alpha = 0.4f))
-            SignalTrace(data = outViz, color = OrpheusColors.warmGlow)
+            SignalTrace(data = inVizFlow, color = OrpheusColors.warmGlow.copy(alpha = 0.6f))
+            SignalTrace(data = fbVizFlow, color = OrpheusColors.warmGlow.copy(alpha = 0.4f))
+            SignalTrace(data = outVizFlow, color = OrpheusColors.warmGlow)
         }
     ) {
         Row(

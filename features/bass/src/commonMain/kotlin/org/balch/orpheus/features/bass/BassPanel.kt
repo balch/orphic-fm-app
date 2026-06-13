@@ -79,7 +79,6 @@ fun BassPanel(
 
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "BASS",
@@ -91,7 +90,7 @@ fun BassPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = outViz, color = bassColors.panelColor.copy(alpha = 0.4f))
+            SignalTrace(data = outVizFlow, color = bassColors.panelColor.copy(alpha = 0.4f))
         },
     ) {
         // ── Row 1: Source & Sequencer ─────────────────────────────────

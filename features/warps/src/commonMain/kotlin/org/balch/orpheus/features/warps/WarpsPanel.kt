@@ -64,9 +64,6 @@ fun WarpsPanel(
 
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val carrierViz by carrierVizFlow.collectAsState()
-    val modulatorViz by modulatorVizFlow.collectAsState()
-    val outputViz by outputVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "BLEND",
@@ -78,9 +75,9 @@ fun WarpsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = carrierViz, color = OrpheusColors.warpsGreen.copy(alpha = 0.5f))
-            SignalTrace(data = modulatorViz, color = OrpheusColors.warpsGreen.copy(alpha = 0.7f))
-            SignalTrace(data = outputViz, color = OrpheusColors.warpsGreen)
+            SignalTrace(data = carrierVizFlow, color = OrpheusColors.warpsGreen.copy(alpha = 0.5f))
+            SignalTrace(data = modulatorVizFlow, color = OrpheusColors.warpsGreen.copy(alpha = 0.7f))
+            SignalTrace(data = outputVizFlow, color = OrpheusColors.warpsGreen)
         }
     ) {
         Column(

@@ -77,6 +77,7 @@ dependencies {
     implementation(project(":core:foundation"))
     implementation(project(":ui:widgets"))
     implementation(libs.androidx.lifecycle.runtimeCompose)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.compose.foundation)
     implementation(project(":core:plugins:pulsar"))
     implementation(project(":core:plugins:dj"))

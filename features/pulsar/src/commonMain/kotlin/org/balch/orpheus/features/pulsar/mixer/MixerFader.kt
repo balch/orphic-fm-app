@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
+import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -210,7 +211,7 @@ internal fun MixerFader(
                 .align(Alignment.Center)
                 .width(trackWidth.dp)
                 .height(trackHeight.dp)
-                .liquefiable(faderLiquidState)
+                .liquefiableVizEffects(faderLiquidState)
                 .clip(RoundedCornerShape(5.dp))
                 .background(
                     Brush.verticalGradient(

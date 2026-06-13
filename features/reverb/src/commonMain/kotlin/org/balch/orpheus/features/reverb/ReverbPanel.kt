@@ -31,8 +31,6 @@ fun ReverbPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val inViz by inVizFlow.collectAsState()
-    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "VERB",
@@ -44,8 +42,8 @@ fun ReverbPanel(
         initialExpanded = false,
         modifier = modifier,
         backgroundContent = {
-            SignalTrace(data = inViz, color = OrpheusColors.echoPeriwinkle)
-            SignalTrace(data = outViz, color = OrpheusColors.echoLavender)
+            SignalTrace(data = inVizFlow, color = OrpheusColors.echoPeriwinkle)
+            SignalTrace(data = outVizFlow, color = OrpheusColors.echoLavender)
         }
     ) {
         Column(

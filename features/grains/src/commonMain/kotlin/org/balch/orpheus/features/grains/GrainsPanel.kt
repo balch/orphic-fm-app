@@ -55,8 +55,6 @@ fun GrainsPanel(
 ) {
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val inViz by inVizFlow.collectAsState()
-    val outViz by outVizFlow.collectAsState()
 
     val panelColor = OrpheusColors.grainsRed
 
@@ -70,8 +68,8 @@ fun GrainsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = inViz, color = OrpheusColors.grainsRed.copy(alpha = 0.5f))
-            SignalTrace(data = outViz, color = OrpheusColors.grainsRed)
+            SignalTrace(data = inVizFlow, color = OrpheusColors.grainsRed.copy(alpha = 0.5f))
+            SignalTrace(data = outVizFlow, color = OrpheusColors.grainsRed)
         }
     ) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

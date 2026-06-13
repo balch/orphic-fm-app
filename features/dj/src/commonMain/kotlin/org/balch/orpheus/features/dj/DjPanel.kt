@@ -159,7 +159,6 @@ fun DjPanel(
     val actions = feature.actions
     val vizA by vizFlowA.collectAsState()
     val vizB by vizFlowB.collectAsState()
-    val outViz by outVizFlow.collectAsState()
     val beatPhase by beatPhaseFlow.collectAsState()
 
     // Hit-test rects are stored in window-space pixels (boundsInWindow /
@@ -409,7 +408,7 @@ fun DjPanel(
         modifier = Modifier.fillMaxSize(),
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = outViz, color = djColors.deckAColor, alpha = 0.25f)
+            SignalTrace(data = outVizFlow, color = djColors.deckAColor, alpha = 0.25f)
         },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

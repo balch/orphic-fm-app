@@ -6,6 +6,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,6 +66,13 @@ interface VizFeature : SynthFeature<VizUiState, VizPanelActions> {
 /**
  * ViewModel for managing visualizations.
  * Injects all available Visualization implementations.
+ *
+ * **Threading contract**: [Visualization.onActivate], [Visualization.onDeactivate], and
+ * [Visualization.setKnob1]/[Visualization.setKnob2] must all be called on the main thread.
+ * Visualization internal state is owned by the main-thread Compose frame loop (`withFrameNanos`),
+ * so any mutation from a background thread would race with the frame loop and can cause
+ * `ConcurrentModificationException`. Preference persistence is the only operation intentionally
+ * dispatched to [DispatcherProvider.default].
  */
 @Inject
 @ClassKey
@@ -105,9 +113,10 @@ class VizViewModel(
     override val stateFlow: StateFlow<VizUiState> = _uiState.asStateFlow()
 
     init {
-        // Activate initial visualization if it's not off (likely is off initially)
+        // Activate initial visualization if it's not off (likely is off initially).
+        // Must run on main — Visualization internal state is owned by the main-thread frame loop.
         if (_currentViz.value.id != "off") {
-            scope.launch(dispatcherProvider.default) {
+            scope.launch(dispatcherProvider.main) {
                 _currentViz.value.onActivate()
             }
         }
@@ -167,7 +176,11 @@ class VizViewModel(
             return
         }
 
-        scope.launch(dispatcherProvider.default) {
+        // Lifecycle mutations (onDeactivate/onActivate/setKnob) are confined to main —
+        // Visualization internal state is owned by the main-thread Compose frame loop.
+        // Preference persistence is dispatched to default inside withContext to keep I/O
+        // off the main thread.
+        scope.launch(dispatcherProvider.main) {
             _currentViz.value.onDeactivate()
             viz.onActivate()
 
@@ -177,6 +190,8 @@ class VizViewModel(
             _currentViz.value = viz
 
             if (viz is DynamicVisualization) {
+                // liquidEffectsFlow collection only writes to a thread-safe MutableStateFlow,
+                // so it is safe to run on the default dispatcher.
                 dynamicEffectsJob = scope.launch(dispatcherProvider.default) {
                     viz.liquidEffectsFlow.collect { effects ->
                          _uiState.update { it.copy(liquidEffects = effects) }
@@ -188,8 +203,10 @@ class VizViewModel(
 
             if (save) {
                 _uiState.update { it.copy(isRandomVizMode = false) }
-                appPreferencesRepository.update {
-                    it.copy(lastVizId = viz.id, randomVizMode = false)
+                withContext(dispatcherProvider.default) {
+                    appPreferencesRepository.update {
+                        it.copy(lastVizId = viz.id, randomVizMode = false)
+                    }
                 }
             }
         }
@@ -241,6 +258,9 @@ class VizViewModel(
     }
     
     override fun close() {
+        // Called synchronously at DI-scope teardown. At that point the Compose frame loop
+        // is no longer active (the UI has already been torn down), so calling onDeactivate()
+        // here does not race with the frame loop.
         _currentViz.value.onDeactivate()
         dynamicEffectsJob?.cancel()
     }

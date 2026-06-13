@@ -15,6 +15,7 @@ import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 
@@ -48,7 +49,7 @@ fun LiquidPreviewContainerWithGradient(
                             )
                         )
                     )
-                    .liquefiable(liquidState)
+                    .liquefiableVizEffects(liquidState)
             )
 
             CompositionLocalProvider(

@@ -46,6 +46,7 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
@@ -153,7 +154,7 @@ fun CompactPortraitLayout(
                 )
             }
             .then(
-                Modifier.liquefiable(liquidState)
+                Modifier.liquefiableVizEffects(liquidState)
             )
     ) {
         // 0. Visualization background (behind everything, including status bar)

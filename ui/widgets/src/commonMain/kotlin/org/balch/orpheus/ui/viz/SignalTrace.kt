@@ -3,12 +3,15 @@ package org.balch.orpheus.ui.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * When true, panel-level SignalTraces are visible.
@@ -27,7 +30,13 @@ val LocalSignalVizGlow = staticCompositionLocalOf { 0.5f }
  * Renders a glowing line path from a FloatArray of samples (-1..+1 range).
  * Designed to sit behind panel knobs at low opacity.
  *
- * @param data Signal samples (-1..+1). Empty array draws nothing.
+ * Takes the sample [StateFlow] (not a materialized array) and collects it
+ * internally. That keeps the high-frequency viz subscription in this leaf
+ * Canvas, so a ~30Hz emission only redraws the trace — the host panel and its
+ * knobs never recompose. When the scope is off the flow is cleared upstream and
+ * emits nothing, so a disabled trace costs nothing.
+ *
+ * @param data Signal-sample flow (-1..+1). Empty array draws nothing.
  * @param color Trace color (alpha controlled separately).
  * @param alpha Opacity of the main trace line.
  * @param strokeWidth Width of the main trace in pixels.
@@ -36,7 +45,7 @@ val LocalSignalVizGlow = staticCompositionLocalOf { 0.5f }
  */
 @Composable
 fun SignalTrace(
-    data: FloatArray,
+    data: StateFlow<FloatArray>,
     color: Color,
     modifier: Modifier = Modifier,
     alpha: Float = 0.15f,
@@ -47,16 +56,17 @@ fun SignalTrace(
     val path = remember { Path() }
     val enabled = LocalSignalVizEnabled.current
     val glow = LocalSignalVizGlow.current
+    val samples by data.collectAsState()
 
     Canvas(modifier = modifier.fillMaxSize()) {
-        if (!enabled || data.isEmpty()) return@Canvas
+        if (!enabled || samples.isEmpty()) return@Canvas
         path.reset()
         val w = size.width
         val h = size.height
         val mid = h / 2f
-        val step = w / data.size.coerceAtLeast(1)
+        val step = w / samples.size.coerceAtLeast(1)
 
-        data.forEachIndexed { i, v ->
+        samples.forEachIndexed { i, v ->
             val x = i * step
             val y = mid - v.coerceIn(-1f, 1f) * mid
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)

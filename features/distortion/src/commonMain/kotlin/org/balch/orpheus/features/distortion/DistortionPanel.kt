@@ -47,7 +47,6 @@ fun DistortionPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "VOL",
@@ -59,7 +58,7 @@ fun DistortionPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = outViz, color = OrpheusColors.neonMagenta.copy(alpha = 0.3f))
+            SignalTrace(data = outVizFlow, color = OrpheusColors.neonMagenta.copy(alpha = 0.3f))
         },
     ) {
         Row(

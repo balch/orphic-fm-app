@@ -471,6 +471,10 @@ class DspSynthEngine(
         if (enabled) monitor.startTurntableViz() else monitor.stopTurntableViz()
     }
 
+    override fun setUiVisible(visible: Boolean) {
+        monitor.setUiVisible(visible)
+    }
+
     override fun getCurrentTime(): Double = audioEngine.getCurrentTime()
 
     override fun stop() {

@@ -48,6 +48,7 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
+import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.lighten
@@ -225,7 +226,7 @@ fun PulsarStepGrid(
         // Layer 0: Canvas draws cells, glow, particles
         Canvas(
             modifier = Modifier.matchParentSize()
-                .liquefiable(gridLiquidState)
+                .liquefiableVizEffects(gridLiquidState)
         ) {
             val totalTrackGaps = (NUM_TRACKS - 1) * trackGap
             val trackHeight = (size.height - totalTrackGaps) / NUM_TRACKS

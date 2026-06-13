@@ -76,6 +76,12 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetCpuLoad(
     return sEngine.getCpuLoad();
 }
 
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetXRunCount(
+        JNIEnv *env, jobject thiz) {
+    return sEngine.getXRunCount();
+}
+
 // ── Parameter control ──────────────────────────
 
 JNIEXPORT void JNICALL

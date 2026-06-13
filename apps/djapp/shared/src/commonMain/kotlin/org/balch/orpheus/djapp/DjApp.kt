@@ -30,6 +30,7 @@ import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.LocalSignalVizEnabled
 import org.balch.orpheus.ui.viz.LocalSignalVizGlow
@@ -65,7 +66,6 @@ fun DjApp(
                 withContext(Dispatchers.Default) {
                     graph.synthOrchestrator.start()
 
-                    graph.synthEngine.setVizEnabled(true)
                     graph.synthEngine.setTurntableVizEnabled(true)
 
                     // DJ-tuned reverb: short tail, high diffusion for tight space.
@@ -99,6 +99,15 @@ fun DjApp(
             // Enable per-panel signal viz when Orphoscope is active
             val isSignalMonitor = vizState.selectedViz.id == "signal-monitor"
 
+            // Only run the heavy 24-channel signal-scope poll while it actually
+            // feeds something on screen (the Orphoscope viz or the per-panel
+            // traces). In every other viz mode it would burn CPU + GC for nobody.
+            // Mirrors the full Orpheus app (App.kt).
+            val signalVizActive = isSignalMonitor || vizState.signalVizEnabled
+            LaunchedEffect(signalVizActive) {
+                graph.synthEngine.setVizEnabled(signalVizActive)
+            }
+
             OrpheusTheme {
                 CompositionLocalProvider(
                     LocalLiquidState provides liquidState,
@@ -114,7 +123,7 @@ fun DjApp(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .liquefiable(dialogLiquidState)
+                                .liquefiableVizEffects(dialogLiquidState)
                         ) {
                             // VizBackground is the source for the panel lenses
                             // (liquidState). It's a SIBLING of DjAppScreen, not
@@ -123,7 +132,7 @@ fun DjApp(
                             VizBackground(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .liquefiable(liquidState),
+                                    .liquefiableVizEffects(liquidState),
                                 selectedViz = vizState.selectedViz,
                             )
                             DjAppScreen(

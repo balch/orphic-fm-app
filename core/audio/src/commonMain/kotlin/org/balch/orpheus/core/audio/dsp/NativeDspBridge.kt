@@ -30,6 +30,15 @@ interface NativeDspBridge {
     fun nativeSetPort(uri: String, symbol: String, value: Float)
     fun nativeGetPort(uri: String, symbol: String): Float
     fun nativeGetMonitor(out: FloatArray)
+
+    /**
+     * Cumulative audio underrun (xrun) count for the current output stream.
+     * Only meaningful on Android (exclusive MMAP underruns are invisible to
+     * the OS mixer — the client is the sole observer). Other platforms
+     * return 0. The counter resets when the stream is reopened, so callers
+     * must treat decreases as a reset, not an error.
+     */
+    fun nativeGetXRunCount(): Int = 0
     fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     fun nativeTriggerDrum(drumIndex: Int, accent: Float)

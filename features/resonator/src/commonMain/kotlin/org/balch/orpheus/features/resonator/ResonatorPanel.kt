@@ -73,8 +73,6 @@ fun ResonatorPanel(
 ) {
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
-    val inViz by inVizFlow.collectAsState()
-    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "REZO",
@@ -86,8 +84,8 @@ fun ResonatorPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = inViz, color = OrpheusColors.lakersGold.copy(alpha = 0.5f))
-            SignalTrace(data = outViz, color = OrpheusColors.lakersGold)
+            SignalTrace(data = inVizFlow, color = OrpheusColors.lakersGold.copy(alpha = 0.5f))
+            SignalTrace(data = outVizFlow, color = OrpheusColors.lakersGold)
         }
     ) {
         // Combined Enable/Mode selector Row

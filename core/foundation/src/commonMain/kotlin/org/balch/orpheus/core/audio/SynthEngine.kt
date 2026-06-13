@@ -262,6 +262,18 @@ interface SynthEngine {
     /** Enable/disable turntable viz polling (DJ platter waveforms). */
     fun setTurntableVizEnabled(enabled: Boolean) {}
 
+    /**
+     * Inform the engine whether the app UI is visible. When false (app
+     * backgrounded on Android), high-frequency UI-feeding polls (peak/CPU
+     * meters, Pulsar step grid, turntable platters, Signal Monitor scopes)
+     * are paused so a backgrounded app doesn't burn CPU; they resume when
+     * the UI returns. Audio rendering and background-required polling (the
+     * Pulsar arrangement state that drives song auto-advance and media
+     * session metadata) are unaffected. Default no-op for engines without
+     * polling (desktop/WASM UI is always visible).
+     */
+    fun setUiVisible(visible: Boolean) {}
+
     // ═══════════════════════════════════════════════════════════
     // Generic Plugin Port Access
     // ═══════════════════════════════════════════════════════════

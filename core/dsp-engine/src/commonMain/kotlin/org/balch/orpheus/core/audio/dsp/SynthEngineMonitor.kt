@@ -1,5 +1,9 @@
 package org.balch.orpheus.core.audio.dsp
 
+import com.diamondedge.logging.logging
+import kotlin.concurrent.Volatile
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +33,11 @@ class SynthEngineMonitor(
 
     private val _cpuLoadFlow = MutableStateFlow(0f)
     val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
+
+    // Audio underruns (xruns) for the current output stream. Android-only
+    // signal (0 elsewhere); resets when the stream reopens on route changes.
+    private val _xrunCountFlow = MutableStateFlow(0)
+    val xrunCountFlow: StateFlow<Int> = _xrunCountFlow.asStateFlow()
 
     private val _voiceLevelsFlow = MutableStateFlow(FloatArray(12))
     val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
@@ -127,14 +136,35 @@ class SynthEngineMonitor(
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
     private val arrangementBuf = IntArray(6)
 
+    // Guards every poll-lifecycle transition below (the five Job refs plus the
+    // uiVisible / monitoringActive / *Requested flags). start/stopMonitoring run
+    // on the orchestrator's Default thread while setUiVisible/setVizEnabled arrive
+    // on the UI main thread; without this lock the check-then-act in the
+    // launch*Poll helpers races and can leak or double-launch polls.
+    private val pollLock = SynchronizedObject()
+
     private var monitoringJob: Job? = null
     private var vizJob: Job? = null
     private var turntableVizJob: Job? = null
     private var pulsarVizJob: Job? = null
     private var arrangementPollJob: Job? = null
     var startRequested = false
+
+    // Volatile for the lone cross-thread read in DspSynthEngine.start(); all
+    // mutations happen under pollLock.
+    @Volatile
     var vizRequested = false
         private set
+
+    /** True between startMonitoring() and stopMonitoring() — i.e. engine running. */
+    private var monitoringActive = false
+
+    /** UI visibility gate for high-frequency polls. Defaults to visible
+     *  (desktop/WASM never call setUiVisible). */
+    private var uiVisible = true
+
+    /** Turntable viz was requested by UI (survives a background pause/resume). */
+    private var turntableVizRequested = false
 
     // Reusable IntArray(1) for JNI read position — avoids allocation per channel per poll
     private val vizReadPosBuf = IntArray(1)
@@ -176,9 +206,71 @@ class SynthEngineMonitor(
         return result
     }
 
-    /** Start the monitoring polling coroutine. */
-    fun startMonitoring() {
-        // Poll monitor data from C++ via native bridge
+    /**
+     * Start the monitoring polling coroutines.
+     *
+     * The arrangement poll always runs while the engine runs — it feeds
+     * background consumers (PulsarSongEnding's song auto-advance and the
+     * media-session metadata path). The monitor + Pulsar viz polls only feed
+     * UI and are gated on [uiVisible] (see [setUiVisible]).
+     */
+    fun startMonitoring() = synchronized(pollLock) {
+        monitoringActive = true
+        launchArrangementPoll()
+        if (uiVisible) {
+            launchMonitorPoll()
+            launchPulsarVizPoll()
+            // If the signal scope / turntable viz was requested before the engine
+            // started (e.g. Orphoscope is the launch viz), honour it now —
+            // setVizEnabled alone can't launch the poll until isRunning is true.
+            if (vizRequested) launchVizPoll()
+            if (turntableVizRequested) launchTurntableVizPoll()
+        }
+    }
+
+    /**
+     * Pause/resume UI-only polling based on app visibility. When the app is
+     * backgrounded the 60Hz Pulsar/turntable/signal-monitor polls and the 5Hz
+     * monitor poll burn CPU for nobody — Android kills the app for excessive
+     * background CPU. The audio engine and the arrangement poll keep running
+     * (background playback + song auto-advance are features).
+     *
+     * Idempotent; safe to call before [startMonitoring] or when the engine
+     * isn't running (relaunch is gated on [monitoringActive]).
+     */
+    fun setUiVisible(visible: Boolean): Unit = synchronized(pollLock) {
+        if (uiVisible == visible) return@synchronized
+        uiVisible = visible
+        if (visible) {
+            log.info {
+                "UI visible — resuming UI polls " +
+                    "(monitoring=$monitoringActive viz=$vizRequested turntable=$turntableVizRequested)"
+            }
+            if (monitoringActive) {
+                launchMonitorPoll()
+                launchPulsarVizPoll()
+                if (vizRequested) launchVizPoll()
+                // Turntable viz is a UI-only poll like the others — only relaunch
+                // it while the engine is actually monitoring, otherwise a resume
+                // after stopMonitoring() would poll a stopped engine.
+                if (turntableVizRequested) launchTurntableVizPoll()
+            }
+        } else {
+            log.info { "UI hidden — pausing UI polls (audio + arrangement poll keep running)" }
+            monitoringJob?.cancel()
+            monitoringJob = null
+            pulsarVizJob?.cancel()
+            pulsarVizJob = null
+            vizJob?.cancel()
+            vizJob = null
+            turntableVizJob?.cancel()
+            turntableVizJob = null
+        }
+    }
+
+    /** 5Hz poll of peak/cpu/voice-level/LFO meters (UI-only consumers). */
+    private fun launchMonitorPoll() {
+        if (monitoringJob != null) return
         monitoringJob = monitoringScope.launch(dispatcherProvider.io) {
             val monitorBuf = FloatArray(20) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend, lfo_a, lfo_b
             while (isActive) {
@@ -194,13 +286,29 @@ class SynthEngineMonitor(
                 _lfoAOutputFlow.value = monitorBuf[18]
                 _lfoBOutputFlow.value = monitorBuf[19]
 
+                val xruns = nativeBridge.nativeGetXRunCount()
+                val previous = _xrunCountFlow.value
+                if (xruns > previous) {
+                    log.warn {
+                        "Audio underrun: +${xruns - previous} (total=$xruns, " +
+                            "dspLoad=${(monitorBuf[2] * 100f).toInt()}%)"
+                    }
+                }
+                // xruns < previous means the stream was reopened (counter reset)
+                _xrunCountFlow.value = xruns
+
                 delay(MONITOR_POLL_INTERVAL_MS)
             }
         }
+    }
 
-        // Poll Pulsar step grid at ~60fps so the playhead doesn't skip steps.
-        // Always active when monitoring runs so the grid works regardless of
-        // the viz waveform toggle.
+    /**
+     * ~60fps poll of the Pulsar step grid so the playhead doesn't skip steps.
+     * Runs whenever monitoring runs and the UI is visible, regardless of the
+     * viz waveform toggle. UI-only consumers (Pulsar/Mixer panels).
+     */
+    private fun launchPulsarVizPoll() {
+        if (pulsarVizJob != null) return
         pulsarVizJob = monitoringScope.launch(dispatcherProvider.io) {
             val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
             val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
@@ -225,7 +333,17 @@ class SynthEngineMonitor(
                 delay(VIZ_POLL_INTERVAL_MS)
             }
         }
+    }
 
+    /**
+     * 5Hz poll of the Pulsar arrangement state. NOT gated on UI visibility:
+     * PulsarSongEnding consumes this (via PulsarViewModel's always-on
+     * enrichment collector) to detect song endings and auto-advance vibes
+     * while the app plays in the background; media-session consumers
+     * (Android Auto) also stay current through it.
+     */
+    private fun launchArrangementPoll() {
+        if (arrangementPollJob != null) return
         arrangementPollJob = monitoringScope.launch(dispatcherProvider.io) {
             while (isActive) {
                 nativeBridge.nativeGetPulsarArrangement(arrangementBuf)
@@ -246,7 +364,16 @@ class SynthEngineMonitor(
     }
 
     /** Start turntable viz polling (lightweight: 2x memcpy of 129 floats at 60fps). */
-    fun startTurntableViz() {
+    fun startTurntableViz(): Unit = synchronized(pollLock) {
+        turntableVizRequested = true
+        // Only launch while the engine is monitoring and the UI is visible; the
+        // request flag survives a pause/stop so startMonitoring()/setUiVisible()
+        // can relaunch it later.
+        if (!uiVisible || !monitoringActive) return@synchronized
+        launchTurntableVizPoll()
+    }
+
+    private fun launchTurntableVizPoll() {
         if (turntableVizJob != null) return
         turntableVizJob = monitoringScope.launch(dispatcherProvider.io) {
             val ttBuf = FloatArray(TURNTABLE_VIZ_SIZE)
@@ -269,7 +396,8 @@ class SynthEngineMonitor(
     }
 
     /** Stop turntable viz polling. */
-    fun stopTurntableViz() {
+    fun stopTurntableViz(): Unit = synchronized(pollLock) {
+        turntableVizRequested = false
         turntableVizJob?.cancel()
         turntableVizJob = null
         _djVizFlowA.value = FloatArray(0)
@@ -277,7 +405,8 @@ class SynthEngineMonitor(
     }
 
     /** Cancel all polling jobs. */
-    fun stopMonitoring() {
+    fun stopMonitoring(): Unit = synchronized(pollLock) {
+        monitoringActive = false
         vizJob?.cancel()
         vizJob = null
         turntableVizJob?.cancel()
@@ -291,46 +420,10 @@ class SynthEngineMonitor(
     }
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
-    fun setVizEnabled(enabled: Boolean, isRunning: Boolean) {
+    fun setVizEnabled(enabled: Boolean, isRunning: Boolean): Unit = synchronized(pollLock) {
         vizRequested = enabled
-        if (enabled && vizJob == null && isRunning) {
-            vizJob = monitoringScope.launch(dispatcherProvider.io) {
-                val vizBuf = FloatArray(VIZ_BUF_SIZE)
-                val readPositions = IntArray(VIZ_CHANNEL_COUNT)
-                while (isActive) {
-                    pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow)
-                    pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow)
-                    pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow)
-                    pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow)
-                    pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow)
-                    pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow)
-                    pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow)
-                    pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow)
-                    pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow)
-                    pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow)
-                    pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow)
-                    pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow)
-                    pollVizChannel(VIZ_DRUM_OUT, readPositions, vizBuf, _drumOutVizFlow)
-                    pollVizChannel(VIZ_GRAINS_IN, readPositions, vizBuf, _grainsInVizFlow)
-                    pollVizChannel(VIZ_GRAINS_OUT, readPositions, vizBuf, _grainsOutVizFlow)
-                    pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow)
-                    pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow)
-                    pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow)
-                    pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow)
-                    pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow)
-                    pollVizChannel(VIZ_HORN_IN, readPositions, vizBuf, _hornInVizFlow)
-                    pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow)
-                    pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow)
-                    pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow)
-                    pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
-                    pollVizChannel(VIZ_TIDES_CH0, readPositions, vizBuf, _tidesCh0VizFlow)
-                    pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow)
-                    pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow)
-                    pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow)
-
-                    delay(VIZ_POLL_INTERVAL_MS)
-                }
-            }
+        if (enabled && isRunning && uiVisible) {
+            launchVizPoll()
         } else if (!enabled && vizJob != null) {
             vizJob?.cancel()
             vizJob = null
@@ -350,6 +443,48 @@ class SynthEngineMonitor(
         }
     }
 
+    /** ~60fps Signal Monitor oscilloscope poll (UI-only consumers). */
+    private fun launchVizPoll() {
+        if (vizJob != null) return
+        vizJob = monitoringScope.launch(dispatcherProvider.io) {
+            val vizBuf = FloatArray(VIZ_BUF_SIZE)
+            val readPositions = IntArray(VIZ_CHANNEL_COUNT)
+            while (isActive) {
+                pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow)
+                pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow)
+                pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow)
+                pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow)
+                pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow)
+                pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow)
+                pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow)
+                pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow)
+                pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow)
+                pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow)
+                pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow)
+                pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow)
+                pollVizChannel(VIZ_DRUM_OUT, readPositions, vizBuf, _drumOutVizFlow)
+                pollVizChannel(VIZ_GRAINS_IN, readPositions, vizBuf, _grainsInVizFlow)
+                pollVizChannel(VIZ_GRAINS_OUT, readPositions, vizBuf, _grainsOutVizFlow)
+                pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow)
+                pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow)
+                pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow)
+                pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow)
+                pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow)
+                pollVizChannel(VIZ_HORN_IN, readPositions, vizBuf, _hornInVizFlow)
+                pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow)
+                pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow)
+                pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow)
+                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
+                pollVizChannel(VIZ_TIDES_CH0, readPositions, vizBuf, _tidesCh0VizFlow)
+                pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow)
+                pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow)
+                pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow)
+
+                delay(VIZ_SCOPE_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     /** Update bend flow from external sources (setBend facade, setPluginPort). */
     fun updateBend(value: Float) {
         _bendFlow.value = value
@@ -359,8 +494,15 @@ class SynthEngineMonitor(
     fun getPeak(): Float = _peakFlow.value
 
     companion object {
+        private val log = logging("SynthEngineMonitor")
         private const val MONITOR_POLL_INTERVAL_MS = 200L
         private const val VIZ_POLL_INTERVAL_MS = 16L  // ~60fps
+        // Signal-monitor oscilloscope poll — the heaviest UI poll (24 channels,
+        // each allocating a fresh FloatArray ring per tick). Run at half the
+        // Pulsar/turntable rate: the Orphoscope only redraws at the display
+        // refresh anyway and 30Hz scope motion still reads as smooth, but the
+        // per-second allocation/GC churn halves.
+        private const val VIZ_SCOPE_POLL_INTERVAL_MS = 33L  // ~30fps
         private const val VIZ_BUF_SIZE = 480           // matches C++ VizRing::kVizBufSize
         // VizChannel IDs (must match C++ VizChannel enum)
         private const val VIZ_LFO = 0
