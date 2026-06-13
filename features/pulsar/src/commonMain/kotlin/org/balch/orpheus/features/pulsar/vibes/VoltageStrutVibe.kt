@@ -84,20 +84,20 @@ class VoltageStrutVibe : VibeProvider {
                 members = listOf(
                     BandMember(
                         "Drummer", listOf(0, 1, 2), alwaysActive = true,
-                        loudness = 0.8f, creativity = 0.35f, swing = 0.02f, drag = -0.02f
+                        loudness = 0.8f, creativity = 0.35f
                     ),
                     // Both basses under one member so they move as a unit during handoff.
                     BandMember(
                         "Bassist", listOf(3, 5), alwaysActive = true,
-                        loudness = 0.85f, creativity = 0.5f, swing = 0.0f, drag = 0.0f
+                        loudness = 0.85f, creativity = 0.5f
                     ),
                     BandMember(
                         "Lead", listOf(4),
-                        loudness = 0.6f, creativity = 0.65f, swing = 0.0f, drag = 0.0f
+                        loudness = 0.6f, creativity = 0.65f
                     ),
                     BandMember(
                         "FX", listOf(6, 7),
-                        loudness = 0.4f, creativity = 0.75f, swing = 0.0f, drag = 0.05f
+                        loudness = 0.4f, creativity = 0.75f
                     ),
                 ),
                 handoffMatrix = bandMatrix(

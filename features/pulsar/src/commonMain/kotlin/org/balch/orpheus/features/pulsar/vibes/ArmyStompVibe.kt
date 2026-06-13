@@ -177,14 +177,14 @@ class ArmyStompVibe : VibeProvider {
                 // instead of pedaling on E — that's the "army wandering" sound.
                 chordFollow = ChordFollow.FOLLOW,
                 compingStyle = CompingStyle.BLUES_SHUFFLE,
-                // Loosen the keyboard's stabs: drop ~a third of them, let some
+                // Loosen the keyboard's stabs: drop ~a quarter of them, let some
                 // jump octaves, occasionally add an extension. The march keys
                 // are tight and disciplined; drift keys should feel like a
                 // tired pianist noodling at dawn.
                 compingHumanization = CompingHumanization(
-                    dropProbability = 0.35f,
+                    dropProbability = 0.25f,
                     ghostProbability = .1f,
-                    octaveJumpProbability = 0.30f,
+                    octaveJumpProbability = 0.2f,
                     extensionProbability = 0.40f,
                 ),
                 customProgression = chords(0, 3, 0, 3),
@@ -311,19 +311,19 @@ class ArmyStompVibe : VibeProvider {
                 members = listOf(
                     BandMember(
                         "Drummer", listOf(0, 1, 2), alwaysActive = true,
-                        creativity = 0.3f, swing = 0.02f, drag = -0.1f
+                        creativity = 0.3f
                     ),
                     BandMember(
                         "Bassist", listOf(3),
-                        creativity = 0.4f, swing = 0.0f, drag = 0.05f
+                        creativity = 0.4f
                     ),
                     BandMember(
                         "Keys", listOf(4),
-                        creativity = 0.6f, swing = 0.0f, drag = 0.0f
+                        creativity = 0.6f
                     ),
                     BandMember(
                         "FX", listOf(5, 6, 7),
-                        creativity = 0.8f, swing = 0.0f, drag = 0.1f
+                        creativity = 0.8f
                     ),
                 ),
                 handoffMatrix = bandMatrix(

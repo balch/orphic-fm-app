@@ -69,6 +69,7 @@ static TestSuite suites[] = {
     {"pulsar_outro_request", run_pulsar_outro_request_tests, true},
     {"oboe_buffer",     run_oboe_buffer_tests,     true},
     {"texture",         run_pulsar_texture_tests,  true},
+    {"complexity_cap",  run_pulsar_complexity_cap_tests, true},
     {"pattern_gen",     run_pulsar_pattern_gen_tests, true},
     {"band_solo",       run_pulsar_band_solo_tests, true},
     {"lick_techniques", run_pulsar_lick_techniques_tests, true},

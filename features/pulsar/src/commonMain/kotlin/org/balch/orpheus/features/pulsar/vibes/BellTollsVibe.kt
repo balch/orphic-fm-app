@@ -267,13 +267,13 @@ class BellTollsVibe : VibeProvider {
             band = Band(
                 members = listOf(
                     BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
-                        loudness = 0.7f, creativity = 0.3f, swing = 0.0f, drag = 0.05f),
+                        loudness = 0.7f, creativity = 0.3f),
                     BandMember("Bassist", listOf(3),
-                        loudness = 0.85f, creativity = 0.4f, swing = 0.0f, drag = 0.08f),
+                        loudness = 0.85f, creativity = 0.4f),
                     BandMember("Melodica", listOf(4),
-                        loudness = 0.55f, creativity = 0.65f, swing = 0.0f, drag = 0.1f),
+                        loudness = 0.55f, creativity = 0.65f),
                     BandMember("Keys", listOf(5, 6),
-                        loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.05f),
+                        loudness = 0.5f, creativity = 0.5f),
                 ),
                 handoffMatrix = bandMatrix(
                     //            DRUM  BASS  MELOD KEYS

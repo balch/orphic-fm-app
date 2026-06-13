@@ -184,7 +184,7 @@ inline void init_chord_progression(PulsarChordState& cs, int style,
 inline void maybe_mutate_progression(PulsarChordState& cs, float complexity, float mood) {
     // Only mutate when complexity > 0.3, probability scales with complexity
     float roll = pattern_rand01(cs.chord_seed);
-    float mutation_prob = (complexity - 0.3f) * 0.4f;  // 0 at 0.3, 0.28 at 1.0
+    float mutation_prob = (complexity - 0.3f) * 0.25f;  // 0 at 0.3, 0.175 at 1.0
     if (mutation_prob <= 0.0f || roll > mutation_prob) return;
 
     // Pick a random position to mutate (not the first chord — keep the tonic anchor)

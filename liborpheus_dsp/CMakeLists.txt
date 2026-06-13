@@ -254,6 +254,7 @@ if(BUILD_TESTS)
         test/test_pulsar_outro_request.cpp
         test/test_oboe_buffer.cpp
         test/test_pulsar_texture.cpp
+        test/test_pulsar_complexity_cap.cpp
         test/test_pulsar_pattern_gen.cpp
         test/test_pulsar_band_solo.cpp
         test/test_pulsar_lick_techniques.cpp

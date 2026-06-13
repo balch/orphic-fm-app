@@ -231,7 +231,7 @@ class VelvetLeashVibe : VibeProvider {
                         alwaysActive = true,
                         creativity = 0.20f
                     ),
-                    BandMember("Bass", listOf(3), creativity = 0.25f, drag = 0.06f),
+                    BandMember("Bass", listOf(3), creativity = 0.25f),
                     BandMember("Marimba", listOf(4, 5), creativity = 0.40f),
                     BandMember("Keys", listOf(6, 7), creativity = 0.35f),
                 ),
@@ -252,7 +252,7 @@ class VelvetLeashVibe : VibeProvider {
                 barsPerLeadMin = 4, barsPerLeadMax = 8,
             ),
             energy = 0.6f,
-            complexity = 0.75f,
+            complexity = 0.65f,
             space = 0.5f,   // Dryish 60s production
             mood = 0.40f,    // Sly / slightly dark — minor key with a smirk
             deep = 0.75f,

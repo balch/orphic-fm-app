@@ -216,7 +216,7 @@ class TremoloTideVibe : VibeProvider {
                 ),
                 recencyDecay = 0.4f,
                 macroOverrides = MacroOverrides(
-                    energy = 0.85f, complexity = 1.60f, space = 1.40f, mood = 1.20f,
+                    energy = 0.85f, complexity = 1.35f, space = 1.40f, mood = 1.20f,
                 ),
                 soloMode = SoloMode.Jam(probability = 0.75f),
             ),
@@ -318,19 +318,19 @@ class TremoloTideVibe : VibeProvider {
                 members = listOf(
                     BandMember(
                         "Drummer", listOf(0, 1, 2), alwaysActive = true,
-                        creativity = 0.20f, swing = 0.04f, drag = 0.02f
+                        creativity = 0.20f
                     ),
                     BandMember(
                         "Bassist", listOf(3),
-                        creativity = 0.30f, swing = 0.0f, drag = 0.06f
+                        creativity = 0.30f
                     ),
                     BandMember(
                         "Lead", listOf(4),
-                        creativity = 0.65f, swing = 0.0f, drag = 0.10f
+                        creativity = 0.65f
                     ),
                     BandMember(
                         "Pads", listOf(5, 6, 7),
-                        creativity = 0.55f, swing = 0.0f, drag = 0.15f
+                        creativity = 0.55f
                     ),
                 ),
                 handoffMatrix = bandMatrix(
@@ -485,7 +485,7 @@ class TremoloTideVibe : VibeProvider {
                         // at section end / chorus / solo.
                         evolution = Evolution(
                             pitch = PitchEvolution.Contour(driftRange = 0.25f),
-                            rhythmic = RhythmicEvolution(tensionResponse = 0.85f),
+                            rhythmic = RhythmicEvolution(tensionResponse = 0.7f),
                         ),
                         evolutionWeight = 0.8f,
                     )

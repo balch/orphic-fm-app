@@ -9,8 +9,10 @@ import kotlinx.serialization.Serializable
  * @param alwaysActive If true, this member never ducks (e.g., drums keep playing).
  * @param loudness Relative output level for this member, 0-1.
  * @param creativity How much this member varies from the base pattern, 0-1.
- * @param swing Timing swing amount for this member, 0-1.
- * @param drag Timing drag (behind the beat) for this member, 0-1.
+ * @param swing DEAD — not wired to the engine; has no audible effect. See audit 2026-06-13.
+ *   Do not author. Kept only so older persisted [Vibe]/[Band] JSON still deserializes.
+ * @param drag DEAD — not wired to the engine; has no audible effect. See audit 2026-06-13.
+ *   Do not author. Kept only so older persisted [Vibe]/[Band] JSON still deserializes.
  */
 @Serializable
 data class BandMember(

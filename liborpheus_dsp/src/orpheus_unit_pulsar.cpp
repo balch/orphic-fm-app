@@ -194,7 +194,9 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
 
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
-        bool is_melodic = (t >= 3 && t <= 4);  // BASS=3, KEYS=4
+        // Per-track variation budget: scales the global complexity into the
+        // track's role-aware {min,max} range (RHYTHM/drums tight, WILD wide).
+        float track_var = lerp_macro(complexity, ts.macro_map.complexity_variation);
 
         for (int s = 0; s < ts.step_count; s++) {
             PulsarStep& step = ts.steps[s];
@@ -203,7 +205,7 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
 
             // Ghost notes: activate inactive steps with low velocity
             if (!step.gate) {
-                float ghost_prob = complexity * 0.08f;  // up to 8% chance per step
+                float ghost_prob = track_var * 0.08f;  // up to 8% chance per step
                 if (roll < ghost_prob) {
                     step.gate = true;
                     step.velocity = 0.15f + roll * 0.15f / std::max(ghost_prob, 0.001f);
@@ -213,14 +215,17 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                 continue;
             }
 
-            // Accent variation: slightly vary existing velocities
-            float accent_range = complexity * 0.15f;
+            // Accent variation: slightly vary existing velocities.
+            // Routed through the per-track variation budget (like ghost/drift/
+            // markov) so RHYTHM/drum tracks don't get full-strength velocity
+            // jitter at high complexity.
+            float accent_range = track_var * 0.15f;
             float accent_offset = (static_cast<float>((h >> 8) & 0xFFFF) / 65535.0f - 0.5f) * 2.0f * accent_range;
             step.velocity = clamp01(step.velocity + accent_offset);
 
             // Note drift for melodic and effect tracks (3-7)
             if (t >= 3 && !use_markov_contour[t]) {
-                float drift_prob = complexity * 0.1f;
+                float drift_prob = track_var * 0.1f;
                 float drift_roll = static_cast<float>((h >> 16) & 0xFFFF) / 65535.0f;
                 if (drift_roll < drift_prob) {
                     // Drift by ±1-2 semitones from raw_note, then quantize
@@ -258,9 +263,11 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             if (!use_markov_contour[t]) continue;
             PulsarTrackState& ts = state->tracks[t];
             SoloBehaviorParam& sb = state->track_solo_behavior[t];
+            float track_var = lerp_macro(complexity, ts.macro_map.complexity_variation);
 
-            // Only mutate a fraction of steps per bar, scaling with complexity
-            float mutate_prob = complexity * 0.15f;  // up to 15% of steps mutated
+            // Only mutate a fraction of steps per bar, scaling with the
+            // per-track variation budget (was raw complexity).
+            float mutate_prob = track_var * 0.15f;  // up to 15% of steps mutated
 
             // Seed current degree from first active step
             int current_degree = 0;
@@ -323,15 +330,17 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
         }
     }
 
-    // Step count mutation (high complexity only, melodic tracks 2-4)
-    if (complexity > 0.7f) {
-        float step_mut_prob = (complexity - 0.7f) * 0.1f;
+    // Step count mutation (very high complexity only; non-percussive tracks
+    // t>=2 — drums are skipped by role below so phrase length stays locked).
+    if (complexity > 0.85f) {
+        float step_mut_prob = (complexity - 0.85f) * 0.1f;
         for (int t = 2; t < kNumPulsarTracks; t++) {
             PulsarTrackState& ts = state->tracks[t];
+            if (ts.role == TrackRole::PERCUSSIVE) continue;  // drums must stay phrase-locked
             float roll = rand01(state->mutation_seed);
             if (roll < step_mut_prob) {
                 int delta = (rand01(state->mutation_seed) > 0.5f) ? 1 : -1;
-                if (rand01(state->mutation_seed) > 0.7f) delta *= 2;
+                // no +/-2 jump: phrase-length desync is the worst disjointedness source
                 int new_count = ts.step_count + delta;
                 if (new_count >= 12 && new_count <= kMaxPulsarSteps) {
                     ts.step_count = new_count;
@@ -2064,7 +2073,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                 // Déjà vu reset: regenerate patterns from original seed periodically
                 state->loops_since_reset++;
-                int reset_interval = std::max(4, static_cast<int>(32.0f * (1.0f - complexity)));
+                int reset_interval = std::max(8, static_cast<int>(32.0f * (1.0f - complexity)));
                 if (state->loops_since_reset >= reset_interval) {
                     state->loops_since_reset = 0;
                     // Re-read genre profile for regeneration

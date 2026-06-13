@@ -69,15 +69,15 @@ class DeepSpaceVibe : VibeProvider {
             band = Band(
                 members = listOf(
                     BandMember("Rhythm", listOf(0, 1, 2), alwaysActive = true,
-                        loudness = 0.7f, creativity = 0.4f, swing = 0.08f, drag = -0.05f),
+                        loudness = 0.7f, creativity = 0.4f),
                     BandMember("Bassist", listOf(3),
-                        loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.1f),
+                        loudness = 0.5f, creativity = 0.5f),
                     BandMember("Keys", listOf(4),
-                        loudness = 0.5f, creativity = 0.6f, swing = 0.0f, drag = 0.1f),
+                        loudness = 0.5f, creativity = 0.6f),
                     BandMember("Guitar", listOf(5),
-                        loudness = 0.4f, creativity = 0.7f, swing = 0.0f, drag = 0.15f),
+                        loudness = 0.4f, creativity = 0.7f),
                     BandMember("Textures", listOf(6, 7),
-                        loudness = 0.3f, creativity = 0.8f, swing = 0.0f, drag = 0.15f),
+                        loudness = 0.3f, creativity = 0.8f),
                 ),
                 handoffMatrix = bandMatrix(
                     //             RHYTHM BASS  KEYS  GUITAR TEX
@@ -99,7 +99,7 @@ class DeepSpaceVibe : VibeProvider {
                 barsPerLeadMin = 2, barsPerLeadMax = 6,
             ),
             energy = 0.35f,
-            complexity = 0.75f,
+            complexity = 0.65f,
             space = 0.85f,
             mood = 0.6f,
             deep = 0.7f,
@@ -359,7 +359,7 @@ class DeepSpaceVibe : VibeProvider {
                         ),
                         recencyDecay = 0.5f,
                         macroOverrides = MacroOverrides(
-                            energy = 0.3f, complexity = 2.0f, space = 1.6f, mood = 1.4f,
+                            energy = 0.3f, complexity = 2.0f, space = 1.6f, mood = 1.4f,  // effective = clamp01(base*2.0) pins to 1.0 — intentional atonal chaos
                         ),
                     ),
                     // 3: return — reprise of the groove, fuller and more triumphant

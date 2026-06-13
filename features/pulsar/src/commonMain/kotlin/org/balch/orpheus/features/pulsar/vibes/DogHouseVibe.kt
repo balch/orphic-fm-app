@@ -233,19 +233,19 @@ class DogHouseVibe : VibeProvider {
                 members = listOf(
                     BandMember(
                         "Drummer", listOf(0, 1, 2), alwaysActive = true,
-                        loudness = 0.7f, creativity = 0.3f, swing = 0.1f, drag = -0.05f
+                        loudness = 0.7f, creativity = 0.3f
                     ),
                     BandMember(
                         "Bassist", listOf(3),
-                        loudness = 0.8f, creativity = 0.5f, swing = 0.0f, drag = 0.08f
+                        loudness = 0.8f, creativity = 0.5f
                     ),
                     BandMember(
                         "Keys", listOf(4),
-                        loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.0f
+                        loudness = 0.5f, creativity = 0.5f
                     ),
                     BandMember(
                         "FX", listOf(5, 6, 7),
-                        loudness = 0.3f, creativity = 0.7f, swing = 0.0f, drag = 0.12f
+                        loudness = 0.3f, creativity = 0.7f
                     ),
                 ),
                 handoffMatrix = bandMatrix(

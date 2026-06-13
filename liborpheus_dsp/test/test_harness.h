@@ -525,6 +525,7 @@ bool run_pulsar_sections_tests();
 bool run_pulsar_outro_request_tests();
 bool run_oboe_buffer_tests();
 bool run_pulsar_texture_tests();
+bool run_pulsar_complexity_cap_tests();
 bool run_pulsar_pattern_gen_tests();
 bool run_pulsar_analysis_tests();
 bool run_pulsar_band_solo_tests();
