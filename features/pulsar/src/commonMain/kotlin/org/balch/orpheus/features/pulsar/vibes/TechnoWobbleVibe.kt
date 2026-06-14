@@ -557,8 +557,15 @@ class TechnoWobbleVibe : VibeProvider {
                         ),
                     ),
                     // 4: drift — the ending. Everything decays, pad holds, kick fades.
-                    // True outro: empty transitions terminate the arrangement (TW-6).
-                    // Reached as the arrangement's outroIndex; the song ends here.
+                    // Still the arrangement's outroIndex: when the outro is ARMED
+                    // (timer / manual / terminal-arm) the C++ advance_section override
+                    // pins the engine here and the song ends. But drift is also
+                    // reachable via the rare grind/stab/fall edges during normal play,
+                    // so it must NOT be terminal — a zero-transition section reached
+                    // unarmed black-holes the engine (the "stuck in drift" bug). The
+                    // single edge back to `pulse` makes drift a recoverable
+                    // false-ending in normal play while the armed outro pin still
+                    // traps it for the real ending.
                     Section(
                         name = "drift",
                         barsMin = 3, barsMax = 4,
@@ -566,7 +573,13 @@ class TechnoWobbleVibe : VibeProvider {
                             energy = 0.25f, space = 1.7f, mood = 0.9f,
                         ),
                         chordFollow = ChordFollow.ROOT_ONLY,
-                        transitions = emptyList(),   // terminal — see Arrangement.outroIndex = 4 (TW-6)
+                        // Hard cut back to the quiet intro. No transitionBars pre-roll:
+                        // a ramp would wobble macros toward pulse on every drift
+                        // re-entry during the ARMED outro loop, destabilizing the
+                        // ending. 0-bar keeps the decay stable.
+                        transitions = listOf(
+                            SectionTransition(targetIndex = 0, weight = 1.0f),
+                        ),
                         compingHumanization = cleanHumanization,
                         // Drift is the deliberate decay. Kick fades, lead becomes
                         // sparse held decays, pad holds nearly forever, MOD wildcard

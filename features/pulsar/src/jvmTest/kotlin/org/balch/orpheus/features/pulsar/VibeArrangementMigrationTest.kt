@@ -60,6 +60,42 @@ class VibeArrangementMigrationTest {
     )
 
     @Test
+    fun `no terminal section is reachable during normal play`() {
+        // A section with no outgoing transitions is TERMINAL. If such a section
+        // is also reachable during normal Markov play (the intro, or any
+        // section's transition target), the C++ engine black-holes there
+        // (select_next_section returns `current` for a zero-transition section)
+        // until the outro is armed — the "stuck in drift" bug. The only
+        // sanctioned terminal section is the outroIndex, entered via the armed
+        // outro pin, never via a normal edge or intro.
+        val violations = mutableListOf<String>()
+        for (provider in allVibes) {
+            val arr = provider.vibe.arrangement ?: continue
+            val sections = arr.sections
+            if (sections.size <= 1) continue // single section = intentional loop, never advances
+
+            val reachable: Set<Int> = buildSet {
+                // null introIndex = random weighted start → any section can begin the song.
+                if (arr.introIndex == null) sections.indices.forEach { add(it) } else add(arr.introIndex!!)
+                for (s in sections) for (t in s.transitions) add(t.targetIndex)
+            }
+
+            sections.forEachIndexed { idx, section ->
+                if (section.transitions.isEmpty() && idx in reachable) {
+                    violations += "${provider.name}: section[$idx] '${section.name}' is terminal " +
+                        "(no transitions) yet reachable in normal play"
+                }
+            }
+        }
+        assertTrue(
+            violations.isEmpty(),
+            "Terminal sections reachable during normal Markov play trap the engine until the " +
+                "outro arms. Give each an outgoing transition, or remove the edges/intro that " +
+                "reach it. Violations:\n" + violations.joinToString("\n"),
+        )
+    }
+
+    @Test
     fun `no vibe sets a per-vibe transitionOut override`() {
         // All vibes inherit the global default. If a vibe genuinely needs its
         // own transition behavior, set it explicitly and add a focused test

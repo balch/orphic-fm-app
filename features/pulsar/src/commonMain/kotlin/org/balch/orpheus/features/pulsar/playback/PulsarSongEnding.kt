@@ -217,8 +217,15 @@ class PulsarSongEnding(
             if (transitionedOut || sectionLooped) {
                 val name = pulsarFeature.vibeFlow.value.name
                 log.info { "song ended: $name (transitionedOut=$transitionedOut sectionLooped=$sectionLooped)" }
-                songEndedEmitted = true
-                _events.tryEmit(SongEndingEvent.SongEnded(name))
+                // Latch only on a successful emit. If the buffer/subscriber drops
+                // it (tryEmit == false), leave songEndedEmitted false so the next
+                // section loop retries — otherwise a single dropped SongEnded
+                // would strand the song in the outro forever.
+                if (_events.tryEmit(SongEndingEvent.SongEnded(name))) {
+                    songEndedEmitted = true
+                } else {
+                    log.warn { "SongEnded emit dropped for $name; will retry on next loop" }
+                }
             }
         }
 
@@ -248,6 +255,41 @@ class PulsarSongEnding(
                         triggerOutro()
                     }
                 }
+            }
+        }
+
+        // Structural terminal-outro safety net. A vibe can declare its outro
+        // section TERMINAL (transitions = emptyList(), e.g. TechnoWobble's
+        // `drift`). If that same section is also reachable via normal Markov
+        // edges, the C++ engine can walk into it on its own and then self-loop
+        // it forever (select_next_section returns `current` for a zero-transition
+        // section). When that happens BEFORE any timed/manual arm, the loop-back
+        // detection above never wakes (it is gated on _endingTriggered) and the
+        // song drones in the outro indefinitely. Arm the outro the moment we
+        // observe the arrangement sitting in a terminal outro section so the
+        // existing sectionLooped detection ends the song on its next loop.
+        //
+        // Fires regardless of `preferences.enabledFlow`: a section the vibe marks
+        // structurally terminal is a hard end of the arrangement, distinct from
+        // the optional *timed* auto-end the preference governs. Detection-only
+        // cannot un-trap the engine (its sole re-route target is this same
+        // outro_index), so ending the song is the only non-stuck behavior.
+        //
+        // Gated on `minVibeSeconds`: if the Markov walk reaches the terminal
+        // outro early, hold the arm until the minimum song length so the song
+        // isn't cut short. Playing-time still accrues in PLAYS mode, so this
+        // gate works whether or not the auto-end preference is on.
+        if (!_endingTriggered.value) {
+            val arr = pulsarFeature.vibeFlow.value.arrangement
+            val outroIdx = arr?.outroIndex ?: -1
+            val outroSection = arr?.sections?.getOrNull(outroIdx)
+            val playingS = (playingMillisLive() / 1000L).toInt()
+            if (outroIdx >= 0 && state.sectionIndex == outroIdx &&
+                outroSection != null && outroSection.transitions.isEmpty() &&
+                playingS >= arr.minVibeSeconds
+            ) {
+                log.info { "reached terminal outro section $outroIdx unarmed at ${playingS}s — auto-arming" }
+                triggerOutro()
             }
         }
 

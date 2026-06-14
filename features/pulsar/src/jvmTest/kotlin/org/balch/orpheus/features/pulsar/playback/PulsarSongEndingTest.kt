@@ -279,6 +279,87 @@ class PulsarSongEndingTest {
         job.cancel()
     }
 
+    // ─── Regression: terminal outro section reached during NORMAL play ──────────
+    // Repro for the "stuck in the last section, never ends" bug (TechnoWobble's
+    // `drift`). When a vibe's outroIndex is a TERMINAL section (transitions =
+    // emptyList()) that is ALSO reachable via normal Markov edges, the C++ engine
+    // self-loops it forever (select_next_section returns `current` for a
+    // zero-transition section) once the walk lands there. If this happens before
+    // any timed/manual arm — and especially with song-ending disabled — the old
+    // detection stayed asleep (gated on _endingTriggered) and the song droned in
+    // the outro forever. Reaching a structurally-terminal outro section must end
+    // the song regardless of the auto-end preference.
+
+    @Test
+    fun `SongEnded fires when arrangement walks into terminal outro section unarmed`() = runTest {
+        // 3 sections; section 2 is the terminal outro (default transitions =
+        // emptyList()), mirroring TechnoWobble's drift.
+        val vibe = mkVibeWithOutro("Tw", sectionCount = 3, outroIndex = 2)
+        val harness = TestHarness(this, initialVibe = vibe)
+        // PLAYS mode: timed auto-end disabled, and we never call armOutro().
+        // Only reaching the terminal outro section can end the song.
+        harness.prefs.enabledFlow.value = false
+        harness.playbackController.play()
+        // Past the minimum song length (default 150s) so the structural
+        // terminal-outro end is allowed to fire (it is gated on minVibeSeconds).
+        advanceTimeBy(160_000L)
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        // Normal Markov play rolls into the terminal outro section (2). Unarmed.
+        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+        harness.feature.arrangement.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        runCurrent()
+        harness.feature.arrangement.value = PulsarArrangementState(2, 2, 4, false, -1, 0)
+        runCurrent()
+        // Engine self-loops the terminal section back to bar 0.
+        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+
+        assertTrue(
+            collected.any { it is SongEndingEvent.SongEnded },
+            "a terminal outro section reached during normal play must end the song, " +
+                "even when unarmed and auto-end is disabled",
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun `terminal outro section reached before minVibeSeconds does not auto-arm`() = runTest {
+        val vibe = mkVibeWithOutro("Tw", sectionCount = 3, outroIndex = 2)
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.prefs.enabledFlow.value = false
+        harness.playbackController.play()
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        // Only 30s in — well under the 150s minimum. Walking into the terminal
+        // outro section here must NOT end the song: the minimum length wins, so
+        // the auto-arm holds off until minVibeSeconds.
+        advanceTimeBy(30_000L)
+        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+        harness.feature.arrangement.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        runCurrent()
+        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+
+        assertEquals(
+            false, harness.songEnding.endingTriggeredForTest,
+            "terminal outro reached before minVibeSeconds must not arm",
+        )
+        assertTrue(
+            collected.none { it is SongEndingEvent.SongEnded },
+            "song must not end before its minimum length",
+        )
+        job.cancel()
+    }
+
     // ─── Invariant: RANDOM never resolves to a non-style ────────────────────────
     // "PLAYS" is NOT a TransitionStyle — it's only the pill's label when song-
     // ending is disabled. The RANDOM resolver picks from the safe styles, which
