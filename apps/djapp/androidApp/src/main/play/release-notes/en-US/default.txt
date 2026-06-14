@@ -1,3 +1,6 @@
-Stability fix.
+Performance and stability release.
 
-• Fixed a bug where a song could get stuck in its final section and never advance to the next track — most noticeable on the Techno Wobble vibe. Songs now always reach their ending and move on.
+• Generated beats hold together far better — drums and percussion stay locked to the groove instead of drifting into busy, disjointed patterns as you raise complexity.
+• Per-track variation now respects each track's role, so tight rhythm parts stay tight while lead parts stay free to roam.
+• Re-tuned several Vibes (Deep Space, Velvet Leash, Tremolo Tide, Army Stomp) for steadier grooves.
+• General stability fixes.
