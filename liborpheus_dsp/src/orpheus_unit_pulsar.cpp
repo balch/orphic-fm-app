@@ -216,10 +216,13 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             }
 
             // Accent variation: slightly vary existing velocities.
-            // Routed through the per-track variation budget (like ghost/drift/
-            // markov) so RHYTHM/drum tracks don't get full-strength velocity
-            // jitter at high complexity.
-            float accent_range = track_var * 0.15f;
+            // Driven by RAW complexity (not the per-track variation budget):
+            // this is velocity jitter on already-active hits, so it never
+            // shifts which steps fire or the phrase length and therefore can't
+            // cause rhythmic disjointedness. Letting complexity drive it gives
+            // drums their groove/life at high complexity instead of flattening
+            // them. Structural mutation (step-count, ghost, drift) stays budgeted.
+            float accent_range = complexity * 0.15f;
             float accent_offset = (static_cast<float>((h >> 8) & 0xFFFF) / 65535.0f - 0.5f) * 2.0f * accent_range;
             step.velocity = clamp01(step.velocity + accent_offset);
 
