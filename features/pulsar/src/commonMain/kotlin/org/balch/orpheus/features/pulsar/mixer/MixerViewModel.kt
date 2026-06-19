@@ -22,6 +22,8 @@ import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.engagement.EngagementAction
+import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
@@ -64,6 +66,7 @@ class MixerViewModel(
     synthController: SynthController,
     pulsarFeature: PulsarFeature,
     persistence: FeatureStatePersistence,
+    private val engagementTracker: EngagementTracker,
     private val restoreStrategy: RestoreStrategy,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
@@ -176,6 +179,7 @@ class MixerViewModel(
     }
 
     private fun onGroupGainChanged(group: MixerGroup, value: Float) {
+        engagementTracker.record(EngagementAction.GAIN_ADJUST)
         val clamped = value.coerceIn(0f, 1f)
         when (group) {
             MixerGroup.PERC -> percMixId.value  = FloatValue(clamped)

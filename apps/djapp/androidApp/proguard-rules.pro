@@ -19,6 +19,14 @@
 -dontwarn org.apache.logging.log4j.**
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
 
+# Google Play in-app review (review-ktx) generates a GMS OnSuccessListener SAM
+# adapter that references @com.google.android.gms.common.annotation.NoNullnessRewrite.
+# That annotation lives in a newer play-services-base than the review libs pull in,
+# so R8 sees a dangling reference. It's a build-time annotation with no runtime
+# behavior and the review API is direct-call (no reflection), so suppressing the
+# warning is sufficient — no -keep rules needed.
+-dontwarn com.google.android.gms.common.annotation.NoNullnessRewrite
+
 # Oboe JNI bridge
 -keep class org.balch.orpheus.core.audio.dsp.OboeAudioBridge {
     void renderAudio(float[], int);

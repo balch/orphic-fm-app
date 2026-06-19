@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
+import org.balch.orpheus.core.engagement.EngagementAction
+import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.AudioActivitySource
 import org.balch.orpheus.core.media.MediaSessionActionHandler
@@ -35,6 +37,7 @@ class PlaybackController(
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val muteSink: MuteSink,
+    private val engagementTracker: EngagementTracker,
     private val metadataProducer: MetadataProducer,
     private val scope: AppCoroutineScope,
     private val overlayProducer: OverlaySubtitleProducer? = null,
@@ -76,6 +79,7 @@ class PlaybackController(
         if (_state.value != PlaybackState.Playing) return
         log.info { "pause() (was Playing)" }
         _state.value = PlaybackState.Paused
+        engagementTracker.record(EngagementAction.PAUSE)
         muteSink.apply(PlaybackState.Paused)
         mediaSessionManager.updatePlaybackState(false)
     }

@@ -29,6 +29,8 @@ import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
+import org.balch.orpheus.core.engagement.EngagementAction
+import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
@@ -277,6 +279,7 @@ class PulsarViewModel(
     private val transitionPreferences: TransitionPreferences,
     private val transitionRunner: PulsarTransitionRunner,
     private val songEndingEventSource: SongEndingEventSource,
+    private val engagementTracker: EngagementTracker,
 ) : PulsarFeature {
 
     // Providers sorted by their cheap `name` accessor — no Vibe construction
@@ -656,7 +659,10 @@ class PulsarViewModel(
     // Actions
     // ═══════════════════════════════════════════════════════════
     override val actions = PulsarPanelActions(
-        setVibe = { vibe -> applyVibe(vibe) },
+        setVibe = { vibe ->
+            engagementTracker.record(EngagementAction.VIBE_SELECT)
+            applyVibe(vibe)
+        },
         setEnergy = energyId.floatSetter(),
         setComplexity = complexityId.floatSetter(),
         setSpace = { value ->
@@ -679,7 +685,10 @@ class PulsarViewModel(
         },
         setPercMix = percMixId.floatSetter(),
         setEnvelopeMode = envelopeModeId.intSetter(),
-        selectTrack = { selectedTrackFlow.value = it },
+        selectTrack = {
+            if (it != null) engagementTracker.record(EngagementAction.INSTRUMENTS_OPEN)
+            selectedTrackFlow.value = it
+        },
         setTrackEngineEdm = { track, engine ->
             trackEdmIds[track].value = IntValue(engine)
         },
@@ -699,6 +708,7 @@ class PulsarViewModel(
         },
         transitionSpec = transitionPreferences.defaultFlow,
         onSetTransitionStyle = { style ->
+            engagementTracker.record(EngagementAction.TRANSITION_SELECT)
             val current = transitionPreferences.defaultFlow.value
             val clampedMs = current.handoffMs?.coerceIn(style.handoffRange)
                 ?.takeIf { style.canHandoff }

@@ -18,6 +18,8 @@ import kotlinx.serialization.Transient
 import org.balch.orpheus.core.audio.MasterVolumeRamp
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.engagement.EngagementAction
+import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
@@ -94,6 +96,7 @@ class TimerViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val widgetNotifier: TimerWidgetNotifier,
+    private val engagementTracker: EngagementTracker,
     scope: FeatureCoroutineScope,
     persistence: FeatureStatePersistence,
 ) : TimerFeature {
@@ -151,6 +154,7 @@ class TimerViewModel(
     }
 
     private fun start() {
+        engagementTracker.record(EngagementAction.TIMER_START)
         val currentStatus = _state.value.status
         if (currentStatus == TimerStatus.RUNNING) return
 

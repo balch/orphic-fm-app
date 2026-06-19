@@ -35,6 +35,14 @@ data class AppPreferences(
     val lastMixerJson: String? = null,
     /** When true, a new random visualization is selected on each vibe transition. */
     val randomVizMode: Boolean = true,
+    /**
+     * Lifetime count of review-engagement actions, keyed PER action type by
+     * `EngagementAction.name`. Each action is gated against its own total threshold,
+     * so counts are kept separately rather than summed. Gates the in-app review
+     * prompt; never reset. String-keyed (not enum-keyed) so renaming/removing an
+     * action degrades gracefully instead of failing deserialization.
+     */
+    val reviewEngagementTotals: Map<String, Int> = emptyMap(),
 )
 
 

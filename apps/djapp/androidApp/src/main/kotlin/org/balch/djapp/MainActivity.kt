@@ -39,6 +39,15 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // When the review manager decides the user is engaged enough, launch the
+        // Play in-app review flow. The Activity is the launch surface; Play decides
+        // whether a card actually appears (and gives no result back).
+        lifecycleScope.launch {
+            graph.inAppReviewManager.reviewTriggers.collect {
+                graph.inAppReviewManager.launchReview(this@MainActivity)
+            }
+        }
+
         setContent {
             DjApp(
                 graph = graph,

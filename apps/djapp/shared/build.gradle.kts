@@ -18,6 +18,8 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.play.review)
+            implementation(libs.play.review.ktx)
         }
         commonMain.dependencies {
             api(project(":core:audio"))

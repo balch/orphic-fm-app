@@ -2,11 +2,14 @@ package org.balch.orpheus.core.playback
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.engagement.DefaultEngagementTracker
+import org.balch.orpheus.core.engagement.EngagementAction
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -42,6 +45,7 @@ private data class Built(
     val muteCalls: MutableList<PlaybackState>,
     val ssm: MediaSessionStateManager,
     val msm: MediaSessionManager,
+    val tracker: DefaultEngagementTracker,
 )
 
 private fun build(
@@ -57,18 +61,20 @@ private fun build(
     val msm = MediaSessionManager().apply { focusGrantOverride = focusGranted }
     val plm = PlaybackLifecycleManager()
     val sink = MuteSink { state -> muteCalls.add(state) }
+    val tracker = DefaultEngagementTracker()
     val controller = PlaybackController(
         mediaSessionManager = msm,
         mediaSessionStateManager = ssm,
         playbackLifecycleManager = plm,
         muteSink = sink,
+        engagementTracker = tracker,
         metadataProducer = metadata,
         scope = scope,
         overlayProducer = overlay,
         skipHandler = skip,
         playFromMediaIdHandler = playFromId,
     )
-    return Built(controller, muteCalls, ssm, msm)
+    return Built(controller, muteCalls, ssm, msm, tracker)
 }
 
 class PlaybackControllerTest {
@@ -77,6 +83,20 @@ class PlaybackControllerTest {
         val c = build().controller
         assertEquals(PlaybackState.Stopped, c.state.value)
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun `pause records a PAUSE engagement on a real play to pause transition`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val built = build()
+            val seen = mutableListOf<EngagementAction>()
+            val job = launch { built.tracker.events.collect { seen += it } }
+
+            built.controller.play()   // -> Playing (focus granted by default)
+            built.controller.pause()  // real transition -> records PAUSE
+
+            assertEquals(listOf(EngagementAction.PAUSE), seen)
+            job.cancel()
+        }
 
     @Test fun `play transitions to Playing and applies mute sink`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()

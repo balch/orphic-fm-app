@@ -63,6 +63,10 @@ class DjAppApplication : Application() {
         // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
         graph.pulsarSongAdvancer
 
+        // Eagerly initialize InAppReviewManager so its init {} subscribes to the
+        // engagement bus and song-ending events from app launch.
+        graph.inAppReviewManager
+
         // Keep the home-screen widget in sync with playback / vibe / timer state.
         DjWidgetUpdater(this, graph).start()
 

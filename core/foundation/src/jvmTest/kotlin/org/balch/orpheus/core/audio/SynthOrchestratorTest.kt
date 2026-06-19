@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -44,6 +45,7 @@ class SynthOrchestratorTest {
             playbackLifecycleManager = playbackLifecycleManager,
             muteSink = MuteSink { state -> muteCalls.add(state) },
             metadataProducer = FakeMetadata(),
+            engagementTracker = DefaultEngagementTracker(),
             scope = scope,
         )
         val orchestrator = SynthOrchestrator(
@@ -130,6 +132,7 @@ class SynthOrchestratorTest {
             playbackLifecycleManager = plm,
             muteSink = MuteSink { state -> muteCalls.add(state) },
             metadataProducer = FakeMetadata(),
+            engagementTracker = DefaultEngagementTracker(),
             scope = scope,
         )
         SynthOrchestrator(
