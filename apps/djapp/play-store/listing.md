@@ -49,8 +49,17 @@ Orphic DJ is an interactive album — original generative music that composes
 itself, endlessly, every time you press play.
 
 There's no streaming, no library, no playlists. The music is created live on
-your device by generative algorithms, so no two listens are ever the same.
-Shape the mood with four simple knobs and let it run for minutes or for hours.
+your device, so no two listens are ever the same.
+
+WHAT'S INSIDE
+• 11 original vibes — from upbeat grooves to deep ambient drones
+• 11 live visualizations that move with the music
+• 8 generative tracks layering every beat
+• 5 mixer controls to ride the levels
+• 4 ambiance knobs: Energy, Complexity, Mood, Space
+• 2 turntables — dual decks with a crossfader
+• 1 home-screen widget — your current vibe and playback at a glance
+∞ infinite music — it never repeats
 
 WHAT YOU CONTROL
 Four knobs capture the essence of any track:
@@ -65,16 +74,10 @@ MADE FOR EVERY MOMENT
 • House parties — open the DJ module, layer effects, and drop changes on the fly
 • Long drives & commutes — music that never repeats and never needs a signal
 
-FEATURES
-• Generative beats and ambient soundscapes — original compositions that never loop
-• Four-knob interactive control that reflects your current headspace
-• A growing collection of vibes, from upbeat grooves to deep ambient drones
-• DJ module — tweak, layer, and mix in real time
-• A home-screen widget — see the current vibe and control playback at a glance
-• Sleep / focus timer for bedtime, study blocks, or a long drive
-• Always offline — no account, no network, no ads, no telemetry
+Always offline — no account, no network, no ads, no telemetry. Your music never
+leaves your device. No sign-up, no tracking, no subscription.
 
-Your music never leaves your device. No sign-up, no tracking, no subscription.
+Tune into orphic.fm for more creations from Orpheus.
 
 Enjoy the vibes.
 ```
