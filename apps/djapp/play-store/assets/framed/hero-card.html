@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0A0814; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+  <!--
+    Orphic DJ portrait hero screenshot (1080x1920, no alpha) — the "by the numbers"
+    card adapted to lead the Play screenshot carousel. Shares the look of
+    feature-graphic.html and frame.html so the carousel reads as one set.
+    Render to PNG, then flatten alpha (Play rejects alpha channels):
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+        --window-size=1080,1920 --screenshot=hero-portrait-raw.png \
+        "file://$PWD/hero-card.html"
+      magick hero-portrait-raw.png -background '#0A0814' -alpha remove -alpha off \
+        PNG24:01-hero-bynumbers-framed.png
+    Edit the HOOK line and the COUNTS below, not the layout, for routine updates.
+  -->
+  <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
+    <title id="t">Orphic DJ — an interactive album, by the numbers</title>
+    <desc id="d">Orphic DJ wordmark over a turntable with Orpheus at center, the line "Easy. Playful. Infinite.", above a count of vibes, visualizations, tracks, mixer controls, knobs, turntables, the widget, and infinite music.</desc>
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0C0A1C"/>
+        <stop offset="0.52" stop-color="#0A0814"/>
+        <stop offset="1" stop-color="#0D0A1E"/>
+      </linearGradient>
+      <linearGradient id="accentH" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#36E0D0"/>
+        <stop offset="0.5" stop-color="#B14CFF"/>
+        <stop offset="1" stop-color="#FF5DC8"/>
+      </linearGradient>
+      <linearGradient id="accentV" gradientUnits="userSpaceOnUse" x1="540" y1="940" x2="540" y2="1745">
+        <stop offset="0" stop-color="#36E0D0"/>
+        <stop offset="0.5" stop-color="#B14CFF"/>
+        <stop offset="1" stop-color="#FF5DC8"/>
+      </linearGradient>
+      <radialGradient id="glowTeal" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#36E0D0" stop-opacity="0.20"/>
+        <stop offset="1" stop-color="#36E0D0" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="glowMag" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#E040FB" stop-opacity="0.22"/>
+        <stop offset="1" stop-color="#E040FB" stop-opacity="0"/>
+      </radialGradient>
+      <clipPath id="emblemClip"><circle cx="540" cy="600" r="71"/></clipPath>
+    </defs>
+
+    <rect x="0" y="0" width="1080" height="1920" fill="url(#bg)"/>
+    <ellipse cx="200" cy="120" rx="560" ry="440" fill="url(#glowTeal)"/>
+    <ellipse cx="540" cy="600" rx="520" ry="430" fill="url(#glowMag)"/>
+    <ellipse cx="540" cy="1790" rx="660" ry="430" fill="url(#glowTeal)"/>
+
+    <!-- Header -->
+    <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">
+      <text x="540" y="236" font-size="118" font-weight="800" letter-spacing="-3" fill="#FFFFFF">ORPHIC DJ</text>
+      <rect x="445" y="260" width="190" height="10" rx="5" fill="url(#accentH)"/>
+      <text x="540" y="322" font-size="33" font-weight="600" letter-spacing="8" fill="#C9C4E8">AN INTERACTIVE ALBUM</text>
+    </g>
+
+    <!-- Turntable centerpiece -->
+    <g>
+      <circle cx="540" cy="600" r="182" fill="#A6AAB6"/>
+      <circle cx="540" cy="600" r="182" fill="none" stroke="#23232B" stroke-width="9" stroke-dasharray="2 20"/>
+      <circle cx="540" cy="600" r="170" fill="#0B0912"/>
+      <circle cx="540" cy="600" r="153" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="600" r="136" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="600" r="119" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="600" r="102" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="600" r="85" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="600" r="71" fill="#201840"/>
+      <image href="../../../androidApp/src/main/res/mipmap-xxxhdpi/orpheus_emblem.png" x="469" y="529" width="142" height="142" clip-path="url(#emblemClip)" preserveAspectRatio="xMidYMid slice"/>
+      <circle cx="540" cy="600" r="77" fill="none" stroke="#E23A4B" stroke-width="8"/>
+    </g>
+
+    <!-- Hook -->
+    <text x="540" y="858" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+          font-size="47" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">Easy. Playful. Infinite.</text>
+
+    <!-- By the numbers -->
+    <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">
+      <g font-size="66" font-weight="800" text-anchor="end" fill="url(#accentV)">
+        <text x="395" y="965">11</text>
+        <text x="395" y="1072">11</text>
+        <text x="395" y="1179">8</text>
+        <text x="395" y="1286">5</text>
+        <text x="395" y="1393">4</text>
+        <text x="395" y="1500">2</text>
+        <text x="395" y="1607">1</text>
+      </g>
+      <g font-size="42" font-weight="600" fill="#F4F1FE">
+        <text x="423" y="965">Original Vibes</text>
+        <text x="423" y="1072">Visualizations</text>
+        <text x="423" y="1179">Generative Tracks</text>
+        <text x="423" y="1286">Mixer Controls</text>
+        <text x="423" y="1393">Ambiance Knobs</text>
+        <text x="423" y="1500">Turntables</text>
+        <text x="423" y="1607">App Widget</text>
+      </g>
+      <line x1="315" y1="1652" x2="735" y2="1652" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="1"/>
+      <text x="395" y="1730" font-size="74" font-weight="800" text-anchor="end" fill="url(#accentV)">&#8734;</text>
+      <text x="423" y="1722" font-size="44" font-weight="700" fill="#FFFFFF">Infinite Music</text>
+    </g>
+  </svg>
+</body>
+</html>

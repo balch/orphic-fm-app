@@ -27,7 +27,7 @@ This is the line that appears under the app name in search results and on the
 detail page. It's the most read piece of copy in the listing — your one-line
 pitch.
 
-**DJ-style generative music for focus, sleep & parties. Mix it live.**
+**Easy. Playful. Infinite. Generative music for focus, sleep & parties.**
 
 ### Constraints
 
@@ -45,11 +45,16 @@ Shown on the listing detail page. Most users scan; few read every word. Format
 matters more than total length.
 
 ```
-Orphic DJ is an interactive album — original generative music that composes
-itself, endlessly, every time you press play.
+Orphic DJ is an interactive album of original generative music that composes itself, live on your device, endlessly. Press play, and no two listens are ever the same.
 
-There's no streaming, no library, no playlists. The music is created live on
-your device, so no two listens are ever the same.
+No streaming. No library. No playlists. Just four knobs and music that never repeats.
+
+WHAT YOU CONTROL
+Four knobs shape the entire mix:
+• Energy: from calm ambient drift to a driving beat
+• Complexity: from sparse and minimal to rich and layered
+• Mood: from bright and uplifting to dark and moody
+• Space: from intimate and dry to vast and reverberant
 
 WHAT'S INSIDE
 • 11 original vibes
@@ -61,23 +66,15 @@ WHAT'S INSIDE
 • 1 home-screen widget
 ∞ infinite music
 
-WHAT YOU CONTROL
-Four knobs capture the essence of any track:
-• Energy — from calm ambient drift to a driving beat
-• Complexity — sparse and minimal, or rich and layered
-• Mood — bright and uplifting, or dark and moody
-• Space — intimate and dry, or vast and reverberant
-
 MADE FOR EVERY MOMENT
-• Focus & study — steady, distraction-free instrumental music for deep work
-• Relax & sleep — wind down with a built-in timer that fades you off to sleep
-• House parties — open the DJ module, layer effects, and drop changes on the fly
-• Long drives & commutes — music that never repeats and never needs a signal
+• Focus & study: steady, distraction-free instrumental music for deep work
+• Relax & sleep: a built-in timer fades you off to sleep
+• House parties: open the DJ module, layer effects, drop changes live
+• Drives & commutes: music that never repeats and never needs a signal
 
-Always offline — no account, no network, no ads, no telemetry. Your music never
-leaves your device. No sign-up, no tracking, no subscription.
+Completely free. No account, no network, no ads, no in-app purchases, no tracking. Your music never leaves your device.
 
-Tune into orphic.fm for more creations from Orpheus.
+Tune into orphic.fm for more from Orpheus.
 ```
 
 ### Recommended structure (~600–1200 chars total — short is fine)
@@ -146,4 +143,4 @@ first 80 chars.
 - [x] Tags — `Music`, `Music & Audio`
 - [x] Primary category — `Music & Audio`
 - [x] GitHub repo link — not included
-- [x] Screenshots — 6 captioned frames (1080×1920) in `assets/framed/`: hero, vibes, mix, DJ, timer, widget. Raw captures kept in `assets/screenshots/`.
+- [x] Screenshots — 7 captioned frames (1080×1920) in `assets/framed/`: by-the-numbers hero (`hero-card.html`), Four knobs, vibes, mix, DJ, timer, widget. Wired into `play/.../phone-screenshots/01–07.png`. Raw captures in `assets/screenshots/`.
