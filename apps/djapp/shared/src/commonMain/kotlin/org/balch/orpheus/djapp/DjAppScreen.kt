@@ -8,14 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -93,9 +90,13 @@ fun DjAppScreen(
     val currentRoute = backStack.lastOrNull() ?: DjTab
 
     BoxWithConstraints(
+        // Fully edge-to-edge: no inset padding, so the UI (and the VizBackground
+        // behind it) fill into the display cutout instead of letterboxing below the
+        // notch. System bars are hidden in MainActivity; the header Row is
+        // SpaceBetween, so on a center punch-hole the title and Viz dropdown sit to
+        // either side of the hole.
         modifier = modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing),
+            .fillMaxSize(),
     ) {
         val isLandscape = maxWidth > maxHeight
 

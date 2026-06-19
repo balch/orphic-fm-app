@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -15,8 +14,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Edge to edge
-        enableEdgeToEdge()
+        // Edge-to-edge layout without androidx.activity's deprecated status/nav-bar
+        // color setters (no-ops on Android 15+, and the source of the Play Console
+        // edge-to-edge warnings). We hide the system bars entirely below, so the
+        // bar-color scrim work enableEdgeToEdge() does would be pure waste here.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         // Full screen / Hide status bars
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)

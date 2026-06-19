@@ -1,7 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <application>
+    <!--
+      Android Auto support (debug builds only) is declared via the
+      com.google.android.gms.car.application meta-data + automotive_app_desc
+      (<uses name="media"/>). Browsing and playback go through the media3
+      MediaLibraryService (DjMediaLibraryService, declared with the
+      androidx.media3.session.MediaLibraryService intent-filter in the main
+      manifest); search is served by MediaLibrarySession.Callback.onSearch /
+      onGetSearchResult.
+
+      MissingMediaBrowserServiceIntentFilter and MissingIntentFilterForMediaSearch
+      are legacy, pre-media3 Auto checks that look for the old
+      android.media.browse.MediaBrowserService action and a MEDIA_PLAY_FROM_SEARCH
+      activity intent-filter. Neither applies to a media3 MediaLibraryService app,
+      so they are suppressed here rather than satisfied with dead legacy filters.
+    -->
+    <application tools:ignore="MissingMediaBrowserServiceIntentFilter,MissingIntentFilterForMediaSearch">
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />

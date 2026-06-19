@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
@@ -18,7 +17,12 @@ import org.balch.orpheus.djapp.DjApp
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // Edge-to-edge layout without androidx.activity's deprecated status/nav-bar
+        // color setters (no-ops on Android 15+, and the source of the Play Console
+        // edge-to-edge warnings). We hide the system bars entirely below, so the
+        // bar-color scrim work enableEdgeToEdge() does would be pure waste here.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

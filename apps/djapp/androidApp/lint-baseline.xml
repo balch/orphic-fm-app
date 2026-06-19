@@ -26,7 +26,7 @@
     <issue
         id="NewApi"
         message="`android:windowLayoutInDisplayCutoutMode` requires API level 27 (current min is 26)"
-        errorLine1="        &lt;item name=&quot;android:windowLayoutInDisplayCutoutMode&quot;>shortEdges&lt;/item>"
+        errorLine1="        &lt;item name=&quot;android:windowLayoutInDisplayCutoutMode&quot;>always&lt;/item>"
         errorLine2="              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/themes.xml"
