@@ -11,7 +11,7 @@ comments, and recover the text if you need to re-submit.
 
 | Field | Value |
 |-------|-------|
-| App name | `Orphic DJ: Generative Music` *(Play store title, 27 chars — keyword-bearing; on-device launcher label stays `Orphic DJ`)* |
+| App name | `Orphic DJ: Generative Music` *(Play store title, 27 chars — keyword-bearing; title is Play's highest-weight ranking field and "Orphic" has ~zero search pull, so the descriptor earns its place. On-device launcher label stays `Orphic DJ`.)* |
 | Default language | English (US) |
 | Category — primary | Music & Audio |
 | Category — secondary | _(optional, see "Tags" below)_ |
@@ -27,7 +27,7 @@ This is the line that appears under the app name in search results and on the
 detail page. It's the most read piece of copy in the listing — your one-line
 pitch.
 
-**Generative ambient music for focus, sleep & parties. Four knobs, endless mixes.**
+**DJ-style generative music for focus, sleep & parties. Mix it live.**
 
 ### Constraints
 
@@ -52,14 +52,14 @@ There's no streaming, no library, no playlists. The music is created live on
 your device, so no two listens are ever the same.
 
 WHAT'S INSIDE
-• 11 original vibes — from upbeat grooves to deep ambient drones
-• 11 live visualizations that move with the music
-• 8 generative tracks layering every beat
-• 5 mixer controls to ride the levels
-• 4 ambiance knobs: Energy, Complexity, Mood, Space
-• 2 turntables — dual decks with a crossfader
-• 1 home-screen widget — your current vibe and playback at a glance
-∞ infinite music — it never repeats
+• 11 original vibes
+• 11 live visualizations
+• 8 generative tracks
+• 5 mixer controls
+• 4 ambiance knobs
+• 2 turntables
+• 1 home-screen widget
+∞ infinite music
 
 WHAT YOU CONTROL
 Four knobs capture the essence of any track:
@@ -78,8 +78,6 @@ Always offline — no account, no network, no ads, no telemetry. Your music neve
 leaves your device. No sign-up, no tracking, no subscription.
 
 Tune into orphic.fm for more creations from Orpheus.
-
-Enjoy the vibes.
 ```
 
 ### Recommended structure (~600–1200 chars total — short is fine)

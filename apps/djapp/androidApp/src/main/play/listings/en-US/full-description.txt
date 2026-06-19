@@ -3,14 +3,14 @@ Orphic DJ is an interactive album — original generative music that composes it
 There's no streaming, no library, no playlists. The music is created live on your device, so no two listens are ever the same.
 
 WHAT'S INSIDE
-• 11 original vibes — from upbeat grooves to deep ambient drones
-• 11 live visualizations that move with the music
-• 8 generative tracks layering every beat
-• 5 mixer controls to ride the levels
-• 4 ambiance knobs: Energy, Complexity, Mood, Space
-• 2 turntables — dual decks with a crossfader
-• 1 home-screen widget — your current vibe and playback at a glance
-∞ infinite music — it never repeats
+• 11 original vibes
+• 11 live visualizations
+• 8 generative tracks
+• 5 mixer controls
+• 4 ambiance knobs
+• 2 turntables
+• 1 home-screen widget
+∞ infinite music
 
 WHAT YOU CONTROL
 Four knobs capture the essence of any track:
