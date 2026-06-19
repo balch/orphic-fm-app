@@ -27,7 +27,7 @@ This is the line that appears under the app name in search results and on the
 detail page. It's the most read piece of copy in the listing — your one-line
 pitch.
 
-**Easy. Playful. Infinite. Generative music for focus, sleep & parties.**
+**Easy. Playful. Infinite. Free generative music for focus, sleep & parties.**
 
 ### Constraints
 

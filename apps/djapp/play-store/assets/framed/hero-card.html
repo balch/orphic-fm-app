@@ -3,8 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <style>
-  html, body { margin: 0; padding: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0A0814; }
-  svg { display: block; }
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0A0814; }
+  body { display: grid; place-items: center; }
+  /* The artwork is a fixed 1080x1920 (9:16) SVG. Scale it to fit the viewport so
+     it's viewable in a small preview pane. At the 1080x1920 headless render
+     window this resolves to exactly 1080x1920, so the output PNG is unchanged. */
+  svg { display: block; width: min(100vw, 56.25vh); height: auto; }
 </style>
 </head>
 <body>
@@ -20,9 +24,12 @@
       magick hero-portrait-raw.png -background '#0A0814' -alpha remove -alpha off \
         PNG24:01-hero-bynumbers-framed.png
     Edit the HOOK line and the COUNTS below, not the layout, for routine updates.
+    Layout: disc is vertically centered (cy=582) in the zone between the header and
+    the hook; numbers are a two-column list (right-aligned counts, left-aligned labels);
+    background glows are symmetric about x=540 so the disc reads as centered.
   -->
   <svg width="1080" height="1920" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
-    <title id="t">Orphic DJ — an interactive album, by the numbers</title>
+    <title id="t">Orphic DJ, a free interactive album, by the numbers</title>
     <desc id="d">Orphic DJ wordmark over a turntable with Orpheus at center, the line "Easy. Playful. Infinite.", above a count of vibes, visualizations, tracks, mixer controls, knobs, turntables, the widget, and infinite music.</desc>
     <defs>
       <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
@@ -48,41 +55,42 @@
         <stop offset="0" stop-color="#E040FB" stop-opacity="0.22"/>
         <stop offset="1" stop-color="#E040FB" stop-opacity="0"/>
       </radialGradient>
-      <clipPath id="emblemClip"><circle cx="540" cy="600" r="71"/></clipPath>
+      <clipPath id="emblemClip"><circle cx="540" cy="582" r="80"/></clipPath>
     </defs>
 
     <rect x="0" y="0" width="1080" height="1920" fill="url(#bg)"/>
-    <ellipse cx="200" cy="120" rx="560" ry="440" fill="url(#glowTeal)"/>
-    <ellipse cx="540" cy="600" rx="520" ry="430" fill="url(#glowMag)"/>
-    <ellipse cx="540" cy="1790" rx="660" ry="430" fill="url(#glowTeal)"/>
+    <!-- Symmetric glows about x=540 so the centered disc reads as centered -->
+    <ellipse cx="540" cy="80" rx="640" ry="380" fill="url(#glowTeal)"/>
+    <ellipse cx="540" cy="582" rx="540" ry="450" fill="url(#glowMag)"/>
+    <ellipse cx="540" cy="1800" rx="680" ry="440" fill="url(#glowTeal)"/>
 
     <!-- Header -->
     <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" text-anchor="middle">
       <text x="540" y="236" font-size="118" font-weight="800" letter-spacing="-3" fill="#FFFFFF">ORPHIC DJ</text>
       <rect x="445" y="260" width="190" height="10" rx="5" fill="url(#accentH)"/>
-      <text x="540" y="322" font-size="33" font-weight="600" letter-spacing="8" fill="#C9C4E8">AN INTERACTIVE ALBUM</text>
+      <text x="540" y="322" font-size="33" font-weight="600" letter-spacing="8" fill="#C9C4E8">A FREE INTERACTIVE ALBUM</text>
     </g>
 
-    <!-- Turntable centerpiece -->
+    <!-- Turntable centerpiece (vertically centered between header and hook) -->
     <g>
-      <circle cx="540" cy="600" r="182" fill="#A6AAB6"/>
-      <circle cx="540" cy="600" r="182" fill="none" stroke="#23232B" stroke-width="9" stroke-dasharray="2 20"/>
-      <circle cx="540" cy="600" r="170" fill="#0B0912"/>
-      <circle cx="540" cy="600" r="153" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
-      <circle cx="540" cy="600" r="136" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
-      <circle cx="540" cy="600" r="119" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
-      <circle cx="540" cy="600" r="102" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
-      <circle cx="540" cy="600" r="85" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
-      <circle cx="540" cy="600" r="71" fill="#201840"/>
-      <image href="../../../androidApp/src/main/res/mipmap-xxxhdpi/orpheus_emblem.png" x="469" y="529" width="142" height="142" clip-path="url(#emblemClip)" preserveAspectRatio="xMidYMid slice"/>
-      <circle cx="540" cy="600" r="77" fill="none" stroke="#E23A4B" stroke-width="8"/>
+      <circle cx="540" cy="582" r="205" fill="#A6AAB6"/>
+      <circle cx="540" cy="582" r="205" fill="none" stroke="#23232B" stroke-width="10" stroke-dasharray="2 22"/>
+      <circle cx="540" cy="582" r="191" fill="#0B0912"/>
+      <circle cx="540" cy="582" r="174" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="582" r="155" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="582" r="136" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="582" r="117" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="582" r="98" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1"/>
+      <circle cx="540" cy="582" r="80" fill="#201840"/>
+      <image href="../../../androidApp/src/main/res/mipmap-xxxhdpi/orpheus_emblem.png" x="460" y="502" width="160" height="160" clip-path="url(#emblemClip)" preserveAspectRatio="xMidYMid slice"/>
+      <circle cx="540" cy="582" r="87" fill="none" stroke="#E23A4B" stroke-width="9"/>
     </g>
 
     <!-- Hook -->
-    <text x="540" y="858" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+    <text x="540" y="860" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
           font-size="47" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">Easy. Playful. Infinite.</text>
 
-    <!-- By the numbers -->
+    <!-- By the numbers (two-column: right-aligned counts | left-aligned labels) -->
     <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">
       <g font-size="66" font-weight="800" text-anchor="end" fill="url(#accentV)">
         <text x="395" y="965">11</text>
