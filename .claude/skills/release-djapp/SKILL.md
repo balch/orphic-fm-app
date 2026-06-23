@@ -100,6 +100,43 @@ EOF
 
 Verify with `gh release view v1.X.Y` and surface the URL to the user.
 
+### 7. Publish to Google Play (alpha track)
+
+The signed AAB is uploaded to Play via **Gradle Play Publisher (GPP)**, not by hand. The
+**going-forward closed testing track is `alpha`** (the former custom `Launch` track was
+retired 2026-06-22). Publish the bundle built in step 3:
+
+```bash
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishReleaseBundle -PplayTrack=alpha
+```
+
+`publishReleaseBundle` builds + signs + uploads the AAB and assigns it to the track in one
+task. There is **no `--track` CLI flag** — the track is the `-PplayTrack=<id>` Gradle
+property read by `play { track.set(...) }` in `apps/djapp/androidApp/build.gradle.kts`. Omit
+it and it defaults to `internal`. Success looks like GPP logging
+`Updating [completed] release (org.balch.djapp:[<versionCode>]) in track 'alpha'` then
+`Committing changes`.
+
+**The "What's New" Play notes are a file**, separate from the GitHub release body:
+`apps/djapp/androidApp/src/main/play/release-notes/en-US/default.txt`. GPP sends whatever is
+in that file. To reuse the previous release's copy, leave it untouched. To force the
+in-app-update flow, add `-PplayUpdatePriority=5` (un-deferrable) or `4` (after 3+ days stale).
+
+**Promote instead of re-publish** to move an *already-uploaded* versionCode to another track
+(no rebuild, no fresh review of the bytes):
+
+```bash
+./gradlew :apps:djapp:androidApp:promoteReleaseArtifact \
+  --from-track <source> --promote-track alpha --version-code <N> --release-status completed
+```
+
+Re-running `publishReleaseBundle` for a versionCode that's already uploaded is a no-op
+(duplicate versionCode → GPP reports `UP-TO-DATE`); use promote for that case.
+
+Full Play-publishing details (service account, credentials lookup, the androidpublisher-scoped
+token recipe for raw `edits` API track queries, and per-version history) live in the
+`project_djapp_play_publishing` memory.
+
 ## Release-notes structure
 
 The body should feel useful to a developer scanning the release page, not like a marketing announcement. Group by what the user/operator cares about, lead with the highest-impact items. The template that has held up well across versions:
