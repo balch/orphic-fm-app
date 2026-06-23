@@ -862,12 +862,12 @@ struct OrpheusEngine {
 
     // Custom chord progression (overrides template.progression when active).
     // Matrix selection still comes from genre_progression_style unless
-    // pulsar_chord_matrix_active is also set. Max 8 slots (kMaxProgressionLength).
+    // pulsar_chord_matrix_active is also set. Max 12 slots (kMaxProgressionLength).
     std::atomic<int>   pulsar_custom_progression_active{0};
     std::atomic<int>   pulsar_custom_progression_length{0};
-    std::atomic<int>   pulsar_custom_progression[8]{};   // chord degrees 0-6
+    std::atomic<int>   pulsar_custom_progression[12]{};   // chord degrees 0-6 (kMaxProgressionLength)
     // Per-chord glide override applied on transition into each chord. 0 = no glide.
-    std::atomic<float> pulsar_custom_progression_glide[8]{};
+    std::atomic<float> pulsar_custom_progression_glide[12]{};
 
     // Lick transfer buffer (written by Kotlin before setting lick_length)
     static constexpr int kMaxLickSteps = 32;
@@ -930,12 +930,14 @@ struct OrpheusEngine {
     // ramp into the destination, in bars; 0 = hard cut at the boundary).
     std::atomic<float> pulsar_section_transitions[8 * 8 * 3] = {};
     // --- Per-section progression override ---
-    // 0 = no override, 1..8 = override length.
-    std::atomic<int>   pulsar_section_progression_length[8] = {};
+    // 0 = no override, 1..12 = override length.
+    std::atomic<int>   pulsar_section_progression_length[8] = {};   // [MAX_SECTIONS]
     // Degree values 0..6 (I..VII). Only slots [0..length) are meaningful.
-    std::atomic<int>   pulsar_section_progression_degrees[8 * 8] = {};
+    // Stride: 8 sections × 12 chords (kMaxProgressionLength) — keep in lockstep
+    // with PulsarViewModel.pushArrangement (section_progression_degree_${s*12+i}).
+    std::atomic<int>   pulsar_section_progression_degrees[8 * 12] = {};
     // Per-chord glide override applied on transition into each chord. 0 = no glide.
-    std::atomic<float> pulsar_section_progression_glides[8 * 8] = {};
+    std::atomic<float> pulsar_section_progression_glides[8 * 12] = {};
     // 0 = no override, 1..4 = override value.
     std::atomic<int>   pulsar_section_chords_per_bar[8] = {};
 

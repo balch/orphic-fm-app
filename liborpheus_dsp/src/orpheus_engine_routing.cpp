@@ -965,12 +965,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         // broader "custom_progression_" so atoi("glide_0") does not collide.
         else if (std::strncmp(symbol, "custom_progression_glide_", 25) == 0) {
             int idx = std::atoi(symbol + 25);
-            if (idx >= 0 && idx < 8)
+            if (idx >= 0 && idx < 12)
                 engine->pulsar_custom_progression_glide[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "custom_progression_", 19) == 0) {
             int idx = std::atoi(symbol + 19);
-            if (idx >= 0 && idx < 8)
+            if (idx >= 0 && idx < 12)
                 engine->pulsar_custom_progression[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strcmp(symbol, "progression_anchor") == 0)
@@ -1084,13 +1084,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strncmp(symbol, "section_progression_degree_", 27) == 0) {
             int idx = std::atoi(symbol + 27);
-            if (idx >= 0 && idx < 8 * 8)
+            if (idx >= 0 && idx < 8 * 12)
                 engine->pulsar_section_progression_degrees[idx].store(
                     static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_progression_glide_", 26) == 0) {
             int idx = std::atoi(symbol + 26);
-            if (idx >= 0 && idx < 8 * 8)
+            if (idx >= 0 && idx < 8 * 12)
                 engine->pulsar_section_progression_glides[idx].store(
                     value, std::memory_order_relaxed);
         }

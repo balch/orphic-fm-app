@@ -71,7 +71,7 @@ enum class ProgressionAnchor(val barsBetweenResets: Int) {
  * @param customProgression Optional explicit chord sequence. Each entry is a [ChordStep]
  *   carrying a scale degree 0-6 (I-VII) and an optional per-chord glide. Overrides
  *   the [progressionStyle]'s template sequence but still uses its matrix unless
- *   [chordTransitionMatrix] is also supplied. Size 1..8. Useful for "hang-on-tonic"
+ *   [chordTransitionMatrix] is also supplied. Size 1..12 (e.g. a literal 12-bar blues). Useful for "hang-on-tonic"
  *   feels and other vibe-specific forms:
  *   ```
  *   customProgression = chords(0, 0, 0, 6)  // i-i-i-VII roots reggae (no glide)

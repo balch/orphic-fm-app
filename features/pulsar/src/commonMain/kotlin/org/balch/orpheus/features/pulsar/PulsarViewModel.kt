@@ -1094,13 +1094,14 @@ class PulsarViewModel(
             }
         }
 
-        // Custom progression (optional chord sequence override, max 8 slots).
+        // Custom progression (optional chord sequence override, max 12 slots —
+        // kMaxProgressionLength, e.g. a literal 12-bar blues).
         // Write degrees + glides first, then length (acts as a release fence on
         // the C++ side). Per-chord glide is applied on transition into each chord.
         val customProg = vibe.genre.customProgression
         if (customProg != null) {
             customProg.forEachIndexed { i, step ->
-                if (i < 8) {
+                if (i < 12) {
                     synthController.setPluginControl(
                         PluginControlId(PULSAR_URI, "custom_progression_$i"),
                         IntValue(step.degree)
@@ -1113,7 +1114,7 @@ class PulsarViewModel(
             }
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "custom_progression_length"),
-                IntValue(minOf(customProg.size, 8))
+                IntValue(minOf(customProg.size, 12))
             )
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "custom_progression_active"),
@@ -1428,11 +1429,11 @@ class PulsarViewModel(
             if (cp != null) {
                 for (i in cp.indices) {
                     synthController.setPluginControl(
-                        PluginControlId(PULSAR_URI, "section_progression_degree_${s * 8 + i}"),
+                        PluginControlId(PULSAR_URI, "section_progression_degree_${s * 12 + i}"),
                         IntValue(cp[i].degree)
                     )
                     synthController.setPluginControl(
-                        PluginControlId(PULSAR_URI, "section_progression_glide_${s * 8 + i}"),
+                        PluginControlId(PULSAR_URI, "section_progression_glide_${s * 12 + i}"),
                         FloatValue(cp[i].glideRate)
                     )
                 }

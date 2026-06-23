@@ -338,7 +338,7 @@ struct PulsarTrackState {
 
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
 static constexpr int kMaxLickSteps = 32;
-static constexpr int kMaxProgressionLength = 8;
+static constexpr int kMaxProgressionLength = 12;  // up to a literal 12-bar blues
 
 struct PulsarLickStep {
     int8_t scale_degree;

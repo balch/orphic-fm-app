@@ -559,7 +559,7 @@ static void restart_progression_for_section(PulsarState* state,
         if (section_idx >= 0 && section_idx < 8) {
             for (int i = 0; i < sec.custom_progression_length; i++) {
                 state->chord_state.progression_glides[i] =
-                    engine->pulsar_section_progression_glides[section_idx * 8 + i].load(
+                    engine->pulsar_section_progression_glides[section_idx * kMaxProgressionLength + i].load(
                         std::memory_order_relaxed);
             }
         } else {
@@ -1059,7 +1059,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 engine->pulsar_section_progression_length[s].load(std::memory_order_relaxed),
                 0, kMaxProgressionLength);
             for (int i = 0; i < kMaxProgressionLength; i++) {
-                int d = engine->pulsar_section_progression_degrees[s * 8 + i].load(
+                int d = engine->pulsar_section_progression_degrees[s * kMaxProgressionLength + i].load(
                     std::memory_order_relaxed);
                 if (d < 0) d = 0;
                 if (d > 6) d = 6;

@@ -3,8 +3,8 @@ package org.balch.orpheus.features.pulsar.models
 import kotlinx.serialization.Serializable
 
 internal fun validateProgression(steps: List<ChordStep>, where: String) {
-    require(steps.size in 1..8) {
-        "$where size must be 1..8, got ${steps.size}"
+    require(steps.size in 1..12) {
+        "$where size must be 1..12, got ${steps.size}"
     }
     require(steps.all { it.degree in 0..6 }) {
         "$where degrees must be 0..6 (I-VII), got ${steps.map { it.degree }}"

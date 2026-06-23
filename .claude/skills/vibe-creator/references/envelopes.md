@@ -9,7 +9,7 @@ These are independent. A vibe in `EnvelopeType.AD` mode still has tracks with di
 
 ## `EnvelopeType` — vibe-global mode
 
-Source: `PulsarVibe.kt:889`, `liborpheus_dsp/src/orpheus_unit_pulsar.cpp:2419-2424`.
+Source: `models/Vibe.kt` (the `EnvelopeType` enum), `liborpheus_dsp/src/orpheus_unit_pulsar.cpp:2419-2424`.
 
 | Value | C++ id | Behavior |
 |---|---:|---|
@@ -32,7 +32,7 @@ ArmyStompVibe uses `BLEND`: at march-section default (energy 0.75), it's AD; in 
 
 ## `EnvelopeProfile` — per-track shape
 
-Source: `PulsarVibe.kt:233`, `PulsarViewModel.kt:1375-1411`, `orpheus_unit_pulsar.cpp:2440-2447`.
+Source: `models/EnvelopeProfile.kt`, `PulsarViewModel.kt:1375-1411`, `orpheus_unit_pulsar.cpp:2440-2447`.
 
 Five profiles. Each one influences three things:
 

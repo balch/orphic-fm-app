@@ -119,7 +119,7 @@ data class Section(
     val chordFollow: ChordFollow? = null,
     /** Per-section chord sequence. Null = inherit vibe's progression.
      *  When set, this section restarts the progression at its degree 0 on entry.
-     *  Same constraints as [GenreProfile.customProgression]: size 1..8, degrees 0..6.
+     *  Same constraints as [GenreProfile.customProgression]: size 1..12, degrees 0..6.
      *  Per-chord glide is honored when supplied. */
     val customProgression: List<ChordStep>? = null,
     /** Per-section chord-change rate override. Null = inherit vibe's chordsPerBar.

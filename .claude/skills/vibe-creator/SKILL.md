@@ -10,10 +10,12 @@ A Vibe is a complete Pulsar preset: 8 tracks, tempo, key, macro defaults, sectio
 ## Where vibes live
 
 - Source: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/<Name>Vibe.kt`
-- Schema (every type you will reference): `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/PulsarVibe.kt`
+- Schema (every type you will reference): the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — **one file per type**, not a single `PulsarVibe.kt` (that file does not exist). The top-level `Vibe` data class plus the `RootNote` / `ScaleType` / `EnvelopeType` / `Album` enums live in `models/Vibe.kt`; the rest are siblings (`OrpheusEngine.kt`, `TrackVoice.kt`, `TrackRole.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Lick.kt`, `ChordStep.kt`, `Band.kt`, `TensionProfile.kt`, `VibeEffects.kt`, `Arrangement.kt`, `MacroTarget.kt`, `Evolution.kt`, `EnvelopeProfile.kt`, `SoloBehavior.kt`, `VibeProvider.kt`).
 - Canonical quality benchmark: `DogHouseVibe.kt` — after any Pulsar change, test this vibe first; a new vibe should feel at least as coherent and musical.
 
 Registration is automatic via Metro DI — each vibe class carries `@Inject` and `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())`, and `PulsarViewModel` receives `Set<VibeProvider>` in its constructor. **No extra registration file, DI module, or list edit is required** — dropping a correctly-annotated file into the `vibes/` directory is enough.
+
+`VibeProvider` has **two** members, both required: `override val name: String` (a cheap constant for picker sorting) and `override val vibe: Vibe` (the heavy body — declare it `by lazy { Vibe(name = name, ...) }` so selecting the picker, not listing it, builds the tracks). See the file template below.
 
 ## Naming rule — read this first
 
@@ -49,13 +51,14 @@ This project has a hard rule: **never use trademarked artist, band, album, or so
 
 ## The Vibe schema — parameter-by-parameter
 
-All of this is in `PulsarVibe.kt`. Read the KDoc there for the full range of valid values; this section focuses on **what to set based on a musical reference**. Ranges in parens are the useful-in-practice subset, not the absolute min/max.
+All of this is in the `models/` package (one file per type — see "Where vibes live"). Read the KDoc there for the full range of valid values; this section focuses on **what to set based on a musical reference**. Ranges in parens are the useful-in-practice subset, not the absolute min/max.
 
 ### Top-level (the frame)
 
 | Field | Purpose | Decision rule |
 |---|---|---|
-| `name` | Vibe picker label | Short, evocative, **no trademarks**. |
+| `name` | Vibe picker label | Short, evocative, **no trademarks**. Must equal `vibe.name`. |
+| `album` | Picker grouping | Optional, default `Album.STEALTH` (also `RIF`, `ZERO_TO_ONE`). |
 | `bpm` | Tempo | Match the reference's BPM (use a tap-tempo app if unsure). |
 | `envelopeType` | `AD` / `TIDES` / `BLEND` | `AD` for tight/EDM/techno, `TIDES` for ambient/drone/pad-heavy, `BLEND` for anything that spans a dynamic range. |
 | `rootNote` | Musical root | Use enharmonic equivalents where needed (`RootNote.G_SHARP` == Ab). |
@@ -72,7 +75,7 @@ All of this is in `PulsarVibe.kt`. Read the KDoc there for the full range of val
 - `rhythmDensity`: Use `RhythmPattern.*.density`. `SPARSE` (ambient), `FOUR_ON_FLOOR` (club), `BACKBEAT` (rock/hip-hop), `DENSE_16TH` (DnB/techno).
 - `progressionStyle`: `POP` (I-IV-V-vi), `BLUES` (12-bar), `DARK` (diminished/minor), `DRONE` (static), `MODAL` (no resolution), `ASCENDING` (rising), `JAZZ` (ii-V-I), `SAD` (descending).
 - `chordsPerBar`: `1` = slow (static/dronal), `2` = standard, `4` = busy.
-- `customProgression`: Optional `List<ChordStep>` (degree 0..6 + optional per-chord glide 0..1). Use the `chords(0, 3, 5, 6)` helper for the no-glide case, or build the list explicitly with `listOf(ChordStep(0), ChordStep(3, glideRate = 0.4f), ...)` when you want a slide into a specific chord. Overrides the template sequence but keeps the Markov matrix. Great for "hang on tonic then dip" forms. Size 1..8.
+- `customProgression`: Optional `List<ChordStep>` (degree 0..6 + optional per-chord glide 0..1). Use the `chords(0, 3, 5, 6)` helper for the no-glide case, or build the list explicitly with `listOf(ChordStep(0), ChordStep(3, glideRate = 0.4f), ...)` when you want a slide into a specific chord. Overrides the template sequence but keeps the Markov matrix. Great for "hang on tonic then dip" forms, or a literal 12-bar blues. Size 1..12 (`kMaxProgressionLength`; raising it means matched edits in C++ `orpheus_unit_pulsar.h`/`orpheus_engine.h`/routing + the `section_progression_*_${s * N + i}` stride on both sides).
 - `chordTransitionMatrix`: Optional 7x7 Markov via `chordMatrix(...)`. Use only when a preset `progressionStyle` does not cover the target motion (see `DeepSpaceVibe` for an example).
 
 ### `progressionAnchor` + `progressionDriftRange`
@@ -93,7 +96,8 @@ To avoid duplicating shared knobs across both engine slots, declare the engine o
 
 ```kotlin
 // Same engine on both sides — declare once, reuse
-OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let { kick ->
+// NB: engine ids are the SHORT codes (BD/SD/HH/WSH/STR/DX/DX2/...), not long names.
+OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.85f).let { kick ->
     TrackVoice(
         engineEdm = kick,
         engineSpace = kick,
@@ -105,21 +109,21 @@ OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.85f).let {
 
 // Engines differ in id only — share knobs, .copy() the id
 OrpheusEngine(
-    engineId = OrpheusEngineId.WAVESHAPING,
+    engineId = OrpheusEngineId.WSH,
     volume = 0.75f,
     noteRangeLow = 33,
     noteRangeHigh = 52,
 ).let { bass ->
     TrackVoice(
         engineEdm = bass,
-        engineSpace = bass.copy(engineId = OrpheusEngineId.STRING),
+        engineSpace = bass.copy(engineId = OrpheusEngineId.STR),
         role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
         // ...
     )
 },
 
 // Engines differ in id AND one knob — chain the .copy()
-engineSpace = bass.copy(engineId = OrpheusEngineId.STRING, harmonics = 0.7f),
+engineSpace = bass.copy(engineId = OrpheusEngineId.STR, harmonics = 0.7f),
 ```
 
 Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, etc.) — it reads better than a generic `engine`. **Do not duplicate `OrpheusEngine(...)` blocks in full** — that's the explicit anti-pattern this convention exists to prevent.
@@ -146,7 +150,7 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
 - **`reverbBrightness`** (default `0.5`): Dark (0.3) for deep/brooding, bright (0.7+) for airy/shimmery.
 - **`delayFeedback`** (default `null` = use vibe-level): Per-voice override.
 - **`glideRate`** (default `0.0`): Portamento. 0 = instant, 0.3 = smooth, 0.6+ = very slow.
-- **`lpgMode`** (default `BYPASS`): Vactrol LPG mode — `BYPASS` (raw), `SUSTAINED` (gate-following), `PLUCK` (asymmetric bloom), or `ENGINE_DEFAULT` (consult per-engine table). Set explicitly per voice when EDM/Space want different envelope behavior (e.g. `PLUCK` for a WSH bass on EDM, `BYPASS` for a STR drone on Space).
+- **`lpgMode`** (default `ENGINE_DEFAULT`): Vactrol LPG mode — `BYPASS` (raw), `SUSTAINED` (gate-following), `PLUCK` (asymmetric bloom), or `ENGINE_DEFAULT` (consult per-engine table). Set explicitly per voice when EDM/Space want different envelope behavior (e.g. `PLUCK` for a WSH bass on EDM, `BYPASS` for a STR drone on Space).
 - **`lpgDecay` / `lpgColour`** (default `0.5`): Vactrol decay length and HF bleed.
 
 #### `TrackVoice` (track-level)
@@ -158,7 +162,7 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
 - **`macroMap`**: `TrackMacroMap.RHYTHM`/`MELODIC`/`EFFECT`/`WILD`, or a custom `TrackMacroMap(...)` you build inline. Match to `envelopeProfile` unless you have a reason not to. The macro map is **how the four live knobs reshape per-track parameters at render time** — and on every parameter it covers, the value written on `OrpheusEngine` is *overwritten* unless the matching `pinHarmonics`/`pinTimbre`/`pinMorph` is set. See the next subsection for when to write your own.
 - **`barStrategy`**: `REPEAT`, `MUTATE`, `FILL`, `CALL_RESPONSE`, `INDEPENDENT`.
 - **`evolutionWeight`** (default `-1` = auto): How much tension-driven evolution affects this track.
-- **`soloBehavior`** / **`duckingProfile`**: Optional. See `PulsarVibe.kt` KDoc.
+- **`soloBehavior`** / **`duckingProfile`**: Optional. See `models/SoloBehavior.kt` KDoc.
 - **`evolution`**: `Evolution(rhythmic, pitch)` — optional Markov drift. `PitchEvolution.Contour` for melodic, `PitchEvolution.Voicing` for chordal.
 
 ### Custom `TrackMacroMap` — when the presets don't fit
@@ -263,7 +267,7 @@ Use when a track should play chord voicings. See `CompLabVibe.kt` for a matrix o
 
 A repeating melodic figure that a track can snap to. Used by tracks whose role is `TrackRole.Melodic(lickMode = LickMode.Fill)` (spans whole bar) or `LickMode.Squash` (compresses to fit). Max 32 steps.
 
-- Each `LickStep`: `scaleDegree` (can be negative — plays below root), `duration` in beats, `velocity` 0-1.
+- Each `LickStep`: `scaleDegree` (0 = root, 1 = 2nd degree, …), `duration` in beats, `velocity` 0-1. **A negative `scaleDegree` is a REST** for that step's duration — *not* a below-root note (verified in `pulsar_pattern_gen.h`: `if (degree < 0)` skips the slots). The rest is reliable at low `lickMutation`; at high mutation a negative step has a `~mutation × 0.3` chance of filling in with a random note instead. This is how you put silence *between* notes inside a lick (e.g. stop-time: hit, hit, rest, walk-up).
 - `loopLength` (in beats): larger than the sum of step durations adds rest padding. Use this for "phrase then space" feels.
 - `lickMutation` on the Vibe (0-1): how much the lick drifts on repeats. 0 = static (mechanical/industrial), 1 = wide drift (jazz, improv).
 - `lickOctave`: -1 for auto, or explicit 0-8. Use when you want the lick to sit in a specific octave regardless of the track's note range.
@@ -304,13 +308,16 @@ A decent default (see `DogHouseVibe`, `ArmyStompVibe`) is 4 members — Drummer/
 Optional but recommended — adds a Markov section graph on top of the vibe.
 
 - `sections`: up to 8 `Section`s. Each has:
-  - `barsMin/Max`: how long it lives before transitioning.
-  - `transitions`: list of `SectionTransition(targetIndex, weight)`. Empty = terminal.
+  - `barsMin/Max`: how long it lives before transitioning. `barStep` (default 1) snaps the random length to multiples — set 2 for even-bar phrases, 4 for 4-bar increments.
+  - `transitions`: list of `SectionTransition(targetIndex, weight, transitionBars)`. Empty = terminal. **`transitionBars`** (default 0 = hard cut) crossfades the macro overrides toward the destination over the *last* N bars of the source section — a per-edge pre-roll ramp. `DogHouseVibe` leans on this (`bluesLiftBars`/`bluesyDropBars`/`bigBluesLiftBars`); name the bar count after the musical role the ramp serves, not the count.
   - `recencyDecay`: penalizes recently-used transitions (0.4-0.6 is healthy).
   - `macroOverrides`: `MacroOverrides(energy, complexity, space, mood)` — **multipliers** (1.0 = no change, 1.4 = 40% boost). Use `null` to leave the default.
-  - `soloMode`: `LongFill`, `LickBuilder`, or `Jam`.
-  - `compingStyle` / `compingInversion` / `chordFollow`: per-section overrides of CHORDAL/melodic behavior.
-- `introIndex`: which section opens; `outroIndex`: which terminates.
+  - `soloMode`: `SoloMode.Jam(probability)`, `SoloMode.LickBuilder(probability, mutationRate)`, or `SoloMode.LongFill` — these take constructor params, they aren't bare objects.
+  - `compingStyle` / `compingInversion` / `compingHumanization` / `chordFollow`: per-section overrides applied to **all** CHORDAL/melodic tracks at once.
+  - `trackOverrides`: `Map<Int, TrackSectionOverride>` — per-*track* overrides scoped to this section, auto-restored on exit. This is how you pedal one track's hook on the tonic while everything else follows the progression (the octave-fold fix): `trackOverrides = mapOf(4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED))`. `TrackSectionOverride` can also override density/volume/sends/`envelopeProfile`/comping per section.
+  - `customProgression` / `chordsPerBar` / `bpmMultiplier`: per-section harmony plus a tempo multiplier (`0.5` = half-time breakdown, `2.0` = double-time burst).
+- `introIndex`: which section opens (default 0; `null` = random weighted start). `outroIndex`: which terminates (`null` = loops forever).
+- `lengthSeconds` (default `150..240`): the song's auto-end window; both bounds must be in `15..1800`.
 - Use the `Arrangement.SIMPLE`, `WITH_SOLOS`, `FULL`, `JAM` presets for quick starts.
 
 A typical 5-section arrangement: intro -> verse/groove -> chorus/peak -> solo -> breakdown -> outro. Use macroOverrides to distinguish (chorus: energy=1.3, complexity=1.3; breakdown: energy=0.4, space=1.5).
@@ -395,7 +402,11 @@ The 8-track layout and 4-member band convention are defaults, not requirements. 
 
 ## File template
 
-Copy-paste the imports and class skeleton, then tune. Always start from a working reference file (e.g. `DogHouseVibe.kt`) and edit in place rather than re-typing from scratch. Full list of imports to expect:
+Copy-paste the imports and class skeleton, then tune. Always start from a working reference file (e.g. `DogHouseVibe.kt`) and edit in place rather than re-typing from scratch.
+
+Two things that bite every time:
+- **`OrpheusEngineId` lives in `org.balch.orpheus.core.audio`** — NOT the pulsar package. Everything else (the schema types *and* the `bandMatrix` / `row` / `chords` / `chordMatrix` helpers) lives in `org.balch.orpheus.features.pulsar.models`. There is no `org.balch.orpheus.features.pulsar.*` package for these — that import will not resolve.
+- **`VibeProvider` has two members: `name` and `vibe`.** Declare `name` as a cheap constant and `vibe` `by lazy` so picker sorting never builds the heavy body, and pass `name = name` so the two stay in sync.
 
 ```kotlin
 package org.balch.orpheus.features.pulsar.vibes
@@ -403,10 +414,23 @@ package org.balch.orpheus.features.pulsar.vibes
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.OrpheusEngineId          // engines: core.audio, NOT pulsar
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.*  // or individual imports matching the existing style
-import org.balch.orpheus.features.pulsar.bandMatrix
-import org.balch.orpheus.features.pulsar.row
+import org.balch.orpheus.features.pulsar.models.Vibe          // schema types: ...pulsar.models
+import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.EnvelopeType
+import org.balch.orpheus.features.pulsar.models.RootNote
+import org.balch.orpheus.features.pulsar.models.ScaleType
+// ...one import per other type/enum you reference (BarStrategy, ChordFollow, Band,
+//    BandMember, Section, SectionTransition, MacroOverrides, TensionProfile, VibeEffects,
+//    Arrangement, RhythmPattern, ProgressionStyle, ProgressionAnchor, ...)
+import org.balch.orpheus.features.pulsar.models.bandMatrix    // helpers: also ...pulsar.models
+import org.balch.orpheus.features.pulsar.models.row
+import org.balch.orpheus.features.pulsar.models.chords
 
 /**
  * <evocative name> — one-line feel summary.
@@ -417,18 +441,23 @@ import org.balch.orpheus.features.pulsar.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class MyNewVibe : VibeProvider {
-    override val vibe = Vibe(
-        name = "My New Vibe",
-        bpm = 120f,
-        envelopeType = EnvelopeType.BLEND,
-        rootNote = RootNote.A,
-        scaleType = ScaleType.MINOR,
-        // ... tracks, genre, effects, arrangement ...
-    )
+    override val name: String = "My New Vibe"
+
+    override val vibe: Vibe by lazy {
+        Vibe(
+            name = name,
+            // album = Album.STEALTH,         // optional; default STEALTH (also RIF / ZERO_TO_ONE)
+            bpm = 120f,
+            envelopeType = EnvelopeType.BLEND,
+            rootNote = RootNote.A,
+            scaleType = ScaleType.MINOR,
+            // ... tracks (exactly 8), genre, band, effects, tension, arrangement ...
+        )
+    }
 }
 ```
 
-Existing vibes in the `vibes/` directory use the full list of explicit imports (not wildcard). Match that style for consistency — your IDE will auto-fill them when you reference the types.
+Existing vibes use the full list of explicit imports (no wildcard) — match that style; your IDE auto-fills them as you reference the types.
 
 ## Testing a new vibe
 
@@ -444,7 +473,7 @@ Existing vibes in the `vibes/` directory use the full list of explicit imports (
    - `barStrategy = INDEPENDENT` on too many tracks (nothing locks in).
    - `progressionDriftRange` too high (chord wandering feels aimless).
    - `density` too high on texture tracks (crowds out the groove).
-5. **Regression-check on `DogHouseVibe`**: If you ended up changing anything under `PulsarVibe.kt` or further down (you should not have — vibes are data), load `DogHouseVibe` and confirm it still sounds great. This is the benchmark the project holds to.
+5. **Regression-check on `DogHouseVibe`**: If you ended up changing anything under `models/` or further down (you should not have — vibes are data), load `DogHouseVibe` and confirm it still sounds great. This is the benchmark the project holds to.
 
 ## When things go wrong
 
@@ -458,7 +487,7 @@ Existing vibes in the `vibes/` directory use the full list of explicit imports (
 
 ## Key references
 
-- Schema source-of-truth: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/PulsarVibe.kt` (KDoc-annotated).
+- Schema source-of-truth: the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — one KDoc-annotated file per type (`Vibe.kt`, `OrpheusEngine.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Arrangement.kt`, …). There is no single `PulsarVibe.kt`.
 - Gold-standard vibe: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/DogHouseVibe.kt`.
 - Ambient / chordMatrix example: `DeepSpaceVibe.kt`.
 - CHORDAL-comping family helper: `CompLabVibe.kt` (uses `generateCompLabVibe(...)`).

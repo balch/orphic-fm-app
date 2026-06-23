@@ -338,8 +338,8 @@ static void push_two_section_ab_arrangement(OrpheusEngine* engine,
         engine->pulsar_section_progression_length[s].store(0, std::memory_order_relaxed);
         engine->pulsar_section_chords_per_bar[s].store(0, std::memory_order_relaxed);
         engine->pulsar_section_tension_active[s].store(0, std::memory_order_relaxed);
-        for (int i = 0; i < 8; i++) {
-            engine->pulsar_section_progression_degrees[s * 8 + i].store(0, std::memory_order_relaxed);
+        for (int i = 0; i < 12; i++) {  // kMaxProgressionLength
+            engine->pulsar_section_progression_degrees[s * 12 + i].store(0, std::memory_order_relaxed);
         }
     }
 
@@ -372,9 +372,9 @@ static bool test_section_progression_override_applied() {
 
     // Section 0: no override.  Section 1: customProgression = [3, 4, 0].
     engine->pulsar_section_progression_length[1].store(3, std::memory_order_relaxed);
-    engine->pulsar_section_progression_degrees[1 * 8 + 0].store(3, std::memory_order_relaxed);
-    engine->pulsar_section_progression_degrees[1 * 8 + 1].store(4, std::memory_order_relaxed);
-    engine->pulsar_section_progression_degrees[1 * 8 + 2].store(0, std::memory_order_relaxed);
+    engine->pulsar_section_progression_degrees[1 * 12 + 0].store(3, std::memory_order_relaxed);
+    engine->pulsar_section_progression_degrees[1 * 12 + 1].store(4, std::memory_order_relaxed);
+    engine->pulsar_section_progression_degrees[1 * 12 + 2].store(0, std::memory_order_relaxed);
 
     trigger_vibe_load(engine);
     // At 240 BPM with 1-bar sections and 512-sample blocks at 48 kHz, one bar ≈ 47 blocks.
@@ -443,8 +443,8 @@ static bool test_section_progression_inheritance_resets_index() {
     // Section 0: no override (should use vibe progression).
     // Section 1: override to [2, 1] (distinct length and contents from vibe progression).
     engine->pulsar_section_progression_length[1].store(2, std::memory_order_relaxed);
-    engine->pulsar_section_progression_degrees[1 * 8 + 0].store(2, std::memory_order_relaxed);
-    engine->pulsar_section_progression_degrees[1 * 8 + 1].store(1, std::memory_order_relaxed);
+    engine->pulsar_section_progression_degrees[1 * 12 + 0].store(2, std::memory_order_relaxed);
+    engine->pulsar_section_progression_degrees[1 * 12 + 1].store(1, std::memory_order_relaxed);
 
     trigger_vibe_load(engine);
     // At 240 BPM with 1-bar sections and 512-sample blocks at 48 kHz, one bar ≈ 47 blocks.

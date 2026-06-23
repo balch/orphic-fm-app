@@ -4,6 +4,8 @@ The `Engine.DX`, `Engine.DX2`, `Engine.DX3` entries are **not three flavors of t
 
 Get this wrong and you'll be writing a "brass lead" comment over a koto.
 
+> **Naming note:** this doc writes `Engine.DX` / `Engine.BD` / `Engine.VCF` etc. as shorthand. The actual type is **`OrpheusEngineId`** (imported from `org.balch.orpheus.core.audio`), and its constants are the short codes: `OrpheusEngineId.DX`, `OrpheusEngineId.DX2`, `OrpheusEngineId.DX3`, `OrpheusEngineId.BD`, `OrpheusEngineId.WSH`, `OrpheusEngineId.STR`, … In vibe code write `engineId = OrpheusEngineId.X` — there is no bare `Engine` type. Read every `Engine.X` below as `OrpheusEngineId.X`.
+
 ## Patch name ≠ final voice
 
 The bank tables below list each patch's **original DX7 name** — what Yamaha (or the patch author) called it on the cartridge in 1985. **That name describes the patch's intended voice at its design register, with default envelope and no effects.** In Pulsar a patch is played in whatever register the track's `noteRangeLow/High` allows, with the vibe's envelope mode (AD vs TIDES), the track's own `holdProbability` and `glideRate`, and per-track reverb/delay sends layered on top. Any of those can transform the apparent voice substantially.
@@ -241,14 +243,14 @@ If MI ever shuffles the bank order in a future Plaits release, this table is the
 ArmyStompVibe's squash lead, before:
 
 ```kotlin
-engineEdm = Engine.VCF,
+engineId = OrpheusEngineId.VCF,
 // ...no harmonics/timbre/morph set
 ```
 
 After (correct brass selection):
 
 ```kotlin
-engineEdm = Engine.DX3,
+engineId = OrpheusEngineId.DX3,
 harmonics = 0.950f,    // patch 31 = "Br trumpet" — fits the "trumpets sound" theme (auto-pinned)
 // timbre / morph: leave unset; macroMap.moodTimbre + spaceDecay drive them.
 // To lock them, add pinTimbre = true / pinMorph = true.
