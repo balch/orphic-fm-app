@@ -13,6 +13,7 @@ import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -136,6 +137,7 @@ internal fun makeStubPlaybackController(scope: AppCoroutineScope): PlaybackContr
         mediaSessionStateManager = MediaSessionStateManager(scope),
         playbackLifecycleManager = PlaybackLifecycleManager(),
         muteSink = MuteSink { _: PlaybackState -> },
+        engagementTracker = DefaultEngagementTracker(),
         metadataProducer = FakeMetadataProducer(),
         scope = scope,
         overlayProducer = null,

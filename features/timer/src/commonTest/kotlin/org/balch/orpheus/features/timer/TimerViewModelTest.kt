@@ -14,6 +14,7 @@ import org.balch.orpheus.core.audio.MasterVolumeRamp
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
@@ -188,7 +189,7 @@ private fun makeVm(
         dispatcherProvider = FakeDispatcherProvider,
         scope = scope,
     )
-    return TimerViewModel(engine, MasterVolumeRamp(engine), manager, mediaSessionStateManager, NoOpTimerWidgetNotifier(), scope, persistence)
+    return TimerViewModel(engine, MasterVolumeRamp(engine), manager, mediaSessionStateManager, NoOpTimerWidgetNotifier(), DefaultEngagementTracker(), scope, persistence)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

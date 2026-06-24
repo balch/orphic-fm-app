@@ -16,6 +16,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.plugin.PortValue
@@ -120,6 +121,7 @@ class PulsarBpmSyncTest {
             transitionPreferences = StubTransitionPreferences(),
             transitionRunner = StubTransitionRunner(),
             songEndingEventSource = StubSongEndingEventSource(),
+            engagementTracker = DefaultEngagementTracker(),
         )
     }
 

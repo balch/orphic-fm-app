@@ -19,11 +19,13 @@ class PulsarVibeSectionValidationTest {
         }
     }
 
-    @Test fun sectionCustomProgressionRejectsSizeAbove8() {
-        val nineDegrees = chords(0, 1, 2, 3, 4, 5, 6, 0, 1)
-        check(nineDegrees.size == 9)
+    @Test fun sectionCustomProgressionRejectsSizeAbove12() {
+        // 12 is the boundary (raised from 8 when longer progressions landed) — must construct.
+        Section(name = "ok-12", customProgression = chords(0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4))
+        val thirteenDegrees = chords(0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5)
+        check(thirteenDegrees.size == 13)
         assertFailsWith<IllegalArgumentException> {
-            Section(name = "bad", customProgression = nineDegrees)
+            Section(name = "bad", customProgression = thirteenDegrees)
         }
     }
 
