@@ -1,6 +1,7 @@
-Performance and stability release.
+Solo handoffs that actually flow.
 
-• Generated beats hold together far better — drums and percussion stay locked to the groove instead of drifting into busy, disjointed patterns as you raise complexity.
-• Per-track variation now respects each track's role, so tight rhythm parts stay tight while lead parts stay free to roam.
-• Re-tuned several Vibes (Deep Space, Velvet Leash, Tremolo Tide, Army Stomp) for steadier grooves.
-• General stability fixes.
+• When the band trades solos, the handoff now glides instead of jumping — solos stay in key, stay in register, and connect to each other.
+• Backing instruments stay present underneath a solo instead of dropping out.
+• Funkier, more articulate bass solos, plus the occasional drum solo that locks to the groove.
+• Re-tuned the Filter Funk interlude for more body.
+• Stability fixes.
