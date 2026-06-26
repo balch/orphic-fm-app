@@ -94,7 +94,14 @@ class FilterFunkVibe : VibeProvider {
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),
                 ),
             ),
-            // 2: interlude — round-robin short solos, each instrument takes a turn
+            // 2: interlude — round-robin short solos, each instrument takes a turn.
+            //    Tuned for body: previously this stacked an energy CUT (0.8) + heavy
+            //    space (1.3) + 0.8 solo probability, so the section thinned out — one
+            //    instrument soloing over a ducked, washed-out, low-energy backing felt
+            //    weak. Now energy sits at full (1.0), space is only lightly lifted
+            //    (1.1), and the solo probability drops to 0.7 so more full-band passages
+            //    survive between solos. (The softened solo ducking in the DSP keeps the
+            //    backing present during the solos themselves.)
             Section(
                 name = "interlude",
                 barsMin = 8, barsMax = 16,
@@ -105,9 +112,9 @@ class FilterFunkVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
-                    energy = 0.8f, complexity = 1.2f, space = 1.3f, mood = 1.1f,
+                    energy = 1.0f, complexity = 1.2f, space = 1.1f, mood = 1.1f,
                 ),
-                soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
+                soloMode = SoloMode.LickBuilder(probability = 0.7f, mutationRate = 0.6f),
             ),
             // 3: drop — stripped to kick + bass droning on G for impact on return
             Section(

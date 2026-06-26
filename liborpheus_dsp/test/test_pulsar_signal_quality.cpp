@@ -17,6 +17,7 @@
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/orpheus_graph.h"
+#include "stmlib/utils/random.h"  // pin the global metallic-noise RNG for reproducible mix tests
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -28,13 +29,38 @@ static constexpr float kSampleRate = 48000.0f;
 // The Chord engine (14) uses divide-down oscillators whose phase relationships
 // snap on retrigger — same behavior as real organ keyboards. Original MI hardware
 // masks this with an LPG; our OrpheusVoice micro-fade handles it in the mix.
-static constexpr float kDiscThresholdMix = 0.95f;       // mixed stereo output (percussion contributes)
+// Mixed stereo output: ALL tracks sum here, including the kick/snare/hihat
+// attack transients. Verified by muting: with all percussion off the mix is
+// smooth (max single-sample jump ~0.23, disc=0) — there is NO buffer seam; the
+// jumps are entirely legitimate percussion attacks. When two or three loud
+// percussion hits land on the same step their soft-limited sum reaches a
+// single-sample jump of ~1.16 (cross-seed ceiling over 240 renders). Which hits
+// coincide is seed-driven, so at the old 0.95 the test flaked (~half of seeds
+// tripped it). 1.4 admits the verified ~1.16 percussion-sum transient with
+// margin while still catching an abnormal near-full-scale (~2.0) mix glitch.
+// (Below the per-track HH threshold of 1.7 because the mix is soft-limited.)
+static constexpr float kDiscThresholdMix = 1.4f;         // mixed stereo output (summed percussion attacks)
 static constexpr float kDiscThresholdMelodic = 0.5f;     // melodic/effect tracks (should be smooth)
 static constexpr float kDiscThresholdPercussive = 0.98f;  // percussion tracks (sharp attacks OK)
 static constexpr float kDiscThresholdChord = 0.95f;       // Chord engine: organ-style phase snaps
+// HH (engine 23) is the 808 "metallic" hat: six NON-bandlimited square
+// oscillators (2*f0 * ratios up to 2.5x) summed in 0.33 steps, run through a
+// RESONANT band-pass (Q = 3+3*tone) then a high-pass. Its natural attack
+// transient is a full-scale sign-flip — a single-sample jump up to ~1.44
+// (verified empirically over many runs; the clocked-noise term uses a global
+// RNG so it varies). Every such jump lands within ~0–130 samples (<3 ms) of a
+// note onset, never mid-sustain, and is scattered across block boundaries — i.e.
+// it is the real metallic attack, not a buffer seam or click. 0.98 is correct
+// for the sine-based BD (~0.91) and noise-based SD (~0.59) but too strict for
+// the hat. 1.7 admits the verified transient with RNG headroom while still
+// flagging an abnormal near-full-scale (~2.0) glitch.
+static constexpr float kDiscThresholdHat = 1.7f;          // HH: 808 metallic-square attack transient
 
 // Classification for per-track threshold selection
 static float threshold_for_engine(int engine_id) {
+    // HH (metallic hat): sharper attack than BD/SD — own threshold
+    if (engine_id == 23)
+        return kDiscThresholdHat;
     // Self-enveloped (percussion): sharp transients expected
     if ((engine_id >= 19 && engine_id <= 23)   // String, Modal, BD, SD, HH
         || (engine_id >= 2 && engine_id <= 4)) // SixOp
@@ -116,11 +142,39 @@ static GraphUnit make_unit() {
     return unit;
 }
 
-static OrpheusEngine* make_engine(void (*setup)(OrpheusEngine*), float bpm) {
+// ── Determinism for the whole suite ──────────────────────────────────
+// Two independent RNGs feed the percussion attack transients that the
+// discontinuity tests measure, and BOTH were unpinned, making the suite flaky
+// across separate process invocations:
+//   1. The pattern seed. The setup helpers leave pulsar_seed=0, which makes
+//      load_vibe re-stir the pattern RNG from the wall clock
+//      (orpheus_unit_pulsar.cpp) — so which steps fire, and which loud hits
+//      coincide, changed every run. A non-zero seed makes the pattern
+//      byte-reproducible.
+//   2. The global stmlib metallic-noise RNG. The 808 hi-hat / snare draw their
+//      clocked noise from stmlib::Random (drums/hi_hat.h), a process-global
+//      state that carries across tests. Pinning it makes each render's noise
+//      byte-stable. Pattern generation does NOT touch this RNG (verified), so
+//      reseeding here, before the render, is sufficient.
+// Pinning both makes every test's output identical run-to-run; the per-engine
+// thresholds then only need to admit the (now fixed) legitimate transients.
+static constexpr int64_t  kReproSeed = 0xBEA7;       // any fixed non-zero pattern seed
+static constexpr uint32_t kReproRng  = 0xBEA70000u;  // fixed global metallic-noise RNG
+
+static OrpheusEngine* make_engine(void (*setup)(OrpheusEngine*), float bpm,
+                                  int64_t seed = kReproSeed) {
     OrpheusEngine* engine = orpheus_engine_create(kSampleRate);
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
     setup(engine);
+    if (seed != 0) {
+        // Pin the pattern seed BEFORE the vibe load (trigger_vibe_load below):
+        // load_vibe only re-stirs from the wall clock when seed == 0.
+        engine->pulsar_seed.store(seed, std::memory_order_relaxed);
+        // Pin the global metallic-noise RNG. Pattern gen does not consume it,
+        // so this state persists to the render and makes it byte-reproducible.
+        stmlib::Random::Seed(kReproRng);
+    }
     trigger_vibe_load(engine);
     engine->clock_bpm.store(bpm, std::memory_order_relaxed);
     return engine;
@@ -135,7 +189,7 @@ bool run_pulsar_signal_tests() {
     // ── Test 1: Mixed output — no artifacts above percussion threshold (30s) ──
     {
         printf("  Test 1: Mixed output at 128 BPM (30s, threshold=%.2f)\n", kDiscThresholdMix);
-        OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+        OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);  // seed pinned in make_engine
         GraphUnit unit = make_unit();
 
         SignalStats stats = process_seconds(&unit, engine, 30.0f, 512);
@@ -243,7 +297,7 @@ bool run_pulsar_signal_tests() {
         bool all_ok = true;
 
         for (int bi = 0; bi < num_bpms; bi++) {
-            OrpheusEngine* engine = make_engine(setup_cosmic_techno, bpms[bi]);
+            OrpheusEngine* engine = make_engine(setup_cosmic_techno, bpms[bi]);  // seed pinned in make_engine
             SignalStats stats = process_seconds(&unit, engine, 5.0f, 512);
 
             printf("    BPM %3.0f: peak=%.4f max_disc=%.4f disc=%d denorm=%d\n",

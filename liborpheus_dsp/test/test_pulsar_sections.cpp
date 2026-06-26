@@ -3,9 +3,14 @@
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/orpheus_graph.h"
 #include "../src/pulsar_section.h"
+#include "../src/pulsar_band_solo.h"
+#include "../src/pulsar_rng.h"
+#include "../src/pulsar_handoff.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+
+static bool approx(float a, float b) { return std::fabs(a - b) < 1e-4f; }
 
 // ── Test helper: create a 3-section arrangement ──
 
@@ -1011,6 +1016,482 @@ static bool test_randomize_section_bars_bounds() {
     return ok;
 }
 
+static bool test_select_next_lead_excludes_self_and_drums() {
+    // 3 members: 0 = drums (always_active), 1 = bass, 2 = keys.
+    // handoff_matrix rows give the CURRENT lead (member 2) nonzero weight to
+    // itself and to the drummer — the primary loop must refuse both.
+    BandSoloConfigParam cfg = {};
+    cfg.member_count = 3;
+    cfg.members[0].always_active = true;
+    cfg.members[1].always_active = false;
+    cfg.members[2].always_active = false;
+    // stride-kMaxBandMembers layout (post-pack), row = current lead 2
+    cfg.handoff_matrix[2 * kMaxBandMembers + 0] = 0.5f; // -> drums (must skip)
+    cfg.handoff_matrix[2 * kMaxBandMembers + 1] = 0.5f; // -> bass  (allowed)
+    cfg.handoff_matrix[2 * kMaxBandMembers + 2] = 0.5f; // -> self  (must skip)
+
+    BandSoloState st = {};
+    st.lead_member = 2;
+    for (int m = 0; m < 3; m++) st.bars_since_lead[m] = 4;
+
+    bool ok = true;
+    uint32_t seed = 1;
+    for (int i = 0; i < 500; i++) {
+        int next = select_next_lead(cfg, st, seed);
+        if (next == 2) { ok = false; printf("  FAIL: re-picked self (member 2)\n"); break; }
+        if (cfg.members[next].always_active) {
+            ok = false; printf("  FAIL: picked always_active drummer (member %d)\n", next); break;
+        }
+    }
+    printf("  select_next_lead excludes self + drums over 500 rolls -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// Fix #4: in JAM mode a member that owns NO melodic track (a chordal-only "Keys"
+// member, as in DogHouse) must never be chosen as the solo lead — generate_jam_solo_line
+// would no-op, producing a dead solo (just boosted comping). Eligible jam leads own >=1
+// MELODIC track. Band here: drums(always), bass(mel), keys(chordal-only), fx(mel).
+static bool test_jam_lead_excludes_chordal_only_member() {
+    BandSoloConfigParam cfg = {};
+    cfg.member_count = 4;
+    cfg.members[0].always_active = true;                                  // drums
+    cfg.members[0].track_count = 3; cfg.members[0].tracks[0]=0; cfg.members[0].tracks[1]=1; cfg.members[0].tracks[2]=2;
+    cfg.members[1].track_count = 1; cfg.members[1].tracks[0]=3;           // bass (melodic)
+    cfg.members[2].track_count = 1; cfg.members[2].tracks[0]=4;           // keys (chordal-only)
+    cfg.members[3].track_count = 1; cfg.members[3].tracks[0]=5;           // fx (melodic)
+    // Every member pushes hard toward keys (member 2) — the filter must still refuse it.
+    for (int f = 0; f < 4; f++) for (int t = 0; t < 4; t++)
+        cfg.handoff_matrix[f * kMaxBandMembers + t] = (f == t) ? 0.0f : 1.0f;
+    cfg.bars_per_lead_min = 1; cfg.bars_per_lead_max = 1;
+
+    PulsarTrackState tracks[kNumPulsarTracks] = {};
+    tracks[0].role = TrackRole::PERCUSSIVE; tracks[1].role = TrackRole::PERCUSSIVE; tracks[2].role = TrackRole::PERCUSSIVE;
+    tracks[3].role = TrackRole::MELODIC; tracks[3].step_count = 16;
+    tracks[4].role = TrackRole::CHORDAL; tracks[4].step_count = 16;
+    tracks[5].role = TrackRole::MELODIC; tracks[5].step_count = 16;
+
+    SectionParam sec = {}; sec.solo_mode = SoloModeId::JAM;
+
+    BandSoloState st = {};
+    st.active = true; st.lead_member = 1;             // start on bass (eligible)
+    st.member_role[1] = MemberSoloRole::LEADING;
+    st.member_bars_remaining[1] = 1;
+    for (int m = 0; m < 4; m++) st.bars_since_lead[m] = 4;
+
+    uint32_t seed = 3;
+    bool keys_ever_led = false;
+    for (int i = 0; i < 400; i++) {
+        advance_band_solo(st, cfg, sec, tracks, seed, kNumPulsarTracks);
+        if (st.lead_member == 2) keys_ever_led = true;
+        if (st.member_bars_remaining[st.lead_member] <= 0) st.member_bars_remaining[st.lead_member] = 1;
+    }
+    bool ok = !keys_ever_led;
+    printf("  jam excludes chordal-only lead over 400 handoffs: keys_led=%d -- %s\n",
+           keys_ever_led, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_duck_gate_is_deterministic() {
+    // Same (playhead, track, loop, mod) must give the same survive/drop decision,
+    // and ~ (1+mod) fraction must survive over many distinct steps.
+    bool deterministic = true;
+    for (int s = 0; s < 16; s++) {
+        bool a = duck_passes(s, 3, 7, -0.4f);
+        bool b = duck_passes(s, 3, 7, -0.4f);
+        if (a != b) { deterministic = false; break; }
+    }
+    int survived = 0, total = 0;
+    for (int loop = 0; loop < 50; loop++)
+        for (int s = 0; s < 16; s++) { total++; if (duck_passes(s, 3, loop, -0.4f)) survived++; }
+    float frac = static_cast<float>(survived) / total;     // expect ~0.6
+    bool frac_ok = frac > 0.45f && frac < 0.75f;
+    bool ok = deterministic && frac_ok;
+    printf("  duck gate deterministic=%s survive_frac=%.2f (exp ~0.60) -- %s\n",
+           deterministic ? "yes" : "no", frac, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_support_duck_is_softened() {
+    // 2 members: 0 keys (LEADING), 1 bass (SUPPORT, not always_active).
+    BandSoloConfigParam cfg = {};
+    cfg.member_count = 2;
+    cfg.members[0].track_count = 1; cfg.members[0].tracks[0] = 1; // keys on track 1
+    cfg.members[1].track_count = 1; cfg.members[1].tracks[0] = 2; // bass on track 2
+    BandSoloState st = {};
+    st.active = true; st.lead_member = 0;
+    st.member_role[0] = MemberSoloRole::LEADING;
+    st.member_role[1] = MemberSoloRole::SUPPORT;
+
+    PulsarTrackState tracks[kNumPulsarTracks] = {};
+    apply_band_solo_modifiers(tracks, cfg, st, kNumPulsarTracks);
+
+    bool ok = approx(tracks[2].solo_density_mod, -0.2f) &&
+              approx(tracks[2].solo_fill_mod,    -0.35f);
+    printf("  SUPPORT duck density=%.2f fill=%.2f (exp -0.20 / -0.35) -- %s\n",
+           tracks[2].solo_density_mod, tracks[2].solo_fill_mod, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_overlap_baton_pass() {
+    printf("\n=== Test: Overlap baton-pass (look-ahead + bridge bar) ===\n");
+    BandSoloConfigParam cfg = {};
+    cfg.member_count = 3;
+    cfg.members[0].always_active = true;                    // drums
+    cfg.members[1].always_active = false;                   // bass
+    cfg.members[2].always_active = false;                   // keys
+    cfg.handoff_matrix[1 * kMaxBandMembers + 2] = 1.0f;     // bass -> keys
+    cfg.bars_per_lead_min = 1; cfg.bars_per_lead_max = 1;
+    SectionParam sec = {}; sec.solo_mode = SoloModeId::JAM;
+
+    BandSoloState st = {};
+    st.active = true; st.lead_member = 1;
+    st.member_role[1] = MemberSoloRole::LEADING;
+    st.member_role[2] = MemberSoloRole::SUPPORT;
+    st.member_bars_remaining[1] = 2;   // expires in 2 bars -> hits ==1 after one advance
+    for (int m = 0; m < 3; m++) st.bars_since_lead[m] = 4;
+
+    PulsarTrackState tracks[kNumPulsarTracks] = {};
+    uint32_t seed = 5;
+
+    advance_band_solo(st, cfg, sec, tracks, seed, kNumPulsarTracks); // bars_remaining 2->1: pre-select
+    bool preselected = (st.pending_lead == 2) && (st.member_role[2] == MemberSoloRole::ACTIVE);
+
+    advance_band_solo(st, cfg, sec, tracks, seed, kNumPulsarTracks); // expiry: promote pending, demote outgoing to ACTIVE
+    bool promoted = (st.lead_member == 2) && (st.member_role[2] == MemberSoloRole::LEADING)
+                 && (st.member_role[1] == MemberSoloRole::ACTIVE) && (st.pending_lead == -1);
+
+    bool ok = preselected && promoted;
+    printf("  baton pass: preselect=%d promote=%d -- %s\n", preselected, promoted, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_slew_toward_monotonic_no_overshoot() {
+    float v = -0.3f; const float target = 0.2f, step = 0.25f;
+    float prev = v; bool ok = true; int bars = 0;
+    while (std::fabs(v - target) > 1e-4f && bars < 20) {
+        v = slew_toward(v, target, step);
+        if (v < prev - 1e-6f) { ok = false; break; }   // monotonic up
+        if (v > target + 1e-4f) { ok = false; break; } // no overshoot
+        prev = v; bars++;
+    }
+    bool reached = std::fabs(v - target) < 1e-4f;
+    // |−0.3 → 0.2| = 0.5 at 0.25/bar => 2 bars
+    bool timing_ok = bars == 2;
+    ok = ok && reached && timing_ok;
+    printf("  slew reached target in %d bars, monotonic/no-overshoot -- %s\n",
+           bars, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// ── Task 7: drum-lead gate + style selection ─────────────────────────────────
+
+static bool test_drum_lead_gate_and_style() {
+    uint32_t seed = 12345;
+    // Rarity: over 2000 LICK_BUILDER rolls with last_was_drum=false, ~12% fire.
+    int fired = 0;
+    for (int i = 0; i < 2000; i++) if (should_drum_lead(SoloModeId::LICK_BUILDER, false, seed)) fired++;
+    float frac = fired / 2000.0f;
+    bool rarity_ok = frac > 0.08f && frac < 0.16f;
+    // Never fires in JAM, never fires consecutively.
+    bool jam_blocked = !should_drum_lead(SoloModeId::JAM, false, seed);
+    bool consec_blocked = !should_drum_lead(SoloModeId::LICK_BUILDER, true, seed);
+    // Contour falls back to LOCK_IN when <3 tracks; allowed with 3.
+    bool fallback_ok = pick_drum_lead_style(1, seed) != DrumLeadStyle::CONTOUR;
+    bool contour_possible = false;
+    for (int i = 0; i < 200; i++) if (pick_drum_lead_style(3, seed) == DrumLeadStyle::CONTOUR) { contour_possible = true; break; }
+    bool ok = rarity_ok && jam_blocked && consec_blocked && fallback_ok && contour_possible;
+    printf("  drum-lead frac=%.3f jam_blocked=%d consec_blocked=%d fallback=%d contour=%d -- %s\n",
+           frac, jam_blocked, consec_blocked, fallback_ok, contour_possible, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// ── Task 8: drum-lead render via generate_lick_rhythm_pattern ───────────────
+
+static bool test_render_drum_lead_mirrors_lick() {
+    // Build a 3-track drum member and a short lick; render each style.
+    // Uses the preferred testable signature (no PulsarState* needed):
+    //   render_drum_lead(config, tracks, num_tracks, lead_member, style, lick, lick_len, complexity, seed)
+
+    // Config: one band member owning tracks 0/1/2 (kick/snare/hat)
+    BandSoloConfigParam cfg = {};
+    cfg.member_count = 1;
+    cfg.members[0].track_count = 3;
+    cfg.members[0].tracks[0] = 0;  // kick
+    cfg.members[0].tracks[1] = 1;  // snare
+    cfg.members[0].tracks[2] = 2;  // hat
+    cfg.members[0].always_active = true;
+
+    // Tracks: 0/1/2 PERCUSSIVE, 3 MELODIC pre-filled with gated steps
+    PulsarTrackState tracks[kNumPulsarTracks] = {};
+    tracks[0].role = TrackRole::PERCUSSIVE; tracks[0].step_count = 16;
+    tracks[1].role = TrackRole::PERCUSSIVE; tracks[1].step_count = 16;
+    tracks[2].role = TrackRole::PERCUSSIVE; tracks[2].step_count = 16;
+    tracks[3].role = TrackRole::MELODIC;    tracks[3].step_count = 16;
+    for (int i = 0; i < 16; i++) tracks[3].steps[i] = make_step(60, 0.8f, true, 0.5f);
+
+    // Short lick to mirror
+    PulsarLickStep lick[4] = {
+        {0, 1.0f, 0.9f, -1.0f}, {2, 1.0f, 0.5f, -1.0f},
+        {4, 1.0f, 0.3f, -1.0f}, {5, 1.0f, 0.8f, -1.0f}
+    };
+    uint32_t seed = 7;
+
+    // LOCK_IN: drum tracks should get hits; melody should be untouched
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed);
+    int drum_hits = 0;
+    for (int i = 0; i < 16; i++) {
+        if (tracks[0].steps[i].gate || tracks[1].steps[i].gate || tracks[2].steps[i].gate)
+            drum_hits++;
+    }
+    bool melody_kept = tracks[3].steps[0].gate;  // LOCK_IN leaves melody alone
+
+    // BREAK: melody should be cleared (all gates off)
+    // Re-fill melody before the BREAK render
+    for (int i = 0; i < 16; i++) tracks[3].steps[i] = make_step(60, 0.8f, true, 0.5f);
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::BREAK, lick, 4, 0.5f, seed);
+    bool melody_dropped = true;
+    for (int i = 0; i < 16; i++) {
+        if (tracks[3].steps[i].gate) { melody_dropped = false; break; }
+    }
+
+    bool ok = (drum_hits > 0) && melody_kept && melody_dropped;
+    printf("  drum render: hits=%d lockin_keeps_melody=%d break_drops_melody=%d -- %s\n",
+           drum_hits, melody_kept, melody_dropped, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// ── Task 6: register reconciliation ─────────────────────────────────────────
+
+static bool test_choose_lick_octave_minimizes_leap() {
+    // Outgoing soloist ended near MIDI 60. The lick's first degree, rendered at
+    // the chosen octave, should land within a perfect 5th (7 semitones) of 60.
+    PulsarScale scale = kPulsarScales[0];   // major scale (index 0)
+    int root = 0;        // C
+    int first_degree = 0;
+    int outgoing = 60;
+    int oct = choose_lick_octave(first_degree, outgoing, root, scale, 36, 84);
+    // Recompute the first note the way render_lick_into_track will, given oct:
+    int note = lick_degree_to_midi(first_degree, root, scale, oct);
+    bool ok = std::abs(note - outgoing) <= 7;
+    printf("  chosen octave places first note %d within a 5th of %d -- %s\n",
+           note, outgoing, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_choose_lick_octave_no_prior_soloist() {
+    // When outgoing_note < 0, choose_lick_octave returns -1 (auto).
+    PulsarScale scale = kPulsarScales[0];
+    int oct = choose_lick_octave(0, -1, 0, scale, 36, 84);
+    bool ok = (oct == -1);
+    printf("  no prior soloist returns -1 (auto) -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_choose_lick_octave_clamps_to_range() {
+    // Outgoing note is 120 (very high). Chosen octave must keep note in [36,84].
+    PulsarScale scale = kPulsarScales[0];
+    int root = 0; int first_degree = 0; int outgoing = 120;
+    int oct = choose_lick_octave(first_degree, outgoing, root, scale, 36, 84);
+    bool ok = false;
+    if (oct >= 0) {
+        int note = lick_degree_to_midi(first_degree, root, scale, oct);
+        ok = (note >= 36 && note <= 84);
+    }
+    printf("  high outgoing note: chosen octave keeps first note in range [36,84] -- %s\n",
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_articulate_bass_solo() {
+    PulsarStep steps[16];
+    for (int i = 0; i < 16; i++) steps[i] = make_step(0, 0.0f, false, 0.0f);
+    // Gated bass roots on the quarter-note downbeats (i = 0,4,8,12).
+    for (int i = 0; i < 16; i += 4) steps[i] = make_step(36, 0.6f, true, 0.5f);
+
+    uint32_t seed = 9;
+    articulate_bass_solo(steps, 16, 0.8f /*dense for the test*/, seed);
+
+    // 1. Downbeat gated steps are accented (velocity raised above the original 0.6).
+    bool accented = steps[0].velocity > 0.6f && steps[4].velocity > 0.6f;
+    // 2. Some empty ODD (off-beat) steps became slap ghosts: gate=true, short dur, high vel, bass note.
+    int slaps = 0; bool slap_shape_ok = true;
+    for (int i = 1; i < 16; i += 2) {            // odd indices only
+        if (steps[i].gate) {
+            slaps++;
+            if (!(steps[i].velocity >= 0.85f && steps[i].duration <= 0.2f && steps[i].note == 36))
+                slap_shape_ok = false;
+        }
+    }
+    // 3. EVEN empty steps (downbeat subdivisions) are NOT slapped — slaps are off-beat only.
+    bool even_clean = true;
+    for (int i = 2; i < 16; i += 4) if (steps[i].gate) even_clean = false;  // i=2,6,10,14 were empty
+    // 4. Original sustained downbeats keep their long duration.
+    bool sustained_ok = steps[0].duration >= 0.5f;
+    // 5. Determinism.
+    PulsarStep steps2[16];
+    for (int i = 0; i < 16; i++) steps2[i] = make_step(0,0.0f,false,0.0f);
+    for (int i = 0; i < 16; i += 4) steps2[i] = make_step(36, 0.6f, true, 0.5f);
+    uint32_t seed2 = 9; articulate_bass_solo(steps2, 16, 0.8f, seed2);
+    bool deterministic = true;
+    for (int i = 0; i < 16; i++) if (steps2[i].gate != steps[i].gate) deterministic = false;
+
+    bool ok = accented && slaps > 0 && slap_shape_ok && even_clean && sustained_ok && deterministic;
+    printf("  articulate: accented=%d slaps=%d shape=%d even_clean=%d sustained=%d det=%d -- %s\n",
+           accented, slaps, slap_shape_ok, even_clean, sustained_ok, deterministic, ok ? "PASS":"FAIL");
+    return ok;
+}
+
+// Fix #2: articulate_bass_solo runs every bar; in JAM the bass substrate may not be
+// regenerated, so it is applied repeatedly to the SAME buffer. It must be idempotent:
+// repeated passes must NOT pile slaps onto every off-beat nor creep velocities to
+// full scale (which turns a sparse bass solo into a loud constant 16th-note slap line).
+static bool test_articulate_bass_solo_idempotent_under_repeats() {
+    PulsarStep steps[16];
+    for (int i = 0; i < 16; i++) steps[i] = make_step(0, 0.0f, false, 0.0f);
+    for (int i = 0; i < 16; i += 4) steps[i] = make_step(36, 0.6f, true, 0.5f);  // quarter roots
+    uint32_t seed = 9;
+    // 20 bars of articulation on the same (never-regenerated) buffer.
+    for (int bar = 0; bar < 20; bar++) articulate_bass_solo(steps, 16, 0.35f, seed);
+
+    int odd_slaps = 0;
+    for (int i = 1; i < 16; i += 2) if (steps[i].gate) odd_slaps++;
+    // Quarter-note roots must not all be pinned at full scale (additive accents would).
+    bool quarter_not_saturated = false;
+    for (int i = 0; i < 16; i += 4) if (steps[i].gate && steps[i].velocity < 0.999f) quarter_not_saturated = true;
+    // Sparse density (0.35) must stay sparse — NOT fill all 8 off-beats over 20 bars.
+    bool slaps_bounded = odd_slaps <= 5;
+    bool ok = slaps_bounded && quarter_not_saturated;
+    printf("  articulate idempotent: odd_slaps=%d(<=5) quarter_not_saturated=%d -- %s\n",
+           odd_slaps, quarter_not_saturated, ok ? "PASS":"FAIL");
+    return ok;
+}
+
+static bool test_solo_fire_boost_never_saturates() {
+    // High base + big mods must NOT clamp to 1.0 — headroom-relative lift leaves rests.
+    float hi = solo_fire_boost(0.94f, 0.39f, 0.70f);   // the bass runaway case
+    bool keeps_rests = hi < 1.0f && hi > 0.94f;
+    // Low base: same mods lift more (more headroom to fill).
+    float lo = solo_fire_boost(0.50f, 0.39f, 0.70f);
+    bool lifts_more_when_low = (lo - 0.50f) > (hi - 0.94f);
+    // Zero/negative density contributes nothing.
+    bool noop = solo_fire_boost(0.7f, 0.0f, 0.5f) == 0.7f;
+    // Never exceeds 1.0 even at extremes.
+    bool bounded = solo_fire_boost(0.99f, 1.0f, 1.0f) <= 1.0f;
+    bool ok = keeps_rests && lifts_more_when_low && noop && bounded;
+    printf("  fire_boost hi=%.3f(<1,>0.94) lo=%.3f lifts_more=%d noop=%d bounded=%d -- %s\n",
+           hi, lo, lifts_more_when_low, noop, bounded, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_midi_lick_degree_roundtrip_and_synth() {
+    const PulsarScale& scale = kPulsarScales[0];
+    int root = 48;  // C3: keeps oct-1..+1 notes in valid MIDI range (36-82)
+    // 1. Round-trip for in-scale notes (octave 0 render).
+    bool roundtrip = true;
+    for (int oct = -1; oct <= 1; oct++) {
+        for (int i = 0; i < scale.count; i++) {
+            int note = root + oct*12 + scale.degrees[i];
+            int d = midi_to_lick_degree(note, root, scale);
+            int back = lick_degree_to_midi(d, root, scale, 0);
+            if (back != note) { roundtrip = false; }
+        }
+    }
+    // 2. Out-of-scale note snaps to a scale tone (back note's pitch-class is in scale).
+    int weird = root + 1;  // a semitone above root (likely not in a diatonic scale)
+    int wd = midi_to_lick_degree(weird, root, scale);
+    int wback = lick_degree_to_midi(wd, root, scale, 0);
+    int wpc = ((wback - root) % 12 + 12) % 12;
+    bool snapped = false; for (int i = 0; i < scale.count; i++) if (scale.degrees[i] == wpc) snapped = true;
+    // 3. synthesize captures only gated steps in order with their dur/vel.
+    PulsarStep steps[8];
+    for (int i = 0; i < 8; i++) steps[i] = make_step(0, 0.0f, false, 0.0f);
+    steps[0] = make_step((uint8_t)(root + scale.degrees[0]), 0.7f, true, 0.5f);
+    steps[2] = make_step((uint8_t)(root + 12 + scale.degrees[1]), 0.9f, true, 0.25f);
+    int8_t dg[32]; float du[32], ve[32];
+    int n = synthesize_lick_from_steps(steps, 8, root, scale, dg, du, ve, 32);
+    bool synth_ok = (n == 2)
+        && approx(du[0], 0.5f) && approx(ve[0], 0.7f)
+        && approx(du[1], 0.25f) && approx(ve[1], 0.9f)
+        && lick_degree_to_midi(dg[0], root, scale, 0) == root + scale.degrees[0]
+        && lick_degree_to_midi(dg[1], root, scale, 0) == root + 12 + scale.degrees[1];
+    bool ok = roundtrip && snapped && synth_ok;
+    printf("  midi<->degree roundtrip=%d snapped=%d synth(n=%d)=%d -- %s\n",
+           roundtrip, snapped, n, synth_ok, ok ? "PASS":"FAIL");
+    return ok;
+}
+
+// Fix #1: a source note BELOW the root maps to a negative scale degree, and the
+// lick renderer (bar_strategy / generate_lick_pattern) treats scale_degree<0 as a
+// REST. So synthesize_lick_from_steps must octave-shift the contour non-negative,
+// or the DogHouse lick-less LickBuilder fallback renders those notes as silence.
+static bool test_synthesize_lick_below_root_renders_notes_not_rests() {
+    const PulsarScale& scale = kPulsarScales[0];  // major
+    int root = 60;  // C4 — a source note below this maps to a negative degree
+    // Ascending line that STARTS below the root: G3, C4, E4.
+    PulsarStep steps[8];
+    for (int i = 0; i < 8; i++) steps[i] = make_step(0, 0.0f, false, 0.0f);
+    steps[0] = make_step((uint8_t)(root - 5), 0.7f, true, 0.5f);  // G3, below root
+    steps[1] = make_step((uint8_t)(root),     0.8f, true, 0.5f);  // C4
+    steps[2] = make_step((uint8_t)(root + 4), 0.9f, true, 0.5f);  // E4
+    int8_t dg[32]; float du[32], ve[32];
+    int n = synthesize_lick_from_steps(steps, 8, root, scale, dg, du, ve, 32);
+    // 1. All synthesized degrees must be NON-NEGATIVE (else they render as rests).
+    bool no_negatives = (n == 3);
+    for (int i = 0; i < n; i++) if (dg[i] < 0) no_negatives = false;
+    // 2. Contour preserved: ascending source -> non-descending degrees.
+    bool ascending = (n == 3) && dg[0] <= dg[1] && dg[1] <= dg[2];
+    bool ok = no_negatives && ascending;
+    printf("  synth below-root: n=%d no_neg=%d ascending=%d (dg=[%d,%d,%d]) -- %s\n",
+           n, no_negatives, ascending, dg[0], dg[1], dg[2], ok ? "PASS":"FAIL");
+    return ok;
+}
+
+static bool test_generate_jam_solo_line() {
+    printf("\n=== Test: generate_jam_solo_line produces in-scale chord-anchored notes ===\n");
+    const PulsarScale& scale = kPulsarScales[0];
+    int root = 0, chord_degree = 0, octave = 5, current = 0;
+    SoloBehaviorParam behavior = {};                       // default weights
+    for (int i = 0; i < kMarkovIntervals; i++) behavior.interval_weights[i] = 1.0f;
+    behavior.rest_probability = 0.0f; behavior.hold_probability = 0.0f;
+    behavior.density_curve_min = 1.0f; behavior.density_curve_max = 1.0f;  // always fire
+    BandSoloState st = {}; st.phrase_cursor = 0;
+    PulsarStep steps[16]; for (int i=0;i<16;i++) steps[i]=make_step(0,0.0f,false,0.0f);
+    uint32_t seed = 11;
+    generate_jam_solo_line(behavior, st, steps, 16, root, scale, chord_degree, octave, current, 0.5f, seed);
+
+    // 1. Every gated note is in scale (pitch class is a scale degree).
+    bool in_scale = true; int gated = 0;
+    for (int s = 0; s < 16; s++) if (steps[s].gate) {
+        gated++;
+        int pc = ((steps[s].note - root) % 12 + 12) % 12;
+        bool ok=false; for (int d=0; d<scale.count; d++) if (scale.degrees[d]==pc) ok=true;
+        if (!ok) in_scale = false;
+    }
+    // 2. Downbeats (s%4==0) that fired are CHORD TONES (pc in {root,3rd,5th} of chord_degree=0).
+    int chord_pcs[3] = { scale.degrees[0],
+                         scale.degrees[2 % scale.count],
+                         scale.degrees[4 % scale.count] };
+    bool downbeats_chord = true;
+    for (int s = 0; s < 16; s += 4) if (steps[s].gate) {
+        int pc = ((steps[s].note - root) % 12 + 12) % 12;
+        bool ct=false; for (int k=0;k<3;k++) if (chord_pcs[k]==pc) ct=true;
+        if (!ct) downbeats_chord = false;
+    }
+    // 3. record_solo_note ran (phrase captured).
+    bool recorded = st.phrase_cursor > 0;
+    // 4. Determinism.
+    SoloBehaviorParam b2 = behavior; BandSoloState s2 = {}; int c2 = 0;
+    PulsarStep st2[16]; for (int i=0;i<16;i++) st2[i]=make_step(0,0.0f,false,0.0f);
+    uint32_t seed2 = 11;
+    generate_jam_solo_line(b2, s2, st2, 16, root, scale, chord_degree, octave, c2, 0.5f, seed2);
+    bool det = true; for (int i=0;i<16;i++) if (st2[i].gate!=steps[i].gate || st2[i].note!=steps[i].note) det=false;
+
+    bool ok = in_scale && downbeats_chord && recorded && det && gated > 0;
+    printf("  jam gen: gated=%d in_scale=%d downbeats_chord=%d recorded=%d det=%d -- %s\n",
+           gated, in_scale, downbeats_chord, recorded, det, ok ? "PASS":"FAIL");
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -1030,6 +1511,23 @@ bool run_pulsar_sections_tests() {
     tally(test_section_comping_humanization_override_loads());
     tally(test_section_macro_subbar_lerp());
     tally(test_randomize_section_bars_bounds());
+    tally(test_select_next_lead_excludes_self_and_drums());
+    tally(test_jam_lead_excludes_chordal_only_member());
+    tally(test_duck_gate_is_deterministic());
+    tally(test_support_duck_is_softened());
+    tally(test_slew_toward_monotonic_no_overshoot());
+    tally(test_overlap_baton_pass());
+    tally(test_drum_lead_gate_and_style());
+    tally(test_render_drum_lead_mirrors_lick());
+    tally(test_choose_lick_octave_minimizes_leap());
+    tally(test_choose_lick_octave_no_prior_soloist());
+    tally(test_choose_lick_octave_clamps_to_range());
+    tally(test_solo_fire_boost_never_saturates());
+    tally(test_articulate_bass_solo());
+    tally(test_articulate_bass_solo_idempotent_under_repeats());
+    tally(test_midi_lick_degree_roundtrip_and_synth());
+    tally(test_synthesize_lick_below_root_renders_notes_not_rests());
+    tally(test_generate_jam_solo_line());
     printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

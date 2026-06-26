@@ -257,6 +257,10 @@ struct PulsarTrackState {
     // Solo/ducking state (applied per-frame)
     float solo_volume_mod = 0.0f;
     float solo_density_mod = 0.0f;
+    // Smoothed values that chase the role targets above, advanced once per bar.
+    // The audio loop reads these (not the raw targets) so handoffs crossfade.
+    float solo_volume_mod_current = 0.0f;
+    float solo_density_mod_current = 0.0f;
     float solo_ghost_mod = 0.0f;
     float solo_fill_mod = 0.0f;
     bool  solo_simplify = false;
@@ -428,6 +432,7 @@ struct SoloBehaviorParam {
     int override_octave_shift = 0;
     int8_t last_interval = 0;         // previous interval for second-order Markov
     PulsarEnvelopeProfile profile = ENV_PROFILE_MELODIC;  // for matrix lookup
+    int markov_current_degree = 0;   // JAM: persists the markov walk's degree across bars
 };
 
 struct DuckingParam {
@@ -559,7 +564,19 @@ struct BandSoloState {
     int bars_since_lead[kMaxBandMembers] = {};
     int8_t last_phrase[kMaxSoloPhrase] = {};
     int phrase_cursor = 0;
+    int pending_lead = -1;   // next lead pre-selected one bar early (overlap bridge)
     uint32_t solo_seed = 0;
+    // Register reconciliation: track where the outgoing soloist ended so the
+    // incoming lick's octave can be chosen to minimise the leap.
+    int outgoing_last_note = -1;   // MIDI note of last rendered lick step; -1 = unknown
+    bool just_handed_off = false;  // true on the bar a handoff occurred (cleared next bar)
+    // Drum-lead state: style chosen at the handoff (-1 = no drum lead this span),
+    // and whether the last handoff was a drum lead (prevents back-to-back drum leads).
+    int drum_lead_style = -1;
+    bool last_handoff_was_drum = false;
+    // Octave chosen for the CURRENT soloist's run (chosen once at handoff, held
+    // stable for the run). -1 = not yet set (first bar of a new run).
+    int solo_lick_octave = -1;
 };
 
 // ── Persistent state (heap-allocated on first process call) ──────────────

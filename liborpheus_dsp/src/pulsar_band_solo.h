@@ -3,6 +3,7 @@
 #include "orpheus_unit_pulsar.h"
 #include "pulsar_pattern_gen.h"  // for pattern_rand01
 #include "pulsar_solo.h"         // for clear_solo_modifiers
+#include "pulsar_handoff.h"      // for should_drum_lead, pick_drum_lead_style, DrumLeadStyle
 #include <cstring>
 #include <algorithm>
 
@@ -17,9 +18,39 @@
 
 // ── Select initial lead member (weighted random, prefer non-always-active) ──
 
+// True if member m owns at least one MELODIC track — i.e. it can host a JAM solo
+// LINE. A chordal-only or percussion-only member cannot (generate_jam_solo_line would
+// no-op into a dead solo), so it must not be chosen as a JAM lead.
+inline bool member_can_lead_solo(const BandSoloConfigParam& config, int m,
+                                 const PulsarTrackState* tracks, int num_tracks) {
+    if (m < 0 || m >= config.member_count) return false;
+    const BandMemberParam& mem = config.members[m];
+    for (int ti = 0; ti < mem.track_count; ti++) {
+        int rt = mem.tracks[ti];
+        if (rt >= 0 && rt < num_tracks && tracks[rt].role == TrackRole::MELODIC) return true;
+    }
+    return false;
+}
+
+// Fill out[member] with JAM solo eligibility (non-drum AND owns a melodic track).
+// Returns out, or nullptr when no member qualifies — the caller then passes nullptr
+// and keeps the unfiltered selection rather than deadlocking on an empty candidate set.
+inline const bool* build_solo_eligibility(const BandSoloConfigParam& config,
+                                          const PulsarTrackState* tracks, int num_tracks,
+                                          bool* out) {
+    int eligible = 0;
+    for (int m = 0; m < config.member_count; m++) {
+        out[m] = !config.members[m].always_active &&
+                 member_can_lead_solo(config, m, tracks, num_tracks);
+        if (out[m]) eligible++;
+    }
+    return (eligible > 0) ? out : nullptr;
+}
+
 inline int select_initial_lead(
     const BandSoloConfigParam& config,
-    uint32_t& seed
+    uint32_t& seed,
+    const bool* eligible = nullptr   // JAM: only members that can host a solo line
 ) {
     float weights[kMaxBandMembers];
     float total = 0.0f;
@@ -27,7 +58,7 @@ inline int select_initial_lead(
     for (int i = 0; i < config.member_count; i++) {
         // Bound the roll toward improvisational intent: creative members lead more
         // often. always_active (drums) never lead. Floor keeps every member possible.
-        weights[i] = config.members[i].always_active
+        weights[i] = (config.members[i].always_active || (eligible && !eligible[i]))
             ? 0.0f
             : (0.3f + config.members[i].creativity);
         total += weights[i];
@@ -56,7 +87,8 @@ inline int select_initial_lead(
 inline int select_next_lead(
     const BandSoloConfigParam& config,
     const BandSoloState& state,
-    uint32_t& seed
+    uint32_t& seed,
+    const bool* eligible = nullptr   // JAM: only members that can host a solo line
 ) {
     int from = state.lead_member;
     if (from < 0 || from >= config.member_count) from = 0;
@@ -65,6 +97,9 @@ inline int select_next_lead(
     float total = 0.0f;
 
     for (int i = 0; i < config.member_count; i++) {
+        if (i == from) { weights[i] = 0.0f; continue; }                 // never self-handoff
+        if (config.members[i].always_active) { weights[i] = 0.0f; continue; } // drums don't lead via the normal path
+        if (eligible && !eligible[i]) { weights[i] = 0.0f; continue; }  // JAM: must host a solo line
         float base = config.handoff_matrix[from * kMaxBandMembers + i];
         if (base <= 0.0f) { weights[i] = 0.0f; continue; }
 
@@ -82,6 +117,7 @@ inline int select_next_lead(
         // Fallback: hand OFF — never re-pick the current lead; prefer least-recent.
         for (int i = 0; i < config.member_count; i++) {
             if (i == from) { weights[i] = 0.0f; continue; }
+            if (eligible && !eligible[i]) { weights[i] = 0.0f; continue; }  // keep the JAM filter
             float base = config.members[i].always_active ? 0.0f : 1.0f;
             int bars_ago = state.bars_since_lead[i];
             float recency = 1.0f;
@@ -137,10 +173,10 @@ inline void apply_band_solo_modifiers(
         if (m < 0) {
             // Track not in any member: standard ducking
             tracks[t].is_soloist = false;
-            tracks[t].solo_volume_mod = -0.3f;
-            tracks[t].solo_density_mod = -0.4f;
-            tracks[t].solo_ghost_mod = -0.5f;
-            tracks[t].solo_fill_mod = -0.7f;
+            tracks[t].solo_volume_mod = -0.18f;
+            tracks[t].solo_density_mod = -0.2f;
+            tracks[t].solo_ghost_mod = -0.35f;
+            tracks[t].solo_fill_mod = -0.35f;
             tracks[t].solo_simplify = true;
             tracks[t].solo_reverb_mod = 0.1f;
             continue;
@@ -185,10 +221,10 @@ inline void apply_band_solo_modifiers(
                 } else {
                     // Standard ducking for non-always-active support
                     tracks[t].is_soloist = false;
-                    tracks[t].solo_volume_mod = -0.3f;
-                    tracks[t].solo_density_mod = -0.4f;
-                    tracks[t].solo_ghost_mod = -0.5f;
-                    tracks[t].solo_fill_mod = -0.7f;
+                    tracks[t].solo_volume_mod = -0.18f;
+                    tracks[t].solo_density_mod = -0.2f;
+                    tracks[t].solo_ghost_mod = -0.35f;
+                    tracks[t].solo_fill_mod = -0.35f;
                     tracks[t].solo_simplify = true;
                     tracks[t].solo_reverb_mod = 0.1f;
                 }
@@ -222,10 +258,21 @@ inline void start_band_solo(
 
     state.active = true;
     state.phrase_cursor = 0;
+    state.pending_lead = -1;
     std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
     state.solo_seed = seed;
+    state.drum_lead_style = -1;
+    state.last_handoff_was_drum = false;
+    state.solo_lick_octave = -1;
+    state.outgoing_last_note = -1;
+    state.just_handed_off = false;
 
-    state.lead_member = select_initial_lead(config, seed);
+    // JAM solos render an improvised melodic LINE, so the lead must own a melodic
+    // track; a chordal-only member would no-op into a dead solo. Filter it out.
+    bool jam_elig[kMaxBandMembers];
+    const bool* elig = (section.solo_mode == SoloModeId::JAM)
+        ? build_solo_eligibility(config, tracks, num_tracks, jam_elig) : nullptr;
+    state.lead_member = select_initial_lead(config, seed, elig);
 
     // LongFill uses section bars, LickBuilder/Jam uses band's barsPerLead
     int bars_min, bars_max;
@@ -272,6 +319,10 @@ inline void advance_band_solo(
 ) {
     if (!state.active) return;
 
+    // Clear the per-bar handoff flag; the expiry block below sets it if a
+    // handoff happens THIS bar. The cpp render reads it AFTER this call.
+    state.just_handed_off = false;
+
     for (int m = 0; m < config.member_count; m++) {
         state.bars_since_lead[m]++;
     }
@@ -296,6 +347,12 @@ inline void advance_band_solo(
     }
 
     // LickBuilder and Jam: pull-ins and handoffs (same as existing advance logic)
+
+    // JAM leads must own a melodic track (a chordal-only member would no-op into a
+    // dead solo). Compute eligibility once and apply it to both lead selections below.
+    bool jam_elig[kMaxBandMembers];
+    const bool* elig = (section.solo_mode == SoloModeId::JAM)
+        ? build_solo_eligibility(config, tracks, num_tracks, jam_elig) : nullptr;
 
     // Drop expired pull-ins
     for (int m = 0; m < config.member_count; m++) {
@@ -324,22 +381,65 @@ inline void advance_band_solo(
         }
     }
 
+    // Pre-select next lead one bar before expiry and pull it toward ACTIVE so it
+    // rises into the handoff (overlap bridge bar).
+    if (state.lead_member >= 0 && state.pending_lead < 0 &&
+        state.member_bars_remaining[state.lead_member] == 1) {
+        int next = select_next_lead(config, state, seed, elig);
+        if (next != state.lead_member) {
+            state.pending_lead = next;
+            if (state.member_role[next] == MemberSoloRole::SUPPORT &&
+                !config.members[next].always_active) {
+                state.member_role[next] = MemberSoloRole::ACTIVE;
+            }
+        }
+    }
+
     // Handle lead expiry and handoff
     if (state.lead_member >= 0 &&
         state.member_bars_remaining[state.lead_member] <= 0) {
-        state.member_role[state.lead_member] = MemberSoloRole::SUPPORT;
+        int outgoing = state.lead_member;
+        int next = (state.pending_lead >= 0) ? state.pending_lead
+                                             : select_next_lead(config, state, seed, elig);
 
-        int next = select_next_lead(config, state, seed);
+        // Drum-lead gate: override `next` with the always_active drummer
+        // when conditions are met. Inserted AFTER next is computed, BEFORE roles.
+        bool drum_lead = should_drum_lead(section.solo_mode, state.last_handoff_was_drum, seed);
+        if (drum_lead) {
+            // pick the always_active drummer as the lead for this span
+            for (int m = 0; m < config.member_count; m++) {
+                if (config.members[m].always_active) { next = m; break; }
+            }
+            state.drum_lead_style =
+                static_cast<int>(pick_drum_lead_style(config.members[next].track_count, seed));
+            state.last_handoff_was_drum = true;
+        } else {
+            state.drum_lead_style = -1;
+            state.last_handoff_was_drum = false;
+        }
+
+        // Demote outgoing lead to ACTIVE for a trailing overlap bar;
+        // the "Drop expired pull-ins" sweep above will return it to SUPPORT
+        // once its member_bars_remaining reaches 0.
+        state.member_role[outgoing] = MemberSoloRole::ACTIVE;
+        state.member_bars_remaining[outgoing] = 1;
         state.lead_member = next;
         state.member_role[next] = MemberSoloRole::LEADING;
+        state.pending_lead = -1;
 
         int range = config.bars_per_lead_max - config.bars_per_lead_min + 1;
         if (range < 1) range = 1;
         state.member_bars_remaining[next] = config.bars_per_lead_min +
             static_cast<int>(pattern_rand01(seed) * range) % range;
 
-        state.phrase_cursor = 0;
-        std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
+        // NOTE: phrase_cursor + last_phrase intentionally NOT reset here.
+        // The outgoing phrase survives to the render block so improvisers_handoff()
+        // can bias the incoming soloist's interval weights toward the outgoing phrase.
+        // The render block resets phrase_cursor + last_phrase AFTER calling handoff.
+        // Signal to the render block that this bar is the first for the new lead;
+        // the render block will choose the lick octave and suppress the octave-jump
+        // mutation idiom so the incoming lick doesn't leap away from the outgoing note.
+        state.just_handed_off = true;
     }
 
     apply_band_solo_modifiers(tracks, config, state, num_tracks);
@@ -355,12 +455,18 @@ inline void clear_band_solo(
     state.active = false;
     state.lead_member = -1;
     state.phrase_cursor = 0;
+    state.pending_lead = -1;
     for (int m = 0; m < kMaxBandMembers; m++) {
         state.member_role[m] = MemberSoloRole::SUPPORT;
         state.member_bars_remaining[m] = 0;
         state.bars_since_lead[m] = 0;
     }
     std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
+    state.drum_lead_style = -1;
+    state.last_handoff_was_drum = false;
+    state.solo_lick_octave = -1;
+    state.outgoing_last_note = -1;
+    state.just_handed_off = false;
 
     clear_solo_modifiers(tracks, num_tracks);
 }

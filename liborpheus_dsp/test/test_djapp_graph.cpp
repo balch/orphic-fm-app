@@ -15,6 +15,11 @@ static void setup_pulsar_cosmic_techno(OrpheusEngine* engine) {
     engine->pulsar_playing.store(1);
     engine->pulsar_mix.store(1.0f);
     setup_cosmic_techno(engine);
+    // Pin a non-zero seed so pattern generation is reproducible. With pulsar_seed==0,
+    // load_vibe() re-stirs the RNG from wall-clock microseconds, so the generated bar
+    // (and thus the reverb/delay TAIL level on stop) varies run-to-run — the rms>0.0001
+    // tail assertions flaked when a sparse bar happened to land before the stop.
+    engine->pulsar_seed.store(0xDA77, std::memory_order_relaxed);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(128.0f);
 }

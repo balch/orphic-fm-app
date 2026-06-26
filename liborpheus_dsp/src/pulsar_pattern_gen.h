@@ -579,6 +579,87 @@ inline int lick_octave_base(int lick_octave, uint8_t root_note,
     return base;
 }
 
+// Canonical degree → MIDI note helper used by both generate_lick_pattern /
+// bar_strategy_call_response AND choose_lick_octave in pulsar_handoff.h.
+// Wraps scale_degree into [0, scale.count) tracking octave offset, then
+// computes: root + lick_octave_base(lick_octave,...) + octave*12 + scale.degrees[d].
+// chord_degree is always 0 for the lick renderer (no chord transposition on the
+// solo line), so we omit it here to keep the signature minimal.
+// note_range_low/high are only used when lick_octave == -1 (auto) — callers that
+// already hold an explicit octave may pass 0, 127 as dummies.
+inline int lick_degree_to_midi(int scale_degree, int root,
+                               const PulsarScale& scale,
+                               int lick_octave,
+                               int note_range_low = 0,
+                               int note_range_high = 127) {
+    int d = scale_degree;
+    int octave = 0;
+    while (d < 0)            { d += scale.count; octave--; }
+    while (d >= scale.count) { d -= scale.count; octave++; }
+    int base = lick_octave_base(lick_octave,
+                                static_cast<uint8_t>(root),
+                                static_cast<uint8_t>(note_range_low),
+                                static_cast<uint8_t>(note_range_high));
+    return std::max(0, std::min(127, root + base + octave * 12 + scale.degrees[d]));
+}
+
+// Inverse of lick_degree_to_midi at octave 0: map a MIDI note to a scale degree
+// (octave*count + nearest in-scale index). Used to snapshot an existing pattern
+// into a lick contour. Out-of-scale notes snap to the nearest scale tone.
+inline int midi_to_lick_degree(int midi, int root, const PulsarScale& scale) {
+    if (scale.count <= 0) return 0;
+    int rel = midi - root;
+    int octave = (rel >= 0) ? (rel / 12) : -(((-rel) + 11) / 12);  // floor div
+    int pc = ((rel % 12) + 12) % 12;
+    int best = 0, bestDist = 128;
+    for (int i = 0; i < scale.count; i++) {
+        int dd = std::abs(static_cast<int>(scale.degrees[i]) - pc);
+        if (dd < bestDist) { bestDist = dd; best = i; }
+    }
+    return octave * scale.count + best;
+}
+
+// Build a lick contour from a track's gated steps (degree + duration + velocity),
+// so a Jam/lick-less solo has a shared evolving line to hand around. Returns length.
+//
+// midi_to_lick_degree returns a NEGATIVE degree for any source note below `root`,
+// but the lick renderer (generate_lick_pattern / bar_strategy_call_response) treats
+// scale_degree < 0 as a REST. Emitting raw negatives would silence every below-root
+// note (the DogHouse lick-less fallback bug). So we octave-shift the ENTIRE contour
+// up by whole scale octaves until the lowest degree is >= 0. Shifting all degrees by
+// the same multiple of scale.count is musically transparent (preserves pitch class
+// and the interval contour; the renderer re-bases the absolute octave via lick_octave).
+inline int synthesize_lick_from_steps(const PulsarStep* steps, int step_count,
+                                      int root, const PulsarScale& scale,
+                                      int8_t* out_degrees, float* out_durations,
+                                      float* out_velocities, int max_out) {
+    if (scale.count <= 0) return 0;
+    // First pass: collect raw degrees (may be negative) and track the minimum so
+    // the whole contour can be shifted up together, preserving its shape.
+    int raw[kMaxLickSteps];
+    int cap = (max_out < kMaxLickSteps) ? max_out : kMaxLickSteps;
+    int n = 0;
+    int min_deg = 0;
+    for (int i = 0; i < step_count && n < cap; i++) {
+        if (!steps[i].gate) continue;
+        int d = midi_to_lick_degree(steps[i].note, root, scale);
+        raw[n] = d;
+        if (d < min_deg) min_deg = d;
+        out_durations[n] = steps[i].duration;
+        out_velocities[n] = steps[i].velocity;
+        n++;
+    }
+    // Octave-shift the whole contour so the lowest degree is non-negative.
+    int shift = 0;
+    if (min_deg < 0) shift = ((-min_deg + scale.count - 1) / scale.count) * scale.count;
+    for (int i = 0; i < n; i++) {
+        int d = raw[i] + shift;
+        if (d < 0) d = 0; if (d > 127) d = 127;
+        out_degrees[i] = static_cast<int8_t>(d);
+    }
+    return n;
+}
+
 // ---------------------------------------------------------------------------
 // Lick pattern generator: melodic tracks driven by AI-generated lick data
 // ---------------------------------------------------------------------------
@@ -735,5 +816,56 @@ inline void generate_track_pattern(
                                 hold_probability, hold_length_min, hold_length_max,
                                 density_override, note_range_low_override, note_range_high_override,
                                 engine_note_min);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bass solo articulation pass
+// ---------------------------------------------------------------------------
+
+// Slap ghost signature — short duration + high velocity. Kept as named constants so
+// the insert and the idempotency-strip below agree on what a prior slap looks like.
+static constexpr float kBassSlapVelocity = 0.9f;
+static constexpr float kBassSlapDuration = 0.15f;
+
+// Articulate the bass when it leads a solo: accent beat positions and insert sparse
+// syncopated percussive slap ghost-notes on empty off-beats. Operates in place.
+// slap_density (~0.35 sparse) scales the off-beat slap probability. The slap note is
+// the most recent preceding gated bass pitch, with a short duration + high velocity so
+// it re-attacks as a percussive ghost (it lands on a rest, so no glide slurs into it).
+//
+// IDEMPOTENT under repeated application: this runs once per bar, but in JAM mode the
+// bass substrate may not be regenerated, so the SAME buffer is articulated bar after
+// bar. To avoid piling slaps onto every off-beat and creeping velocities to full scale
+// (a sparse bass solo turning into a loud constant 16th-slap line), it (1) strips any
+// slap inserted by a prior pass before re-inserting, and (2) uses max-toward-floor
+// accents instead of additive boosts so accented beats settle at a fixed level.
+inline void articulate_bass_solo(PulsarStep* steps, int step_count,
+                                 float slap_density, uint32_t& seed) {
+    if (step_count <= 0) return;
+    // (1) Strip slaps inserted by a previous pass (gated off-beat steps carrying the
+    // slap signature) so re-articulating a non-regenerated buffer can't accumulate.
+    for (int i = 1; i < step_count; i += 2) {
+        if (steps[i].gate &&
+            steps[i].duration == kBassSlapDuration &&
+            steps[i].velocity == kBassSlapVelocity) {
+            steps[i] = make_step(0, 0.0f, false, 0.0f);
+        }
+    }
+    uint8_t last_note = 36;  // default low bass note if none seen yet
+    for (int i = 0; i < step_count; i++) {
+        if (steps[i].gate) {
+            last_note = steps[i].note;
+            // (2) Beat-position accents as idempotent floors (max, not additive): strong
+            // on the quarter (i%4==0), medium on the eighth (i%2==0). max() preserves
+            // already-louder source notes and never creeps past the floor on repeats.
+            if (i % 4 == 0)      steps[i].velocity = std::max(steps[i].velocity, 0.85f);
+            else if (i % 2 == 0) steps[i].velocity = std::max(steps[i].velocity, 0.70f);
+        } else if ((i % 2) == 1 && slap_density > 0.0f) {
+            // Empty off-beat: sparse slap ghost.
+            if (pattern_rand01(seed) < slap_density * 0.5f) {
+                steps[i] = make_step(last_note, kBassSlapVelocity, true, kBassSlapDuration);
+            }
+        }
     }
 }

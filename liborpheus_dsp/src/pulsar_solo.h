@@ -367,3 +367,46 @@ inline void record_solo_note(
         state.phrase_cursor++;
     }
 }
+
+// Nearest chord tone (1-3-5 of the chord on chord_degree) to `degree`, octave-shifted
+// into degree's neighborhood so anchoring doesn't introduce a leap.
+inline int nearest_chord_tone_degree(int degree, int chord_degree, int scale_count) {
+    if (scale_count <= 0) return degree;
+    int cand[3] = { chord_degree, chord_degree + 2, chord_degree + 4 };
+    int best = degree, bestDist = 1 << 30;
+    for (int k = 0; k < 3; k++) {
+        int c = cand[k];
+        while (c - degree >  scale_count / 2) c -= scale_count;
+        while (degree - c >  scale_count / 2) c += scale_count;
+        int dist = std::abs(c - degree);
+        if (dist < bestDist) { bestDist = dist; best = c; }
+    }
+    return best;
+}
+
+// Create-mode: generate a fresh chord-anchored improvised line into steps[] for the
+// Jam lead, recording the phrase for cross-soloist carryover.
+inline void generate_jam_solo_line(SoloBehaviorParam& behavior, BandSoloState& solo_state,
+                                   PulsarStep* steps, int step_count,
+                                   int root, const PulsarScale& scale, int chord_degree,
+                                   int octave, int& current_degree,
+                                   float solo_progress, uint32_t& seed) {
+    if (step_count <= 0 || scale.count <= 0) return;
+    for (int s = 0; s < step_count; s++) {
+        int degree = markov_next_note(behavior, current_degree, scale.count, solo_progress, seed);
+        if (degree == -1 || degree == -2) {        // rest / hold -> no new attack
+            steps[s] = make_step(0, 0.0f, false, 0.0f);
+            continue;
+        }
+        current_degree = degree;
+        record_solo_note(solo_state, degree);
+        int eff = degree;
+        if ((s % 4) == 0) eff = nearest_chord_tone_degree(degree, chord_degree, scale.count);
+        int d = ((eff % scale.count) + scale.count) % scale.count;
+        int oct_off = (eff - d) / scale.count;     // exact since eff-d is a multiple of count
+        int note = root + octave * 12 + oct_off * 12 + scale.degrees[d];
+        if (note < 24) note = 24; if (note > 96) note = 96;
+        float vel = 0.6f + 0.3f * ((s % 4) == 0 ? 1.0f : 0.4f);  // accent downbeats
+        steps[s] = make_step(static_cast<uint8_t>(note), vel, true, 0.5f);
+    }
+}

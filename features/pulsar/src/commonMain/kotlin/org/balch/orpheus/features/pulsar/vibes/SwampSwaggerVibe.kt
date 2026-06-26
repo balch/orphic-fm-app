@@ -1,10 +1,6 @@
 package org.balch.orpheus.features.pulsar.vibes
 
-import dev.zacsweers.metro.ContributesIntoSet
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
-import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -61,8 +57,11 @@ import org.balch.orpheus.features.pulsar.models.row
  * thirds the scale can't spell. Builds through a 6-section arc to a climactic
  * stomping outro.
  */
-@Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+// PARKED — intentionally NOT contributed to the VibeProvider set, so Swamp Swagger
+// does not appear in the picker (WIP, not shipping yet). To re-enable, restore:
+//   import dev.zacsweers.metro.{Inject, ContributesIntoSet, binding}
+//   import org.balch.orpheus.core.di.FeatureScope
+//   @Inject @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class SwampSwaggerVibe : VibeProvider {
     override val name: String = "Swamp Swagger"
 
@@ -254,11 +253,11 @@ class SwampSwaggerVibe : VibeProvider {
                     noteRangeHigh = 72,
                     reverbSend = 0.20f,
                     delaySend = 0.18f,
-                    glideRate = 0.45f, // the slide
+                    glideRate = 0.25f, // the slide
                 ).let { slide ->
                     TrackVoice(
                         engineEdm = slide,
-                        engineSpace = slide.copy(engineId = OrpheusEngineId.FM),
+                        engineSpace = slide.copy(engineId = OrpheusEngineId.CSAW),
                         role = TrackRole.Melodic(
                             chordFollow = ChordFollow.FOLLOW,
                             lickMode = LickMode.Fill,

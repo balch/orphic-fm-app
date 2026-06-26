@@ -44,7 +44,8 @@ inline void init_live_lick(
 inline void mutate_live_lick(
     int8_t* degrees, float* durations, float* velocities, int length,
     float creativity, uint32_t& seed,
-    const int8_t* base_degrees = nullptr, int max_degree_drift = 14
+    const int8_t* base_degrees = nullptr, int max_degree_drift = 14,
+    bool allow_octave_jump = true
 ) {
     if (length <= 0) return;
 
@@ -71,9 +72,9 @@ inline void mutate_live_lick(
             velocities[i] = std::max(0.1f, std::min(1.0f, velocities[i] + delta));
         }
 
-        // Octave jump (high creativity only)
+        // Octave jump (high creativity only) — suppressed on the first post-handoff bar
         roll = pattern_rand01(seed);
-        if (roll < creativity * 0.1f) {
+        if (allow_octave_jump && roll < creativity * 0.1f) {
             int octave = (pattern_rand01(seed) > 0.5f) ? 7 : -7;
             degrees[i] = static_cast<int8_t>(degrees[i] + octave);
         }
