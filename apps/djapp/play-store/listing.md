@@ -11,7 +11,7 @@ comments, and recover the text if you need to re-submit.
 
 | Field | Value |
 |-------|-------|
-| App name | `Orphic DJ: Generative Music` *(Play store title, 27 chars — keyword-bearing; title is Play's highest-weight ranking field and "Orphic" has ~zero search pull, so the descriptor earns its place. On-device launcher label stays `Orphic DJ`.)* |
+| App name | `Orphic DJ: Play It Live` *(Play store title, 23 chars. Leads with the live/interactive hook, the app's real differentiator, and exits the contested "generative music" keyword. Title is Play's highest-weight ranking field. On-device launcher label stays `Orphic DJ`.)* |
 | Default language | English (US) |
 | Category — primary | Music & Audio |
 | Category — secondary | _(optional, see "Tags" below)_ |
@@ -27,7 +27,7 @@ This is the line that appears under the app name in search results and on the
 detail page. It's the most read piece of copy in the listing — your one-line
 pitch.
 
-**Easy. Playful. Infinite. Free generative music for focus, sleep & parties.**
+**Easy. Playful. Infinite. Live electronic music for focus, sleep & parties.**
 
 ### Constraints
 
@@ -45,9 +45,9 @@ Shown on the listing detail page. Most users scan; few read every word. Format
 matters more than total length.
 
 ```
-Orphic DJ is an interactive album of original generative music that composes itself, live on your device, endlessly. Press play, and no two listens are ever the same.
+Orphic DJ is live electronic music you perform with four knobs. No decks, no skills, no two performances alike. Twist Energy, Complexity, Mood, and Space and the music reshapes around you in real time. Open the DJ module to drop effects and ride the mix. Underneath, it composes itself endlessly, so every performance is a piece that never repeats.
 
-No streaming. No library. No playlists. Just four knobs and music that never repeats.
+No streaming. No library. No playlists. Just four knobs and music you play.
 
 WHAT YOU CONTROL
 Four knobs shape the entire mix:
@@ -57,7 +57,7 @@ Four knobs shape the entire mix:
 • Space: from intimate and dry to vast and reverberant
 
 WHAT'S INSIDE
-• 11 original vibes
+• 9 original vibes
 • 11 live visualizations
 • 8 generative tracks
 • 5 mixer controls

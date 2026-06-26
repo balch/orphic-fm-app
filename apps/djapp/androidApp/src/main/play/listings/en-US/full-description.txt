@@ -1,6 +1,6 @@
-Orphic DJ is an interactive album of original generative music that composes itself, live on your device, endlessly. Press play, and no two listens are ever the same.
+Orphic DJ is live electronic music you perform with four knobs. No decks, no skills, no two performances alike. Twist Energy, Complexity, Mood, and Space and the music reshapes around you in real time. Open the DJ module to drop effects and ride the mix. Underneath, it composes itself endlessly, so every performance is a piece that never repeats.
 
-No streaming. No library. No playlists. Just four knobs and music that never repeats.
+No streaming. No library. No playlists. Just four knobs and music you play.
 
 WHAT YOU CONTROL
 Four knobs shape the entire mix:
@@ -10,7 +10,7 @@ Four knobs shape the entire mix:
 • Space: from intimate and dry to vast and reverberant
 
 WHAT'S INSIDE
-• 11 original vibes
+• 9 original vibes
 • 11 live visualizations
 • 8 generative tracks
 • 5 mixer controls
