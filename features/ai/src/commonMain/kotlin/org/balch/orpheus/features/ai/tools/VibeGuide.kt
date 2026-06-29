@@ -1,0 +1,180 @@
+package org.balch.orpheus.features.ai.tools
+
+/**
+ * Hand-curated composition guide handed to the in-app agent before it builds a vibe — the musical
+ * semantics of the dev vibe-creator skill, reshaped for an author emitting JSON (all Kotlin/DI/Gradle
+ * scaffolding removed). Pairs with the dynamic catalog (vibeFingerprint) appended by buildGuide.
+ *
+ * Source of truth for the prose: .claude/skills/vibe-creator/SKILL.md. When that skill's musical
+ * guidance changes, update this constant too (they serve different audiences and neither the skill
+ * markdown nor the model KDoc is reachable at app runtime).
+ */
+internal const val STATIC_GUIDE: String = """
+# Building a Pulsar vibe — composition guide
+
+You edit an existing vibe's JSON into a new one. First understand what each control does, then pick
+the closest existing vibe from the catalog below and re-tune every parameter with intent. Do not
+reskin one template by changing only bpm and root — that is what makes vibes feel samey.
+
+## 1. The frame
+- bpm: tempo. rootNote, scaleType: the key and mode (set the mode to the feel — PHRYGIAN/MINOR dark,
+  MAJOR/LYDIAN bright, DORIAN/MIXOLYDIAN bluesy-modal, the BLUES scales for blues/rock).
+- envelopeType: AD (plucky/percussive) vs AR/ASR (sustained/pad-like).
+- energy / complexity / space / mood / deep (0..1): the starting position of the four live macros
+  plus 'deep'. energy = busier+harder, complexity = more rhythmic variation, space = wetter/roomier,
+  mood = brighter vs darker. These are the *initial* macro values the user then performs live.
+
+## 2. Groove (GenreProfile)
+swingAmount (0 = straight, ~0.3+ = heavy shuffle), ghostProbability (quiet in-between hits),
+rhythmDensity, progressionStyle (chord-movement flavour: POP/BLUES/JAZZ/MODAL/...), chordsPerBar,
+and customProgression (explicit scale-degree list, degrees 0..6). Recall the reference song's
+tempo/key/progression yourself and set these to match.
+
+## 3. Tracks, roles, engine families
+Exactly 8 tracks. Each track has a role — Percussive, Melodic, or Chordal — and an engine id that
+must stay in its role family:
+- drums: BD / SD / HH / NSE / PAR
+- bass: WSH / VCF / PD / VA / DX
+- keys: DX2
+- lead: DX3 / WSH / FM / WTB
+- pad: ENS / STR / CHD / GRN / ADD
+- texture: MOD / PAR / SPK / SWM / NES / TRN
+Keep each track's engine within its family when you swap sounds.
+
+## 4. The DX / DX2 / DX3 patch-selector gotcha
+For the DX engines, 'harmonics' is NOT a tone knob: it selects one of 32 FM patch banks (quantized,
+auto-pinned). Changing it changes the *patch*, not the brightness. Set it deliberately to choose the
+voice, and leave it alone if you only want a timbre tweak.
+
+## 5. Macros + macroMap
+The four live knobs (energy/complexity/space/mood) reshape per-track parameters through each track's
+macroMap. Four presets cover most cases:
+- RHYTHM: energy gates volume + density; complexity drives swing and variation. Good for drums and
+  bass tracks that should punch harder as energy rises.
+- MELODIC: mood sweeps harmonics and timbre through a musical tonal range; energy lifts density and
+  volume. Use for lead and keys tracks where the mood knob should change the voice color.
+- EFFECT: energy and space together modulate the FX voice; volume is intentionally attenuated so the
+  effect sits under the mix rather than over it. Good for texture and FX tracks.
+- WILD: all four macros modulate aggressively across their full ranges. Reserve for tracks that
+  should behave unpredictably when the user pushes the knobs.
+
+When none of the presets fit, supply a custom macroMap with seven min/max pairs (one per dimension):
+energyVolume, energyDensity, complexitySwing, complexityVariation, spaceDecay, moodHarmonics,
+moodTimbre. Each dimension maps one macro to one parameter at render time. Interpolation is linear:
+value = min + macro × (max − min). A min > max gives an inverted response. Use min == max to lock a
+parameter while still letting tension-evolution drift it. Setting moodTimbre to (0, 0) opts the track
+entirely out of tension-evolution. For DX/DX2/DX3 tracks, harmonics is auto-pinned, so moodHarmonics
+is effectively locked by the engine regardless of the macroMap range.
+
+## 6. Tension arc (TensionProfile)
+innerBars sets the primary build-and-release cycle length (4 = tight phrase, 8 = longer, 16 = epic).
+outerBars adds a secondary envelope (0 = disabled; 16-32 for long macro arcs). outerDepth (0..1)
+controls how much the outer cycle modulates the inner.
+
+Important: innerBars < 7 disables the octave climax and spurt behaviours — the tension sawtooth
+still runs but its peak-time events (octave shift, chromatic passing, spurts) are gated off. Keep
+innerBars >= 8 if you want those moments. volume (0..1) = how much tension affects track gains;
+timing (0..1) = how much it tightens or loosens step timing. tonal.octaveShift and tonal.keyShift
+let tension briefly push the melody up an octave or shift key at the peak.
+
+## 7. Sections (Arrangement)
+A section graph lets the vibe tell a story: intro → verse → chorus → solo → breakdown → outro. Each
+section has barsMin/Max (how long it lives before picking a transition), macroOverrides (multipliers
+on the four live macros — 1.0 = unchanged, 1.4 = 40% boost), and optional trackOverrides (apply a
+change to one specific track for this section only, auto-restored on exit).
+
+Transitions carry an optional transitionBars field: when non-zero, the section crossfades its macro
+overrides toward the next section over that many bars before the cut, creating a pre-roll ramp
+instead of a hard switch. Use this on chorus→breakdown (energy needs a few bars to come down) and
+on verse→chorus (build-up anticipation). Name the bar count after its musical role, not the number.
+
+soloMode on a section activates the band's soloist: Jam(probability) for free improvisation,
+LickBuilder(probability, mutationRate) for melodic construction, LongFill for extended fills.
+
+To peg a lead voice on the tonic while other tracks follow the progression — and as the standard
+fix when a lick lurches on leaping progressions — use trackOverrides keyed by the track index as a
+string: "trackOverrides": { "4": { "chordFollow": "FIXED" } }. All TrackSectionOverride fields
+are optional; only set what you need to change (density, volume, reverbSend, delaySend,
+envelopeProfile, compingStyle, sectionInversion, arpMode, chordFollow, holdProbability,
+holdLengthMin, holdLengthMax). Settings restore automatically when the section ends.
+
+A simple 5-section shape: intro (sparse, low energy) → groove (full band, macro baseline) → peak
+(energy × 1.3, complexity × 1.3) → breakdown (energy × 0.4, space × 1.5) → outro (sparse, fade).
+
+## 8. Effects (VibeEffects)
+Two delay taps (delayTimeA/B as a fraction of one bar: 0.25 = 16th, 0.375 = dotted-8th, 0.5 = half
+bar) plus delayFeedback (0.2 = subtle, 0.5 = moderate, 0.7+ = building) and delayDamping (how dark
+each repeat gets — higher = darker). Reverb: reverbSize (0.3 = room, 0.6 = hall, 0.9 = cathedral),
+reverbDamping (low-pass on the tail), reverbBrightness (0.3 = warm/dark, 0.8 = shimmery). deepFloor
+sets the minimum DEEP multiplier even when the SPACE macro is at zero — use 0.2–0.4 to keep some
+effects presence even at the driest setting.
+
+Per-track: each OrpheusEngine has delaySend + reverbSend (0..1). Leads get moderate sends, pads
+generous, drums usually dry. Match the reverb character to the mood: dark vibes use low
+reverbBrightness; bright/ambient vibes push it high.
+
+## 9. Translation recipes — feel -> settings
+The highest-value part: translate a described feel into concrete parameter choices.
+
+### Feel and groove
+- Straight / mechanical / industrial: swingAmount = 0.0, low timing tension, barStrategy = REPEAT
+  on drums, lickMutation <= 0.4. Everything locks to the grid; nothing wanders.
+- Shuffled / bluesy: swingAmount = 0.1–0.3, rhythmDensity = BACKBEAT, progressionStyle = BLUES.
+  Ghost notes (ghostProbability 0.2–0.3) fill the pocket.
+- Loose / human / swung: swingAmount = 0.05–0.15, ghostProbability = 0.2–0.35, humanization dialed
+  up on comping tracks. Nothing is perfectly on the grid.
+- Hypnotic / loop-based: progressionAnchor = EVERY_8, progressionDriftRange < 0.2, barStrategy =
+  REPEAT on bass. The loop repeats before the Markov engine wanders too far.
+- Sliding / pedal-steel / glide feel: glideRate 0.35–0.55 on bass and lead melodic tracks.
+  Portamento is per-track — set it on every track that should slide.
+- Distorted / aggressive: harder engines (WSH, VCF), higher energy, denser rhythm.
+
+### Darkness / mood
+- Dark / brooding / heavy: mood <= 0.3, scaleType = MINOR or PHRYGIAN, progressionStyle = DARK,
+  reverbBrightness < 0.4, low rootNote register.
+- Bright / uplifting: mood >= 0.6, MAJOR or MIXOLYDIAN scale, POP or ASCENDING progression,
+  higher reverbBrightness, fuller pads with generous reverb send.
+- Exotic / suspended: HIRAJOSHI, IN_SEN, or WHOLE_TONE scale with MODAL or DRONE progression.
+
+### Texture / production
+- Wet / spacious / reverb-heavy: space >= 0.6, deep >= 0.6, reverbSize >= 0.6, generous per-track
+  reverbSend, high deepFloor so effects don't disappear at low SPACE settings.
+- Dry / in-your-face: space <= 0.3, reverbSize <= 0.35, sparse delaySend + reverbSend.
+- Distorted / gritty: WSH or VCF engine on bass and lead, higher harmonics and timbre values.
+- Clean / polished: VA, PD, or CHD engines; moderate harmonics, lower timbre.
+
+### Energy / drums
+- 4-on-the-floor kick: rhythmDensity = FOUR_ON_FLOOR, kick density ~0.5, barStrategy = REPEAT.
+- Backbeat (rock/hip-hop): rhythmDensity = BACKBEAT, snare on 2 and 4.
+- Dense 16ths (DnB/techno): rhythmDensity = DENSE_16TH, high-hat density 0.6–0.8.
+- Minimal / ambient: rhythmDensity = SPARSE, drum density < 0.2, or replace drum tracks with
+  modal/particle hits using MOD or PAR engines at very low density.
+
+### Chord harmony
+- Clear progression: use customProgression with 0-indexed scale degrees 0–6 (e.g. [0, 3, 5, 6]
+  for a I–IV–VI–VII riff). Size 1–12.
+- Static / dronal: progressionStyle = DRONE or customProgression = [0] (single tonic).
+- Per-chord glide: set glideRate on the individual track (bass or lead) so notes slide into
+  chord changes; glideRate 0.35–0.55 produces a portamento feel into that chord step.
+- Jazz substitutions: when no progressionStyle preset covers the movement, supply a 7x7
+  chordTransitionMatrix as a 7-element array of 7-element arrays (row = current chord degree,
+  column = next; values are relative weights).
+- chordsPerBar = 1 → slow (one chord per bar); 2 = standard; 4 = busy.
+
+### Lick / riff
+- Repetitive 2-note riff (garage rock, industrial): 2 steps with long durations, lickMutation <= 0.3,
+  lickMode = Fill. The riff locks in and barely drifts.
+- Walking bass line: longer lick (6–8 steps) with varied scale degrees, loopLength matches the phrase,
+  moderate lickMutation (0.3–0.5) for a living feel.
+- Static drone with embellishment: single-note lick with long duration, low-velocity accents, and
+  chordFollow = FIXED so the pitch does not chase chord changes.
+- Negative scaleDegree = rest in that step's slot — use this for stop-time: hit, hit, rest, walk-up.
+
+## 10. Invariants & failure modes
+- There are exactly 8 tracks. Do not add or remove tracks.
+- Progression / customProgression degrees are 0..6 (seven scale degrees).
+- Band matrices are square; chordTransitionMatrix is 7x7.
+- Bass should use chordFollow = ROOT_ONLY to stay in key (don't let it chase chord tones out of key).
+- Use FIXED chordFollow sparingly on melodic/chordal tracks — it pins a track off the chord progression; most tracks want FOLLOW.
+- For DX/DX2/DX3, set 'harmonics' deliberately (it picks a patch bank, see section 4).
+"""

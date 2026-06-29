@@ -278,7 +278,11 @@ class OrpheusAgentConfig(
         (NOT a title; the title goes in 'name'); rootNote/scaleType/envelopeType are also enums. When unsure
         of a field's type or allowed values, call pulsar_vibe_schema — it returns the full schema (every
         field's type and the exact enum vocabulary).
-        1. Call pulsar_get_vibe with a close template name (or 'current' to tweak what is playing).
+        0. Call pulsar_vibe_guide FIRST. It returns how each control shapes the sound, the
+           feel->settings recipes, and a catalog of the existing vibes (key/tempo/progression/engines).
+           Use it to learn the controls and to choose the closest-fitting vibe as your starting template.
+        1. Call pulsar_get_vibe with the template name you chose from the catalog (or 'current' to
+           tweak what is playing) to get its full JSON.
         2. Edit the returned JSON to match the request — bpm, rootNote, scaleType, genre.customProgression,
            per-track engines, arrangement. Recall the reference song's key/tempo/progression yourself.
         Instruments: keep each track's engine in its role family (drums BD/SD/HH; bass WSH/VCF/PD/VA;

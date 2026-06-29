@@ -78,7 +78,8 @@ class VibeReadTool(
             name = "pulsar_get_vibe",
             description = """
                 Read an existing Pulsar beat-machine vibe as JSON so you can edit it into a new vibe.
-                ALWAYS start here: pass a known-good vibe name (or 'current' for what is playing) to get
+                Call pulsar_vibe_guide first for what the fields mean and which template to start from.
+                Pass a known-good vibe name (or 'current' for what is playing) to get
                 a complete, valid template, then change only the fields you need and send it to
                 pulsar_apply_vibe. Never write a vibe from scratch — edit a template.
                 Keep each track's engine in its role family; for DX/DX2/DX3, 'harmonics' selects a
