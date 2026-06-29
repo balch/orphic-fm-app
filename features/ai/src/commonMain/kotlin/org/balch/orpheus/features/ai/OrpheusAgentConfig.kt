@@ -39,8 +39,26 @@ class OrpheusAgentConfig(
     /** Model to use for the agent - uses user's selection */
     val model: LLModel get() = aiModelProvider.currentKoogModel
 
-    /** Maximum iterations before the agent stops */
+    /**
+     * Session-global hard stop: total graph node executions across the WHOLE conversation (one Koog
+     * run()). A monotonic counter that never resets per turn, so this is the ultimate net, not a
+     * per-turn backstop. See [maxToolRoundsPerTurn] for the per-turn guard.
+     */
     val maxAgentIterations = 100
+
+    /**
+     * Per-turn backstop: the maximum number of tool-result round-trips the model may take within a
+     * single user turn before the graph force-ends the turn (see [agentStrategy]). Resets at every
+     * turn boundary. A non-terminating model (one that keeps calling tools instead of replying) is
+     * stopped here regardless of prompt adherence. Sized comfortably above the heaviest legitimate
+     * single-turn flow (the tutorial/explain workflow batches several synth_control calls per round,
+     * so it lands well under this) while still bounding a runaway build loop.
+     */
+    val maxToolRoundsPerTurn = 16
+
+    /** Shown as Orpheus's reply when a turn is force-ended by [maxToolRoundsPerTurn]. */
+    val turnToolBudgetMessage =
+        "I have woven a great deal into that one. Take a listen, then tell me what you would like to reshape."
 
     /** System instruction defining Orpheus persona */
     val systemInstruction = """
@@ -296,6 +314,12 @@ class OrpheusAgentConfig(
         a plain-text reply between those tool calls. A plain-text reply pauses you to wait for the user and
         abandons the build half-finished. Save your one or two sentence description for AFTER
         pulsar_apply_vibe succeeds.
+        STOP AFTER A SUCCESSFUL APPLY. Call pulsar_apply_vibe EXACTLY ONCE per request. The moment it
+        returns success=true the vibe is live and playing, so you are DONE: reply with your one or two
+        sentence description and end your turn. Do NOT call pulsar_get_vibe, pulsar_vibe_schema,
+        pulsar_apply_vibe, or any other tool again to verify, re-read, re-apply, polish, or refine the
+        vibe. Re-tune ONLY when the user comes back and explicitly asks for a change. Your text reply is
+        what ends the turn; without it you will loop forever.
         Naming: always invent an evocative ORIGINAL name that captures the feel — never use a real
         artist, band, song, or album name. If pulsar_apply_vibe returns success=false, fix the JSON per
         the message and try again.
@@ -361,10 +385,22 @@ class OrpheusAgentConfig(
         onAssistantMessage: suspend (String) -> String,
         onReasoning: (String) -> Unit = {},
     ) = strategy(name = name) {
+        // Per-turn tool-round counter. Graph nodes run sequentially in one coroutine, so a plain var
+        // is race-free here (parallel=true only fans out tools WITHIN a single nodeExecuteTool). It
+        // counts LLM tool-result continuations this turn and is reset at the turn boundary
+        // (nodeAssistantMessage). When it reaches maxToolRoundsPerTurn the graph force-ends the turn.
+        var toolRoundsThisTurn = 0
+
         val nodeRequestLLM by nodeLLMRequestStreaming().transform { it.collapseToMessage(onReasoning) }   // CHANGED
-        val nodeAssistantMessage by node<String, String> { message -> onAssistantMessage(message) }
+        val nodeAssistantMessage by node<String, String> { message ->
+            toolRoundsThisTurn = 0   // turn is ending; reset the per-turn tool budget
+            onAssistantMessage(message)
+        }
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
-        val nodeSendToolResult by nodeLLMSendToolResultsStreaming().transform { it.collapseToMessage(onReasoning) }   // CHANGED
+        val nodeSendToolResult by nodeLLMSendToolResultsStreaming().transform {
+            toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
+            it.collapseToMessage(onReasoning)
+        }   // CHANGED
         val nodeCompressHistory by nodeLLMCompressHistory<ReceivedToolResults>()
 
         edge(nodeStart forwardTo nodeRequestLLM)
@@ -385,6 +421,17 @@ class OrpheusAgentConfig(
             nodeExecuteTool forwardTo nodeFinish
                     onCondition { it.toolResults.singleOrNull()?.tool == "__exit__" }
                     transformed { it.toolResults.single().result?.toString() ?: "Unknown" }
+        )
+
+        // Per-turn backstop: a model that keeps calling tools without ever replying is force-stopped
+        // here. We stop AFTER nodeExecuteTool (the just-run tool calls already have their results in
+        // history) rather than after nodeSendToolResult (which would leave a dangling tool_use with no
+        // tool_result and break the next turn's request). Declared before the continuation edges so
+        // first-match resolution lets it win when the budget is spent.
+        edge(
+            nodeExecuteTool forwardTo nodeAssistantMessage
+                    onCondition { toolRoundsThisTurn >= maxToolRoundsPerTurn }
+                    transformed { turnToolBudgetMessage }
         )
 
         edge(
