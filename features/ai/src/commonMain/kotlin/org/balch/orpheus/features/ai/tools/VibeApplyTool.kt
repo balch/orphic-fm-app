@@ -1,0 +1,156 @@
+package org.balch.orpheus.features.ai.tools
+
+import ai.koog.agents.core.tools.Tool
+import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
+import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.VibeCreateEventBus
+import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.LickMode
+import org.balch.orpheus.features.pulsar.models.Vibe
+
+/**
+ * JSON config for decoding agent-emitted vibes.
+ *
+ * `coerceInputValues` makes an unknown *enum* value on a field WITH a default (e.g. the agent
+ * writing a title into the `album` enum) fall back to that default instead of throwing.
+ *
+ * The `polymorphicDefaultDeserializer` entries do the same for the *sealed* "enum-like" types
+ * (all parameterless objects): when the agent invents a style that isn't in the set — e.g.
+ * `CompingStyle.ORGAN_PAD` at `$.tracks[].role.comping.style` — the unknown subtype falls back to
+ * the default subtype rather than crashing the whole decode. coerceInputValues does NOT cover
+ * polymorphic subtypes, only enums, so this is the polymorphic analog. Structural sealed types
+ * (TrackRole/SoloMode/PitchEvolution, which carry parametrized data-class subtypes) are left
+ * strict on purpose, so a genuinely malformed role still surfaces for self-correction.
+ *
+ * Essential, default-less fields (name/bpm/rootNote/scaleType/genre/tracks) stay strict too.
+ */
+internal val vibeApplyJson = Json {
+    encodeDefaults = true
+    ignoreUnknownKeys = true
+    coerceInputValues = true
+    serializersModule = SerializersModule {
+        polymorphicDefaultDeserializer(CompingStyle::class) { CompingStyle.PAD.serializer() }
+        polymorphicDefaultDeserializer(LickMode::class) { LickMode.None.serializer() }
+    }
+}
+
+@LLMDescription("Arguments for applying a Pulsar vibe (built by editing a pulsar_get_vibe template) to the live engine.")
+@Serializable
+data class VibeApplyArgs(
+    @property:LLMDescription("A complete Pulsar vibe as JSON. Get a template from pulsar_get_vibe, edit it, and pass the whole edited JSON here. Use an evocative ORIGINAL name — never a real artist/band/song/album name.")
+    val vibeJson: String,
+)
+
+@LLMDescription("Result of applying a vibe. On failure, message explains what to fix; correct the JSON and call pulsar_apply_vibe again.")
+@Serializable
+data class VibeApplyResult(
+    @property:LLMDescription("True if the vibe was valid and is now playing.")
+    val success: Boolean,
+    @property:LLMDescription("Status, or the exact reason the vibe was rejected so you can fix it.")
+    val message: String,
+    @property:LLMDescription("The name of the vibe that was applied, or null on failure.")
+    val appliedName: String? = null,
+)
+
+/** Cleans common AI artifacts (smart quotes, escaped quotes, zero-width chars) before JSON decode. */
+internal fun sanitizeVibeJson(raw: String): String =
+    raw
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .replace('“', '"')
+        .replace('”', '"')
+        .replace('‘', '\'')
+        .replace('’', '\'')
+        .replace("\\\"", "\"")
+        .replace("\\'", "'")
+        .replace("​", "")
+        .replace("‌", "")
+        .replace("‍", "")
+        .replace("﻿", "")
+
+/** Decode + construct a Vibe; the schema and the model's init { require(...) } blocks are the validator. */
+internal fun decodeVibe(json: Json, raw: String): Result<Vibe> =
+    runCatching { json.decodeFromString<Vibe>(sanitizeVibeJson(raw)) }
+
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
+@Inject
+class VibeApplyTool(
+    // Lazy provider, not a direct PulsarFeature: injecting the feature eagerly here pulls
+    // PulsarViewModel into the OrpheusAgentConfig tool-set construction, closing a DI cycle
+    // (Pulsar -> PlaybackController -> AiOptionsViewModel -> OrpheusAgent -> tools -> Pulsar).
+    // Mirrors PulsarSongEnding/PulsarMetadataProducer/PulsarVibePicker which take the same provider.
+    private val pulsarFeatureProvider: () -> PulsarFeature,
+    private val eventBus: VibeCreateEventBus,
+) : ToolProvider {
+
+    private val json = vibeApplyJson
+
+    override val tool by lazy {
+        object : Tool<VibeApplyArgs, VibeApplyResult>(
+            argsType = typeToken<VibeApplyArgs>(),
+            resultType = typeToken<VibeApplyResult>(),
+            name = "pulsar_apply_vibe",
+            description = """
+                Apply a Pulsar vibe to the live beat machine and start it playing.
+                Workflow: call pulsar_get_vibe to get a template, edit the JSON to match the
+                requested feel (bpm, rootNote, scaleType, genre.customProgression, per-track engines,
+                arrangement), then pass the complete edited JSON here.
+                Rules: exactly 8 tracks; progression degrees 0..6; name must be an evocative ORIGINAL
+                name (never a real artist/band/song/album).
+                Instruments — keep each track's engine in its role family when you change it:
+                  drums BD/SD/HH/NSE/PAR · bass WSH/VCF/PD/VA/DX · keys DX2 · lead DX3/WSH/FM/WTB ·
+                  pad ENS/STR/CHD/GRN/ADD · texture MOD/PAR/SPK/SWM/NES/TRN.
+                DX FAMILY (DX/DX2/DX3): 'harmonics' is NOT a tone knob — it is a 32-patch selector
+                (quantized, auto-pinned). Set it deliberately to pick a patch; to land on patch index N
+                use harmonics = N / (32 * 1.02). Never leave a DX engine's harmonics arbitrary or it
+                loads a random patch and sounds wrong. Set harmonics/timbre/morph explicitly on any
+                engine you swap in.
+                If this returns success=false, read the message, fix the JSON, and call again.
+            """.trimIndent(),
+        ) {
+            override suspend fun execute(args: VibeApplyArgs): VibeApplyResult {
+                eventBus.emitGenerating()
+                return decodeVibe(json, args.vibeJson).fold(
+                    onSuccess = { vibe ->
+                        // decodeVibe guards the parse/validation; guard the apply side-effects too, so an
+                        // engine-wiring throw still emits Failed instead of escaping execute() and leaving
+                        // the panel stuck on the Generating spinner with no error or retry.
+                        try {
+                            log.debug { "Applying agent vibe '${vibe.name}'" }
+                            val pulsar = pulsarFeatureProvider()
+                            pulsar.applyVibe(vibe)
+                            pulsar.actions.setMix(0.8f)
+                            eventBus.emitGenerated(vibe)
+                            VibeApplyResult(true, "Applied and playing '${vibe.name}'.", vibe.name)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            log.warn { "Vibe apply failed after decode: ${e.message}" }
+                            eventBus.emitFailed(e.message ?: "unknown error")
+                            VibeApplyResult(false, "Could not apply vibe: ${e.message}", null)
+                        }
+                    },
+                    onFailure = { e ->
+                        log.warn { "Vibe rejected: ${e.message}" }
+                        eventBus.emitFailed(e.message ?: "unknown error")
+                        VibeApplyResult(false, "Could not build vibe: ${e.message}", null)
+                    },
+                )
+            }
+        }
+    }
+
+    private val log = logging("VibeApplyTool")
+}

@@ -27,6 +27,7 @@ kotlin {
             implementation(project(":features:flux")) // For SynthControlTool?
             implementation(project(":features:voice"))
             implementation(project(":features:presets"))
+            implementation(project(":features:pulsar")) // For VibeReadTool/VibeApplyTool
             implementation(project(":core:plugins:delay"))
             implementation(project(":core:plugins:duolfo"))
             implementation(project(":core:plugins:distortion"))
@@ -42,6 +43,10 @@ kotlin {
             implementation(libs.markdown)
             implementation(libs.markdown.m3)
             implementation(libs.kotlinx.datetime)
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

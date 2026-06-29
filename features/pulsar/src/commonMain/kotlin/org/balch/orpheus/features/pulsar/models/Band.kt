@@ -97,4 +97,14 @@ data class Band(
     val pullInBarsMax: Int = 4,
     val barsPerLeadMin: Int = 2,
     val barsPerLeadMax: Int = 6,
-)
+) {
+    init {
+        val n = members.size
+        require(handoffMatrix.size == n * n) {
+            "Band.handoffMatrix must have ${n * n} values (members.size² for $n members), got ${handoffMatrix.size}"
+        }
+        require(pullInMatrix.size == n * n) {
+            "Band.pullInMatrix must have ${n * n} values (members.size² for $n members), got ${pullInMatrix.size}"
+        }
+    }
+}

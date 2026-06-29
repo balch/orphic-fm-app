@@ -9,9 +9,20 @@ import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicParams
+import ai.koog.prompt.executor.clients.anthropic.models.AnthropicThinking
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
+import ai.koog.prompt.executor.clients.google.GoogleParams
+import ai.koog.prompt.executor.clients.google.models.GoogleThinkingConfig
+import ai.koog.prompt.executor.clients.google.models.GoogleThinkingLevel
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
+import ai.koog.prompt.executor.clients.openai.OpenAIResponsesParams
+import ai.koog.prompt.executor.clients.openai.base.models.ReasoningEffort
+import ai.koog.prompt.executor.clients.openai.models.ReasoningConfig
+import ai.koog.prompt.executor.clients.openai.models.ReasoningSummary
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
+import ai.koog.prompt.llm.LLMCapability
+import ai.koog.prompt.params.LLMParams
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -50,6 +61,8 @@ import org.balch.orpheus.features.ai.session.AgentSessionStats
 import org.balch.orpheus.features.ai.session.SessionUsage
 import kotlin.time.ExperimentalTime
 
+private const val ANTHROPIC_THINKING_BUDGET = 4096   // ≥1024, counts toward maxTokens; tune for latency/quality
+
 /**
  * Orpheus AI Agent - a musical guide inhabiting the Orphic-FM synthesizer.
  * Uses Gemini to provide expert advice on sounds and can control the synth.
@@ -61,6 +74,7 @@ class OrpheusAgent(
     private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,
     private val replCodeEventBus: ReplCodeEventBus,
+    private val agentActivityEventBus: AgentActivityEventBus,
     private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
 ) {
@@ -249,12 +263,14 @@ class OrpheusAgent(
         val strategy = config.agentStrategy(
             name = "OrpheusAgent",
             onAssistantMessage = { message ->
+                agentActivityEventBus.emitAssistant(message)
                 send(agentMessageToState(message))
                 val userPrompt = userIntent.first()
                 userIntent.resetReplayCache()
                 send(userMessageToState(userPrompt.displayText))
                 userPrompt.prompt
-            }
+            },
+            onReasoning = { agentActivityEventBus.emitReasoning(it) },
         )
 
         createAgent(strategy, apiKey) {
@@ -262,8 +278,14 @@ class OrpheusAgent(
             handleEvents {
                 onAgentStarting { _ -> logger.d { "Agent starting" } }
                 onAgentCompleted { _ -> logger.d { "Agent completed" } }
-                onToolCallStarting { context -> logger.d { "Tool call starting: ${context.toolName}" } }
-                onToolCallCompleted { context -> logger.d { "Tool call completed: ${context.toolName}" } }
+                onToolCallStarting { context ->
+                    logger.d { "Tool call starting: ${context.toolName}" }
+                    agentActivityEventBus.emitToolStarted(context.toolName)
+                }
+                onToolCallCompleted { context ->
+                    logger.d { "Tool call completed: ${context.toolName}" }
+                    agentActivityEventBus.emitToolCompleted(context.toolName)
+                }
             }
             // Error handling handler
             handleEvents {
@@ -333,8 +355,20 @@ class OrpheusAgent(
         }
         val executor = MultiLLMPromptExecutor(llmClient)
 
+        val thinkingParams: LLMParams =
+            if (config.model.supports(LLMCapability.Thinking)) {
+                when (aiProvider) {
+                    AiProvider.Anthropic -> AnthropicParams(thinking = AnthropicThinking.Enabled(budgetTokens = ANTHROPIC_THINKING_BUDGET))
+                    AiProvider.Google -> GoogleParams(thinkingConfig = GoogleThinkingConfig(includeThoughts = true, thinkingLevel = GoogleThinkingLevel.HIGH))
+                    AiProvider.OpenAI -> OpenAIResponsesParams(reasoning = ReasoningConfig(effort = ReasoningEffort.MEDIUM, summary = ReasoningSummary.AUTO))
+                    else -> LLMParams()
+                }
+            } else {
+                LLMParams()
+            }
+
         val agentConfig = AIAgentConfig(
-            prompt = prompt("OrpheusAgent") {
+            prompt = prompt("OrpheusAgent", thinkingParams) {
                 system(config.systemInstruction)
             },
             model = config.model,

@@ -192,8 +192,15 @@ static const PulsarScale kPulsarScales[] = {
     {5, {0,3,5,7,10,0,0,0,0,0,0,0}},               // 10: Minor Pentatonic
     {5, {0,2,3,7,8,0,0,0,0,0,0,0}},                // 11: Hirajoshi
     {5, {0,1,5,7,10,0,0,0,0,0,0,0}},               // 12: In Sen
+    {6, {0,3,5,6,7,10,0,0,0,0,0,0}},               // 13: Blues (minor blues, hexatonic: R b3 4 b5 5 b7)
+    {5, {0,3,5,6,10,0,0,0,0,0,0,0}},               // 14: Blues Pentatonic (minor penta + b5: R b3 4 b5 b7)
+    {6, {0,2,3,4,7,9,0,0,0,0,0,0}},                // 15: Major Blues (major penta + b3: R 2 b3 3 5 6)
 };
-static constexpr int kNumPulsarScales = 13;
+static constexpr int kNumPulsarScales = 16;
+// Count and table must stay in lockstep — adding a scale row without bumping the
+// count (or vice versa) is a silent bug that plays the wrong scale. Catch it here.
+static_assert(kNumPulsarScales == sizeof(kPulsarScales) / sizeof(kPulsarScales[0]),
+              "kNumPulsarScales must equal the number of kPulsarScales rows");
 
 enum PulsarEnvPhase { ENV_IDLE, ENV_ATTACK, ENV_SUSTAIN, ENV_DECAY };
 

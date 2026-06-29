@@ -33,6 +33,7 @@ object FactoryPanelSets {
         collapse(PanelId.BASS)
         collapse(PanelId.TWEAKS)
         collapse(PanelId.CODE)
+        collapse(PanelId.VIBE_CREATE)
         collapse(PanelId.LOOPER)
         collapse(PanelId.SPEECH)
         collapse(PanelId.ASL_MAESTRO)
@@ -95,6 +96,7 @@ object FactoryPanelSets {
         expand(PanelId.FLUX)
         expand(PanelId.FLUX_TRIGGERS)
         expand(PanelId.PULSAR)
+        collapse(PanelId.VIBE_CREATE)
     }
 
     /** Performance-focused layout. */

@@ -94,5 +94,10 @@ data class GenreProfile(
 ) {
     init {
         customProgression?.let { validateProgression(it, "GenreProfile.customProgression") }
+        chordTransitionMatrix?.let {
+            require(it.size == 49) {
+                "GenreProfile.chordTransitionMatrix must have 49 values (7x7), got ${it.size}"
+            }
+        }
     }
 }

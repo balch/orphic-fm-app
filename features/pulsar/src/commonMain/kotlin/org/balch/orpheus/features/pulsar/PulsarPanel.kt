@@ -67,6 +67,7 @@ private val NoteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", 
 private val ScaleNames = listOf(
     "Minor", "Major", "Pentatonic", "Phrygian", "Whole Tone", "Chromatic",
     "Dorian", "Lydian", "Mixolydian", "Harm Minor", "Min Penta", "Hirajoshi", "In Sen",
+    "Blues", "Blues Pent", "Maj Blues",
 )
 
 @Composable

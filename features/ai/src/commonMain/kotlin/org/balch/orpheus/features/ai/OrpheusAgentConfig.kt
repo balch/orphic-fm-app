@@ -5,8 +5,8 @@ import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.dsl.extension.ReceivedToolResults
 import ai.koog.agents.core.dsl.extension.nodeExecuteTools
 import ai.koog.agents.core.dsl.extension.nodeLLMCompressHistory
-import ai.koog.agents.core.dsl.extension.nodeLLMRequest
-import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResults
+import ai.koog.agents.core.dsl.extension.nodeLLMRequestStreaming
+import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResultsStreaming
 import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
@@ -271,6 +271,31 @@ class OrpheusAgentConfig(
         - For Flux: set voice_duo_mod_source_0 to 3 (FLUX), voice_duo_mod_source_level_0 to 0.5, AND flux_mix to 0.5, hold voices, then sweep flux_spread and flux_bias so user hears the random melodies
         - **NEVER** just play REPL patterns when explaining — the user wants to see knobs highlighted and turning
 
+        ## Creating Pulsar vibes
+        When the user asks for a new beat-machine vibe ("make a vibe like X", "a darker techno groove"),
+        or to tweak the one playing ("slower", "swap the lead to a bell"):
+        Field values: enum fields must use exact allowed values — 'album' is one of STEALTH/RIF/ZERO_TO_ONE
+        (NOT a title; the title goes in 'name'); rootNote/scaleType/envelopeType are also enums. When unsure
+        of a field's type or allowed values, call pulsar_vibe_schema — it returns the full schema (every
+        field's type and the exact enum vocabulary).
+        1. Call pulsar_get_vibe with a close template name (or 'current' to tweak what is playing).
+        2. Edit the returned JSON to match the request — bpm, rootNote, scaleType, genre.customProgression,
+           per-track engines, arrangement. Recall the reference song's key/tempo/progression yourself.
+        Instruments: keep each track's engine in its role family (drums BD/SD/HH; bass WSH/VCF/PD/VA;
+        keys DX2; lead DX3/WSH/FM; pad ENS/STR/CHD; texture MOD/PAR/SPK). For DX/DX2/DX3, 'harmonics'
+        picks a 32-patch bank (set it deliberately) — it is not a tone knob.
+        Per-section variation: to change ONE track within a section (pedal a hook on the tonic, drop a
+        track's density in a breakdown, swap its comping in the chorus), set that Section's trackOverrides,
+        keyed by track index — e.g. "trackOverrides": {"4": {"chordFollow": "FIXED"}}. See pulsar_vibe_schema.
+        3. Call pulsar_apply_vibe with the complete edited JSON. It applies and plays immediately.
+        Build in a single turn: call pulsar_get_vibe and then pulsar_apply_vibe back to back. Do NOT send
+        a plain-text reply between those tool calls. A plain-text reply pauses you to wait for the user and
+        abandons the build half-finished. Save your one or two sentence description for AFTER
+        pulsar_apply_vibe succeeds.
+        Naming: always invent an evocative ORIGINAL name that captures the feel — never use a real
+        artist, band, song, or album name. If pulsar_apply_vibe returns success=false, fix the JSON per
+        the message and try again.
+
         ## Your Personality
         - Be poetic but concise. Use musical metaphors naturally.
         - Guide users in creating beautiful sounds with enthusiasm.
@@ -329,12 +354,13 @@ class OrpheusAgentConfig(
      */
     fun agentStrategy(
         name: String,
-        onAssistantMessage: suspend (String) -> String
+        onAssistantMessage: suspend (String) -> String,
+        onReasoning: (String) -> Unit = {},
     ) = strategy(name = name) {
-        val nodeRequestLLM by nodeLLMRequest()
+        val nodeRequestLLM by nodeLLMRequestStreaming().transform { it.collapseToMessage(onReasoning) }   // CHANGED
         val nodeAssistantMessage by node<String, String> { message -> onAssistantMessage(message) }
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
-        val nodeSendToolResult by nodeLLMSendToolResults()
+        val nodeSendToolResult by nodeLLMSendToolResultsStreaming().transform { it.collapseToMessage(onReasoning) }   // CHANGED
         val nodeCompressHistory by nodeLLMCompressHistory<ReceivedToolResults>()
 
         edge(nodeStart forwardTo nodeRequestLLM)

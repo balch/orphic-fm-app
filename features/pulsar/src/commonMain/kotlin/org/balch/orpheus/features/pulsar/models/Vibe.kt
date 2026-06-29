@@ -42,6 +42,9 @@ enum class ScaleType(val scaleIndex: Int) {
     MINOR_PENTATONIC(10),
     HIRAJOSHI(11),
     IN_SEN(12),
+    BLUES(13),
+    BLUES_PENTATONIC(14),
+    BLUES_MAJOR(15),
 }
 
 /**

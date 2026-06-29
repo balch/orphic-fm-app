@@ -761,7 +761,7 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_mood{0.5f};
     std::atomic<float> pulsar_bpm_override{0.0f};  // 0 = follow global tempo
     std::atomic<int> pulsar_root_note{0};      // 0=C, 11=B
-    std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
+    std::atomic<int> pulsar_scale_index{0};    // index into kPulsarScales (0..kNumPulsarScales-1)
     std::atomic<float> pulsar_mix{0.0f};       // output level 0-1 (Kotlin sets per-app default)
     // Console-fader convention: stored 0..1 is fader *travel*. The Penny &
     // Giles-style law in pulsar_fader_to_gain() (orpheus_unit_pulsar.cpp)

@@ -4,6 +4,7 @@
 
 #include "test_harness.h"
 #include "../src/pulsar_pattern_gen.h"
+#include "../src/orpheus_unit_pulsar.h"  // kPulsarScales, PulsarLickStep
 
 static int count_gates(const PulsarStep* steps, int count) {
     int gates = 0;
@@ -311,6 +312,42 @@ static bool test_dust_groove_scenario() {
     return ok;
 }
 
+// The Blues scale (kPulsarScales index 13, ScaleType.BLUES) must expose the b5
+// "blue note" — the whole reason it exists. Render a lick that walks R, b3, 4, b5
+// through the real wired table and assert the flat-fifth lands at root + 6 semis.
+static bool test_blues_scale_renders_flat_five() {
+    printf("\n  Test: Blues scale renders the b5 blue note\n");
+
+    const PulsarScale& blues = kPulsarScales[13];  // 13 = Blues (minor blues, hexatonic)
+    bool degrees_ok = blues.count == 6 &&
+        blues.degrees[0] == 0 && blues.degrees[1] == 3 && blues.degrees[2] == 5 &&
+        blues.degrees[3] == 6 && blues.degrees[4] == 7 && blues.degrees[5] == 10;
+
+    // R, b3, 4, b5 — degree 3 is the b5. 0.25-beat steps = 1 slot each.
+    PulsarLickStep lick[4] = {
+        {0, 0.25f, 0.9f, -1.0f},
+        {1, 0.25f, 0.9f, -1.0f},
+        {2, 0.25f, 0.9f, -1.0f},
+        {3, 0.25f, 0.9f, -1.0f},
+    };
+    PulsarStep steps[kMaxPulsarSteps] = {};
+    const int root = 36;  // C2
+    // lick_octave 0 → base offset 0; chord_degree 0; no rest padding.
+    generate_lick_pattern(steps, 16, lick, 4, 0.0f, (uint8_t)root, blues, 7u,
+                          0, 0, 36, 72, 0);
+
+    // Onsets at steps 0..3 (1 slot each): R, b3, 4, b5.
+    bool notes_ok = steps[0].note == root + 0 &&   // R
+                    steps[1].note == root + 3 &&   // b3
+                    steps[2].note == root + 5 &&   // 4
+                    steps[3].note == root + 6;     // b5 (the blue note)
+
+    bool ok = degrees_ok && notes_ok;
+    printf("    degrees_ok=%s, b5_note=%d (expect %d) -- %s\n",
+           degrees_ok ? "yes" : "no", steps[3].note, root + 6, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_pattern_gen_tests() {
     printf("\n=== Pulsar Pattern Gen Tests ===\n");
     int pass = 0, fail = 0;
@@ -324,6 +361,7 @@ bool run_pulsar_pattern_gen_tests() {
     test_loop_length_half_step_count()      ? pass++ : fail++;
     test_loop_length_equals_lick_length()   ? pass++ : fail++;
     test_dust_groove_scenario()             ? pass++ : fail++;
+    test_blues_scale_renders_flat_five()    ? pass++ : fail++;
 
     printf("\n  Results: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);
