@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.ai.AiVibeArchive
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
 import org.balch.orpheus.features.pulsar.models.CompingStyle
@@ -93,6 +94,7 @@ class VibeApplyTool(
     // Mirrors PulsarSongEnding/PulsarMetadataProducer/PulsarVibePicker which take the same provider.
     private val pulsarFeatureProvider: () -> PulsarFeature,
     private val eventBus: VibeCreateEventBus,
+    private val aiVibeArchive: AiVibeArchive,
 ) : ToolProvider {
 
     private val json = vibeApplyJson
@@ -124,6 +126,11 @@ class VibeApplyTool(
                 eventBus.emitGenerating()
                 return decodeVibe(json, args.vibeJson).fold(
                     onSuccess = { vibe ->
+                        // Persist the AI's creation immediately (best-effort, never throws) so it is
+                        // retrievable later even if the song auto-advances past it, the app closes, or
+                        // the apply below fails. Archives only on the DJ app (Android + JVM); a no-op
+                        // elsewhere.
+                        aiVibeArchive.archive(vibe.name, args.vibeJson)
                         // decodeVibe guards the parse/validation; guard the apply side-effects too, so an
                         // engine-wiring throw still emits Failed instead of escaping execute() and leaving
                         // the panel stuck on the Generating spinner with no error or retry.
