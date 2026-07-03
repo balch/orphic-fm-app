@@ -1,3 +1,5 @@
+import com.android.build.api.artifact.SingleArtifact
+
 plugins {
     id("orpheus.android.app")
     alias(libs.plugins.play.publisher)
@@ -29,11 +31,71 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
+    flavorDimensions += "edition"
+    productFlavors {
+        create("og") { dimension = "edition" }
+        create("ai") {
+            dimension = "edition"
+            applicationIdSuffix = ".ai"
+        }
+    }
+
     sourceSets {
         getByName("debugRelease") {
             manifest.srcFile("src/debug/AndroidManifest.xml")
         }
     }
+}
+
+// OG edition must NEVER request INTERNET — INTERNET (and all AI/network deps) exist only
+// in the `ai` flavor (see src/ai/AndroidManifest.xml). This guard uses the AGP Variant API to
+// grab each variant's merged-manifest artifact (SingleArtifact.MERGED_MANIFEST) instead of
+// hardcoding an intermediates/ path, which has moved across AGP versions.
+val mergedManifestsByVariant = mutableMapOf<String, Provider<RegularFile>>()
+androidComponents {
+    onVariants { variant ->
+        mergedManifestsByVariant[variant.name] = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
+    }
+}
+
+val verifyOgHasNoInternet by tasks.registering {
+    group = "verification"
+    description = "Fails if the OG edition's merged manifest requests android.permission.INTERNET."
+
+    val ogManifest = mergedManifestsByVariant.getValue("ogDebug")
+    val aiManifest = mergedManifestsByVariant.getValue("aiDebug")
+    dependsOn(ogManifest, aiManifest)
+
+    inputs.file(ogManifest)
+    inputs.file(aiManifest)
+
+    doLast {
+        val internetPermission = "android.permission.INTERNET"
+
+        val ogFile = ogManifest.get().asFile
+        require(ogFile.exists()) { "OG merged manifest not found at $ogFile" }
+        require(!ogFile.readText().contains(internetPermission)) {
+            "OG edition must not request $internetPermission (found in ${ogFile.absolutePath})"
+        }
+
+        // Negative control: prove this check is actually wired to real manifests by asserting
+        // the `ai` edition — which legitimately needs network access — DOES declare INTERNET.
+        // Without this, a guard that silently no-ops (e.g. wrong path) would pass trivially.
+        val aiFile = aiManifest.get().asFile
+        require(aiFile.exists()) { "AI merged manifest not found at $aiFile" }
+        require(aiFile.readText().contains(internetPermission)) {
+            "Expected AI edition to request $internetPermission (found none in ${aiFile.absolutePath}); " +
+                "verifyOgHasNoInternet would pass even if INTERNET were declared nowhere"
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyOgHasNoInternet)
 }
 
 // Google Play Developer API publishing (Gradle Play Publisher).
@@ -76,6 +138,7 @@ play {
 
 dependencies {
     implementation(projects.apps.djapp.shared)
+    "aiImplementation"(project(":apps:djapp:ai"))
     implementation(project(":core:foundation"))
     implementation(project(":ui:widgets"))
     implementation(libs.androidx.lifecycle.runtimeCompose)

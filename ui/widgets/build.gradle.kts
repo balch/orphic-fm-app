@@ -26,5 +26,11 @@ kotlin {
             implementation(libs.liquid)
             implementation(libs.compose.ui.tooling.preview)
         }
+
+        androidMain.dependencies {
+            // WindowCompat / WindowInsetsControllerCompat for re-hiding system bars on
+            // the ModalBottomSheet's own window (ImmersiveSheetEffect).
+            implementation(libs.androidx.core.ktx)
+        }
     }
 }

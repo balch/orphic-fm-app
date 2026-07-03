@@ -57,3 +57,44 @@
 -keep class * implements androidx.glance.appwidget.action.ActionCallback { <init>(); }
 # Keep the widget's own classes (receiver, widget, actions) intact.
 -keep class org.balch.djapp.widget.** { *; }
+
+# Koog builds its agent graph from delegated DSL builder functions (e.g.
+#   val node by nodeLLMRequestStreaming()
+# in OrpheusAgentConfig) that kotlin-reflect resolves at runtime by reading the builder
+# function's @kotlin.Metadata. THE ACTUAL R8 BUG (root-caused 2026-07-01 from mapping.txt):
+# R8 full mode renamed kotlin.jvm.functions.Function2 -> a synthetic name, because nothing
+# kept kotlin.jvm.functions.**. A -keep on the koog method does NOT pin its PARAMETER types,
+# so R8 rewrote the real method's bytecode descriptor to take the renamed Function2 — but R8
+# does NOT rewrite the JVM-signature string frozen inside @kotlin.Metadata, which still names
+# Function2. kotlin-reflect reads the frozen metadata, can't map it to the renamed method, and
+# throws "nodeLLMRequestStreaming ... not resolved in file class AIAgentNodesKt: no members
+# found", killing the whole agent run (empty Activity/Thinking feeds, generation stuck).
+# THE FIX is to pin the NAMES of Kotlin's functional-interface types so the live method
+# descriptor keeps matching the frozen metadata string kotlin-reflect reads. -keepnames
+# (not -keep) only blocks renaming; it does not disable shrinking/optimization. This is why
+# the earlier -keep class ai.koog.**/-dontoptimize attempts failed — none kept the type that
+# was actually renamed out from under the metadata.
+-keepnames class kotlin.jvm.functions.** { *; }
+-keepnames class kotlin.Function** { *; }
+
+# Freeze koog's own builder facades + metadata so their names/metadata stay in lockstep
+# with the reflection that reads them.
+-keep class ai.koog.** { *; }
+-keepclassmembers class ai.koog.** { *; }
+-keep class kotlin.Metadata { *; }
+-keepattributes InnerClasses,Signature,RuntimeVisible*Annotations,EnclosingMethod
+-dontwarn ai.koog.**
+-dontwarn kotlin.reflect.jvm.internal.**
+# Keeping ai.koog.** makes R8 trace into Koog's bundled OpenTelemetry integration, which
+# references AutoValue (a compile-time-only annotation processor, never on the runtime
+# classpath) and a few optional/incubator OpenTelemetry metrics APIs this OpenTelemetry
+# version doesn't ship. Neither is reachable at runtime — Koog's tracing isn't configured
+# with any exporter in this app — so warning suppression is correct, not a keep rule.
+-dontwarn com.google.auto.value.**
+-dontwarn io.opentelemetry.api.incubator.**
+# Jackson (transitive via Koog) references java.beans.* which does not exist on Android.
+# These are optional Java SE reflection hooks Jackson probes for and skips at runtime; the
+# standard Android suppression. (Surfaced once R8 full mode was disabled — full mode had
+# been silently suppressing them.)
+-dontwarn java.beans.ConstructorProperties
+-dontwarn java.beans.Transient

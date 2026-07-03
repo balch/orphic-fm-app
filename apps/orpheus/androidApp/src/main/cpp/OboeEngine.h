@@ -55,6 +55,7 @@ public:
     void getMonitor(OrpheusMonitorData* out);
     int  getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
+    void getPulsarActiveEngines(int* out);
     void getPulsarArrangement(int* out);
     void getTurntableViz(int deck, float* outBuf);
     void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);

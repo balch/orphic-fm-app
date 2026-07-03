@@ -8,11 +8,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -24,6 +29,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,12 +46,15 @@ import androidx.navigation3.ui.NavDisplay
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.djapp.variant.DjTabContribution
+import org.balch.orpheus.djapp.variant.mergeTabContributions
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjViewModel
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
+import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -74,6 +84,7 @@ fun DjAppScreen(
     vizFeature: VizFeature,
     onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
+    tabContributions: List<DjTabContribution> = emptyList(),
 ) {
     val djFeature = DjViewModel.feature()
     val pulsarFeature = PulsarViewModel.feature()
@@ -88,6 +99,24 @@ fun DjAppScreen(
     // Nav3 back stack — single-level tab switching
     val backStack = remember { NavBackStack<DjRoute>(DjTab) }
     val currentRoute = backStack.lastOrNull() ?: DjTab
+    val tabs = remember(tabContributions) { mergeTabContributions(djTabs, tabContributions) }
+
+    // Single source of truth for which overlay sheet (if any) is open: a tab-sheet contribution's
+    // route (e.g. AiTab), the title-triggered VibeInfoTab, or null. One state can only hold one
+    // route, so opening a second sheet naturally replaces the first — no manual "clear the other"
+    // bookkeeping. rememberSaveable so an Android config change (rotation recreates the activity)
+    // keeps the sheet open and the app-lifetime AI ViewModel observed, instead of closing the sheet
+    // mid-generation while the agent keeps running unseen.
+    val sheetRouteSaver = remember(tabs) {
+        val byKey = (tabs + VibeInfoTab).associateBy { it.label }
+        Saver<DjRoute?, String>(
+            save = { route -> route?.label ?: "" },
+            restore = { key -> byKey[key] },
+        )
+    }
+    var activeSheet by rememberSaveable(stateSaver = sheetRouteSaver) {
+        mutableStateOf<DjRoute?>(null)
+    }
 
     BoxWithConstraints(
         // Fully edge-to-edge: no inset padding, so the UI (and the VizBackground
@@ -112,6 +141,13 @@ fun DjAppScreen(
             pulsarFeature = pulsarFeature,
             timerFeature = timerFeature,
             onTogglePlayback = onTogglePlayback,
+            tabs = tabs,
+            onOpenSheet = { route ->
+                // Toggle: tapping the active sheet's nav item closes it, otherwise open (replacing
+                // whatever sheet was open). Uses the tapped route rather than a hardcoded AiTab.
+                activeSheet = if (activeSheet == route) null else route
+            },
+            openSheetRoute = activeSheet,
             modifier = Modifier.fillMaxSize(),
         ) {
             // Shared nav content composable used in both orientations
@@ -206,6 +242,7 @@ fun DjAppScreen(
                             .padding(top = 4.dp)) {
                         DjAppHeaderRow(
                             vizFeature = vizFeature,
+                            onInfoClick = { activeSheet = VibeInfoTab },
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             horizontalPadding = 0.dp,
@@ -218,6 +255,7 @@ fun DjAppScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     DjAppHeaderRow(
                         vizFeature = vizFeature,
+                        onInfoClick = { activeSheet = VibeInfoTab },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -235,6 +273,33 @@ fun DjAppScreen(
                     navContent(Modifier.weight(.4f).fillMaxWidth())
                 }
             }
+
+            // VibeInfo is title-triggered, not a tab contribution, so it keeps its dedicated
+            // composable — but shares the single activeSheet state.
+            if (activeSheet == VibeInfoTab) {
+                VibeInfoSheet(
+                    pulsar = pulsarFeature,
+                    vizFlow = synthEngine.pulsarVizFlow,
+                    onDismiss = { activeSheet = null },
+                )
+            }
+
+            // Generic tab-sheet rendering: any contribution whose route opens as a sheet stays
+            // composed the whole time and is told whether it is the active sheet via isOpen (it
+            // renders its own chrome only while open). Keeping it composed while closed lets the
+            // contribution cancel in-flight work when isOpen goes true->false — covering EVERY close
+            // path (nav-item toggle, switching to another sheet, scrim/drag/back), not just the
+            // scrim. A second sheet contribution would work here with no new code.
+            tabContributions.forEach { contribution ->
+                if (contribution.route.opensAsSheet) {
+                    contribution.Content(
+                        isOpen = activeSheet == contribution.route,
+                        modifier = Modifier.fillMaxSize(),
+                        isLandscape = isLandscape,
+                        onDismiss = { activeSheet = null },
+                    )
+                }
+            }
         }
     }
 }
@@ -242,6 +307,7 @@ fun DjAppScreen(
 @Composable
 private fun DjAppHeaderRow(
     vizFeature: VizFeature,
+    onInfoClick: () -> Unit,
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = 8.dp,
 ) {
@@ -252,13 +318,25 @@ private fun DjAppHeaderRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppTitleTreatment(
-            title = "Orphic DJ",
-            modifier = Modifier.height(36.dp),
-            effects = effects,
-            showSizeEffects = false,
-            horizontalPadding = horizontalPadding,
-        )
+        // Title + Info button grouped on the left, inset-padded to stay clear of
+        // side camera notches in landscape (edge-to-edge layout: no outer inset padding).
+        Row(
+            modifier = Modifier.windowInsetsPadding(
+                WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // The title itself is the Vibe Info trigger (raised, tappable) — no separate Info button.
+            AppTitleTreatment(
+                title = "Orphic DJ",
+                modifier = Modifier.height(32.dp),
+                effects = effects,
+                showSizeEffects = false,
+                horizontalPadding = horizontalPadding,
+                verticalPadding = 4.dp,
+                onClick = onInfoClick,
+            )
+        }
 
         VizDropdown(vizFeature = vizFeature)
     }
@@ -392,6 +470,7 @@ private fun DjAppPreviewLayout(
         Column(modifier = modifier.fillMaxSize()) {
             DjAppHeaderRow(
                 vizFeature = VizViewModel.previewFeature(),
+                onInfoClick = {},
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 4.dp),

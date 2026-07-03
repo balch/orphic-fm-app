@@ -1,7 +1,7 @@
 package org.balch.orpheus.features.ai.tools
 
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
-import org.balch.orpheus.features.pulsar.vibes.SmokehouseVibe
+import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -54,8 +54,8 @@ class VibeGuideToolTest {
 
     @Test
     fun `fingerprint includes lick segment when a lick is present`() {
-        val withLick = dogHouse.copy(lick = SmokehouseVibe().vibe.lick)
-        assertTrue(SmokehouseVibe().vibe.lick != null, "precondition: Smokehouse has a lick to borrow")
+        val withLick = dogHouse.copy(lick = FireSkyVibe().vibe.lick)
+        assertTrue(FireSkyVibe().vibe.lick != null, "precondition: Fire Sky has a lick to borrow")
         assertTrue(vibeFingerprint(withLick).contains("· lick"), "lick segment missing when lick present")
     }
 

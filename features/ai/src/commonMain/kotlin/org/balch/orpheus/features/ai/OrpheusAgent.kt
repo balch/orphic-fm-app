@@ -51,6 +51,7 @@ import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.AgentGreetingMode
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.tidal.ReplCodeEvent
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
@@ -77,6 +78,7 @@ class OrpheusAgent(
     private val agentActivityEventBus: AgentActivityEventBus,
     private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
+    private val greetingMode: AgentGreetingMode,
 ) {
     private val logger = logging("OrpheusAgent")
 
@@ -200,8 +202,24 @@ class OrpheusAgent(
                 return@launch
             }
             val (apiKey, _) = keyResult
-            
-            runAgent(config.initialAgentPrompt(), apiKey)
+
+            // Choose the prompt that seeds the run. ON_START greets immediately; ON_FIRST_PROMPT
+            // suspends here until the user submits, so merely opening the panel issues no LLM request.
+            val seedPrompt = when (greetingMode) {
+                AgentGreetingMode.ON_START -> config.initialAgentPrompt()
+                AgentGreetingMode.ON_FIRST_PROMPT -> {
+                    // SUSPEND here until the user submits: no LLM client is built and no request is
+                    // sent until then. We do NOT reset the replay cache before suspending — a fresh
+                    // start has none, and a prompt the user submits during the getKey() await above
+                    // must be preserved (replay=1 buffers it and first() returns it). Stale prompts
+                    // from a prior run are cleared in restart() before it re-arms this coroutine.
+                    val intent = userIntent.first()
+                    userIntent.resetReplayCache()           // clear the just-consumed prompt so the run-loop's own userIntent.first() suspends correctly next turn
+                    intent.prompt
+                }
+            }
+
+            runAgent(seedPrompt, apiKey)
                 .flowOn(Dispatchers.Default)
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow" }
@@ -214,20 +232,32 @@ class OrpheusAgent(
     }
 
     fun restart() {
+        // Cancel the current run before re-arming, regardless of greeting mode.
+        currentAgentJob?.cancel()
+        currentAgentJob = null
+
+        if (greetingMode == AgentGreetingMode.ON_FIRST_PROMPT) {
+            // Silent restart: drop any prompt left over from the cancelled run so the re-armed
+            // coroutine truly waits for a NEW submit, then re-arm and suspend on the next user
+            // prompt (startAgentIfNeeded reads config.model fresh on the next run). Send NO
+            // greeting/model-switch prompt.
+            userIntent.resetReplayCache()
+            startAgentIfNeeded()
+            return
+        }
+
+        // ON_START: greet the user with a model-switch message (Orpheus behavior, unchanged).
         val modelName = config.model.toString()
             .substringAfterLast(".")
             .replace("_", " ")
             .lowercase()
             .replaceFirstChar { it.uppercase() }
-        
+
         logger.debug { "Restarting agent with model: $modelName" }
-        
-        currentAgentJob?.cancel()
-        currentAgentJob = null
-        
+
         messages.add(ChatMessage(text = "Switching to $modelName...", type = ChatMessageType.Loading))
         _agentState.value = AgentState.Loading(messages.toList())
-        
+
         currentAgentJob = scope.launch(dispatcherProvider.io) {
             // Get API key for the current model's provider
             val aiProvider = aiModelProvider.selectedModel.value.aiProvider

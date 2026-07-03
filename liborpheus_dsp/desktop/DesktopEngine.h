@@ -61,6 +61,7 @@ public:
     int   isTtsPlaying();
 
     void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
+    void  getPulsarActiveEngines(int* out);
     void  getPulsarArrangement(int* out);
 
 private:

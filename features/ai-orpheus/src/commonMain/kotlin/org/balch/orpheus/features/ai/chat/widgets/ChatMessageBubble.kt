@@ -141,6 +141,9 @@ fun ChatMessageBubble(
                                                 color = message.type.textColor().copy(alpha = 0.8f)
                                             )
                                         }
+                                        // User / Loading are already excluded by the enclosing
+                                        // guards; no header to render for them.
+                                        else -> {}
                                     }
                                 }
                             }

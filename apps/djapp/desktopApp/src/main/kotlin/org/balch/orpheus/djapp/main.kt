@@ -7,13 +7,12 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
-import org.balch.orpheus.djapp.di.DjAppGraph
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
 
     application {
-        val graph = remember { createGraphFactory<DjAppGraph.Factory>().create() }
+        val graph = remember { createGraphFactory<DjAppGraphDesktop.Factory>().create() }
         // Eagerly initialize PulsarPlaybackBridge so its init {} subscribes to
         // PlaybackController.state at startup. Without this touch the singleton
         // is never created and the PULSAR_PLAYING port stays at 0.

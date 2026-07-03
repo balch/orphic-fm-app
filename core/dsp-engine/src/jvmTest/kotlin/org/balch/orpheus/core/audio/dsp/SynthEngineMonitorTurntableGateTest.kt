@@ -130,6 +130,7 @@ class SynthEngineMonitorTurntableGateTest {
             playheadsOut: IntArray,
             stepCountsOut: IntArray,
         ) {}
+        override fun nativeGetPulsarActiveEngines(out: IntArray) { for (i in out.indices) out[i] = -1 }
         override fun nativeGetPulsarArrangement(out: IntArray) { out[0] = -1 }
 
         // Unused control surface.

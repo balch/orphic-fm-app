@@ -3,31 +3,23 @@ package org.balch.orpheus.features.pulsar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,12 +30,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.CosmicDragHandle
 import org.balch.orpheus.ui.widgets.HorizontalFader
+import org.balch.orpheus.ui.widgets.OrpheusSlideUpSheet
 
 // ─── Per-style UI metadata ───────────────────────────────────────────────────
 //
@@ -140,28 +133,14 @@ fun TransitionSettingsSheet(
     onHandoffMsChange: (Int) -> Unit,
     inactivityTimeoutMs: Long = INACTIVITY_TIMEOUT_MS,
 ) {
-    val sheetState = rememberModalBottomSheetState()
     val visibleStyles = remember { TransitionStyle.entries.filter { it.isVisible } }
     val handoffMs = remember(spec) { spec.effectiveHandoffMs }
 
-    // Inactivity timer: any user interaction increments interactionTick, which
-    // restarts the LaunchedEffect's delay. After inactivityTimeoutMs of no
-    // interaction the sheet dismisses itself. Initial open counts as the first
-    // interaction (tick starts at 0 so the timer arms immediately).
-    var interactionTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(interactionTick, inactivityTimeoutMs) {
-        delay(inactivityTimeoutMs)
-        onDismiss()
-    }
-    val kick: () -> Unit = remember { { interactionTick++ } }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = OrpheusColors.deepPurple,
-        contentColor = OrpheusColors.onSurfaceDark,
+    OrpheusSlideUpSheet(
+        onDismiss = onDismiss,
+        inactivityTimeoutMs = inactivityTimeoutMs,
         dragHandle = { CosmicDragHandle() },
-    ) {
+    ) { kick ->
         TransitionSheetContent(
             spec = spec,
             enabled = enabled,
@@ -245,17 +224,6 @@ private fun TransitionSheetContent(
 }
 
 // ─── Subcomposables ──────────────────────────────────────────────────────────
-
-@Composable
-private fun CosmicDragHandle() {
-    Box(
-        modifier = Modifier
-            .padding(vertical = 8.dp)
-            .size(width = 40.dp, height = 4.dp)
-            .clip(RoundedCornerShape(2.dp))
-            .background(OrpheusColors.cosmicPurple.copy(alpha = 0.5f)),
-    )
-}
 
 /**
  * Standalone HANDOFF row. "MORPH" titles the row on the leading edge; the knob

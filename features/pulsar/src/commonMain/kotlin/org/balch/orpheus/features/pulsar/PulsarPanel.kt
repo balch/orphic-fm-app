@@ -63,13 +63,6 @@ import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.time.Duration.Companion.milliseconds
 
-private val NoteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
-private val ScaleNames = listOf(
-    "Minor", "Major", "Pentatonic", "Phrygian", "Whole Tone", "Chromatic",
-    "Dorian", "Lydian", "Mixolydian", "Harm Minor", "Min Penta", "Hirajoshi", "In Sen",
-    "Blues", "Blues Pent", "Maj Blues",
-)
-
 @Composable
 private fun <T> EnumDropdown(
     label: String,
@@ -202,18 +195,18 @@ fun PulsarPanel(
 
             EnumDropdown(
                 label = "ROOT",
-                selectedDisplay = NoteNames[state.rootNote],
-                entries = NoteNames.indices.toList(),
-                displayName = { NoteNames[it] },
+                selectedDisplay = PULSAR_NOTE_NAMES[state.rootNote],
+                entries = PULSAR_NOTE_NAMES.indices.toList(),
+                displayName = { PULSAR_NOTE_NAMES[it] },
                 onSelected = actions.setRootNote,
                 color = OrpheusColors.cosmicPurple,
             )
 
             EnumDropdown(
                 label = "SCALE",
-                selectedDisplay = ScaleNames[state.scaleIndex],
-                entries = ScaleNames.indices.toList(),
-                displayName = { ScaleNames[it] },
+                selectedDisplay = PULSAR_SCALE_NAMES[state.scaleIndex],
+                entries = PULSAR_SCALE_NAMES.indices.toList(),
+                displayName = { PULSAR_SCALE_NAMES[it] },
                 onSelected = actions.setScale,
                 color = OrpheusColors.cosmicPurple,
             )

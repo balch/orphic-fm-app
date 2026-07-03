@@ -83,6 +83,7 @@ kotlin {
             api(project(":features:speech"))
             api(project(":features:visualizations"))
             api(project(":features:ai"))
+            api(project(":features:ai-orpheus"))
             api(project(":features:debug"))
             api(project(":features:midi"))
             api(project(":features:presets"))

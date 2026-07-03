@@ -66,6 +66,16 @@ class AiKeyRepository(
             preferencesRepository.load().userApiKeys[aiProvider.id]
         }.getOrNull()
 
+    /**
+     * True if a key (build-time default or user-provided) exists for [aiProvider].
+     * Read-only: does NOT touch global key state ([isApiKeySetFlow]/[isUserProvidedKeyFlow]),
+     * so it is safe to call from a reactive collector without causing a feedback loop.
+     */
+    suspend fun hasKey(aiProvider: AiProvider): Boolean =
+        withContext(dispatcherProvider.io) {
+            aiProvider.defaultKey() != null || getPreferenceKey(aiProvider) != null
+        }
+
     suspend fun setKey(aiProvider: AiProvider, key: String): Boolean =
         withContext(dispatcherProvider.io) {
             runCatchingSuspend {

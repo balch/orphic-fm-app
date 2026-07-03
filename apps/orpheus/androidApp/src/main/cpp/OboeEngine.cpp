@@ -236,6 +236,10 @@ int OboeEngine::getViz(int channel, float* outBuf, int maxSamples, int* lastRead
 void OboeEngine::getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut) {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_get_pulsar_viz(e, gatesOut, velocitiesOut, playheadsOut, stepCountsOut);
 }
+void OboeEngine::getPulsarActiveEngines(int* out) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_get_pulsar_active_engines(e, out);
+    else for (int t = 0; t < 8; t++) out[t] = -1;
+}
 void OboeEngine::getPulsarArrangement(int* out) {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_get_pulsar_arrangement(e, out);
     else out[0] = -1;

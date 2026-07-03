@@ -1,23 +1,39 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.BarStrategy
+import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
+import org.balch.orpheus.features.pulsar.models.CompingFills
+import org.balch.orpheus.features.pulsar.models.CompingHumanization
+import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
+import org.balch.orpheus.features.pulsar.models.EvolutionTension
+import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.Lick
+import org.balch.orpheus.features.pulsar.models.LickMode
+import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.TensionProfile
+import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
  * Garage Blitz — raw two-note power-riff stomp.
@@ -31,12 +47,11 @@ import org.balch.orpheus.features.pulsar.models.VibeEffects
  * doesn't apply to Floor/Dark/Jazz/Ascending Blitz.
  */
 
-/*
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class GarageBlitzVibe : VibeProvider {
     override val name: String = "Garage Blitz"
-    override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
+    override val vibe: Vibe by lazy {
         Vibe(
             name = "Garage Blitz",
             bpm = 132f,  // close to the original's tempo
@@ -54,7 +69,11 @@ class GarageBlitzVibe : VibeProvider {
                     LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),   // A — slide up
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),   // G
                     LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.85f),   // A
-                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.95f),   // G — longer hold
+                    LickStep(
+                        scaleDegree = 0,
+                        duration = 1.0f,
+                        velocity = 0.95f
+                    ),   // G — longer hold
                 ),
                 loopLength = 8,
             ),
@@ -76,7 +95,7 @@ class GarageBlitzVibe : VibeProvider {
             progressionDriftRange = 0.15f,  // keep it locked on the 2-chord idea
             tracks = listOf(
                 // Track 0: Kick — pounding on 1 and 3
-                OrpheusEngine(engineId = OrpheusEngineId.ANALOG_BASS_DRUM, volume = 0.95f).let { kick ->
+                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.95f).let { kick ->
                     TrackVoice(
                         engineEdm = kick,
                         engineSpace = kick,
@@ -88,7 +107,7 @@ class GarageBlitzVibe : VibeProvider {
                     )
                 },
                 // Track 1: Snare — backbeat on 2 and 4, the garage-rock stomp
-                OrpheusEngine(engineId = OrpheusEngineId.ANALOG_SNARE_DRUM, volume = 0.80f).let { snare ->
+                OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.80f).let { snare ->
                     TrackVoice(
                         engineEdm = snare,
                         engineSpace = snare,
@@ -100,7 +119,7 @@ class GarageBlitzVibe : VibeProvider {
                     )
                 },
                 // Track 2: Hihat — steady 8th notes, driving
-                OrpheusEngine(engineId = OrpheusEngineId.METALLIC_HI_HAT, volume = 0.60f).let { hat ->
+                OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.60f).let { hat ->
                     TrackVoice(
                         engineEdm = hat,
                         engineSpace = hat,
@@ -114,14 +133,14 @@ class GarageBlitzVibe : VibeProvider {
                 // Track 3: Bass — WSH (gritty) plays the riff locked to chord root.
                 // Bass doubles the rhythm of the lead but just pounds on root.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.WAVESHAPING,
+                    engineId = OrpheusEngineId.WSH,
                     volume = 0.75f,
                     noteRangeLow = 40, noteRangeHigh = 52,
                     reverbBrightness = 0.4f,
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
-                        engineSpace = bass.copy(engineId = OrpheusEngineId.VIRTUAL_ANALOG),
+                        engineSpace = bass.copy(engineId = OrpheusEngineId.VA),
                         role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                         pan = 0.00f, density = 0.50f,
                         envelopeProfile = EnvelopeProfile.MELODIC,
@@ -133,7 +152,7 @@ class GarageBlitzVibe : VibeProvider {
                 // LickMode.Fill spans the full bar; chordFollow = FOLLOW so it transposes
                 // with the 2-chord progression (i ↔ VII) — the whole riff moves together.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.WAVESHAPING,
+                    engineId = OrpheusEngineId.WSH,
                     volume = 0.85f,
                     harmonics = 0.75f, timbre = 0.6f, morph = 0.4f,  // gritty distorted tone
                     noteRangeLow = 52, noteRangeHigh = 67,
@@ -153,7 +172,7 @@ class GarageBlitzVibe : VibeProvider {
                 // Drops/ghosts/octave jumps keep the organ loose and alive — garage
                 // rock organ should feel stomped at, not programmed.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.CHORD,
+                    engineId = OrpheusEngineId.CHD,
                     volume = 0.45f,
                     noteRangeLow = 48, noteRangeHigh = 72,
                     reverbBrightness = 0.5f,
@@ -185,7 +204,7 @@ class GarageBlitzVibe : VibeProvider {
                 },
                 // Track 6: Noise/tambourine — sparse garage texture
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.NOISE,
+                    engineId = OrpheusEngineId.NSE,
                     volume = 0.25f,
                     modLfoRate = 0.4f, modLfoDepth = 0.25f, modLfoShape = 0.4f, modLfoCoupling = 0.1f,
                     holdProbability = 0.05f,
@@ -194,7 +213,7 @@ class GarageBlitzVibe : VibeProvider {
                 ).let { fx ->
                     TrackVoice(
                         engineEdm = fx,
-                        engineSpace = fx.copy(engineId = OrpheusEngineId.PARTICLE),
+                        engineSpace = fx.copy(engineId = OrpheusEngineId.PAR),
                         role = TrackRole.Percussive,
                         pan = -0.30f, density = 0.10f,
                         envelopeProfile = EnvelopeProfile.EFFECT,
@@ -202,7 +221,7 @@ class GarageBlitzVibe : VibeProvider {
                     )
                 },
                 // Track 7: silent placeholder
-                OrpheusEngine(engineId = OrpheusEngineId.CHIPTUNE, volume = 0.0f).let { silent ->
+                OrpheusEngine(engineId = OrpheusEngineId.CHU, volume = 0.0f).let { silent ->
                     TrackVoice(
                         engineEdm = silent,
                         engineSpace = silent,
@@ -220,9 +239,14 @@ class GarageBlitzVibe : VibeProvider {
                 tonal = TonalTension(chromaticPassing = 0.1f),
                 timing = 0.15f,
                 evolution = EvolutionTension(
-                    timbreLow = 0.5f, timbreHigh = 0.85f, timbreProbability = 0.7f,  // the distortion breathes
-                    morphLow = 0.3f, morphHigh = 0.55f, morphProbability = 0.5f,
-                    attackPoint = 0.5f, releaseSpeed = 0.3f,
+                    timbreLow = 0.5f,
+                    timbreHigh = 0.85f,
+                    timbreProbability = 0.7f,  // the distortion breathes
+                    morphLow = 0.3f,
+                    morphHigh = 0.55f,
+                    morphProbability = 0.5f,
+                    attackPoint = 0.5f,
+                    releaseSpeed = 0.3f,
                 ),
                 spurtChance = 0.15f,  // occasional lick mutation spurts — the riff gets wilder sometimes
             ),
@@ -240,7 +264,7 @@ class GarageBlitzVibe : VibeProvider {
 }
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FloorBlitzVibe : VibeProvider {
     override val name: String = "Floor Blitz"
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
@@ -271,7 +295,7 @@ class FloorBlitzVibe : VibeProvider {
 }
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class DarkBlitzVibe : VibeProvider {
     override val name: String = "Dark Blitz"
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
@@ -303,7 +327,7 @@ class DarkBlitzVibe : VibeProvider {
 }
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class JazzBlitzVibe : VibeProvider {
     override val name: String = "Jazz Blitz"
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
@@ -335,7 +359,7 @@ class JazzBlitzVibe : VibeProvider {
 }
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class AscBlitzVibe : VibeProvider {
     override val name: String = "Ascending Blitz"
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
@@ -366,9 +390,7 @@ class AscBlitzVibe : VibeProvider {
     }
 }
 
- */
-
-private fun generateBaseVibe(
+ private fun generateBaseVibe(
     name: String,
     bpm: Float = 138f,
     envelopeType: EnvelopeType = EnvelopeType.AD,

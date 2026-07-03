@@ -1,6 +1,10 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
@@ -44,8 +48,8 @@ import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
 
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class ArmyStompVibe : VibeProvider {
     override val name: String = "Army Stomp"
 

@@ -6,6 +6,7 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.dsp.WiringGraphProvider
 import org.balch.orpheus.core.audio.dsp.buildDefaultWiringGraph
+import org.balch.orpheus.core.features.AgentGreetingMode
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
@@ -54,6 +55,9 @@ interface OrpheusModule {
 
         @Provides
         fun providePulsarPlaybackMode(): PulsarPlaybackMode = PulsarPlaybackMode.MIX_GATED
+
+        @Provides
+        fun provideAgentGreetingMode(): AgentGreetingMode = AgentGreetingMode.ON_START
 
         @Provides
         @SingleIn(AppScope::class)

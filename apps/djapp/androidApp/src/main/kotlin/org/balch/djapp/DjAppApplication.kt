@@ -11,7 +11,6 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.djapp.widget.DjWidgetUpdater
-import org.balch.orpheus.djapp.di.DjAppGraph
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 
@@ -19,14 +18,12 @@ class DjAppApplication : Application() {
 
     private val log = logging("DjAppApplication")
 
-    lateinit var graph: DjAppGraph
+    lateinit var graph: DjAppGraphAndroid
         private set
 
     override fun onCreate() {
         super.onCreate()
-        graph = createGraphFactory<DjAppGraph.Factory>().create(
-            this,
-        )
+        graph = createGraphFactory<DjAppGraphAndroid.Factory>().create(this)
 
         graph.mediaSessionManager.setServiceIntent(
             Intent(this, DjMediaLibraryService::class.java)
@@ -90,7 +87,7 @@ class DjAppApplication : Application() {
     }
 
     companion object {
-        fun getGraph(context: Context): DjAppGraph =
+        fun getGraph(context: Context): DjAppGraphAndroid =
             (context.applicationContext as DjAppApplication).graph
     }
 }

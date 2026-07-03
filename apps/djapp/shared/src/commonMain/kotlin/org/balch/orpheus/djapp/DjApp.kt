@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -108,6 +109,11 @@ fun DjApp(
                 graph.synthEngine.setVizEnabled(signalVizActive)
             }
 
+            // Snapshot the DI multibinding once. This scope recomposes on every vizState change,
+            // and toList() would otherwise allocate a fresh list each frame for a set that is
+            // fixed for the graph's lifetime.
+            val tabContributions = remember(graph) { graph.djTabContributions.toList() }
+
             OrpheusTheme {
                 CompositionLocalProvider(
                     LocalLiquidState provides liquidState,
@@ -140,6 +146,7 @@ fun DjApp(
                                 vizFeature = vizFeature,
                                 onTogglePlayback = onTogglePlayback,
                                 modifier = Modifier.fillMaxSize(),
+                                tabContributions = tabContributions,
                             )
                         }
 

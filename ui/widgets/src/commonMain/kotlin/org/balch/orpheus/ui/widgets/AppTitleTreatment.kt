@@ -1,6 +1,8 @@
 package org.balch.orpheus.ui.widgets
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -9,7 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.platform.LocalDensity
@@ -25,6 +29,26 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 
+// On a dark theme a "raised" look reads through bevel + gradient, not Material elevation
+// (drop shadows are near-invisible on black): a lit cyan TOP edge + dark BOTTOM edge, a
+// top→bottom convex fill, and a soft cyan glow. Colors are compile-time constants, so these
+// brushes are hoisted to file-level vals to avoid re-allocating on every recomposition.
+private val raisedFill = Brush.verticalGradient(
+    listOf(
+        OrpheusColors.cosmicPurple.copy(alpha = 0.70f), // lit convex top
+        OrpheusColors.deepPurple.copy(alpha = 0.96f),   // shadowed bottom
+    )
+)
+private val raisedBevel = BorderStroke(
+    1.5.dp,
+    Brush.verticalGradient(
+        listOf(
+            OrpheusColors.neonCyan.copy(alpha = 0.95f), // top highlight (light from above)
+            Color.Black.copy(alpha = 0.55f),            // bottom shadow edge
+        )
+    )
+)
+
 @Preview
 @Composable
 fun AppTitleTreatment(
@@ -33,9 +57,13 @@ fun AppTitleTreatment(
     effects: VisualizationLiquidEffects = VisualizationLiquidEffects.Default,
     showSizeEffects: Boolean = true,
     horizontalPadding: Dp = 16.dp,
+    verticalPadding: Dp = 8.dp,
+    /** When non-null, the title becomes a clickable, raised button (tap → [onClick]). */
+    onClick: (() -> Unit)? = null,
 ) {
     val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
+    val raised = onClick != null
     val density = LocalDensity.current
     val textShadow = remember(effects.title.titleElevation, density) {
         val blur = with(density) { effects.title.titleElevation.toPx() }
@@ -52,21 +80,39 @@ fun AppTitleTreatment(
 
     Card(
         modifier = modifier
-            .liquidVizEffects(
-                liquidState = liquidState,
-                scope = effects.title.scope,
-                frostAmount = effects.frostLarge.dp,
-                color = OrpheusColors.softPurple,
-                tintAlpha = 0.2f,
-                shape = shape,
-            ),
+            .then(
+                if (raised) {
+                    Modifier
+                        .shadow(
+                            elevation = 6.dp,
+                            shape = shape,
+                            clip = false,
+                            ambientColor = OrpheusColors.neonCyan,
+                            spotColor = OrpheusColors.neonCyan,
+                        )
+                        .background(raisedFill, shape)
+                } else {
+                    Modifier.liquidVizEffects(
+                        liquidState = liquidState,
+                        scope = effects.title.scope,
+                        frostAmount = effects.frostLarge.dp,
+                        color = OrpheusColors.softPurple,
+                        tintAlpha = 0.2f,
+                        shape = shape,
+                    )
+                }
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = effects.title.titleElevation),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (raised) 0.dp else effects.title.titleElevation,
+        ),
         shape = shape,
-        border =
-            if (showSizeEffects) {
-                BorderStroke(effects.title.borderWidth, effects.title.borderColor)
-            } else null
+        border = when {
+            raised -> raisedBevel
+            showSizeEffects -> BorderStroke(effects.title.borderWidth, effects.title.borderColor)
+            else -> null
+        },
     ) {
         Text(
             text = title,
@@ -78,7 +124,7 @@ fun AppTitleTreatment(
             color = effects.title.titleColor,
             style = TextStyle(shadow = textShadow),
             modifier = Modifier
-                .padding(horizontal = horizontalPadding, vertical = 8.dp)
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding)
 
         )
     }

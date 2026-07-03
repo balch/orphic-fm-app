@@ -288,6 +288,12 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
     }
 }
 
+void orpheus_engine_get_pulsar_active_engines(OrpheusEngine* engine, int* out) {
+    if (!engine || !out) return;
+    for (int t = 0; t < kNumPulsarTracks; t++)
+        out[t] = engine->pulsar_track_active_engine[t].load(std::memory_order_relaxed);
+}
+
 void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
     if (!engine || !out) { if (out) out[0] = -1; return; }
     const PulsarState* ps = engine->pulsar_state;

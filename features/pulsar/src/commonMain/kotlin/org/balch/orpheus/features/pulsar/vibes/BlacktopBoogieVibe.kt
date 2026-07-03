@@ -1,6 +1,10 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -54,8 +58,8 @@ import org.balch.orpheus.features.pulsar.models.row
  * "chorus" of stab chords answered by an ascending walk-up, and a structure of solos,
  * trades, and choruses.
  */
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class BlacktopBoogieVibe : VibeProvider {
     override val name: String = "Blacktop Boogie"
 

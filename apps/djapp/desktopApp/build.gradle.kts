@@ -4,8 +4,12 @@ plugins {
     id("orpheus.desktop.app")
 }
 
+val edition = (findProperty("edition") as String?) ?: "core"
+val catalog = (findProperty("catalog") as String?) ?: "live"
+
 dependencies {
     implementation(projects.apps.djapp.shared)
+    if (edition == "ai") implementation(project(":apps:djapp:ai"))
     implementation(compose.desktop.currentOs)
     implementation(libs.kotlinx.coroutinesSwing)
     implementation(libs.kmlogging)
@@ -27,6 +31,7 @@ compose.desktop {
         }
 
         jvmArgs += listOf("-Dorpheus.engine=cpp")
+        jvmArgs += "-Dcatalog=$catalog"
         val nativePath = System.getProperty("orpheus.native.path", "")
         if (nativePath.isNotEmpty()) {
             jvmArgs += "-Djava.library.path=$nativePath"

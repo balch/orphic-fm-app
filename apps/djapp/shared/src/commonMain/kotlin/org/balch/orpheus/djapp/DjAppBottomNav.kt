@@ -41,6 +41,9 @@ fun DjAppNavScaffold(
     pulsarFeature: PulsarFeature,
     timerFeature: TimerFeature,
     onTogglePlayback: () -> Unit,
+    tabs: List<DjRoute> = djTabs,
+    onOpenSheet: (DjRoute) -> Unit = {},
+    openSheetRoute: DjRoute? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -50,7 +53,7 @@ fun DjAppNavScaffold(
     val pulsarState by pulsarFeature.stateFlow.collectAsState()
     val timerState by timerFeature.stateFlow.collectAsState()
     // Insert play/pause in the center for portrait, at the end for landscape
-    val playPauseIndex = if (isLandscape) djTabs.size else djTabs.size / 2
+    val playPauseIndex = if (isLandscape) tabs.size else tabs.size / 2
 
     NavigationSuiteScaffold(
         modifier = modifier,
@@ -69,13 +72,16 @@ fun DjAppNavScaffold(
                 label = { Text(playLabel, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.cosmicPurple) },
             )
 
-            djTabs.forEachIndexed { index, route ->
+            tabs.forEachIndexed { index, route ->
                 if (index == playPauseIndex) addPlayPause()
 
-                val selected = currentRoute == route
+                val selected = if (route.opensAsSheet) route == openSheetRoute
+                               else currentRoute == route
                 item(
                     selected = selected,
-                    onClick = { onRouteSelected(route) },
+                    onClick = {
+                        if (route.opensAsSheet) onOpenSheet(route) else onRouteSelected(route)
+                    },
                     icon = {
                         val showCountdown = route is TimerTab
                             && (timerState.status == TimerStatus.RUNNING
@@ -117,7 +123,7 @@ fun DjAppNavScaffold(
                 )
             }
             // Landscape: play/pause at the end of the rail
-            if (playPauseIndex == djTabs.size) addPlayPause()
+            if (playPauseIndex == tabs.size) addPlayPause()
         },
         navigationSuiteColors = NavigationSuiteDefaults.colors(
             navigationBarContainerColor = Color.Transparent,

@@ -55,6 +55,8 @@ interface NativeDspBridge {
         playheadsOut: IntArray,
         stepCountsOut: IntArray,
     )
+    /** Reads the live per-track active engine ids (what the DSP is playing) into out[8]. */
+    fun nativeGetPulsarActiveEngines(out: IntArray)
     fun nativeGetPulsarArrangement(out: IntArray)
 
     /**

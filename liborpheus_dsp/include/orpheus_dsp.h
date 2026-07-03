@@ -149,6 +149,12 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
                                    int* playheads_out,
                                    int* step_counts_out);
 
+// ── Pulsar live per-track active engine read-back (polled with the viz) ──
+// Reads the engine id the DSP block actually selected for each track into
+// out[8] (reflects the random crossfade + section energy overrides — i.e.
+// what is actually heard, not a knob-derived guess). -1 = unset.
+void orpheus_engine_get_pulsar_active_engines(OrpheusEngine* engine, int* out);
+
 // ── Pulsar arrangement state read-back (polled at ~5fps from UI thread) ──
 // Reads the current arrangement state into out[6]:
 //   out[0] = section_index (-1 = inactive)

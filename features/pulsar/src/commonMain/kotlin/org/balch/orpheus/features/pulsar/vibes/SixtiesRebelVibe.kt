@@ -1,6 +1,10 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
@@ -45,8 +49,8 @@ import org.balch.orpheus.features.pulsar.models.row
  * is the star, while acoustic strums and piano provide a solid foundation.
  */
 // Not Ready For PrimeTime
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class SixtiesRebelVibe : VibeProvider {
     override val name: String = "Sixties Rebel"
     // I — IV (E — A in E Mixolydian). Simple back-and-forth.

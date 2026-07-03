@@ -134,6 +134,7 @@ class SynthEngineMonitor(
     private val pulsarVelocities = FloatArray(PULSAR_NUM_TRACKS * PULSAR_MAX_STEPS)
     private val pulsarPlayheads = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
+    private val pulsarActiveEngines = IntArray(PULSAR_NUM_TRACKS) { -1 }
     private val arrangementBuf = IntArray(6)
 
     // Guards every poll-lifecycle transition below (the five Job refs plus the
@@ -316,6 +317,7 @@ class SynthEngineMonitor(
                 nativeBridge.nativeGetPulsarViz(
                     pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
                 )
+                nativeBridge.nativeGetPulsarActiveEngines(pulsarActiveEngines)
                 val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
                 for (t in 0 until PULSAR_NUM_TRACKS) {
                     pollVizChannel(VIZ_PULSAR_TRACK_0 + t, pulsarReadPos, pulsarVizBuf, _pulsarTrackVizFlows[t])
@@ -328,6 +330,7 @@ class SynthEngineMonitor(
                     playheads = pulsarPlayheads.copyOf(),
                     stepCounts = pulsarStepCounts.copyOf(),
                     trackLevels = trackLevels,
+                    activeEngines = pulsarActiveEngines.copyOf(),
                 )
 
                 delay(VIZ_POLL_INTERVAL_MS)

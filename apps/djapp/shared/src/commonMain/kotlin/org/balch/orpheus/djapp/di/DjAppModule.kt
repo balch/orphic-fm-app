@@ -2,10 +2,12 @@ package org.balch.orpheus.djapp.di
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
+import dev.zacsweers.metro.Multibinds
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.dsp.WiringGraphProvider
 import org.balch.orpheus.core.audio.dsp.buildDjAppWiringGraph
+import org.balch.orpheus.core.features.AgentGreetingMode
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
@@ -13,6 +15,7 @@ import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.playback.OverlaySubtitleProducer
 import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.core.playback.SkipHandler
+import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
@@ -24,6 +27,9 @@ import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 
 @ContributesTo(AppScope::class)
 interface DjAppModule {
+    @Multibinds(allowEmpty = true)
+    fun djTabContributions(): Set<DjTabContribution>
+
     companion object {
         @Provides
         @SingleIn(AppScope::class)
@@ -35,6 +41,9 @@ interface DjAppModule {
 
         @Provides
         fun providePulsarPlaybackMode(): PulsarPlaybackMode = PulsarPlaybackMode.EXPLICIT
+
+        @Provides
+        fun provideAgentGreetingMode(): AgentGreetingMode = AgentGreetingMode.ON_FIRST_PROMPT
 
         @Provides
         @SingleIn(AppScope::class)

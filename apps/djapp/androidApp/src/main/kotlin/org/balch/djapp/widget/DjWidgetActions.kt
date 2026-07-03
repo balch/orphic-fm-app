@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.balch.djapp.DjAppApplication
+import org.balch.djapp.DjAppGraphAndroid
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.playback.SkipDirection
-import org.balch.orpheus.djapp.di.DjAppGraph
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.timer.TimerFeature
@@ -26,14 +26,14 @@ private val log = logging("DjWidgetActions")
 private const val SKIP_SETTLE_MS = 5_000L
 private const val TIMER_SETTLE_MS = 2_000L
 
-private fun graphOf(context: Context): DjAppGraph =
+private fun graphOf(context: Context): DjAppGraphAndroid =
     (context.applicationContext as DjAppApplication).graph
 
-private fun timerOf(graph: DjAppGraph): TimerFeature =
+private fun timerOf(graph: DjAppGraphAndroid): TimerFeature =
     graph.featureGraphHolder.featureGraph.featureCollection
         .getFeature(TimerViewModel::class)
 
-private fun pulsarOf(graph: DjAppGraph): PulsarFeature =
+private fun pulsarOf(graph: DjAppGraphAndroid): PulsarFeature =
     graph.featureGraphHolder.featureGraph.featureCollection
         .getFeature(PulsarViewModel::class)
 
@@ -62,7 +62,7 @@ private fun expectedSkipTarget(pulsar: PulsarFeature, direction: SkipDirection):
  * When the title can't change (single-vibe list, or [expected] already current),
  * return immediately rather than blocking the Glance worker for the full timeout.
  */
-private suspend fun runSkip(graph: DjAppGraph, direction: SkipDirection, skip: () -> Unit) {
+private suspend fun runSkip(graph: DjAppGraphAndroid, direction: SkipDirection, skip: () -> Unit) {
     val pulsar = pulsarOf(graph)
     val before = graph.metadataProducer.titleFlow.value
     val expected = expectedSkipTarget(pulsar, direction)

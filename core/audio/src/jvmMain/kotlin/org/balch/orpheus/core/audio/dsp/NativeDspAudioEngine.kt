@@ -112,6 +112,7 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
         gatesOut: BooleanArray, velocitiesOut: FloatArray,
         playheadsOut: IntArray, stepCountsOut: IntArray,
     ) = bridge.nativeGetPulsarViz(gatesOut, velocitiesOut, playheadsOut, stepCountsOut)
+    override fun nativeGetPulsarActiveEngines(out: IntArray) = bridge.nativeGetPulsarActiveEngines(out)
     override fun nativeGetPulsarArrangement(out: IntArray) = bridge.nativeGetPulsarArrangement(out)
 
     companion object {

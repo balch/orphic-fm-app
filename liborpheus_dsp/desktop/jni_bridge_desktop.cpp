@@ -301,6 +301,13 @@ JNI_FN(nativeGetPulsarViz)(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT void JNICALL
+JNI_FN(nativeGetPulsarActiveEngines)(JNIEnv *env, jobject thiz, jintArray out) {
+    int buf[8] = {};
+    sEngine.getPulsarActiveEngines(buf);
+    env->SetIntArrayRegion(out, 0, 8, reinterpret_cast<jint*>(buf));
+}
+
+JNIEXPORT void JNICALL
 JNI_FN(nativeGetPulsarArrangement)(JNIEnv *env, jobject thiz, jintArray out) {
     int data[6] = {-1, 0, 0, 0, -1, 0};
     sEngine.getPulsarArrangement(data);

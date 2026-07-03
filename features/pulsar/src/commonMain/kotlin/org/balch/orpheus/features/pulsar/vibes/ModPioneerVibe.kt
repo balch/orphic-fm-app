@@ -1,6 +1,10 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
@@ -39,8 +43,8 @@ import org.balch.orpheus.features.pulsar.models.row
  * Transitions are crisp, and the tension builds through rhythmic density.
  */
 // Not Ready For PrimeTime
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class ModPioneerVibe : VibeProvider {
     override val name: String = "Mod Pioneer"
     // i — bVII — bVI — v (Am — G — F — E in A minor). Descending minor move.

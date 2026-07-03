@@ -1,8 +1,12 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
@@ -539,8 +543,8 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
     )
 }
 
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class UtcDriftVibe : VibeProvider {
     override val name: String = "UTC"
     override val vibe: Vibe
@@ -550,9 +554,8 @@ class UtcDriftVibe : VibeProvider {
             hourBasis = TimeZone.UTC,
         )
 }
-
-//@Inject
-//@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class TimeZoneDriftVibe : VibeProvider {
     override val name: String = "TimeZone"
     override val vibe: Vibe

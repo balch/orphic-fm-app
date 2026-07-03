@@ -9,7 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import org.balch.orpheus.djapp.di.DjAppGraph
+import org.balch.djapp.DjAppGraphAndroid
 import org.balch.orpheus.djapp.widget.DjWidgetRefresh
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -25,7 +25,7 @@ import org.balch.orpheus.features.timer.TimerViewModel
  */
 class DjWidgetUpdater(
     private val context: Context,
-    private val graph: DjAppGraph,
+    private val graph: DjAppGraphAndroid,
 ) {
     private val log = logging("DjWidgetUpdater")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

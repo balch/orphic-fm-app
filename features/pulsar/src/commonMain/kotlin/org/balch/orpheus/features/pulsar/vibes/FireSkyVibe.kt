@@ -47,7 +47,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
 /**
- * Smokehouse — a relentless, low-and-gritty hard-rock stomp built around the
+ * Fire Sky — a relentless, low-and-gritty hard-rock stomp built around the
  * most-taught rock riff of all time, recast for the BLUES scale in G.
  *
  * ## The feel
@@ -81,8 +81,8 @@ import org.balch.orpheus.features.pulsar.models.chords
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class SmokehouseVibe : VibeProvider {
-    override val name: String = "Smokehouse"
+class FireSkyVibe : VibeProvider {
+    override val name: String = "Fire Sky"
 
     // The riff hangs on the i (G), then makes the iconic hard-rock move: down to
     // the bVII (degree 6) and up to the IV (degree 3), then home.
@@ -224,11 +224,11 @@ class SmokehouseVibe : VibeProvider {
             scaleType = ScaleType.BLUES,
             seed = 0,
             // --- macro defaults: driving, locked, dry-ish rock ---
-            energy = 0.72f,
-            complexity = 0.40f,
-            space = 0.30f,
-            mood = 0.55f,
-            deep = 0.28f,
+            energy = 0.54f,
+            complexity = 0.78f,
+            space = 0.40f,
+            mood = 0.75f,
+            deep = 0.48f,
             // --- the riff (track 4 plays it as LickMode.Fill) ---
             // BLUES degrees: 0=G, 1=Bb(b3), 2=C(4th), 3=Db(b5 blue note), 4=D(5th), 5=F(b7).
             // Sequence [0,1,2] [0,1,3,2] [0,1,2] [1,0]; durations in BEATS sum to exactly
@@ -358,7 +358,13 @@ class SmokehouseVibe : VibeProvider {
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
-                        engineSpace = lead.copy(engineId = OrpheusEngineId.VA, lpgMode = LpgMode.SUSTAINED),
+                        engineSpace = lead.copy(
+                            engineId = OrpheusEngineId.DX3,
+                            harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
+                            timbre = 0.55f,           // a touch of drawbar brightness
+                            morph = 0.50f,
+                            lpgMode = LpgMode.SUSTAINED
+                        ),
                         role = TrackRole.Melodic(
                             chordFollow = ChordFollow.FOLLOW,
                             lickMode = LickMode.Fill,  // full 32-step single continuous phrase
@@ -370,14 +376,14 @@ class SmokehouseVibe : VibeProvider {
                         barStrategy = BarStrategy.REPEAT,  // riff repeats exactly; variation = lickMutation only
                     )
                 },
-                // Track 5 — Organ (DX3 idx 1 "Hammond"), the Hammond layer — Chordal, sustained.
+                // Track 5 — Organ, the Hammond layer — Chordal, sustained.
                 // DX3 harmonics is an auto-pinned 32-step patch selector: 0.031 = "Hammond",
                 // 0.092 = "60s organ" (space slot). Do not interpolate.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX3,
+                    engineId = OrpheusEngineId.VA,
                     volume = 0.50f,
-                    harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
-                    timbre = 0.55f,           // a touch of drawbar brightness
+                    harmonics = 0.031f,
+                    timbre = 0.55f,
                     morph = 0.50f,
                     noteRangeLow = 48,        // C3
                     noteRangeHigh = 72,       // C5
@@ -387,7 +393,11 @@ class SmokehouseVibe : VibeProvider {
                 ).let { organ ->
                     TrackVoice(
                         engineEdm = organ,
-                        engineSpace = organ.copy(harmonics = 0.092f, reverbSend = 0.32f),  // "60s organ", wetter
+                        engineSpace = organ.copy(
+                            engineId = OrpheusEngineId.DX3,
+                            harmonics = 0.092f,
+                            reverbSend = 0.32f
+                        ),  // "60s organ", wetter
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
                             comping = ChordComping(

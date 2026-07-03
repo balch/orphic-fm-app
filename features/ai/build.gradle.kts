@@ -18,31 +18,23 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // Slim agent-core + vibe tools ONLY. The Orpheus-only tools, VMs and panels (which
+            // dragged in tts / drum / warps / flux / voice / presets / plugins / markdown) live in
+            // :features:ai-orpheus so the lean DJ AI edition never pulls them onto its classpath.
             implementation(project(":core:ai"))
-            implementation(project(":core:tts"))
-            implementation(project(":core:tidal"))
-            implementation(project(":features:visualizations")) // For LiquidPreview if needed
-            implementation(project(":features:drum")) // For DrumsTool
-            implementation(project(":features:warps")) // For SynthControlTool?
-            implementation(project(":features:flux")) // For SynthControlTool?
-            implementation(project(":features:voice"))
-            implementation(project(":features:presets"))
-            implementation(project(":features:pulsar")) // For VibeReadTool/VibeApplyTool
-            implementation(project(":core:plugins:delay"))
-            implementation(project(":core:plugins:duolfo"))
-            implementation(project(":core:plugins:distortion"))
-            implementation(project(":ui:panels"))
-            implementation(libs.liquid)
+            // api (not implementation): ReplCodeEventBus appears in OrpheusAgent's PUBLIC
+            // constructor, so any DI graph that builds OrpheusAgent (incl. the DJ AI edition, whose
+            // graph is generated in its entry module) must see :core:tidal on its compile classpath
+            // to generate the @Inject factory. Only ReplCodeEventBus (a lightweight event bus) is
+            // reachable here — the heavy TidalRepl's consumers moved to :features:ai-orpheus.
+            api(project(":core:tidal"))
+            implementation(project(":features:pulsar")) // vibe tools read/apply Pulsar vibes
 
             // AI/koog
             api(libs.koog.agents)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.serialization.json)
             implementation(libs.ktor.client.content.negotiation)
-            // Markdown rendering (core + Material 3 theme)
-            implementation(libs.markdown)
-            implementation(libs.markdown.m3)
-            implementation(libs.kotlinx.datetime)
         }
         jvmTest.dependencies {
             implementation(libs.kotlin.test)

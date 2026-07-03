@@ -71,3 +71,6 @@ apps/djapp/play-store/.secrets/*.json
 
 # Local R8 / Perfetto analysis artifacts
 tmp/
+
+# Brainstorming visual-companion scratch
+.superpowers/

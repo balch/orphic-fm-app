@@ -1,35 +1,22 @@
 package org.balch.orpheus.features.ai
  
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowDropDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.features.ai.widgets.AiButton
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
+import org.balch.orpheus.features.ai.widgets.ModelSelector
 import org.balch.orpheus.features.ai.widgets.UserKeyIndicator
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -158,67 +145,5 @@ fun AiOptionsLayoutNoKeyPreview() {
             ),
             isExpanded = true
         )
-    }
-}
-
-/**
- * Compact model selector dropdown.
- */
-@Composable
-fun ModelSelector(
-    selectedModel: AiModel,
-    availableModels: List<AiModel>,
-    onSelectModel: (AiModel) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Row(
-        modifier = modifier
-            .background(
-                OrpheusColors.midnightBlue.copy(alpha = 0.4f),
-                shape = MaterialTheme.shapes.small
-            )
-            .clickable { expanded = true }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween // Text left, arrow right
-    ) {
-        Text(
-            text = selectedModel.displayName,
-            color = OrpheusColors.sterlingSilver,
-            fontSize = 11.sp,
-            textAlign = TextAlign.Start,
-        )
-
-        Icon(
-            imageVector = Icons.Rounded.ArrowDropDown,
-            contentDescription = "Select",
-            tint = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
-            modifier = Modifier.size(20.dp)
-        )
-    }
-
-    // Dropdown menu
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = { expanded = false },
-        modifier = Modifier.background(OrpheusColors.panelSurface)
-    ) {
-        availableModels.forEach { model ->
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = model.displayName,
-                        fontSize = 12.sp,
-                        color = Color.White
-                    )
-                },
-                onClick = {
-                    onSelectModel(model)
-                    expanded = false
-                }
-            )
-        }
     }
 }

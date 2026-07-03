@@ -560,6 +560,11 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         }
     }
 
+    // iOS not wired for live active-engine read-back yet — no-op stub.
+    override fun nativeGetPulsarActiveEngines(out: IntArray) {
+        for (i in out.indices) out[i] = -1
+    }
+
     companion object {
         private val log = logging("IosAudioEngine")
     }

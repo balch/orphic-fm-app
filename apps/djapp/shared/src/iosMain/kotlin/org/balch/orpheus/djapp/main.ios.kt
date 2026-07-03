@@ -4,11 +4,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.window.ComposeUIViewController
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
-import org.balch.orpheus.djapp.di.DjAppGraph
+import org.balch.orpheus.djapp.di.DjAppGraphIos
 
 fun MainViewController() = ComposeUIViewController {
     val graph = remember {
-        createGraphFactory<DjAppGraph.Factory>().create()
+        createGraphFactory<DjAppGraphIos.Factory>().create()
     }
     // Eagerly initialize PulsarPlaybackBridge so its init {} subscribes to
     // PlaybackController.state at startup. Without this touch the singleton

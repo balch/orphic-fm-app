@@ -45,18 +45,21 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 # Desktop (C++ DSP engine via JNI + miniaudio)
 ./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run
 
-# Android
-./gradlew :apps:androidApp:installDebugRelease
+# Android (Orpheus)
+./gradlew :apps:orpheus:androidApp:installDebug
 
-# iOS Simulator
-./gradlew :apps:orpheus:shared:linkDebugFrameworkIosSimulatorArm64
-cd apps/iosApp && xcodegen generate && open OrpheusApp.xcodeproj
+# Orphic DJ — Android (AI edition)
+./gradlew :apps:djapp:androidApp:installAiDebug
 
-# WASM dev server (opens browser at localhost:8080)
-./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun
+# Orphic DJ — Android (OG edition — no AI, no network permission)
+./gradlew :apps:djapp:androidApp:installOgDebug
 
-# WASM in orphic.fm site (serves at localhost:4001/synth/)
-./scripts/dev-site.sh
+# Orphic DJ — Desktop (AI edition; use -Pedition=og, or omit, for the non-AI edition)
+./gradlew :apps:djapp:desktopApp:run -Pedition=ai
+
+# Vibe-tier visibility on desktop: -Pcatalog=live|wip|shelf (cumulative, default live)
+#   live = flagship vibes only · wip = live + works-in-progress · shelf = everything
+./gradlew :apps:djapp:desktopApp:run -Pedition=ai -Pcatalog=wip
 ```
 
 ## Platform Details
@@ -82,18 +85,25 @@ The native library is built from `liborpheus_dsp/` using `liborpheus_dsp/platfor
 
 Uses [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) with the C++ DSP engine compiled via NDK.
 
+**Orpheus App:**
 ```bash
 # Debug build
-./gradlew :apps:androidApp:installDebug
+./gradlew :apps:orpheus:androidApp:installDebug
 
 # Release build
-./gradlew :apps:androidApp:installDebugRelease
-
-# Run instrumented tests
-./gradlew :apps:androidApp:connectedDebugAndroidTest
+./gradlew :apps:orpheus:androidApp:installDebugRelease
 ```
 
-The Android CMake build is configured in `apps/androidApp/build.gradle.kts` and uses `liborpheus_dsp/platform/android/CMakeLists.txt`.
+**Orphic DJ:**
+```bash
+# AI Edition (Debug)
+./gradlew :apps:djapp:androidApp:installAiDebug
+
+# OG Edition (Debug)
+./gradlew :apps:djapp:androidApp:installOgDebug
+```
+
+The Android CMake build is configured in the respective `androidApp` modules and uses `liborpheus_dsp/platform/android/CMakeLists.txt`.
 
 ### iOS
 

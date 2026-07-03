@@ -66,6 +66,7 @@ class OboeAudioBridge {
         playheadsOut: IntArray,
         stepCountsOut: IntArray,
     )
+    external fun nativeGetPulsarActiveEngines(out: IntArray)
     external fun nativeGetPulsarArrangement(out: IntArray)
 
     /**

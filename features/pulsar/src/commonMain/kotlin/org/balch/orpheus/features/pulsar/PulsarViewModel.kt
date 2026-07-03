@@ -79,6 +79,8 @@ import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
 import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
 
 @Serializable
@@ -274,6 +276,10 @@ class PulsarViewModel(
     dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
     vibeProviders: Set<VibeProvider>,
+    // Default keeps direct test construction terse; in the app graphs the per-platform
+    // VibeCatalogPolicyProvider binding always wins (android debuggable-flag -> WIP, desktop
+    // -Pcatalog level default live, iOS debug binary -> WIP, wasm live).
+    vibeCatalogPolicy: VibeCatalogPolicy = VibeCatalogPolicy(),
     private val playbackMode: PulsarPlaybackMode,
     private val songEndingPreferences: SongEndingPreferences,
     private val transitionPreferences: TransitionPreferences,
@@ -282,21 +288,24 @@ class PulsarViewModel(
     private val engagementTracker: EngagementTracker,
 ) : PulsarFeature {
 
-    // Providers sorted by their cheap `name` accessor — no Vibe construction
-    // forced. The list itself stays around for lazy access; vibeList below
-    // realizes the actual Vibe data only on first iteration.
-    private val sortedProviders: List<VibeProvider> =
-        vibeProviders.sortedBy { it.name }
+    // The injected set filtered + ordered through VibeCatalog (the green-light map):
+    // WIP/uncataloged vibes are curated out, catalog position = picker order, and the
+    // first LIVE entry is the fresh-install default. curate() touches only the cheap
+    // `name` accessor — no Vibe construction forced; vibeList below still realizes the
+    // actual Vibe data only on first iteration. (Saved/user vibes will merge inside the
+    // catalog when persistence lands — see VibeCatalog's KDoc hooks.)
+    private val curatedProviders: List<VibeProvider> =
+        VibeCatalog.curate(vibeProviders, visibleThrough = vibeCatalogPolicy.catalogLevel)
 
     // Lazy: the full vibeList materializes only when first iterated (e.g.
     // user opens the vibe dropdown or restoreSavedState looks up a name).
     // Until then, only the initial vibeFlow.value vibe is constructed.
     override val vibeList: List<Vibe> by lazy {
-        sortedProviders.map { it.vibe }
+        curatedProviders.map { it.vibe }
     }
 
     // Cheap accessor — never forces Vibe construction.
-    override val vibeNames: List<String> = sortedProviders.map { it.name }
+    override val vibeNames: List<String> = curatedProviders.map { it.name }
 
     private val log = logging("PulsarVM")
 
@@ -561,7 +570,7 @@ class PulsarViewModel(
     // Initial vibe = the first provider in class-name order. Forces ONE
     // vibe at construction; the other 25 stay lazy until vibeList is
     // iterated (e.g. by restoreSavedState or the dropdown).
-    override val vibeFlow = MutableStateFlow(sortedProviders.first().vibe)
+    override val vibeFlow = MutableStateFlow(curatedProviders.first().vibe)
     private val restoreComplete = CompletableDeferred<Unit>()
     private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
@@ -882,8 +891,8 @@ class PulsarViewModel(
         val name = saved.vibeName.ifEmpty { saved.vibe.name }
         // Use provider.name (cheap) to look up by name without forcing all
         // 26 vibes to materialize. Only the matched provider's `vibe` is built.
-        val provider = sortedProviders.firstOrNull { it.name == name }
-            ?: sortedProviders.first()
+        val provider = curatedProviders.firstOrNull { it.name == name }
+            ?: curatedProviders.first()
         applyVibe(provider.vibe)
         // Then override with saved macro values
         energyId.value = FloatValue(saved.energy)
@@ -917,7 +926,7 @@ class PulsarViewModel(
         style?.engineId ?: 0  // PAD (default for non-CHORDAL tracks — harmless)
 
     override fun applyVibeByName(name: String): Boolean {
-        val provider = sortedProviders.firstOrNull { it.name == name } ?: return false
+        val provider = curatedProviders.firstOrNull { it.name == name } ?: return false
         applyVibe(provider.vibe)
         return true
     }
