@@ -17,6 +17,12 @@
 #include <algorithm>
 #include <chrono>
 
+// The engine's atomic transfer array and the pulsar lick working buffer must
+// agree on capacity, or a full-length lick pushed from Kotlin silently
+// truncates (or the engine reads past pulsar_lick[]).
+static_assert(OrpheusEngine::kMaxLickSteps == kMaxLickSteps,
+              "engine transfer array and pulsar lick buffer must agree");
+
 static constexpr float kTidesNorm = 0.125f;
 
 // Per-bar slew rate for solo level/density crossfades. A full role swing
@@ -801,6 +807,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         // For 32-step vibes, generate bar 1 (16 steps) then apply bar strategy
         int bar1_len = (step_count_config > 16) ? 16 : step_count_config;
 
+        // Default: no half-lick truncation. Only FILL leads set this (below) so the
+        // tension half_lick flag can loop just their first bar; all other tracks stay full.
+        ts.half_loop_len = 0;
+
         LickMode lick_mode = static_cast<LickMode>(
             engine->pulsar_track_lick_mode[t].load(std::memory_order_relaxed));
 
@@ -861,6 +871,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             if (lick_mode == LickMode::FILL) {
                 // FILL: lick spans full step count, bypass bar strategy
                 ts.step_count = step_count_config;
+                // Tension half_lick can later loop just bar 1 of this FILL riff (the
+                // "jam on the first part" mode) — record its length. The full pattern
+                // is still built; the render-time playhead wrap does the truncation so
+                // it can toggle per-section without regenerating the pattern.
+                ts.half_loop_len = bar1_len;
                 if (bar_strategy == BarStrategy::CALL_RESPONSE) {
                     bar_strategy_call_response(ts.steps, step_count_config,
                                                state->lick, lick_len,
@@ -1047,6 +1062,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.chord_follow_override = (cf < 0.0f) ? -1 : static_cast<int>(cf);
             }
 
+            // Slot 15: per-section exit-scratch length in ms (0 = none).
+            sec.exit_scratch_ms = static_cast<int>(
+                engine->pulsar_section_data[base + 15].load(std::memory_order_relaxed));
+
             // Per-track section overrides; -1 = no override (per-track wins over section-level)
             {
                 int tbase = s * kNumPulsarTracks;
@@ -1200,6 +1219,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 const SectionParam& sec = arr.sections[init_sec];
                 if (sec.custom_progression_length > 0 || sec.chords_per_bar_override > 0) {
                     restart_progression_for_section(state, sec, engine);
+                }
+
+                // Apply the initial section's TENSION override. The section-change
+                // handler does this on every later transition, but the first section
+                // is entered via init_section_state (no advance_section fires), so
+                // without this the intro would play the vibe-base tension (loaded by
+                // reload_vibe_tension above) for its whole duration — a halfLick or
+                // custom-evolution intro would silently not take effect. Base tension
+                // is already loaded, so only replace it when this section overrides it.
+                if (sec.has_tension_override) {
+                    state->tension = sec.tension_override;
                 }
 
                 // Apply per-track section overrides for the initial section so
@@ -1614,8 +1644,17 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // (all tracks advance together on the same clock)
     bool step_is_odd = (state->tracks[0].playhead % 2) != 0;
 
+    // Task B — section-exit scratch hold: while a master record-scratch is active,
+    // FREEZE the pulsar clock. A frozen accumulator produces no step boundaries, so
+    // every track's playhead stays put, advance_section can't run, and the incoming
+    // section (e.g. the drop after the build's scratch) is held until the scratch
+    // drops back to live — its first steps aren't eaten. The scratch runs downstream
+    // on the master bus off its own past-audio ring buffer, so freezing pulsar is safe
+    // (it doesn't starve the scratch). Inert when no scratch is ever armed.
+    const bool scratch_hold = engine->master_scratch_l.is_active();
+
     for (int i = 0; i < num_frames; i++) {
-        state->clock_accumulator += 1.0;
+        if (!scratch_hold) state->clock_accumulator += 1.0;
 
         // Swing: alternate threshold between straight and delayed
         // swing_amount from complexity macro (use track 0's macro as global ref)
@@ -1790,7 +1829,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Determine gate state for voice rendering.
         for (int b = 0; b < num_boundaries; b++) {
             int prev_playhead = ts.playhead;
-            ts.playhead = (ts.playhead + 1) % ts.step_count;
+            // Tension half-lick: a FILL lead loops only its first bar while active,
+            // so the opening figure repeats/jams (its tone still breathes via evolution).
+            int loop_len = pulsar_effective_loop_len(ts, state->tension.half_lick);
+            ts.playhead = (ts.playhead + 1) % loop_len;
 
             // Advance chord progression on track 0 step boundaries
             if (t == 0) {
@@ -1813,12 +1855,28 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         state->section_state.outro_triggered = true;
                     }
 
+                    int prev_sec = state->section_state.current_section;  // outgoing section
                     bool section_changed = advance_section(
                         state->section_state, state->arrangement, state->mutation_seed);
 
                     if (section_changed) {
                         int cur_sec = state->section_state.current_section;
                         const SectionParam& sec = state->arrangement.sections[cur_sec];
+
+                        // Task B: if the section we just LEFT declared an exit scratch, arm
+                        // the master record-scratch NOW — synchronous with the flip, so no
+                        // Kotlin/flow latency (the arrangement poll is 5Hz). The clock-freeze
+                        // gate below (`scratch_hold`) then holds the incoming section's
+                        // sequencer while the scratch is active, so the drop is not eaten.
+                        if (prev_sec >= 0 && prev_sec < state->arrangement.section_count) {
+                            int scratch_ms = state->arrangement.sections[prev_sec].exit_scratch_ms;
+                            if (scratch_ms > 0) {
+                                int scratch_samples =
+                                    static_cast<int>(scratch_ms * engine->sample_rate / 1000.0f);
+                                engine->master_scratch_l.arm(scratch_samples, engine->sample_rate, 0);
+                                engine->master_scratch_r.arm(scratch_samples, engine->sample_rate, 0x55555555u);
+                            }
+                        }
 
                         // Apply section macro overrides
                         state->section_state.target_energy = sec.macro_overrides.energy;
@@ -1853,7 +1911,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // Initialize live lick for LickBuilder mode
                             if (sec.solo_mode == SoloModeId::LICK_BUILDER && state->lick_length > 0) {
                                 // Copy from struct-of-arrays lick into separate live buffers
-                                int n = state->lick_length < 32 ? state->lick_length : 32;
+                                int n = state->lick_length < kMaxLickSteps ? state->lick_length : kMaxLickSteps;
                                 state->live_lick_length = n;
                                 state->live_lick_active = true;
                                 for (int i = 0; i < n; i++) {
@@ -2039,7 +2097,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                         state->tracks[src].steps, state->tracks[src].step_count,
                                         static_cast<int>(live_root), sc,
                                         state->live_lick_degrees, state->live_lick_durations,
-                                        state->live_lick_velocities, 32);
+                                        state->live_lick_velocities, kMaxLickSteps);
                                     if (n > 0) {
                                         state->live_lick_length = n;
                                         state->live_lick_active = true;

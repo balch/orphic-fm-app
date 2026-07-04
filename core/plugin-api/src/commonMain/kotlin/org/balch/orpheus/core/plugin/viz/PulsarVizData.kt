@@ -1,6 +1,10 @@
 package org.balch.orpheus.core.plugin.viz
 
 const val PULSAR_NUM_TRACKS = 8
+// The viz step-grid EXPORT width — MUST equal C++ kPulsarVizSteps (orpheus_engine.h).
+// Decoupled from the sequencer/lick cap (kMaxPulsarSteps, 64): a >32-step pattern plays
+// fully but the on-screen grid shows only the first PULSAR_MAX_STEPS. The native producer
+// clamps to this; raising the grid to 64 must change BOTH sides in lockstep.
 const val PULSAR_MAX_STEPS = 32
 
 private const val NUM_TRACKS = PULSAR_NUM_TRACKS

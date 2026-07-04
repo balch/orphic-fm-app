@@ -251,6 +251,7 @@ if(BUILD_TESTS)
         test/test_pulsar_tension.cpp
         test/test_pulsar_solos.cpp
         test/test_pulsar_sections.cpp
+        test/test_pulsar_lick_marshalling.cpp
         test/test_pulsar_outro_request.cpp
         test/test_oboe_buffer.cpp
         test/test_pulsar_texture.cpp

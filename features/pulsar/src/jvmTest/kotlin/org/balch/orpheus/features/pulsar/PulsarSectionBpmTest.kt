@@ -40,6 +40,10 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -56,15 +60,16 @@ class PulsarSectionBpmTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val arrangementFlow = MutableStateFlow<PulsarArrangementState?>(ARRANGEMENT_STATE_UNKNOWN)
+    private val stubEngine = ArrangementStubEngine(arrangementFlow)
 
     @BeforeTest fun setUp() { Dispatchers.setMain(testDispatcher) }
     @AfterTest fun tearDown() { Dispatchers.resetMain() }
 
-    private fun pushSection(index: Int) {
+    private fun pushSection(index: Int, barsElapsed: Int = 0, barsTotal: Int = 8) {
         arrangementFlow.value = PulsarArrangementState(
             sectionIndex = index,
-            barsElapsed = 0,
-            barsTotal = 8,
+            barsElapsed = barsElapsed,
+            barsTotal = barsTotal,
             soloActive = false,
             soloTrack = -1,
             soloMode = 0,
@@ -81,6 +86,9 @@ class PulsarSectionBpmTest {
     private fun makeViewModel(
         vibe: Vibe,
         globalTempo: GlobalTempo,
+        providers: Set<VibeProvider> = setOf(SectionedVibeProvider(vibe)),
+        prefs: AppPreferencesRepository = StubPrefs(),
+        engine: SynthEngine = stubEngine,
     ): PulsarViewModel {
         val controller = SynthController().apply {
             val ports = mutableMapOf<String, PortValue>()
@@ -93,17 +101,15 @@ class PulsarSectionBpmTest {
             )
         }
         val portRegistry = PortRegistry(emptySet())
-        val engine = ArrangementStubEngine(arrangementFlow)
-        val appScope = makeAppCoroutineScope(testDispatcher)
         return PulsarViewModel(
             synthController = controller,
             synthEngine = engine,
             globalTempo = globalTempo,
-            appPreferencesRepository = StubPrefs(),
+            appPreferencesRepository = prefs,
             presetLoader = PresetLoader(portRegistry, globalTempo, controller),
             dispatcherProvider = TestDispatchers(testDispatcher),
             scope = FeatureCoroutineScope(),
-            vibeProviders = setOf(SectionedVibeProvider(vibe)),
+            vibeProviders = providers,
             playbackMode = PulsarPlaybackMode.EXPLICIT,
             songEndingPreferences = StubSongEndingPreferences(),
             transitionPreferences = StubTransitionPreferences(),
@@ -166,6 +172,64 @@ class PulsarSectionBpmTest {
     }
 
     @Test
+    fun `FireSky half-time intro plays slow then drops back to exactly the vibe bpm`() =
+        runTest(testDispatcher) {
+            // Regression guard for the 0.53x (not 0.5x) choice: FireSky is 114 BPM, so a
+            // literal 0.5x cold open would be 57 -> clamped to the 60 floor, and the drop
+            // (restore-by-ratio, x 1/0.5) would then over-restore to 60*2 = 120, running
+            // the whole electro body 6 BPM fast. 0.53x stays above the 60 floor so the
+            // slow sections are ~60.4 and the drop restores cleanly to 114.
+            val fireSky = org.balch.orpheus.features.pulsar.vibes.FireSkyVibe().vibe
+            val tempo = GlobalTempo(StubAudioEngine())
+            val vm = makeViewModel(fireSky, tempo)
+            vm.actions.setVibe(fireSky)
+            advanceUntilIdle()
+            assertBpmNear(60.42, tempo.getBpm(),
+                "applyVibe now applies the opening section's 0.53× itself (114 * 0.53), so the " +
+                    "intro is half-time immediately — no dependence on a section-0 emission")
+
+            pushSection(0); advanceUntilIdle()  // intro (cold open), mult 0.53 — idempotent re-emit
+            assertBpmNear(60.42, tempo.getBpm(),
+                "cold open (0.53x) should be ~60.4 BPM — above the 60 floor, not clamped")
+
+            pushSection(1); advanceUntilIdle()  // build, also mult 0.53
+            assertBpmNear(60.42, tempo.getBpm(),
+                "build (same 0.53x) should hold the half-time tempo, no change")
+
+            pushSection(2); advanceUntilIdle()  // verse — THE DROP, mult 1.0
+            assertBpmNear(114.0, tempo.getBpm(),
+                "drop into verse must restore EXACTLY 114 (a literal 0.5x would give 120)")
+        }
+
+    // NOTE: the exit-scratch is now triggered and held entirely in C++ (the pulsar unit
+    // arms the master scratch at the section flip and freezes its clock while active).
+    // The Kotlin VM no longer calls masterScratch, so that behavior is covered by the C++
+    // test `test_master_scratch_freezes_pulsar_clock` in test_pulsar_sections.cpp.
+
+    @Test
+    fun `switching from a fast vibe already on section 0 into FireSky still opens at half-time`() =
+        runTest(testDispatcher) {
+            // Reproduces the production bug: the prior vibe sits on section 0, so the
+            // section-BPM collector's distinctUntilChanged suppresses FireSky's section-0
+            // re-emission — applyVibe itself must apply the intro's 0.53×, not the collector.
+            val tempo = GlobalTempo(StubAudioEngine())
+            val vFast = sectionedVibe(bpm = 160f, mults = listOf(1.0f, 1.0f))
+            val fireSky = org.balch.orpheus.features.pulsar.vibes.FireSkyVibe().vibe
+
+            val vm = makeViewModel(vFast, tempo)
+            vm.actions.setVibe(vFast); advanceUntilIdle()
+            pushSection(0); advanceUntilIdle()   // leaves the flow parked on sectionIndex 0
+            assertBpmNear(160.0, tempo.getBpm(), "vFast section 0 (mult 1.0) = 160")
+
+            // Switch into FireSky WITHOUT any section re-emission (no -1/0 push): production
+            // has none, and distinctUntilChanged would swallow a 0→0 poll anyway.
+            vm.actions.setVibe(fireSky); advanceUntilIdle()
+            assertBpmNear(60.42, tempo.getBpm(),
+                "FireSky must open at ~60.4 (114 * 0.53) even when the prior vibe was on " +
+                    "section 0 and no section re-emission arrives")
+        }
+
+    @Test
     fun `vibe reload resets section-mult tracker so next section composes against vibe_bpm`() =
         runTest(testDispatcher) {
             val tempo = GlobalTempo(StubAudioEngine())
@@ -178,23 +242,67 @@ class PulsarSectionBpmTest {
             pushSection(1); advanceUntilIdle()
             assertBpmNear(60.0, tempo.getBpm(), "v1 section 1 should be 60")
 
-            // Switching vibes resets the BPM to v2.bpm (applyVibe does this) and
-            // resets lastSectionMult to 1.0 so the next section's multiplier
-            // applies on top of v2.bpm directly.
+            // Switching vibes: applyVibe(v2) applies v2's OPENING section mult (1.5) itself
+            // and seeds lastSectionMult=1.5, so BPM lands at 100 * 1.5 = 150 immediately and
+            // v1's 0.5× cannot leak forward.
             vm.actions.setVibe(v2); advanceUntilIdle()
-            assertBpmNear(100.0, tempo.getBpm(), "applyVibe(v2) should set BPM to v2.bpm")
+            assertBpmNear(150.0, tempo.getBpm(),
+                "applyVibe(v2) applies v2's intro mult 1.5 → 100 * 1.5 = 150 (no leak of v1's 0.5×)")
 
-            // arrangementFlow still holds sectionIndex=1 from v1. Re-emit to drive
-            // the v2 section path. Going to section 0 of v2 (mult=2.0) from the
-            // reset baseline (lastSectionMult=1.0) should produce 100 * 2.0.
-            pushSection(-1); advanceUntilIdle()  // move out of section so the next push isn't deduped
+            // A subsequent section-0 emission is idempotent (newMult == seeded oldMult 1.5),
+            // so it must NOT re-scale. pushSection(-1) is filtered out before
+            // distinctUntilChanged, so the following 0 still emits (1→0).
+            pushSection(-1); advanceUntilIdle()
             pushSection(0); advanceUntilIdle()
             assertBpmNear(150.0, tempo.getBpm(),
-                "v2 section 0 (mult=1.5) should be 100 * (1.5/1.0) = 150 after vibe reset")
+                "v2 section 0 (mult 1.5) re-emit is idempotent — stays 150")
+        }
+
+    @Test
+    fun `restoring a saved half-time-intro vibe opens at half-time, not the flat saved bpm`() =
+        runTest(testDispatcher) {
+            // Production repro of the "FireSky starts at full tempo on launch" bug. FireSky is
+            // the saved/default vibe and the previous session persisted the BODY tempo (114).
+            // On startup restoreSavedState() re-applies the saved bpm; if it ignores the opening
+            // section's 0.53x multiplier it restores the ~60 BPM half-time intro at the full 114
+            // body tempo. bpmId feeds the C++ pulsar clock's live override, so this is audible.
+            //
+            // graphReady is left PENDING so the VM's post-graph vibe re-apply (which re-seeds the
+            // intro tempo from vibe.bpm) can't mask the restore push — isolating the unit under
+            // test. In MIX_GATED that re-apply is itself re-clobbered by the presetFlow-driven
+            // second restore, so in production the (buggy) restore push is the last writer anyway.
+            val savedBpm = 114f
+            val savedJson = persistJson.encodeToString(
+                PulsarUiState(
+                    vibe = sectionedVibe(bpm = savedBpm, mults = listOf(1.0f)),
+                    vibeName = "Fire Sky",
+                    bpm = savedBpm,
+                )
+            )
+            val tempo = GlobalTempo(StubAudioEngine())
+            val pendingGraph = ArrangementStubEngine(
+                MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN),
+                graphReadyDeferred = CompletableDeferred(),  // never completes: hold the re-apply
+            )
+            makeViewModel(
+                vibe = FireSkyVibe().vibe,
+                globalTempo = tempo,
+                providers = setOf(FireSkyVibe()),
+                prefs = StubPrefs(AppPreferences(lastPulsarJson = savedJson)),
+                engine = pendingGraph,
+            )
+            advanceUntilIdle()
+
+            assertBpmNear(60.42, tempo.getBpm(),
+                "restore of FireSky (saved body bpm 114) must open the half-time intro at " +
+                    "114 * 0.53 = 60.42 — not the flat saved 114")
         }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
+
+// Mirrors PulsarViewModel.persistJson so a hand-built saved state round-trips identically.
+private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
 private fun sectionedVibe(bpm: Float, mults: List<Float>): Vibe {
     val sections = mults.mapIndexed { i, m ->
@@ -241,8 +349,8 @@ private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherPr
     override val unconfined get() = d
 }
 
-private class StubPrefs : AppPreferencesRepository {
-    private var prefs = AppPreferences()
+private class StubPrefs(initial: AppPreferences = AppPreferences()) : AppPreferencesRepository {
+    private var prefs = initial
     override suspend fun load() = prefs
     override suspend fun save(preferences: AppPreferences) { prefs = preferences }
     override suspend fun update(transform: (AppPreferences) -> AppPreferences) {
@@ -254,7 +362,13 @@ private class StubPrefs : AppPreferencesRepository {
 // drive section transitions. Everything else is a no-op.
 private class ArrangementStubEngine(
     private val arrangement: MutableStateFlow<PulsarArrangementState?>,
+    // Default: an already-completed graphReady, so the VM's post-graph vibe re-apply runs
+    // (matches most tests). Pass a pending CompletableDeferred() to hold that re-apply back
+    // and observe restoreSavedState()'s tempo push in isolation.
+    private val graphReadyDeferred: kotlinx.coroutines.Deferred<Unit> =
+        kotlinx.coroutines.CompletableDeferred(Unit),
 ) : SynthEngine {
+    override val graphReady: kotlinx.coroutines.Deferred<Unit> get() = graphReadyDeferred
     override val pulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> get() = arrangement
     override fun start() = Unit
     override fun stop() = Unit

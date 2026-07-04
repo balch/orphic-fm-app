@@ -74,10 +74,19 @@ import org.balch.orpheus.features.pulsar.models.chords
  * lands in cell 2 and is the signature lean-in.
  *
  * ## Arrangement
- * intro (bare riff + drums) -> verse (full band baseline) -> chorus (driving peak,
+ * intro (HALF-TIME cold open: the iconic riff ALONE at ~60 BPM — its correct, heavy
+ * pace — over a soft kick, nothing else) -> build (still half-time; the organ + bass
+ * swell in under the slow riff) -> verse (THE DROP: tempo snaps back to full 114 and
+ * the whole band crashes in — this is the electro version) -> chorus (driving peak,
  * lead pedals FIXED so the bVII/IV moves read as a hammering hook rather than an
  * octave-fold lurch) -> solo (band jams, riff develops) -> breakdown (one long
- * anticipation build) -> outro (climactic stomp). A/B against DogHouseVibe.
+ * anticipation build) -> outro (climactic stomp).
+ *
+ * The half-time intro and the full-tempo body play the SAME [Lick] at two speeds —
+ * pace lives in the sequencer clock, not the notes, so a per-section bpmMultiplier is
+ * all it takes. The engine floors BPM at 60, so the slow sections use 0.53x (not a
+ * literal 0.5x, which would clamp 57->60 and then over-restore the drop to 120).
+ * A/B against DogHouseVibe.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
@@ -103,49 +112,125 @@ class FireSkyVibe : VibeProvider {
     private val dropBars = 3
     private val bigLiftBars = 4
 
+    // The vibe's tension arc. Pulled out so the build section can .copy() it with
+    // halfLick = true (jam the first-bar hook) + wider tone evolution.
+    private val baseTension = TensionProfile(
+        innerBars = 8,   // >= 7 enables spurt + octave climax
+        outerBars = 32,
+        outerDepth = 0.55f,
+        volume = 0.30f,
+        tonal = TonalTension(octaveShift = true, chromaticPassing = 0.10f),  // riff jumps an octave at the peak
+        timing = 0.20f,
+        evolution = EvolutionTension(
+            timbreLow = 0.25f, timbreHigh = 0.62f, timbreProbability = 0.7f,  // the distortion breathes
+            morphLow = 0.35f, morphHigh = 0.55f, morphProbability = 0.5f,
+            attackPoint = 0.6f, releaseSpeed = 0.35f,  // peak past midpoint = a build into the next phrase
+        ),
+        spurtChance = 0.10f,  // occasional lick-mutation spurt — the riff gets wilder sometimes
+    )
+
+    // Build-section tension: the lead's tone breathes harder here (wider morph/timbre,
+    // faster inner ramp) as the band swells into the drop, and octaveShift is off so the
+    // slow riff stays grounded. halfLick stays off — it's reserved for solo use later.
+    private val buildTension = baseTension.copy(
+        innerBars = 3,  // fast tension ramp so the tone actually moves within the short build
+        tonal = baseTension.tonal.copy(halfLick = false, octaveShift = false),
+        evolution = baseTension.evolution.copy(
+            timbreLow = 0.20f, timbreHigh = 0.75f, timbreProbability = 0.85f,
+            morphLow = 0.30f, morphHigh = 0.72f, morphProbability = 0.75f,
+            attackPoint = 0.35f,  // tone reaches its peak earlier in the 2-bar section
+        ),
+    )
+
+    private val leadInTension = baseTension.copy(
+        innerBars = 2,  // fast tension ramp so the tone actually moves within the short build
+        tonal = baseTension.tonal.copy(halfLick = true, octaveShift = false),
+        evolution = baseTension.evolution.copy(
+            timbreLow = 0.20f, timbreHigh = 0.75f, timbreProbability = 0.85f,
+            morphLow = 0.30f, morphHigh = 0.72f, morphProbability = 0.75f,
+            attackPoint = 0.35f,  // tone reaches its peak earlier in the 2-bar section
+        ),
+    )
+
     val sectionList by lazy {
         listOf(
-            // 0: intro — the RIFF ALONE. Drums + lead riff, no organ/rhythm yet.
-            //    Lead pinned FIXED so the bare riff doesn't transpose before the band is in.
+            // 0: intro (cold open) — HALF-TIME. The iconic riff ALONE at its correct,
+            //    heavy pace: just the riff + a soft kick pulse, everything else out.
+            //    bpmMultiplier 0.53 drops 114 -> ~60 BPM (the engine's 60 floor; a
+            //    literal 0.5 would clamp 57->60 and then over-restore the drop to 120).
+            //    Lead pinned FIXED so the bare riff doesn't transpose.
             Section(
                 name = "intro",
-                barsMin = 2, barsMax = 4,
+                barsMin = 2, barsMax = 2,   // one slow riff statements (the riff loops every 2 bars)
+                bpmMultiplier = 0.53f,      // ~60 BPM half-time cold open — the riff's true pace
                 transitions = listOf(
-                    SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),
+                    SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),  // -> build
                 ),
                 macroOverrides = MacroOverrides(
-                    energy = 0.55f, complexity = 0.35f, space = 0.4f, mood = 0.5f,
+                    energy = 0.45f, complexity = 0.30f, space = 0.55f, mood = 0.5f,
                 ),
                 customProgression = chords(0),  // hang on the i alone
                 chordsPerBar = 1,
                 trackOverrides = mapOf(
+                    1 to TrackSectionOverride(density = 0.0f),                   // snare out
+                    2 to TrackSectionOverride(density = 0.0f),                   // hats out
+                    3 to TrackSectionOverride(density = 0.0f),                   // bass out — riff + kick only
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // bare riff, no transpose
                     5 to TrackSectionOverride(density = 0.0f),                   // organ out
                     6 to TrackSectionOverride(density = 0.0f),                   // rhythm gtr out
-                    7 to TrackSectionOverride(density = 0.05f),                  // minimal texture
+                    7 to TrackSectionOverride(density = 0.0f),                   // texture out — truly bare
                 ),
             ),
-            // 1: verse — full-band groove, the baseline. macroOverrides = null (verse IS baseline).
+            // 1: build — STILL HALF-TIME. The organ enters and the bass creeps in under
+            //    the slow riff, swelling toward the drop. Snare/hats/rhythm-gtr stay out
+            //    so they all crash in together at the verse (the "band kicks in"). Energy
+            //    lifts over the last liftBars into the drop.
+            Section(
+                name = "build",
+                barsMin = 2, barsMax = 2,   // two more slow statements as the organ swells
+                bpmMultiplier = 0.53f,      // same ~60 BPM half-time as the cold open
+                exitScratchMs = 500,        // record-scratch out of the build's tail, into the drop
+                transitions = listOf(
+                    SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = liftBars),  // -> verse = THE DROP (tempo snaps to 114)
+                ),
+                macroOverrides = MacroOverrides(
+                    energy = 0.65f, complexity = 0.42f, space = 0.45f, mood = 0.6f,
+                ),
+                customProgression = chords(0),  // still hanging on the i — hypnotic slow riff
+                chordsPerBar = 1,
+                // The lead's tone breathes harder as the organ swells (buildTension:
+                // wider morph/timbre, no octave leap). The full tension arc returns at
+                // the verse, which carries no override.
+                tensionOverride = buildTension,
+                trackOverrides = mapOf(
+                    1 to TrackSectionOverride(density = 0.0f),                   // snare still out
+                    2 to TrackSectionOverride(density = 0.0f),                   // hats still out
+                    3 to TrackSectionOverride(density = 0.30f),                  // bass creeps in
+                    4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // riff still FIXED
+                    5 to TrackSectionOverride(density = 0.32f, volume = 0.52f),  // organ ENTERS — the swell
+                    6 to TrackSectionOverride(density = 0.0f),                   // rhythm gtr out
+                    7 to TrackSectionOverride(density = 0.0f),                   // texture out
+                ),
+            ),
+            // 2: verse — full-band groove, the baseline. macroOverrides = null (verse IS baseline).
+            //    THE DROP lands here: tempo snaps from ~60 back to 114 and the full band enters.
             Section(
                 name = "verse",
-                barsMin = 6, barsMax = 10,
+                barsMin = 4, barsMax = 6,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.60f, transitionBars = liftBars),  // -> chorus
-                    SectionTransition(targetIndex = 3, weight = 0.25f, transitionBars = liftBars),  // -> solo
-                    SectionTransition(targetIndex = 4, weight = 0.15f, transitionBars = dropBars),  // -> breakdown
+                    SectionTransition(targetIndex = 3, weight = 1.0f, transitionBars = liftBars),  // -> chorus
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = null,
             ),
-            // 2: chorus — fuller, driving peak. Lead PEDALS FIXED so the bVII/IV moves
+            // 3: chorus — fuller, driving peak. Lead PEDALS FIXED so the bVII/IV moves
             //    read as a hammering hook, not an octave-fold lurch. Tighter pump progression.
             Section(
                 name = "chorus",
-                barsMin = 4, barsMax = 6,
+                barsMin = 2, barsMax = 4,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 1, weight = 0.40f, transitionBars = liftBars),  // -> verse
-                    SectionTransition(targetIndex = 3, weight = 0.35f, transitionBars = dropBars),  // -> solo
-                    SectionTransition(targetIndex = 4, weight = 0.25f, transitionBars = dropBars),  // -> breakdown
+                    SectionTransition(targetIndex = 4, weight = 0.75f, transitionBars = dropBars),  // -> solo
+                    SectionTransition(targetIndex = 6, weight = 0.25f, transitionBars = dropBars),  // -> breakdown
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
@@ -159,14 +244,27 @@ class FireSkyVibe : VibeProvider {
                     6 to TrackSectionOverride(density = 0.44f),                  // rhythm gtr drives harder
                 ),
             ),
-            // 3: solo — band jams over the groove; lead develops the riff (FOLLOW kept).
+            // 4: solo — band jams over the groove; lead develops the riff (FOLLOW kept).
+            Section(
+                name = "lead-in",
+                barsMin = 2, barsMax = 4,
+                tensionOverride = leadInTension,
+                transitions = listOf(
+                    SectionTransition(targetIndex = 5, weight = 1.0f, transitionBars = liftBars),  // -> chorus
+                ),
+                recencyDecay = 0.4f,
+                macroOverrides = MacroOverrides(
+                    energy = 1.9f, complexity = 1.4f, space = .75f, mood = 1.2f,
+                ),
+                soloMode = SoloMode.LongFill(probability = 0.85f),
+            ),
             Section(
                 name = "solo",
-                barsMin = 8, barsMax = 16,
+                barsMin = 6, barsMax = 8,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.50f, transitionBars = liftBars),  // -> chorus
-                    SectionTransition(targetIndex = 1, weight = 0.30f, transitionBars = liftBars),  // -> verse
-                    SectionTransition(targetIndex = 4, weight = 0.20f, transitionBars = dropBars),  // -> breakdown
+                    SectionTransition(targetIndex = 3, weight = 0.33f, transitionBars = liftBars),  // -> chorus
+                    SectionTransition(targetIndex = 2, weight = 0.33f, transitionBars = liftBars),  // -> verse
+                    SectionTransition(targetIndex = 6, weight = 0.34f, transitionBars = dropBars),  // -> breakdown
                 ),
                 recencyDecay = 0.4f,
                 macroOverrides = MacroOverrides(
@@ -174,14 +272,14 @@ class FireSkyVibe : VibeProvider {
                 ),
                 soloMode = SoloMode.Jam(probability = 0.85f),
             ),
-            // 4: breakdown — stripped to bass + drums + organ. Locked to 4 bars =
+            // 5: breakdown — stripped to bass + drums + organ. Locked to 4 bars =
             //    one long anticipation build into the chorus (bigLift).
             Section(
                 name = "breakdown",
                 barsMin = 4, barsMax = 4,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.70f, transitionBars = bigLiftBars), // -> chorus (THE lift)
-                    SectionTransition(targetIndex = 1, weight = 0.30f, transitionBars = liftBars),     // -> verse
+                    SectionTransition(targetIndex = 3, weight = 0.70f, transitionBars = bigLiftBars), // -> chorus (THE lift)
+                    SectionTransition(targetIndex = 2, weight = 0.30f, transitionBars = liftBars),     // -> verse
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
@@ -192,7 +290,7 @@ class FireSkyVibe : VibeProvider {
                     6 to TrackSectionOverride(density = 0.0f),   // rhythm gtr out
                 ),
             ),
-            // 5: outro — the climactic stomp: riff full-throttle, everyone in, pinned FIXED.
+            // 6: outro — the climactic stomp: riff full-throttle, everyone in, pinned FIXED.
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 6,
@@ -230,32 +328,41 @@ class FireSkyVibe : VibeProvider {
             mood = 0.75f,
             deep = 0.48f,
             // --- the riff (track 4 plays it as LickMode.Fill) ---
-            // BLUES degrees: 0=G, 1=Bb(b3), 2=C(4th), 3=Db(b5 blue note), 4=D(5th), 5=F(b7).
-            // Sequence [0,1,2] [0,1,3,2] [0,1,2] [1,0]; durations in BEATS sum to exactly
-            // 8.0 (= 2 bars), all multiples of 0.25 so every onset lands on the 16th grid.
-            // No rest — the riff is relentless.
+            // BLUES degrees: 0=G, 1=Bb(b3), 2=C(4th), 3=Db(b5 blue note), 4=D(5th), 5=F(b7), 6=G(oct).
+            // Copyright-safe rewrite (highest-exposure source — pushed hardest): keeps the heavy
+            // G-blues single-note stomp (scale, low-mid register, gritty, relentless/no-rest) but
+            // abandons the recognizable cell chain — opens on a descending root gallop, moves the
+            // b5 off its telltale slot into a fast descending crush, leaps to the OCTAVE as an
+            // arch-shaped peak, and drops the 4th entirely. Faithful original preserved in
+            // FireSkyOgVibe (WIP, -Pcatalog). 2 bars, sums to exactly 8.0 beats, no rest.
             lick = Lick(
                 steps = listOf(
-                    // cell 1: G  Bb  C   — state the figure
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),  // G  (downbeat, hard)
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),  // Bb (b3, passing up)
-                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),  // C  (4th, held answer-tone)
-                    // cell 2: G  Bb  Db  C — push past it to the BLUE NOTE
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),  // G
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),  // Bb (b3)
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),  // Db (b5 — the signature blue note)
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.85f),  // C  (4th, settle back)
-                    // cell 3: G  Bb  C   — restate
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),  // G
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),  // Bb (b3)
-                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),  // C  (4th, held)
-                    // cell 4: Bb  G     — the answer / landing
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),  // Bb (b3)
-                    LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.90f),  // G  (home, let-ring)
+                    // bar 1 — 16th gallop that DROPS to the b7, a fast b5 crush, up to the 5th
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.78f), // D  5 — pickup
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.98f), // G  root ┐ gallop
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.85f), // G  root ┘
+                    LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.88f),  // F  b7 — drop below the tonic
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f), // G  root
+                    LickStep(scaleDegree = 3, duration = 0.25f, velocity = 0.72f), // Db b5 — fast descending crush
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.86f),  // D  5
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.90f), // G  root
+                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.80f), // Bb b3
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.84f), // D  5 — launch
+                    // bar 2 — leap to the OCTAVE peak, bluesy b7-5-b3 tail, low gallop, long home
+                    LickStep(scaleDegree = 6, duration = 0.75f, velocity = 0.92f), // G  octave — arch peak, let-ring
+                    LickStep(scaleDegree = 5, duration = 0.25f, velocity = 0.82f), // F  b7 ┐
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.80f), // D  5  │ turnaround tail
+                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.78f),  // Bb b3 ┘
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f), // G  root ┐ gallop chug
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.85f), // G  root ┘
+                    LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.80f),  // F  b7
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.82f), // D  5
+                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.76f), // Bb b3
+                    LickStep(scaleDegree = 0, duration = 1.75f, velocity = 0.90f), // G  root — long let-ring close
                 ),
-                loopLength = 8,  // 2 bars; notes sum to 8.0 — no rest, the riff is relentless
+                loopLength = 8,  // 2 bars; notes sum to 8.0 — no rest, relentless
             ),
-            lickMutation = 0.10f,  // hook stays instantly recognizable run-to-run; just-living variation
+            lickMutation = 0.18f,  // bumped for copyright distance (more run-to-run drift off the figure)
             lickOctave = -1,       // auto = midpoint of the lead's note range (low-mid guitar register)
             genre = GenreProfile(
                 swingAmount = 0.04f,          // near-straight rock; a hair off the grid for human feel
@@ -489,20 +596,7 @@ class FireSkyVibe : VibeProvider {
                 },
             ),
             stepCount = 32,  // 2 bars / 8 beats — the full riff as one LickMode.Fill phrase
-            tension = TensionProfile(
-                innerBars = 8,   // >= 7 enables spurt + octave climax
-                outerBars = 32,
-                outerDepth = 0.55f,
-                volume = 0.30f,
-                tonal = TonalTension(octaveShift = true, chromaticPassing = 0.10f),  // riff jumps an octave at the peak
-                timing = 0.20f,
-                evolution = EvolutionTension(
-                    timbreLow = 0.25f, timbreHigh = 0.62f, timbreProbability = 0.7f,  // the distortion breathes
-                    morphLow = 0.35f, morphHigh = 0.55f, morphProbability = 0.5f,
-                    attackPoint = 0.6f, releaseSpeed = 0.35f,  // peak past midpoint = a build into the next phrase
-                ),
-                spurtChance = 0.10f,  // occasional lick-mutation spurt — the riff gets wilder sometimes
-            ),
+            tension = baseTension,
             effects = VibeEffects(
                 delayTimeA = 0.18f,       // tight slapback, not spacious
                 delayTimeB = 0.28f,

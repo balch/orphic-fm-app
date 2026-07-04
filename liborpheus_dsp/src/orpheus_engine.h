@@ -69,6 +69,19 @@
 #include <cstring>
 
 static constexpr int kNumMainVoices = 12;
+
+// Pulsar viz EXPORT width. The Kotlin<->native step-grid buffer contract is
+// kNumPulsarTracks * kPulsarVizSteps ints/floats (= 256). DECOUPLED from
+// kMaxPulsarSteps (the sequencer/lick cap, now 64): a >32-step pattern PLAYS in full,
+// but the on-screen step grid only exports/shows its first kPulsarVizSteps steps.
+// Every viz consumer buffer (jni_bridge_desktop/android, IosAudioEngine,
+// SynthEngineMonitor, PulsarVizData) is sized to this, and the producer
+// orpheus_engine_get_pulsar_viz MUST clamp to it — otherwise it overruns those
+// fixed-size buffers (native overflow at ~60fps). Raising the on-screen grid to 64
+// is a follow-up that must grow all of those consumers in lockstep.
+static constexpr int kPulsarVizSteps = 32;
+static_assert(kPulsarVizSteps <= kMaxPulsarSteps,
+              "viz export reads from the kMaxPulsarSteps-sized PulsarViz struct");
 static constexpr int kNumDrumVoices = 3;
 static constexpr int kDrumVoiceStart = kNumMainVoices;  // 12
 static constexpr int kNumVoices = kNumMainVoices + kNumDrumVoices;  // 15
@@ -831,7 +844,7 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL
     std::atomic<int>   pulsar_track_bar_strategy[8]{};  // BarStrategy enum (0-4)
     std::atomic<int>   pulsar_track_evo_rhythmic[8]{};
-    std::atomic<int>   pulsar_step_count{16};           // 16 or 32
+    std::atomic<int>   pulsar_step_count{16};           // 16, 32, or 64
 
     // Per-track macro maps (set by Kotlin on vibe load)
     // 8 targets × 2 (min/max) = 16 floats per track
@@ -870,7 +883,8 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_custom_progression_glide[12]{};
 
     // Lick transfer buffer (written by Kotlin before setting lick_length)
-    static constexpr int kMaxLickSteps = 32;
+    static constexpr int kMaxLickSteps = 64;
+    static constexpr int kLickFieldsPerStep = 4;   // degree, duration, velocity, glide
     struct LickStepAtomic {
         int8_t scale_degree;
         float duration;

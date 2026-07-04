@@ -133,6 +133,65 @@ static bool test_viz_lfo_integration() {
     return pass;
 }
 
+// Regression: a 64-step vibe drives the pulsar playhead/step_count past the viz window
+// (kPulsarVizSteps=32), but the consumer viz arrays — gates_out/velocities_out here, and the
+// Kotlin stepGates/stepVelocities that mirror them — are only kPulsarVizSteps wide.
+// orpheus_engine_get_pulsar_viz must clamp the exported playhead/step_count to that window,
+// or PulsarStepGrid's `if (ph < stepCounts[t]) stepGates[t][ph]` indexes a 32-wide array at
+// >=32 and crashes (ArrayIndexOutOfBoundsException on the viz frame callback).
+static bool test_pulsar_viz_clamps_to_window() {
+    printf("\n=== Test: pulsar viz clamps 64-step playhead/step_count to window ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(SR);
+    bool pass = true;
+
+    // Simulate the audio thread's written viz state for a mix of pattern lengths:
+    //   t0: 16-step (normal), t1: 32-step at the edge, t2/t3: 64-step with the playhead
+    //   already past the 32-step window (exactly the state a Corner Office loop reaches).
+    auto& viz = engine->pulsar_viz;
+    for (int t = 0; t < kNumPulsarTracks; t++) { viz.playheads[t] = 0; viz.step_counts[t] = 0; }
+    viz.playheads[0] = 0;  viz.step_counts[0] = 16;
+    viz.playheads[1] = 31; viz.step_counts[1] = 32;
+    viz.playheads[2] = 40; viz.step_counts[2] = 64;
+    viz.playheads[3] = 63; viz.step_counts[3] = 64;
+
+    // Output buffers sized exactly as the real consumers (JNI/iOS/monitor) allocate them.
+    int   gates_out[kNumPulsarTracks * kPulsarVizSteps];
+    float vels_out[kNumPulsarTracks * kPulsarVizSteps];
+    int   playheads_out[kNumPulsarTracks];
+    int   step_counts_out[kNumPulsarTracks];
+    orpheus_engine_get_pulsar_viz(engine, gates_out, vels_out, playheads_out, step_counts_out);
+
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        // Contract: nothing exported may exceed the viz window.
+        if (step_counts_out[t] > kPulsarVizSteps) {
+            printf("  FAIL t%d: step_count %d > window %d\n", t, step_counts_out[t], kPulsarVizSteps);
+            pass = false;
+        }
+        if (playheads_out[t] >= kPulsarVizSteps) {
+            printf("  FAIL t%d: playhead %d >= window %d\n", t, playheads_out[t], kPulsarVizSteps);
+            pass = false;
+        }
+        // Crash-repro: mirror PulsarStepGrid's exact access. When the guard passes, the index
+        // into a kPulsarVizSteps-wide array must be in bounds.
+        int ph = playheads_out[t];
+        if (ph < step_counts_out[t] && (ph < 0 || ph >= kPulsarVizSteps)) {
+            printf("  FAIL t%d: consumer would index stepGates[%d] into a %d-wide array\n",
+                   t, ph, kPulsarVizSteps);
+            pass = false;
+        }
+    }
+
+    // <=32 tracks must pass through unchanged (no over-clamping of the visible grid).
+    if (playheads_out[0] != 0  || step_counts_out[0] != 16) { pass = false; printf("  FAIL: 16-step passthrough\n"); }
+    if (playheads_out[1] != 31 || step_counts_out[1] != 32) { pass = false; printf("  FAIL: 32-step edge passthrough\n"); }
+    printf("  t2 (in 40/64) -> playhead=%d step_count=%d\n", playheads_out[2], step_counts_out[2]);
+    printf("  t3 (in 63/64) -> playhead=%d step_count=%d\n", playheads_out[3], step_counts_out[3]);
+
+    orpheus_engine_destroy(engine);
+    printf("pulsar viz clamp: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_viz_tests() {
     printf("\n══════════════════════════════════════\n");
     printf("  SIGNAL VISUALIZATION TESTS\n");
@@ -144,6 +203,7 @@ bool run_viz_tests() {
     tally(test_viz_get_api());
     tally(test_viz_get_api_lapping());
     tally(test_viz_lfo_integration());
+    tally(test_pulsar_viz_clamps_to_window());
     printf("\nViz tests: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

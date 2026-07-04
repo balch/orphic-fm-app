@@ -77,7 +77,8 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param space Starting space level 0-1. Higher = longer decays, more reverb/delay sends.
  * @param mood Starting mood 0-1. Affects harmonics and timbre across tracks.
  * @param deep Starting depth 0-1. Controls wet/dry mix for vibe effects (delay + reverb).
- * @param stepCount Steps per pattern. 16 = standard, 32 = double-length phrases.
+ * @param stepCount Steps per pattern. 16 = standard, 32 = double-length phrases,
+ *   64 = quad-length phrases (max).
  * @param tension Build-and-release arc configuration.
  * @param arrangement Optional section-based structure (verse, chorus, solo, etc.)
  * @param effects Delay and reverb tuning for this vibe.

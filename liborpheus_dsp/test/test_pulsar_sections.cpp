@@ -722,6 +722,80 @@ static bool test_tension_override_then_inherit() {
     return ok;
 }
 
+static bool test_initial_section_tension_override_applied_on_load() {
+    printf("\n=== Test: Initial section's tension override applies on load (before any transition) ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+
+    // Vibe-level tension: distinctive base volume = 0.3
+    engine->pulsar_tension_inner_bars.store(4, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+    engine->pulsar_tension_volume.store(0.3f, std::memory_order_relaxed);
+
+    push_two_section_ab_arrangement(engine, 1);
+    // The AB helper defaults intro_index to -1 (random weighted start); pin it to 0
+    // so the section carrying the override below is deterministically the initial one.
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+
+    // Override on the INITIAL section (0) with distinctive volume = 0.9. Before the
+    // fix, load_vibe left the intro on the vibe base (0.3) until the first transition.
+    engine->pulsar_section_tension_active[0].store(1, std::memory_order_relaxed);
+    constexpr int kSectionStride = 21;
+    const int tb = 0 * kSectionStride;
+    engine->pulsar_section_tension_data[tb + 0].store(4.0f, std::memory_order_relaxed);  // inner_bars
+    engine->pulsar_section_tension_data[tb + 1].store(0.0f, std::memory_order_relaxed);  // outer_bars
+    engine->pulsar_section_tension_data[tb + 2].store(0.5f, std::memory_order_relaxed);  // outer_depth
+    engine->pulsar_section_tension_data[tb + 3].store(0.9f, std::memory_order_relaxed);  // volume <-- distinctive
+    engine->pulsar_section_tension_data[tb + 4].store(0.2f, std::memory_order_relaxed);  // timing
+    engine->pulsar_section_tension_data[tb + 5].store(0.0f, std::memory_order_relaxed);  // octave_shift
+    engine->pulsar_section_tension_data[tb + 6].store(0.0f, std::memory_order_relaxed);  // key_shift
+    engine->pulsar_section_tension_data[tb + 7].store(0.0f, std::memory_order_relaxed);  // half_lick
+    engine->pulsar_section_tension_data[tb + 8].store(0.0f, std::memory_order_relaxed);  // chromatic_passing
+    engine->pulsar_section_tension_data[tb + 9].store(0.25f, std::memory_order_relaxed); // evo_timbre_low
+    engine->pulsar_section_tension_data[tb + 10].store(0.55f, std::memory_order_relaxed);// evo_timbre_high
+    engine->pulsar_section_tension_data[tb + 11].store(0.5f, std::memory_order_relaxed); // evo_timbre_prob
+    engine->pulsar_section_tension_data[tb + 12].store(-1.0f, std::memory_order_relaxed);// evo_morph_low
+    engine->pulsar_section_tension_data[tb + 13].store(-1.0f, std::memory_order_relaxed);// evo_morph_high
+    engine->pulsar_section_tension_data[tb + 14].store(0.5f, std::memory_order_relaxed); // evo_morph_prob
+    engine->pulsar_section_tension_data[tb + 15].store(-1.0f, std::memory_order_relaxed);// evo_harm_low
+    engine->pulsar_section_tension_data[tb + 16].store(-1.0f, std::memory_order_relaxed);// evo_harm_high
+    engine->pulsar_section_tension_data[tb + 17].store(0.3f, std::memory_order_relaxed); // evo_harm_prob
+    engine->pulsar_section_tension_data[tb + 18].store(0.5f, std::memory_order_relaxed); // evo_attack_point
+    engine->pulsar_section_tension_data[tb + 19].store(0.3f, std::memory_order_relaxed); // evo_release_speed
+    engine->pulsar_section_tension_data[tb + 20].store(0.0f, std::memory_order_relaxed); // spurt_chance
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    // The first render runs load_vibe (initial-section entry). Assert the intro's
+    // override is live immediately — BEFORE any advance_section transition fires
+    // (one 512-frame block at 240 BPM is far shorter than a bar, so section stays 0).
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = ps != nullptr
+           && ps->section_state.current_section == 0
+           && std::fabs(ps->tension.volume - 0.9f) < 1e-5f;
+
+    if (!ps) {
+        printf("  FAIL: no pulsar state\n");
+    } else {
+        printf("  initial section=%d, tension.volume=%.4f (expected 0.90 override, NOT 0.30 base) -- %s\n",
+               ps->section_state.current_section, ps->tension.volume, ok ? "OK" : "FAIL");
+    }
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 static bool test_section_comping_humanization_override_loads() {
     printf("\n=== Test: Section comping humanization override loads from atomics ===\n");
 
@@ -1492,6 +1566,173 @@ static bool test_generate_jam_solo_line() {
     return ok;
 }
 
+// ── P1-T5: >32-step FILL lick renders through the sequencer ────────────────
+//
+// The lick marshalling tests (test_pulsar_lick_marshalling.cpp) only prove
+// the Kotlin -> C++ round-trip of engine->pulsar_lick[]/lick_length. This
+// test proves the RENDER path: a 48-step FILL lick (cap now 64, so 48 is
+// valid) becomes the track's ts.step_count, every one of its 48 steps is
+// rendered into ts.steps[] as authored, and the sequencer's playhead wraps
+// at 48 (not 32, and not 64 — the kMaxPulsarSteps buffer bound).
+static bool test_fill_lick_48_steps_renders_and_wraps() {
+    printf("\n=== Test: 48-step FILL lick renders through the sequencer and wraps at 48 ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+    engine->pulsar_seed.store(424242, std::memory_order_relaxed);  // pin RNG (avoid wall-clock re-stir)
+
+    // setup_cosmic_techno's role[] marks track 4 (keys) MELODIC — make it the
+    // FILL lead. Zero mutation so the authored lick renders byte-for-byte
+    // (no random degree/velocity/duration perturbation from generate_lick_pattern).
+    constexpr int kLeadTrack = 4;
+    engine->pulsar_track_lick_mode[kLeadTrack].store(2 /* FILL */, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);   // auto
+    engine->pulsar_lick_loop_length.store(0, std::memory_order_relaxed); // no rest padding
+
+    // 48-step lick: one scale-degree note per sequencer step (duration=0.25 beat
+    // == 1 slot at 4 steps/beat), each step carrying a distinct velocity so
+    // truncation/collapse at any index is unmistakable. Degrees cycle 0..6 so
+    // the octave-quantized MIDI note stays in a sane range.
+    constexpr int kSteps = 48;
+    for (int i = 0; i < kSteps; i++) {
+        engine->pulsar_lick[i].scale_degree = static_cast<int8_t>(i % 7);
+        engine->pulsar_lick[i].duration = 0.25f;
+        engine->pulsar_lick[i].velocity = 0.5f + i * 0.01f;   // distinct per step, stays <= 0.97
+        engine->pulsar_lick[i].glide_rate = -1.0f;
+    }
+    engine->pulsar_lick_length.store(kSteps, std::memory_order_release);  // release-fence LAST
+
+    engine->pulsar_step_count.store(kSteps, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    // One process call is enough to run load_vibe() and render the FILL pattern
+    // into ts.steps[] — we don't need audio playback for the static checks.
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = (ps != nullptr);
+    if (!ok) {
+        printf("  FAIL: PulsarState was null after process call\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+
+    const PulsarTrackState& ts = ps->tracks[kLeadTrack];
+
+    bool step_count_ok = (ts.step_count == kSteps);
+    printf("  lead track step_count=%d (expected %d) -- %s\n",
+           ts.step_count, kSteps, step_count_ok ? "OK" : "FAIL");
+
+    // Spot-check steps 0, 32 (past the OLD 32-step cap), and 47 (the tail,
+    // exactly what a 32-cap or an off-by-one would have dropped/clipped).
+    auto check_step = [&](int i) -> bool {
+        const PulsarStep& s = ts.steps[i];
+        float expected_vel = 0.5f + i * 0.01f;
+        bool gate_ok = s.gate;
+        bool vel_ok = approx(s.velocity, expected_vel);
+        printf("  step %2d: gate=%d velocity=%.4f (expected gate=1, velocity=%.4f) -- %s\n",
+               i, s.gate, s.velocity, expected_vel,
+               (gate_ok && vel_ok) ? "OK" : "FAIL");
+        return gate_ok && vel_ok;
+    };
+    bool step0_ok  = check_step(0);
+    bool step32_ok = check_step(32);
+    bool step47_ok = check_step(47);
+
+    // No read past kMaxPulsarSteps (64): the fixed-size steps[] buffer bound
+    // itself guards this at compile time, but the functional contract is that
+    // the RENDERED pattern never claims more than the buffer holds.
+    bool bound_ok = (ts.step_count <= kMaxPulsarSteps);
+    printf("  step_count within kMaxPulsarSteps buffer bound (%d <= %d) -- %s\n",
+           ts.step_count, kMaxPulsarSteps, bound_ok ? "OK" : "FAIL");
+
+    // ── Playhead wrap: advance the sequencer and confirm it wraps at 48, ──
+    // ── not 32 (old cap) and not 64 (buffer bound).                      ──
+    // Drive audio at 240 BPM (16 steps/sec at 48kHz => 3000 samples/step)
+    // in small blocks so every step boundary is observable, and watch for
+    // the playhead to return to 0 after having reached 47 (never touching
+    // 48+, which the % loop_len wrap makes impossible by construction, but
+    // an assertion here still proves it empirically from the render path).
+    int max_seen = -1;
+    bool saw_47 = false;
+    bool wrapped_after_47 = false;
+    bool ever_hit_48_or_more = false;
+    int prev_playhead = ts.playhead;
+
+    for (int i = 0; i < 4000 && !wrapped_after_47; i++) {
+        unit_process_pulsar(&unit, engine, 64, 48000.0f);
+        int ph = ps->tracks[kLeadTrack].playhead;
+        if (ph > max_seen) max_seen = ph;
+        if (ph >= kSteps) ever_hit_48_or_more = true;
+        if (ph == kSteps - 1) saw_47 = true;
+        if (saw_47 && prev_playhead == kSteps - 1 && ph == 0) wrapped_after_47 = true;
+        prev_playhead = ph;
+    }
+
+    bool wrap_ok = saw_47 && wrapped_after_47 && !ever_hit_48_or_more;
+    printf("  playhead: max_seen=%d saw_47=%d wrapped_47->0=%d ever>=48=%d -- %s\n",
+           max_seen, saw_47, wrapped_after_47, ever_hit_48_or_more, wrap_ok ? "OK" : "FAIL");
+
+    ok = step_count_ok && step0_ok && step32_ok && step47_ok && bound_ok && wrap_ok;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+static bool test_master_scratch_freezes_pulsar_clock() {
+    printf("\n=== Test: an active master scratch freezes the pulsar clock (holds the incoming section) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+
+    // First render allocates pulsar_state, so read ps only after warming up.
+    for (int i = 0; i < 10; i++) unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    PulsarState* ps = engine->pulsar_state;
+    if (!ps) { printf("  FAIL: no pulsar state\n"); orpheus_engine_destroy(engine); return false; }
+
+    // Control: with NO scratch active, the clock advances (track 0 playhead moves).
+    // ~30 blocks * 512 = 15360 samples ≈ 2.5 steps at 120 BPM (6000 samples/step).
+    int t0_start = ps->tracks[0].playhead;
+    for (int i = 0; i < 30; i++) unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    bool advanced_normally = ps->tracks[0].playhead != t0_start;
+
+    // Snapshot every playhead, arm a long (1s) scratch, render many blocks. Because
+    // unit_process_pulsar does not process the master unit, samples_left_ never drains,
+    // so is_active() stays true and the freeze holds for all 60 blocks (~5 steps' worth).
+    int ph_before[kNumPulsarTracks];
+    for (int t = 0; t < kNumPulsarTracks; t++) ph_before[t] = ps->tracks[t].playhead;
+    engine->master_scratch_l.arm(48000, 48000, 0);
+    engine->master_scratch_r.arm(48000, 48000, 0x55555555u);
+    for (int i = 0; i < 60; i++) unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    bool frozen = true;
+    for (int t = 0; t < kNumPulsarTracks; t++)
+        if (ps->tracks[t].playhead != ph_before[t]) frozen = false;
+
+    bool ok = advanced_normally && frozen;
+    printf("  advances w/o scratch=%d, all playheads frozen during scratch=%d -- %s\n",
+           advanced_normally, frozen, ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -1507,6 +1748,9 @@ bool run_pulsar_sections_tests() {
     tally(test_section_progression_inheritance_resets_index());
     tally(test_tension_phase_resets_without_override());
     tally(test_tension_override_then_inherit());
+    tally(test_initial_section_tension_override_applied_on_load());
+    tally(test_master_scratch_freezes_pulsar_clock());
+    tally(test_fill_lick_48_steps_renders_and_wraps());
     tally(test_section_macro_crossfade());
     tally(test_section_comping_humanization_override_loads());
     tally(test_section_macro_subbar_lerp());

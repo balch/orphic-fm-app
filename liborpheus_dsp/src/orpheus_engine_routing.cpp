@@ -1024,8 +1024,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strncmp(symbol, "lick_data_", 10) == 0) {
             int idx = std::atoi(symbol + 10);
-            int step = idx / 4;
-            int field = idx % 4;
+            int step = idx / OrpheusEngine::kLickFieldsPerStep;
+            int field = idx % OrpheusEngine::kLickFieldsPerStep;
             if (step >= 0 && step < OrpheusEngine::kMaxLickSteps) {
                 switch (field) {
                     case 0: engine->pulsar_lick[step].scale_degree = static_cast<int8_t>(value); break;

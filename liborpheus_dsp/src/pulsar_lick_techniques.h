@@ -25,7 +25,7 @@ inline void init_live_lick(
 ) {
     live_length = src_length;
     live_active = src_length > 0;
-    for (int i = 0; i < src_length && i < 32; i++) {
+    for (int i = 0; i < src_length && i < kMaxLickSteps; i++) {
         live_degrees[i] = src_degrees[i];
         live_durations[i] = src_durations[i];
         live_velocities[i] = src_velocities[i];

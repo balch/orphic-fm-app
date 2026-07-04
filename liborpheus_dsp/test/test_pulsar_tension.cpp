@@ -104,6 +104,33 @@ static bool test_tension_struct_defaults() {
     return ok;
 }
 
+static bool test_half_lick_effective_loop_len() {
+    printf("\n=== Test: half_lick truncates a FILL lead to its first bar ===\n");
+    // A 32-step FILL lead records half_loop_len = 16 (bar 1). With half_lick active
+    // the sequencer loops just those 16 steps; without it, the full 32.
+    PulsarTrackState fill{};
+    fill.step_count = 32;
+    fill.half_loop_len = 16;
+    bool ok = pulsar_effective_loop_len(fill, true)  == 16   // jam the first bar
+           && pulsar_effective_loop_len(fill, false) == 32;  // full riff at the drop
+
+    // A non-FILL track (half_loop_len = 0) is never truncated, even under half_lick —
+    // so drums/bass keep their full pattern while the lead jams.
+    PulsarTrackState perc{};
+    perc.step_count = 32;
+    perc.half_loop_len = 0;
+    ok = ok && pulsar_effective_loop_len(perc, true) == 32;
+
+    // Guard: a 16-step vibe whose bar1 == step_count is a no-op (no phantom truncation).
+    PulsarTrackState oneBar{};
+    oneBar.step_count = 16;
+    oneBar.half_loop_len = 16;
+    ok = ok && pulsar_effective_loop_len(oneBar, true) == 16;
+
+    printf("  half_lick loop length -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_tension_chromatic_passing_math() {
     printf("\n=== Test: Chromatic passing probability scales with intensity ===\n");
     float base_prob = 0.5f;
@@ -349,6 +376,7 @@ bool run_pulsar_tension_tests() {
     tally(test_tension_timing_scaling());
     tally(test_tension_evolution_attack_point());
     tally(test_tension_struct_defaults());
+    tally(test_half_lick_effective_loop_len());
     tally(test_tension_chromatic_passing_math());
     // Lick evolution spurt tests
     tally(test_spurt_triggers_at_tension_peak());

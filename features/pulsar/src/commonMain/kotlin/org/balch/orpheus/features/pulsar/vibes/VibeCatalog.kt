@@ -88,7 +88,9 @@ object VibeCatalog {
         "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
         "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
+        "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Rust Belt" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
+        "Rust Belt OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
@@ -99,6 +101,7 @@ object VibeCatalog {
 
 // -----------------------------
         "Corner Office" to CatalogEntry(VibeStatus.WIP, tags = listOf("funk", "rock", "riff")),
+        "Corner Office OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         // ── STEALTH: grooves and moods ──
         "Army Stomp" to CatalogEntry(VibeStatus.WIP, tags = listOf("march")),
         "Swamp Swagger" to CatalogEntry(VibeStatus.WIP, tags = listOf("swamp")),

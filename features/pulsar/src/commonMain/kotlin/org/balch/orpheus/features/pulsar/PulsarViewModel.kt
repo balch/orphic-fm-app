@@ -9,6 +9,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,6 +60,7 @@ import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
@@ -409,8 +413,9 @@ class PulsarViewModel(
     private val progressionDriftRangeId = synthController.controlFlow(PulsarSymbol.PROGRESSION_DRIFT_RANGE.controlId)
     private val lickLengthId = synthController.controlFlow(PulsarSymbol.LICK_LENGTH.controlId)
     private val lickLoopLengthId = synthController.controlFlow(PulsarSymbol.LICK_LOOP_LENGTH.controlId)
-    // 32 lick steps × 4 floats per step (degree, duration, velocity, glide_rate).
-    private val lickDataIds = (0..127).map { i ->
+    // MAX_LICK_STEPS lick steps × LICK_FIELDS_PER_STEP floats per step
+    // (degree, duration, velocity, glide_rate).
+    private val lickDataIds = (0 until Lick.MAX_LICK_STEPS * Lick.LICK_FIELDS_PER_STEP).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i].controlId)
     }
 
@@ -578,6 +583,12 @@ class PulsarViewModel(
     // by the section-BPM collector and reset to 1.0f at every applyVibe (since
     // applyVibe resets globalTempo to vibe.bpm — the 1.0× baseline).
     @Volatile private var lastSectionMult: Float = 1.0f
+
+    // Accelerando (Section.bpmRampBars): the in-flight tempo-ramp job, and a guard so a
+    // ramp fires at most once per section visit. Cancelled + snapped-to-target on every
+    // section change so the drop can never overshoot (the FireSky 0.5× clamp trap).
+    @Volatile private var bpmRampJob: Job? = null
+    private var rampStartedForSectionVisit: Boolean = false
 
     // Per-track effective send base values. Section overrides may swap these
     // between vibe load and the next vibe load — pushEffectiveSends reads from
@@ -824,28 +835,74 @@ class PulsarViewModel(
                 bpmId.value = FloatValue(bpm.toFloat())
             }
         }
-        // Per-section BPM: on each section transition, scale the live BPM by
-        // (newMult / oldMult). This composes with user-dialed tempo edits —
-        // a half-time breakdown stays half-time even if the user dialed BPM
-        // during the previous section. lastSectionMult resets to 1.0 on each
-        // vibe load (see applyVibe), so the first section's mult applies on
-        // top of vibe.bpm.
+        // Per-section BPM + accelerando. Two concerns keyed off the arrangement flow, in ONE
+        // collector (sequential event processing = no racing BPM writes):
+        //   (1) Section change — scale the live BPM by (newMult / oldMult). Composes with
+        //       user-dialed tempo edits (a half-time breakdown stays half-time even if the
+        //       user dialed BPM in the previous section). lastSectionMult resets to 1.0 on
+        //       each vibe load (see applyVibe), so the first section's mult applies on top
+        //       of vibe.bpm.
+        //   (2) Section.bpmRampBars accelerando — over the section's tail, wind the BPM up
+        //       from its half-time tempo to full base tempo, landing on the next downbeat.
+        //       Runs as a child job; the section-change branch cancels it and snaps to the
+        //       target, so an interrupted or completed wind-up never overshoots the drop.
         scope.launch(dispatcherProvider.io) {
+            var lastSectionIndex = -1
             arrangementStateFlow
-                .map { it.sectionIndex }
-                .filter { it >= 0 }
-                .distinctUntilChanged()
-                .collect { sectionIndex ->
+                .filter { it.sectionIndex >= 0 }
+                .collect { arr ->
                     val vibe = vibeFlow.value
-                    val newMult = vibe.arrangement?.sections
-                        ?.getOrNull(sectionIndex)?.bpmMultiplier ?: 1.0f
-                    val oldMult = lastSectionMult
-                    lastSectionMult = newMult
-                    if (newMult == oldMult) return@collect
-                    val currentBpm = globalTempo.getBpm().toFloat()
-                    val effective = currentBpm * (newMult / oldMult)
-                    if (kotlin.math.abs(effective - currentBpm) > 0.01f) {
-                        globalTempo.setBpm(effective.toDouble())
+                    val sections = vibe.arrangement?.sections
+                    val sectionIndex = arr.sectionIndex
+
+                    // (1) Section change: settle the tempo definitively.
+                    if (sectionIndex != lastSectionIndex) {
+                        lastSectionIndex = sectionIndex
+                        val wasRamping = rampStartedForSectionVisit
+                        rampStartedForSectionVisit = false
+                        // Fully STOP any in-flight accelerando before touching tempo.
+                        // cancelAndJoin (not cancel) matters: cancel is cooperative, so a bare
+                        // cancel lets the ramp fire one more low setBpm AFTER ours, leaving the
+                        // drop stuck mid-wind-up. Joining guarantees the ramp is dead first.
+                        bpmRampJob?.cancelAndJoin()
+                        bpmRampJob = null
+                        val newMult = sections?.getOrNull(sectionIndex)?.bpmMultiplier ?: 1.0f
+                        val oldMult = lastSectionMult
+                        lastSectionMult = newMult
+                        if (wasRamping) {
+                            // Coming out of an accelerando (which left the live BPM mid-flight):
+                            // land the new section at its absolute tempo so the drop is exact.
+                            globalTempo.setBpm((vibe.bpm * newMult).toDouble())
+                        } else if (newMult != oldMult) {
+                            // Normal per-section flip: scale live BPM by the mult ratio so it
+                            // composes with any user-dialed tempo edits.
+                            val currentBpm = globalTempo.getBpm().toFloat()
+                            val effective = currentBpm * (newMult / oldMult)
+                            if (kotlin.math.abs(effective - currentBpm) > 0.01f) {
+                                globalTempo.setBpm(effective.toDouble())
+                            }
+                        }
+                        log.debug { "SectionTempo: sec=$sectionIndex settled @ ${globalTempo.getBpm().toInt()} BPM" }
+                    }
+
+                    // (2) Accelerando: fire once when we enter the section's last window.
+                    val section = sections?.getOrNull(sectionIndex) ?: return@collect
+                    val rampBars = section.bpmRampBars
+                    if (rampBars > 0 && !rampStartedForSectionVisit && arr.barsTotal > 0 &&
+                        arr.barsElapsed >= arr.barsTotal - rampBars
+                    ) {
+                        rampStartedForSectionVisit = true
+                        val startBpm = vibe.bpm * section.bpmMultiplier
+                        val endBpm = vibe.bpm  // full base tempo = the drop target
+                        // Pre-set lastSectionMult to the target so a section flip mid-ramp
+                        // composes correctly (no overshoot) even before the ramp finishes.
+                        lastSectionMult = 1.0f
+                        if (endBpm - startBpm > 0.01f) {
+                            log.debug { "Accelerando: sec=$sectionIndex ${startBpm.toInt()}->${endBpm.toInt()} BPM over $rampBars bar(s)" }
+                            bpmRampJob = launch(dispatcherProvider.io) {
+                                rampBpm(startBpm, endBpm, rampBars)
+                            }
+                        }
                     }
                 }
         }
@@ -862,6 +919,12 @@ class PulsarViewModel(
                     applyTrackOverridesForSection(sectionIndex)
                 }
         }
+        // NOTE: the per-section EXIT scratch (Section.exitScratchMs) is triggered in C++,
+        // not here. The arrangement flow is a 5Hz poll (up to 200ms latency), far too
+        // coarse to fire a scratch AT the boundary and hold the drop's first steps. The
+        // pulsar unit arms the master scratch synchronously at the section flip and freezes
+        // its own clock while the scratch is active, so the incoming section can't advance
+        // until the scratch drops. See orpheus_unit_pulsar.cpp (section-changed handler).
         // Debounced save: waits for restore to complete first to avoid saving stale defaults.
         // Timeout ensures saving isn't blocked forever if presetFlow never emits.
         scope.launch(dispatcherProvider.io) {
@@ -870,6 +933,31 @@ class PulsarViewModel(
                 saveState(state)
             }
         }
+    }
+
+    /**
+     * Accelerando helper: ease the live BPM from [startBpm] up to [endBpm] over a wall-clock
+     * window sized to [rampBars] arrangement-bars (at the average of the two tempi, clamped to
+     * a musical 1.5–5 s), with an ease-in (t²) so the wind-up accelerates into the drop.
+     * Cancellable mid-ramp via [bpmRampJob]; a section change snaps to the target, so this
+     * need not run to completion. BPM flows out via globalTempo → bpmId → the C++ clock.
+     */
+    private suspend fun rampBpm(startBpm: Float, endBpm: Float, rampBars: Int) {
+        // HOLD at the slow tempo through most of the window, then a QUICK wind-up over ~the last
+        // couple beats into the drop. A whole-bar ramp drags; the punch belongs at the very end.
+        val beatsPerBar = 8f  // one arrangement-bar (track-0 loop) ≈ 2 real bars = 8 beats
+        val windowMs = (rampBars * beatsPerBar * (60_000f / startBpm)).toLong()
+        val windUpMs = 1_300L  // the quick accelerando itself (~2 beats)
+        val holdMs = (windowMs - windUpMs).coerceAtLeast(0L)
+        if (holdMs > 0) delay(holdMs)
+        val stepMs = 40L
+        val steps = (windUpMs / stepMs).toInt().coerceAtLeast(1)
+        for (i in 1..steps) {
+            val t = i.toFloat() / steps
+            globalTempo.setBpm((startBpm + (endBpm - startBpm) * (t * t)).toDouble())
+            delay(stepMs)
+        }
+        globalTempo.setBpm(endBpm.toDouble())
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -899,8 +987,18 @@ class PulsarViewModel(
         complexityId.value = FloatValue(saved.complexity)
         spaceId.value = FloatValue(saved.space)
         moodId.value = FloatValue(saved.mood)
-        bpmId.value = FloatValue(saved.bpm)
-        globalTempo.setBpm(saved.bpm.toDouble())
+        // saved.bpm is the user's BASE (1.0x) tempo — scale it by the OPENING section's
+        // multiplier, exactly as applyVibe(above) does, so a half-time intro is restored at
+        // half-time and not the flat body tempo. BOTH pushes must be multiplied: bpmId feeds
+        // the pulsar clock's live override, and globalTempo must match or the globalTempo->bpmId
+        // collector would overwrite bpmId back to the flat value. applyVibe already seeded
+        // lastSectionMult to introMult, so the section-0 collector stays idempotent. (In
+        // MIX_GATED, presetFlow re-runs this after the graph-ready re-apply, so this push — not
+        // applyVibe's — is the last writer; a flat value here is the "intro at default" bug.)
+        val introIdx = provider.vibe.arrangement?.introIndex ?: 0
+        val introMult = provider.vibe.arrangement?.sections?.getOrNull(introIdx)?.bpmMultiplier ?: 1.0f
+        bpmId.value = FloatValue(saved.bpm * introMult)
+        globalTempo.setBpm((saved.bpm * introMult).toDouble())
         deepId.value = FloatValue(saved.deep)
         pushEffectiveSends(saved.deep)
         percMixId.value = FloatValue(saved.percMix)
@@ -1140,11 +1238,12 @@ class PulsarViewModel(
         val lick = vibe.lick
         if (lick != null) {
             lick.steps.forEachIndexed { i, step ->
-                lickDataIds[i * 4].value = FloatValue(step.scaleDegree.toFloat())
-                lickDataIds[i * 4 + 1].value = FloatValue(step.duration)
-                lickDataIds[i * 4 + 2].value = FloatValue(step.velocity)
+                val base = i * Lick.LICK_FIELDS_PER_STEP
+                lickDataIds[base].value = FloatValue(step.scaleDegree.toFloat())
+                lickDataIds[base + 1].value = FloatValue(step.duration)
+                lickDataIds[base + 2].value = FloatValue(step.velocity)
                 // -1 = "use the track's TrackVoice.glideRate"; explicit value overrides.
-                lickDataIds[i * 4 + 3].value = FloatValue(step.glideRate)
+                lickDataIds[base + 3].value = FloatValue(step.glideRate)
             }
             lickMutationId.value = FloatValue(vibe.lickMutation)
             lickOctaveId.value = IntValue(vibe.lickOctave)
@@ -1190,8 +1289,21 @@ class PulsarViewModel(
         // Set macro defaults
         rootNoteId.value = IntValue(vibe.rootNote.noteIndex)
         scaleId.value = IntValue(vibe.scaleType.scaleIndex)
-        bpmId.value = FloatValue(vibe.bpm)
-        globalTempo.setBpm(vibe.bpm.toDouble())
+        // Apply the OPENING section's bpmMultiplier here, synchronously, so the intro
+        // tempo is deterministic on a vibe switch. bpmId feeds the C++ pulsar clock's
+        // pulsar_bpm_override, which the audio thread reads live and in PRIORITY over the
+        // global clock_bpm — so bpmId must carry the ALREADY-MULTIPLIED live tempo. Pushing
+        // the flat vibe.bpm here leaves a half-time opening section (e.g. FireSky's ~60 BPM
+        // intro) running at the full body tempo until a later section change. The section-BPM
+        // collector is gated by distinctUntilChanged on sectionIndex; when the previous vibe
+        // was already on section 0, the new vibe's section-0 re-emission is suppressed and the
+        // collector never applies the multiplier. Seeding lastSectionMult keeps the collector
+        // idempotent: when section 0 does emit, newMult == oldMult and it early-returns.
+        val introIdx = vibe.arrangement?.introIndex ?: 0
+        val introMult = vibe.arrangement?.sections?.getOrNull(introIdx)?.bpmMultiplier ?: 1.0f
+        bpmId.value = FloatValue(vibe.bpm * introMult)
+        globalTempo.setBpm((vibe.bpm * introMult).toDouble())
+        lastSectionMult = introMult
         energyId.value = FloatValue(vibe.energy)
         complexityId.value = FloatValue(vibe.complexity)
         spaceId.value = FloatValue(vibe.space)
@@ -1370,7 +1482,7 @@ class PulsarViewModel(
                 setSection(12, (sectionSolo as? SoloMode.Jam)?.lickInfluence ?: 0.5f)
                 setSection(13, (sectionSolo as? SoloMode.LongFill)?.barsMin?.toFloat() ?: 2f)
                 setSection(14, (sectionSolo as? SoloMode.LongFill)?.barsMax?.toFloat() ?: 4f)
-                setSection(15, 0f) // reserved
+                setSection(15, 0f) // set below (exit scratch)
                 setSection(16, 0f) // reserved
                 setSection(17, 0f) // reserved
             } else {
@@ -1378,6 +1490,12 @@ class PulsarViewModel(
                 setSection(9, 0f)
                 for (slot in 10..17) setSection(slot, 0f)
             }
+
+            // Slot 15: per-section EXIT scratch (ms), independent of solo. C++ arms a
+            // master record-scratch at this section's exit and freezes the incoming
+            // section's clock while the scratch runs (0 = none). Written after the
+            // solo block so it wins over the reserved-0 set in both branches.
+            setSection(15, section.exitScratchMs.toFloat())
 
             // Section-level comping overrides (slots 18-20); -1.0 = no override
             setSection(18, compingStyleOrSentinel(section.compingStyle))

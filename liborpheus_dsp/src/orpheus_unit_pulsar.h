@@ -8,7 +8,7 @@
 #include "frames/poly_lfo.h"
 
 static constexpr int kNumPulsarTracks = 8;
-static constexpr int kMaxPulsarSteps = 32;
+static constexpr int kMaxPulsarSteps = 64;
 static constexpr int kMaxSections = 8;
 static constexpr int kMaxSectionTransitions = 8;
 static constexpr int kMarkovIntervals = 15;
@@ -219,6 +219,10 @@ struct PulsarTrackState {
     PulsarStep steps[kMaxPulsarSteps];
     int step_count;
     int playhead;
+    // Tension half-lick: when >0 this FILL lick loops only its first bar (the first
+    // `half_loop_len` steps of the full step_count). 0 = not a FILL lick / no truncation.
+    // Set at load_vibe for FILL melodic leads; gated at render time on tension.half_lick.
+    int half_loop_len = 0;
     int engine_index;
     float volume;
     float pan;
@@ -347,8 +351,22 @@ struct PulsarTrackState {
     int anchor_indices[2] = {-1, -1};  // cached anchor positions
 };
 
+// Effective sequencer loop length for a track, honoring the tension "half-lick"
+// mode: when half_lick is active AND this track carries a truncatable FILL lick
+// (half_loop_len set to its first-bar length), the playhead loops only that first
+// bar so the opening figure repeats/jams. Otherwise the full step_count is used.
+inline int pulsar_effective_loop_len(const PulsarTrackState& ts, bool half_lick) {
+    if (half_lick && ts.half_loop_len > 0 && ts.half_loop_len < ts.step_count) {
+        return ts.half_loop_len;
+    }
+    return ts.step_count;
+}
+
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
-static constexpr int kMaxLickSteps = 32;
+static constexpr int kMaxLickSteps = 64;
+static constexpr int kLickFieldsPerStep = 4;   // degree, duration, velocity, glide
+static_assert(kMaxLickSteps <= kMaxPulsarSteps,
+              "a FILL lick is written into a step_count-sized sequencer buffer");
 static constexpr int kMaxProgressionLength = 12;  // up to a literal 12-bar blues
 
 struct PulsarLickStep {
@@ -499,6 +517,10 @@ struct SectionParam {
     float comping_humanization_ghost = 0.0f;
     float comping_humanization_octave = 0.0f;
     float comping_humanization_extension = 0.0f;
+    // Master record-scratch fired when this section is LEFT (0 = none). The pulsar
+    // unit arms the scratch at the section flip and freezes its own clock while the
+    // scratch is active, so the incoming section holds until the scratch drops.
+    int exit_scratch_ms = 0;
 };
 
 struct ArrangementParams {
@@ -650,15 +672,15 @@ struct PulsarState {
     bool has_band_solo = false;
 
     // Living lick state for LickBuilder/Jam modes
-    int8_t live_lick_degrees[32] = {};
-    float live_lick_durations[32] = {};
-    float live_lick_velocities[32] = {};
+    int8_t live_lick_degrees[kMaxLickSteps] = {};
+    float live_lick_durations[kMaxLickSteps] = {};
+    float live_lick_velocities[kMaxLickSteps] = {};
     int live_lick_length = 0;
     bool live_lick_active = false;
     // MUT-4: section-entry snapshot of the lick degrees. mutate_live_lick clamps
     // each evolving degree against this so the octave-jump idiom can't run away
     // now that the live lick is audibly rendered (SOLO-1).
-    int8_t live_lick_base_degrees[32] = {};
+    int8_t live_lick_base_degrees[kMaxLickSteps] = {};
 
     // Arrangement read-back (written by audio thread, read by viz polling)
     // relaxed atomics: zero overhead on ARM/x86 for aligned ints, standards-compliant

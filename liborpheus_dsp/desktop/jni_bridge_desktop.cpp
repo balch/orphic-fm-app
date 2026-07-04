@@ -277,9 +277,12 @@ JNI_FN(nativeGetPulsarViz)(JNIEnv *env, jobject thiz,
                             jfloatArray velocitiesOut,
                             jintArray playheadsOut,
                             jintArray stepCountsOut) {
-    // Must match kNumPulsarTracks and kMaxPulsarSteps in orpheus_unit_pulsar.h
+    // Must match kNumPulsarTracks and the viz EXPORT width kPulsarVizSteps (orpheus_engine.h),
+    // which is decoupled from the sequencer cap kMaxPulsarSteps (now 64). The producer
+    // orpheus_engine_get_pulsar_viz clamps its export to kPulsarVizSteps; keep kSteps == it,
+    // or these buffers overrun. (test_pulsar_lick_marshalling's canary guards this.)
     constexpr int kTracks = 8;
-    constexpr int kSteps = 32;
+    constexpr int kSteps = 32;   // == kPulsarVizSteps
     constexpr int kTotal = kTracks * kSteps;
 
     // Read from C++ engine via C API into flat int/float arrays

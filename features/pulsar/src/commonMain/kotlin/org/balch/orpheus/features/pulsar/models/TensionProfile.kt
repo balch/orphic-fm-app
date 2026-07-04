@@ -6,7 +6,10 @@ import kotlinx.serialization.Serializable
  * Pitch/scale modifications applied during high-tension moments.
  * @param octaveShift If true, melodic tracks may shift up an octave at peak tension.
  * @param keyShift Semitones to shift the root at peak tension. 0 = none, 5 = up a 4th.
- * @param halfLick If true, lick plays at double speed during high tension (half-time feel).
+ * @param halfLick If true, a FILL lick loops only its first bar (the first 16 of the 32
+ *   steps) so the opening figure repeats and "jams" while mutation/evolution churn its
+ *   tone. Best set per-section via [Section.tensionOverride] to jam in one section (e.g.
+ *   a build) and play the full lick elsewhere. No effect on SQUASH licks (already 1 bar).
  * @param chromaticPassing Probability of inserting chromatic passing tones at high tension, 0-1.
  */
 @Serializable

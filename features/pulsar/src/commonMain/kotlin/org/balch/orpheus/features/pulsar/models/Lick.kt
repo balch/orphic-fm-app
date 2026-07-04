@@ -24,7 +24,7 @@ data class LickStep(
 /**
  * A repeating melodic figure (bass riff). Assign to a [Vibe] and set
  * `lickMode = LickMode.Fill` (or `Squash`) on the track that should play it.
- * @param steps The note sequence. Max 32 steps.
+ * @param steps The note sequence. Max 64 steps.
  * @param loopLength Total loop length in **beats**. When larger than the sum of step
  *   durations, the extra time is silence (rest padding). E.g. a 4-beat lick with
  *   `loopLength = 8` plays 4 beats of notes then 4 beats of rest per cycle.
@@ -46,7 +46,10 @@ data class Lick(
     }
 
     companion object {
-        const val MAX_LICK_STEPS = 32
+        const val MAX_LICK_STEPS = 64
+
+        /** Fields marshalled per lick step to C++: degree, duration, velocity, glide. */
+        const val LICK_FIELDS_PER_STEP = 4
     }
 }
 
@@ -60,8 +63,8 @@ sealed class LickMode {
     @Serializable
     data object None : LickMode()
 
-    /** Compress lick to fit within one bar. In 32-step mode, the second
-     *  half is handled by the bar strategy. */
+    /** Compress lick to fit within one bar. In multi-bar (32/64-step) mode, the
+     *  second half is handled by the bar strategy. */
     @Serializable
     data object Squash : LickMode()
 

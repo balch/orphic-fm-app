@@ -278,13 +278,25 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
                                    int* step_counts_out) {
     if (!engine) return;
     const auto& viz = engine->pulsar_viz;
+    // Export only kPulsarVizSteps per track — the consumer buffers (JNI/iOS/monitor)
+    // are sized kNumPulsarTracks * kPulsarVizSteps. Using kMaxPulsarSteps here would
+    // overrun them by 2x now that the sequencer cap is 64 (see kPulsarVizSteps).
     for (int t = 0; t < kNumPulsarTracks; t++) {
-        for (int s = 0; s < kMaxPulsarSteps; s++) {
-            gates_out[t * kMaxPulsarSteps + s] = viz.step_gates[t][s] ? 1 : 0;
-            velocities_out[t * kMaxPulsarSteps + s] = viz.step_velocities[t][s];
+        for (int s = 0; s < kPulsarVizSteps; s++) {
+            gates_out[t * kPulsarVizSteps + s] = viz.step_gates[t][s] ? 1 : 0;
+            velocities_out[t * kPulsarVizSteps + s] = viz.step_velocities[t][s];
         }
-        playheads_out[t] = viz.playheads[t];
-        step_counts_out[t] = viz.step_counts[t];
+        // Clamp the exported playhead + step_count to the viz window too. The consumer
+        // viz arrays (gates_out/velocities_out, and the Kotlin stepGates/stepVelocities that
+        // mirror them) are only kPulsarVizSteps wide, so a raw >32 playhead/step_count from a
+        // 64-step vibe makes consumers index them out of bounds (e.g. PulsarStepGrid's per-frame
+        // particle loop: `ph < stepCounts[t] && stepGates[t][ph]`). Rendering the full 64-step
+        // grid is the follow-up; until then the on-screen playhead parks at the window edge for
+        // steps beyond kPulsarVizSteps.
+        int ph = viz.playheads[t];
+        playheads_out[t] = ph < kPulsarVizSteps ? ph : kPulsarVizSteps - 1;
+        int sc = viz.step_counts[t];
+        step_counts_out[t] = sc < kPulsarVizSteps ? sc : kPulsarVizSteps;
     }
 }
 

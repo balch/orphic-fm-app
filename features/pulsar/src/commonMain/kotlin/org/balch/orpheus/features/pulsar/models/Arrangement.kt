@@ -132,6 +132,18 @@ data class Section(
      *  user makes during a section carry through into subsequent sections at
      *  their relative multiplier. */
     val bpmMultiplier: Float = 1.0f,
+    /** When leaving this section, fire a master record-scratch of this many ms
+     *  (0 = none). The scratch grabs the outgoing audio and drops back to live on
+     *  the next section's beat — put it on a build section to scratch into the drop.
+     *  Fires once per exit of this section. Useful range ~400..1000 ms. */
+    val exitScratchMs: Int = 0,
+    /** Accelerando: over the last [bpmRampBars] arrangement-bars of this section, ramp
+     *  the live BPM from this section's [bpmMultiplier] tempo UP to the vibe's full base
+     *  tempo, landing on the next section's downbeat (0 = no ramp; instant flip as before).
+     *  Put it on a half-time intro/build to wind up into the drop instead of scratching.
+     *  Bars are counted in the same units as [barsMin]/[barsMax]. Prototype: ramps toward
+     *  full base tempo (1.0×); see PulsarViewModel accelerando. Useful range 1..2. */
+    val bpmRampBars: Int = 0,
 ) {
     init {
         customProgression?.let { validateProgression(it, "Section.customProgression") }
@@ -140,6 +152,8 @@ data class Section(
         }
         require(barStep in 1..16) { "Section.barStep must be 1..16, got $barStep" }
         require(bpmMultiplier > 0f) { "Section.bpmMultiplier must be > 0, got $bpmMultiplier" }
+        require(exitScratchMs >= 0) { "Section.exitScratchMs must be >= 0, got $exitScratchMs" }
+        require(bpmRampBars >= 0) { "Section.bpmRampBars must be >= 0, got $bpmRampBars" }
     }
 }
 

@@ -262,9 +262,11 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarViz(
         jfloatArray velocitiesOut,
         jintArray playheadsOut,
         jintArray stepCountsOut) {
-    // Must match kNumPulsarTracks and kMaxPulsarSteps in orpheus_unit_pulsar.h
+    // Must match kNumPulsarTracks and the viz EXPORT width kPulsarVizSteps (orpheus_engine.h),
+    // decoupled from the sequencer cap kMaxPulsarSteps (now 64). The producer clamps its
+    // export to kPulsarVizSteps; keep kSteps == it or these buffers overrun.
     constexpr int kTracks = 8;
-    constexpr int kSteps = 32;
+    constexpr int kSteps = 32;   // == kPulsarVizSteps
     constexpr int kTotal = kTracks * kSteps;
 
     int gatesInt[kTotal] = {};

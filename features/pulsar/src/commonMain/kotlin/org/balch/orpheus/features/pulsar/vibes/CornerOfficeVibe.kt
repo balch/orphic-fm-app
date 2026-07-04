@@ -95,10 +95,16 @@ class CornerOfficeVibe : VibeProvider {
 
     val sectionList by lazy {
         listOf(
-            // 0: intro — riff + drums; stabs ghost in at low density, pad/lead out.
+            // 0: intro — HALF-TIME cold open so you can PICK OUT the strut. Bass + a soft kick
+            //    at ~61 BPM (bpmMultiplier 0.5; 122×0.5=61 clears the 60 floor). Snare/hats out
+            //    to unmask it, and the stabs stay out for the bare first statement; lead/pad
+            //    out. Over the last bar the tempo winds UP (bpmRampBars) into the full-tempo
+            //    verse — an accelerando drop.
             Section(
                 name = "intro",
-                barsMin = 4, barsMax = 4,
+                barsMin = 2, barsMax = 2,   // one full 4-bar strut, stated slow
+                bpmMultiplier = 0.5f,       // ~61 BPM half-time — the strut, legible
+                bpmRampBars = 1,            // accelerando over the last bar, lands on the drop
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),
                 ),
@@ -108,7 +114,9 @@ class CornerOfficeVibe : VibeProvider {
                 customProgression = verseProgression,
                 chordsPerBar = 1,
                 trackOverrides = mapOf(
-                    4 to TrackSectionOverride(density = 0.12f),  // stabs ghost in
+                    1 to TrackSectionOverride(density = 0.0f),   // snare out — unmask the strut
+                    2 to TrackSectionOverride(density = 0.0f),   // hats out — unmask the strut
+                    4 to TrackSectionOverride(density = 0.0f),   // stabs out for the bare statement
                     5 to TrackSectionOverride(density = 0.0f),   // lead out
                     6 to TrackSectionOverride(density = 0.0f),   // pad out
                     7 to TrackSectionOverride(density = 0.05f),
@@ -227,34 +235,55 @@ class CornerOfficeVibe : VibeProvider {
             mood = 0.45f,
             deep = 0.34f,
             // --- THE STRUT (track 3 bass plays it as LickMode.Fill) ---
-            // MINOR degrees: 0=E(root), 1=F#(2), 2=G(b3), 3=A(4), 4=B(5), 5=C(b6), 6=D(b7).
-            // Two bars, sums to exactly 8.0 beats, every onset on the 16th grid.
+            // MINOR degrees: 0=E(root), 1=F#(2), 2=G(b3), 3=A(4), 4=B(5), 5=C(b6), 6=D(b7), 7=E(oct).
+            // Copyright-safe rewrite: keeps the cynical E-minor filter-funk strut (scale, register,
+            // staccato 16ths, rest-carried pocket, b6/b7 color) but drops the recognizable
+            // signature — a grace-pickup opening instead of stabbed root triplets, octave POPS +
+            // a b6 lean the source never uses, a rising b7-pickup turnaround, and a through-
+            // composed 4-bar arc instead of a 2-bar A/A. Faithful original preserved in
+            // CornerOfficeOgVibe (WIP, -Pcatalog). 4 bars, sums to exactly 16.0 beats on the grid.
             lick = Lick(
                 steps = listOf(
-                    // bar 1 — staccato root stabs, then the snake down
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 1.00f),  // E  — 16th stab
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),  // E  — double-hit
-                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (16th rest — funk gap)
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.85f),  // E  — hammer on the "a"
-                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.80f),   // D  — b7
-                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.82f),   // B  — 5
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.75f),   // G  — b3
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.80f),   // A  — 4
-                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.90f),   // E  — home, ring
-                    // bar 2 — exhale, ghost hits, climb and snap back
+                    // bar 1 — grace-pickup into a held root, then ASCENDING (root->4->5->b7)
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.72f),  // B  5 — grace pickup
+                    LickStep(scaleDegree = 0, duration = 0.75f, velocity = 1.00f),  // E  root — held
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.60f),  // E  root — ghost
+                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.85f),   // A  4  ┐
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.88f),   // B  5  │ climb
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.80f),   // D  b7 ┘
+                    // bar 2 — octave POP hook, walk back down through b7-5-b3-4 to a long home
+                    LickStep(scaleDegree = 4, duration = 0.75f, velocity = 0.78f),  // B  5 — recoil
+                    LickStep(scaleDegree = 7, duration = 0.5f, velocity = 0.92f),   // E  octave POP
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 6, duration = 0.25f, velocity = 0.70f),  // D  b7
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.80f),   // B  5
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.82f),   // G  b3
+                    LickStep(scaleDegree = 3, duration = 0.25f, velocity = 0.68f),  // A  4
+                    LickStep(scaleDegree = 0, duration = 1.25f, velocity = 0.90f),  // E  root — long ring
+                    // bar 3 — sparser strut leaning on the b6 (new tension), b3 held into the turn
                     LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (rest — pocket)
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),  // E  — 16th
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.60f),  // E  — ghost
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.78f),   // G  — b3 ┐
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.80f),   // A  — 4  │ the climb
-                    LickStep(scaleDegree = 4, duration = 0.75f, velocity = 0.85f),  // B  — 5  ┘ leans long
-                    LickStep(scaleDegree = 6, duration = 0.25f, velocity = 0.70f),  // D  — b7 snap off the top
-                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.80f),   // B  — 5
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.75f),   // G  — b3, falls home to E at loop
+                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),   // E  root
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),   // G  b3
+                    LickStep(scaleDegree = 5, duration = 0.75f, velocity = 0.86f),  // C  b6 — the minor lean, long
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.72f),  // B  5
+                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.78f),   // A  4
+                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.80f),   // G  b3 — held into the turn
+                    // bar 4 — rising turnaround (root->4->5->b7), octave snap, close on a b7 pickup
+                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.88f),   // E  root
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.62f),  // E  root — ghost
+                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.82f),   // A  4  ┐
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.85f),   // B  5  │ rising turnaround
+                    LickStep(scaleDegree = 6, duration = 0.75f, velocity = 0.90f),  // D  b7 ┘
+                    LickStep(scaleDegree = 7, duration = 0.25f, velocity = 0.80f),  // E  octave snap off the top
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.78f),   // B  5
+                    LickStep(scaleDegree = 6, duration = 1.0f, velocity = 0.92f),   // D  b7 pickup pulling into the loop
                 ),
-                loopLength = 8,  // 2 bars; steps sum to 8.0 exactly
+                loopLength = 16,  // 4 bars; steps sum to 16.0 exactly
             ),
-            lickMutation = 0.16f,  // funk wants a little more talk-back than swamp
+            lickMutation = 0.24f,  // bumped for copyright distance (more run-to-run drift off the figure)
             lickOctave = -1,       // auto = midpoint of the bass range (~E2)
             genre = GenreProfile(
                 swingAmount = 0.06f,          // tight strut — barely off the grid
@@ -490,7 +519,7 @@ class CornerOfficeVibe : VibeProvider {
                     )
                 },
             ),
-            stepCount = 32,  // 2 bars / 8 beats — the whole strut as one LickMode.Fill phrase
+            stepCount = 64,  // 4 bars / 16 beats — the whole strut as one LickMode.Fill phrase (longer-lick demo)
             tension = TensionProfile(
                 innerBars = 8,
                 outerBars = 32,

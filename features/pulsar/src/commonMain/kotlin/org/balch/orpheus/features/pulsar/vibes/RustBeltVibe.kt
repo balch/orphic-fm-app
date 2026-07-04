@@ -95,11 +95,16 @@ class RustBeltVibe : VibeProvider {
 
     val sectionList by lazy {
         listOf(
-            // 0: intro — THE HOOK ALONE. Bass + drums; comp/lead/organ all out.
-            //    Locked to 4 bars = the hook stated twice before the band walks in.
+            // 0: intro — SLOWED cold open so you can PICK OUT the hook. Bass + a soft kick at
+            //    ~78 BPM (bpmMultiplier 0.75; 104×0.75=78, well above the engine's 60 floor, so
+            //    the drop restores to 104 cleanly with no overshoot). Snare/hats out to unmask
+            //    the syncopation; comp/lead/organ out. Over the last bar the tempo winds UP
+            //    (bpmRampBars) into the full-tempo verse — an accelerando drop.
             Section(
                 name = "intro",
-                barsMin = 4, barsMax = 4,
+                barsMin = 2, barsMax = 2,   // the 2-bar hook stated twice, slow
+                bpmMultiplier = 0.75f,      // ~78 BPM — slowed so the hook reads, then winds up
+                bpmRampBars = 1,            // accelerando over the last bar, lands on the drop
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),
                 ),
@@ -109,6 +114,8 @@ class RustBeltVibe : VibeProvider {
                 customProgression = verseProgression,
                 chordsPerBar = 1,
                 trackOverrides = mapOf(
+                    1 to TrackSectionOverride(density = 0.0f),   // snare out — unmask the hook
+                    2 to TrackSectionOverride(density = 0.0f),   // hats out — unmask the hook
                     4 to TrackSectionOverride(density = 0.0f),   // jangle comp out
                     5 to TrackSectionOverride(density = 0.0f),   // twang lead out
                     6 to TrackSectionOverride(density = 0.0f),   // organ out
@@ -214,7 +221,7 @@ class RustBeltVibe : VibeProvider {
         Vibe(
             name = name,
             album = Album.RIF,
-            bpm = 104f,
+            bpm = 88f,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
@@ -232,33 +239,35 @@ class RustBeltVibe : VibeProvider {
             mood = 0.62f,
             deep = 0.30f,
             // --- THE HOOK (track 3 bass plays it as LickMode.Fill) ---
-            // DORIAN degrees: 0=D(root), 1=E(2), 2=F(b3), 3=G(4), 4=A(5), 5=B(6), 6=C(b7).
-            // Two bars, sums to exactly 8.0 beats, every onset on the 16th grid.
-            // Negative degree = REST — the swamp lives in the space between notes.
+            // DORIAN degrees: 0=D(root), 1=E(2), 2=F(b3), 3=G(4), 4=A(5), 5=B(6), 6=C(b7), 7=D(oct).
+            // Copyright-safe rewrite: keeps the swampy D-Dorian heartland pocket (scale, low
+            // register, rest density, b7/6 color) but inverts the recognizable signature — a
+            // single anchored root that leans DOWNWARD, an octave POP, and a DESCENDING turn
+            // (the opposite of the faithful thumps -> jump-up -> walk-up). The faithful original
+            // is preserved verbatim in RustBeltOgVibe (WIP, -Pcatalog). 2 bars, sums to 8.0.
             lick = Lick(
                 steps = listOf(
-                    // bar 1 — statement: anchor, ghost pickup, syncopated push, b7/5 bounce, land home
-                    LickStep(scaleDegree = 0, duration = 0.75f, velocity = 1.00f),  // D  — fat anchor
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.55f),  // D  — ghost pickup
-                    LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (rest — pocket breath)
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),   // D  — and-of-2 push
-                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.80f),   // C  — b7 lean
-                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.75f),   // A  — 5th bounce
-                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.92f),   // D  — home, rings over the bar
-                    // bar 2 — answer: exhale, sixteenth turn, then the walk-up home
-                    LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (rest — kick alone on the 1)
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.70f),   // D  — off-beat re-entry
-                    LickStep(scaleDegree = 6, duration = 0.25f, velocity = 0.62f),  // C  — b7 sixteenth
-                    LickStep(scaleDegree = 5, duration = 0.25f, velocity = 0.58f),  // B  — dorian 6th passing
-                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.78f),   // A  — 5th
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.72f),   // F  — b3, the blues lean
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.78f),   // G  — 4   ┐
-                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.84f),   // A  — 5   │ the walk-up
-                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.92f),   // C  — b7  ┘ resolves to D at loop top
+                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.98f),   // D  root — single anchor
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 6, duration = 0.75f, velocity = 0.90f),  // C  b7 — dotted downward lean
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.86f),   // A  5
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 1.00f),   // D  root — home by leap DOWN, held
+                    LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.80f),   // B  6 — bright lift
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 7, duration = 0.5f, velocity = 0.92f),   // D  octave POP
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
+                    LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.84f),   // C  b7
+                    LickStep(scaleDegree = 4, duration = 0.75f, velocity = 0.88f),  // A  5 — dotted
+                    LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (pocket breath)
+                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.78f),   // G  4  ┐
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.74f),   // F  b3 │ DESCENDING turn into the loop
+                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.70f),  // E  2  ┘
+                    LickStep(scaleDegree = -1, duration = 0.25f, velocity = 0.0f),  // (rest)
                 ),
                 loopLength = 8,  // 2 bars; steps sum to 8.0 exactly
             ),
-            lickMutation = 0.14f,  // the hook breathes run-to-run but stays instantly itself
+            lickMutation = 0.22f,  // bumped for copyright distance (more run-to-run drift off the figure)
             lickOctave = -1,       // auto = midpoint of the bass range (lands around D2)
             genre = GenreProfile(
                 swingAmount = 0.09f,          // lazy-tough pocket — behind the beat, not shuffled
