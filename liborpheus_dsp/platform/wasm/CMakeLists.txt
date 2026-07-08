@@ -114,6 +114,7 @@ set(ORPHEUS_SRC
     "${LIB_SRC}/orpheus_unit_compressor.cpp"
     "${LIB_SRC}/orpheus_patch.cpp"
     "${LIB_SRC}/orpheus_resonator.cpp"
+    "${LIB_SRC}/orpheus_spectrum.cc"
 )
 
 # ── WASM export wrappers ─────────────────────────

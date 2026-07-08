@@ -126,6 +126,7 @@ class DspSynthEngine(
     override val tidesCh1VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh1VizFlow
     override val tidesCh2VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh2VizFlow
     override val tidesCh3VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh3VizFlow
+    override val spectrumFlow: StateFlow<FloatArray> get() = monitor.spectrumFlow
     override val pulsarVizFlow get() = monitor.pulsarVizFlow
     override val pulsarTrackVizFlows get() = monitor.pulsarTrackVizFlows
     override val pulsarArrangementStateFlow get() = monitor.arrangementStateFlow
@@ -445,6 +446,9 @@ class DspSynthEngine(
         if (monitor.vizRequested) {
             monitor.setVizEnabled(true, true)
         }
+        if (monitor.spectrumRequested) {
+            monitor.setSpectrumEnabled(true, true)
+        }
         log.debug { "Audio Engine Started" }
         _graphReady.complete(Unit)
     }
@@ -465,6 +469,10 @@ class DspSynthEngine(
 
     override fun setVizEnabled(enabled: Boolean) {
         monitor.setVizEnabled(enabled, audioEngine.isRunning)
+    }
+
+    override fun setSpectrumEnabled(enabled: Boolean) {
+        monitor.setSpectrumEnabled(enabled, audioEngine.isRunning)
     }
 
     override fun setTurntableVizEnabled(enabled: Boolean) {

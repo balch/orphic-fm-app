@@ -40,6 +40,7 @@ interface NativeDspBridge {
      */
     fun nativeGetXRunCount(): Int = 0
     fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
+    fun nativeGetSpectrum(bands: FloatArray): Int
     fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     fun nativeLoadGraph(data: ByteArray): Int

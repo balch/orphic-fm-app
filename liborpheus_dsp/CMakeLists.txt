@@ -151,6 +151,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_pulsar_reverb.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
+    "src/orpheus_spectrum.cc"
     "src/orpheus_unit_chaos.cpp"
     "src/orpheus_master_fader.cpp"
     "src/orpheus_master_tape_stop.cpp"
@@ -225,6 +226,7 @@ if(BUILD_TESTS)
         test/test_output_chain.cpp
         test/test_drums_graph.cpp
         test/test_lfo.cpp
+        test/test_spectrum.cpp
         test/test_control_routing.cpp
         test/test_snapshots.cpp
         test/test_headroom.cpp

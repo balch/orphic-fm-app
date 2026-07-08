@@ -112,6 +112,10 @@ void orpheus_engine_get_waveform(OrpheusEngine* engine,
 int  orpheus_engine_get_viz(OrpheusEngine* engine, int channel,
                             float* out_buf, int max_samples, int* last_read_pos);
 
+// ── Spectrum analyzer (polled at ~60fps from UI thread; FFT runs here, off audio thread) ──
+// Fills bands[0..num_bands) with linear magnitude per log-spaced band. Returns num_bands.
+int  orpheus_engine_get_spectrum(OrpheusEngine* engine, float* bands, int num_bands);
+
 // ── Automation (called from UI thread) ──────────
 // target: 0=VOICE_GATE, 1=VOICE_FREQ
 // voice_index: 0-11

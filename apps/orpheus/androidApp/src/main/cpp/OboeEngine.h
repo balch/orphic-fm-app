@@ -54,6 +54,7 @@ public:
     void setBend(float v);
     void getMonitor(OrpheusMonitorData* out);
     int  getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
+    int  getSpectrum(float* bands, int numBands);
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void getPulsarActiveEngines(int* out);
     void getPulsarArrangement(int* out);

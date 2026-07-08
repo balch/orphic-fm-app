@@ -548,3 +548,4 @@ bool run_master_scratch_tests();
 bool run_master_fader_pulsar_routing_tests();
 bool run_master_leslie_tests();
 bool run_master_tape_stop_pulsar_routing_tests();
+bool run_spectrum_tests();

@@ -225,6 +225,7 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         engine->peak_left.store(0.0f, std::memory_order_relaxed);
         engine->peak_right.store(0.0f, std::memory_order_relaxed);
         engine->viz_rings[VIZ_MASTER_OUT].write(0.0f);
+        for (int i = 0; i < n; ++i) engine->spectrum_ring.write(0.0f);
         return;
     }
 
@@ -308,6 +309,8 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         };
         l = soft_sat(l);
         r = soft_sat(r);
+
+        engine->spectrum_ring.write((l + r) * 0.5f);
 
         output_buffer[i * 2]     = l;
         output_buffer[i * 2 + 1] = r;

@@ -124,6 +124,7 @@ class SynthEngineMonitorTurntableGateTest {
         // Poll surface the monitor exercises — kept inert.
         override fun nativeGetMonitor(out: FloatArray) {}
         override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
+        override fun nativeGetSpectrum(bands: FloatArray): Int = 0
         override fun nativeGetPulsarViz(
             gatesOut: BooleanArray,
             velocitiesOut: FloatArray,

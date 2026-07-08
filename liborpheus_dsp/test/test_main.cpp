@@ -47,6 +47,7 @@ static TestSuite suites[] = {
     {"bridge",          run_bridge_audit,          true},
     {"preset",          run_preset_tests,          true},
     {"viz",             run_viz_tests,             true},
+    {"spectrum",        run_spectrum_tests,        true},
     {"fm-compare",      run_fm_compare_tests,      false},
     {"chain-compare",   run_chain_compare_tests,   false},
     {"bass",            run_bass_voice_tests,      true},

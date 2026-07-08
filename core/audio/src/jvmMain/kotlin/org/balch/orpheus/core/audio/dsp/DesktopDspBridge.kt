@@ -103,6 +103,7 @@ class DesktopDspBridge {
     external fun nativeSetBend(value: Float)
     external fun nativeGetMonitor(out: FloatArray)
     external fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
+    external fun nativeGetSpectrum(bands: FloatArray): Int
     external fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     external fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
     external fun nativeClearAutomation(target: Int, voiceIndex: Int)

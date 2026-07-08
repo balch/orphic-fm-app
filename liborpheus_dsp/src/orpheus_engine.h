@@ -7,6 +7,7 @@
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
 #include "orpheus_voice.h"
 #include "orpheus_viz.h"
+#include "orpheus_spectrum.h"
 
 // Include MI Clouds granular processor
 #include "clouds/dsp/granular_processor.h"
@@ -1136,4 +1137,10 @@ struct OrpheusEngine {
     // ── Signal visualization ring buffers ──
     // Written by audio thread (one sample per block), read by UI at ~60fps.
     VizRing viz_rings[VIZ_CHANNEL_COUNT];
+
+    // ── Spectrum analyzer (master-mix FFT for the Spectrograph viz) ──
+    // Audio thread writes every sample into spectrum_ring; UI poll thread runs
+    // spectrum_analyzer.Analyze() off the audio thread.
+    SampleRing       spectrum_ring;
+    SpectrumAnalyzer spectrum_analyzer;
 };

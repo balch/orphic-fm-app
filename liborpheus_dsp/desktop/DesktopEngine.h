@@ -52,6 +52,7 @@ public:
     void  setBend(float v);
     void  getMonitor(OrpheusMonitorData* out);
     int   getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
+    int   getSpectrum(float* bands, int numBands);
     void  getTurntableViz(int deck, float* outBuf);
     void  setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);
     void  clearAutomation(int target, int voiceIndex);

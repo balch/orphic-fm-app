@@ -255,6 +255,15 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetViz(
     return count;
 }
 
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetSpectrum(
+        JNIEnv *env, jobject thiz, jfloatArray bands) {
+    jfloat* buf = env->GetFloatArrayElements(bands, nullptr);
+    int count = sEngine.getSpectrum(buf, env->GetArrayLength(bands));
+    env->ReleaseFloatArrayElements(bands, buf, 0);
+    return count;
+}
+
 JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarViz(
         JNIEnv *env, jobject thiz,

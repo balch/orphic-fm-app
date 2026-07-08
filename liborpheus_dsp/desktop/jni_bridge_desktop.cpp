@@ -217,6 +217,14 @@ JNI_FN(nativeGetViz)(JNIEnv *env, jobject thiz,
     return count;
 }
 
+JNIEXPORT jint JNICALL
+JNI_FN(nativeGetSpectrum)(JNIEnv *env, jobject thiz, jfloatArray bands) {
+    jfloat* buf = env->GetFloatArrayElements(bands, nullptr);
+    int count = sEngine.getSpectrum(buf, env->GetArrayLength(bands));
+    env->ReleaseFloatArrayElements(bands, buf, 0);
+    return count;
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(nativeGetTurntableViz)(JNIEnv *env, jobject thiz,
                                jint deck, jfloatArray outBuf) {

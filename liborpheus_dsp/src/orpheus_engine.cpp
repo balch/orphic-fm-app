@@ -16,6 +16,7 @@ void horn_reset_static();
 OrpheusEngine* orpheus_engine_create(float sample_rate) {
     auto* engine = new OrpheusEngine();
     engine->sample_rate = sample_rate;
+    engine->spectrum_analyzer.Init(sample_rate);
 
     // Initialize all Plaits voices (OrpheusVoice: direct engine render)
     for (int i = 0; i < kNumVoices; i++) {

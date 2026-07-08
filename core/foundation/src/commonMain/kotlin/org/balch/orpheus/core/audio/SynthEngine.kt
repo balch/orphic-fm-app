@@ -247,6 +247,9 @@ interface SynthEngine {
     val tidesCh2VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val tidesCh3VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
 
+    // Spectrum analyzer flow (FFT band magnitudes, gated by setSpectrumEnabled)
+    val spectrumFlow: StateFlow<FloatArray> get() = emptyVizFlow
+
     // Pulsar step grid visualization
     val pulsarVizFlow: StateFlow<PulsarVizData> get() = emptyPulsarVizFlow
 
@@ -258,6 +261,9 @@ interface SynthEngine {
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}
+
+    /** Enable/disable spectrum FFT polling. Only poll while Spectrograph is active. */
+    fun setSpectrumEnabled(enabled: Boolean) {}
 
     /** Enable/disable turntable viz polling (DJ platter waveforms). */
     fun setTurntableVizEnabled(enabled: Boolean) {}

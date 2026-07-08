@@ -55,6 +55,10 @@ class SynthEngineMonitor(
     private val _bendFlow = MutableStateFlow(0f)
     val bendFlow: StateFlow<Float> = _bendFlow.asStateFlow()
 
+    // Spectrum analyzer flow (FFT band magnitudes; UI-only poll, gated like the signal scope)
+    private val _spectrumFlow = MutableStateFlow(FloatArray(0))
+    val spectrumFlow: StateFlow<FloatArray> = _spectrumFlow.asStateFlow()
+
     // Signal visualization flows (60fps oscilloscope data)
     private val _lfoVizFlow = MutableStateFlow(FloatArray(0))
     val lfoVizFlow: StateFlow<FloatArray> = _lfoVizFlow.asStateFlow()
@@ -149,12 +153,19 @@ class SynthEngineMonitor(
     private var turntableVizJob: Job? = null
     private var pulsarVizJob: Job? = null
     private var arrangementPollJob: Job? = null
+    private var spectrumJob: Job? = null
     var startRequested = false
 
     // Volatile for the lone cross-thread read in DspSynthEngine.start(); all
     // mutations happen under pollLock.
     @Volatile
     var vizRequested = false
+        private set
+
+    // Volatile for the lone cross-thread read in DspSynthEngine.start(); all
+    // mutations happen under pollLock.
+    @Volatile
+    var spectrumRequested = false
         private set
 
     /** True between startMonitoring() and stopMonitoring() — i.e. engine running. */
@@ -226,6 +237,7 @@ class SynthEngineMonitor(
             // setVizEnabled alone can't launch the poll until isRunning is true.
             if (vizRequested) launchVizPoll()
             if (turntableVizRequested) launchTurntableVizPoll()
+            if (spectrumRequested) launchSpectrumPoll()
         }
     }
 
@@ -255,6 +267,7 @@ class SynthEngineMonitor(
                 // it while the engine is actually monitoring, otherwise a resume
                 // after stopMonitoring() would poll a stopped engine.
                 if (turntableVizRequested) launchTurntableVizPoll()
+                if (spectrumRequested) launchSpectrumPoll()
             }
         } else {
             log.info { "UI hidden — pausing UI polls (audio + arrangement poll keep running)" }
@@ -266,6 +279,8 @@ class SynthEngineMonitor(
             vizJob = null
             turntableVizJob?.cancel()
             turntableVizJob = null
+            spectrumJob?.cancel()
+            spectrumJob = null
         }
     }
 
@@ -420,6 +435,8 @@ class SynthEngineMonitor(
         arrangementPollJob = null
         monitoringJob?.cancel()
         monitoringJob = null
+        spectrumJob?.cancel()
+        spectrumJob = null
     }
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
@@ -488,6 +505,31 @@ class SynthEngineMonitor(
         }
     }
 
+    /** Enable/disable spectrum FFT polling. Only poll while Spectrograph is active. */
+    fun setSpectrumEnabled(enabled: Boolean, isRunning: Boolean): Unit = synchronized(pollLock) {
+        spectrumRequested = enabled
+        if (enabled && isRunning && uiVisible) {
+            launchSpectrumPoll()
+        } else if (!enabled) {
+            spectrumJob?.cancel()
+            spectrumJob = null
+            _spectrumFlow.value = FloatArray(0)
+        }
+    }
+
+    /** ~60fps FFT band-magnitude poll for the Spectrograph viz (UI-only consumer). */
+    private fun launchSpectrumPoll() {
+        if (spectrumJob != null) return
+        spectrumJob = monitoringScope.launch(dispatcherProvider.io) {
+            while (isActive) {
+                val bands = FloatArray(SPECTRUM_BAND_COUNT)
+                nativeBridge.nativeGetSpectrum(bands)
+                _spectrumFlow.value = bands
+                delay(VIZ_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     /** Update bend flow from external sources (setBend facade, setPluginPort). */
     fun updateBend(value: Float) {
         _bendFlow.value = value
@@ -500,6 +542,7 @@ class SynthEngineMonitor(
         private val log = logging("SynthEngineMonitor")
         private const val MONITOR_POLL_INTERVAL_MS = 200L
         private const val VIZ_POLL_INTERVAL_MS = 16L  // ~60fps
+        const val SPECTRUM_BAND_COUNT = 40
         // Signal-monitor oscilloscope poll — the heaviest UI poll (24 channels,
         // each allocating a fresh FloatArray ring per tick). Run at half the
         // Pulsar/turntable rate: the Orphoscope only redraws at the display

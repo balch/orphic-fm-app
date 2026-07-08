@@ -29,6 +29,7 @@ import orpheus_dsp.orpheus_engine_get_monitor
 import orpheus_dsp.orpheus_engine_get_port
 import orpheus_dsp.orpheus_engine_get_pulsar_arrangement
 import orpheus_dsp.orpheus_engine_get_pulsar_viz
+import orpheus_dsp.orpheus_engine_get_spectrum
 import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
 import orpheus_dsp.orpheus_engine_is_tts_playing
@@ -440,6 +441,14 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                         pinnedPos.addressOf(0)
                     )
                 }
+            }
+        } ?: 0
+    }
+
+    override fun nativeGetSpectrum(bands: FloatArray): Int {
+        return engine?.let { eng ->
+            bands.usePinned { pinned ->
+                orpheus_engine_get_spectrum(eng, pinned.addressOf(0), bands.size)
             }
         } ?: 0
     }
