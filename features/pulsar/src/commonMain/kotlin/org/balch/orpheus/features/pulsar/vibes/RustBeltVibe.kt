@@ -96,14 +96,14 @@ class RustBeltVibe : VibeProvider {
     val sectionList by lazy {
         listOf(
             // 0: intro — SLOWED cold open so you can PICK OUT the hook. Bass + a soft kick at
-            //    ~78 BPM (bpmMultiplier 0.75; 104×0.75=78, well above the engine's 60 floor, so
-            //    the drop restores to 104 cleanly with no overshoot). Snare/hats out to unmask
+            //    ~61.2 BPM (bpmMultiplier 0.85; 72×0.85=61.2, just above the engine's 60 floor,
+            //    so the drop restores to 72 cleanly with no overshoot). Snare/hats out to unmask
             //    the syncopation; comp/lead/organ out. Over the last bar the tempo winds UP
             //    (bpmRampBars) into the full-tempo verse — an accelerando drop.
             Section(
                 name = "intro",
                 barsMin = 2, barsMax = 2,   // the 2-bar hook stated twice, slow
-                bpmMultiplier = 0.75f,      // ~78 BPM — slowed so the hook reads, then winds up
+                bpmMultiplier = 0.85f,      // ~61.2 BPM — slowed so the hook reads, then winds up
                 bpmRampBars = 1,            // accelerando over the last bar, lands on the drop
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),
@@ -221,7 +221,7 @@ class RustBeltVibe : VibeProvider {
         Vibe(
             name = name,
             album = Album.RIF,
-            bpm = 88f,
+            bpm = 72f,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,

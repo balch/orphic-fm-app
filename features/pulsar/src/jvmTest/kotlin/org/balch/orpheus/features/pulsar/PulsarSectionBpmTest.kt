@@ -174,31 +174,31 @@ class PulsarSectionBpmTest {
     @Test
     fun `FireSky half-time intro plays slow then drops back to exactly the vibe bpm`() =
         runTest(testDispatcher) {
-            // Regression guard for the 0.53x (not 0.5x) choice: FireSky is 114 BPM, so a
-            // literal 0.5x cold open would be 57 -> clamped to the 60 floor, and the drop
+            // Regression guard for the 0.72x (not 0.5x) choice: FireSky is 84 BPM, so a
+            // literal 0.5x cold open would be 42 -> clamped to the 60 floor, and the drop
             // (restore-by-ratio, x 1/0.5) would then over-restore to 60*2 = 120, running
-            // the whole electro body 6 BPM fast. 0.53x stays above the 60 floor so the
-            // slow sections are ~60.4 and the drop restores cleanly to 114.
+            // the whole electro body 36 BPM fast. 0.72x stays above the 60 floor so the
+            // slow sections are ~60.48 and the drop restores cleanly to 84.
             val fireSky = org.balch.orpheus.features.pulsar.vibes.FireSkyVibe().vibe
             val tempo = GlobalTempo(StubAudioEngine())
             val vm = makeViewModel(fireSky, tempo)
             vm.actions.setVibe(fireSky)
             advanceUntilIdle()
-            assertBpmNear(60.42, tempo.getBpm(),
-                "applyVibe now applies the opening section's 0.53× itself (114 * 0.53), so the " +
+            assertBpmNear(60.48, tempo.getBpm(),
+                "applyVibe now applies the opening section's 0.72× itself (84 * 0.72), so the " +
                     "intro is half-time immediately — no dependence on a section-0 emission")
 
-            pushSection(0); advanceUntilIdle()  // intro (cold open), mult 0.53 — idempotent re-emit
-            assertBpmNear(60.42, tempo.getBpm(),
-                "cold open (0.53x) should be ~60.4 BPM — above the 60 floor, not clamped")
+            pushSection(0); advanceUntilIdle()  // intro (cold open), mult 0.72 — idempotent re-emit
+            assertBpmNear(60.48, tempo.getBpm(),
+                "cold open (0.72x) should be ~60.48 BPM — above the 60 floor, not clamped")
 
-            pushSection(1); advanceUntilIdle()  // build, also mult 0.53
-            assertBpmNear(60.42, tempo.getBpm(),
-                "build (same 0.53x) should hold the half-time tempo, no change")
+            pushSection(1); advanceUntilIdle()  // build, also mult 0.72
+            assertBpmNear(60.48, tempo.getBpm(),
+                "build (same 0.72x) should hold the half-time tempo, no change")
 
             pushSection(2); advanceUntilIdle()  // verse — THE DROP, mult 1.0
-            assertBpmNear(114.0, tempo.getBpm(),
-                "drop into verse must restore EXACTLY 114 (a literal 0.5x would give 120)")
+            assertBpmNear(84.0, tempo.getBpm(),
+                "drop into verse must restore EXACTLY 84 (a literal 0.5x would give 120)")
         }
 
     // NOTE: the exit-scratch is now triggered and held entirely in C++ (the pulsar unit
@@ -224,8 +224,8 @@ class PulsarSectionBpmTest {
             // Switch into FireSky WITHOUT any section re-emission (no -1/0 push): production
             // has none, and distinctUntilChanged would swallow a 0→0 poll anyway.
             vm.actions.setVibe(fireSky); advanceUntilIdle()
-            assertBpmNear(60.42, tempo.getBpm(),
-                "FireSky must open at ~60.4 (114 * 0.53) even when the prior vibe was on " +
+            assertBpmNear(60.48, tempo.getBpm(),
+                "FireSky must open at ~60.48 (84 * 0.72) even when the prior vibe was on " +
                     "section 0 and no section re-emission arrives")
         }
 
@@ -262,16 +262,19 @@ class PulsarSectionBpmTest {
     fun `restoring a saved half-time-intro vibe opens at half-time, not the flat saved bpm`() =
         runTest(testDispatcher) {
             // Production repro of the "FireSky starts at full tempo on launch" bug. FireSky is
-            // the saved/default vibe and the previous session persisted the BODY tempo (114).
+            // the saved/default vibe and the previous session persisted the BODY tempo unchanged
+            // (savedBpm is derived from the live vibe, not hardcoded, so this test can't go stale
+            // the next time FireSky's bpm is retuned — see PulsarSectionBpmTest history).
             // On startup restoreSavedState() re-applies the saved bpm; if it ignores the opening
-            // section's 0.53x multiplier it restores the ~60 BPM half-time intro at the full 114
-            // body tempo. bpmId feeds the C++ pulsar clock's live override, so this is audible.
+            // section's 0.72x multiplier it restores the ~60 BPM half-time intro at the full
+            // body tempo instead. bpmId feeds the C++ pulsar clock's live override, so this is
+            // audible.
             //
             // graphReady is left PENDING so the VM's post-graph vibe re-apply (which re-seeds the
             // intro tempo from vibe.bpm) can't mask the restore push — isolating the unit under
             // test. In MIX_GATED that re-apply is itself re-clobbered by the presetFlow-driven
             // second restore, so in production the (buggy) restore push is the last writer anyway.
-            val savedBpm = 114f
+            val savedBpm = FireSkyVibe().vibe.bpm
             val savedJson = persistJson.encodeToString(
                 PulsarUiState(
                     vibe = sectionedVibe(bpm = savedBpm, mults = listOf(1.0f)),
@@ -293,9 +296,9 @@ class PulsarSectionBpmTest {
             )
             advanceUntilIdle()
 
-            assertBpmNear(60.42, tempo.getBpm(),
-                "restore of FireSky (saved body bpm 114) must open the half-time intro at " +
-                    "114 * 0.53 = 60.42 — not the flat saved 114")
+            assertBpmNear(60.48, tempo.getBpm(),
+                "restore of FireSky (saved body bpm $savedBpm) must open the half-time intro " +
+                    "at $savedBpm * 0.72 = 60.48 — not the flat saved $savedBpm")
         }
 }
 

@@ -37,7 +37,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
  *
  * Essential, default-less fields (name/bpm/rootNote/scaleType/genre/tracks) stay strict too.
  */
-internal val vibeApplyJson = Json {
+val vibeApplyJson = Json {
     encodeDefaults = true
     ignoreUnknownKeys = true
     coerceInputValues = true
@@ -65,7 +65,11 @@ data class VibeApplyResult(
     val appliedName: String? = null,
 )
 
-/** Cleans common AI artifacts (smart quotes, escaped quotes, zero-width chars) before JSON decode. */
+/**
+ * Cleans common AI artifacts (smart quotes, zero-width chars) before JSON decode. Safe to apply
+ * unconditionally: unlike [unescapeDoubledQuotes], it never touches a backslash-escape, so a
+ * field value that legitimately contains an escaped quote round-trips unchanged.
+ */
 internal fun sanitizeVibeJson(raw: String): String =
     raw
         .replace("\r\n", "\n")
@@ -74,16 +78,36 @@ internal fun sanitizeVibeJson(raw: String): String =
         .replace('”', '"')
         .replace('‘', '\'')
         .replace('’', '\'')
-        .replace("\\\"", "\"")
-        .replace("\\'", "'")
         .replace("​", "")
         .replace("‌", "")
         .replace("‍", "")
         .replace("﻿", "")
 
-/** Decode + construct a Vibe; the schema and the model's init { require(...) } blocks are the validator. */
-internal fun decodeVibe(json: Json, raw: String): Result<Vibe> =
-    runCatching { json.decodeFromString<Vibe>(sanitizeVibeJson(raw)) }
+/**
+ * Strips one layer of backslash-escaping from quotes, recovering a blob the model emitted as if
+ * it were still wrapped in its own string literal. Only ever used as a fallback in [decodeVibe]:
+ * applied unconditionally, this would corrupt any field whose value legitimately contains an
+ * escaped quote.
+ */
+private fun unescapeDoubledQuotes(raw: String): String =
+    raw.replace("\\\"", "\"").replace("\\'", "'")
+
+/**
+ * Decode + construct a Vibe; the schema and the model's init { require(...) } blocks are the
+ * validator. Tries the sanitized JSON as-is first, the normal case, where any escaped quote in a
+ * field value is legitimate content and must survive intact. Only falls back to stripping a layer
+ * of backslash-escaping if that first decode fails, recovering the case where the model emitted
+ * the whole blob as if it were still wrapped in its own string literal. On a genuine parse
+ * failure (neither attempt decodes), the direct attempt's error is the more useful one to
+ * surface, since the fallback's extra unescaping only mangles already-broken JSON further.
+ */
+fun decodeVibe(json: Json, raw: String): Result<Vibe> {
+    val sanitized = sanitizeVibeJson(raw)
+    val direct = runCatching { json.decodeFromString<Vibe>(sanitized) }
+    if (direct.isSuccess) return direct
+    val unescaped = runCatching { json.decodeFromString<Vibe>(unescapeDoubledQuotes(sanitized)) }
+    return if (unescaped.isSuccess) unescaped else direct
+}
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject

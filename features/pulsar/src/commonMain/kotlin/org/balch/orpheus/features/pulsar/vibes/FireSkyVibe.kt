@@ -76,7 +76,7 @@ import org.balch.orpheus.features.pulsar.models.chords
  * ## Arrangement
  * intro (HALF-TIME cold open: the iconic riff ALONE at ~60 BPM — its correct, heavy
  * pace — over a soft kick, nothing else) -> build (still half-time; the organ + bass
- * swell in under the slow riff) -> verse (THE DROP: tempo snaps back to full 114 and
+ * swell in under the slow riff) -> verse (THE DROP: tempo snaps back to full 84 and
  * the whole band crashes in — this is the electro version) -> chorus (driving peak,
  * lead pedals FIXED so the bVII/IV moves read as a hammering hook rather than an
  * octave-fold lurch) -> solo (band jams, riff develops) -> breakdown (one long
@@ -84,8 +84,8 @@ import org.balch.orpheus.features.pulsar.models.chords
  *
  * The half-time intro and the full-tempo body play the SAME [Lick] at two speeds —
  * pace lives in the sequencer clock, not the notes, so a per-section bpmMultiplier is
- * all it takes. The engine floors BPM at 60, so the slow sections use 0.53x (not a
- * literal 0.5x, which would clamp 57->60 and then over-restore the drop to 120).
+ * all it takes. The engine floors BPM at 60, so the slow sections use 0.72x (not a
+ * literal 0.5x, which would clamp 42->60 and then over-restore the drop to 120).
  * A/B against DogHouseVibe.
  */
 @Inject
@@ -156,13 +156,13 @@ class FireSkyVibe : VibeProvider {
         listOf(
             // 0: intro (cold open) — HALF-TIME. The iconic riff ALONE at its correct,
             //    heavy pace: just the riff + a soft kick pulse, everything else out.
-            //    bpmMultiplier 0.53 drops 114 -> ~60 BPM (the engine's 60 floor; a
-            //    literal 0.5 would clamp 57->60 and then over-restore the drop to 120).
+            //    bpmMultiplier 0.72 drops 84 -> ~60.48 BPM (the engine's 60 floor; a
+            //    literal 0.5 would clamp 42->60 and then over-restore the drop to 120).
             //    Lead pinned FIXED so the bare riff doesn't transpose.
             Section(
                 name = "intro",
                 barsMin = 2, barsMax = 2,   // one slow riff statements (the riff loops every 2 bars)
-                bpmMultiplier = 0.53f,      // ~60 BPM half-time cold open — the riff's true pace
+                bpmMultiplier = 0.72f,      // ~60 BPM half-time cold open — the riff's true pace
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),  // -> build
                 ),
@@ -188,10 +188,10 @@ class FireSkyVibe : VibeProvider {
             Section(
                 name = "build",
                 barsMin = 2, barsMax = 2,   // two more slow statements as the organ swells
-                bpmMultiplier = 0.53f,      // same ~60 BPM half-time as the cold open
+                bpmMultiplier = 0.72f,      // same ~60 BPM half-time as the cold open
                 exitScratchMs = 500,        // record-scratch out of the build's tail, into the drop
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = liftBars),  // -> verse = THE DROP (tempo snaps to 114)
+                    SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = liftBars),  // -> verse = THE DROP (tempo snaps to 84)
                 ),
                 macroOverrides = MacroOverrides(
                     energy = 0.65f, complexity = 0.42f, space = 0.45f, mood = 0.6f,
@@ -213,7 +213,7 @@ class FireSkyVibe : VibeProvider {
                 ),
             ),
             // 2: verse — full-band groove, the baseline. macroOverrides = null (verse IS baseline).
-            //    THE DROP lands here: tempo snaps from ~60 back to 114 and the full band enters.
+            //    THE DROP lands here: tempo snaps from ~60 back to 84 and the full band enters.
             Section(
                 name = "verse",
                 barsMin = 4, barsMax = 6,
@@ -310,7 +310,7 @@ class FireSkyVibe : VibeProvider {
         Vibe(
             name = name,
             album = Album.ZERO_TO_ONE,
-            bpm = 114f,
+            bpm = 84f,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,

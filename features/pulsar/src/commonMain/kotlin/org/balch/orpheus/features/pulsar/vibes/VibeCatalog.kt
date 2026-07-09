@@ -94,15 +94,16 @@ object VibeCatalog {
         "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
-        "Tremolo Tide" to CatalogEntry(VibeStatus.LIVE, tags = listOf("surf")),
         "Techno Wobble" to CatalogEntry(VibeStatus.LIVE, tags = listOf("club")),
         "Velvet Leash" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock")),
         "Voltage Strut" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
+        "Lost In Space" to CatalogEntry(VibeStatus.LIVE, tags = listOf("ambient")),
 
 // -----------------------------
         "Corner Office" to CatalogEntry(VibeStatus.WIP, tags = listOf("funk", "rock", "riff")),
         "Corner Office OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         // ── STEALTH: grooves and moods ──
+        "Tremolo Tide" to CatalogEntry(VibeStatus.WIP, tags = listOf("surf")),
         "Army Stomp" to CatalogEntry(VibeStatus.WIP, tags = listOf("march")),
         "Swamp Swagger" to CatalogEntry(VibeStatus.WIP, tags = listOf("swamp")),
         "Blacktop Boogie" to CatalogEntry(VibeStatus.WIP, tags = listOf("boogie")),

@@ -17,6 +17,16 @@ Registration is automatic via Metro DI — each vibe class carries `@Inject` and
 
 `VibeProvider` has **two** members, both required: `override val name: String` (a cheap constant for picker sorting) and `override val vibe: Vibe` (the heavy body — declare it `by lazy { Vibe(name = name, ...) }` so selecting the picker, not listing it, builds the tracks). See the file template below.
 
+## Starting from a codegen-imported vibe
+
+If `grab-ai-vibes` already ran `tools:vibe-codegen` on an AI-archived JSON, there's already a
+compiling `<Class>Vibe.kt` in this directory with every field spelled out explicitly and a
+provenance-header comment instead of prose. Once that vibe earns a keep, start from *that* file
+rather than `DogHouseVibe.kt` — your job is polish, not translation: collapse identical
+`engineEdm`/`engineSpace` pairs into the `OrpheusEngine(...).let { x -> TrackVoice(engineEdm = x,
+engineSpace = x) }` idiom (the generator never does this itself), add the musical-intent KDoc
+every hand-authored vibe carries (see the naming rule below — no trademarks), and tune by ear.
+
 ## Naming rule — read this first
 
 This project has a hard rule: **never use trademarked artist, band, album, or song names in user-facing code or comments.** The `name` field in `Vibe(...)` is user-facing (shows up in the Pulsar vibe picker), as are KDoc block comments at the top of the file.

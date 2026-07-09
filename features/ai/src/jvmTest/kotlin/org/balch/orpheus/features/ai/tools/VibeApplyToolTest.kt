@@ -110,4 +110,27 @@ class VibeApplyToolTest {
         val result = decodeVibe(json, withSmartQuotes)
         assertTrue(result.isSuccess)
     }
+
+    @Test
+    fun `a name containing an escaped quote round-trips instead of being corrupted`() {
+        // Regression test: sanitizeVibeJson used to unconditionally strip every backslash-escaped
+        // quote, which corrupted a LEGITIMATE escaped quote inside a field value (not just AI
+        // double-escaping) into invalid JSON. decodeVibe's fallback design fixes this — see its doc.
+        val vibe = DogHouseVibe().vibe.copy(name = "Midnight \"Echo\" Run")
+        val result = decodeVibe(vibeApplyJson, vibeApplyJson.encodeToString(vibe))
+        assertTrue(result.isSuccess, "decode failed: ${result.exceptionOrNull()?.message}")
+        assertEquals("Midnight \"Echo\" Run", result.getOrThrow().name)
+    }
+
+    @Test
+    fun `a blob double-escaped as if still wrapped in its own string literal still decodes`() {
+        // Preserves the original intent of the escaped-quote fallback: some models emit the JSON
+        // as if it were still a string literal (every quote backslash-escaped). The fallback in
+        // decodeVibe recovers that as a last resort, only after a direct decode fails.
+        val dh = DogHouseVibe().vibe
+        val doubled = vibeApplyJson.encodeToString(dh).replace("\"", "\\\"")
+        val result = decodeVibe(vibeApplyJson, doubled)
+        assertTrue(result.isSuccess, "decode failed: ${result.exceptionOrNull()?.message}")
+        assertEquals(dh, result.getOrNull())
+    }
 }

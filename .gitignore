@@ -29,6 +29,9 @@ tools/train-asl-model/.venv/
 .worktrees/
 .claude/worktrees/
 
+# skill-creator eval/optimizer scratch output (trigger-eval.json, optimizer.log, iteration logs)
+.claude/skills/*-workspace/
+
 # Gradle generated files
 gradle/gradle-daemon-jvm.properties
 
