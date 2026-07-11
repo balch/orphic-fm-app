@@ -81,6 +81,46 @@ The audio engine is the C++ DSP library (`liborpheus_desktop.dylib` on macOS) lo
 
 The native library is built from `liborpheus_dsp/` using `liborpheus_dsp/platform/jvm/CMakeLists.txt`.
 
+#### Windows Installers (MSI / EXE)
+
+MSI and EXE are produced by jpackage, which **cannot cross-compile** — these commands must be run **on Windows** with a full JDK (containing `jpackage`), plus CMake + a C++ compiler + the `eurorack/` source, since packaging also runs `buildDesktopNative` to bundle `orpheus_desktop.dll`.
+
+Package names: `Orphic-FM` (Orpheus) and `DjApp` (Orphic DJ). The DJ desktop edition is selected with `-Pedition=ai|og` (default `og`/core), not a build flavor.
+
+**MSI** (already enabled — `TargetFormat.Msi` is declared):
+
+```bash
+# Orpheus
+./gradlew :apps:orpheus:desktopApp:packageMsi           # debug/dev build
+./gradlew :apps:orpheus:desktopApp:packageReleaseMsi    # optimized (ProGuard) build
+
+# Orphic DJ (add -Pedition=ai for the AI edition)
+./gradlew :apps:djapp:desktopApp:packageMsi -Pedition=ai
+./gradlew :apps:djapp:desktopApp:packageReleaseMsi -Pedition=ai
+```
+
+**EXE** (`TargetFormat.Exe` is declared in both desktop modules):
+
+```bash
+# Orpheus
+./gradlew :apps:orpheus:desktopApp:packageExe
+./gradlew :apps:orpheus:desktopApp:packageReleaseExe
+
+# Orphic DJ
+./gradlew :apps:djapp:desktopApp:packageExe -Pedition=ai
+./gradlew :apps:djapp:desktopApp:packageReleaseExe -Pedition=ai
+```
+
+Installers land in (debug uses `main/`, release uses `main-release/`):
+
+```
+apps/orpheus/desktopApp/build/compose/binaries/main/msi/Orphic-FM-1.0.0.msi
+apps/orpheus/desktopApp/build/compose/binaries/main/exe/Orphic-FM-1.0.0.exe
+apps/djapp/desktopApp/build/compose/binaries/main/msi/DjApp-1.0.0.msi
+```
+
+To build every declared installer for the host OS at once, use `packageDistributionForCurrentOS` (or `packageReleaseDistributionForCurrentOS`).
+
 ### Android
 
 Uses [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) with the C++ DSP engine compiled via NDK.

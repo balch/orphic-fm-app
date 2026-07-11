@@ -24,7 +24,7 @@ compose.desktop {
         mainClass = "org.balch.orpheus.djapp.MainKt"
 
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
             packageName = "DjApp"
             packageVersion = "1.0.0"
             macOS { dockName = "Orphic DJ" }
