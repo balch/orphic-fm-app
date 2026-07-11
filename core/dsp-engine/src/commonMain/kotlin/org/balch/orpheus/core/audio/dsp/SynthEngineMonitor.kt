@@ -1,7 +1,6 @@
 package org.balch.orpheus.core.audio.dsp
 
 import com.diamondedge.logging.logging
-import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.Job
@@ -17,6 +16,8 @@ import org.balch.orpheus.core.plugin.viz.PULSAR_MAX_STEPS
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import kotlin.concurrent.Volatile
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Owns all monitoring StateFlows and signal visualization polling.
@@ -313,7 +314,7 @@ class SynthEngineMonitor(
                 // xruns < previous means the stream was reopened (counter reset)
                 _xrunCountFlow.value = xruns
 
-                delay(MONITOR_POLL_INTERVAL_MS)
+                delay(MONITOR_POLL_INTERVAL)
             }
         }
     }
@@ -348,7 +349,7 @@ class SynthEngineMonitor(
                     activeEngines = pulsarActiveEngines.copyOf(),
                 )
 
-                delay(VIZ_POLL_INTERVAL_MS)
+                delay(VIZ_POLL_INTERVAL)
             }
         }
     }
@@ -376,7 +377,7 @@ class SynthEngineMonitor(
                         soloMode = arrangementBuf[5],
                     )
                 } else null
-                delay(200)
+                delay(200.milliseconds)
             }
         }
     }
@@ -408,7 +409,7 @@ class SynthEngineMonitor(
                 if (beatCount > 0) {
                     _beatPhaseFlow.value = vizBuf[beatCount - 1].coerceIn(0f, 1f)
                 }
-                delay(VIZ_POLL_INTERVAL_MS)
+                delay(VIZ_POLL_INTERVAL)
             }
         }
     }
@@ -500,7 +501,7 @@ class SynthEngineMonitor(
                 pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow)
                 pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow)
 
-                delay(VIZ_SCOPE_POLL_INTERVAL_MS)
+                delay(VIZ_SCOPE_POLL_INTERVAL)
             }
         }
     }
@@ -525,7 +526,7 @@ class SynthEngineMonitor(
                 val bands = FloatArray(SPECTRUM_BAND_COUNT)
                 nativeBridge.nativeGetSpectrum(bands)
                 _spectrumFlow.value = bands
-                delay(VIZ_POLL_INTERVAL_MS)
+                delay(VIZ_POLL_INTERVAL)
             }
         }
     }
@@ -540,15 +541,15 @@ class SynthEngineMonitor(
 
     companion object {
         private val log = logging("SynthEngineMonitor")
-        private const val MONITOR_POLL_INTERVAL_MS = 200L
-        private const val VIZ_POLL_INTERVAL_MS = 16L  // ~60fps
+        private val MONITOR_POLL_INTERVAL = 200.milliseconds
+        private val VIZ_POLL_INTERVAL = 16.milliseconds  // ~60fps
         const val SPECTRUM_BAND_COUNT = 40
         // Signal-monitor oscilloscope poll — the heaviest UI poll (24 channels,
         // each allocating a fresh FloatArray ring per tick). Run at half the
         // Pulsar/turntable rate: the Orphoscope only redraws at the display
         // refresh anyway and 30Hz scope motion still reads as smooth, but the
         // per-second allocation/GC churn halves.
-        private const val VIZ_SCOPE_POLL_INTERVAL_MS = 33L  // ~30fps
+        private val VIZ_SCOPE_POLL_INTERVAL = 33.milliseconds  // ~30fps
         private const val VIZ_BUF_SIZE = 480           // matches C++ VizRing::kVizBufSize
         // VizChannel IDs (must match C++ VizChannel enum)
         private const val VIZ_LFO = 0

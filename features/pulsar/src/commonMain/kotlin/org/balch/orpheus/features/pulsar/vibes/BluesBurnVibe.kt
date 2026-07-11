@@ -90,8 +90,8 @@ import org.balch.orpheus.features.pulsar.models.chords
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class FireSkyVibe : VibeProvider {
-    override val name: String = "Fire Sky"
+class BluesBurnVibe : VibeProvider {
+    override val name: String = "Blues Burn"
 
     // The riff hangs on the i (G), then makes the iconic hard-rock move: down to
     // the bVII (degree 6) and up to the IV (degree 3), then home.
@@ -100,7 +100,7 @@ class FireSkyVibe : VibeProvider {
     private val chordsPerBar = 1
 
     // Tighter two-chord pump for the chorus/outro — i pedal punching to bVII/IV.
-    private val chorusProgression = chords(0, 0, 6, 3)
+    private val chorusProgression = chords(0, 0, 6, 3, 0, 3)
     private val chorusChordsPerBar = 2
 
     // Per-edge transition ramps named for their musical role, not the bar count.
@@ -115,25 +115,25 @@ class FireSkyVibe : VibeProvider {
     // The vibe's tension arc. Pulled out so the build section can .copy() it with
     // halfLick = true (jam the first-bar hook) + wider tone evolution.
     private val baseTension = TensionProfile(
-        innerBars = 8,   // >= 7 enables spurt + octave climax
-        outerBars = 32,
-        outerDepth = 0.55f,
-        volume = 0.30f,
-        tonal = TonalTension(octaveShift = true, chromaticPassing = 0.10f),  // riff jumps an octave at the peak
-        timing = 0.20f,
+        innerBars = 7,   // >= 7 enables spurt + octave climax
+        outerBars = 16,
+        outerDepth = 0.75f,
+        volume = 0.40f,
+        tonal = TonalTension(octaveShift = true, chromaticPassing = 0.40f),  // riff jumps an octave at the peak
+        timing = 0.40f,
         evolution = EvolutionTension(
-            timbreLow = 0.25f, timbreHigh = 0.62f, timbreProbability = 0.7f,  // the distortion breathes
-            morphLow = 0.35f, morphHigh = 0.55f, morphProbability = 0.5f,
+            timbreLow = 0.25f, timbreHigh = 0.62f, timbreProbability = 0.8f,  // the distortion breathes
+            morphLow = 0.35f, morphHigh = 0.55f, morphProbability = 0.75f,
             attackPoint = 0.6f, releaseSpeed = 0.35f,  // peak past midpoint = a build into the next phrase
         ),
-        spurtChance = 0.10f,  // occasional lick-mutation spurt — the riff gets wilder sometimes
+        spurtChance = 0.40f,  // occasional lick-mutation spurt — the riff gets wilder sometimes
     )
 
     // Build-section tension: the lead's tone breathes harder here (wider morph/timbre,
     // faster inner ramp) as the band swells into the drop, and octaveShift is off so the
     // slow riff stays grounded. halfLick stays off — it's reserved for solo use later.
     private val buildTension = baseTension.copy(
-        innerBars = 3,  // fast tension ramp so the tone actually moves within the short build
+        innerBars = 2,  // fast tension ramp so the tone actually moves within the short build
         tonal = baseTension.tonal.copy(halfLick = false, octaveShift = false),
         evolution = baseTension.evolution.copy(
             timbreLow = 0.20f, timbreHigh = 0.75f, timbreProbability = 0.85f,
@@ -162,7 +162,6 @@ class FireSkyVibe : VibeProvider {
             Section(
                 name = "intro",
                 barsMin = 2, barsMax = 2,   // one slow riff statements (the riff loops every 2 bars)
-                bpmMultiplier = 0.72f,      // ~60 BPM half-time cold open — the riff's true pace
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),  // -> build
                 ),
@@ -188,8 +187,6 @@ class FireSkyVibe : VibeProvider {
             Section(
                 name = "build",
                 barsMin = 2, barsMax = 2,   // two more slow statements as the organ swells
-                bpmMultiplier = 0.72f,      // same ~60 BPM half-time as the cold open
-                exitScratchMs = 500,        // record-scratch out of the build's tail, into the drop
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = liftBars),  // -> verse = THE DROP (tempo snaps to 84)
                 ),
@@ -310,7 +307,7 @@ class FireSkyVibe : VibeProvider {
         Vibe(
             name = name,
             album = Album.ZERO_TO_ONE,
-            bpm = 84f,
+            bpm = 62f,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
@@ -322,7 +319,7 @@ class FireSkyVibe : VibeProvider {
             scaleType = ScaleType.BLUES,
             seed = 0,
             // --- macro defaults: driving, locked, dry-ish rock ---
-            energy = 0.54f,
+            energy = 0.44f,
             complexity = 0.78f,
             space = 0.40f,
             mood = 0.75f,
@@ -337,25 +334,28 @@ class FireSkyVibe : VibeProvider {
             // FireSkyOgVibe (WIP, -Pcatalog). 2 bars, sums to exactly 8.0 beats, no rest.
             lick = Lick(
                 steps = listOf(
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
-                    LickStep(scaleDegree = 2, duration = 0.25f, velocity = 0.85f),
-                    LickStep(scaleDegree = 2, duration = 0.25f, velocity = 0.85f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
-                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.80f),
-                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.80f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.90f),
-                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.90f),
-                    LickStep(scaleDegree = 0, duration = 1f, velocity = 0.90f),
+                    // bar 1 — 16th gallop that DROPS to the b7, a fast b5 crush, up to the 5th
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.78f), // D  5 — pickup
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.98f), // G  root ┐ gallop
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.85f), // G  root ┘
+                    LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.88f),  // F  b7 — drop below the tonic
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f), // G  root
+                    LickStep(scaleDegree = 3, duration = 0.25f, velocity = 0.72f), // Db b5 — fast descending crush
+                    LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.86f),  // D  5
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.90f), // G  root
+                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.80f), // Bb b3
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.84f), // D  5 — launch
+                    // bar 2 — leap to the OCTAVE peak, bluesy b7-5-b3 tail, low gallop, long home
+                    LickStep(scaleDegree = 6, duration = 0.75f, velocity = 0.92f), // G  octave — arch peak, let-ring
+                    LickStep(scaleDegree = 5, duration = 0.25f, velocity = 0.82f), // F  b7 ┐
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.80f), // D  5  │ turnaround tail
+                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.78f),  // Bb b3 ┘
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f), // G  root ┐ gallop chug
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.85f), // G  root ┘
+                    LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.80f),  // F  b7
+                    LickStep(scaleDegree = 4, duration = 0.25f, velocity = 0.82f), // D  5
+                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.76f), // Bb b3
+                    LickStep(scaleDegree = 0, duration = 1.75f, velocity = 0.90f), // G  root — long let-ring close
                 ),
                 loopLength = 8,  // 2 bars; notes sum to 8.0 — no rest, relentless
             ),
@@ -372,7 +372,7 @@ class FireSkyVibe : VibeProvider {
                 customProgression = mainProgression,
             ),
             progressionAnchor = ProgressionAnchor.EVERY_8,  // reset drift each 8-bar phrase
-            progressionDriftRange = 0.10f,                  // subtle — the riff hangs on the tonic
+            progressionDriftRange = 0.30f,                  // subtle — the riff hangs on the tonic
             tracks = listOf(
                 // Track 0 — Kick (BD)
                 OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.88f).let { kick ->
@@ -426,7 +426,7 @@ class FireSkyVibe : VibeProvider {
                     noteRangeLow = 31,        // G1
                     noteRangeHigh = 50,       // D3
                     reverbBrightness = 0.26f,
-                    glideRate = 0.08f,        // tiny slur on chord changes
+                    glideRate = 0.28f,        // tiny slur on chord changes
                     lpgMode = LpgMode.PLUCK,  // articulate attack so the root pulse punches
                     lpgDecay = 0.45f,
                 ).let { bass ->
@@ -435,7 +435,7 @@ class FireSkyVibe : VibeProvider {
                         engineSpace = bass.copy(engineId = OrpheusEngineId.STR, lpgMode = LpgMode.SUSTAINED),
                         role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                         pan = 0.00f,
-                        density = 0.50f,
+                        density = 0.750f,
                         envelopeProfile = EnvelopeProfile.MELODIC,
                         macroMap = TrackMacroMap.MELODIC,
                         barStrategy = BarStrategy.REPEAT,  // locked pocket
@@ -505,10 +505,10 @@ class FireSkyVibe : VibeProvider {
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
                             comping = ChordComping(
-                                style = CompingStyle.ROCK_DOWNBEATS,  // hits on 1 & 3 — rock organ stabs
+                                style = CompingStyle.BLUES_SHUFFLE,
                                 arpMode = ArpMode.AUTO,
                                 arpSpeed = 0.12f,
-                                arpDirection = ArpDirection.UP,
+                                arpDirection = ArpDirection.RANDOM,
                                 sectionInversion = SectionInversion.FIRST_INVERSION,
                                 humanization = CompingHumanization(
                                     dropProbability = 0.16f,

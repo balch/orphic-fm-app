@@ -2,6 +2,8 @@ package org.balch.orpheus.features.pulsar.vibes
 
 import com.diamondedge.logging.logging
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.curate
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.vibeStatusFromArg
 
 /**
  * Ship-readiness of a cataloged vibe.
@@ -87,9 +89,10 @@ object VibeCatalog {
     val entries: Map<String, CatalogEntry> = linkedMapOf(
         "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
+        "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
         "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Rust Belt" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
+        "Rust Belt" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "swamp")),
         "Rust Belt OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
