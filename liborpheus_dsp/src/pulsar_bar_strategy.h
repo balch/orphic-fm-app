@@ -132,7 +132,8 @@ inline void bar_strategy_call_response(
     uint32_t seed,
     int lick_octave = -1,
     uint8_t note_range_low = 36, uint8_t note_range_high = 72,
-    int lick_loop_length = 0)
+    int lick_loop_length = 0,
+    int lick_degree_offset = 0)
 {
     if (lick_length <= 0) return;
 
@@ -203,7 +204,7 @@ inline void bar_strategy_call_response(
             }
 
             int octave = 0;
-            int d = degree;
+            int d = degree + lick_degree_offset;  // per-track parallel harmony (sounding notes only)
             while (d < 0) { d += scale.count; octave--; }
             while (d >= scale.count) { d -= scale.count; octave++; }
 
@@ -279,7 +280,7 @@ inline void bar_strategy_call_response(
             }
 
             int octave = 0;
-            int d = degree;
+            int d = degree + lick_degree_offset;  // compose offset with the response transform
             while (d < 0) { d += scale.count; octave--; }
             while (d >= scale.count) { d -= scale.count; octave++; }
 
@@ -340,7 +341,8 @@ inline void apply_bar_strategy(
     const PulsarLickStep* lick, int lick_length, float lick_mutation,
     uint32_t seed,
     int lick_octave = -1,
-    int lick_loop_length = 0)
+    int lick_loop_length = 0,
+    int lick_degree_offset = 0)
 {
     int bar1_len = ts.step_count;  // bar 1 length (already generated)
 
@@ -369,7 +371,8 @@ inline void apply_bar_strategy(
                                            root, scale, seed,
                                            lick_octave,
                                            genre.note_range_low, genre.note_range_high,
-                                           lick_loop_length);
+                                           lick_loop_length,
+                                           lick_degree_offset);
             } else {
                 // Fallback: just repeat if no lick loaded
                 bar_strategy_repeat(ts.steps, bar1_len);
@@ -405,7 +408,8 @@ inline void render_lick_into_track(
     BarStrategy bar_strategy, int step_count,
     int lick_octave,
     uint8_t note_range_low, uint8_t note_range_high,
-    int lick_loop_length)
+    int lick_loop_length,
+    int lick_degree_offset = 0)
 {
     ts.step_count = step_count;
     if (bar_strategy == BarStrategy::CALL_RESPONSE) {
@@ -413,12 +417,14 @@ inline void render_lick_into_track(
                                    lick, lick_length, lick_mutation,
                                    root, scale, seed ^ (static_cast<uint32_t>(track_index) * 7919u),
                                    lick_octave, note_range_low, note_range_high,
-                                   lick_loop_length);
+                                   lick_loop_length,
+                                   lick_degree_offset);
     } else {
         generate_lick_pattern(ts.steps, ts.step_count,
                               lick, lick_length, lick_mutation,
                               root, scale, seed ^ (static_cast<uint32_t>(track_index) * 7919u),
                               0, lick_octave, note_range_low, note_range_high,
-                              lick_loop_length);
+                              lick_loop_length,
+                              lick_degree_offset);
     }
 }

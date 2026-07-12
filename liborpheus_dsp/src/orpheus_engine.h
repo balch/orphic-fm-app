@@ -1039,6 +1039,10 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_glide_rate_space[8] = {};
     // Per-track lick usage
     std::atomic<int>   pulsar_track_lick_mode[8] = {};  // LickMode: 0=NONE, 1=SQUASH, 2=FILL
+    // Diatonic scale-degree shift applied to this track's render of the shared
+    // lick (parallel harmony vs the lead, e.g. -2 = a fourth below in a 7-note
+    // scale). Sounding notes only; rests are unaffected.
+    std::atomic<int>   pulsar_track_lick_degree_offset[8] = {};
     std::atomic<int>   pulsar_track_comping_style[8] = {};  // CompingStyleId: 0=PAD, 1=FUNK, 2=ROCK, 3=CUSTOM
     std::atomic<int>   pulsar_track_arp_mode[8] = {};       // ArpModeId: 0=AUTO, 1=ALWAYS, 2=NEVER
     std::atomic<float> pulsar_track_arp_speed[8] = {};      // 0.0-1.0

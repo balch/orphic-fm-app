@@ -672,7 +672,8 @@ inline void generate_lick_pattern(
     int chord_degree = 0,
     int lick_octave = -1,
     uint8_t note_range_low = 36, uint8_t note_range_high = 72,
-    int lick_loop_length = 0)
+    int lick_loop_length = 0,
+    int lick_degree_offset = 0)
 {
     // Clear all steps first (rests by default)
     for (int i = 0; i < step_count; i++) {
@@ -748,9 +749,11 @@ inline void generate_lick_pattern(
             dur = std::max(0.1f, std::min(2.0f, dur));
         }
 
-        // Quantize scale degree to MIDI note
+        // Quantize scale degree to MIDI note. The per-track degree offset shifts
+        // sounding notes only (rests bailed out above): parallel diatonic harmony
+        // that composes with mutation and the octave fold below.
         int octave = 0;
-        int d = degree;
+        int d = degree + lick_degree_offset;
         while (d < 0) { d += scale.count; octave--; }
         while (d >= scale.count) { d -= scale.count; octave++; }
 

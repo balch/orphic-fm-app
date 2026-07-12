@@ -19,6 +19,9 @@ class PulsarLickTest {
     fun `lick symbol count matches MAX_LICK_STEPS x fields`() {
         val lickData = PulsarSymbol.entries.filter { it.name.startsWith("LICK_DATA_") }
         assertEquals(Lick.MAX_LICK_STEPS * Lick.LICK_FIELDS_PER_STEP, lickData.size)
+        // LICK_DATA_COUNT is what PulsarPlugin sizes its port registration from —
+        // pin it to the same contract so all three stay in lockstep.
+        assertEquals(PulsarSymbol.LICK_DATA_COUNT, lickData.size)
     }
 
     @Test

@@ -51,6 +51,10 @@ val TrackVoice.chordComping: ChordComping?
 val TrackVoice.lickMode: LickMode
     get() = (role as? TrackRole.Melodic)?.lickMode ?: LickMode.None
 
+/** Convenience: lick scale-degree offset if [TrackRole.Melodic], else 0. */
+val TrackVoice.lickDegreeOffset: Int
+    get() = (role as? TrackRole.Melodic)?.lickDegreeOffset ?: 0
+
 /** Convenience: chord-follow mode — [ChordFollow.FOLLOW] for percussive tracks. */
 val TrackVoice.chordFollow: ChordFollow
     get() = when (val r = role) {

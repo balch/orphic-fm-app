@@ -76,7 +76,7 @@ class PulsarPlugin : DspPlugin {
     private var _trackRole = IntArray(8) { if (it < 3) 0 else 1 }
     private val _trackBarStrategy = IntArray(8) { 0 }
     private var _stepCount = 16
-    private var _trackMacro = FloatArray(8 * 16) { 0.5f }
+    private var _trackMacro = FloatArray(8 * PulsarSymbol.TRACK_MACRO_STRIDE) { 0.5f }
     private var _genreDensity = floatArrayOf(0.5f, 0.35f, 0.8f, 0.4f, 0.3f, 0.2f, 0.15f, 0.08f)
     private var _genreSwing = 0.02f
     private var _genreGhostProb = 0.3f
@@ -89,7 +89,7 @@ class PulsarPlugin : DspPlugin {
     private var _progressionDriftRange = 0.5f
     private var _lickLength = 0
     private var _lickLoopLength = 0
-    private var _lickData = FloatArray(96) { 0f }
+    private var _lickData = FloatArray(PulsarSymbol.LICK_DATA_COUNT) { 0f }
     // Tension profile
     private var _tensionInnerBars = 4
     private var _tensionOuterBars = 0
@@ -128,6 +128,7 @@ class PulsarPlugin : DspPlugin {
     private val _delayFeedbackTrack = FloatArray(8) { -1f }
     private val _glideRate = FloatArray(8) { 0f }
     private val _trackLickMode = IntArray(8) { 0 }
+    private val _trackLickDegreeOffset = IntArray(8) { 0 }
     private val _trackEvoRhythmic = IntArray(8) { 0 }
     private val _trackEvoTensionResp = FloatArray(8) { 1.0f }
     private val _trackEvoNoteFollow = IntArray(8) { 0 }
@@ -327,11 +328,12 @@ class PulsarPlugin : DspPlugin {
             intType { default = _stepCount; get { _stepCount }; set { _stepCount = it } }
         }
 
-        // Per-track macro maps (16 entries per track, stride = 16)
+        // Per-track macro maps (TRACK_MACRO_STRIDE entries per track: 7 targets × min/max)
         for (t in 0..7) {
-            val macroBase = PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal + t * 16
-            for (m in 0..15) {
-                val idx = t * 16 + m
+            val macroBase =
+                PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal + t * PulsarSymbol.TRACK_MACRO_STRIDE
+            for (m in 0 until PulsarSymbol.TRACK_MACRO_STRIDE) {
+                val idx = t * PulsarSymbol.TRACK_MACRO_STRIDE + m
                 controlPort(PulsarSymbol.entries[macroBase + m]) {
                     floatType { default = 0.5f; min = 0f; max = 1f; get { _trackMacro[idx] }; set { _trackMacro[idx] = it } }
                 }
@@ -373,17 +375,22 @@ class PulsarPlugin : DspPlugin {
                 get { _progressionDriftRange }; set { _progressionDriftRange = it } }
         }
 
-        // Lick buffer
-        controlPort(PulsarSymbol.LICK_LENGTH) {
-            intType { default = 0; get { _lickLength }; set { _lickLength = it } }
+        // Lick buffer. Data ports register BEFORE the length ports: C++ reads
+        // lick_length with memory_order_acquire as the "lick is ready" fence, so
+        // data must be written first and length last (the same order the
+        // PulsarViewModel pushes). syncNativeBridgeState() forwards ports to C++
+        // in registration order, so this ordering preserves the contract on
+        // preset restore and engine re-sync.
+        for (i in 0 until PulsarSymbol.LICK_DATA_COUNT) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i]) {
+                floatType { default = 0f; get { _lickData[i] }; set { _lickData[i] = it } }
+            }
         }
         controlPort(PulsarSymbol.LICK_LOOP_LENGTH) {
             intType { default = 0; get { _lickLoopLength }; set { _lickLoopLength = it } }
         }
-        for (i in 0..95) {
-            controlPort(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i]) {
-                floatType { default = 0f; get { _lickData[i] }; set { _lickData[i] = it } }
-            }
+        controlPort(PulsarSymbol.LICK_LENGTH) {
+            intType { default = 0; get { _lickLength }; set { _lickLength = it } }
         }
 
         // Tension profile
@@ -537,6 +544,11 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_MODE.ordinal + t]) {
                 intType { default = 0; get { _trackLickMode[t] }; set { _trackLickMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_DEGREE_OFFSET.ordinal + t]) {
+                intType { default = 0; get { _trackLickDegreeOffset[t] }; set { _trackLickDegreeOffset[t] = it } }
             }
         }
         for (t in 0..7) {

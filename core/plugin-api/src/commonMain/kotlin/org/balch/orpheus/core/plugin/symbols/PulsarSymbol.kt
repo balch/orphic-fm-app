@@ -804,6 +804,17 @@ enum class PulsarSymbol(
     TRACK_5_LICK_MODE("track_5_lick_mode"),
     TRACK_6_LICK_MODE("track_6_lick_mode"),
     TRACK_7_LICK_MODE("track_7_lick_mode"),
+    // Per-track lick scale-degree offset: diatonic shift applied to this track's
+    // render of the shared lick (parallel harmony vs the lead; e.g. -2 = a fourth
+    // below in a 7-note scale). Sounding notes only — rests are unaffected.
+    TRACK_0_LICK_DEGREE_OFFSET("track_0_lick_degree_offset"),
+    TRACK_1_LICK_DEGREE_OFFSET("track_1_lick_degree_offset"),
+    TRACK_2_LICK_DEGREE_OFFSET("track_2_lick_degree_offset"),
+    TRACK_3_LICK_DEGREE_OFFSET("track_3_lick_degree_offset"),
+    TRACK_4_LICK_DEGREE_OFFSET("track_4_lick_degree_offset"),
+    TRACK_5_LICK_DEGREE_OFFSET("track_5_lick_degree_offset"),
+    TRACK_6_LICK_DEGREE_OFFSET("track_6_lick_degree_offset"),
+    TRACK_7_LICK_DEGREE_OFFSET("track_7_lick_degree_offset"),
     // Per-track evolution: tension response (float 0-1)
     TRACK_0_EVO_TENSION_RESP("track_0_evo_tension_resp"),
     TRACK_1_EVO_TENSION_RESP("track_1_evo_tension_resp"),
@@ -1247,4 +1258,24 @@ enum class PulsarSymbol(
     PULSAR_REVERB_SIZE("pulsar_reverb_size"),
     PULSAR_REVERB_DAMPING("pulsar_reverb_damping"),
     PULSAR_REVERB_BRIGHTNESS("pulsar_reverb_brightness"),
+    ;
+
+    companion object {
+        /**
+         * Number of LICK_DATA_* entries (64 steps × 4 fields) — the marshalling
+         * contract described above [LICK_LENGTH]. PulsarPlugin sizes its port
+         * registration from this; PulsarLickTest pins it to the actual enum entries
+         * and to `Lick.MAX_LICK_STEPS * Lick.LICK_FIELDS_PER_STEP`.
+         */
+        const val LICK_DATA_COUNT = 256
+
+        /**
+         * Per-track macro-map symbols per track (7 targets × min/max), the ordinal
+         * stride from [TRACK_0_MACRO_ENERGY_VOL_MIN]. Anything indexing the macro
+         * block with `entries[... + t * stride + m]` MUST use this — a stale stride
+         * silently registers/writes neighboring symbols (PulsarPlugin shipped with
+         * stride 16 for a while, shadowing the genre + lick ports).
+         */
+        const val TRACK_MACRO_STRIDE = 14
+    }
 }

@@ -869,6 +869,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_glide_rate_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "lick_mode") == 0)
                 engine->pulsar_track_lick_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "lick_degree_offset") == 0)
+                engine->pulsar_track_lick_degree_offset[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "comping_style") == 0)
                 engine->pulsar_track_comping_style[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "arp_mode") == 0)

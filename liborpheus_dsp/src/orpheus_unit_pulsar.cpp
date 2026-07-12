@@ -868,6 +868,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             // one increment up front and need to compensate.
             ts.bars_since_fill = 1;
         } else if (lick_len > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
+            const int lick_deg_off =
+                engine->pulsar_track_lick_degree_offset[t].load(std::memory_order_relaxed);
             if (lick_mode == LickMode::FILL) {
                 // FILL: lick spans full step count, bypass bar strategy
                 ts.step_count = step_count_config;
@@ -884,14 +886,16 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                                base_seed ^ (t * 7919u),
                                                state->lick_octave,
                                                genre.note_range_low, genre.note_range_high,
-                                               state->lick_loop_length);
+                                               state->lick_loop_length,
+                                               lick_deg_off);
                 } else {
                     generate_lick_pattern(ts.steps, ts.step_count, state->lick, lick_len,
                                           eff_mutation, static_cast<uint8_t>(root), scale,
                                           base_seed ^ (t * 7919u), 0,
                                           state->lick_octave,
                                           genre.note_range_low, genre.note_range_high,
-                                          state->lick_loop_length);
+                                          state->lick_loop_length,
+                                          lick_deg_off);
                 }
                 // No bar strategy — FILL owns the full pattern
             } else {
@@ -902,7 +906,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                       base_seed ^ (t * 7919u), 0,
                                       state->lick_octave,
                                       genre.note_range_low, genre.note_range_high,
-                                      state->lick_loop_length);
+                                      state->lick_loop_length,
+                                      lick_deg_off);
                 // Apply bar strategy for bar 2
                 if (step_count_config > 16) {
                     apply_bar_strategy(ts, t, bar_strategy, (role == TrackRole::PERCUSSIVE), genre,
@@ -912,7 +917,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                        state->lick, lick_len, eff_mutation,
                                        base_seed ^ (t * 13331u),
                                        state->lick_octave,
-                                       state->lick_loop_length);
+                                       state->lick_loop_length,
+                                       lick_deg_off);
                 }
             }
         } else {
@@ -2190,7 +2196,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                        rtrk.bar_strategy, rtrk.step_count,
                                                        oct,
                                                        nr_low, nr_high,
-                                                       state->lick_loop_length);
+                                                       state->lick_loop_length,
+                                                       engine->pulsar_track_lick_degree_offset[rt].load(
+                                                           std::memory_order_relaxed));
                             }
                             // Task 6: stash the last rendered lick note so the next
                             // handoff can reconcile the incoming lead's register.
@@ -2360,7 +2368,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                    reset_seed, bs, step_count_cfg,
                                                    state->lick_octave,
                                                    rg.note_range_low, rg.note_range_high,
-                                                   state->lick_loop_length);
+                                                   state->lick_loop_length,
+                                                   engine->pulsar_track_lick_degree_offset[rt].load(
+                                                       std::memory_order_relaxed));
                         } else {
                             float hold_prob = engine->pulsar_track_hold_probability[rt].load(std::memory_order_relaxed);
                             int hold_min = engine->pulsar_track_hold_length_min[rt].load(std::memory_order_relaxed);

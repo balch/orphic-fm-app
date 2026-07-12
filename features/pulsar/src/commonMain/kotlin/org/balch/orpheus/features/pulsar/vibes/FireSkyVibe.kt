@@ -47,35 +47,39 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
 /**
- * Fire Sky — a relentless, low-and-gritty hard-rock stomp built around the
- * most-taught rock riff of all time, recast for the BLUES scale in G.
+ * Fire Sky — a relentless, low-and-gritty hard-rock stomp built around an original
+ * three-note power-climb hook on the BLUES scale in G.
  *
  * ## The feel
  * Low and gritty. A heavy, articulate riff hammers in the low-mid guitar register
  * over a stomping backbeat, a vintage drawbar-organ comping on the downbeats, and
- * a chugging rhythm-guitar layer. It is dry-ish and forward — garage/club, not hall.
- * The signature blue note (the b5) leans in once per loop and the figure resolves
- * home on a long, let-ring tonic before it starts over. The riff never rests: it is
- * a continuous two-bar phrase that loops on top of the band.
+ * a second guitar doubling the riff an octave down. It is dry-ish and forward —
+ * garage/club, not hall. The hook is a rising three-note power climb (root -> 5th ->
+ * ringing b7), stated once per bar and left to ring — the punch lives in the space
+ * after each hit. The signature blue note (the b5) appears once per loop as a
+ * descending passing tone, and the figure resolves home on a long, let-ring tonic
+ * before it starts over.
  *
- * ## Monophony limitation (important)
- * The reference riff stacks parallel FOURTHS — two-note power-chord shapes moving
- * in parallel. A Pulsar [Lick] is strictly MONOPHONIC: one scaleDegree per step.
- * This reproduces ONLY the single-note melodic skeleton of the figure. The "power"
- * of the harmonized fourths is NOT in the notes — it is approximated by a gritty
- * Waveshaping lead with a hard per-note pluck LPG, sitting in a low-mid register.
- * Do not read this as the fourths being voiced; they are not.
+ * ## Riff doubling (pseudo-polyphony)
+ * A Pulsar [Lick] is strictly MONOPHONIC: one scaleDegree per step — chords are
+ * unrepresentable. Width comes from track 6 playing the SAME lick as track 4 with
+ * a noteRange one octave lower. In FOLLOW sections the per-track octave pin folds
+ * each track's render into its own register (true octave doubling); FIXED sections
+ * skip the pin, so both tracks render the raw generated octave (unison thickening).
+ * Both are intentional: verses get spread, choruses slam in unison. The two tracks
+ * roll density and mutation with independent seeds, so the double is loose, not
+ * sample-accurate — two guitarists, not one chorused voice.
  *
  * ## Scale mapping
  * Root = G, ScaleType.BLUES (degrees {0,3,5,6,7,10} semitones). So a LickStep's
  * scaleDegree indexes that list: 0 = G (root), 1 = Bb (b3), 2 = C (4th),
- * 3 = Db (b5 — the blue note), 4 = D (5th), 5 = F (b7). The single-note reduction
- * of the riff is [0,1,2] [0,1,3,2] [0,1,2] [1,0]; the lone b5 (Db = degree 3)
- * lands in cell 2 and is the signature lean-in.
+ * 3 = Db (b5 — the blue note), 4 = D (5th), 5 = F (b7), 6 = G (octave). The hook
+ * opens 0 -> 4 -> 5 (G-D-F) and the lone b5 lands mid-descent in the bar-2 answer
+ * (4 -> 3 -> 1, i.e. D -> Db -> Bb).
  *
  * ## Arrangement
- * intro (HALF-TIME cold open: the iconic riff ALONE at ~60 BPM — its correct, heavy
- * pace — over a soft kick, nothing else) -> build (still half-time; the organ + bass
+ * intro (HALF-TIME cold open: the hook ALONE at ~60 BPM — its heaviest pace —
+ * over a soft kick, nothing else) -> build (still half-time; the organ + bass
  * swell in under the slow riff) -> verse (THE DROP: tempo snaps back to full 84 and
  * the whole band crashes in — this is the electro version) -> chorus (driving peak,
  * lead pedals FIXED so the bVII/IV moves read as a hammering hook rather than an
@@ -154,8 +158,8 @@ class FireSkyVibe : VibeProvider {
 
     val sectionList by lazy {
         listOf(
-            // 0: intro (cold open) — HALF-TIME. The iconic riff ALONE at its correct,
-            //    heavy pace: just the riff + a soft kick pulse, everything else out.
+            // 0: intro (cold open) — HALF-TIME. The hook ALONE at its heaviest
+            //    pace: just the riff + a soft kick pulse, everything else out.
             //    bpmMultiplier 0.72 drops 84 -> ~60.48 BPM (the engine's 60 floor; a
             //    literal 0.5 would clamp 42->60 and then over-restore the drop to 120).
             //    Lead pinned FIXED so the bare riff doesn't transpose.
@@ -177,7 +181,7 @@ class FireSkyVibe : VibeProvider {
                     3 to TrackSectionOverride(density = 0.0f),                   // bass out — riff + kick only
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // bare riff, no transpose
                     5 to TrackSectionOverride(density = 0.0f),                   // organ out
-                    6 to TrackSectionOverride(density = 0.0f),                   // rhythm gtr out
+                    6 to TrackSectionOverride(density = 0.0f),                   // riff double out — single voice
                     7 to TrackSectionOverride(density = 0.0f),                   // texture out — truly bare
                 ),
             ),
@@ -208,7 +212,7 @@ class FireSkyVibe : VibeProvider {
                     3 to TrackSectionOverride(density = 0.30f),                  // bass creeps in
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // riff still FIXED
                     5 to TrackSectionOverride(density = 0.32f, volume = 0.52f),  // organ ENTERS — the swell
-                    6 to TrackSectionOverride(density = 0.0f),                   // rhythm gtr out
+                    6 to TrackSectionOverride(density = 0.0f),                   // riff double still out — saved for the drop
                     7 to TrackSectionOverride(density = 0.0f),                   // texture out
                 ),
             ),
@@ -241,7 +245,7 @@ class FireSkyVibe : VibeProvider {
                 trackOverrides = mapOf(
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // riff pedals — no lurch at the peak
                     5 to TrackSectionOverride(density = 0.34f, volume = 0.58f),  // organ comes forward
-                    6 to TrackSectionOverride(density = 0.44f),                  // rhythm gtr drives harder
+                    6 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // double pinned WITH the lead — unison slam
                 ),
             ),
             // 4: solo — band jams over the groove; lead develops the riff (FOLLOW kept).
@@ -271,6 +275,9 @@ class FireSkyVibe : VibeProvider {
                     energy = 0.9f, complexity = 1.4f, space = 1.15f, mood = 1.2f,
                 ),
                 soloMode = SoloMode.Jam(probability = 0.85f),
+                trackOverrides = mapOf(
+                    6 to TrackSectionOverride(density = 0.40f),  // double thins while the lead jams
+                ),
             ),
             // 5: breakdown — stripped to bass + drums + organ. Locked to 4 bars =
             //    one long anticipation build into the chorus (bigLift).
@@ -287,7 +294,7 @@ class FireSkyVibe : VibeProvider {
                 ),
                 trackOverrides = mapOf(
                     4 to TrackSectionOverride(density = 0.25f),  // lead pulls way back
-                    6 to TrackSectionOverride(density = 0.0f),   // rhythm gtr out
+                    6 to TrackSectionOverride(density = 0.0f),   // riff double out
                 ),
             ),
             // 6: outro — the climactic stomp: riff full-throttle, everyone in, pinned FIXED.
@@ -301,6 +308,7 @@ class FireSkyVibe : VibeProvider {
                 chordsPerBar = chorusChordsPerBar,
                 trackOverrides = mapOf(
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // riff hammers home, no lurch
+                    6 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // double pinned WITH the lead
                 ),
             ),
         )
@@ -327,39 +335,38 @@ class FireSkyVibe : VibeProvider {
             space = 0.40f,
             mood = 0.75f,
             deep = 0.48f,
-            // --- the riff (track 4 plays it as LickMode.Fill) ---
+            // --- the riff (track 4 plays it as LickMode.Fill; track 6 doubles it an octave down) ---
             // BLUES degrees: 0=G, 1=Bb(b3), 2=C(4th), 3=Db(b5 blue note), 4=D(5th), 5=F(b7), 6=G(oct).
-            // Copyright-safe rewrite (highest-exposure source — pushed hardest): keeps the heavy
-            // G-blues single-note stomp (scale, low-mid register, gritty, relentless/no-rest) but
-            // abandons the recognizable cell chain — opens on a descending root gallop, moves the
-            // b5 off its telltale slot into a fast descending crush, leaps to the OCTAVE as an
-            // arch-shaped peak, and drops the 4th entirely. Faithful original preserved in
-            // FireSkyOgVibe (WIP, -Pcatalog). 2 bars, sums to exactly 8.0 beats, no rest.
+            // SPARSE three-note POWER-CLIMB hook: G -> D -> F (root, 5th, b7), stated once and
+            // left to RING for the rest of the bar — the punch lives in the space after the
+            // hit, not in note count. Bar 2 restates the climb but falls through the lone b5
+            // (D -> Db -> Bb) to a long home tonic. The b3->4th cell chain and ascending b5
+            // approach of the well-known figure are gone entirely; what carries over is only
+            // genre vocabulary (G blues, low-mid grit, 2-bar loop). Faithful original preserved
+            // in FireSkyOgVibe (WIP, -Pcatalog). 8 notes, sums to exactly 8.0 beats.
+            // NOTE (octave pin): FOLLOW sections fold each track's notes into one octave above
+            // its noteRangeLow, recasting the climb as a dip-and-lift; the FIXED showcase
+            // sections (intro cold open, chorus, outro) render the true ascending climb.
             lick = Lick(
                 steps = listOf(
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
                     LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
+                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
                     LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
                     LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
-                    LickStep(scaleDegree = 2, duration = 0.25f, velocity = 0.85f),
-                    LickStep(scaleDegree = 2, duration = 0.25f, velocity = 0.85f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.95f),
+                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
                     LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
-                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.80f),
-                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.80f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.90f),
+                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
+                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),
                     LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.90f),
-                    LickStep(scaleDegree = 0, duration = 1f, velocity = 0.90f),
+                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),
+                    LickStep(scaleDegree = 3, duration = 1.0f, velocity = 0.90f),
                 ),
-                loopLength = 8,  // 2 bars; notes sum to 8.0 — no rest, relentless
+                loopLength = 8,  // 2 bars; notes sum to 8.0 — space comes from the rings
             ),
-            lickMutation = 0.18f,  // bumped for copyright distance (more run-to-run drift off the figure)
+            lickMutation = 0.10f,  // low drift keeps the octave double coherent; distance now lives in the notes
             lickOctave = -1,       // auto = midpoint of the lead's note range (low-mid guitar register)
             genre = GenreProfile(
                 swingAmount = 0.04f,          // near-straight rock; a hair off the grid for human feel
@@ -514,12 +521,12 @@ class FireSkyVibe : VibeProvider {
                                     dropProbability = 0.16f,
                                     ghostProbability = 0.20f,
                                     octaveJumpProbability = 0.18f,
-                                    extensionProbability = 0.22f,  // bluesy 7ths/9ths color
+                                    extensionProbability = 0.12f,  // bluesy 7ths/9ths color
                                 ),
                                 fills = CompingFills(
                                     everyNBars = 8,
                                     fillType = FillType.TURNAROUND,  // bluesy organ rip at the turnaround
-                                    skipProbability = 0.20f,
+                                    skipProbability = 0.50f,
                                 ),
                             ),
                         ),
@@ -530,10 +537,15 @@ class FireSkyVibe : VibeProvider {
                         barStrategy = BarStrategy.REPEAT,
                     )
                 },
-                // Track 6 — Rhythm guitar chug (WSH / ENS on space) — Melodic root chug, ROOT_ONLY.
+                // Track 6 — Riff harmony (WSH / ENS on space) — the lead's lick in parallel
+                // fourths below (lickDegreeOffset = -2 in the blues hexatonic: an exact fourth
+                // under every riff note except the b5, where the in-scale third substitutes).
+                // noteRange G2..C4 sits one octave under the lead's D3..A4, so the octave pin
+                // folds this track's render into the lower register (see class KDoc). PLUCK LPG
+                // keeps the doubled notes picked and distinct; volume sits under the lead.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.46f,
+                    volume = 0.52f,
                     harmonics = 0.68f,        // gritty, slightly less than the lead
                     timbre = 0.58f,
                     modLfoRate = 0.30f,
@@ -547,17 +559,21 @@ class FireSkyVibe : VibeProvider {
                     reverbBrightness = 0.45f,
                     lpgMode = LpgMode.PLUCK,
                     lpgDecay = 0.40f,
-                ).let { rhythm ->
+                ).let { double ->
                     TrackVoice(
-                        engineEdm = rhythm,
-                        engineSpace = rhythm.copy(
+                        engineEdm = double,
+                        engineSpace = double.copy(
                             engineId = OrpheusEngineId.ENS,
                             lpgMode = LpgMode.SUSTAINED,
                             reverbSend = 0.22f,
                         ),
-                        role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
-                        pan = 0.24f,
-                        density = 0.34f,
+                        role = TrackRole.Melodic(
+                            chordFollow = ChordFollow.FOLLOW,
+                            lickMode = LickMode.Fill,      // follows the lead's riff
+                            lickDegreeOffset = -2,         // parallel fourths below (SOTW voicing)
+                        ),
+                        pan = 0.24f,          // spread against the lead at 0.05
+                        density = 0.92f,      // fires with the lead; independent seed = loose double
                         envelopeProfile = EnvelopeProfile.MELODIC,
                         macroMap = TrackMacroMap.MELODIC,
                         barStrategy = BarStrategy.REPEAT,

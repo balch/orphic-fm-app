@@ -33,6 +33,13 @@ sealed class TrackRole {
         val chordFollow: ChordFollow = ChordFollow.FOLLOW,
         /** How this track maps the vibe's lick to sequencer steps. */
         val lickMode: LickMode = LickMode.None,
+        /**
+         * Diatonic scale-degree shift applied to this track's render of the vibe's
+         * lick — parallel harmony against the lead (e.g. -2 = a fourth below in a
+         * 7-note scale, -3 in blues hexatonic). Sounding notes only; rests are
+         * unaffected. 0 = play the lick as written.
+         */
+        val lickDegreeOffset: Int = 0,
     ) : TrackRole()
 
     /** Chord voicings — progression-following, comping patterns. */

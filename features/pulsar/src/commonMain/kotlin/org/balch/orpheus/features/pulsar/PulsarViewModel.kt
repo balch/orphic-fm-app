@@ -32,13 +32,13 @@ import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
-import org.balch.orpheus.core.engagement.EngagementAction
-import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.engagement.EngagementAction
+import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.PulsarPlaybackMode
@@ -78,6 +78,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
+import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
 import org.balch.orpheus.features.pulsar.models.lickMode
 import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
@@ -395,8 +396,13 @@ class PulsarViewModel(
     }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val trackMacroIds = (0..7).map { t ->
-        (0..13).map { m ->
-            synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal + t * 14 + m].controlId)
+        (0 until PulsarSymbol.TRACK_MACRO_STRIDE).map { m ->
+            synthController.controlFlow(
+                PulsarSymbol.entries[
+                    PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal +
+                        t * PulsarSymbol.TRACK_MACRO_STRIDE + m
+                ].controlId
+            )
         }
     }
     private val genreDensityIds = (0..7).map { i ->
@@ -477,6 +483,7 @@ class PulsarViewModel(
     private val trackDelayFeedbackIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_FEEDBACK_TRACK.ordinal + it].controlId) }
     private val trackGlideRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE.ordinal + it].controlId) }
     private val trackLickModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_MODE.ordinal + it].controlId) }
+    private val trackLickDegreeOffsetIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_DEGREE_OFFSET.ordinal + it].controlId) }
     private val trackCompingStyleIds = (0..7).map {
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_COMPING_STYLE.ordinal + it].controlId)
     }
@@ -1129,6 +1136,7 @@ class PulsarViewModel(
                 is LickMode.Squash -> 1
                 is LickMode.Fill -> 2
             })
+            trackLickDegreeOffsetIds[i].value = IntValue(tv.lickDegreeOffset)
             trackCompingStyleIds[i].value = IntValue(compingStyleToInt(tv.chordComping?.style))
             trackArpModeIds[i].value = IntValue(tv.chordComping?.arpMode?.ordinal ?: 0)
             trackArpSpeedIds[i].value = FloatValue(tv.chordComping?.arpSpeed ?: 0.2f)
