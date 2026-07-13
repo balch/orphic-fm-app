@@ -17,6 +17,20 @@ plugins {
 kotlin {
     android {
         namespace = "org.balch.orpheus.core.ai"
+        // Koog ships no R8 consumer rules (JetBrains/koog#1068), so this module — the owner
+        // of the Koog dependency — ships them instead. AGP merges consumer-rules.pro into
+        // every Android app variant that pulls :core:ai (Orpheus app, djapp ai flavor).
+        // publish=true is REQUIRED despite its name: without it the KMP android library
+        // exports no consumer rules even to same-build project consumers (verified via the
+        // apps' merged R8 configuration.txt — the rules simply never arrived).
+        // The whole KmpOptimization DSL is @Incubating in AGP 9.x; accepted deliberately —
+        // it is the only way for a KMP android library to ship consumer rules, and a future
+        // rename would fail configuration loudly right here.
+        @Suppress("UnstableApiUsage")
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.files(project.file("consumer-rules.pro"))
+        }
     }
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
