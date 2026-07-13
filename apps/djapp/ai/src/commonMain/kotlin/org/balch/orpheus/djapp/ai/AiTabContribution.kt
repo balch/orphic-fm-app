@@ -3,11 +3,6 @@ package org.balch.orpheus.djapp.ai
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
@@ -32,19 +27,13 @@ class AiTabContribution : DjTabContribution {
         isLandscape: Boolean,
         onDismiss: () -> Unit,
     ) {
-        // Content stays composed while the sheet is closed (isOpen=false) so we can cancel the
-        // in-flight agent run whenever the sheet CLOSES — by ANY path (scrim/drag/back, the nav-item
-        // toggle, or switching to another sheet), not just the scrim tap. A late vibe must not
-        // auto-start audio "from silence" after the user has left. The reset is keyed off the
-        // isOpen true->false transition (NOT onDispose): a config-change recomposition restores
-        // isOpen=true and so must NOT cancel a run the user wanted to keep. The agent is greeting-
+        // Closing the sheet does NOT cancel an in-flight run. The feature and agent are
+        // app-scoped, so a generation keeps streaming into state while the sheet is away and
+        // reopening shows live progress; the panel's explicit ✕ Cancel is the only abort. A
+        // vibe that completes while the sheet is closed still applies and starts playback —
+        // fulfilling the request is the point of having asked for it. The agent is greeting-
         // free (ON_FIRST_PROMPT), so resolving the feature while closed issues no LLM traffic.
         val feature = DjAiViewModel.feature()
-        var wasOpen by remember { mutableStateOf(false) }
-        LaunchedEffect(isOpen) {
-            if (!isOpen && wasOpen) feature.actions.reset()
-            wasOpen = isOpen
-        }
         if (isOpen) {
             BoxWithConstraints(modifier.fillMaxSize()) {
                 AdaptiveAiSheet(

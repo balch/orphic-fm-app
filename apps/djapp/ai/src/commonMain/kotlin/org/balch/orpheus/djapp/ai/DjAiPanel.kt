@@ -11,6 +11,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -40,7 +41,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +63,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
@@ -76,7 +80,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
  * - Prompt input: single line; Enter / IME Send submits and dismisses the keyboard.
  * - Dismissible error strip (scrolls internally when the message is long).
  * - Unified agent feed: chronological tool rows, chevron-expandable thinking rows
- *   (collapsed by default), and the agent's reply. Auto-scrolls on new rows only.
+ *   (collapsed by default), and the agent's reply. Follow-mode auto-scroll on new rows.
  */
 @Composable
 fun DjAiPanel(
@@ -347,11 +351,19 @@ private fun WorkingStatusCard(
     }
 }
 
+/** How close (px) the previous tail's bottom edge must be to the viewport bottom to count as "at the bottom". */
+private const val FOLLOW_TAIL_SLACK_PX = 24
+
+/** How long (ns) an expanding thinking row's growing bottom edge is tracked; covers the expand animation. */
+private const val EXPAND_FOLLOW_WINDOW_NANOS = 500_000_000L
+
 /**
  * Unified chronological agent feed. Thinking rows expand in place behind a chevron;
- * tool rows and the reply are plain rows. Auto-scrolls when a NEW row appears, never
- * on text accumulation inside an existing row, so reading an expanded row while the
- * agent streams does not fight the scroll.
+ * tool rows and the reply are plain rows. Follow-mode auto-scroll: a NEW row is chased
+ * only while the viewport bottom is pixel-close to the content bottom — never on text
+ * accumulation inside an existing row, and never while the user is reading anywhere
+ * above the tail (including partway up a tall expanded row). Expanding a thinking row
+ * tracks the unfolding body so its text stays in view.
  */
 @Composable
 private fun AiFeed(
@@ -359,7 +371,9 @@ private fun AiFeed(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     var expandedIds by remember { mutableStateOf(setOf<Long>()) }
+    var prevSize by remember { mutableStateOf(0) }
 
     // New run / reset: drop stale expansion state so a fresh run's recycled ids
     // don't start expanded.
@@ -368,7 +382,24 @@ private fun AiFeed(
     }
 
     LaunchedEffect(feed.size) {
-        if (feed.isNotEmpty()) {
+        val oldSize = prevSize
+        prevSize = feed.size
+        if (feed.isEmpty()) return@LaunchedEffect
+        if (oldSize == 0) {
+            listState.scrollToItem(feed.size - 1)
+            return@LaunchedEffect
+        }
+        // Follow mode, decided in pixels: chase the new row only if the PREVIOUS tail
+        // row's bottom edge sat at the viewport bottom. Appending below never moves the
+        // rows above it, so this reads the same whether this effect runs before or after
+        // the layout pass that includes the new row. An index-based check cannot work
+        // here: a tall expanded row keeps its index "visible" while the user reads its
+        // middle, which is exactly when a chase must NOT happen.
+        val info = listState.layoutInfo
+        val oldLast = info.visibleItemsInfo.find { it.index == oldSize - 1 }
+        val wasAtBottom = oldLast != null &&
+            oldLast.offset + oldLast.size <= info.viewportEndOffset + FOLLOW_TAIL_SLACK_PX
+        if (wasAtBottom) {
             listState.scrollToItem(feed.size - 1)
         }
     }
@@ -378,16 +409,43 @@ private fun AiFeed(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        items(items = feed, key = { it.id }) { item ->
+        itemsIndexed(items = feed, key = { _, item -> item.id }) { index, item ->
             when (item) {
                 is DjAiFeedItem.Thinking -> ThinkingRow(
                     item = item,
                     expanded = item.id in expandedIds,
                     onToggle = {
-                        expandedIds = if (item.id in expandedIds) {
-                            expandedIds - item.id
-                        } else {
+                        val expanding = item.id !in expandedIds
+                        expandedIds = if (expanding) {
                             expandedIds + item.id
+                        } else {
+                            expandedIds - item.id
+                        }
+                        if (expanding) {
+                            // The body unfolds BELOW the label over the expand animation,
+                            // so its final position cannot be computed up front (at toggle
+                            // time it still has ~zero height, and for the tail row there is
+                            // nothing below the label yet to scroll into). Instead, track
+                            // the animation: each frame, scroll down by however much the
+                            // row's bottom overflows the viewport, clamped so the label
+                            // never leaves the top. A user wheel-scroll cancels this (their
+                            // gesture outranks programmatic scrolling).
+                            scope.launch {
+                                val start = withFrameNanos { it }
+                                var elapsed = 0L
+                                while (elapsed <= EXPAND_FOLLOW_WINDOW_NANOS) {
+                                    val info = listState.layoutInfo
+                                    val row = info.visibleItemsInfo.find { it.index == index }
+                                        ?: break
+                                    val overflow = row.offset + row.size - info.viewportEndOffset
+                                    val headroom = row.offset - info.viewportStartOffset
+                                    val step = minOf(overflow, headroom)
+                                    if (step > 0) {
+                                        listState.scrollBy(step.toFloat())
+                                    }
+                                    elapsed = withFrameNanos { it } - start
+                                }
+                            }
                         }
                     },
                 )

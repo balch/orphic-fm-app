@@ -344,11 +344,17 @@ fun UserKeyIndicator(
             fontSize = 9.sp,
             color = OrpheusColors.metallicBlue
         )
-        IconButton(
-            onClick = { onRemove(aiProvider) },
-            modifier = Modifier.size(16.dp)
-        ) {
-            Text("✕", fontSize = 10.sp, color = OrpheusColors.sterlingSilver.copy(alpha = 0.7f))
-        }
+        // Plain-text close matching the app-wide ✕ idiom. M3 IconButton's minimum
+        // touch-target machinery misplaces the glyph when squeezed into a 16dp slot,
+        // drawing it detached from the chip.
+        Text(
+            text = "✕",
+            fontSize = 10.sp,
+            color = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable { onRemove(aiProvider) }
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        )
     }
 }
