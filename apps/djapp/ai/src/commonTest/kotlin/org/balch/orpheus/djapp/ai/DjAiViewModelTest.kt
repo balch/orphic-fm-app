@@ -344,6 +344,28 @@ class DjAiViewModelTest {
     }
 
     // ─────────────────────────────────────────────────
+    // Agent errors surface instead of spinning forever
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun errorEventEndsRunWithIdleAndErrorMessage() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.Error("400: max_tokens too small"), s1)
+        assertEquals(DjAiPhase.IDLE, s2.phase)
+        assertEquals("400: max_tokens too small", s2.error)
+        // The feed keeps its failure context for the user to inspect.
+        assertEquals(s1.feed, s2.feed)
+    }
+
+    @Test
+    fun idleGuard_errorDroppedWhenIdle() {
+        val s0 = DjAiUiState(phase = DjAiPhase.IDLE)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Error("stale failure"), s0)
+        assertEquals(s0, s1)
+    }
+
+    // ─────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────
 

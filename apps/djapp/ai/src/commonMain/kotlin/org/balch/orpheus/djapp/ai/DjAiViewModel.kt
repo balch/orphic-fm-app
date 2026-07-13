@@ -111,6 +111,9 @@ private fun friendly(tool: String): String = when (tool) {
  * - [AgentActivityEvent.ToolStarted]/[AgentActivityEvent.ToolCompleted] -> append/flip a
  *   [DjAiFeedItem.Tool] row.
  * - [AgentActivityEvent.Assistant] -> the trailing [DjAiFeedItem.Reply] (latest wins).
+ * - [AgentActivityEvent.Error] -> back to [DjAiPhase.IDLE] with [DjAiUiState.error] set;
+ *   the feed keeps its failure context. Without this, an LLM/API failure (e.g. a 400)
+ *   left the panel spinning in GENERATING forever with the error only in the log.
  * - When a vibe tool starts from [DjAiPhase.IDLE], phase advances to [DjAiPhase.GENERATING].
  */
 internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiState {
@@ -171,6 +174,10 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
                 )
             }
         }
+        is AgentActivityEvent.Error ->
+            // Agent/LLM failure (e.g. an API 400): end the run visibly — back to the prompt
+            // with the error banner. The feed keeps its failure context.
+            s.copy(phase = DjAiPhase.IDLE, error = e.message)
     }
 }
 

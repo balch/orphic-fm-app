@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.ai
 
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponse
 import kotlinx.coroutines.flow.Flow
@@ -53,5 +54,34 @@ internal suspend fun Flow<StreamFrame>.collapseToMessage(onReasoning: (String) -
     val chunker = ReasoningChunker(onReasoning)
     val frames = onEach { chunker.consume(it) }.toList()
     chunker.flush()
-    return frames.toMessageResponse()
+    // Zero-arg tool calls (pulsar_get_vibe, pulsar_vibe_schema) stream no input_json
+    // deltas on Anthropic, so ToolCallComplete.content arrives as "" — and Koog's
+    // toMessageResponse() parses it with a raw Json.parseToJsonElement, which throws on
+    // empty input and killed the whole run. Normalize to an explicit empty object.
+    return frames
+        .map { frame ->
+            if (frame is StreamFrame.ToolCallComplete && frame.content.isBlank()) {
+                frame.copy(content = "{}")
+            } else {
+                frame
+            }
+        }
+        .toMessageResponse()
+}
+
+/**
+ * Batched-path twin of [collapseToMessage]: taps reasoning from an already-complete
+ * assistant message into [onReasoning] as sentence chunks, returning the message
+ * unchanged. Used for providers that must run non-streaming (Anthropic on Koog 1.0.0 —
+ * the streaming path drops thinking signatures and never appends the assistant turn to
+ * history, both of which Anthropic's strict tool-loop replay rules reject).
+ */
+internal fun Message.Assistant.tapReasoning(onReasoning: (String) -> Unit): Message.Assistant {
+    val chunker = ReasoningChunker(onReasoning)
+    parts.filterIsInstance<MessagePart.Reasoning>().forEach { part ->
+        part.content.forEach { chunker.consume(StreamFrame.ReasoningDelta(text = it)) }
+        part.summary?.forEach { chunker.consume(StreamFrame.ReasoningDelta(text = null, summary = it)) }
+    }
+    chunker.flush()
+    return this
 }

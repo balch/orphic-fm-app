@@ -8,12 +8,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.di.FeatureScope
 
-/** A live agent activity event for the VIBE panel feed. Extensible: add Reasoning(text) when token streaming lands. */
+/** A live agent activity event for the VIBE panel feed. */
 sealed interface AgentActivityEvent {
     data class ToolStarted(val tool: String) : AgentActivityEvent
     data class ToolCompleted(val tool: String) : AgentActivityEvent
     data class Assistant(val text: String) : AgentActivityEvent
     data class Reasoning(val text: String) : AgentActivityEvent
+
+    /** Agent/LLM failure (e.g. an API 4xx). Consumers must end their "generating" state. */
+    data class Error(val message: String) : AgentActivityEvent
 }
 
 @SingleIn(FeatureScope::class)
@@ -30,4 +33,5 @@ class AgentActivityEventBus {
     fun emitToolCompleted(tool: String) { _events.tryEmit(AgentActivityEvent.ToolCompleted(tool)) }
     fun emitAssistant(text: String) { _events.tryEmit(AgentActivityEvent.Assistant(text)) }
     fun emitReasoning(text: String) { _events.tryEmit(AgentActivityEvent.Reasoning(text)) }
+    fun emitError(message: String) { _events.tryEmit(AgentActivityEvent.Error(message)) }
 }

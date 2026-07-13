@@ -39,6 +39,7 @@ internal fun activityLine(event: AgentActivityEvent): String = when (event) {
     is AgentActivityEvent.ToolCompleted -> "✓ ${friendlyTool(event.tool)}"
     is AgentActivityEvent.Assistant -> event.text
     is AgentActivityEvent.Reasoning -> "💭 ${event.text}"
+    is AgentActivityEvent.Error -> "⚠ ${event.message}"
 }
 
 private fun friendlyTool(tool: String): String = when (tool) {
@@ -58,9 +59,11 @@ internal val VIBE_TOOLS = setOf("pulsar_get_vibe", "pulsar_vibe_schema", "pulsar
  *    and seed the feed so the agent's thinking is visible from the top.
  *  - Otherwise append activity (tool calls, reasoning, any assistant narration) to the feed while
  *    generating so the user can watch the agent work; ignore activity when idle (shared agent, focused
- *    panel). The phase leaves GENERATING ONLY via the vibe bus (Generated -> RESULT, Failed -> IDLE) or
- *    the panel's cancel control — never off an assistant message. An assistant message mid-run is just
- *    narration; resetting on it snaps the panel shut and reads as a spurious cancel.
+ *    panel). The phase leaves GENERATING ONLY via the vibe bus (Generated -> RESULT, Failed -> IDLE),
+ *    an [AgentActivityEvent.Error] (an LLM/API failure that would otherwise never reach the vibe bus
+ *    and leave the panel spinning), or the panel's cancel control — never off an assistant message.
+ *    An assistant message mid-run is just narration; resetting on it snaps the panel shut and reads
+ *    as a spurious cancel.
  */
 internal fun reduceActivity(event: AgentActivityEvent, prev: VibeCreateUiState): VibeCreateUiState {
     val startsVibeRun = event is AgentActivityEvent.ToolStarted && event.tool in VIBE_TOOLS
@@ -68,6 +71,8 @@ internal fun reduceActivity(event: AgentActivityEvent, prev: VibeCreateUiState):
         prev.phase != VibePhase.GENERATING && startsVibeRun ->
             prev.copy(phase = VibePhase.GENERATING, feed = listOf(activityLine(event)), vibe = null, error = null)
         prev.phase != VibePhase.GENERATING -> prev
+        event is AgentActivityEvent.Error ->
+            prev.copy(phase = VibePhase.IDLE, error = event.message, feed = prev.feed + activityLine(event))
         else -> prev.copy(feed = prev.feed + activityLine(event))
     }
 }

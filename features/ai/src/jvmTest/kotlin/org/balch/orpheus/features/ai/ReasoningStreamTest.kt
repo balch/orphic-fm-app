@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai
 
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.streaming.StreamFrame
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -35,5 +36,38 @@ class ReasoningStreamTest {
         // Return type is Message.Assistant (compile-guaranteed); toMessageResponse fidelity is Koog's concern.
         frames.collapseToMessage { reasoning.add(it) }
         assertTrue(reasoning.any { it.contains("key and tempo") }, "reasoning should be tapped")
+    }
+
+    @Test
+    fun `collapseToMessage tolerates zero-arg tool calls (empty streamed args)`() = runTest {
+        // Anthropic streams NO input_json deltas for tools with no parameters
+        // (pulsar_get_vibe, pulsar_vibe_schema), so ToolCallComplete.content arrives "".
+        // Koog's toMessageResponse would throw JsonDecodingException on it and kill the run.
+        val frames = flowOf(
+            StreamFrame.ToolCallComplete(id = "toolu_1", name = "pulsar_get_vibe", content = ""),
+            StreamFrame.TextComplete(text = "done"),
+        )
+        val message = frames.collapseToMessage { }
+        val call = message.parts.filterIsInstance<MessagePart.Tool.Call>().single()
+        assertEquals("pulsar_get_vibe", call.tool)
+        assertEquals("{}", call.args.toString(), "empty streamed args must normalize to {}")
+    }
+
+    @Test
+    fun `tapReasoning chunks a batched message's reasoning parts and returns it unchanged`() {
+        val chunks = mutableListOf<String>()
+        val message = ai.koog.prompt.message.Message.Assistant(
+            parts = listOf(
+                MessagePart.Reasoning(
+                    id = null,
+                    content = listOf("Choosing a dusty blues key for this vibe. Then setting tempo."),
+                ),
+                MessagePart.Text("Done."),
+            ),
+            metaInfo = ai.koog.prompt.message.ResponseMetaInfo.Empty,
+        )
+        val returned = message.tapReasoning { chunks.add(it) }
+        assertEquals(message, returned)
+        assertTrue(chunks.any { it.contains("dusty blues key") }, "reasoning should be tapped")
     }
 }

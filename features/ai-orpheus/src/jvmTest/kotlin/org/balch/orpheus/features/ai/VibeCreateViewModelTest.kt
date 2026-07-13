@@ -39,6 +39,21 @@ class VibeCreateViewModelTest {
     // --- reduceActivity (the shared agent activity feed) ---
 
     @Test
+    fun `an agent error while generating ends the run with the message and a feed line`() {
+        val generating = reduceActivity(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), VibeCreateUiState())
+        val after = reduceActivity(AgentActivityEvent.Error("api exploded"), generating)
+        assertEquals(VibePhase.IDLE, after.phase)
+        assertEquals("api exploded", after.error)
+        assertTrue(after.feed.last().startsWith("⚠"))
+    }
+
+    @Test
+    fun `an agent error while idle is ignored (stale failure from another surface)`() {
+        val idle = VibeCreateUiState(phase = VibePhase.IDLE)
+        assertEquals(idle, reduceActivity(AgentActivityEvent.Error("stale"), idle))
+    }
+
+    @Test
     fun `a vibe tool starting while idle begins a generating run (chat-initiated path)`() {
         val state = reduceActivity(AgentActivityEvent.ToolStarted("pulsar_get_vibe"), VibeCreateUiState(phase = VibePhase.IDLE))
         assertEquals(VibePhase.GENERATING, state.phase)

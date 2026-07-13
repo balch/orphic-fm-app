@@ -8,6 +8,7 @@ import ai.koog.agents.features.eventHandler.feature.handleEvents
 import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicParams
 import ai.koog.prompt.executor.clients.anthropic.models.AnthropicThinking
@@ -22,6 +23,7 @@ import ai.koog.prompt.executor.clients.openai.models.ReasoningConfig
 import ai.koog.prompt.executor.clients.openai.models.ReasoningSummary
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLMCapability
+import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.params.LLMParams
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
@@ -45,10 +47,14 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
+import org.balch.orpheus.core.ai.anthropicModelVersionsMap
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
+import org.balch.orpheus.core.ai.usesAdaptiveThinking
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.AgentGreetingMode
@@ -63,6 +69,40 @@ import org.balch.orpheus.features.ai.session.SessionUsage
 import kotlin.time.ExperimentalTime
 
 private const val ANTHROPIC_THINKING_BUDGET = 4096   // ≥1024, counts toward maxTokens; tune for latency/quality
+
+// Koog's Anthropic request defaults max_tokens to MAX_TOKENS_DEFAULT = 2048 — LESS than the
+// thinking budget above, and Anthropic rejects that pairing outright (400: "max_tokens must
+// be greater than thinking.budget_tokens"). Always set it explicitly. Thinking (budgeted OR
+// adaptive) counts toward max_tokens, so leave generous room for the visible reply too.
+private const val ANTHROPIC_MAX_TOKENS = 16_000
+
+/**
+ * Anthropic thinking config, shaped per model generation.
+ *
+ * Models flagged [usesAdaptiveThinking] reject `thinking: {type: "enabled",
+ * budget_tokens}` with a 400 (Opus 4.7+ / Sonnet 5 / Fable 5). Koog 1.0.0 has no
+ * adaptive variant of [AnthropicThinking], so the raw object rides
+ * additionalProperties, which Koog's AnthropicMessageRequestSerializer flattens into
+ * the request body. `display: "summarized"` matters: these models default to omitted
+ * thinking text, which would leave the apps' thinking feeds permanently empty.
+ */
+internal fun anthropicThinkingParams(model: LLModel): AnthropicParams =
+    if (model.usesAdaptiveThinking) {
+        AnthropicParams(
+            maxTokens = ANTHROPIC_MAX_TOKENS,
+            additionalProperties = mapOf(
+                "thinking" to buildJsonObject {
+                    put("type", "adaptive")
+                    put("display", "summarized")
+                },
+            ),
+        )
+    } else {
+        AnthropicParams(
+            maxTokens = ANTHROPIC_MAX_TOKENS,
+            thinking = AnthropicThinking.Enabled(budgetTokens = ANTHROPIC_THINKING_BUDGET),
+        )
+    }
 
 /**
  * Orpheus AI Agent - a musical guide inhabiting the Orphic-FM synthesizer.
@@ -127,6 +167,10 @@ class OrpheusAgent(
 
     fun sendPrompt(prompt: PromptIntent) {
         userIntent.tryEmit(prompt)
+        // A failed run leaves the loop dead (its flow completed after the error). Re-arm so
+        // this prompt gets consumed: ON_FIRST_PROMPT picks the just-buffered intent straight
+        // from the replay cache; ON_START re-greets, then the run loop consumes it.
+        startAgentIfNeeded()
     }
 
     fun sendReplPrompt(
@@ -187,6 +231,9 @@ class OrpheusAgent(
     }
     
     private fun startAgentIfNeeded() {
+        // "IfNeeded" enforced here: live run loops are never doubled. restart() manages its
+        // own cancel + relaunch and does not route through this guard.
+        if (currentAgentJob?.isActive == true) return
         currentAgentJob = scope.launch(dispatcherProvider.io) {
             // Get API key for the current model's provider
             val aiProvider = aiModelProvider.selectedModel.value.aiProvider
@@ -223,6 +270,7 @@ class OrpheusAgent(
                 .flowOn(Dispatchers.Default)
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow" }
+                    agentActivityEventBus.emitError(throwable.message ?: "An error occurred")
                     _agentState.value = errorMessageAsState(throwable, throwable.message ?: "An error occurred")
                 }
                 .collect { state ->
@@ -280,6 +328,7 @@ class OrpheusAgent(
                 .flowOn(Dispatchers.Default)
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow after restart" }
+                    agentActivityEventBus.emitError(throwable.message ?: "An error occurred")
                     _agentState.value = errorMessageAsState(throwable, throwable.message ?: "An error occurred")
                 }
                 .collect { state ->
@@ -301,6 +350,9 @@ class OrpheusAgent(
                 userPrompt.prompt
             },
             onReasoning = { agentActivityEventBus.emitReasoning(it) },
+            // See agentStrategy: Anthropic needs the batched nodes (signed thinking replay
+            // + correct history); Google keeps live streaming.
+            streamResponses = aiModelProvider.selectedModel.value.aiProvider != AiProvider.Anthropic,
         )
 
         createAgent(strategy, apiKey) {
@@ -325,6 +377,7 @@ class OrpheusAgent(
                     } else {
                         logger.error(ctx.error) { "Error running agent" }
                         send(errorMessageAsState(ctx.error, "Something went wrong..."))
+                        agentActivityEventBus.emitError(ctx.error.message ?: "Something went wrong")
                     }
                 }
                 onToolCallFailed { context -> logger.e { "Tool call failed: ${context.toolName} : ${context.message}" } }
@@ -338,6 +391,7 @@ class OrpheusAgent(
         logger.d { "Agent state: $it" }
     }.catch { throwable ->
         logger.error(throwable) { "Unhandled exception in agent flow" }
+        agentActivityEventBus.emitError(throwable.message ?: "An error occurred")
         emit(errorMessageAsState(throwable, throwable.message ?: "An error occurred"))
     }
 
@@ -379,7 +433,13 @@ class OrpheusAgent(
         val httpFactory = KtorKoogHttpClient.Factory()
         val llmClient: LLMClient = when (aiProvider) {
             AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
-            AiProvider.Anthropic -> AnthropicLLMClient(apiKey, httpClientFactory = httpFactory)
+            // The extended versions map is REQUIRED: Koog 1.0.0's serializer throws
+            // "Unsupported model" for any LLModel absent from it (all post-4.7 models).
+            AiProvider.Anthropic -> AnthropicLLMClient(
+                apiKey,
+                settings = AnthropicClientSettings(modelVersionsMap = anthropicModelVersionsMap),
+                httpClientFactory = httpFactory,
+            )
             AiProvider.OpenAI -> OpenAILLMClient(apiKey, httpClientFactory = httpFactory)
             else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
         }
@@ -388,7 +448,7 @@ class OrpheusAgent(
         val thinkingParams: LLMParams =
             if (config.model.supports(LLMCapability.Thinking)) {
                 when (aiProvider) {
-                    AiProvider.Anthropic -> AnthropicParams(thinking = AnthropicThinking.Enabled(budgetTokens = ANTHROPIC_THINKING_BUDGET))
+                    AiProvider.Anthropic -> anthropicThinkingParams(config.model)
                     AiProvider.Google -> GoogleParams(thinkingConfig = GoogleThinkingConfig(includeThoughts = true, thinkingLevel = GoogleThinkingLevel.HIGH))
                     AiProvider.OpenAI -> OpenAIResponsesParams(reasoning = ReasoningConfig(effort = ReasoningEffort.MEDIUM, summary = ReasoningSummary.AUTO))
                     else -> LLMParams()

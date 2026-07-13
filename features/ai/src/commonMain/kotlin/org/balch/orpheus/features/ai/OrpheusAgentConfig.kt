@@ -2,15 +2,19 @@ package org.balch.orpheus.features.ai
 
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
+import ai.koog.agents.core.agent.entity.AIAgentNodeBase
 import ai.koog.agents.core.dsl.extension.ReceivedToolResults
 import ai.koog.agents.core.dsl.extension.nodeExecuteTools
 import ai.koog.agents.core.dsl.extension.nodeLLMCompressHistory
+import ai.koog.agents.core.dsl.extension.nodeLLMRequest
 import ai.koog.agents.core.dsl.extension.nodeLLMRequestStreaming
+import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResults
 import ai.koog.agents.core.dsl.extension.nodeLLMSendToolResultsStreaming
 import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.llm.LLModel
+import ai.koog.prompt.message.Message
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
@@ -384,6 +388,13 @@ class OrpheusAgentConfig(
         name: String,
         onAssistantMessage: suspend (String) -> String,
         onReasoning: (String) -> Unit = {},
+        // Anthropic must run the BATCHED LLM nodes on Koog 1.0.0: the streaming path never
+        // appends the assistant turn to session history (Anthropic then rejects the next
+        // request — tool_result without its tool_use) AND drops thinking signature deltas,
+        // which Anthropic requires for replaying thinking blocks in tool loops. The batched
+        // client captures signatures and appends history correctly; reasoning still reaches
+        // the feeds per turn via tapReasoning. Google keeps the live streaming path.
+        streamResponses: Boolean = true,
     ) = strategy(name = name) {
         // Per-turn tool-round counter. Graph nodes run sequentially in one coroutine, so a plain var
         // is race-free here (parallel=true only fans out tools WITHIN a single nodeExecuteTool). It
@@ -391,16 +402,30 @@ class OrpheusAgentConfig(
         // (nodeAssistantMessage). When it reaches maxToolRoundsPerTurn the graph force-ends the turn.
         var toolRoundsThisTurn = 0
 
-        val nodeRequestLLM by nodeLLMRequestStreaming().transform { it.collapseToMessage(onReasoning) }   // CHANGED
+        // Both flavors are declared; nodes materialize lazily, so only the selected branch
+        // ever creates one. (`by if (...) a else b` defeats Kotlin's delegate resolution.)
+        // Explicit node names keep Koog's graph logs stable across both modes.
+        val nodeRequestLLMStreaming by nodeLLMRequestStreaming("nodeRequestLLM")
+            .transform { it.collapseToMessage(onReasoning) }
+        val nodeRequestLLMBatched by nodeLLMRequest("nodeRequestLLM")
+            .transform { it.tapReasoning(onReasoning) }
+        val nodeRequestLLM: AIAgentNodeBase<String, Message.Assistant> =
+            if (streamResponses) nodeRequestLLMStreaming else nodeRequestLLMBatched
         val nodeAssistantMessage by node<String, String> { message ->
             toolRoundsThisTurn = 0   // turn is ending; reset the per-turn tool budget
             onAssistantMessage(message)
         }
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
-        val nodeSendToolResult by nodeLLMSendToolResultsStreaming().transform {
+        val nodeSendToolResultStreaming by nodeLLMSendToolResultsStreaming("nodeSendToolResult").transform {
             toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
             it.collapseToMessage(onReasoning)
-        }   // CHANGED
+        }
+        val nodeSendToolResultBatched by nodeLLMSendToolResults("nodeSendToolResult").transform {
+            toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
+            it.tapReasoning(onReasoning)
+        }
+        val nodeSendToolResult: AIAgentNodeBase<ReceivedToolResults, Message.Assistant> =
+            if (streamResponses) nodeSendToolResultStreaming else nodeSendToolResultBatched
         val nodeCompressHistory by nodeLLMCompressHistory<ReceivedToolResults>()
 
         edge(nodeStart forwardTo nodeRequestLLM)
