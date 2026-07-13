@@ -24,144 +24,8 @@ import kotlin.test.assertTrue
 class DjAiViewModelTest {
 
     // ─────────────────────────────────────────────────
-    // reduceActivityEvent — Reasoning path
+    // reduceActivityEvent — ToolStarted phase transitions
     // ─────────────────────────────────────────────────
-
-    @Test
-    fun reasoningGoesToThinkingOnly() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("hm"), s0)
-        assertEquals(listOf("hm"), s1.thinking)
-        assertEquals(emptyList<String>(), s1.activity)
-    }
-
-    @Test
-    fun reasoningAppendsToExistingThinking() {
-        val s0 = DjAiUiState(
-            phase = DjAiPhase.GENERATING,
-            thinking = listOf("first thought"),
-        )
-        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("second thought"), s0)
-        assertEquals(listOf("first thought", "second thought"), s1.thinking)
-        assertEquals(emptyList<String>(), s1.activity)
-    }
-
-    // ─────────────────────────────────────────────────
-    // reduceActivityEvent — Tool / Assistant path
-    // ─────────────────────────────────────────────────
-
-    @Test
-    fun toolStartedGoesToActivityOnly() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
-        assertEquals(emptyList<String>(), s1.thinking)
-        assertEquals(1, s1.activity.size)
-        assertTrue(s1.activity[0].isNotBlank())
-    }
-
-    @Test
-    fun toolCompletedGoesToActivityOnly() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s0)
-        assertEquals(emptyList<String>(), s1.thinking)
-        assertEquals(1, s1.activity.size)
-        assertTrue(s1.activity[0].isNotBlank())
-    }
-
-    @Test
-    fun assistantGoesToReplyNotActivity() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.Assistant("Here is your vibe!"), s0)
-        // The main reply surfaces in the status card, never in the activity log or thinking.
-        assertEquals("Here is your vibe!", s1.assistantReply)
-        assertEquals(emptyList<String>(), s1.activity)
-        assertEquals(emptyList<String>(), s1.thinking)
-    }
-
-    @Test
-    fun assistantLatestReplyWins() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.Assistant("first"), s0)
-        val s2 = reduceActivityEvent(AgentActivityEvent.Assistant("second"), s1)
-        assertEquals("second", s2.assistantReply)
-    }
-
-    // ─────────────────────────────────────────────────
-    // Thinking headlines mirrored into Activity
-    // ─────────────────────────────────────────────────
-
-    @Test
-    fun extractHeadlinesPullsBoldSpans() {
-        val headlines = extractHeadlines("**Defining the Key and Tempo**\nblah blah **Crafting the Bass** more")
-        assertEquals(listOf("Defining the Key and Tempo", "Crafting the Bass"), headlines)
-    }
-
-    @Test
-    fun extractHeadlinesIgnoresPlainText() {
-        assertEquals(emptyList<String>(), extractHeadlines("no bold headers here, just prose"))
-    }
-
-    @Test
-    fun reasoningMirrorsHeadlineIntoActivity() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("**Considering the Request**\nI'm thinking…"), s0)
-        assertEquals(listOf("**Considering the Request**\nI'm thinking…"), s1.thinking)
-        assertEquals(listOf("💭 Considering the Request"), s1.activity)
-    }
-
-    @Test
-    fun reasoningHeadlineNotDuplicatedAcrossChunks() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        // Same headline present in two streamed chunks must appear once in activity.
-        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("**Tuning the Groove** part one"), s0)
-        val s2 = reduceActivityEvent(AgentActivityEvent.Reasoning("**Tuning the Groove** part two continues"), s1)
-        assertEquals(1, s2.activity.count { it == "💭 Tuning the Groove" })
-        // A new headline in a later chunk is added.
-        val s3 = reduceActivityEvent(AgentActivityEvent.Reasoning("**Adding Percussion** now"), s2)
-        assertEquals(listOf("💭 Tuning the Groove", "💭 Adding Percussion"), s3.activity)
-    }
-
-    @Test
-    fun reasoningWithoutHeadlineLeavesActivityUnchanged() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING, activity = listOf("🔧 Apply Vibe…"))
-        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("just prose, no headers"), s0)
-        assertEquals(listOf("🔧 Apply Vibe…"), s1.activity)
-        assertEquals(listOf("just prose, no headers"), s1.thinking)
-    }
-
-    @Test
-    fun toolCompletedReplacesItsRunningRowInPlace() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
-        val s2 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s1)
-        assertEquals(1, s2.activity.size)
-        assertTrue(s2.activity[0].startsWith("✓"))
-    }
-
-    @Test
-    fun toolCompletedOnlyReplacesLatestRunOfRepeatedTool() {
-        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
-        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
-        val s2 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s1)
-        val s3 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s2)
-        assertEquals(2, s3.activity.size)
-        assertTrue(s3.activity[0].startsWith("✓"))
-        assertTrue(s3.activity[1].startsWith("🔧"))
-        val s4 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s3)
-        assertEquals(2, s4.activity.size)
-        assertTrue(s4.activity[1].startsWith("✓"))
-    }
-
-    @Test
-    fun toolEventsDoNotClearActivity() {
-        val s0 = DjAiUiState(
-            phase = DjAiPhase.GENERATING,
-            activity = listOf("previous step"),
-        )
-        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_vibe_schema"), s0)
-        assertEquals(2, s1.activity.size)
-        assertEquals("previous step", s1.activity[0])
-    }
 
     @Test
     fun toolStartedFromIdleOnVibeToolMovesToGenerating() {
@@ -186,8 +50,7 @@ class DjAiViewModelTest {
         val s0 = DjAiUiState(phase = DjAiPhase.IDLE)
         val s1 = reduceActivityEvent(AgentActivityEvent.Assistant("stale message"), s0)
         assertEquals(s0, s1)
-        assertEquals(emptyList<String>(), s1.activity)
-        assertEquals(emptyList<String>(), s1.thinking)
+        assertEquals(emptyList<DjAiFeedItem>(), s1.feed)
     }
 
     @Test
@@ -195,8 +58,7 @@ class DjAiViewModelTest {
         val s0 = DjAiUiState(phase = DjAiPhase.IDLE)
         val s1 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_get_vibe"), s0)
         assertEquals(s0, s1)
-        assertEquals(emptyList<String>(), s1.activity)
-        assertEquals(emptyList<String>(), s1.thinking)
+        assertEquals(emptyList<DjAiFeedItem>(), s1.feed)
     }
 
     @Test
@@ -204,7 +66,7 @@ class DjAiViewModelTest {
         val s0 = DjAiUiState(phase = DjAiPhase.IDLE)
         val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("stale thought"), s0)
         assertEquals(s0, s1)
-        assertEquals(emptyList<String>(), s1.thinking)
+        assertEquals(emptyList<DjAiFeedItem>(), s1.feed)
     }
 
     // ─────────────────────────────────────────────────
@@ -244,9 +106,9 @@ class DjAiViewModelTest {
     fun closingToolAndAssistantEventsProcessedAfterResultFlip() {
         // VibeApplyTool emits Generated (GENERATING -> RESULT) BEFORE Koog fires the trailing
         // ToolCompleted + Assistant. Those closing events must still be applied in RESULT.
-        val generating = DjAiUiState(
-            phase = DjAiPhase.GENERATING,
-            activity = listOf("🔧 Apply Vibe…"),
+        val generating = reduceActivityEvent(
+            AgentActivityEvent.ToolStarted("pulsar_apply_vibe"),
+            DjAiUiState(phase = DjAiPhase.GENERATING),
         )
         val afterResult = reduceVibeEvent(VibeCreateEvent.Generated(makeTestVibe()), generating)
         assertEquals(DjAiPhase.RESULT, afterResult.phase)
@@ -255,13 +117,230 @@ class DjAiViewModelTest {
             AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"),
             afterResult,
         )
-        assertEquals(listOf("✓ Apply Vibe"), afterCompleted.activity)
+        val tool = afterCompleted.feed.single() as DjAiFeedItem.Tool
+        assertEquals("Apply Vibe", tool.name)
+        assertTrue(!tool.running)
 
         val afterReply = reduceActivityEvent(
             AgentActivityEvent.Assistant("Vibe ready: X"),
             afterCompleted,
         )
-        assertEquals("Vibe ready: X", afterReply.assistantReply)
+        assertEquals("Vibe ready: X", (afterReply.feed.last() as DjAiFeedItem.Reply).text)
+    }
+
+    // ─────────────────────────────────────────────────
+    // Unified feed — Reasoning grouping and headline splits
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun feed_reasoningCreatesNullHeadlineThinkingTail() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("just prose"), s0)
+        val item = s1.feed.single() as DjAiFeedItem.Thinking
+        assertNull(item.headline)
+        assertEquals("just prose", item.text)
+    }
+
+    @Test
+    fun feed_reasoningChunksAppendToTailThinking() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("part one "), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.Reasoning("part two"), s1)
+        val item = s2.feed.single() as DjAiFeedItem.Thinking
+        assertEquals("part one part two", item.text)
+    }
+
+    @Test
+    fun feed_headlineWithBlankPreambleRelabelsInPlace() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(
+            AgentActivityEvent.Reasoning("**Considering the Request**\nI'm thinking…"),
+            s0,
+        )
+        val item = s1.feed.single() as DjAiFeedItem.Thinking
+        assertEquals("Considering the Request", item.headline)
+        assertEquals("\nI'm thinking…", item.text)
+    }
+
+    @Test
+    fun feed_headlineSplitAcrossChunksLabelsExistingItem() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("**Defining the"), s0)
+        val id0 = s1.feed.single().id
+        val s2 = reduceActivityEvent(AgentActivityEvent.Reasoning(" Key** and now the body"), s1)
+        val item = s2.feed.single() as DjAiFeedItem.Thinking
+        assertEquals("Defining the Key", item.headline)
+        assertEquals(" and now the body", item.text)
+        assertEquals(id0, item.id)
+    }
+
+    @Test
+    fun feed_nonBlankPreambleSplitsIntoSeparateItems() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(
+            AgentActivityEvent.Reasoning("warming up **Crafting the Bass** low end"),
+            s0,
+        )
+        assertEquals(2, s1.feed.size)
+        val preamble = s1.feed[0] as DjAiFeedItem.Thinking
+        val labeled = s1.feed[1] as DjAiFeedItem.Thinking
+        assertNull(preamble.headline)
+        assertEquals("warming up ", preamble.text)
+        assertEquals("Crafting the Bass", labeled.headline)
+        assertEquals(" low end", labeled.text)
+        assertTrue(preamble.id != labeled.id)
+    }
+
+    @Test
+    fun feed_multipleHeadlinesInOneChunkSplitLeftToRight() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(
+            AgentActivityEvent.Reasoning("**Tempo** at 120 **Percussion** ghost notes"),
+            s0,
+        )
+        assertEquals(2, s1.feed.size)
+        val first = s1.feed[0] as DjAiFeedItem.Thinking
+        val second = s1.feed[1] as DjAiFeedItem.Thinking
+        assertEquals("Tempo", first.headline)
+        assertEquals(" at 120 ", first.text)
+        assertEquals("Percussion", second.headline)
+        assertEquals(" ghost notes", second.text)
+    }
+
+    @Test
+    fun feed_toolEventEndsThinkingSegment() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("pondering"), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_vibe_schema"), s1)
+        val s3 = reduceActivityEvent(AgentActivityEvent.Reasoning("new segment"), s2)
+        assertEquals(3, s3.feed.size)
+        assertTrue(s3.feed[1] is DjAiFeedItem.Tool)
+        val newSegment = s3.feed[2] as DjAiFeedItem.Thinking
+        assertNull(newSegment.headline)
+        assertEquals("new segment", newSegment.text)
+    }
+
+    @Test
+    fun feed_blankReasoningChunkCreatesNoItem() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("  \n"), s0)
+        assertEquals(emptyList<DjAiFeedItem>(), s1.feed)
+    }
+
+    @Test
+    fun feed_degenerateHeadlineMarkerIsDroppedWithoutSplit() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("before ** : ** after"), s0)
+        val item = s1.feed.single() as DjAiFeedItem.Thinking
+        assertNull(item.headline)
+        assertEquals("before  after", item.text)
+    }
+
+    @Test
+    fun feed_blankChunkAppendsToOpenThinkingTailWithoutNewItem() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("pondering"), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.Reasoning("  "), s1)
+        val item = s2.feed.single() as DjAiFeedItem.Thinking
+        assertEquals("pondering  ", item.text)
+        assertEquals(s1.feed.single().id, item.id)
+    }
+
+    // ─────────────────────────────────────────────────
+    // Unified feed — Tool and Reply rows
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun feed_toolStartedAppendsRunningTool() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
+        val tool = s1.feed.single() as DjAiFeedItem.Tool
+        assertEquals("Apply Vibe", tool.name)
+        assertTrue(tool.running)
+    }
+
+    @Test
+    fun feed_toolCompletedFlipsMatchingRunningToolInPlace() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
+        val id0 = s1.feed.single().id
+        val s2 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s1)
+        val tool = s2.feed.single() as DjAiFeedItem.Tool
+        assertEquals(id0, tool.id)
+        assertTrue(!tool.running)
+    }
+
+    @Test
+    fun feed_toolCompletedWithoutStartAppendsCompletedRow() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_get_vibe"), s0)
+        val tool = s1.feed.single() as DjAiFeedItem.Tool
+        assertEquals("Current Vibe", tool.name)
+        assertTrue(!tool.running)
+    }
+
+    @Test
+    fun feed_repeatedToolCompletionFlipsLatestRun() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s1)
+        val s3 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s2)
+        val s4 = reduceActivityEvent(AgentActivityEvent.ToolCompleted("pulsar_apply_vibe"), s3)
+        assertEquals(2, s4.feed.size)
+        assertTrue(s4.feed.all { !(it as DjAiFeedItem.Tool).running })
+    }
+
+    @Test
+    fun feed_assistantAppendsReplyRow() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Assistant("Here is your vibe!"), s0)
+        assertEquals("Here is your vibe!", (s1.feed.single() as DjAiFeedItem.Reply).text)
+    }
+
+    @Test
+    fun feed_consecutiveAssistantReplacesTailReply() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Assistant("first"), s0)
+        val id0 = s1.feed.single().id
+        val s2 = reduceActivityEvent(AgentActivityEvent.Assistant("second"), s1)
+        val reply = s2.feed.single() as DjAiFeedItem.Reply
+        assertEquals("second", reply.text)
+        assertEquals(id0, reply.id)
+    }
+
+    @Test
+    fun feed_assistantAfterInterveningItemAppendsNewReply() {
+        val s0 = DjAiUiState(phase = DjAiPhase.GENERATING)
+        val s1 = reduceActivityEvent(AgentActivityEvent.Assistant("first"), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s1)
+        val s3 = reduceActivityEvent(AgentActivityEvent.Assistant("second"), s2)
+        assertEquals(3, s3.feed.size)
+        assertEquals("second", (s3.feed[2] as DjAiFeedItem.Reply).text)
+    }
+
+    @Test
+    fun feed_idsAreUniqueAcrossItems() {
+        var s = DjAiUiState(phase = DjAiPhase.GENERATING)
+        s = reduceActivityEvent(AgentActivityEvent.Reasoning("a **B** c"), s)
+        s = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s)
+        s = reduceActivityEvent(AgentActivityEvent.Assistant("done"), s)
+        val ids = s.feed.map { it.id }
+        assertEquals(ids.toSet().size, ids.size)
+    }
+
+    // ─────────────────────────────────────────────────
+    // clearRunOutput — shared submit()/reset() clear
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun clearRunOutputEmptiesFeedAndResetsIds() {
+        var s = DjAiUiState(phase = DjAiPhase.GENERATING)
+        s = reduceActivityEvent(AgentActivityEvent.Reasoning("**Tempo** thinking"), s)
+        s = reduceActivityEvent(AgentActivityEvent.ToolStarted("pulsar_apply_vibe"), s)
+        val cleared = clearRunOutput(s.copy(error = "boom"))
+        assertEquals(emptyList<DjAiFeedItem>(), cleared.feed)
+        assertEquals(0L, cleared.nextId)
+        assertNull(cleared.error)
     }
 
     // ─────────────────────────────────────────────────

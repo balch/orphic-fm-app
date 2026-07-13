@@ -18,15 +18,56 @@ enum class DjAiPhase {
 }
 
 /**
+ * One row of the unified agent feed, in chronological event order.
+ *
+ * [id] is a monotonically assigned key, unique within a run. The UI uses it as the
+ * LazyColumn item key and as the expansion key for [Thinking] rows; reducers preserve
+ * it across in-place edits (thinking text accumulation, tool completion, reply update).
+ */
+@Immutable
+sealed interface DjAiFeedItem {
+    val id: Long
+
+    /**
+     * A reasoning segment, expandable in the UI.
+     *
+     * @property headline Bold `**headline**` label parsed from the reasoning stream;
+     *   null renders as "Thinking…". [text] never contains its own headline markers.
+     * @property text Accumulated raw reasoning for this segment.
+     */
+    data class Thinking(
+        override val id: Long,
+        val headline: String?,
+        val text: String,
+    ) : DjAiFeedItem
+
+    /**
+     * A tool invocation row: `🔧 name…` while [running], `✓ name` once complete.
+     *
+     * @property name Human-readable tool name (already `friendly()`-mapped).
+     */
+    data class Tool(
+        override val id: Long,
+        val name: String,
+        val running: Boolean,
+    ) : DjAiFeedItem
+
+    /** The agent's conversational reply, shown as the feed's trailing row. */
+    data class Reply(
+        override val id: Long,
+        val text: String,
+    ) : DjAiFeedItem
+}
+
+/**
  * UI state for the DJ AI vibe-creation panel.
  *
  * @property phase Current lifecycle phase.
  * @property promptDraft The user's in-progress text input.
- * @property activity High-level agent steps (tool starts/completes) and `💭`-prefixed thinking
- *   headlines parsed from the reasoning stream. Auto-scrolling.
- * @property thinking Incremental reasoning / chain-of-thought from the model. User-scrollable.
- * @property assistantReply The agent's main conversational reply (latest wins). Surfaced in the
- *   prompt-row status card while generating / after a result, so it is never lost in the log.
+ * @property feed Unified chronological agent feed: expandable [DjAiFeedItem.Thinking]
+ *   segments, [DjAiFeedItem.Tool] rows, and the trailing [DjAiFeedItem.Reply].
+ * @property nextId Monotonic id source for [feed] items; reducers stay pure by
+ *   threading it through state.
  * @property error Error description set when [phase] == [DjAiPhase.IDLE] after a failure.
  * @property selectedModel Currently selected AI model.
  * @property availableModels All models the user may choose from.
@@ -36,9 +77,8 @@ enum class DjAiPhase {
 data class DjAiUiState(
     val phase: DjAiPhase = DjAiPhase.IDLE,
     val promptDraft: String = "",
-    val activity: List<String> = emptyList(),
-    val thinking: List<String> = emptyList(),
-    val assistantReply: String = "",
+    val feed: List<DjAiFeedItem> = emptyList(),
+    val nextId: Long = 0,
     val error: String? = null,
     val selectedModel: AiModel = AiModel.DEFAULT,
     val availableModels: List<AiModel> = emptyList(),
@@ -59,9 +99,9 @@ data class DjAiPanelActions(
     val clearKey: (AiProvider) -> Unit,
     /** Switch the active AI model. */
     val selectModel: (AiModel) -> Unit,
-    /** Reset to IDLE, clearing activity, thinking, and error. */
+    /** Reset to IDLE, clearing the feed and error. */
     val reset: () -> Unit,
-    /** Dismiss the error banner without touching activity/thinking context. */
+    /** Dismiss the error banner without touching the feed's failure context. */
     val dismissError: () -> Unit,
 ) {
     companion object {

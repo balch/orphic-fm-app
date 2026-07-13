@@ -1,24 +1,25 @@
 package org.balch.orpheus.djapp.ai
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -62,7 +67,6 @@ import org.balch.orpheus.features.ai.widgets.ModelSelector
 import org.balch.orpheus.features.ai.widgets.UserKeyIndicator
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import kotlin.math.max
 
 /**
  * DJ AI vibe-creation panel.
@@ -71,8 +75,8 @@ import kotlin.math.max
  * - Config strip: model dropdown + API key control.
  * - Prompt input: single line; Enter / IME Send submits and dismisses the keyboard.
  * - Dismissible error strip (scrolls internally when the message is long).
- * - Two resizable panes separated by a draggable divider: auto-scrolling Activity feed
- *   on top, user-scrollable Thinking feed (italic, dimmed) on the bottom.
+ * - Unified agent feed: chronological tool rows, chevron-expandable thinking rows
+ *   (collapsed by default), and the agent's reply. Auto-scrolls on new rows only.
  */
 @Composable
 fun DjAiPanel(
@@ -95,9 +99,8 @@ fun DjAiPanel(
             onClearKey = actions.clearKey,
         )
 
-        // The prompt row is the input box when idle, and a working/output status card while the
-        // agent runs (and after a result) — so the agent's main reply is always front-and-center
-        // instead of scrolling away in the activity log.
+        // The prompt row is the input box when idle, and a one-line status strip while the
+        // agent runs (and after a result). The agent's reply lives in the feed below.
         if (uiState.phase == DjAiPhase.IDLE) {
             PromptInput(
                 draft = uiState.promptDraft,
@@ -108,7 +111,7 @@ fun DjAiPanel(
         } else {
             WorkingStatusCard(
                 working = uiState.phase == DjAiPhase.GENERATING,
-                reply = uiState.assistantReply,
+                onCancel = actions.reset,
                 onNew = actions.reset,
             )
         }
@@ -117,11 +120,8 @@ fun DjAiPanel(
             ErrorBanner(error = error, onDismiss = actions.dismissError)
         }
 
-        ActivityThinkingPanes(
-            activity = uiState.activity,
-            thinking = uiState.thinking,
-            isGenerating = uiState.phase == DjAiPhase.GENERATING,
-            onCancel = actions.reset,
+        AiFeed(
+            feed = uiState.feed,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
     }
@@ -129,7 +129,7 @@ fun DjAiPanel(
 
 /**
  * Dismissible error strip. Long errors (e.g. a vibe JSON parse failure dumping the whole
- * exception) scroll within a bounded height instead of squeezing the feeds below.
+ * exception) scroll within a bounded height instead of squeezing the feed below.
  */
 @Composable
 private fun ErrorBanner(
@@ -222,7 +222,7 @@ private fun PromptInput(
         val submitIfAble = {
             if (isKeySet) {
                 onSubmit()
-                // Dismiss the keyboard so the Activity/Thinking feeds are visible while generating.
+                // Dismiss the keyboard so the feed is visible while generating.
                 keyboardController?.hide()
                 focusManager.clearFocus()
             }
@@ -285,14 +285,14 @@ private fun PromptInput(
 }
 
 /**
- * Replaces the prompt input while the agent is running or after a result. Shows a pulsing
- * indicator + status line, the agent's latest reply (so it is never lost in the activity log),
- * and — once the run is done — a "＋ New" affordance that returns to the input for another prompt.
+ * Replaces the prompt input while the agent is running or after a result. A one-line
+ * status strip: pulsing indicator + status text, with ✕ Cancel while working and a
+ * "＋ New" affordance once the run is done. The agent's reply renders in the feed.
  */
 @Composable
 private fun WorkingStatusCard(
     working: Boolean,
-    reply: String,
+    onCancel: () -> Unit,
     onNew: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -309,7 +309,7 @@ private fun WorkingStatusCard(
             .clip(RoundedCornerShape(6.dp))
             .background(OrpheusColors.midnightBlue.copy(alpha = 0.4f))
             .padding(10.dp),
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "✦",
@@ -317,30 +317,28 @@ private fun WorkingStatusCard(
             color = OrpheusColors.metallicBlue.copy(alpha = if (working) pulse else 1f),
             modifier = Modifier.padding(end = 8.dp),
         )
-        Column(modifier = Modifier.weight(1f)) {
+        Text(
+            text = if (working) "Composing your vibe…" else "Vibe ready",
+            style = MaterialTheme.typography.labelSmall,
+            color = OrpheusColors.metallicBlue.copy(alpha = 0.9f),
+            modifier = Modifier.weight(1f),
+        )
+        if (working) {
             Text(
-                text = if (working) "Composing your vibe…" else "Vibe ready",
+                text = "✕ Cancel",
                 style = MaterialTheme.typography.labelSmall,
-                color = OrpheusColors.metallicBlue.copy(alpha = 0.9f),
+                color = OrpheusColors.warmGlow,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(onClick = onCancel)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
             )
-            if (reply.isNotBlank()) {
-                Text(
-                    text = reply,
-                    style = TextStyle(fontSize = 13.sp, color = OrpheusColors.pureWhite),
-                    modifier = Modifier
-                        .padding(top = 4.dp)
-                        .heightIn(max = 96.dp)
-                        .verticalScroll(rememberScrollState()),
-                )
-            }
-        }
-        if (!working) {
+        } else {
             Text(
                 text = "＋ New",
                 style = MaterialTheme.typography.labelSmall,
                 color = OrpheusColors.sterlingSilver,
                 modifier = Modifier
-                    .padding(start = 8.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .clickable(onClick = onNew)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -349,145 +347,136 @@ private fun WorkingStatusCard(
     }
 }
 
+/**
+ * Unified chronological agent feed. Thinking rows expand in place behind a chevron;
+ * tool rows and the reply are plain rows. Auto-scrolls when a NEW row appears, never
+ * on text accumulation inside an existing row, so reading an expanded row while the
+ * agent streams does not fight the scroll.
+ */
 @Composable
-private fun ActivityThinkingPanes(
-    activity: List<String>,
-    thinking: List<String>,
-    isGenerating: Boolean,
-    onCancel: () -> Unit,
+private fun AiFeed(
+    feed: List<DjAiFeedItem>,
     modifier: Modifier = Modifier,
 ) {
-    var activityWeight by remember { mutableStateOf(0.5f) }
+    val listState = rememberLazyListState()
+    var expandedIds by remember { mutableStateOf(setOf<Long>()) }
 
-    Column(modifier = modifier) {
-        ActivityFeed(
-            activity = activity,
-            isGenerating = isGenerating,
-            onCancel = onCancel,
-            modifier = Modifier.weight(activityWeight).fillMaxWidth(),
-        )
+    // New run / reset: drop stale expansion state so a fresh run's recycled ids
+    // don't start expanded.
+    LaunchedEffect(feed.isEmpty()) {
+        if (feed.isEmpty()) expandedIds = emptySet()
+    }
 
-        DraggableHandle(
-            onDrag = { deltaPx ->
-                activityWeight = (activityWeight + deltaPx / DIVIDER_DRAG_RANGE_PX).coerceIn(0.2f, 0.8f)
-            },
-        )
+    LaunchedEffect(feed.size) {
+        if (feed.isNotEmpty()) {
+            listState.scrollToItem(feed.size - 1)
+        }
+    }
 
-        ThinkingFeed(
-            thinking = thinking,
-            modifier = Modifier.weight(1f - activityWeight).fillMaxWidth(),
-        )
+    LazyColumn(
+        state = listState,
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        items(items = feed, key = { it.id }) { item ->
+            when (item) {
+                is DjAiFeedItem.Thinking -> ThinkingRow(
+                    item = item,
+                    expanded = item.id in expandedIds,
+                    onToggle = {
+                        expandedIds = if (item.id in expandedIds) {
+                            expandedIds - item.id
+                        } else {
+                            expandedIds + item.id
+                        }
+                    },
+                )
+                is DjAiFeedItem.Tool -> Text(
+                    text = if (item.running) "🔧 ${item.name}…" else "✓ ${item.name}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = OrpheusColors.sterlingSilver,
+                )
+                is DjAiFeedItem.Reply -> ReplyRow(text = item.text)
+            }
+        }
     }
 }
 
 /**
- * Divider handle between the Activity and Thinking panes. Reports raw vertical drag delta (px);
- * the caller converts that into a weight delta via [DIVIDER_DRAG_RANGE_PX].
+ * One thinking segment: a tappable label row with a rotating chevron, and the raw
+ * reasoning text revealed below it. Rows with no body text yet (headline arrived,
+ * body still streaming, or empty segment) render without an active chevron.
  */
 @Composable
-private fun DraggableHandle(onDrag: (Float) -> Unit, modifier: Modifier = Modifier) {
-    val dragState = rememberDraggableState(onDelta = onDrag)
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(12.dp)
-            .draggable(orientation = Orientation.Vertical, state = dragState)
-            .background(OrpheusColors.sterlingSilver.copy(alpha = 0.12f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .height(3.dp)
-                .fillMaxWidth(0.15f)
-                .clip(RoundedCornerShape(2.dp))
-                .background(OrpheusColors.sterlingSilver.copy(alpha = 0.4f)),
-        )
-    }
-}
-
-/** Approximate pane-region height (px) used to convert a divider drag delta into a weight delta. */
-private const val DIVIDER_DRAG_RANGE_PX = 600f
-
-@Composable
-private fun ActivityFeed(
-    activity: List<String>,
-    isGenerating: Boolean,
-    onCancel: () -> Unit,
+private fun ThinkingRow(
+    item: DjAiFeedItem.Thinking,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(activity.size) {
-        if (activity.isNotEmpty()) {
-            listState.scrollToItem(max(0, activity.size - 1))
-        }
-    }
-
-    Column(modifier = modifier) {
+    val expandable = item.text.isNotBlank()
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded && expandable) 90f else 0f,
+        label = "thinkingChevron",
+    )
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(4.dp))
+                .then(if (expandable) Modifier.clickable(onClick = onToggle) else Modifier)
+                .padding(vertical = 2.dp),
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = when {
+                    !expandable -> null
+                    expanded -> "Collapse thinking"
+                    else -> "Expand thinking"
+                },
+                tint = OrpheusColors.sterlingSilver.copy(alpha = if (expandable) 0.7f else 0.3f),
+                modifier = Modifier.size(14.dp).rotate(rotation),
+            )
+            Text(
+                text = item.headline ?: "Thinking…",
+                style = MaterialTheme.typography.labelSmall,
+                color = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
+                modifier = Modifier.padding(start = 2.dp),
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded && expandable,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
         ) {
             Text(
-                "ACTIVITY",
-                style = MaterialTheme.typography.labelSmall,
-                color = OrpheusColors.metallicBlue.copy(alpha = 0.7f),
-                modifier = Modifier.padding(bottom = 2.dp),
+                text = item.text.trim(),
+                style = MaterialTheme.typography.labelSmall.copy(fontStyle = FontStyle.Italic),
+                color = OrpheusColors.sterlingSilver.copy(alpha = 0.5f),
+                modifier = Modifier.padding(start = 16.dp, bottom = 4.dp),
             )
-            if (isGenerating) {
-                Text(
-                    "✕ Cancel",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = OrpheusColors.warmGlow,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable(onClick = onCancel)
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-            }
-        }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            items(activity) { line ->
-                Text(
-                    line,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = OrpheusColors.sterlingSilver,
-                )
-            }
         }
     }
 }
 
+/** The agent's reply row: ✦ marker + the reply text in the primary text style. */
 @Composable
-private fun ThinkingFeed(thinking: List<String>, modifier: Modifier = Modifier) {
-    val listState = rememberLazyListState()
-
-    Column(modifier = modifier) {
+private fun ReplyRow(text: String, modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = modifier.fillMaxWidth().padding(top = 4.dp),
+    ) {
         Text(
-            "THINKING",
-            style = MaterialTheme.typography.labelSmall,
-            color = OrpheusColors.metallicBlue.copy(alpha = 0.7f),
-            modifier = Modifier.padding(bottom = 2.dp),
+            text = "✦",
+            fontSize = 13.sp,
+            color = OrpheusColors.metallicBlue,
+            modifier = Modifier.padding(end = 6.dp),
         )
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            items(thinking) { line ->
-                Text(
-                    line,
-                    style = MaterialTheme.typography.labelSmall.copy(fontStyle = FontStyle.Italic),
-                    color = OrpheusColors.sterlingSilver.copy(alpha = 0.5f),
-                )
-            }
-        }
+        Text(
+            text = text,
+            style = TextStyle(fontSize = 13.sp, color = OrpheusColors.pureWhite),
+        )
     }
 }
 
@@ -499,15 +488,18 @@ private fun DjAiPanelPreview() {
             feature = DjAiViewModel.previewFeature(
                 DjAiUiState(
                     isKeySet = true,
-                    activity = listOf(
-                        "🔧 Vibe Schema…",
-                        "✓ Vibe Schema",
-                        "🔧 Apply Vibe…",
+                    phase = DjAiPhase.GENERATING,
+                    feed = listOf(
+                        DjAiFeedItem.Tool(id = 0, name = "Vibe Schema", running = false),
+                        DjAiFeedItem.Thinking(
+                            id = 1,
+                            headline = "Defining the Key and Tempo",
+                            text = "Leaning towards a minor-key groove around 122 BPM…",
+                        ),
+                        DjAiFeedItem.Tool(id = 2, name = "Apply Vibe", running = true),
+                        DjAiFeedItem.Reply(id = 3, text = "Spinning up a dusty midnight groove."),
                     ),
-                    thinking = listOf(
-                        "Considering tempo and swing…",
-                        "Leaning towards a minor-key groove…",
-                    ),
+                    nextId = 4,
                 )
             ),
         )

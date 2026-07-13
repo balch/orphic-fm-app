@@ -37,21 +37,59 @@ import org.balch.orpheus.features.pulsar.VibeCreateEventBus
 /** Tool-name set that indicates a Pulsar vibe operation is under way. */
 private val VIBE_TOOLS = setOf("pulsar_apply_vibe", "pulsar_vibe_schema", "pulsar_get_vibe")
 
-/** Prefix marking an Activity row that came from a Thinking-stream headline (vs a 🔧/✓ tool step). */
-internal const val HEADLINE_PREFIX = "💭 "
-
 private val HEADLINE_RE = Regex("""\*\*(.+?)\*\*""")
 
 /**
- * Pull the `**bold**` headlines out of a reasoning blob. The model prefixes each reasoning
- * section with a short bold title (e.g. `**Defining the Key and Tempo**`); those make a clean
- * high-level narrative for the Activity feed. Surrounding `*`/`:`/whitespace is trimmed.
+ * Append a reasoning chunk to the feed's tail [DjAiFeedItem.Thinking] (creating one when
+ * the tail is not a Thinking), then split at each completed `**headline**` marker.
+ *
+ * Invariant: a Thinking item's text never contains its own headline markers, so any
+ * regex match in the tail is a NEW headline. Scanning the accumulated tail text (not
+ * just the incoming chunk) handles headlines split across streamed chunks.
  */
-internal fun extractHeadlines(text: String): List<String> =
-    HEADLINE_RE.findAll(text)
-        .map { it.groupValues[1].trim().trim('*', ':', ' ') }
-        .filter { it.isNotBlank() }
-        .toList()
+internal fun appendReasoning(
+    feed: List<DjAiFeedItem>,
+    nextId: Long,
+    chunk: String,
+): Pair<List<DjAiFeedItem>, Long> {
+    val tail = feed.lastOrNull()
+    if (chunk.isBlank() && tail !is DjAiFeedItem.Thinking) return feed to nextId
+
+    var id = nextId
+    val out: MutableList<DjAiFeedItem>
+    var current: DjAiFeedItem.Thinking
+    if (tail is DjAiFeedItem.Thinking) {
+        out = feed.dropLast(1).toMutableList()
+        current = tail.copy(text = tail.text + chunk)
+    } else {
+        out = feed.toMutableList()
+        current = DjAiFeedItem.Thinking(id = id++, headline = null, text = chunk)
+    }
+
+    while (true) {
+        val match = HEADLINE_RE.find(current.text) ?: break
+        val label = match.groupValues[1].trim().trim('*', ':', ' ')
+        val before = current.text.substring(0, match.range.first)
+        val after = current.text.substring(match.range.last + 1)
+        when {
+            // Degenerate marker (e.g. `** : **`): drop it and keep scanning.
+            label.isBlank() -> current = current.copy(text = before + after)
+            // Nothing before this segment's first headline: relabel in place, id preserved.
+            current.headline == null && before.isBlank() ->
+                current = current.copy(headline = label, text = after)
+            else -> {
+                out += current.copy(text = before)
+                current = DjAiFeedItem.Thinking(id = id++, headline = label, text = after)
+            }
+        }
+    }
+    out += current
+    return out to id
+}
+
+/** Shared clear applied on submit() and reset(): a fresh run starts with an empty feed. */
+internal fun clearRunOutput(s: DjAiUiState): DjAiUiState =
+    s.copy(feed = emptyList(), nextId = 0, error = null)
 
 /**
  * Convert a raw tool name to a human-readable label.
@@ -68,12 +106,11 @@ private fun friendly(tool: String): String = when (tool) {
  * Reduce an [AgentActivityEvent] into a new [DjAiUiState].
  *
  * Routing rules:
- * - [AgentActivityEvent.Reasoning] -> appended to [DjAiUiState.thinking]; any `**bold**` headlines
- *   in the accumulated reasoning are also mirrored into [DjAiUiState.activity] (deduped) as a
- *   `💭`-prefixed high-level narrative.
- * - [AgentActivityEvent.Assistant] -> the agent's main reply -> [DjAiUiState.assistantReply]
- *   (latest wins), surfaced in the prompt-row status card, NOT buried in the activity log.
- * - [AgentActivityEvent.ToolStarted]/[AgentActivityEvent.ToolCompleted] -> [DjAiUiState.activity].
+ * - [AgentActivityEvent.Reasoning] -> appended to / split into the tail
+ *   [DjAiFeedItem.Thinking] via [appendReasoning].
+ * - [AgentActivityEvent.ToolStarted]/[AgentActivityEvent.ToolCompleted] -> append/flip a
+ *   [DjAiFeedItem.Tool] row.
+ * - [AgentActivityEvent.Assistant] -> the trailing [DjAiFeedItem.Reply] (latest wins).
  * - When a vibe tool starts from [DjAiPhase.IDLE], phase advances to [DjAiPhase.GENERATING].
  */
 internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiState {
@@ -85,19 +122,8 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
     if (s.phase == DjAiPhase.IDLE && !startsVibeRun) return s
     return when (e) {
         is AgentActivityEvent.Reasoning -> {
-            val newThinking = s.thinking + e.text
-            // Mirror the reasoning's bold headlines into Activity. Parse from the FULL accumulated
-            // thinking (a headline can arrive split across streamed chunks) and add only ones not
-            // already shown.
-            val existing = s.activity
-                .filter { it.startsWith(HEADLINE_PREFIX) }
-                .map { it.removePrefix(HEADLINE_PREFIX) }
-                .toSet()
-            val fresh = extractHeadlines(newThinking.joinToString("\n"))
-                .distinct()
-                .filter { it !in existing }
-                .map { HEADLINE_PREFIX + it }
-            s.copy(thinking = newThinking, activity = s.activity + fresh)
+            val (newFeed, newNextId) = appendReasoning(s.feed, s.nextId, e.text)
+            s.copy(feed = newFeed, nextId = newNextId)
         }
         is AgentActivityEvent.ToolStarted -> {
             val newPhase = if (s.phase == DjAiPhase.IDLE && e.tool in VIBE_TOOLS) {
@@ -107,28 +133,44 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
             }
             s.copy(
                 phase = newPhase,
-                activity = s.activity + "🔧 ${friendly(e.tool)}…",
+                feed = s.feed + DjAiFeedItem.Tool(id = s.nextId, name = friendly(e.tool), running = true),
+                nextId = s.nextId + 1,
             )
         }
         is AgentActivityEvent.ToolCompleted -> {
-            // Consolidate: flip this tool's in-flight "🔧 name…" row to "✓ name" in place
-            // rather than appending a second row for the same call. Falls back to appending
-            // if the start row was never recorded (e.g. its event predated GENERATING).
-            val running = "🔧 ${friendly(e.tool)}…"
-            val done = "✓ ${friendly(e.tool)}"
-            val idx = s.activity.lastIndexOf(running)
+            // Consolidate: flip this tool's in-flight running row to done in place rather
+            // than appending a second row for the same call. Falls back to appending if the
+            // start row was never recorded (e.g. its event predated GENERATING).
+            val name = friendly(e.tool)
+            val feedIdx = s.feed.indexOfLast {
+                it is DjAiFeedItem.Tool && it.name == name && it.running
+            }
             s.copy(
-                activity = if (idx >= 0) {
-                    s.activity.toMutableList().also { it[idx] = done }
+                feed = if (feedIdx >= 0) {
+                    s.feed.toMutableList().also {
+                        it[feedIdx] = (it[feedIdx] as DjAiFeedItem.Tool).copy(running = false)
+                    }
                 } else {
-                    s.activity + done
+                    s.feed + DjAiFeedItem.Tool(id = s.nextId, name = name, running = false)
                 },
+                nextId = if (feedIdx >= 0) s.nextId else s.nextId + 1,
             )
         }
-        is AgentActivityEvent.Assistant ->
-            // The main conversational reply is surfaced in the prompt-row status card, not the
-            // activity log where it used to scroll away. Latest message wins.
-            s.copy(assistantReply = e.text)
+        is AgentActivityEvent.Assistant -> {
+            // The main conversational reply is the feed's trailing Reply row. Latest wins:
+            // a consecutive Assistant event updates the tail in place (id preserved).
+            val tail = s.feed.lastOrNull()
+            if (tail is DjAiFeedItem.Reply) {
+                s.copy(
+                    feed = s.feed.dropLast(1) + tail.copy(text = e.text),
+                )
+            } else {
+                s.copy(
+                    feed = s.feed + DjAiFeedItem.Reply(id = s.nextId, text = e.text),
+                    nextId = s.nextId + 1,
+                )
+            }
+        }
     }
 }
 
@@ -241,14 +283,9 @@ class DjAiViewModel(
         if (draft.isBlank()) return
 
         log.debug { "Submitting prompt: $draft" }
-        _uiState.update { it.copy(
-            phase = DjAiPhase.GENERATING,
-            promptDraft = "",
-            activity = emptyList(),
-            thinking = emptyList(),
-            assistantReply = "",
-            error = null,
-        ) }
+        _uiState.update {
+            clearRunOutput(it).copy(phase = DjAiPhase.GENERATING, promptDraft = "")
+        }
         agent.sendPrompt(PromptIntent(
             prompt = "Make a Pulsar vibe: $draft",
             displayText = draft,
@@ -293,16 +330,10 @@ class DjAiViewModel(
      */
     private fun reset() {
         agent.restart()
-        _uiState.update { it.copy(
-            phase = DjAiPhase.IDLE,
-            activity = emptyList(),
-            thinking = emptyList(),
-            assistantReply = "",
-            error = null,
-        ) }
+        _uiState.update { clearRunOutput(it).copy(phase = DjAiPhase.IDLE) }
     }
 
-    /** Clear just the error banner — activity/thinking keep their failure context. */
+    /** Clear just the error banner — the feed keeps its failure context. */
     private fun dismissError() {
         _uiState.update { it.copy(error = null) }
     }
