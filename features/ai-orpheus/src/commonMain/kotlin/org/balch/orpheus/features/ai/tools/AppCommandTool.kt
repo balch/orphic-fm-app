@@ -36,10 +36,12 @@ sealed class AppCommand {
 
     @Serializable
     @SerialName("ChangeModel")
-    @LLMDescription("Changes the AI model. Use when user wants to switch between Flash 2.5 and Pro 2.5 models.")
+    @LLMDescription("Changes the AI model. Use when the user asks to switch to a different AI model or tier.")
     data class ChangeModel(
         @SerialName("model_name")
-        @property:LLMDescription("The model ID to switch to. Available: 'flash_25' (Flash 2.5) or 'pro_25' (Pro 2.5)")
+        // Annotations need compile-time constants, so this cannot enumerate AiModel.entries;
+        // keep it generation-agnostic — a wrong id fails with the real id list in the message.
+        @property:LLMDescription("The model id to switch to, case-sensitive, exactly as defined in the app's AiModel catalog. If unsure, pass your best guess for the id; a failed match returns the full list of valid ids to retry with.")
         val modelId: String
     ) : AppCommand()
 

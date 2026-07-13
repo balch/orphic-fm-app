@@ -1,7 +1,6 @@
 package org.balch.orpheus.core.ai
 
 import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
-import ai.koog.prompt.executor.clients.google.GoogleModels
 import ai.koog.prompt.llm.LLModel
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
@@ -27,15 +26,15 @@ enum class AiModel(
     val llmModel: LLModel,
 ) {
     HAIKU("Haiku", "Haiku 4.5", AiProvider.Anthropic, AnthropicModels.Haiku_4_5),
-    SONNET("Sonnet", "Sonnet 4.6", AiProvider.Anthropic, AnthropicModels.Sonnet_4_6),
-    OPUS("opus", "Opus 4.7", AiProvider.Anthropic, AnthropicModels.Opus_4_7),
-    PRO_30("pro_30", "Pro 3.0", AiProvider.Google, GoogleModels.Gemini3_Pro_Preview),
-    FLASH_30("flash_30", "Flash 3.0", AiProvider.Google, GoogleModels.Gemini3_Flash_Preview),
+    SONNET("Sonnet", "Sonnet 5", AiProvider.Anthropic, Sonnet5),
+    OPUS("opus", "Opus 4.8", AiProvider.Anthropic, Opus4_8),
+    FABLE("fable", "Fable 5", AiProvider.Anthropic, Fable5),
     PRO_31("pro_31", "Pro 3.1", AiProvider.Google, Gemini3_1ProPreview),
     FLASH_35("flash_35", "Flash 3.5", AiProvider.Google, Gemini3_5FlashPreview);
+
     companion object {
-        val DEFAULT = FLASH_30
-        
+        val DEFAULT = FLASH_35
+
         fun fromId(id: String): AiModel = entries.find { it.id == id } ?: DEFAULT
     }
 }
