@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai
 
+import ai.koog.prompt.executor.clients.anthropic.AnthropicCacheControl
 import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.executor.clients.anthropic.models.AnthropicThinking
 import kotlinx.serialization.json.jsonObject
@@ -25,6 +26,11 @@ class AnthropicThinkingParamsTest {
             assertEquals("adaptive", thinking["type"]?.jsonPrimitive?.content)
             assertEquals("summarized", thinking["display"]?.jsonPrimitive?.content)
             assertEquals(16_000, params.maxTokens, "explicit maxTokens for ${model.id}")
+            assertEquals(
+                AnthropicCacheControl.Default,
+                params.cacheControl,
+                "request-level cache_control for ${model.id}",
+            )
         }
     }
 
@@ -37,5 +43,6 @@ class AnthropicThinkingParamsTest {
         // and Anthropic 400s the pairing ("max_tokens must be greater than
         // thinking.budget_tokens").
         assertEquals(16_000, params.maxTokens)
+        assertEquals(AnthropicCacheControl.Default, params.cacheControl, "request-level cache_control")
     }
 }

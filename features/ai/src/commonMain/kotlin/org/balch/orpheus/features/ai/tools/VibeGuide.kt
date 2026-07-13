@@ -1,6 +1,33 @@
 package org.balch.orpheus.features.ai.tools
 
 /**
+ * JSON example strings embedded in the agent-facing guide prose ([STATIC_GUIDE] and
+ * `TRACK_OVERRIDES_NOTE` in VibeSchemaTool.kt). Extracted so [VibeGuideExamplesTest] can decode
+ * each one with the real apply-path Json (`vibeApplyJson`) and assert it is actually interpolated
+ * into the shipped text — prose examples can no longer silently drift from the schema.
+ */
+internal object VibeGuideExamples {
+    /** Bare-degree shorthand for `GenreProfile.customProgression` — a I-IV-VI-VII riff, no glide. */
+    const val CUSTOM_PROGRESSION_SHORTHAND: String = "[0, 3, 5, 6]"
+
+    /** Object form of the same field, needed when a chord step carries per-chord glide. */
+    const val CUSTOM_PROGRESSION_WITH_GLIDE: String =
+        """[{"degree": 0}, {"degree": 3, "glideRate": 0.4}]"""
+
+    /** `Section.trackOverrides` shape: override two fields on track 4 for one section. */
+    const val TRACK_OVERRIDES_EXAMPLE: String =
+        """{ "4": { "chordFollow": "FIXED", "density": 0.3 } }"""
+
+    /** `Section.trackOverrides` shape used to pin only chordFollow (the section-7 pegging recipe). */
+    const val TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE: String =
+        """{ "4": { "chordFollow": "FIXED" } }"""
+
+    /** Polymorphic `compingStyle` object form (NOT a bare enum string). */
+    const val COMPING_STYLE_EXAMPLE: String =
+        """{ "type": "org.balch.orpheus.features.pulsar.models.CompingStyle.FUNK_STABS" }"""
+}
+
+/**
  * Hand-curated composition guide handed to the in-app agent before it builds a vibe — the musical
  * semantics of the dev vibe-creator skill, reshaped for an author emitting JSON (all Kotlin/DI/Gradle
  * scaffolding removed). Pairs with the dynamic catalog (vibeFingerprint) appended by buildGuide.
@@ -8,8 +35,11 @@ package org.balch.orpheus.features.ai.tools
  * Source of truth for the prose: .claude/skills/vibe-creator/SKILL.md. When that skill's musical
  * guidance changes, update this constant too (they serve different audiences and neither the skill
  * markdown nor the model KDoc is reachable at app runtime).
+ *
+ * `internal val`, not `const val`: the JSON examples below are interpolated in from
+ * [VibeGuideExamples], and Kotlin const vals cannot hold string templates.
  */
-internal const val STATIC_GUIDE: String = """
+internal val STATIC_GUIDE: String = """
 # Building a Pulsar vibe — composition guide
 
 You edit an existing vibe's JSON into a new one. First understand what each control does, then pick
@@ -93,10 +123,11 @@ LickBuilder(probability, mutationRate) for melodic construction, LongFill for ex
 
 To peg a lead voice on the tonic while other tracks follow the progression — and as the standard
 fix when a lick lurches on leaping progressions — use trackOverrides keyed by the track index as a
-string: "trackOverrides": { "4": { "chordFollow": "FIXED" } }. All TrackSectionOverride fields
-are optional; only set what you need to change (density, volume, reverbSend, delaySend,
-envelopeProfile, compingStyle, sectionInversion, arpMode, chordFollow, holdProbability,
-holdLengthMin, holdLengthMax). Settings restore automatically when the section ends.
+string: "trackOverrides": ${VibeGuideExamples.TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE}. All
+TrackSectionOverride fields are optional; only set what you need to change (density, volume,
+reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode, chordFollow,
+holdProbability, holdLengthMin, holdLengthMax). Settings restore automatically when the section
+ends.
 
 A simple 5-section shape: intro (sparse, low energy) → groove (full band, macro baseline) → peak
 (energy × 1.3, complexity × 1.3) → breakdown (energy × 0.4, space × 1.5) → outro (sparse, fade).
@@ -151,14 +182,17 @@ The highest-value part: translate a described feel into concrete parameter choic
   modal/particle hits using MOD or PAR engines at very low density.
 
 ### Chord harmony
-- Clear progression: use customProgression with 0-indexed scale degrees 0–6 (e.g. [0, 3, 5, 6]
-  for a I–IV–VI–VII riff). Size 1–12.
+- Clear progression: use customProgression with 0-indexed scale degrees 0–6, either the bare-degree
+  shorthand ${VibeGuideExamples.CUSTOM_PROGRESSION_SHORTHAND} (no glide — a I–IV–VI–VII riff) or the
+  object form ${VibeGuideExamples.CUSTOM_PROGRESSION_WITH_GLIDE} when a step needs per-chord glide.
+  Size 1–12.
 - Static / dronal: progressionStyle = DRONE or customProgression = [0] (single tonic).
-- Per-chord glide: set glideRate on the individual track (bass or lead) so notes slide into
-  chord changes; glideRate 0.35–0.55 produces a portamento feel into that chord step.
-- Jazz substitutions: when no progressionStyle preset covers the movement, supply a 7x7
-  chordTransitionMatrix as a 7-element array of 7-element arrays (row = current chord degree,
-  column = next; values are relative weights).
+- Per-chord glide: set glideRate on the chord-step object itself, inside customProgression — not on
+  the track — so playback slides into that chord; glideRate 0.35–0.55 produces a smooth portamento
+  into the step.
+- Jazz substitutions: when no progressionStyle preset covers the movement, supply
+  chordTransitionMatrix as a flat list of 49 relative weights, 7x7 row-major (row = current chord
+  degree, column = next).
 - chordsPerBar = 1 → slow (one chord per bar); 2 = standard; 4 = busy.
 
 ### Lick / riff

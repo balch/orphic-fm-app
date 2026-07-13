@@ -85,3 +85,19 @@ internal fun Message.Assistant.tapReasoning(onReasoning: (String) -> Unit): Mess
     chunker.flush()
     return this
 }
+
+/**
+ * Taps the narration text of a tool-call turn (e.g. "Now I'll fetch a template...") into
+ * [onReasoning] so it reaches the activity feed as a thinking bubble. Tool-call turns' text parts
+ * otherwise have no path to the feed; text-only turns (no tool calls) are excluded here because
+ * their text is the final chat reply, delivered separately via onAssistantMessage — tapping it here
+ * would duplicate it in the feed.
+ */
+internal fun Message.Assistant.tapToolTurnNarration(onReasoning: (String) -> Unit): Message.Assistant {
+    if (parts.none { it is MessagePart.Tool.Call }) return this
+    parts.filterIsInstance<MessagePart.Text>().forEach { part ->
+        val trimmed = part.text.trim()
+        if (trimmed.isNotEmpty()) onReasoning(trimmed)
+    }
+    return this
+}

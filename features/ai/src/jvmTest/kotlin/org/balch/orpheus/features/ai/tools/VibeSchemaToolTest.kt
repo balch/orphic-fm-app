@@ -57,4 +57,12 @@ class VibeSchemaToolTest {
         assertTrue(reference.contains("trackOverrides"), "reference missing trackOverrides guidance")
         assertTrue(reference.contains("chordFollow"), "reference missing a TrackSectionOverride field")
     }
+
+    @Test
+    fun `generated schema pins ChordStep object shape with degree and glideRate properties`() {
+        // ChordStepSerializer's hand-maintained descriptor must keep the object shape or the agent-facing schema silently degrades.
+        val schema = generateVibeSchemaJson()
+        assertTrue(schema.contains("\"degree\""), "schema missing 'degree' property from ChordStep")
+        assertTrue(schema.contains("\"glideRate\""), "schema missing 'glideRate' property from ChordStep")
+    }
 }

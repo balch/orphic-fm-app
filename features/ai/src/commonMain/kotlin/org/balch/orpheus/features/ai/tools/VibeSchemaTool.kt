@@ -54,20 +54,23 @@ internal fun generateVibeSchemaJson(): String {
 /**
  * Hand-written addendum for `Section.trackOverrides`, which is omitted from the generated schema
  * above (its Int map keys can't be expressed in JSON Schema) but IS a supported, important feature.
+ *
+ * `internal val`, not `const val`: interpolates JSON examples from [VibeGuideExamples], and Kotlin
+ * const vals cannot hold string templates.
  */
-internal const val TRACK_OVERRIDES_NOTE: String = """
+internal val TRACK_OVERRIDES_NOTE: String = """
 NOTE — `trackOverrides` (a field on each arrangement Section) is NOT in the schema above because the
 schema tool can't represent its integer keys, but it IS fully supported and is how you change ONE
 track's behaviour within a single section (e.g. pedal a hook on the tonic, drop a track's density in a
 breakdown, swap a track's comping in the chorus). It auto-restores when the section ends.
 Shape — an object keyed by the track index (0-7) as a string:
-  "trackOverrides": { "4": { "chordFollow": "FIXED", "density": 0.3 } }
+  "trackOverrides": ${VibeGuideExamples.TRACK_OVERRIDES_EXAMPLE}
 TrackSectionOverride fields (all optional, override only what you set):
   density, volume, reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode,
   chordFollow, holdProbability, holdLengthMin, holdLengthMax.
 IMPORTANT — unlike the bare-string enum fields beside it, `compingStyle` is a polymorphic OBJECT,
 written exactly like Section.compingStyle in the schema above (NOT a bare string):
-  "compingStyle": { "type": "org.balch.orpheus.features.pulsar.models.CompingStyle.FUNK_STABS" }
+  "compingStyle": ${VibeGuideExamples.COMPING_STYLE_EXAMPLE}
   Allowed values: PAD, FUNK_STABS, ROCK_DOWNBEATS, SKA_UPSTROKES, BLUES_SHUFFLE, JAZZ_COMP,
   REGGAE_SKANK, GOSPEL_STABS.
 """

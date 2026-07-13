@@ -9,6 +9,7 @@ import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
+import ai.koog.prompt.executor.clients.anthropic.AnthropicCacheControl
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicParams
 import ai.koog.prompt.executor.clients.anthropic.models.AnthropicThinking
@@ -85,6 +86,12 @@ private const val ANTHROPIC_MAX_TOKENS = 16_000
  * additionalProperties, which Koog's AnthropicMessageRequestSerializer flattens into
  * the request body. `display: "summarized"` matters: these models default to omitted
  * thinking text, which would leave the apps' thinking feeds permanently empty.
+ *
+ * `cacheControl` requests Anthropic's request-level "automatic caching" (the API
+ * places the cache breakpoint on the last cacheable block), which suits this
+ * persistent agent: every call re-sends the whole conversation, so cache reads
+ * (~0.1x input price) dominate after the first call of a session. `Default` is a
+ * 5-minute ephemeral TTL, refreshed by every call within a generation flow.
  */
 internal fun anthropicThinkingParams(model: LLModel): AnthropicParams =
     if (model.usesAdaptiveThinking) {
@@ -96,11 +103,13 @@ internal fun anthropicThinkingParams(model: LLModel): AnthropicParams =
                     put("display", "summarized")
                 },
             ),
+            cacheControl = AnthropicCacheControl.Default,
         )
     } else {
         AnthropicParams(
             maxTokens = ANTHROPIC_MAX_TOKENS,
             thinking = AnthropicThinking.Enabled(budgetTokens = ANTHROPIC_THINKING_BUDGET),
+            cacheControl = AnthropicCacheControl.Default,
         )
     }
 

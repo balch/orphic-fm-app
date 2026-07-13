@@ -70,4 +70,52 @@ class ReasoningStreamTest {
         assertEquals(message, returned)
         assertTrue(chunks.any { it.contains("dusty blues key") }, "reasoning should be tapped")
     }
+
+    @Test
+    fun `tapToolTurnNarration surfaces text parts of a tool-call turn, chained after tapReasoning`() {
+        val chunks = mutableListOf<String>()
+        val message = ai.koog.prompt.message.Message.Assistant(
+            parts = listOf(
+                MessagePart.Reasoning(
+                    id = null,
+                    content = listOf("Considering the key and tempo for this vibe."),
+                ),
+                MessagePart.Text("Fetching a template."),
+                MessagePart.Tool.Call(id = "toolu_1", tool = "pulsar_get_vibe", args = "{}"),
+            ),
+            metaInfo = ai.koog.prompt.message.ResponseMetaInfo.Empty,
+        )
+        val returned = message.tapReasoning { chunks.add(it) }.tapToolTurnNarration { chunks.add(it) }
+        assertTrue(returned === message, "message must be returned unchanged (same instance)")
+        assertTrue(chunks.any { it.contains("key and tempo") }, "tapReasoning behavior must be unchanged when chained")
+        assertTrue(chunks.any { it == "Fetching a template." }, "tool-turn narration text should be tapped")
+    }
+
+    @Test
+    fun `tapToolTurnNarration emits nothing for a text-only turn with no tool calls`() {
+        val chunks = mutableListOf<String>()
+        val message = ai.koog.prompt.message.Message.Assistant(
+            parts = listOf(MessagePart.Text("final reply")),
+            metaInfo = ai.koog.prompt.message.ResponseMetaInfo.Empty,
+        )
+        val returned = message.tapToolTurnNarration { chunks.add(it) }
+        assertEquals(message, returned)
+        assertTrue(returned === message, "message must be returned unchanged (same instance)")
+        assertTrue(chunks.isEmpty(), "text-only turns must not be tapped here; that text is the final reply")
+    }
+
+    @Test
+    fun `tapToolTurnNarration skips blank text parts on a tool-call turn`() {
+        val chunks = mutableListOf<String>()
+        val message = ai.koog.prompt.message.Message.Assistant(
+            parts = listOf(
+                MessagePart.Text("   \n  "),
+                MessagePart.Tool.Call(id = "toolu_1", tool = "pulsar_get_vibe", args = "{}"),
+            ),
+            metaInfo = ai.koog.prompt.message.ResponseMetaInfo.Empty,
+        )
+        val returned = message.tapToolTurnNarration { chunks.add(it) }
+        assertEquals(message, returned)
+        assertTrue(chunks.isEmpty(), "blank/whitespace text parts must not be emitted")
+    }
 }

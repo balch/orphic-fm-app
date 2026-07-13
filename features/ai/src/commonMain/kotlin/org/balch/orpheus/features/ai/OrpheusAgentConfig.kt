@@ -406,9 +406,9 @@ class OrpheusAgentConfig(
         // ever creates one. (`by if (...) a else b` defeats Kotlin's delegate resolution.)
         // Explicit node names keep Koog's graph logs stable across both modes.
         val nodeRequestLLMStreaming by nodeLLMRequestStreaming("nodeRequestLLM")
-            .transform { it.collapseToMessage(onReasoning) }
+            .transform { it.collapseToMessage(onReasoning).tapToolTurnNarration(onReasoning) }
         val nodeRequestLLMBatched by nodeLLMRequest("nodeRequestLLM")
-            .transform { it.tapReasoning(onReasoning) }
+            .transform { it.tapReasoning(onReasoning).tapToolTurnNarration(onReasoning) }
         val nodeRequestLLM: AIAgentNodeBase<String, Message.Assistant> =
             if (streamResponses) nodeRequestLLMStreaming else nodeRequestLLMBatched
         val nodeAssistantMessage by node<String, String> { message ->
@@ -418,11 +418,11 @@ class OrpheusAgentConfig(
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
         val nodeSendToolResultStreaming by nodeLLMSendToolResultsStreaming("nodeSendToolResult").transform {
             toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
-            it.collapseToMessage(onReasoning)
+            it.collapseToMessage(onReasoning).tapToolTurnNarration(onReasoning)
         }
         val nodeSendToolResultBatched by nodeLLMSendToolResults("nodeSendToolResult").transform {
             toolRoundsThisTurn++   // one more tool-result round-trip consumed this turn
-            it.tapReasoning(onReasoning)
+            it.tapReasoning(onReasoning).tapToolTurnNarration(onReasoning)
         }
         val nodeSendToolResult: AIAgentNodeBase<ReceivedToolResults, Message.Assistant> =
             if (streamResponses) nodeSendToolResultStreaming else nodeSendToolResultBatched

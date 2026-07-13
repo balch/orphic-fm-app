@@ -1,6 +1,11 @@
 package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonTransformingSerializer
 
 /**
  * Preset rhythm density levels mapped to common drum patterns.
@@ -89,6 +94,7 @@ data class GenreProfile(
     val rhythmDensity: Float,
     val progressionStyle: ProgressionStyle = ProgressionStyle.POP,
     val chordsPerBar: Int = 2,
+    @Serializable(with = ChordTransitionMatrixSerializer::class)
     val chordTransitionMatrix: List<Float>? = null,
     val customProgression: List<ChordStep>? = null,
 ) {
@@ -99,5 +105,20 @@ data class GenreProfile(
                 "GenreProfile.chordTransitionMatrix must have 49 values (7x7), got ${it.size}"
             }
         }
+    }
+}
+
+/**
+ * Decodes the canonical flat 49-float array AND a nested 7x7 array of rows — agents sometimes
+ * emit a Markov matrix as `rows` (readable, matches how they reason about it) instead of the flat
+ * form. Flattens row-major (`matrix[7]` == row 1's first value) before [GenreProfile.init]'s
+ * `size == 49` check runs, so a malformed nested shape (e.g. 6 rows of 7) still fails with the
+ * existing "must have 49 values" message. Encoding always emits the flat form.
+ */
+private object ChordTransitionMatrixSerializer :
+    JsonTransformingSerializer<List<Float>>(ListSerializer(Float.serializer())) {
+    override fun transformDeserialize(element: JsonElement): JsonElement {
+        if (element !is JsonArray || element.firstOrNull() !is JsonArray) return element
+        return JsonArray(element.flatMap { it as JsonArray })
     }
 }
