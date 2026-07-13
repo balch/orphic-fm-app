@@ -32,6 +32,9 @@ tools/train-asl-model/.venv/
 # skill-creator eval/optimizer scratch output (trigger-eval.json, optimizer.log, iteration logs)
 .claude/skills/*-workspace/
 
+# runtime lock for the scheduled-tasks/cron feature; rewritten by whichever session holds it
+.claude/scheduled_tasks.lock
+
 # Gradle generated files
 gradle/gradle-daemon-jvm.properties
 
