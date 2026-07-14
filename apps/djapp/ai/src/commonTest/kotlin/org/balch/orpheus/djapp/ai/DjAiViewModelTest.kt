@@ -366,6 +366,104 @@ class DjAiViewModelTest {
     }
 
     // ─────────────────────────────────────────────────
+    // startRun — run seeding
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun startRunSeedsFeedWithRequestRowAndRemembersLastPrompt() {
+        val s0 = DjAiUiState(
+            phase = DjAiPhase.IDLE,
+            promptDraft = "dark techno",
+            error = "stale error",
+        )
+        val s1 = startRun(s0, "dark techno")
+        assertEquals(DjAiPhase.GENERATING, s1.phase)
+        assertEquals(
+            listOf<DjAiFeedItem>(DjAiFeedItem.Request(id = 0, text = "dark techno")),
+            s1.feed,
+        )
+        assertEquals(1L, s1.nextId)
+        assertEquals("dark techno", s1.lastPrompt)
+        assertEquals("", s1.promptDraft)
+        assertNull(s1.error)
+    }
+
+    @Test
+    fun startRunDiscardsPreviousRunFeed() {
+        val s0 = DjAiUiState(
+            phase = DjAiPhase.RESULT,
+            feed = listOf(
+                DjAiFeedItem.Request(id = 0, text = "first"),
+                DjAiFeedItem.Reply(id = 1, text = "done"),
+            ),
+            nextId = 2,
+            lastPrompt = "first",
+        )
+        val s1 = startRun(s0, "second")
+        assertEquals(
+            listOf<DjAiFeedItem>(DjAiFeedItem.Request(id = 0, text = "second")),
+            s1.feed,
+        )
+        assertEquals(1L, s1.nextId)
+        assertEquals("second", s1.lastPrompt)
+    }
+
+    // ─────────────────────────────────────────────────
+    // applyModelSwitch — unstick + prefill
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun modelSwitchDuringGenerationReturnsToIdleKeepingFeedAndError() {
+        val feed = listOf<DjAiFeedItem>(
+            DjAiFeedItem.Request(id = 0, text = "lofi beats"),
+            DjAiFeedItem.Tool(id = 1, name = "Apply Vibe", running = true),
+        )
+        val s0 = DjAiUiState(
+            phase = DjAiPhase.GENERATING,
+            feed = feed,
+            nextId = 2,
+            error = "api blew up",
+            lastPrompt = "lofi beats",
+        )
+        val s1 = applyModelSwitch(s0)
+        assertEquals(DjAiPhase.IDLE, s1.phase)
+        assertEquals(feed, s1.feed)
+        assertEquals("api blew up", s1.error)
+    }
+
+    @Test
+    fun modelSwitchWithBlankDraftPrefillsLastPrompt() {
+        val s0 = DjAiUiState(promptDraft = "  ", lastPrompt = "lofi beats")
+        val s1 = applyModelSwitch(s0)
+        assertEquals("lofi beats", s1.promptDraft)
+    }
+
+    @Test
+    fun modelSwitchWithTypedDraftKeepsIt() {
+        val s0 = DjAiUiState(promptDraft = "new idea", lastPrompt = "lofi beats")
+        val s1 = applyModelSwitch(s0)
+        assertEquals("new idea", s1.promptDraft)
+    }
+
+    // ─────────────────────────────────────────────────
+    // Request head row is inert to streaming reducers
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun reasoningAndReplyAppendAfterRequestHeadWithoutMerging() {
+        val s0 = DjAiUiState(
+            phase = DjAiPhase.GENERATING,
+            feed = listOf(DjAiFeedItem.Request(id = 0, text = "lofi beats")),
+            nextId = 1,
+        )
+        val s1 = reduceActivityEvent(AgentActivityEvent.Reasoning("Picking a key. "), s0)
+        val s2 = reduceActivityEvent(AgentActivityEvent.Assistant("Here you go."), s1)
+        assertEquals(DjAiFeedItem.Request(id = 0, text = "lofi beats"), s2.feed[0])
+        assertTrue(s2.feed[1] is DjAiFeedItem.Thinking)
+        assertTrue(s2.feed[2] is DjAiFeedItem.Reply)
+    }
+
+    // ─────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────
 

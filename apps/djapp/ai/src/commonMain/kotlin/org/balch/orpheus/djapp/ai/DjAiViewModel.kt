@@ -92,6 +92,32 @@ internal fun clearRunOutput(s: DjAiUiState): DjAiUiState =
     s.copy(feed = emptyList(), nextId = 0, error = null)
 
 /**
+ * Start a fresh run from [draft]: clear the previous run's output, seed the feed with the
+ * [DjAiFeedItem.Request] row (always id 0, always the top row), remember [draft] as
+ * [DjAiUiState.lastPrompt] for the model-switch prefill, and blank the input.
+ */
+internal fun startRun(s: DjAiUiState, draft: String): DjAiUiState =
+    clearRunOutput(s).copy(
+        phase = DjAiPhase.GENERATING,
+        promptDraft = "",
+        lastPrompt = draft,
+        feed = listOf(DjAiFeedItem.Request(id = 0, text = draft)),
+        nextId = 1,
+    )
+
+/**
+ * State transition for a model switch. Always returns to [DjAiPhase.IDLE]: the agent
+ * restart aborts any in-flight run, and without this the panel stayed stuck on the
+ * working strip forever (the aborted run's closing events never arrive). Prefills the
+ * input with the last submitted prompt so "retry on another model" is one tap — but
+ * never clobbers a draft the user is mid-typing.
+ */
+internal fun applyModelSwitch(s: DjAiUiState): DjAiUiState = s.copy(
+    phase = DjAiPhase.IDLE,
+    promptDraft = s.promptDraft.ifBlank { s.lastPrompt },
+)
+
+/**
  * Convert a raw tool name to a human-readable label.
  * Mirrors the `friendlyTool` helper in `VibeCreateViewModel`.
  */
@@ -290,9 +316,7 @@ class DjAiViewModel(
         if (draft.isBlank()) return
 
         log.debug { "Submitting prompt: $draft" }
-        _uiState.update {
-            clearRunOutput(it).copy(phase = DjAiPhase.GENERATING, promptDraft = "")
-        }
+        _uiState.update { startRun(it, draft) }
         agent.sendPrompt(PromptIntent(
             prompt = "Make a Pulsar vibe: $draft",
             displayText = draft,
@@ -324,6 +348,7 @@ class DjAiViewModel(
             // take effect. restart() is SILENT for the DJ app (cancel + re-arm, no greeting), which
             // re-reads config.model on the next submit with zero LLM traffic.
             agent.restart()
+            _uiState.update { applyModelSwitch(it) }
             log.debug { "Model selected: ${model.displayName}" }
         }
     }

@@ -29,6 +29,16 @@ sealed interface DjAiFeedItem {
     val id: Long
 
     /**
+     * The user's submitted request, seeded as the first row of each run's feed.
+     *
+     * @property text The raw prompt as typed (never the internal agent-prompt prefix).
+     */
+    data class Request(
+        override val id: Long,
+        val text: String,
+    ) : DjAiFeedItem
+
+    /**
      * A reasoning segment, expandable in the UI.
      *
      * @property headline Bold `**headline**` label parsed from the reasoning stream;
@@ -64,6 +74,8 @@ sealed interface DjAiFeedItem {
  *
  * @property phase Current lifecycle phase.
  * @property promptDraft The user's in-progress text input.
+ * @property lastPrompt Raw text of the most recently submitted prompt. Set on submit,
+ *   never cleared (survives reset/error/model switch); feeds the model-switch prefill.
  * @property feed Unified chronological agent feed: expandable [DjAiFeedItem.Thinking]
  *   segments, [DjAiFeedItem.Tool] rows, and the trailing [DjAiFeedItem.Reply].
  * @property nextId Monotonic id source for [feed] items; reducers stay pure by
@@ -77,6 +89,7 @@ sealed interface DjAiFeedItem {
 data class DjAiUiState(
     val phase: DjAiPhase = DjAiPhase.IDLE,
     val promptDraft: String = "",
+    val lastPrompt: String = "",
     val feed: List<DjAiFeedItem> = emptyList(),
     val nextId: Long = 0,
     val error: String? = null,

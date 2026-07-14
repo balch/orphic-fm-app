@@ -55,6 +55,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -63,6 +64,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiProvider
@@ -77,7 +79,8 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
  *
  * Layout, top -> bottom:
  * - Config strip: model dropdown + API key control.
- * - Prompt input: single line; Enter / IME Send submits and dismisses the keyboard.
+ * - Prompt input: multiline soft-wrap (grows to 8 lines); Enter / IME Send submits
+ *   and dismisses the keyboard.
  * - Dismissible error strip (scrolls internally when the message is long).
  * - Unified agent feed: chronological tool rows, chevron-expandable thinking rows
  *   (collapsed by default), and the agent's reply. Follow-mode auto-scroll on new rows.
@@ -219,8 +222,9 @@ private fun PromptInput(
         //   2. performEditorAction(DONE/GO)   -> KeyboardActions(onDone/onGo) [Samsung, some versions]
         //   3. commitText("\n")               -> newline intercept in onValueChange [Samsung, classic]
         //   4. sendKeyEvent(KEYCODE_ENTER)    -> onPreviewKeyEvent            [hardware keys]
-        // Note singleLine=true does NOT filter committed newlines from onValueChange in the
-        // string-based BasicTextField — it only sets layout constraints and IME hints.
+        // Note the string-based BasicTextField delivers committed newlines through
+        // onValueChange regardless of line mode, so the '\n' intercept stays mandatory
+        // now that the field is multiline.
         val keyboardController = LocalSoftwareKeyboardController.current
         val focusManager = LocalFocusManager.current
         val submitIfAble = {
@@ -241,7 +245,11 @@ private fun PromptInput(
                     onDraftChange(new)
                 }
             },
-            singleLine = true,
+            // Multiline display, single-line SEMANTICS: text soft-wraps and the box grows
+            // to 8 visual lines (then scrolls internally), but Enter/Send still submits and
+            // literal newlines remain impossible via the '\n' intercept above. The explicit
+            // imeAction=Send below keeps the IME's send key despite the multiline field.
+            maxLines = 8,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(
                 onSend = { submitIfAble() },
@@ -358,8 +366,9 @@ private const val FOLLOW_TAIL_SLACK_PX = 24
 private const val EXPAND_FOLLOW_WINDOW_NANOS = 500_000_000L
 
 /**
- * Unified chronological agent feed. Thinking rows expand in place behind a chevron;
- * tool rows and the reply are plain rows. Follow-mode auto-scroll: a NEW row is chased
+ * Unified chronological agent feed, headed by the user's request row (copyable).
+ * Thinking rows expand in place behind a chevron; tool rows and the reply are
+ * plain rows. Follow-mode auto-scroll: a NEW row is chased
  * only while the viewport bottom is pixel-close to the content bottom — never on text
  * accumulation inside an existing row, and never while the user is reading anywhere
  * above the tail (including partway up a tall expanded row). Expanding a thinking row
@@ -384,6 +393,12 @@ private fun AiFeed(
     LaunchedEffect(feed.size) {
         val oldSize = prevSize
         prevSize = feed.size
+        // A shrink is a run boundary (reducers only grow the feed or edit rows in
+        // place): drop stale expansion state so the new run's recycled ids don't
+        // start expanded. The isEmpty reset above cannot catch this — startRun
+        // replaces the old feed with the seeded request row without ever passing
+        // through empty.
+        if (feed.size < oldSize) expandedIds = emptySet()
         if (feed.isEmpty()) return@LaunchedEffect
         if (oldSize == 0) {
             listState.scrollToItem(feed.size - 1)
@@ -411,6 +426,7 @@ private fun AiFeed(
     ) {
         itemsIndexed(items = feed, key = { _, item -> item.id }) { index, item ->
             when (item) {
+                is DjAiFeedItem.Request -> RequestRow(text = item.text)
                 is DjAiFeedItem.Thinking -> ThinkingRow(
                     item = item,
                     expanded = item.id in expandedIds,
@@ -518,6 +534,53 @@ private fun ThinkingRow(
     }
 }
 
+/**
+ * The user's submitted request: `❯` marker + the raw prompt text + a copy glyph that
+ * flips to `✓` for a moment after copying (so the prompt can be retried on another
+ * model, or anywhere else). The copy goes through [copyPlainText]'s per-platform
+ * actuals — CMP 1.11.1 exposes no common plain-text ClipEntry factory.
+ */
+@Composable
+private fun RequestRow(text: String, modifier: Modifier = Modifier) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1_500)
+            copied = false
+        }
+    }
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = modifier.fillMaxWidth().padding(bottom = 4.dp),
+    ) {
+        Text(
+            text = "❯",
+            fontSize = 13.sp,
+            color = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
+            modifier = Modifier.padding(end = 6.dp),
+        )
+        Text(
+            text = text,
+            style = TextStyle(fontSize = 13.sp, color = OrpheusColors.pureWhite),
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = if (copied) "✓" else "⧉",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (copied) OrpheusColors.metallicBlue else OrpheusColors.sterlingSilver,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable {
+                    scope.launch { clipboard.copyPlainText(text) }
+                    copied = true
+                }
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
 /** The agent's reply row: ✦ marker + the reply text in the primary text style. */
 @Composable
 private fun ReplyRow(text: String, modifier: Modifier = Modifier) {
@@ -548,16 +611,17 @@ private fun DjAiPanelPreview() {
                     isKeySet = true,
                     phase = DjAiPhase.GENERATING,
                     feed = listOf(
-                        DjAiFeedItem.Tool(id = 0, name = "Vibe Schema", running = false),
+                        DjAiFeedItem.Request(id = 0, text = "A dusty midnight groove with warm tape hiss"),
+                        DjAiFeedItem.Tool(id = 1, name = "Vibe Schema", running = false),
                         DjAiFeedItem.Thinking(
-                            id = 1,
+                            id = 2,
                             headline = "Defining the Key and Tempo",
                             text = "Leaning towards a minor-key groove around 122 BPM…",
                         ),
-                        DjAiFeedItem.Tool(id = 2, name = "Apply Vibe", running = true),
-                        DjAiFeedItem.Reply(id = 3, text = "Spinning up a dusty midnight groove."),
+                        DjAiFeedItem.Tool(id = 3, name = "Apply Vibe", running = true),
+                        DjAiFeedItem.Reply(id = 4, text = "Spinning up a dusty midnight groove."),
                     ),
-                    nextId = 4,
+                    nextId = 5,
                 )
             ),
         )
