@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.pulsar.vibes
 
+import com.diamondedge.logging.Platform.name
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -45,6 +46,114 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
+
+// Faithful 2-bar riff (BLUES: 0=G,1=Bb/b3,2=C/4,3=Db/b5,4=D/5,5=F/b7). Preserved verbatim.
+private val ogLick = Lick(
+    steps = listOf(
+        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
+        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
+        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.85f),
+        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.90f),
+    ),
+    loopLength = 8,
+)
+
+private val aiLick = Lick(
+    steps = listOf(
+        // bar 1 — the climb, stated once: G D F, the b7 rings out the bar
+        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.90f),
+        LickStep(scaleDegree = 5, duration = 3.0f, velocity = 0.88f),  // the hook lands — let ring
+        // bar 2 — the answer: climb again, but fall through the b5 to home
+        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.90f),
+        LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.72f),  // the b5, descending crush
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.82f),
+        LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.95f),  // home, rings 2 beats
+    ),
+    loopLength = 8,
+)
+
+private val tweakLick = Lick(
+    steps = listOf(
+        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
+        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
+        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
+        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
+        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
+        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),
+        LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.90f),
+        LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),
+        LickStep(scaleDegree = 3, duration = 1.0f, velocity = 0.90f),
+    ),
+    loopLength = 8,
+)
+
+/**
+ * Fire Sky (OG) — FROZEN faithful-reproduction backup of the original blues-rock riff, kept as
+ * a dev A/B reference. Catalog status WIP: dev-only, visible on debuggable / `-Pcatalog=wip`
+ * builds for A/B but MUST NEVER be promoted to LIVE. It is a verbatim reproduction of a
+ * copyrighted riff, so a LIVE (release) listing would ship it to users. Reuses the live
+ * [FireSkyVibe] wholesale and swaps ONLY the lick + mutation back to faithful, so an A/B
+ * isolates the riff. This is the highest-exposure original of the three — do not edit, and
+ * never flip it to LIVE. Git commit ee8677e0 is the hard, fully-frozen snapshot.
+ */
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+class FireSkyOgVibe : VibeProvider {
+    override val name: String = "Fire Sky OG"
+
+    override val vibe: Vibe by lazy {
+        FireSkyVibeBase().vibe.copy(
+            name = name,
+            lick = ogLick,
+            lickMutation = 0.10f,
+            stepCount = 32
+        )
+    }
+}
+
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+class FireSkyCxVibe : VibeProvider {
+    override val name: String = "Fire Sky CX"
+
+    override val vibe: Vibe by lazy {
+        FireSkyVibeBase().vibe.copy(
+            name = name,
+            lick = tweakLick,
+            lickMutation = 0.60f,
+            stepCount = 32
+        )
+    }
+}
+
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+class FireSkyVibe : VibeProvider {
+    override val name: String = "Fire Sky"
+    override val vibe: Vibe by lazy {
+        FireSkyVibeBase().vibe.copy(
+            name = name,
+            lick = aiLick,
+            lickMutation = 0.25f,
+            stepCount = 32
+        )
+    }
+}
 
 /**
  * Fire Sky — a relentless, low-and-gritty hard-rock stomp built around an original
@@ -92,10 +201,7 @@ import org.balch.orpheus.features.pulsar.models.chords
  * literal 0.5x, which would clamp 42->60 and then over-restore the drop to 120).
  * A/B against DogHouseVibe.
  */
-@Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class FireSkyVibe : VibeProvider {
-    override val name: String = "Fire Sky"
+private class FireSkyVibeBase {
 
     // The riff hangs on the i (G), then makes the iconic hard-rock move: down to
     // the bVII (degree 6) and up to the IV (degree 3), then home.
@@ -238,20 +344,20 @@ class FireSkyVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
-                    energy = 1.4f, complexity = 1.2f, space = 0.7f, mood = 1.15f,
+                    energy = 1.2f, complexity = 1.2f, space = 0.7f, mood = 1.15f,
                 ),
                 customProgression = chorusProgression,
                 chordsPerBar = chorusChordsPerBar,
                 trackOverrides = mapOf(
                     4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // riff pedals — no lurch at the peak
-                    5 to TrackSectionOverride(density = 0.34f, volume = 0.58f),  // organ comes forward
+                    5 to TrackSectionOverride(density = 0.24f, volume = 0.58f),  // organ comes forward
                     6 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // double pinned WITH the lead — unison slam
                 ),
             ),
             // 4: solo — band jams over the groove; lead develops the riff (FOLLOW kept).
             Section(
                 name = "lead-in",
-                barsMin = 2, barsMax = 4,
+                barsMin = 2, barsMax = 2,
                 tensionOverride = leadInTension,
                 transitions = listOf(
                     SectionTransition(targetIndex = 5, weight = 1.0f, transitionBars = liftBars),  // -> chorus
@@ -314,7 +420,7 @@ class FireSkyVibe : VibeProvider {
         )
     }
 
-    override val vibe: Vibe by lazy {
+    val vibe: Vibe by lazy {
         Vibe(
             name = name,
             album = Album.ZERO_TO_ONE,
@@ -335,37 +441,6 @@ class FireSkyVibe : VibeProvider {
             space = 0.40f,
             mood = 0.75f,
             deep = 0.48f,
-            // --- the riff (track 4 plays it as LickMode.Fill; track 6 doubles it an octave down) ---
-            // BLUES degrees: 0=G, 1=Bb(b3), 2=C(4th), 3=Db(b5 blue note), 4=D(5th), 5=F(b7), 6=G(oct).
-            // SPARSE three-note POWER-CLIMB hook: G -> D -> F (root, 5th, b7), stated once and
-            // left to RING for the rest of the bar — the punch lives in the space after the
-            // hit, not in note count. Bar 2 restates the climb but falls through the lone b5
-            // (D -> Db -> Bb) to a long home tonic. The b3->4th cell chain and ascending b5
-            // approach of the well-known figure are gone entirely; what carries over is only
-            // genre vocabulary (G blues, low-mid grit, 2-bar loop). Faithful original preserved
-            // in FireSkyOgVibe (WIP, -Pcatalog). 8 notes, sums to exactly 8.0 beats.
-            // NOTE (octave pin): FOLLOW sections fold each track's notes into one octave above
-            // its noteRangeLow, recasting the climb as a dip-and-lift; the FIXED showcase
-            // sections (intro cold open, chorus, outro) render the true ascending climb.
-            lick = Lick(
-                steps = listOf(
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
-                    LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
-                    LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),
-                    LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.90f),
-                    LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),
-                    LickStep(scaleDegree = 3, duration = 1.0f, velocity = 0.90f),
-                ),
-                loopLength = 8,  // 2 bars; notes sum to 8.0 — space comes from the rings
-            ),
             lickMutation = 0.10f,  // low drift keeps the octave double coherent; distance now lives in the notes
             lickOctave = -1,       // auto = midpoint of the lead's note range (low-mid guitar register)
             genre = GenreProfile(
