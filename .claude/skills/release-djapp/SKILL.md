@@ -38,6 +38,15 @@ git tag -l "v1.*" --sort=-creatordate | head -5   # what's the last release?
 
 If working tree isn't clean, ask the user — `--dirty` would taint the version name.
 
+> **Finalize the Play "What's New" file _before_ you tag.** The Play publish (step 7) rebuilds
+> the AAB from **current HEAD**, not from the tag. Editing + committing
+> `src/main/play/release-notes/en-US/default.txt` _after_ tagging (a natural release-finishing
+> instinct) puts one commit on top of the tag, so the published AAB is built one commit past it:
+> `versionName` comes out `vX.Y.Z-1-gSHA` (**not** dirty — the `-1-gSHA` just means "1 commit
+> after the tag") and `versionCode` bumps by 1. The GitHub artifacts, built at the tag in step 3,
+> stay clean — so the two surfaces diverge. Commit the notes file as part of the pre-tag state and
+> both come out clean. If you catch it too late, see the recovery in "Verifying versions" below.
+
 ### 2. Annotated tag
 
 Use an **annotated** tag (`-a`), not a lightweight one. `git describe` prefers annotated tags, and the message becomes the canonical changelog source.
@@ -116,6 +125,15 @@ property read by `play { track.set(...) }` in `apps/djapp/androidApp/build.gradl
 it and it defaults to `internal`. Success looks like GPP logging
 `Updating [completed] release (org.balch.djapp:[<versionCode>]) in track 'alpha'` then
 `Committing changes`.
+
+> **`publishReleaseBundle` rebuilds from HEAD, not from the tag.** The version baked into the
+> uploaded AAB reflects wherever HEAD sits _at publish time_ — `versionName` is the raw
+> `git describe --tags --always --dirty`, `versionCode` is `git rev-list --count HEAD`. Any commit
+> landed since the tag (even a docs/notes commit) yields `vX.Y.Z-N-gSHA` and a bumped code. The
+> **filename still looks clean** (`djapp-vX.Y.Z-og-release.aab`) because `base.archivesName` strips
+> the `-N-gSHA` suffix via a separate `versionTag` — so the filename is _not_ a reliable signal.
+> Confirm the real values with `bundletool dump manifest` right before publishing (see "Verifying
+> versions" below).
 
 **The "What's New" Play notes are a file**, separate from the GitHub release body:
 `apps/djapp/androidApp/src/main/play/release-notes/en-US/default.txt`. GPP sends whatever is
@@ -266,7 +284,26 @@ bundletool dump manifest --bundle=path/to/djapp-v1.X.Y-release.aab | \
   grep -E "versionCode|versionName"
 ```
 
-If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you built — most likely because someone landed a commit between `git tag` and `./gradlew`. Re-tag (see "add one more commit" above) and rebuild.
+If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you built — most likely because a commit landed between `git tag` and the build (or the Play notes were committed after tagging; see step 1). Re-tag (see "add one more commit" above) and rebuild.
+
+**Recovery when the tainted `vX.Y.Z-N-gSHA` build is _already on Play_:** Play rejects any
+versionCode ≤ the one already live on the track, so you can't rebuild at the tag — that code
+(`rev-list --count` at the tag) is now _lower_ than what's uploaded. Instead, move the tag
+**forward** onto a commit whose `git describe` is exactly `vX.Y.Z` and whose count exceeds the
+tainted code, then republish:
+
+```bash
+git tag -d v1.X.Y
+git tag -a v1.X.Y -m "<same annotation>" HEAD   # HEAD's rev-list count must exceed the tainted code
+git push origin v1.X.Y --force
+./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease
+# verify: bundletool dump manifest ... shows a clean "vX.Y.Z" versionName
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha
+```
+
+The fresh upload (higher versionCode, clean versionName) supersedes the tainted one. Re-clobber
+the GitHub artifacts (see "add one more commit") so both surfaces carry the same build. Note that
+re-pointing an already-pushed tag is a force-push — flag it once, but it's the documented path.
 
 ## Reference commands
 
