@@ -18,7 +18,7 @@ Restructure the root `README.md` into a two-product story (Orpheus synth + Orphi
 | Charts | Mermaid (GitHub-native render) |
 | DJ shot list | Curated 5 shots (S1-S5 below) |
 | Pipeline | New worktree; parallel fan-out, 2 emulators, 3 agents/wave |
-| AI feed shot | Staged fixture, worktree-only; seeding code dropped before merge |
+| AI feed shot | Real agent run. API key is baked into the ai build; model = Flash 3.5 (Gemini); happy-birthday prompt. User monitors and can assist with prompts if needed |
 
 ## New README structure
 
@@ -96,15 +96,16 @@ notifications), 1080-wide, converted to webp in `docs/screenshots/djapp/`.
 | S2 | og | ogDebugRelease | VIBE dropdown open showing the 9 LIVE vibes | debugRelease required: debug builds leak WIP/SHELF vibes |
 | S3 | og | ogDebugRelease | Vibe Info sheet (tap "Orphic DJ" title) | Playing so section strip highlights + track dots glow |
 | S4 | og | ogDebugRelease | Mix tab: reverb + 8-track mixer | Playing |
-| S5 | ai | aiDebugRelease + fixture | AI sheet: unified feed (request row, thinking, tool rows, reply) with model selector visible | Staged fixture (below) |
+| S5 | ai | aiDebugRelease | AI sheet: unified feed (request row, thinking, tool rows, reply) with model selector visible | Real run (below) |
 
-**S5 fixture:** worktree-only temporary seeding of `DjAiFeedItem` state
-(Request -> Thinking -> Tool "Vibe Schema" done -> Tool "Apply Vibe" done -> Reply),
-content mirroring a real archived run (check `~/.config/orpheus-dj/ai-vibes/` for
-authentic prompt/reply text; else write plausible copy). Key indicator chip shows
-the "key set" state; no secret appears anywhere. The fixture is an uncommitted
-working-tree patch in the worktree: applied, built, captured, reverted. It is
-never committed.
+**S5 real run:** the ai build ships with the API key baked in; no key entry on
+device. Agent B selects **Flash 3.5** in the model switcher, types a
+happy-birthday vibe prompt (e.g. "A happy birthday party vibe"), sends it, waits
+for the run to complete, and captures the finished feed
+(Request -> Thinking -> Tool rows -> Reply). The generated vibe applies to the
+always-visible Pulsar behind the sheet, which makes the shot livelier. No secret
+is visible anywhere in the UI. If the run fails (network/model error), retry
+once, then notify the user, who is monitoring and can supply prompts or help.
 
 **Status-bar demo mode:**
 `adb shell settings put global sysui_demo_allowed 1` then
@@ -147,15 +148,16 @@ anchors/links to README sections that move (grep docs/ for `README.md#`).
 Worktree `readme-djapp` off `main`. Squash-merge into main at the end
 (user's standard workflow).
 
-- **Wave 0 (main agent):** create worktree; build `assembleOgDebugRelease`;
-  verify AVDs exist (`emulator -list-avds`), boot two (fallback: serialize B
-  after A on one AVD); prepare `docs/screenshots/djapp/`.
+- **Wave 0 (main agent):** create worktree; build `assembleOgDebugRelease` +
+  `assembleAiDebugRelease` (one invocation); verify AVDs exist
+  (`emulator -list-avds`), boot two (fallback: serialize B after A on one AVD);
+  prepare `docs/screenshots/djapp/`.
 - **Wave 1 (3 agents, parallel):**
   - **A - og captures** (emulator A): install og APK, demo mode, stage and capture
     S1-S4, pull PNGs into worktree `docs/screenshots/djapp/raw/`.
-  - **B - ai captures** (emulator B): apply S5 fixture patch in worktree, build
-    `assembleAiDebugRelease` (its own build; wave 0 does not build ai), install,
-    demo mode, capture S5, pull PNG, revert fixture patch.
+  - **B - ai captures** (emulator B): install ai APK, demo mode, open AI sheet,
+    select Flash 3.5, send happy-birthday prompt, wait for completion, capture S5,
+    pull PNG.
   - **C - charts + prose** (no emulator): 4 mermaid charts, restructured README,
     relocation edits to docs/GESTURES.md + docs/BUILD.md, DJ detail copy.
     Does NOT touch screenshot paths' existence assumptions: uses agreed filenames.
