@@ -1,7 +1,6 @@
-Solo handoffs that actually flow.
+Fire Sky joins the lineup, plus a glowing new visualizer.
 
-• When the band trades solos, the handoff now glides instead of jumping — solos stay in key, stay in register, and connect to each other.
-• Backing instruments stay present underneath a solo instead of dropping out.
-• Funkier, more articulate bass solos, plus the occasional drum solo that locks to the groove.
-• Re-tuned the Filter Funk interlude for more body.
+• New vibe: Fire Sky, a stomping blues-rock groove, now live in the picker.
+• The spectrum visualizer got a glow-up — bars now shift color with pitch, with a real bloom and a lingering afterglow on falling peaks.
+• Fixed a bug where two of the macro knobs could silently do nothing depending on setup order.
 • Stability fixes.
