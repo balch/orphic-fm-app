@@ -1,6 +1,7 @@
-Fire Sky joins the lineup, plus a glowing new visualizer.
+Lost in Space and Fire Sky join the lineup, plus a glowing new visualizer and Vibe info panel.
 
-• New vibe: Fire Sky, a stomping blues-rock groove, now live in the picker.
+• New vibes: Lost in Space and Fire Sky are now live in the picker.
+• The Vibe info panel gives you more details about the current vibe.
 • The spectrum visualizer got a glow-up — bars now shift color with pitch, with a real bloom and a lingering afterglow on falling peaks.
 • Fixed a bug where two of the macro knobs could silently do nothing depending on setup order.
 • Stability fixes.
