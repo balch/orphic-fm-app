@@ -192,8 +192,14 @@ class BellTollsVibe : VibeProvider {
                     ),
                 ),
                 recencyDecay = 0.5f,
+                // energy ×0.55 (not ×0.4): with base energy 0.55 the old
+                // multiplier dropped effective energy to ~0.22, which maxed
+                // every low-energy humanization system at once (tempo wander,
+                // long drum decay, slow Tides attacks) — the drums fell apart
+                // in the haze instead of anchoring it. The drummer keeps time
+                // through the dub; space still carries the drowning.
                 macroOverrides = MacroOverrides(
-                    energy = 0.4f, complexity = 0.5f, space = 1.8f, mood = 1.1f,
+                    energy = 0.55f, complexity = 0.5f, space = 1.8f, mood = 1.1f,
                 ),
                 chordFollow = ChordFollow.FIXED,  // everything drones on A
             ),
@@ -227,8 +233,10 @@ class BellTollsVibe : VibeProvider {
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 4,
+                // energy ×0.55 keeps the closing one-drop tight (see dub
+                // section note); the song should end locked-in, not loose.
                 macroOverrides = MacroOverrides(
-                    energy = 0.4f, complexity = 0.5f, space = 1.8f, mood = 1.1f,
+                    energy = 0.55f, complexity = 0.5f, space = 1.8f, mood = 1.1f,
                 ),
                 chordFollow = ChordFollow.FIXED,  // everything drones on A
                 compingInversion = SectionInversion.SECOND_INVERSION,

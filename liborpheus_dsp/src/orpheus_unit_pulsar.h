@@ -288,6 +288,20 @@ struct PulsarTrackState {
     bool in_hold;
     int hold_steps_remaining;
 
+    // Sub-block trigger timing (per-block scratch, audio thread only).
+    // trigger_offset: sample index within the current block where this
+    // track's step trigger landed (0 = block start / no mid-block trigger).
+    // The render is split there so the onset lands on the true step boundary
+    // instead of snapping up to a full block early.
+    // gate_pre_boundary: voice_active before this block's boundaries were
+    // processed — the first trigger_offset samples render with it so the
+    // previous note's tail isn't replaced by an early onset.
+    // pending_retrig: a step trigger requested an envelope rising edge; the
+    // Tides gate is forced low at trigger_offset rather than at block start.
+    int trigger_offset = 0;
+    bool gate_pre_boundary = false;
+    bool pending_retrig = false;
+
     // Reverb send brightness filter (one-pole LP per channel)
     float reverb_send_filter_state_l = 0.0f;
     float reverb_send_filter_state_r = 0.0f;

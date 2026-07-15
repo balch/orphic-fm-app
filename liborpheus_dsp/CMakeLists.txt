@@ -253,6 +253,7 @@ if(BUILD_TESTS)
         test/test_pulsar_tension.cpp
         test/test_pulsar_solos.cpp
         test/test_pulsar_sections.cpp
+        test/test_pulsar_timing.cpp
         test/test_pulsar_lick_marshalling.cpp
         test/test_pulsar_lick_offset.cpp
         test/test_pulsar_outro_request.cpp

@@ -67,6 +67,7 @@ static TestSuite suites[] = {
     {"tension",         run_pulsar_tension_tests,  true},
     {"pulsar_solos",    run_pulsar_solos_tests,    true},
     {"pulsar_sections", run_pulsar_sections_tests, true},
+    {"pulsar_timing",   run_pulsar_timing_tests,   true},
     {"pulsar_marshalling", run_pulsar_marshalling_tests, true},
     {"lick_offset",     run_pulsar_lick_offset_tests, true},
     {"pulsar_outro_request", run_pulsar_outro_request_tests, true},

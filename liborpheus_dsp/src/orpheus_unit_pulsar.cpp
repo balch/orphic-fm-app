@@ -212,8 +212,14 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             uint32_t h = step_hash(s, t, state->loop_count);
             float roll = static_cast<float>(h & 0xFFFF) / 65535.0f;
 
-            // Ghost notes: activate inactive steps with low velocity
+            // Ghost notes: activate inactive steps with low velocity.
+            // Percussive tracks are exempt: mutation never removes drum
+            // gates, so runtime ghosts accumulated monotonically until the
+            // déjà-vu reset (~2 minutes at typical settings) and the kit got
+            // progressively busier and sloppier over each window. Drum ghosts
+            // come from the pattern generator's authored ghost_probability.
             if (!step.gate) {
+                if (ts.role == TrackRole::PERCUSSIVE) continue;
                 float ghost_prob = track_var * 0.08f;  // up to 8% chance per step
                 if (roll < ghost_prob) {
                     step.gate = true;
@@ -224,16 +230,13 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                 continue;
             }
 
-            // Accent variation: slightly vary existing velocities.
-            // Driven by RAW complexity (not the per-track variation budget):
-            // this is velocity jitter on already-active hits, so it never
-            // shifts which steps fire or the phrase length and therefore can't
-            // cause rhythmic disjointedness. Letting complexity drive it gives
-            // drums their groove/life at high complexity instead of flattening
-            // them. Structural mutation (step-count, ghost, drift) stays budgeted.
-            float accent_range = complexity * 0.15f;
-            float accent_offset = (static_cast<float>((h >> 8) & 0xFFFF) / 65535.0f - 0.5f) * 2.0f * accent_range;
-            step.velocity = clamp01(step.velocity + accent_offset);
+            // Accent life comes from the per-hit variation_amt jitter applied
+            // at trigger time: it is hash-fresh every loop and zero-mean
+            // around the STORED velocity. The in-place walk that used to live
+            // here (velocity = clamp01(velocity + offset) once per loop)
+            // compounded into an unbounded-within-window random walk, so
+            // accents audibly diverged from the authored pattern between
+            // déjà-vu resets.
 
             // Note drift for melodic and effect tracks (3-7)
             if (t >= 3 && !use_markov_contour[t]) {
@@ -665,6 +668,12 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         base_seed = state->seed_counter * 2654435761u;
     } else {
         base_seed = static_cast<uint32_t>(seed_val) * 2654435761u;
+        // Pin seed_counter too: déjà-vu resets regenerate patterns from
+        // seed_counter (not mutation_seed), and PulsarState construction
+        // seeds it from the wall clock. Without this, a locked-seed vibe
+        // is only reproducible until its first déjà-vu reset (~1-2 min),
+        // after which patterns diverge run-to-run.
+        state->seed_counter = static_cast<uint32_t>(seed_val);
     }
     // SEED-1: Defense-in-depth ONLY for the random path. An explicit (non-zero)
     // seed must be byte-reproducible so a curated/locked roll can be recalled
@@ -1608,7 +1617,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     double samples_per_step = static_cast<double>(sample_rate) / steps_per_second;
 
     // ── Elastic tempo: slow random walk scaled by (1 - energy) ──
-    float max_drift = (1.0f - energy) * 0.15f;
+    // Cap the wander at ±5% at energy=0. (The old ±15% ceiling was masked by
+    // a slew bug — see below — but once the slew advances at the intended
+    // rate, 15% turns low-energy outros into an audible ±wobble of many BPM.
+    // 5% reads as gentle rubato instead of sloppy timekeeping.)
+    float max_drift = (1.0f - energy) * 0.05f;
 
     state->tempo_drift_countdown -= num_frames;
     if (state->tempo_drift_countdown <= 0) {
@@ -1617,7 +1630,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->tempo_drift_countdown = static_cast<int>(samples_per_step * 16.0 * bars);
     }
 
-    float drift_coeff = 1.0f - std::exp(-1.0f / std::max(static_cast<float>(samples_per_step * 32.0f), 1.0f));
+    // Slew toward the target over ~32 steps. This runs once per BLOCK, so the
+    // exponent must scale with the frames advanced this call — the previous
+    // per-sample constant applied per block slewed ~512x slower than intended.
+    float drift_coeff = 1.0f - std::exp(-static_cast<float>(num_frames)
+        / std::max(static_cast<float>(samples_per_step * 32.0), 1.0f));
     state->tempo_drift += drift_coeff * (state->tempo_drift_target - state->tempo_drift);
     state->tempo_drift = std::max(-max_drift, std::min(max_drift, state->tempo_drift));
 
@@ -1640,8 +1657,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     std::memset(engine->pulsar_reverb_send_r, 0, num_frames * sizeof(float));
 
     // ── Clock: find step boundaries within this block ──
-    // Swing: odd steps are delayed by swing_amount * 0.5 * samples_per_step.
-    // We track a global step parity to alternate even/odd thresholds.
+    // Swing: the off-beat (odd) onset is delayed by swing * 0.5 * step by
+    // lengthening the on-beat (even) step; the odd step is shortened by the
+    // same amount so a swung pair still totals exactly 2 * samples_per_step.
+    // We track a global step parity to alternate the two thresholds.
     static constexpr int kMaxStepBoundaries = 32;
     int step_boundary_samples[kMaxStepBoundaries];
     int num_boundaries = 0;
@@ -1659,16 +1678,30 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // (it doesn't starve the scratch). Inert when no scratch is ever armed.
     const bool scratch_hold = engine->master_scratch_l.is_active();
 
+    // Swing amount is constant across the block: the complexity macro of
+    // track 0 provides the live groove amount, with the vibe's authored
+    // genre swing as a floor (pulsar_genre_swing was previously loaded but
+    // never consumed anywhere in the clock).
+    float swing_amount = std::max(
+        engine->pulsar_genre_swing.load(std::memory_order_relaxed),
+        lerp_macro(complexity, state->tracks[0].macro_map.complexity_swing));
+    swing_amount = std::max(0.0f, std::min(swing_amount, 0.9f));
+    const double swing_shift =
+        static_cast<double>(swing_amount) * 0.5 * samples_per_step;
+
     for (int i = 0; i < num_frames; i++) {
         if (!scratch_hold) state->clock_accumulator += 1.0;
 
-        // Swing: alternate threshold between straight and delayed
-        // swing_amount from complexity macro (use track 0's macro as global ref)
-        float swing_amount = lerp_macro(complexity, state->tracks[0].macro_map.complexity_swing);
-        double threshold = samples_per_step;
-        if (step_is_odd) {
-            threshold += static_cast<double>(swing_amount) * 0.5 * samples_per_step;
-        }
+        // A swung pair must total exactly 2 * samples_per_step: lengthening
+        // the even (on-beat) step delays the odd (off-beat) onset, and the
+        // odd step is shortened by the same amount so the next on-beat lands
+        // back on the nominal grid. (The old code only lengthened — every
+        // pair took 2S + swing*0.5*S, so the real tempo ran swing/4 below
+        // the nominal BPM that fixed-ms delays, beat-synced LFOs, and the
+        // bass/grids/stutter units follow. They all drifted off the drum
+        // grid over the course of a song.)
+        double threshold = step_is_odd ? (samples_per_step - swing_shift)
+                                       : (samples_per_step + swing_shift);
 
         if (state->clock_accumulator >= threshold) {
             state->clock_accumulator -= threshold;
@@ -1695,6 +1728,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
         const PulsarTrackMacroMap& mm = ts.macro_map;
+
+        // Reset per-block trigger-timing scratch and capture the pre-boundary
+        // gate so the split render can keep the old note's tail intact for
+        // the samples before this block's trigger.
+        ts.trigger_offset = 0;
+        ts.pending_retrig = false;
+        ts.gate_pre_boundary = ts.voice_active;
 
         // Per-block refresh of fields that section transitions can override.
         // Atomic-cheap; lets Kotlin push per-section overrides without a vibe reload.
@@ -2437,11 +2477,30 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             continue;
                         }
 
+                        // Simplify during a bandmate's solo: SUPPORT members
+                        // drop their ornament (low-velocity) hits and keep only
+                        // the backbone. Deterministic, so the same hits vanish
+                        // every bar rather than flickering.
+                        if (ts.solo_simplify && step.velocity < 0.45f) {
+                            ts.prev_step_gated = false;
+                            ts.in_hold = false;
+                            continue;
+                        }
+
                         // Probability gating: energy controls base fire probability.
                         // TEXTURE/FX tracks (5-7) at low energy bypass gating so hold
                         // chains reliably start — the pattern generator already controls
                         // density, and the energy volume curve handles presence.
                         float base_prob = energy * 0.6f + 0.4f;  // 40% at energy=0, 100% at energy=1
+                        // Percussive tracks keep their backbone at any energy:
+                        // randomly dropping one-drop kicks and backbeats reads
+                        // as a drummer flubbing hits, not as dynamics — and
+                        // low-energy outro/breakdown sections made it happen
+                        // to a third of the kit's already-sparse pattern. The
+                        // energy volume curve handles presence instead.
+                        if (ts.role == TrackRole::PERCUSSIVE) {
+                            base_prob = std::max(base_prob, 0.9f);
+                        }
                         float vel_boost = step.velocity * (1.0f - base_prob) * 0.5f;
                         float fire_prob = base_prob + vel_boost;
 
@@ -2482,8 +2541,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 vel = clamp01(vel * vel_scale);
                             }
 
-                            // Force retrigger: reset gate so Tides sees a rising edge
-                            ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
+                            // Sample-accurate trigger: remember where in this
+                            // block the step boundary landed. The render is
+                            // split there, and the envelope rising edge
+                            // (pending_retrig) is forced at that offset
+                            // instead of at block start.
+                            ts.trigger_offset = step_boundary_samples[b];
+                            ts.pending_retrig = true;
                             ts.voice_active = true;
                             float drunk = state->drunk_offsets[t][ts.playhead];
                             float base_gate = static_cast<float>(step.duration * samples_per_step);
@@ -3005,6 +3069,34 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 track_buffer,
                 num_frames);
         } else {
+            // Sub-block trigger accuracy: split the render at the intra-block
+            // step-boundary offset so the voice's gate edge — and with it the
+            // drum onset — lands on the true boundary sample instead of
+            // snapping up to a full block (10.7ms at 512/48k) early. The
+            // pre-boundary segment renders the previous note's tail with its
+            // old gate state. OrpheusVoice buffers sub-24-sample remainders
+            // internally, so arbitrary segment lengths are safe.
+            const int trig_off =
+                (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
+                    ? ts.trigger_offset : 0;
+            if (trig_off > 0) {
+                int gate_pre = ts.gate_pre_boundary ? 1 : 0;
+                if (is_self_env && ts.in_hold) gate_pre = gate_for_render;
+                ts.voice.Render(
+                    ts.engine_index,
+                    gate_pre,
+                    note_for_render,
+                    clamp01(mod_harmonics),
+                    clamp01(mod_timbre),
+                    clamp01(mod_morph),
+                    accent_for_render,
+                    track_buffer,
+                    trig_off,
+                    static_cast<LpgMode>(active_lpg_mode),
+                    ts.lpg_decay,
+                    ts.lpg_colour
+                );
+            }
             ts.voice.Render(
                 ts.engine_index,
                 gate_for_render,
@@ -3013,8 +3105,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 clamp01(mod_timbre),
                 clamp01(mod_morph),
                 accent_for_render,
-                track_buffer,
-                num_frames,
+                track_buffer + trig_off,
+                num_frames - trig_off,
                 static_cast<LpgMode>(active_lpg_mode),
                 ts.lpg_decay,
                 ts.lpg_colour
@@ -3045,11 +3137,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if (decay_coeff < 0.9999f) decay_coeff = 0.9999f;
                 if (decay_coeff > 0.999999f) decay_coeff = 0.999999f;
 
+                const int drone_trig_off = ts.trigger_offset;
                 for (int i = 0; i < num_frames; i++) {
-                    if (ts.voice_active && ts.tides_env_level < 1.0f) {
+                    // Before the intra-block trigger offset, the previous
+                    // note's gate state applies (sub-block trigger accuracy).
+                    const bool active_i = (i < drone_trig_off)
+                        ? ts.gate_pre_boundary : ts.voice_active;
+                    if (active_i && ts.tides_env_level < 1.0f) {
                         ts.tides_env_level += 1.0f / attack_samples;
                         if (ts.tides_env_level > 1.0f) ts.tides_env_level = 1.0f;
-                    } else if (!ts.voice_active) {
+                    } else if (!active_i) {
                         ts.tides_env_level *= decay_coeff;
                         if (ts.tides_env_level < 0.001f) ts.tides_env_level = 0.0f;
                     }
@@ -3070,9 +3167,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                          state->mutation_seed, env_shape, env_pw, env_smoothness, env_freq_mult);
 
                     stmlib::GateFlags env_flags[kMaxFrames];
+                    const int env_trig_off = ts.trigger_offset;
                     for (int i = 0; i < num_frames; i++) {
+                        // Force the retrigger's rising edge at the true step
+                        // boundary sample; before it, the previous note's
+                        // gate state holds.
+                        if (ts.pending_retrig && i == env_trig_off) {
+                            ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
+                            ts.pending_retrig = false;
+                        }
+                        const bool gate_i = (i < env_trig_off)
+                            ? ts.gate_pre_boundary : ts.voice_active;
                         env_flags[i] = stmlib::ExtractGateFlags(
-                            ts.tides_prev_gate, ts.voice_active);
+                            ts.tides_prev_gate, gate_i);
                         ts.tides_prev_gate = env_flags[i];
                     }
 
@@ -3113,11 +3220,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     if (decay_coeff < 0.99f) decay_coeff = 0.99f;
                     if (decay_coeff > 0.99999f) decay_coeff = 0.99999f;
 
+                    const int ad_trig_off = ts.trigger_offset;
                     for (int i = 0; i < num_frames; i++) {
-                        if (ts.voice_active && ts.tides_env_level < 1.0f) {
+                        // Before the intra-block trigger offset, the previous
+                        // note's gate state applies (sub-block trigger accuracy).
+                        const bool active_i = (i < ad_trig_off)
+                            ? ts.gate_pre_boundary : ts.voice_active;
+                        if (active_i && ts.tides_env_level < 1.0f) {
                             ts.tides_env_level += 1.0f / attack_samples;
                             if (ts.tides_env_level > 1.0f) ts.tides_env_level = 1.0f;
-                        } else if (!ts.voice_active) {
+                        } else if (!active_i) {
                             ts.tides_env_level *= decay_coeff;
                             if (ts.tides_env_level < 0.001f) ts.tides_env_level = 0.0f;
                         }

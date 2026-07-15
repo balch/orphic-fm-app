@@ -59,7 +59,10 @@ data class EvolutionTension(
  * @param outerBars Secondary (macro) tension cycle. 0 = disabled. 16-32 = album-length arcs.
  * @param outerDepth How much the outer cycle modulates the inner. 0-1.
  * @param volume How much tension affects track volumes. 0 = none, 0.3 = subtle, 0.6+ = dramatic.
- * @param timing How much tension affects rhythmic tightness. 0 = none, 0.2 = subtle drift.
+ * @param timing How much tension loosens note LENGTHS (gate durations), not onsets —
+ *   the "drunk" offsets stretch/shrink how long notes ring as tension peaks, most
+ *   audible on LPG/envelope-gated voices. Hit placement always stays on the swung
+ *   grid. 0 = none, 0.2 = subtle.
  * @param tonal Pitch/scale tension (octave shifts, chromatic passing tones).
  * @param evolution Timbre evolution over the tension cycle (harmonics/timbre/morph drift).
  */

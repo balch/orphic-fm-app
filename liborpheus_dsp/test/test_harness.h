@@ -522,6 +522,7 @@ bool run_pulsar_signal_tests();
 bool run_pulsar_tension_tests();
 bool run_pulsar_solos_tests();
 bool run_pulsar_sections_tests();
+bool run_pulsar_timing_tests();
 bool run_pulsar_marshalling_tests();
 bool run_pulsar_lick_offset_tests();
 bool run_pulsar_outro_request_tests();

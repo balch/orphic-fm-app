@@ -59,6 +59,8 @@ enum class ProgressionAnchor(val barsBetweenResets: Int) {
  * Genre-level musical parameters shared across all 8 tracks.
  *
  * @param swingAmount Shuffle feel 0-1. 0 = straight, 0.1 = subtle groove, 0.3+ = heavy swing.
+ *   Acts as the FLOOR for live swing: the engine plays max(swingAmount, track-0
+ *   complexity-macro swing), so the authored groove survives low-complexity sections.
  * @param ghostProbability Chance of inserting quiet ghost notes 0-1. Adds human feel.
  *   0.1 = sparse, 0.3 = funky, 0.5+ = busy.
  * @param noteRangeLow Default MIDI note floor for melodic tracks (overridden per-track if set).
