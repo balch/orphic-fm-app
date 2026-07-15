@@ -1,6 +1,5 @@
 package org.balch.orpheus.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -71,7 +70,10 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun OrpheusTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // Orpheus renders dark by design, independent of system theme — a light
+    // system theme should not leak M3 light defaults into the synth UI.
+    // Callers may still pass false explicitly to opt into LightColorScheme.
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
@@ -28,6 +30,21 @@ import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerStatus
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.time.Duration
+
+/**
+ * Alpha applied to the selected-tab indicator pill. Kept low so the pill reads as a
+ * neon wash behind the icon/label rather than a solid block — the hand-set icon and
+ * text tints (see [DjAppNavScaffold]) already carry the actual selection signal.
+ */
+private const val NavIndicatorAlpha = 0.16f
+
+/**
+ * Selected-tab indicator color for both the bottom bar and the rail. M3's default
+ * indicator (`colorScheme.secondaryContainer`) renders invisible against our
+ * transparent nav background in dark posture, and baseline lavender under a light
+ * system theme — a deliberate neon-cyan wash replaces it instead.
+ */
+private val NavIndicatorColor = OrpheusColors.neonCyan.copy(alpha = NavIndicatorAlpha)
 
 /**
  * Adaptive navigation scaffold: bottom bar in portrait, side rail in landscape.
@@ -55,6 +72,17 @@ fun DjAppNavScaffold(
     // Insert play/pause in the center for portrait, at the end for landscape
     val playPauseIndex = if (isLandscape) tabs.size else tabs.size / 2
 
+    // NavigationSuiteScaffold has no scaffold-level default-item-colors hook in this
+    // M3 version — NavigationSuiteScope.item() takes its own `colors`, so this is
+    // built once here and passed to every item() call below. Only the indicator is
+    // overridden; icon/text colors are left at their theme defaults since the icon
+    // and label content already sets an explicit tint/color that takes precedence
+    // over whatever NavigationBarItemColors/NavigationRailItemColors would resolve.
+    val navItemColors = NavigationSuiteDefaults.itemColors(
+        navigationBarItemColors = NavigationBarItemDefaults.colors(indicatorColor = NavIndicatorColor),
+        navigationRailItemColors = NavigationRailItemDefaults.colors(indicatorColor = NavIndicatorColor),
+    )
+
     NavigationSuiteScaffold(
         modifier = modifier,
         layoutType = layoutType,
@@ -70,6 +98,7 @@ fun DjAppNavScaffold(
                 onClick = onTogglePlayback,
                 icon = { Icon(playIcon, contentDescription = playLabel, tint = OrpheusColors.cosmicPurple) },
                 label = { Text(playLabel, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.cosmicPurple) },
+                colors = navItemColors,
             )
 
             tabs.forEachIndexed { index, route ->
@@ -120,6 +149,7 @@ fun DjAppNavScaffold(
                                     else Color.White.copy(alpha = 0.6f),
                         )
                     },
+                    colors = navItemColors,
                 )
             }
             // Landscape: play/pause at the end of the rail

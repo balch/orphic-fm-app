@@ -5,11 +5,27 @@ Enable gesture control from the Gesture Control panel.
 
 ## How It Works
 
-The camera tracks your hands using MediaPipe HandLandmarker. A hybrid
-classifier combines a custom ML model (trained via MediaPipe Model Maker
-on all 26 ASL letters) with geometric rule-based analysis for robust sign
-recognition from the 21-point landmark data. One hand selects targets and
-parameters, then pinch gestures control values.
+The camera tracks your hands using [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/guide),
+which detects 21 hand landmarks per hand at 30fps. One hand selects targets
+and parameters, then pinch gestures control values.
+
+### Recognition Pipeline
+
+A hybrid classifier fuses two independent recognizers over the landmark data:
+
+- **ML model**: trained with [MediaPipe Model Maker](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer/customize)
+  on all 26 ASL letters plus numbers 1-8, using the
+  [Synthetic ASL Alphabet](https://www.kaggle.com/datasets/lexset/synthetic-asl-alphabet)
+  and [Synthetic ASL Numbers](https://www.kaggle.com/datasets/lexset/synthetic-asl-numbers) datasets.
+- **Rule-based classifier**: a pure-Kotlin geometric analysis of the same landmarks.
+
+The fusion algorithm boosts confidence when both classifiers agree and
+penalizes when they disagree. Geometric signs (R, H, D, Q, K, F) trust the
+rule-based classifier over the ML model.
+
+The ML model runs on both desktop (JNI, VIDEO mode) and Android (Java API,
+LIVE_STREAM mode). To rebuild the desktop native library, see
+[BUILD.md](BUILD.md#rebuilding-the-hand-tracking-dylib).
 
 ## One-Hand Selection Flow
 
@@ -171,6 +187,17 @@ Multiple fingers can touch simultaneously to play chords.
 
 - **Hand height** (Y) controls dynamics — high hand = loud, low hand = quiet (auto-calibrated)
 - **Hand roll** (tilt) controls global pitch bend
+- **Hand openness** controls timbre
+- **Ring modifier**: while the ring finger touches the thumb, hand roll adjusts
+  the mod source level instead of pitch bend
+- **Pinky modifier**: while the pinky touches the thumb, push/pull toward the
+  camera steps through hold detents
 - **Open palm swipe** left/right switches panels
 
 No voice selection step needed — fingers directly control individual voices.
+
+## AR Keyboard Mode
+
+Enter Keyboard Mode by signing **E**. A chromatic 12-key piano keyboard is
+projected onto the live camera view, turning any flat surface into a playable
+instrument. Sign **E** again to exit.

@@ -14,7 +14,7 @@
 
 **Optional:**
 - [jenv](https://www.jenv.be/) for managing JDK versions
-- [Bazelisk](https://github.com/bazelbuild/bazelisk) for rebuilding MediaPipe JNI (see README)
+- [Bazelisk](https://github.com/bazelbuild/bazelisk) for rebuilding MediaPipe JNI (see [Rebuilding the Hand-Tracking Dylib](#rebuilding-the-hand-tracking-dylib))
 
 ### Eurorack Source
 
@@ -147,7 +147,7 @@ The Android CMake build is configured in the respective `androidApp` modules and
 
 ### iOS
 
-The C++ DSP engine is compiled as a static library for iOS arm64 (device) and simulator, linked via Kotlin/Native cinterop. Audio renders through `AVAudioEngine` with an `AVAudioSourceNode` callback. The Xcode project is generated via XcodeGen.
+The C++ DSP engine is compiled as a static library for iOS arm64 (device) and simulator, linked via Kotlin/Native cinterop. Audio renders through `AVAudioEngine` with an `AVAudioSourceNode` callback. The engine outputs interleaved stereo that is deinterleaved in C++ (`orpheus_engine_process_deinterleaved`) to match CoreAudio's non-interleaved buffer format, keeping the entire audio path in native code with zero GC pressure. The Xcode project is generated via XcodeGen.
 
 ```bash
 # Build the Kotlin framework for simulator
@@ -177,7 +177,7 @@ The iOS CMake build is configured in `liborpheus_dsp/platform/ios/CMakeLists.txt
 
 ### WASM
 
-The WASM target compiles the C++ DSP engine to WebAssembly via Emscripten. Audio runs in a Web Worker, rendering 128-frame buffers that feed an AudioWorkletNode for gapless playback.
+The WASM target compiles the C++ DSP engine to WebAssembly via Emscripten. Audio runs in a Web Worker, rendering 128-frame buffers that feed an AudioWorkletNode for gapless playback. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`.
 
 ```bash
 # Build WASM module (one-time or after C++ changes)
@@ -260,6 +260,38 @@ make -j$(nproc)
 ```
 
 See [TESTS.md](TESTS.md) for full testing documentation.
+
+## Rebuilding the Hand-Tracking Dylib
+
+Hand tracking on Desktop uses a pre-built native library (`libmediapipe_hand_jni.dylib`) and model file that are checked into the repository, so it works out of the box on macOS arm64. On Android, hand tracking uses the MediaPipe Tasks SDK (pulled via Gradle) and needs no native setup. Rebuilding is only needed when updating the MediaPipe version or modifying the JNI layer.
+
+**Prerequisites:** [Bazelisk](https://github.com/bazelbuild/bazelisk) (`brew install bazelisk`), [MediaPipe source](https://github.com/google-ai-edge/mediapipe), Homebrew OpenCV and TBB (`brew install opencv tbb`).
+
+The project includes custom build files in the MediaPipe tree that produce a single self-contained dylib with MediaPipe, OpenCV, protobuf, and TBB all statically linked (no Homebrew runtime dependencies):
+
+- `mediapipe/tasks/c/vision/hand_landmarker/mediapipe_jni.cc` -- JNI shim
+- `mediapipe/tasks/c/vision/hand_landmarker/BUILD` -- combined dylib target
+- `third_party/opencv_macos.BUILD` -- static OpenCV linkage
+
+```bash
+cd ~/Source/mediapipe
+bazelisk build --config darwin_arm64 -c opt --strip always \
+  --define MEDIAPIPE_DISABLE_GPU=1 \
+  --repo_env=HERMETIC_PYTHON_VERSION=3.12 \
+  "--per_file_copt=external/zlib/.*@-UTARGET_OS_MAC" \
+  "--host_per_file_copt=external/zlib/.*@-UTARGET_OS_MAC" \
+  //mediapipe/tasks/c/vision/hand_landmarker:libmediapipe_hand_jni.dylib
+
+cp bazel-bin/mediapipe/tasks/c/vision/hand_landmarker/libmediapipe_hand_jni.dylib \
+   ~/Source/orphic-fm-app/core/mediapipe/src/jvmMain/resources/native/darwin-aarch64/
+```
+
+To update the model file:
+
+```bash
+curl -L -o core/mediapipe/src/jvmMain/resources/models/hand_landmarker.task \
+  https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+```
 
 ## Configuration
 
