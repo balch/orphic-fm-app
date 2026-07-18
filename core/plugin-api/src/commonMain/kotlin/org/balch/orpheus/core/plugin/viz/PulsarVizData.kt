@@ -17,6 +17,10 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  * @param stepVelocities 8 tracks x 32 steps — velocity 0..1
  * @param playheads Current playhead position per track (0-based, -1 = off)
  * @param stepCounts Number of active steps per track
+ * @param trackLevels 8 tracks — per-track peak audio level 0..1
+ * @param voidGain Live Void Anomaly gain (1.0 = idle/no duck, dips toward the
+ *   arc's floor while active). Rides the same fast viz-ring transport as
+ *   [trackLevels]; drives the VIBE dropdown's glow in PulsarPanel.
  * @param activeEngines Live per-track engine id the DSP is actually playing
  *   (reflects the random crossfade + section energy overrides). -1 = unset.
  */
@@ -26,6 +30,7 @@ data class PulsarVizData(
     val playheads: IntArray = IntArray(NUM_TRACKS) { -1 },
     val stepCounts: IntArray = IntArray(NUM_TRACKS) { 16 },
     val trackLevels: FloatArray = FloatArray(NUM_TRACKS),  // per-track peak audio level 0..1
+    val voidGain: Float = 1f,
     val activeEngines: IntArray = IntArray(NUM_TRACKS) { -1 },
 ) {
     override fun equals(other: Any?): Boolean {
@@ -36,6 +41,7 @@ data class PulsarVizData(
         if (!playheads.contentEquals(other.playheads)) return false
         if (!stepCounts.contentEquals(other.stepCounts)) return false
         if (!trackLevels.contentEquals(other.trackLevels)) return false
+        if (voidGain != other.voidGain) return false
         if (!activeEngines.contentEquals(other.activeEngines)) return false
         return true
     }
@@ -46,6 +52,7 @@ data class PulsarVizData(
         result = 31 * result + playheads.contentHashCode()
         result = 31 * result + stepCounts.contentHashCode()
         result = 31 * result + trackLevels.contentHashCode()
+        result = 31 * result + voidGain.hashCode()
         result = 31 * result + activeEngines.contentHashCode()
         return result
     }

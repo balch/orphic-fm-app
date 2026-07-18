@@ -89,16 +89,10 @@ object VibeCatalog {
     val entries: Map<String, CatalogEntry> = linkedMapOf(
         "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
-        "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
-        "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
-        "Fire Sky CX" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
         "Rust Belt" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "swamp")),
-        "Rust Belt OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Black Cat" to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
-        "Black Cat OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
+        "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
         "Techno Wobble" to CatalogEntry(VibeStatus.LIVE, tags = listOf("club")),
         "Velvet Leash" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock")),
@@ -106,6 +100,13 @@ object VibeCatalog {
         "Lost In Space" to CatalogEntry(VibeStatus.LIVE, tags = listOf("ambient")),
 
 // -----------------------------
+        "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
+        "Fire Sky CX" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Rust Belt OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Black Cat" to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
+        "Black Cat OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         "Corner Office" to CatalogEntry(VibeStatus.WIP, tags = listOf("funk", "rock", "riff")),
         "Corner Office OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         // ── STEALTH: grooves and moods ──

@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -72,8 +74,25 @@ private fun <T> EnumDropdown(
     onSelected: (T) -> Unit,
     color: Color,
     modifier: Modifier = Modifier,
+    onLongPress: (() -> Unit)? = null,
+    /**
+     * 0f..1f — how strongly this dropdown should show the "armed"/"active" tint,
+     * mirroring the ENDING pill's outroArmed-driven background below. Used by the
+     * VIBE dropdown: firing the manual anomaly trigger sets a steady floor (see
+     * PulsarViewModel.anomalyArmed), and the Void Anomaly's live gain lifts it
+     * further while the duck is actually audible (see PulsarVizData.voidGain).
+     */
+    highlight: Float = 0f,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val backgroundColor by animateColorAsState(
+        targetValue = lerp(
+            OrpheusColors.darkVoid.copy(alpha = 0.6f),
+            OrpheusColors.cosmicPurple,
+            highlight.coerceIn(0f, 1f),
+        ),
+        animationSpec = tween(200),
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -92,9 +111,12 @@ private fun <T> EnumDropdown(
 
         Box(
             modifier = Modifier
-                .clickable { expanded = true }
+                .combinedClickable(
+                    onClick = { expanded = true },
+                    onLongClick = onLongPress,
+                )
                 .clip(RoundedCornerShape(6.dp))
-                .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
+                .background(backgroundColor)
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -183,6 +205,12 @@ fun PulsarPanel(
             verticalAlignment = Alignment.Top,
         ) {
             val vibeList = remember { pulsar.vibeList }
+            // The manual anomaly trigger arms the Void Anomaly (equivalent to the
+            // ENDING pill's outro arm); the dropdown tints cosmicPurple while armed
+            // so the user knows the trigger took effect. Once the duck actually
+            // starts, voidGain (live from the C++ audio thread) dips below 1 and
+            // deepens the tint further — it breathes back as the mix returns.
+            val anomalyArmed by actions.anomalyArmed.collectAsState()
             EnumDropdown(
                 modifier = Modifier.widthIn(max = 120.dp),
                 label = "VIBE",
@@ -191,6 +219,8 @@ fun PulsarPanel(
                 displayName = { it.name },
                 onSelected = { actions.setVibe(it) },
                 color = OrpheusColors.cosmicPurple,
+                onLongPress = actions.onTriggerAnomaly,
+                highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - vizData.voidGain),
             )
 
             EnumDropdown(

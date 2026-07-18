@@ -30,12 +30,14 @@ class MainActivity : ComponentActivity() {
 
         val graph = (application as DjAppApplication).graph
 
-        // Keep screen on only while an audio source is active (timer, Pulsar, etc.).
-        // When all sources stop (e.g. sleep timer finishes), the flag is cleared
-        // so the device can sleep.
+        // Keep screen on only while actively playing. Cleared on pause/stop so
+        // the OS screen timeout applies normally. NOTE: this is intentionally
+        // narrower than isMediaSessionNeeded (which stays true across Paused,
+        // e.g. Pulsar/Timer, so notification controls keep working) — the
+        // screen should not stay awake just because the media session is alive.
         lifecycleScope.launch {
-            graph.mediaSessionStateManager.isMediaSessionNeeded.collect { needed ->
-                if (needed) {
+            graph.playbackController.state.collect { state ->
+                if (state == PlaybackState.Playing) {
                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 } else {
                     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

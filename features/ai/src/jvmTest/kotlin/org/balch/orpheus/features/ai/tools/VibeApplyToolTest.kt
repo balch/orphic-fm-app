@@ -6,8 +6,12 @@ import kotlinx.serialization.json.Json
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.Lick
+import org.balch.orpheus.features.pulsar.models.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
+import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
+import org.balch.orpheus.features.pulsar.models.VoidAnomaly
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.TremoloTideVibe
 import kotlin.test.Test
@@ -91,6 +95,36 @@ class VibeApplyToolTest {
             """{"density":0.3,"compingStyle":{"type":"org.balch.orpheus.features.pulsar.models.CompingStyle.ORGAN_PAD"}}""",
         )
         assertEquals(CompingStyle.PAD, tso.compingStyle)
+    }
+
+    @Test
+    fun `unknown anomaly type degrades to an auto-inert void instead of failing`() {
+        // The guide documents only the "void" and "lick" anomaly types, so an agent-invented one
+        // (e.g. {"type":"sweep"}) is a rare-hallucination path — but it must degrade, not crash
+        // the whole apply into the retry loop. InertVoidAnomalyDeserializer decodes it as a
+        // VoidAnomaly with probability zeroed: still declared (the manual anomaly trigger can
+        // fire it) but never auto-firing, so a hallucinated type cannot add surprise 4% voids.
+        val vibe = DogHouseVibe().vibe.copy(anomalies = listOf(VoidAnomaly(probability = 0.5f)))
+        val mangled = vibeApplyJson.encodeToString(vibe)
+            .replace("\"type\":\"void\"", "\"type\":\"sweep\"")
+        val result = decodeVibe(vibeApplyJson, mangled)
+        assertTrue(result.isSuccess, "decode failed: ${result.exceptionOrNull()?.message}")
+        val anomaly = result.getOrThrow().anomalies.single()
+        assertTrue(anomaly is VoidAnomaly, "expected the VoidAnomaly fallback, got $anomaly")
+        assertEquals(0f, anomaly.probability, "fallback void must be auto-inert (probability 0)")
+    }
+
+    @Test
+    fun `known anomaly types still decode exactly`() {
+        // The fallback must not swallow the real subtypes — round-trip a declared void + lick pair.
+        val lick = Lick(listOf(LickStep(0, 0.5f)), loopLength = 8)
+        val vibe = DogHouseVibe().vibe.copy(
+            lick = lick,
+            anomalies = listOf(VoidAnomaly(probability = 0.2f), LickAnomaly(lick = lick, chance = 0.3f)),
+        )
+        val result = decodeVibe(vibeApplyJson, vibeApplyJson.encodeToString(vibe))
+        assertTrue(result.isSuccess, "decode failed: ${result.exceptionOrNull()?.message}")
+        assertEquals(vibe.anomalies, result.getOrThrow().anomalies)
     }
 
     @Test

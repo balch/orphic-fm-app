@@ -101,9 +101,17 @@ inline void render_drum_lead(const BandSoloConfigParam& config,
         sc, lick, lick_len, complexity, role, seed);
 
     if (style == DrumLeadStyle::BREAK) {
-        // Duck the melodic tracks for the span — clear every MELODIC track's steps.
+        // Duck the OTHER melodic voices — clear every MELODIC track's steps,
+        // but exempt the lead member's own tracks. Without this, an all-Melodic
+        // vibe (no PERCUSSIVE tracks) wipes the drum member's just-rendered
+        // rhythm too, collapsing the whole sequencer to silence.
         for (int t = 0; t < num_tracks; t++) {
             if (tracks[t].role != TrackRole::MELODIC) continue;
+            bool is_lead_track = false;
+            for (int k = 0; k < dm.track_count; k++) {
+                if (dm.tracks[k] == t) { is_lead_track = true; break; }
+            }
+            if (is_lead_track) continue;
             for (int i = 0; i < tracks[t].step_count; i++)
                 tracks[t].steps[i] = make_step(0, 0.0f, false, 0.0f);
         }

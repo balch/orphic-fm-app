@@ -8,6 +8,7 @@
 #include "pulsar_solo.h"
 #include "pulsar_band_solo.h"
 #include "pulsar_lick_techniques.h"
+#include "pulsar_lick_select.h"
 #include "pulsar_handoff.h"
 #include "pulsar_mod_ranges.h"
 #include "pulsar_comping.h"
@@ -636,6 +637,51 @@ static void reload_vibe_tension(OrpheusEngine* engine, PulsarState* state) {
         state->tension.track_evo_weight[i] = engine->pulsar_track_evo_weight[i].load(std::memory_order_relaxed);
 }
 
+// Copy lick-pool slot `idx` into the active lick buffers (state->lick / original_lick).
+// Resets drift so the swapped lick starts from its pristine form.
+static void apply_pool_lick(PulsarState* state, int idx) {
+    int len = state->lick_pool_len[idx];
+    if (len > kMaxLickSteps) len = kMaxLickSteps;
+    state->lick_length = len;
+    state->lick_loop_length = (state->lick_pool_loop[idx] > 0) ? state->lick_pool_loop[idx] : len;
+    for (int i = 0; i < len; i++) state->lick[i] = state->lick_pool[idx][i];
+    std::memcpy(state->original_lick, state->lick, sizeof(PulsarLickStep) * len);
+    state->in_spurt = false;
+    state->spurt_bars_remaining = 0;
+}
+
+// Re-render all FILL/Squash melodic tracks from state->lick — used after a rotation or
+// anomaly swap. Mirrors the déjà-vu render loop (orpheus_unit_pulsar.cpp:2414-2435):
+// derives root/scale/note-range/step-count from the live engine atomics.
+static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, uint32_t seed) {
+    if (state->lick_length <= 0) return;
+    int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+    if (si < 0) si = 0;
+    if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
+    const PulsarScale& scale = kPulsarScales[si];
+    uint8_t root  = static_cast<uint8_t>(engine->pulsar_root_note.load(std::memory_order_relaxed));
+    uint8_t rg_lo = static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed));
+    uint8_t rg_hi = static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed));
+    int step_count_cfg = engine->pulsar_step_count.load(std::memory_order_relaxed);
+    if (step_count_cfg <= 0) step_count_cfg = 16;
+    if (step_count_cfg > kMaxPulsarSteps) step_count_cfg = kMaxPulsarSteps;  // guard ts.steps[kMaxPulsarSteps]
+    float eff_mutation = state->in_spurt
+        ? std::min(1.0f, state->lick_mutation * 3.0f) : state->lick_mutation;
+    for (int rt = 0; rt < kNumPulsarTracks; rt++) {
+        PulsarTrackState& rts = state->tracks[rt];
+        TrackRole r_role = static_cast<TrackRole>(engine->pulsar_track_role[rt].load(std::memory_order_relaxed));
+        if (r_role == TrackRole::PERCUSSIVE) continue;
+        LickMode r_lick_mode = static_cast<LickMode>(
+            engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
+        if (r_lick_mode == LickMode::NONE) continue;
+        render_lick_into_track(rts, rt, state->lick, state->lick_length,
+                               eff_mutation, root, scale, seed,
+                               rts.bar_strategy, step_count_cfg, state->lick_octave,
+                               rg_lo, rg_hi, state->lick_loop_length,
+                               engine->pulsar_track_lick_degree_offset[rt].load(std::memory_order_relaxed));
+    }
+}
+
 // ── Vibe loading (reads recipe from engine atomics) ─────────────────
 
 static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
@@ -694,6 +740,23 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // previous vibe left behind.
     state->mutation_seed = base_seed;
 
+    // Void RNG: always stir from the wall clock so the anomaly's occurrence
+    // varies per play, independent of the (possibly pinned) pattern seed.
+    {
+        uint64_t vstir = static_cast<uint64_t>(
+            std::chrono::steady_clock::now().time_since_epoch().count());
+        state->void_seed = base_seed ^ static_cast<uint32_t>(vstir * 0x9E3779B9u) ^ 0xA5A5A5A5u;
+    }
+
+    // Lick-select RNG: play-scoped, independent of the pattern seed AND void_seed, so
+    // Fire Sky .5f rotation + anomaly vary per play. Distinct salt from void_seed.
+    {
+        uint64_t lstir = static_cast<uint64_t>(
+            std::chrono::steady_clock::now().time_since_epoch().count());
+        state->lick_select_seed = base_seed ^ static_cast<uint32_t>(lstir * 0x2545F491u) ^ 0x5A5A5A5Au;
+        if (state->lick_select_seed == 0) state->lick_select_seed = 0x1234567u;  // xorshift needs nonzero
+    }
+
     // Snap macro smoothers to the current engine atomics so the new vibe's
     // very first render block uses new-vibe macros (no ~10ms cross-fade from
     // the old vibe's smoothed values). Pattern decisions made on bar 1 read
@@ -738,6 +801,34 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->in_spurt = false;
     state->spurt_bars_remaining = 0;
     state->lick_octave = engine->pulsar_lick_octave.load(std::memory_order_relaxed);
+
+    // Fire Sky .5f lick pool: rotation members + optional anomaly lick. When present
+    // (pool_count > 0), pick an initial rotation member and override the single lick.
+    int pool_count = engine->pulsar_lick_pool_count.load(std::memory_order_acquire);
+    if (pool_count > kMaxLickPool) pool_count = kMaxLickPool;
+    state->lick_pool_count = pool_count;
+    if (pool_count > 0) {
+        state->lick_anomaly_index  = engine->pulsar_lick_anomaly_index;
+        state->lick_anomaly_chance = engine->pulsar_lick_anomaly_chance;
+        for (int s = 0; s < kMaxLickPool; s++) {
+            int plen = engine->pulsar_lick_pool_len[s];
+            if (plen > kMaxLickSteps) plen = kMaxLickSteps;
+            state->lick_pool_len[s]  = plen;
+            state->lick_pool_loop[s] = engine->pulsar_lick_pool_loop[s];
+            for (int i = 0; i < plen; i++) {
+                int b = s * (kMaxLickSteps * kLickFieldsPerStep) + i * kLickFieldsPerStep;
+                state->lick_pool[s][i].scale_degree = static_cast<int8_t>(engine->pulsar_lick_pool_data[b + 0]);
+                state->lick_pool[s][i].duration     = engine->pulsar_lick_pool_data[b + 1];
+                state->lick_pool[s][i].velocity     = engine->pulsar_lick_pool_data[b + 2];
+                state->lick_pool[s][i].glide_rate   = engine->pulsar_lick_pool_data[b + 3];
+            }
+        }
+        state->active_rotation_index = lick_pick_rotation(state->lick_select_seed, pool_count);
+        state->current_lick_index = state->active_rotation_index;
+        apply_pool_lick(state, state->active_rotation_index);  // overrides state->lick
+    } else {
+        state->current_lick_index = -1;
+    }
 
     int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
     int scale_idx = engine->pulsar_scale_index.load(std::memory_order_relaxed);
@@ -1351,10 +1442,38 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->arr_viz_section_index.store(-1, std::memory_order_relaxed);
     }
 
+    // Void Anomaly config bank [prob, floor, rampDown, floorMin, floorMax, rampUp, ghost].
+    // Loaded unconditionally (independent of arr_active), but today the void only
+    // ARMS (auto and manual) while an arrangement is active — see the section-
+    // advancement block below. Arming a locked-length pattern off its own loop as
+    // the "section" is a possible future extension, not current behavior.
+    state->void_config.probability     = engine->pulsar_void_data[0].load(std::memory_order_relaxed);
+    state->void_config.floor_level     = engine->pulsar_void_data[1].load(std::memory_order_relaxed);
+    state->void_config.ramp_down_bars  = engine->pulsar_void_data[2].load(std::memory_order_relaxed);
+    state->void_config.floor_bars_min  = engine->pulsar_void_data[3].load(std::memory_order_relaxed);
+    state->void_config.floor_bars_max  = engine->pulsar_void_data[4].load(std::memory_order_relaxed);
+    state->void_config.ramp_up_bars    = engine->pulsar_void_data[5].load(std::memory_order_relaxed);
+    state->void_config.ghost_intensity = engine->pulsar_void_data[6].load(std::memory_order_relaxed);
+    // [7] is the explicit "this vibe declares the void anomaly" flag (Kotlin pushes
+    // 1.0 when Vibe.anomalies contains a VoidAnomaly, 0.0 otherwise). The manual trigger
+    // only arms the void when this is set — no default-shape fallback for undeclared vibes.
+    state->void_declared = engine->pulsar_void_data[7].load(std::memory_order_relaxed) > 0.5f;
+    void_reset(state->void_state);
+    // PulsarState (and VoidAnomaly's default member initializer) is only constructed
+    // once for the life of the engine, not per vibe load -- so a void that was
+    // mid-duck when the vibe changed would otherwise leave gain_smoothed stuck below
+    // 1.0 and the new vibe's first blocks would start artificially quiet. A vibe
+    // switch already hard-cuts/reinitializes the rest of the audio state, so snap
+    // this back to full too rather than gliding it (nothing to click against).
+    state->void_state.gain_smoothed = 1.0f;
+
     // Clear any stale outro request so a request from a prior vibe does not
     // bleed into the new arrangement. Placed after arrangement loading so that
     // it always runs regardless of whether arr_active is set.
     engine->pulsar_arrangement_outro_request.store(0, std::memory_order_relaxed);
+    engine->pulsar_anomaly_request.store(0, std::memory_order_relaxed);
+    state->prev_anomaly_request = 0;
+    state->force_lick_anomaly = false;  // per-vibe hygiene: no forced anomaly carries over
 
     state->current_vibe_generation = generation;
     state->last_root_note = root;
@@ -1500,6 +1619,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memset(engine->pulsar_delay_send_r, 0, num_frames * sizeof(float));
         std::memset(engine->pulsar_reverb_send_l, 0, num_frames * sizeof(float));
         std::memset(engine->pulsar_reverb_send_r, 0, num_frames * sizeof(float));
+        // Report the void glow as idle while paused/muted: this return sits above the
+        // void-gain pre-pass and its viz write, so without these two lines a pause
+        // mid-duck freezes the Kotlin VIBE-dropdown tint at the ring's last (ducked)
+        // sample until resume. A pause is an audio gap, so snapping gain_smoothed to
+        // 1.0 is inaudible -- and on resume the pre-pass slew re-glides it down to
+        // the still-armed arc's target, so the snap can't click on either edge.
+        // (`state` is always non-null here: the lazy-init block above allocated it.)
+        state->void_state.gain_smoothed = 1.0f;
+        engine->viz_rings[VIZ_PULSAR_VOID_GAIN].write(1.0f);
         return;
     }
 
@@ -1640,6 +1768,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     samples_per_step *= (1.0 + static_cast<double>(state->tempo_drift));
 
+    // Void cursor: fractional steps elapsed in the current section. Advances at the
+    // sequencer rate so the end-aligned arc stays locked to the section boundary.
+    double void_cursor_start = state->void_state.cursor;
+    state->void_state.cursor += static_cast<double>(num_frames) / samples_per_step;
+
     // ── Zero output buffers ──
     std::memset(out_l, 0, num_frames * sizeof(float));
     std::memset(out_r, 0, num_frames * sizeof(float));
@@ -1711,6 +1844,53 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
     }
+
+    // Precompute the per-sample void gain for this block (all tracks share it),
+    // and the block-level note-on suppression flag. The raw target (1.0f when idle /
+    // not armed, void_arc_gain(...) when armed) is slewed with a max-delta clamp
+    // (gain_smoothed on VoidAnomaly) so ghost-bar steps and section-boundary resets
+    // glide instead of stepping -- see pulsar_void.h. Cheap fast-path when idle AND
+    // already settled at 1.0 keeps the steady-state (void never used) cost a plain
+    // fill; the idle-but-not-settled case (gliding back after a reset) still slews.
+    float void_gain_buf[kMaxFrames];
+    {
+        const VoidAnomaly& vz = state->void_state;
+        bool active = vz.armed;
+        const float max_step = void_gain_max_step_per_sample(sample_rate);
+        float g = state->void_state.gain_smoothed;
+        if (!active && std::fabs(g - 1.0f) < 1e-4f) {
+            for (int i = 0; i < num_frames; i++) void_gain_buf[i] = 1.0f;
+            state->void_state.gain_smoothed = 1.0f;
+            state->void_state.suppress_note_ons = false;
+        } else if (!active) {
+            for (int i = 0; i < num_frames; i++)
+                void_gain_buf[i] = g = slew_toward(g, 1.0f, max_step);
+            state->void_state.gain_smoothed = g;
+            state->void_state.suppress_note_ons = false;
+        } else {
+            double inc = 1.0 / samples_per_step;
+            double cur = void_cursor_start;
+            bool susp_mid = false;
+            for (int i = 0; i < num_frames; i++) {
+                bool s = false;
+                float target = void_arc_gain(vz, static_cast<float>(cur - vz.start_step), &s);
+                void_gain_buf[i] = g = slew_toward(g, target, max_step);
+                if (i == num_frames / 2) susp_mid = s;
+                cur += inc;
+            }
+            state->void_state.gain_smoothed = g;
+            state->void_state.suppress_note_ons = susp_mid;
+            // Disarm once the arc has fully played out (gain back to 1.0).
+            if (void_cursor_start - vz.start_step >= vz.ramp_up_end)
+                state->void_state.armed = false;
+        }
+    }
+
+    // Publish this block's void gain to the UI viz ring (1.0 when idle/not armed).
+    // Rides the same lock-free per-channel VizRing transport as the per-track
+    // levels below (VIZ_PULSAR_TRACK_0+t) — the Kotlin VIBE-dropdown glow polls
+    // this at the same ~60fps cadence instead of approximating off a fixed timer.
+    engine->viz_rings[VIZ_PULSAR_VOID_GAIN].write(void_gain_buf[num_frames - 1]);
 
     // ── Per-track: advance sequencer + render voice ──
     float track_buffer[kMaxFrames];
@@ -1901,6 +2081,21 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         state->section_state.outro_triggered = true;
                     }
 
+                    // Anomaly Engine: edge-detect the manual trigger counter and fire every
+                    // anomaly this vibe DECLARES. A vibe with no declared anomaly ignores the
+                    // gesture entirely (no default fallback). Registry point: future anomaly
+                    // types (scratch/tape/sweep) add their declared-check + fire here.
+                    int anomaly_req = engine->pulsar_anomaly_request.load(std::memory_order_acquire);
+                    if (anomaly_req != state->prev_anomaly_request) {
+                        state->prev_anomaly_request = anomaly_req;
+                        if (state->void_declared && !state->void_state.armed) {
+                            arm_void_manual(state->void_state, state->void_config, state->void_seed);
+                        }
+                        if (state->lick_pool_count > 0 && state->lick_anomaly_index >= 0) {
+                            state->force_lick_anomaly = true;   // one-shot; consumed at the next lick resolve
+                        }
+                    }
+
                     int prev_sec = state->section_state.current_section;  // outgoing section
                     bool section_changed = advance_section(
                         state->section_state, state->arrangement, state->mutation_seed);
@@ -2043,6 +2238,34 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 ? static_cast<ArpModeId>(per_track)
                                 : state->tracks[t].default_arp_mode;
                             state->tracks[t].arp_mode = target;
+                        }
+
+                        // Void Anomaly: snapshot section length (in steps) and roll
+                        // the auto trigger, end-aligned to the boundary.
+                        void_reset(state->void_state);
+                        state->section_total_steps =
+                            static_cast<float>(state->section_state.bars_remaining) *
+                            static_cast<float>(state->tracks[0].step_count);
+                        arm_void_auto(state->void_state, state->void_config,
+                                      state->section_total_steps, state->void_seed);
+                    }
+
+                    // ── Fire Sky .5f: per-section rotation + rare anomaly override ──
+                    // lick_resolve_desired re-rolls rotation on section change, rolls the
+                    // anomaly every statement (inert until a vibe sets anomaly_index >= 0),
+                    // and returns the winning bank slot. force_lick_anomaly (Anomaly Engine
+                    // manual trigger) is a one-shot override consumed here regardless of
+                    // whether it actually changed the slot. Swap + re-render only on change.
+                    if (state->lick_pool_count > 0) {
+                        int desired = lick_resolve_desired(
+                            state->lick_select_seed, section_changed, state->lick_pool_count,
+                            state->lick_anomaly_index, state->lick_anomaly_chance,
+                            state->active_rotation_index, state->force_lick_anomaly);
+                        state->force_lick_anomaly = false;
+                        if (desired != state->current_lick_index) {
+                            apply_pool_lick(state, desired);
+                            state->current_lick_index = desired;
+                            regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u);
                         }
                     }
 
@@ -2445,6 +2668,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             const PulsarStep& step = ts.steps[ts.playhead];
 
             if (step.gate) {
+                // Void Anomaly floor: mute new note-ons (sounding voices ring on).
+                if (state->void_state.suppress_note_ons) {
+                    ts.prev_step_gated = false;
+                    ts.in_hold = false;
+                    continue;
+                }
                 // Hold continuation: previous step had hold=true, extend gate without retrigger
                 if (ts.in_hold) {
                     float drunk = state->drunk_offsets[t][ts.playhead];
@@ -3274,7 +3503,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         for (int i = 0; i < num_frames; i++) {
-            float s = track_buffer[i] * vol;
+            float s = track_buffer[i] * vol * void_gain_buf[i];
             out_l[i] += s * pan_l;
             out_r[i] += s * pan_r;
             // Also accumulate into the per-bus buffer
@@ -3297,7 +3526,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         if (delay_send_amt > 0.001f || reverb_send_amt > 0.001f) {
             for (int i = 0; i < num_frames; i++) {
-                float s = track_buffer[i] * vol;
+                float s = track_buffer[i] * vol * void_gain_buf[i];
                 if (delay_send_amt > 0.001f) {
                     engine->pulsar_delay_send_l[i] += s * pan_l * delay_send_amt;
                     engine->pulsar_delay_send_r[i] += s * pan_r * delay_send_amt;

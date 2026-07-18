@@ -1,5 +1,7 @@
 package org.balch.orpheus.features.ai.tools
 
+import org.balch.orpheus.features.pulsar.models.LickAnomaly
+import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
 import kotlin.test.Test
@@ -57,6 +59,18 @@ class VibeGuideToolTest {
         val withLick = dogHouse.copy(lick = FireSkyVibe().vibe.lick)
         assertTrue(FireSkyVibe().vibe.lick != null, "precondition: Fire Sky has a lick to borrow")
         assertTrue(vibeFingerprint(withLick).contains("· lick"), "lick segment missing when lick present")
+    }
+
+    @Test
+    fun `fingerprint includes lick-rotation and anomalies segments`() {
+        val l = FireSkyVibe().vibe.lick!!
+        val withRotation = dogHouse.copy(
+            lickRotation = LickRotation(pool = listOf(l, l)),
+            anomalies = listOf(LickAnomaly(lick = l, chance = 0.2f)),
+        )
+        val fp = vibeFingerprint(withRotation)
+        assertTrue(fp.contains("lick-rotation(2)"), "lick-rotation segment missing/incorrect: $fp")
+        assertTrue(fp.contains("anomalies[lick]"), "anomalies segment missing/incorrect: $fp")
     }
 
     @Test

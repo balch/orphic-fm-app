@@ -73,3 +73,32 @@ sealed class LickMode {
     @Serializable
     data object Fill : LickMode()
 }
+
+/**
+ * A pool of licks a vibe rotates between. When set on [Vibe.lickRotation], the engine picks a
+ * [pool] member per section, so the riff varies section to section instead of repeating forever.
+ * A null [Vibe.lickRotation] leaves the single [Vibe.lick] playing, unchanged.
+ *
+ * Rotation is NORMAL, always-on behavior driven at section boundaries, so the vibe needs an
+ * arrangement; without one, the pool falls back to a single load-time pick. The rare "swap in an
+ * original riff" event that used to live here is now a [LickAnomaly] in [Vibe.anomalies].
+ */
+@Serializable
+data class LickRotation(
+    val pool: List<Lick>,
+) {
+    init {
+        require(pool.isNotEmpty()) { "LickRotation.pool must not be empty" }
+        require(pool.size <= MAX_LICK_POOL) {
+            "LickRotation.pool (${pool.size}) exceeds MAX_LICK_POOL=$MAX_LICK_POOL"
+        }
+    }
+
+    companion object {
+        /**
+         * Max bank slots. Bounds `pool` PLUS any [LickAnomaly] lick sharing the C++ lick bank
+         * (validated together in [Vibe.init]). MUST equal C++ kMaxLickPool.
+         */
+        const val MAX_LICK_POOL = 4
+    }
+}

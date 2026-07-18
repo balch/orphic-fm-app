@@ -27,7 +27,7 @@ private val PULSAR_FULL_RING = listOf(
     PickerEntry("SM",   6, OrpheusColors.engineOrange.copy(alpha = 0.8f)),
 )
 
-// V1.2 engines (C++ only) — double-click easter egg ring, using C++ indices.
+// V1.2 engines (C++ only) — extended ring, using C++ indices.
 // Also includes 4 Braids character engines (ids 105-108).
 private val PULSAR_V2_RING = listOf(
     PickerEntry("VCF",  0, OrpheusColors.engineRed),       // VirtualAnalogVCF
@@ -47,7 +47,7 @@ private val PULSAR_V2_RING = listOf(
 
 val PULSAR_V2_PICKER = PickerConfig(PULSAR_V2_RING, "V2", -1)
 
-// Braids chord engines (triple-click ring, ids 100..104).
+// Braids chord engines (extended ring, ids 100..104).
 private val PULSAR_V3_RING = listOf(
     PickerEntry("3SAW", 100, OrpheusColors.engineRed),
     PickerEntry("3SQR", 101, OrpheusColors.enginePurple),
@@ -58,7 +58,7 @@ private val PULSAR_V3_RING = listOf(
 
 val PULSAR_V3_PICKER = PickerConfig(PULSAR_V3_RING, "CHD", -1)
 
-// Chaos / fractal engines (quad-click ring, ids 200..204).
+// Chaos / fractal engines (extended ring, ids 200..204).
 private val PULSAR_V4_RING = listOf(
     PickerEntry("LRZ", 200, OrpheusColors.engineBlue),
     PickerEntry("ROS", 201, OrpheusColors.synthGreen),

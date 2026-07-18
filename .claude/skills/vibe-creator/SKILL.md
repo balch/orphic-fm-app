@@ -10,7 +10,7 @@ A Vibe is a complete Pulsar preset: 8 tracks, tempo, key, macro defaults, sectio
 ## Where vibes live
 
 - Source: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/<Name>Vibe.kt`
-- Schema (every type you will reference): the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — **one file per type**, not a single `PulsarVibe.kt` (that file does not exist). The top-level `Vibe` data class plus the `RootNote` / `ScaleType` / `EnvelopeType` / `Album` enums live in `models/Vibe.kt`; the rest are siblings (`OrpheusEngine.kt`, `TrackVoice.kt`, `TrackRole.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Lick.kt`, `ChordStep.kt`, `Band.kt`, `TensionProfile.kt`, `VibeEffects.kt`, `Arrangement.kt`, `MacroTarget.kt`, `Evolution.kt`, `EnvelopeProfile.kt`, `SoloBehavior.kt`, `VibeProvider.kt`).
+- Schema (every type you will reference): the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — **one file per type**, not a single `PulsarVibe.kt` (that file does not exist). The top-level `Vibe` data class plus the `RootNote` / `ScaleType` / `EnvelopeType` / `Album` enums live in `models/Vibe.kt`; the rest are siblings (`OrpheusEngine.kt`, `TrackVoice.kt`, `TrackRole.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Lick.kt`, `ChordStep.kt`, `Band.kt`, `TensionProfile.kt`, `VibeEffects.kt`, `Arrangement.kt`, `Anomaly.kt`, `LickAnomaly.kt`, `VoidAnomaly.kt`, `MacroTarget.kt`, `Evolution.kt`, `EnvelopeProfile.kt`, `SoloBehavior.kt`, `VibeProvider.kt`).
 - Canonical quality benchmark: `DogHouseVibe.kt` — after any Pulsar change, test this vibe first; a new vibe should feel at least as coherent and musical.
 
 Registration is automatic via Metro DI — each vibe class carries `@Inject` and `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())`, and `PulsarViewModel` receives `Set<VibeProvider>` in its constructor. **No extra registration file, DI module, or list edit is required** — dropping a correctly-annotated file into the `vibes/` directory is enough.
@@ -282,6 +282,18 @@ A repeating melodic figure that a track can snap to. Used by tracks whose role i
 - `lickMutation` on the Vibe (0-1): how much the lick drifts on repeats. 0 = static (mechanical/industrial), 1 = wide drift (jazz, improv).
 - `lickOctave`: -1 for auto, or explicit 0-8. Use when you want the lick to sit in a specific octave regardless of the track's note range.
 
+### `LickRotation` — rotating between licks (optional)
+
+Instead of one static `lick`, a vibe can hold a pool of licks and rotate between them per section. Set `Vibe.lickRotation = LickRotation(pool)`; while active it overrides the static `lick` (keep `lick` set as a fallback seed/load-time pick). Needs an `Arrangement` — rotation happens at section boundaries; without one the pool falls back to a single load-time pick.
+
+- `pool: List<Lick>` — the rotation members; the engine picks one per section (2–4 works well).
+- `MAX_LICK_POOL = 4` caps `pool.size` — plus one more shared slot if the vibe also declares a `LickAnomaly` (see the Anomalies section below): both ride the same C++ lick bank.
+- Copyright: if any pooled lick is a recognizable copyrighted riff, keep the vibe dev-only WIP — never LIVE.
+
+`LickRotation` is **pool-only** now. The rare "swap in an original riff" event that used to live here as `anomaly`/`anomalyChance` is now a **`LickAnomaly`** in `Vibe.anomalies` — configured, force-fired, and auto-rolled independently of the rotation pool (see the Anomalies section below).
+
+Working example: `FireSky05Vibe` in `FireSkyVibe.kt` (rotates `aiLick`/`tweakLick` via `lickRotation`, with a rare `ogLick` `LickAnomaly`).
+
 ### `Band` + `BandMember` + matrices (solos)
 
 The cast of characters for solos. Typically 4 members: Drummer (alwaysActive), Bassist, Keys/Lead, FX. Each member lists which `tracks` it owns.
@@ -362,6 +374,54 @@ The same pattern works with `COMPLEXITY` source — see `ArmyStompVibe.kt` track
 
 This pattern only works on `DX`/`DX2`/`DX3` engines (the quantizer is what makes the smooth macro sweep land on discrete voices). On continuous engines it does nothing.
 
+### Anomalies (`Vibe.anomalies` — the Anomaly Engine)
+
+`anomalies: List<Anomaly> = emptyList()` on `Vibe` — a **sealed list** of rare, dramatic events the Anomaly Engine may fire. `Anomaly` is a `sealed interface` (`models/Anomaly.kt`); each concrete subtype carries a kotlinx `"type"` discriminator and auto-fires on its own probability/chance, so anomalies surface on their own, rarely, as a surprise. **At most one instance of each concrete type** (`Vibe.init` enforces this). **Both subtypes require an `arrangement`** — they only arm while a section graph is active, which also gates the manual trigger below.
+
+**Manual trigger** (long-press on the VIBE dropdown): force-fires every anomaly the vibe **declares**, all at once, at the next musical bar. This is declared-only — there is no config-or-default fallback: a vibe with an **empty** `anomalies` list ignores the trigger entirely (no highlight, no counter bump).
+
+#### `VoidAnomaly` — `{"type": "void", ...}`
+
+A rare, dramatic breath: the whole mix eases down to near-silence, holds a suppressed floor for a bar or two — optionally with one "ghost bar" of the full arrangement flickering through — then swells back up, end-aligned to the section boundary on auto-fire. Reverb/delay tails ring out into the quiet (the duck is inside the sequencer, not the reverb returns). Durations are in **musical bars** (16 steps).
+
+- `probability`: chance the void auto-fires at each section entry (0-1). Keep it low (0.02-0.06); ship default `0.04`. Set `0` to leave only the manual trigger. (Higher only for testing.)
+- `floorLevel`: mix gain at the bottom of the dip (0-1). `0.05` = near-silent; `0.15-0.3` = a gentler duck.
+- `rampDownBars` / `rampUpBars`: musical bars to ease down to the floor and to swell back up (defaults `1.0` / `1.5`).
+- `floorBarsMin` / `floorBarsMax`: the near-quiet hold length, drawn per occurrence (defaults `1.0` / `2.0`).
+- `ghostIntensity`: `0` = clean silent void; `>0` punches one bar of the full arrangement through the middle of the floor at that gain (`1.0` = full flash, `0.3` = distant echo). Default `0.5`.
+
+Best on ambient / spacey / cinematic vibes where a rare void adds drama; skip it on relentless dance grooves.
+
+#### `LickAnomaly` — `{"type": "lick", "lick": {...}, "chance": 0.02}`
+
+A rare one-statement swap-in of `lick` (e.g. an original riff) over whatever lick is otherwise playing — a "the record remembers" moment. On each ~2-bar statement the engine may swap in `lick` with probability `chance`, then reverts.
+
+- `lick`: the `Lick` to swap in — see the `Lick` section above for the step schema.
+- `chance` (0-1, default `0.02`): per-~2-bar-statement swap probability. `0.02` ≈ 1-in-50 (genuinely rare); keep it low so it stays a surprise.
+
+Requires the vibe to have a lick source — either its own `lick` or a `lickRotation` pool (`Vibe.init` enforces this). The anomaly lick rides the **same C++ lick bank as the `LickRotation` pool**, occupying the slot past the pool, so `lickRotation.pool.size + 1` must fit `LickRotation.MAX_LICK_POOL` (4) — also enforced by `Vibe.init`.
+
+#### Authoring shape
+
+```kotlin
+Vibe(
+    // ...
+    lickRotation = LickRotation(pool = listOf(aiLick, tweakLick)),
+    anomalies = listOf(
+        VoidAnomaly(probability = 0.04f, floorLevel = 0.05f, ghostIntensity = 0.5f),
+        LickAnomaly(lick = ogLick, chance = 0.02f),
+    ),
+)
+```
+
+Omit the field, or pass `emptyList()` (the default), for a vibe with no anomalies — the manual gesture then does nothing.
+
+#### Roadmap
+
+The sealed interface is the extension point: future dramatic events (Scratch / Tape / Sweep) join as new `@SerialName` subtypes with their own config fields, no changes needed to `Vibe` or the manual-trigger dispatch.
+
+(Kept in sync with `VibeGuide.kt`'s `STATIC_GUIDE` section 9.)
+
 ## Translation recipes — reference -> parameter choices
 
 When a user gives a musical reference, decompose it along these axes:
@@ -383,6 +443,8 @@ When a user gives a musical reference, decompose it along these axes:
 - **Dry / in-your-face** -> `space <= 0.3`, `reverbSize <= 0.35`, `reverbSend` sparse.
 - **Distorted / gritty** -> `WSH` engine on bass and lead, higher `harmonics` and `timbre`.
 - **Clean / polished** -> `VA`, `PD`, `CHD` engines; moderate harmonics.
+- **Rare void / breakdown (drops to near-silence and swells back)** -> add a `VoidAnomaly(probability = 0.04, floorLevel = 0.05, ghostIntensity = 0.5)` (a ghost of the arrangement flickers through) to `anomalies`; needs an `arrangement`. See the Anomalies section above.
+- **Rare original-riff flash / "the record remembers" moment** -> add a `LickAnomaly(lick = ogLick, chance = 0.02)` to `anomalies` alongside a `LickRotation` pool; needs a lick source and an `arrangement`. See the Anomalies section above.
 
 ### Energy / drums
 - **4-on-the-floor kick** -> `RhythmPattern.FOUR_ON_FLOOR`, kick `density ~= 0.5`, `BarStrategy.REPEAT`.
@@ -401,6 +463,7 @@ When a user gives a musical reference, decompose it along these axes:
 - **Repetitive 2-note riff** (garage rock, industrial): 2 steps x several pulses with low `lickMutation`. See the currently-commented `GarageBlitzVibe` in `GarageBlitzVibe.kt`.
 - **Walking bass line**: longer lick with varied scale degrees, `loopLength` matches phrase length, moderate `lickMutation`.
 - **Static drone with occasional embellishment**: single-note lick with long duration, low velocity on the accents, `chordFollow = FIXED`.
+- **Rotating riff for variety** (keep a repetitive riff from wearing out): a `lickRotation.pool` of 2–4 licks the engine swaps per section; for a rare surprise line, add a `LickAnomaly` to `anomalies` alongside it (see the Anomalies section above). See `FireSky05Vibe`.
 
 ### Doubled-role instrumentation (two drummers, two basses, etc.)
 

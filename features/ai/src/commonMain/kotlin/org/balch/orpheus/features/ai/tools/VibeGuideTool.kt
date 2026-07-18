@@ -10,7 +10,10 @@ import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.models.Anomaly
+import org.balch.orpheus.features.pulsar.models.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VoidAnomaly
 import kotlin.math.roundToInt
 
 /**
@@ -18,6 +21,12 @@ import kotlin.math.roundToInt
  * codebase's roundToInt idiom (cf. DistortionPanel's `(x * 100).roundToInt() / 100.0`).
  */
 internal fun oneDecimal(f: Float): String = ((f * 10).roundToInt() / 10.0).toString()
+
+/** Short catalog tag for an anomaly, e.g. "void" / "lick". Mirrors each type's @SerialName. */
+internal fun anomalyTag(a: Anomaly): String = when (a) {
+    is VoidAnomaly -> "void"
+    is LickAnomaly -> "lick"
+}
 
 /**
  * One catalog line per vibe, auto-derived from its data — no curated blurbs. Segments are omitted
@@ -39,6 +48,10 @@ internal fun vibeFingerprint(vibe: Vibe): String {
         vibe.arrangement?.let { add("${it.sections.size} sections") }
         vibe.band?.let { add("band(${it.members.size})") }
         if (vibe.lick != null) add("lick")
+        vibe.lickRotation?.let { add("lick-rotation(${it.pool.size})") }
+        if (vibe.anomalies.isNotEmpty()) {
+            add("anomalies[" + vibe.anomalies.joinToString("/") { anomalyTag(it) } + "]")
+        }
     }
     return "${vibe.name} — " + parts.joinToString(" · ")
 }

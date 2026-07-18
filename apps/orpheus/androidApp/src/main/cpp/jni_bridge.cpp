@@ -1,6 +1,7 @@
 #include <jni.h>
 #include "OboeEngine.h"
 #include <cstring>
+#include <mutex>
 
 static OboeEngine sEngine;
 
@@ -9,13 +10,33 @@ static OboeEngine sEngine;
 // method is invoked from Oboe's error thread when the DSP engine is rebuilt.
 static JavaVM* sCallbackJvm = nullptr;
 static jobject sEngineRecreatedRunnable = nullptr;
+// Cached at registration on a real JNI thread. Resolving the method id from the
+// Oboe error thread would leak the jclass local ref (that thread is attached
+// manually, so its local refs are not reclaimed until DetachCurrentThread).
+static jmethodID sEngineRecreatedRun = nullptr;
+// Guards the three globals above. Registration (main thread) can delete the
+// global ref at the same moment Oboe's error thread is mid-upcall; without this
+// the error thread would call through a freed ref. The lock is held across the
+// upcall so the ref stays alive for its whole use. Oboe invokes the callback
+// without holding any of its own locks (atomics only), so there is no
+// lock-ordering hazard, and the Kotlin Runnable does not re-register the
+// callback, so a non-recursive mutex cannot self-deadlock.
+static std::mutex sCallbackMutex;
 
-static JNIEnv* attachToJvm() {
+// Attach the calling (Oboe error) thread to the JVM if it isn't already.
+// Sets *needsDetach so the caller can balance a fresh attach with a detach —
+// leaving a thread we attached permanently attached leaks its thread-local JNI
+// state and can crash the JVM if the thread later exits without detaching.
+static JNIEnv* attachToJvm(bool* needsDetach) {
+    *needsDetach = false;
     if (!sCallbackJvm) return nullptr;
     JNIEnv* env = nullptr;
     int status = sCallbackJvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (status == JNI_EDETACHED) {
-        sCallbackJvm->AttachCurrentThread(&env, nullptr);
+        if (sCallbackJvm->AttachCurrentThread(&env, nullptr) != 0) return nullptr;
+        *needsDetach = true;
+    } else if (status != JNI_OK) {
+        return nullptr;
     }
     return env;
 }
@@ -62,6 +83,7 @@ JNIEXPORT jint JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeLoadGraph(
         JNIEnv *env, jobject thiz, jbyteArray serialized) {
     jbyte* data = env->GetByteArrayElements(serialized, nullptr);
+    if (data == nullptr) return -200;  // OOM pinning the array; leave the graph untouched
     jsize len = env->GetArrayLength(serialized);
     jint result = sEngine.loadGraph(
         reinterpret_cast<const uint8_t*>(data),
@@ -248,7 +270,13 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetViz(
         JNIEnv *env, jobject thiz,
         jint channel, jfloatArray outBuf, jintArray lastReadPos) {
     jint* rp = env->GetIntArrayElements(lastReadPos, nullptr);
+    if (rp == nullptr) return 0;
     jfloat* buf = env->GetFloatArrayElements(outBuf, nullptr);
+    if (buf == nullptr) {
+        // Release the array we already pinned before bailing, else it leaks.
+        env->ReleaseIntArrayElements(lastReadPos, rp, JNI_ABORT);
+        return 0;
+    }
     int count = sEngine.getViz(channel, buf, env->GetArrayLength(outBuf), rp);
     env->ReleaseFloatArrayElements(outBuf, buf, 0);
     env->ReleaseIntArrayElements(lastReadPos, rp, 0);
@@ -327,7 +355,12 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetAutomation(
         jfloatArray jtimes, jfloatArray jvalues,
         jint count) {
     jfloat* times = env->GetFloatArrayElements(jtimes, nullptr);
+    if (times == nullptr) return;
     jfloat* values = env->GetFloatArrayElements(jvalues, nullptr);
+    if (values == nullptr) {
+        env->ReleaseFloatArrayElements(jtimes, times, JNI_ABORT);
+        return;
+    }
     sEngine.setAutomation(target, voiceIndex, times, values, count);
     env->ReleaseFloatArrayElements(jtimes, times, JNI_ABORT);
     env->ReleaseFloatArrayElements(jvalues, values, JNI_ABORT);
@@ -371,22 +404,41 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeIsTtsPlaying(
 JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetEngineRecreatedCallback(
         JNIEnv *env, jobject thiz, jobject runnable) {
+    // Resolve Runnable.run() here, on a valid JNI thread, before taking the lock
+    // (these lookups touch only local state).
+    jclass cls = (runnable != nullptr) ? env->GetObjectClass(runnable) : nullptr;
+    jmethodID run = (cls != nullptr) ? env->GetMethodID(cls, "run", "()V") : nullptr;
+    if (cls != nullptr) env->DeleteLocalRef(cls);
+
+    std::lock_guard<std::mutex> lock(sCallbackMutex);
     env->GetJavaVM(&sCallbackJvm);
     if (sEngineRecreatedRunnable) {
         env->DeleteGlobalRef(sEngineRecreatedRunnable);
         sEngineRecreatedRunnable = nullptr;
+        sEngineRecreatedRun = nullptr;
     }
-    if (runnable == nullptr) {
+    if (runnable == nullptr || run == nullptr) {
         sEngine.setEngineRecreatedCallback(nullptr);
         return;
     }
     sEngineRecreatedRunnable = env->NewGlobalRef(runnable);
+    sEngineRecreatedRun = run;
+
     sEngine.setEngineRecreatedCallback([]() {
-        JNIEnv* e = attachToJvm();
-        if (!e || !sEngineRecreatedRunnable) return;
-        jclass cls = e->GetObjectClass(sEngineRecreatedRunnable);
-        jmethodID run = e->GetMethodID(cls, "run", "()V");
-        if (run) e->CallVoidMethod(sEngineRecreatedRunnable, run);
+        bool needsDetach = false;
+        JNIEnv* e = attachToJvm(&needsDetach);
+        if (e != nullptr) {
+            // Hold the lock across the upcall so registration can't delete the
+            // global ref out from under us while run() executes.
+            std::lock_guard<std::mutex> lock(sCallbackMutex);
+            if (sEngineRecreatedRunnable != nullptr && sEngineRecreatedRun != nullptr) {
+                e->CallVoidMethod(sEngineRecreatedRunnable, sEngineRecreatedRun);
+                // Never let an exception from the Runnable leak back into the JVM
+                // on a native thread — that would abort at the next JNI call.
+                if (e->ExceptionCheck()) e->ExceptionClear();
+            }
+        }
+        if (needsDetach) sCallbackJvm->DetachCurrentThread();
     });
 }
 

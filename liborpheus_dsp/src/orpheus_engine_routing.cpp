@@ -1037,6 +1037,28 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 }
             }
         }
+        else if (std::strncmp(symbol, "lick_pool_data_", 15) == 0) {
+            int idx = std::atoi(symbol + 15);
+            if (idx >= 0 && idx < OrpheusEngine::kMaxLickPool *
+                    OrpheusEngine::kMaxLickSteps * OrpheusEngine::kLickFieldsPerStep)
+                engine->pulsar_lick_pool_data[idx] = value;
+        }
+        else if (std::strncmp(symbol, "lick_pool_len_", 14) == 0) {
+            int idx = std::atoi(symbol + 14);
+            if (idx >= 0 && idx < OrpheusEngine::kMaxLickPool)
+                engine->pulsar_lick_pool_len[idx] = static_cast<int>(value);
+        }
+        else if (std::strncmp(symbol, "lick_pool_loop_", 15) == 0) {
+            int idx = std::atoi(symbol + 15);
+            if (idx >= 0 && idx < OrpheusEngine::kMaxLickPool)
+                engine->pulsar_lick_pool_loop[idx] = static_cast<int>(value);
+        }
+        else if (std::strcmp(symbol, "lick_anomaly_index") == 0)
+            engine->pulsar_lick_anomaly_index = static_cast<int>(value);
+        else if (std::strcmp(symbol, "lick_anomaly_chance") == 0)
+            engine->pulsar_lick_anomaly_chance = value;
+        else if (std::strcmp(symbol, "lick_pool_count") == 0)
+            engine->pulsar_lick_pool_count.store(static_cast<int>(value), std::memory_order_release);
         // ── Arrangement / Sections ──
         else if (std::strcmp(symbol, "arrangement_active") == 0)
             engine->pulsar_arrangement_active.store(static_cast<int>(value), std::memory_order_relaxed);
@@ -1053,6 +1075,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < 8 * 21)
                 engine->pulsar_section_data[idx].store(value, std::memory_order_relaxed);
         }
+        else if (std::strncmp(symbol, "void_data_", 10) == 0) {
+            int idx = std::atoi(symbol + 10);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_void_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "anomaly_request") == 0)
+            engine->pulsar_anomaly_request.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strncmp(symbol, "section_track_comping_", 22) == 0) {
             int idx = std::atoi(symbol + 22);
             if (idx >= 0 && idx < 8 * 8)

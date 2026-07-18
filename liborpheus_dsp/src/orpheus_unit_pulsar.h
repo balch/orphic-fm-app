@@ -2,6 +2,7 @@
 
 #include "orpheus_voice.h"
 #include "orpheus_unit_chaos.h"
+#include "pulsar_void.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
 #include "stmlib/dsp/filter.h"
@@ -379,6 +380,7 @@ inline int pulsar_effective_loop_len(const PulsarTrackState& ts, bool half_lick)
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
 static constexpr int kMaxLickSteps = 64;
 static constexpr int kLickFieldsPerStep = 4;   // degree, duration, velocity, glide
+static constexpr int kMaxLickPool = 4;   // MUST equal OrpheusEngine::kMaxLickPool
 static_assert(kMaxLickSteps <= kMaxPulsarSteps,
               "a FILL lick is written into a step_count-sized sequencer buffer");
 static constexpr int kMaxProgressionLength = 12;  // up to a literal 12-bar blues
@@ -657,6 +659,17 @@ struct PulsarState {
     float lick_mutation;
     int lick_octave;  // -1 = auto (midpoint of noteRange), 0-8 = explicit MIDI octave
 
+    // Lick pool (Fire Sky .5f); copied from engine atomics on vibe load.
+    int lick_pool_count = 0;                 // 0 = disabled (single-lick path)
+    PulsarLickStep lick_pool[kMaxLickPool][kMaxLickSteps];
+    int lick_pool_len[kMaxLickPool] = {};
+    int lick_pool_loop[kMaxLickPool] = {};
+    int lick_anomaly_index = -1;
+    float lick_anomaly_chance = 0.0f;
+    int active_rotation_index = 0;           // current section's rotation choice
+    int current_lick_index = -1;             // bank slot currently rendered (-1 = single-lick)
+    uint32_t lick_select_seed = 0;           // play-scoped RNG, independent of mutation/void
+
     // Lick evolution spurt state
     bool in_spurt = false;
     int spurt_bars_remaining = 0;
@@ -684,6 +697,15 @@ struct PulsarState {
     BandSoloState band_solo_state;
     BandSoloConfigParam band_solo_config;
     bool has_band_solo = false;
+
+    // Void Anomaly (dispatched by the Anomaly Engine)
+    VoidConfig void_config;
+    VoidAnomaly void_state;
+    uint32_t void_seed = 0;             // play-scoped RNG, independent of mutation_seed
+    int prev_anomaly_request = 0;       // edge-detect mirror of pulsar_anomaly_request
+    bool void_declared = false;         // true when this vibe opts into the void (void_data[7])
+    bool force_lick_anomaly = false;    // one-shot: force the OG lick anomaly at the next resolve
+    float section_total_steps = 0.0f;   // drawn section length in steps, snapshot at entry
 
     // Living lick state for LickBuilder/Jam modes
     int8_t live_lick_degrees[kMaxLickSteps] = {};

@@ -82,6 +82,9 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param tension Build-and-release arc configuration.
  * @param arrangement Optional section-based structure (verse, chorus, solo, etc.)
  * @param effects Delay and reverb tuning for this vibe.
+ * @param anomalies Rare dramatic events (see [Anomaly]) the Anomaly Engine may fire — e.g. a
+ *   [VoidAnomaly] drop-to-silence or a [LickAnomaly] original-riff swap. Empty = none; the vibe
+ *   then ignores the manual anomaly trigger. At most one anomaly of each concrete type.
  */
 @Serializable
 data class Vibe(
@@ -91,6 +94,7 @@ data class Vibe(
     val lick: Lick? = null,
     val lickMutation: Float = 0.5f,
     val lickOctave: Int = -1,
+    val lickRotation: LickRotation? = null,
     val band: Band? = null,
     val seed: Int = 0,
     val bpm: Float,
@@ -109,10 +113,37 @@ data class Vibe(
     val progressionAnchor: ProgressionAnchor = ProgressionAnchor.EVERY_4,
     val progressionDriftRange: Float = 0.5f,
     val effects: VibeEffects = VibeEffects(),
+    val anomalies: List<Anomaly> = emptyList(),
 ) {
     init {
         require(tracks.size == 8) {
             "Vibe requires exactly 8 tracks, got ${tracks.size}"
+        }
+        // The Anomaly Engine only arms while a section graph is active — a declared anomaly on
+        // an arrangement-less vibe would flash the manual-trigger tint but never fire.
+        require(anomalies.isEmpty() || arrangement != null) {
+            "anomalies require an arrangement — the Anomaly Engine arms at section boundaries"
+        }
+        // C++ has a single void config bank and a single lick-anomaly slot, so each concrete
+        // anomaly type may appear at most once.
+        require(anomalies.filterIsInstance<VoidAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one VoidAnomaly"
+        }
+        val lickAnomalies = anomalies.filterIsInstance<LickAnomaly>()
+        require(lickAnomalies.size <= 1) {
+            "Vibe.anomalies may contain at most one LickAnomaly"
+        }
+        // A LickAnomaly rides the lick bank, so the vibe must supply a lick source to ride over.
+        require(lickAnomalies.isEmpty() || lickRotation != null || lick != null) {
+            "Vibe.anomalies has a LickAnomaly but the vibe has no lick source (set lick or lickRotation)"
+        }
+        // pool + the lick-anomaly slot share the C++ lick bank; together they must fit it.
+        // NB: this formula is NOT the pushed bank size — with lickRotation == null, a LickAnomaly
+        // pushes an implicit [lick, anomalyLick] 2-slot bank (counted as 1 here), undercounting by
+        // design and still safely under MAX_LICK_POOL.
+        require((lickRotation?.pool?.size ?: 0) + lickAnomalies.size <= LickRotation.MAX_LICK_POOL) {
+            "lick bank (rotation pool ${lickRotation?.pool?.size ?: 0} + ${lickAnomalies.size} lick " +
+                "anomaly) exceeds MAX_LICK_POOL=${LickRotation.MAX_LICK_POOL}"
         }
     }
 }

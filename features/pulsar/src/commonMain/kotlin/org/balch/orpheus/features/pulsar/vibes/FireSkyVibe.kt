@@ -22,6 +22,8 @@ import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
+import org.balch.orpheus.features.pulsar.models.LickAnomaly
+import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
@@ -47,7 +49,8 @@ import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
-// Faithful 2-bar riff (BLUES: 0=G,1=Bb/b3,2=C/4,3=Db/b5,4=D/5,5=F/b7). Preserved verbatim.
+// The founding 2-bar hook (BLUES: 0=G,1=Bb/b3,2=C/4,3=Db/b5,4=D/5,5=F/b7) — the OG A/B
+// reference and Fire Sky .5f's rare anomaly flash.
 private val ogLick = Lick(
     steps = listOf(
         LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
@@ -103,13 +106,12 @@ private val tweakLick = Lick(
 )
 
 /**
- * Fire Sky (OG) — FROZEN faithful-reproduction backup of the original blues-rock riff, kept as
- * a dev A/B reference. Catalog status WIP: dev-only, visible on debuggable / `-Pcatalog=wip`
- * builds for A/B but MUST NEVER be promoted to LIVE. It is a verbatim reproduction of a
- * copyrighted riff, so a LIVE (release) listing would ship it to users. Reuses the live
- * [FireSkyVibe] wholesale and swaps ONLY the lick + mutation back to faithful, so an A/B
- * isolates the riff. This is the highest-exposure original of the three — do not edit, and
- * never flip it to LIVE. Git commit ee8677e0 is the hard, fully-frozen snapshot.
+ * Fire Sky (OG) — FROZEN A/B reference: the founding hook stated exactly, kept so riff
+ * variants can be compared against the original statement. Catalog status WIP: dev-only,
+ * visible on debuggable / `-Pcatalog=wip` builds; not for LIVE promotion — the shipping
+ * vibes are the variants, this file is the reference. Reuses the live [FireSkyVibe]
+ * wholesale and swaps ONLY the lick + mutation, so an A/B isolates the riff. Do not
+ * edit; git commit ee8677e0 is the hard, fully-frozen snapshot.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
@@ -151,6 +153,34 @@ class FireSkyVibe : VibeProvider {
             lick = aiLick,
             lickMutation = 0.25f,
             stepCount = 32
+        )
+    }
+}
+
+/**
+ * Fire Sky .5f — a flat 60 BPM Fire Sky (no half-time — every section, including
+ * intro/build, runs at the same tempo, and the build's exit scratch is off) that
+ * ROTATES between [aiLick] and [tweakLick] per section, with the rare [ogLick]
+ * anomaly: a flash of the founding hook stated exactly, also fired by the
+ * manual anomaly trigger.
+ */
+@Inject
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
+class FireSky05Vibe : VibeProvider {
+    override val name: String = "Fire Sky .5f"
+
+    override val vibe: Vibe by lazy {
+        FireSkyVibeBase(baseBpm = 60f, halfTimeMult = 1.0f, buildExitScratchMs = 0).vibe.copy(
+            name = name,
+            lick = aiLick,  // fallback seed; the pool overrides it at load
+            lickRotation = LickRotation(pool = listOf(aiLick, tweakLick)),
+            anomalies = listOf(
+                // A rare flash of the founding hook, stated exactly; also fired by
+                // the manual anomaly trigger.
+                LickAnomaly(lick = ogLick, chance = 0.02f),
+            ),
+            lickMutation = 0.10f,
+            stepCount = 32,
         )
     }
 }
@@ -201,7 +231,11 @@ class FireSkyVibe : VibeProvider {
  * literal 0.5x, which would clamp 42->60 and then over-restore the drop to 120).
  * A/B against DogHouseVibe.
  */
-private class FireSkyVibeBase {
+private class FireSkyVibeBase(
+    private val baseBpm: Float = 84f,
+    private val halfTimeMult: Float = 0.72f,
+    private val buildExitScratchMs: Int = 500,
+) {
 
     // The riff hangs on the i (G), then makes the iconic hard-rock move: down to
     // the bVII (degree 6) and up to the IV (degree 3), then home.
@@ -272,7 +306,7 @@ private class FireSkyVibeBase {
             Section(
                 name = "intro",
                 barsMin = 2, barsMax = 2,   // one slow riff statements (the riff loops every 2 bars)
-                bpmMultiplier = 0.72f,      // ~60 BPM half-time cold open — the riff's true pace
+                bpmMultiplier = halfTimeMult,      // ~60 BPM half-time cold open — the riff's true pace
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),  // -> build
                 ),
@@ -298,8 +332,8 @@ private class FireSkyVibeBase {
             Section(
                 name = "build",
                 barsMin = 2, barsMax = 2,   // two more slow statements as the organ swells
-                bpmMultiplier = 0.72f,      // same ~60 BPM half-time as the cold open
-                exitScratchMs = 500,        // record-scratch out of the build's tail, into the drop
+                bpmMultiplier = halfTimeMult,      // same ~60 BPM half-time as the cold open
+                exitScratchMs = buildExitScratchMs, // record-scratch out of the build's tail, into the drop
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = liftBars),  // -> verse = THE DROP (tempo snaps to 84)
                 ),
@@ -424,11 +458,11 @@ private class FireSkyVibeBase {
         Vibe(
             name = name,
             album = Album.ZERO_TO_ONE,
-            bpm = 84f,
+            bpm = baseBpm,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
-                lengthSeconds = 150..240,
+                lengthSeconds = 120..166,
                 sections = sectionList,
             ),
             envelopeType = EnvelopeType.BLEND,

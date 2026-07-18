@@ -1,7 +1,6 @@
-Lost in Space and Fire Sky join the lineup, plus a glowing new visualizer and Vibe info panel.
+Lost in Space and Fire Sky join the lineup, plus Anomalies, a glowing new visualizer, and the Vibe info panel.
 
-• New vibes: Lost in Space and Fire Sky are now live in the picker.
-• The Vibe info panel gives you more details about the current vibe.
-• The spectrum visualizer got a glow-up — bars now shift color with pitch, with a real bloom and a lingering afterglow on falling peaks.
-• Fixed a bug where two of the macro knobs could silently do nothing depending on setup order.
-• Stability fixes.
+• New vibes: Lost in Space and Fire Sky are live in the picker.
+• Anomalies: rare moments — if you heard it, it was real.
+• The Vibe info panel shows details about the current vibe.
+• The visualizer got a glow-up — bars shift color with pitch, bloom and afterglow.

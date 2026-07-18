@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orpheus_unit_pulsar.h"
+#include "pulsar_rng.h"   // for pattern_rand / pattern_rand01
 #include <algorithm>
 
 // ---------------------------------------------------------------------------
@@ -54,18 +55,7 @@ inline PulsarStep make_step(uint8_t note, float velocity, bool gate, float durat
     return s;
 }
 
-// xorshift32 PRNG — deterministic from seed
-inline uint32_t pattern_rand(uint32_t& seed) {
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    return seed;
-}
-
-// Returns 0.0-1.0 float from PRNG
-inline float pattern_rand01(uint32_t& seed) {
-    return static_cast<float>(pattern_rand(seed) & 0x7FFFFF) / static_cast<float>(0x7FFFFF);
-}
+// pattern_rand / pattern_rand01 live in pulsar_rng.h (included above).
 
 // ---------------------------------------------------------------------------
 // Rhythm pattern generators (tracks 0=KICK, 1=PERC, 2=HIHAT)

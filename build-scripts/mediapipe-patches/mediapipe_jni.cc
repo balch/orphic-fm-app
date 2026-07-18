@@ -41,8 +41,13 @@ static void gr_deliver_result(JNIEnv* env, const GestureRecognizerResult* result
                               int64_t timestamp_ms);
 
 static void throw_exception(JNIEnv* env, const char* msg) {
+    // A pending exception from an earlier failed call must be cleared before we
+    // can look up a class or throw, otherwise ThrowNew asserts in debug JVMs.
+    if (env->ExceptionCheck()) env->ExceptionClear();
     jclass cls = env->FindClass("java/lang/RuntimeException");
+    if (cls == nullptr) return;  // FindClass failed and left its own exception pending
     env->ThrowNew(cls, msg);
+    env->DeleteLocalRef(cls);
 }
 
 /* Helper: attach to JVM if needed, returns env and sets needs_detach flag */
@@ -81,36 +86,44 @@ static void hl_on_result(MpStatus status, const HandLandmarkerResult* result,
 
         int arraySize = 1 + numHands * 64;
         jResult = env->NewFloatArray(arraySize);
-        jfloat* buf = env->GetFloatArrayElements(jResult, nullptr);
+        // NewFloatArray/GetFloatArrayElements return null with a pending
+        // OutOfMemoryError; deliver a null result rather than dereferencing.
+        jfloat* buf = (jResult != nullptr)
+            ? env->GetFloatArrayElements(jResult, nullptr) : nullptr;
+        if (buf != nullptr) {
+            buf[0] = (float)numHands;
 
-        buf[0] = (float)numHands;
+            for (int h = 0; h < numHands; h++) {
+                int base = 1 + h * 64;
 
-        for (int h = 0; h < numHands; h++) {
-            int base = 1 + h * 64;
+                float handednessValue = 0.0f;
+                if (h < (int)result->handedness_count &&
+                    result->handedness[h].categories_count > 0) {
+                    const char* name = result->handedness[h].categories[0].category_name;
+                    if (name && name[0] == 'R') {
+                        handednessValue = 1.0f;
+                    }
+                }
+                buf[base] = handednessValue;
 
-            float handednessValue = 0.0f;
-            if (h < (int)result->handedness_count &&
-                result->handedness[h].categories_count > 0) {
-                const char* name = result->handedness[h].categories[0].category_name;
-                if (name && name[0] == 'R') {
-                    handednessValue = 1.0f;
+                struct NormalizedLandmarks* lms = &result->hand_landmarks[h];
+                for (unsigned int i = 0; i < lms->landmarks_count && i < 21; i++) {
+                    buf[base + 1 + i * 3]     = lms->landmarks[i].x;
+                    buf[base + 1 + i * 3 + 1] = lms->landmarks[i].y;
+                    buf[base + 1 + i * 3 + 2] = lms->landmarks[i].z;
                 }
             }
-            buf[base] = handednessValue;
 
-            struct NormalizedLandmarks* lms = &result->hand_landmarks[h];
-            for (unsigned int i = 0; i < lms->landmarks_count && i < 21; i++) {
-                buf[base + 1 + i * 3]     = lms->landmarks[i].x;
-                buf[base + 1 + i * 3 + 1] = lms->landmarks[i].y;
-                buf[base + 1 + i * 3 + 2] = lms->landmarks[i].z;
-            }
+            env->ReleaseFloatArrayElements(jResult, buf, 0);
         }
-
-        env->ReleaseFloatArrayElements(jResult, buf, 0);
     }
 
+    // Clear any pending exception (e.g. OOM from the allocations above) before
+    // the upcall; calling a Java method with an exception pending is illegal.
+    if (env->ExceptionCheck()) env->ExceptionClear();
     env->CallVoidMethod(g_hl_callback, g_hl_onResult,
                         jResult, static_cast<jlong>(timestamp_ms));
+    if (env->ExceptionCheck()) env->ExceptionClear();
 
     if (jResult != nullptr) env->DeleteLocalRef(jResult);
     if (needs_detach) g_jvm->DetachCurrentThread();
@@ -142,55 +155,66 @@ static void gr_deliver_result(JNIEnv* env, const GestureRecognizerResult* result
         int arraySize = 1 + numHands * perHand;
 
         jResult = env->NewFloatArray(arraySize);
-        jfloat* buf = env->GetFloatArrayElements(jResult, nullptr);
+        // Null (with pending OOM) on allocation failure — guard before use.
+        jfloat* buf = (jResult != nullptr)
+            ? env->GetFloatArrayElements(jResult, nullptr) : nullptr;
 
         jclass stringClass = env->FindClass("java/lang/String");
-        jNames = env->NewObjectArray((jsize)numHands, stringClass, nullptr);
-
-        buf[0] = (float)numHands;
-
-        for (int h = 0; h < numHands; h++) {
-            int base = 1 + h * perHand;
-
-            float handednessValue = 0.0f;
-            if (h < (int)result->handedness_count &&
-                result->handedness[h].categories_count > 0) {
-                const char* name = result->handedness[h].categories[0].category_name;
-                if (name && name[0] == 'R') {
-                    handednessValue = 1.0f;
-                }
-            }
-            buf[base] = handednessValue;
-
-            float gestureScore = 0.0f;
-            const char* gestureName = nullptr;
-            if (h < (int)result->gestures_count &&
-                result->gestures[h].categories_count > 0) {
-                gestureName = result->gestures[h].categories[0].category_name;
-                gestureScore = result->gestures[h].categories[0].score;
-            }
-            buf[base + 1] = gestureScore;
-
-            // Pass gesture name string directly — no index indirection
-            if (gestureName != nullptr) {
-                jstring jname = env->NewStringUTF(gestureName);
-                env->SetObjectArrayElement(jNames, (jsize)h, jname);
-                env->DeleteLocalRef(jname);
-            }
-
-            struct NormalizedLandmarks* lms = &result->hand_landmarks[h];
-            for (unsigned int i = 0; i < lms->landmarks_count && i < 21; i++) {
-                buf[base + 2 + i * 3]     = lms->landmarks[i].x;
-                buf[base + 2 + i * 3 + 1] = lms->landmarks[i].y;
-                buf[base + 2 + i * 3 + 2] = lms->landmarks[i].z;
-            }
+        if (stringClass != nullptr) {
+            jNames = env->NewObjectArray((jsize)numHands, stringClass, nullptr);
+            env->DeleteLocalRef(stringClass);
         }
 
-        env->ReleaseFloatArrayElements(jResult, buf, 0);
+        if (buf != nullptr) {
+            buf[0] = (float)numHands;
+
+            for (int h = 0; h < numHands; h++) {
+                int base = 1 + h * perHand;
+
+                float handednessValue = 0.0f;
+                if (h < (int)result->handedness_count &&
+                    result->handedness[h].categories_count > 0) {
+                    const char* name = result->handedness[h].categories[0].category_name;
+                    if (name && name[0] == 'R') {
+                        handednessValue = 1.0f;
+                    }
+                }
+                buf[base] = handednessValue;
+
+                float gestureScore = 0.0f;
+                const char* gestureName = nullptr;
+                if (h < (int)result->gestures_count &&
+                    result->gestures[h].categories_count > 0) {
+                    gestureName = result->gestures[h].categories[0].category_name;
+                    gestureScore = result->gestures[h].categories[0].score;
+                }
+                buf[base + 1] = gestureScore;
+
+                // Pass gesture name string directly — no index indirection
+                if (gestureName != nullptr && jNames != nullptr) {
+                    jstring jname = env->NewStringUTF(gestureName);
+                    if (jname != nullptr) {
+                        env->SetObjectArrayElement(jNames, (jsize)h, jname);
+                        env->DeleteLocalRef(jname);
+                    }
+                }
+
+                struct NormalizedLandmarks* lms = &result->hand_landmarks[h];
+                for (unsigned int i = 0; i < lms->landmarks_count && i < 21; i++) {
+                    buf[base + 2 + i * 3]     = lms->landmarks[i].x;
+                    buf[base + 2 + i * 3 + 1] = lms->landmarks[i].y;
+                    buf[base + 2 + i * 3 + 2] = lms->landmarks[i].z;
+                }
+            }
+
+            env->ReleaseFloatArrayElements(jResult, buf, 0);
+        }
     }
 
+    if (env->ExceptionCheck()) env->ExceptionClear();
     env->CallVoidMethod(g_gr_callback, g_gr_onResult,
                         jResult, jNames, static_cast<jlong>(timestamp_ms));
+    if (env->ExceptionCheck()) env->ExceptionClear();
 
     if (jResult != nullptr) env->DeleteLocalRef(jResult);
     if (jNames != nullptr) env->DeleteLocalRef(jNames);
@@ -213,17 +237,22 @@ JNIEXPORT jlong JNICALL
 Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeCreateLandmarker(
     JNIEnv* env, jclass cls, jstring modelPath, jobject callback) {
 
+    // Resolve the method id before mutating any global state so a failed lookup
+    // leaves the previous callback (if any) intact rather than stale.
+    jclass callbackClass = env->GetObjectClass(callback);
+    jmethodID onResult = (callbackClass != nullptr)
+        ? env->GetMethodID(callbackClass, "onResult", "([FJ)V") : nullptr;
+    if (callbackClass != nullptr) env->DeleteLocalRef(callbackClass);
+    if (onResult == nullptr) {
+        throw_exception(env, "ResultCallback.onResult([FJ)V method not found");
+        return 0;
+    }
+
     if (g_hl_callback != nullptr) {
         env->DeleteGlobalRef(g_hl_callback);
     }
     g_hl_callback = env->NewGlobalRef(callback);
-
-    jclass callbackClass = env->GetObjectClass(callback);
-    g_hl_onResult = env->GetMethodID(callbackClass, "onResult", "([FJ)V");
-    if (g_hl_onResult == nullptr) {
-        throw_exception(env, "ResultCallback.onResult([FJ)V method not found");
-        return 0;
-    }
+    g_hl_onResult = onResult;
 
     const char* model = env->GetStringUTFChars(modelPath, nullptr);
 
@@ -263,6 +292,7 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeDetectAsync(
     auto landmarker = reinterpret_cast<MpHandLandmarkerPtr>(landmarkerPtr);
 
     jbyte* pixels = env->GetByteArrayElements(pixelData, nullptr);
+    if (pixels == nullptr) return;  // OOM pinning the array; nothing to process
     int dataSize = width * height * 3;
 
     MpImagePtr image = nullptr;
@@ -281,11 +311,12 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeDetectAsync(
 
     status = MpHandLandmarkerDetectAsync(landmarker, image, nullptr,
                                           timestampMs, &error_msg);
+    if (status != kMpOk && error_msg) free(error_msg);
 
-    if (status != kMpOk) {
-        if (error_msg) free(error_msg);
-        MpImageFree(image);
-    }
+    // DetectAsync copies the frame into an internal packet synchronously; the
+    // MpImage handle is always caller-owned. Free it on every path — the old
+    // code only freed on failure, leaking one full RGB frame per call.
+    MpImageFree(image);
 }
 
 JNIEXPORT void JNICALL
@@ -310,19 +341,22 @@ JNIEXPORT jlong JNICALL
 Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeCreateGestureRecognizer(
     JNIEnv* env, jclass cls, jstring modelPath, jint numHands, jobject callback) {
 
+    /* New signature: onResult(float[], String[], long) */
+    jclass callbackClass = env->GetObjectClass(callback);
+    jmethodID onResult = (callbackClass != nullptr)
+        ? env->GetMethodID(callbackClass, "onResult", "([F[Ljava/lang/String;J)V")
+        : nullptr;
+    if (callbackClass != nullptr) env->DeleteLocalRef(callbackClass);
+    if (onResult == nullptr) {
+        throw_exception(env, "GestureCallback.onResult([F[Ljava/lang/String;J)V not found");
+        return 0;
+    }
+
     if (g_gr_callback != nullptr) {
         env->DeleteGlobalRef(g_gr_callback);
     }
     g_gr_callback = env->NewGlobalRef(callback);
-
-    jclass callbackClass = env->GetObjectClass(callback);
-    /* New signature: onResult(float[], String[], long) */
-    g_gr_onResult = env->GetMethodID(callbackClass, "onResult",
-                                     "([F[Ljava/lang/String;J)V");
-    if (g_gr_onResult == nullptr) {
-        throw_exception(env, "GestureCallback.onResult([F[Ljava/lang/String;J)V not found");
-        return 0;
-    }
+    g_gr_onResult = onResult;
 
     const char* model = env->GetStringUTFChars(modelPath, nullptr);
 
@@ -367,6 +401,7 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeRecognizeGestureForVide
     auto recognizer = reinterpret_cast<MpGestureRecognizerPtr>(recognizerPtr);
 
     jbyte* pixels = env->GetByteArrayElements(pixelData, nullptr);
+    if (pixels == nullptr) return JNI_FALSE;  // OOM pinning the array
     int dataSize = width * height * 3;
 
     MpImagePtr image = nullptr;
@@ -390,6 +425,11 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeRecognizeGestureForVide
     memset(&result, 0, sizeof(result));
     status = MpGestureRecognizerRecognizeForVideo(recognizer, image, nullptr,
                                                    timestampMs, &result, &error_msg);
+
+    // RecognizeForVideo is synchronous, so it never retains the image past this
+    // call: the caller owns it and must free it on every path. The old code
+    // never freed it, leaking one full RGB frame on every recognized frame.
+    MpImageFree(image);
 
     if (status != kMpOk) {
         fprintf(stderr, "[JNI] GR err: %s\n", error_msg ? error_msg : "?");

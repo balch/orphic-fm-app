@@ -151,6 +151,7 @@ class FilterFunkVibe : VibeProvider {
                 introIndex = 0,
                 sections = sectionList,
                 outroIndex = sectionList.lastIndex,
+                lengthSeconds = 130 .. 150,
             ),
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,

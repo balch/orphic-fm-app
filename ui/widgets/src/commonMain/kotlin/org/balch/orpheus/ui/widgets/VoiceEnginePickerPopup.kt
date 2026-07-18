@@ -95,7 +95,7 @@ val VOICE_PICKER_CONFIG = PickerConfig(
     centerOrdinal = -1,
 )
 
-// ── V1.2 engines (C++ only, easter egg ring) ──
+// ── V1.2 engines (C++ only, extended ring) ──
 
 val VOICE_PICKER_V2_CONFIG = PickerConfig(
     ring = listOf(
@@ -117,7 +117,7 @@ val VOICE_PICKER_V2_CONFIG = PickerConfig(
     centerOrdinal = -1,
 )
 
-// ── Braids chord engines (triple-click ring) ──
+// ── Braids chord engines (extended ring) ──
 
 val VOICE_PICKER_V3_CONFIG = PickerConfig(
     ring = listOf(
@@ -131,7 +131,7 @@ val VOICE_PICKER_V3_CONFIG = PickerConfig(
     centerOrdinal = -1,
 )
 
-// ── Chaos / fractal engines (quad-click ring) ──
+// ── Chaos / fractal engines (extended ring) ──
 
 val VOICE_PICKER_V4_CONFIG = PickerConfig(
     ring = listOf(
@@ -174,7 +174,7 @@ val DRUM_SD_PICKER_CONFIG = PickerConfig(DRUM_RING, "SD", 1)
 /** Drum picker with HH as center default. */
 val DRUM_HH_PICKER_CONFIG = PickerConfig(DRUM_RING, "HH", 2)
 
-// ── V1.2 drum engines (C++ only, easter egg ring) ──
+// ── V1.2 drum engines (C++ only, extended ring) ──
 
 private val DRUM_V2_RING = listOf(
     PickerEntry("VCF", 17, OrpheusColors.engineRed),
@@ -260,7 +260,7 @@ private const val DOUBLE_CLICK_THRESHOLD_MS = 300L
 /**
  * Self-contained engine picker button that manages its own popup state and gesture handling.
  * Press-and-drag to select an engine from the radial popup.
- * Double-click-and-drag opens the [v2Config] ring (if provided).
+ * A secondary interaction opens the [v2Config] ring (if provided).
  */
 @Composable
 fun EnginePickerButton(

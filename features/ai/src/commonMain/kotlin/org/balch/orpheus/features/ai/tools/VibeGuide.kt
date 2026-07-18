@@ -144,7 +144,32 @@ Per-track: each OrpheusEngine has delaySend + reverbSend (0..1). Leads get moder
 generous, drums usually dry. Match the reverb character to the mood: dark vibes use low
 reverbBrightness; bright/ambient vibes push it high.
 
-## 9. Translation recipes — feel -> settings
+## 9. Anomalies (rare dramatic events)
+`anomalies` is a list of rare events the Anomaly Engine may fire; each entry is an object tagged by a
+`"type"` discriminator. Omit the field (or `[]`) for none. At most one entry of each type. Every
+anomaly requires an arrangement — the engine only arms anomalies while a section graph is active.
+
+VOID — `{"type":"void", ...}`: a rare, dramatic breath: the whole mix eases down to near-silence,
+holds a suppressed floor for a bar or two — optionally with a single "ghost bar" of the full
+arrangement flickering through — then swells back up, resolving by the section boundary. Reverb and
+delay tails ring out into the quiet. It requires an arrangement (the void only arms while a section
+graph is active). Durations are in musical bars.
+- probability (0..1): chance the void auto-fires at each section entry. Keep it low (0.02-0.06) so it
+  stays a surprise; the ship default is 0.04. Set 0 and the anomaly is effectively dormant.
+- floorLevel (0..1): mix gain at the bottom of the dip. 0.05 = near-silent; 0.15-0.3 = a gentler duck.
+- rampDownBars / rampUpBars: musical bars to ease down to the floor and to swell back up.
+- floorBarsMin / floorBarsMax: the near-quiet hold length, drawn per occurrence.
+- ghostIntensity (0..1): 0 = a clean silent void; >0 punches one bar of the full arrangement through
+  the middle of the floor at that gain (1.0 = full-volume flash, 0.3 = a distant echo).
+Best on ambient / spacey / cinematic vibes where a rare void adds drama; skip it on relentless dance
+grooves.
+
+LICK — `{"type":"lick", "lick": {…}, "chance": 0.02}`: a rare one-statement swap-in of an alternate
+riff over whatever lick is playing, reverting after. Requires a lick source (`lick` or `lickRotation`).
+`chance` (0..1) is the per-~2-bar-statement swap probability; keep it low. The anomaly lick shares the
+lick bank, so `lickRotation.pool` size + 1 must be ≤ 4 (MAX_LICK_POOL). See section 10's riff recipe.
+
+## 10. Translation recipes — feel -> settings
 The highest-value part: translate a described feel into concrete parameter choices.
 
 ### Feel and groove
@@ -173,6 +198,9 @@ The highest-value part: translate a described feel into concrete parameter choic
 - Dry / in-your-face: space <= 0.3, reverbSize <= 0.35, sparse delaySend + reverbSend.
 - Distorted / gritty: WSH or VCF engine on bass and lead, higher harmonics and timbre values.
 - Clean / polished: VA, PD, or CHD engines; moderate harmonics, lower timbre.
+- Rare void / breakdown that drops to near-silence and swells back: add a `{"type":"void", ...}`
+  entry to `anomalies` with probability 0.04, floorLevel ~0.05, ghostIntensity ~0.5 for a ghost of
+  the arrangement flickering through (needs an arrangement). See section 9.
 
 ### Energy / drums
 - 4-on-the-floor kick: rhythmDensity = FOUR_ON_FLOOR, kick density ~0.5, barStrategy = REPEAT.
@@ -203,8 +231,13 @@ The highest-value part: translate a described feel into concrete parameter choic
 - Static drone with embellishment: single-note lick with long duration, low-velocity accents, and
   chordFollow = FIXED so the pitch does not chase chord changes.
 - Negative scaleDegree = rest in that step's slot — use this for stop-time: hit, hit, rest, walk-up.
+- Rotating riff (per-section variety, avoids monotony): set `lickRotation.pool` to 2–4 licks and the engine
+  swaps between them at section boundaries (needs an arrangement). For a rare surprise, add a
+  `{"type":"lick", "lick": {…}, "chance": 0.02}` entry to `anomalies` (≈ 1-in-50 per ~2-bar statement) —
+  that lick cuts in occasionally, then reverts. Pool size + the lick anomaly must be ≤ 4 (MAX_LICK_POOL).
+  `lickRotation` overrides the static `lick` while active.
 
-## 10. Invariants & failure modes
+## 11. Invariants & failure modes
 - There are exactly 8 tracks. Do not add or remove tracks.
 - Progression / customProgression degrees are 0..6 (seven scale degrees).
 - Band matrices are square; chordTransitionMatrix is 7x7.

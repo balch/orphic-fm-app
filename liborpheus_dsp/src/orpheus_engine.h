@@ -897,6 +897,19 @@ struct OrpheusEngine {
     LickStepAtomic pulsar_lick[kMaxLickSteps];     // not atomic; guarded by length write order
     std::atomic<float> pulsar_lick_mutation{0.5f};
     std::atomic<int> pulsar_lick_octave{-1};       // -1 = auto (midpoint of noteRange)
+
+    // Lick pool (Fire Sky .5f rotation + optional anomaly), Pattern-B string-pushed.
+    // Plain buffers guarded by pulsar_lick_pool_count's release store (same publish
+    // contract as pulsar_lick / pulsar_lick_length). kMaxLickPool bank slots hold the
+    // rotation members plus one optional anomaly lick.
+    static constexpr int kMaxLickPool = 4;
+    float pulsar_lick_pool_data[kMaxLickPool * kMaxLickSteps * kLickFieldsPerStep] = {};
+    int   pulsar_lick_pool_len[kMaxLickPool]  = {};
+    int   pulsar_lick_pool_loop[kMaxLickPool] = {};
+    float pulsar_lick_anomaly_chance = 0.0f;   // 0 = no anomaly
+    int   pulsar_lick_anomaly_index  = -1;     // bank slot of anomaly lick, or -1
+    std::atomic<int> pulsar_lick_pool_count{0}; // # rotation members; 0 = disabled (release fence)
+
     std::atomic<int64_t> pulsar_seed{0};           // 0 = random seed each load
 
     // ── Pulsar Tension ──
@@ -932,6 +945,12 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_request{0};
     std::atomic<float> pulsar_section_data[8 * 21] = {};
+    // Void Anomaly: 8-float config bank [0]=prob, [1]=floor, [2]=rampDown, [3]=floorMin,
+    // [4]=floorMax, [5]=rampUp, [6]=ghost, [7]=declared flag (1.0 when the vibe declares a
+    // VoidAnomaly; gates the manual trigger).
+    std::atomic<float> pulsar_void_data[8] = {};
+    // Anomaly manual-trigger counter (edge-detected in the pulsar unit).
+    std::atomic<int>   pulsar_anomaly_request{0};
     // Per-track section overrides. Stride: 8 sections × 8 tracks. -1 sentinel
     // means "no override — use the track's base value". Read at vibe load and
     // consulted at section transitions for chordal pattern regeneration and

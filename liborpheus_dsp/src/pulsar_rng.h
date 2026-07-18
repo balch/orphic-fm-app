@@ -18,3 +18,15 @@ inline bool duck_passes(int playhead, int track, int loop, float density_mod) {
     float roll = static_cast<float>(h & 0xFFFF) / 65535.0f;
     return roll <= gate;
 }
+
+// xorshift32 PRNG — deterministic from seed. Canonical home; pattern_gen and
+// pulsar_void both consume these.
+inline uint32_t pattern_rand(uint32_t& seed) {
+    seed ^= seed << 13;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;
+    return seed;
+}
+inline float pattern_rand01(uint32_t& seed) {
+    return static_cast<float>(pattern_rand(seed) & 0x7FFFFF) / static_cast<float>(0x7FFFFF);
+}

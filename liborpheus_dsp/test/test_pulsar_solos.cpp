@@ -3,6 +3,7 @@
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/pulsar_bar_strategy.h"
 #include "../src/pulsar_solo.h"
+#include "../src/pulsar_handoff.h"
 #include <cstdio>
 #include <cmath>
 #include <vector>
@@ -905,6 +906,52 @@ static bool test_jam_improv_generated_and_carryover() {
     return ok;
 }
 
+// BREAK must silence the OTHER melodic voices but NOT annihilate the drummer's
+// own tracks. Regression test for the all-Melodic self-wipe (Lost in Space).
+static bool test_break_exempts_lead_member_tracks() {
+    printf("\n=== Test: BREAK exempts the lead member's own tracks ===\n");
+
+    // One band member owning tracks {0,1,2,3}. Tracks 0-2 map to kick/snare/hat
+    // (overwritten by the rhythm render); track 3 is a member track the render
+    // never touches, so it isolates the BREAK-clear behavior.
+    BandSoloConfigParam config{};
+    config.member_count = 1;
+    config.members[0].track_count = 4;
+    config.members[0].tracks[0] = 0;
+    config.members[0].tracks[1] = 1;
+    config.members[0].tracks[2] = 2;
+    config.members[0].tracks[3] = 3;
+
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        tracks[t].role = TrackRole::MELODIC;
+        tracks[t].step_count = 16;
+        for (int i = 0; i < 16; i++) tracks[t].steps[i].gate = true;
+    }
+
+    PulsarLickStep lick[4] = {};   // zero-init is valid regardless of struct fields
+    uint32_t seed = 12345;
+
+    render_drum_lead(config, tracks, kNumPulsarTracks, /*lead_member=*/0,
+                     DrumLeadStyle::BREAK, lick, /*lick_len=*/4, /*complexity=*/0.5f, seed);
+
+    // Track 3 (member, not kick/snare/hat) must be exempted: its gates survive.
+    int member_gates = 0;
+    for (int i = 0; i < tracks[3].step_count; i++) if (tracks[3].steps[i].gate) member_gates++;
+
+    // Track 5 (non-member melodic) must be fully cleared: BREAK still works.
+    int nonmember_gates = 0;
+    for (int i = 0; i < tracks[5].step_count; i++) if (tracks[5].steps[i].gate) nonmember_gates++;
+
+    bool exempt_ok = member_gates > 0;
+    bool wipe_ok = nonmember_gates == 0;
+    printf("  member track 3 gates=%d (expected >0) -- %s\n", member_gates, exempt_ok ? "OK" : "FAIL");
+    printf("  non-member track 5 gates=%d (expected 0) -- %s\n", nonmember_gates, wipe_ok ? "OK" : "FAIL");
+    bool ok = exempt_ok && wipe_ok;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_solos_tests() {
     printf("\n========== PULSAR SOLOS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -924,6 +971,7 @@ bool run_pulsar_solos_tests() {
     tally(test_render_lick_into_track_honors_call_response());
     tally(test_jam_solo_shared_line());
     tally(test_jam_improv_generated_and_carryover());
+    tally(test_break_exempts_lead_member_tracks());
     printf("\nPulsar solos tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -60,5 +60,6 @@ enum VizChannel {
     VIZ_PULSAR_TRACK_6 = 35,
     VIZ_PULSAR_TRACK_7 = 36,
     VIZ_BEAT_PHASE = 37,
+    VIZ_PULSAR_VOID_GAIN = 38,  // Void Anomaly's live per-block gain (1.0 = idle/no duck)
     VIZ_CHANNEL_COUNT
 };

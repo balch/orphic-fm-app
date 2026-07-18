@@ -61,6 +61,7 @@ import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
+import org.balch.orpheus.features.pulsar.models.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
@@ -76,6 +77,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VoidAnomaly
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
@@ -87,6 +89,7 @@ import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
+import kotlin.time.Duration.Companion.seconds
 
 @Serializable
 @Immutable
@@ -169,6 +172,19 @@ data class PulsarPanelActions(
      * auto-trigger firing now, regardless of playing time or random roll.
      */
     val onArmOutro: () -> Unit = {},
+    /**
+     * Manual trigger handler for the VIBE dropdown — fires the Anomaly
+     * Engine, bumping the request counter the C++ engine edge-detects on.
+     */
+    val onTriggerAnomaly: () -> Unit = {},
+    /**
+     * True for a short window after [onTriggerAnomaly] fires. Unlike
+     * [outroArmed] (which latches until the song ends), the Void Anomaly is
+     * transient, so this auto-clears on a timer — see
+     * [PulsarViewModel.ANOMALY_HIGHLIGHT]. The VIBE dropdown uses this to
+     * tint itself as trigger confirmation.
+     */
+    val anomalyArmed: StateFlow<Boolean> = MutableStateFlow(false),
 ) {
     companion object {
         val EMPTY = PulsarPanelActions()
@@ -320,6 +336,11 @@ class PulsarViewModel(
     private val playingId = synthController.controlFlow(PulsarSymbol.PLAYING.controlId)
     private val mutedId = synthController.controlFlow(AppSymbol.MUTED.controlId)
     private val vibeGenerationId = synthController.controlFlow(PulsarSymbol.VIBE_GENERATION.controlId)
+    private val anomalyRequestId = synthController.controlFlow(PulsarSymbol.ANOMALY_REQUEST.controlId)
+    // Drives the VIBE dropdown's "armed" tint — see PulsarPanelActions.anomalyArmed
+    // and the companion's ANOMALY_HIGHLIGHT constant for the auto-clear window.
+    private val _anomalyArmed = MutableStateFlow(false)
+    private var anomalyArmedResetJob: Job? = null
     private val energyId = synthController.controlFlow(PulsarSymbol.ENERGY.controlId)
     private val complexityId = synthController.controlFlow(PulsarSymbol.COMPLEXITY.controlId)
     private val spaceId = synthController.controlFlow(PulsarSymbol.SPACE.controlId)
@@ -757,6 +778,26 @@ class PulsarViewModel(
         finalSectionIndex = songEndingEventSource.finalSectionIndex,
         outroArmed = songEndingEventSource.endingTriggered,
         onArmOutro = { songEndingEventSource.armOutro() },
+        onTriggerAnomaly = {
+            val vibe = vibeFlow.value
+            // Vibe.init rejects anomalies without an arrangement, but check again here too:
+            // the engine only arms anomalies while an arrangement is active, and this guards
+            // any future construction path that bypasses init.
+            val hasAnomaly = vibe.anomalies.isNotEmpty() && vibe.arrangement != null
+            // No declared (and armable) anomaly: skip the counter bump and highlight — nothing would fire.
+            if (hasAnomaly) {
+                anomalyRequestId.value = IntValue(anomalyRequestId.value.asInt() + 1)
+                // Re-arming before the previous window elapses restarts the clock
+                // rather than letting a rapid re-press clear early.
+                anomalyArmedResetJob?.cancel()
+                _anomalyArmed.value = true
+                anomalyArmedResetJob = scope.launch {
+                    delay(ANOMALY_HIGHLIGHT)
+                    _anomalyArmed.value = false
+                }
+            }
+        },
+        anomalyArmed = _anomalyArmed.asStateFlow(),
     )
 
     // ═══════════════════════════════════════════════════════════
@@ -1048,6 +1089,11 @@ class PulsarViewModel(
         // for the section-BPM collector to compose multipliers against.
         lastSectionMult = 1.0f
 
+        // A new vibe load clears any stale Void Anomaly tint immediately
+        // rather than waiting out ANOMALY_HIGHLIGHT.
+        anomalyArmedResetJob?.cancel()
+        _anomalyArmed.value = false
+
         // Reset all track mutes on vibe load
         _trackMutedFlow.value = List(8) { false }
         for (i in 0 until 8) {
@@ -1260,6 +1306,54 @@ class PulsarViewModel(
         } else {
             lickLoopLengthId.value = IntValue(0)
             lickLengthId.value = IntValue(0)
+        }
+
+        // Push lick rotation pool (Pattern B dynamic controls: bank data first,
+        // pool_count last as the release fence). Bank layout: rotation members in
+        // slots 0..poolPart.size-1, then the LickAnomaly lick (if any) in the next slot.
+        //
+        // Rotation lives in vibe.lickRotation.pool; the anomaly lives in vibe.anomalies as a
+        // LickAnomaly. They recombine here into the SAME C++ lick bank the old embedded-anomaly
+        // schema produced, so the DSP wire format is unchanged. A LickAnomaly with only a single
+        // vibe.lick (no rotation) becomes a rotation-of-1 with the anomaly in slot 1.
+        val la = vibe.anomalies.filterIsInstance<LickAnomaly>().firstOrNull()
+        val poolPart: List<Lick> = vibe.lickRotation?.pool ?: listOfNotNull(vibe.lick)
+        if ((la != null || vibe.lickRotation != null) && poolPart.isNotEmpty()) {
+            val bank = poolPart + listOfNotNull(la?.lick)
+            val anomalyIndex = if (la != null) poolPart.size else -1
+            bank.forEachIndexed { slot, l ->
+                l.steps.forEachIndexed { step, s ->
+                    val base = slot * (Lick.MAX_LICK_STEPS * Lick.LICK_FIELDS_PER_STEP) +
+                        step * Lick.LICK_FIELDS_PER_STEP
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "lick_pool_data_$base"),
+                        FloatValue(s.scaleDegree.toFloat()))
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "lick_pool_data_${base + 1}"),
+                        FloatValue(s.duration))
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "lick_pool_data_${base + 2}"),
+                        FloatValue(s.velocity))
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "lick_pool_data_${base + 3}"),
+                        FloatValue(s.glideRate))
+                }
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "lick_pool_len_$slot"),
+                    FloatValue(l.steps.size.toFloat()))
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "lick_pool_loop_$slot"),
+                    FloatValue(l.loopLength.toFloat()))
+            }
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_anomaly_index"), FloatValue(anomalyIndex.toFloat()))
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_anomaly_chance"), FloatValue(la?.chance ?: 0f))
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_pool_count"), FloatValue(poolPart.size.toFloat()))
+        } else {
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_pool_count"), FloatValue(0f))
         }
 
         seedId.value = IntValue(vibe.seed)
@@ -1742,6 +1836,24 @@ class PulsarViewModel(
             setDuck(5, ducking.reverbBoost)
         }
 
+        // Void Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        val va = vibe.anomalies.filterIsInstance<VoidAnomaly>().firstOrNull()
+        val voidData = floatArrayOf(
+            va?.probability ?: 0f,
+            va?.floorLevel ?: 0.05f,
+            va?.rampDownBars ?: 1f,
+            va?.floorBarsMin ?: 1f,
+            va?.floorBarsMax ?: 2f,
+            va?.rampUpBars ?: 1.5f,
+            va?.ghostIntensity ?: 0.5f,
+            if (va != null) 1f else 0f, // [7] declared flag — manual trigger fires only on declaring vibes
+        )
+        voidData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "void_data_$i"), FloatValue(v)
+            )
+        }
+
         // Write arrangement generation last as release fence (triggers C++ load_vibe re-read)
         synthController.setPluginControl(
             PluginControlId(PULSAR_URI, "arrangement_generation"),
@@ -1797,6 +1909,15 @@ class PulsarViewModel(
         cf?.ordinal?.toFloat() ?: -1.0f
 
     companion object {
+        /**
+         * How long the VIBE dropdown stays tinted after the manual anomaly
+         * trigger fires. The anomaly's actual active window lives in C++ and
+         * isn't surfaced back to Kotlin, so this is an approximation of the
+         * arm-latency + arc — just long enough to visibly confirm the
+         * trigger landed.
+         */
+        private val ANOMALY_HIGHLIGHT = 8.seconds
+
         private val previewVibe = Vibe(
             name = "Preview",
             bpm = 120f,

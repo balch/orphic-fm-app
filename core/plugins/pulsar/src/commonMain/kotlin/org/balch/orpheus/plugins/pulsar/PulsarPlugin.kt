@@ -31,6 +31,7 @@ class PulsarPlugin : DspPlugin {
 
     private var _playing = 0
     private var _vibeGeneration = 0
+    private var _anomalyRequest: Int = 0
     private var _energy = 0.5f
     private var _complexity = 0.3f
     private var _space = 0.4f
@@ -159,6 +160,9 @@ class PulsarPlugin : DspPlugin {
         }
         controlPort(PulsarSymbol.VIBE_GENERATION) {
             intType { default = 0; get { _vibeGeneration }; set { _vibeGeneration = it } }
+        }
+        controlPort(PulsarSymbol.ANOMALY_REQUEST) {
+            intType { default = 0; get { _anomalyRequest }; set { _anomalyRequest = it } }
         }
         controlPort(PulsarSymbol.ENERGY) {
             floatType { default = 0.5f; get { _energy }; set { _energy = it } }

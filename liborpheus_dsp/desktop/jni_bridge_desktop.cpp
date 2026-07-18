@@ -19,6 +19,7 @@ JNI_FN(nativeOpen)(JNIEnv *env, jobject thiz, jint sampleRate) {
 JNIEXPORT jint JNICALL
 JNI_FN(nativeLoadGraph)(JNIEnv *env, jobject thiz, jbyteArray serialized) {
     jbyte* data = env->GetByteArrayElements(serialized, nullptr);
+    if (data == nullptr) return -200;  // OOM pinning the array; leave the graph untouched
     jsize len = env->GetArrayLength(serialized);
     jint result = sEngine.loadGraph(
         reinterpret_cast<const uint8_t*>(data),
@@ -33,6 +34,7 @@ JNI_FN(nativeProcess)(JNIEnv *env, jobject thiz, jfloatArray buffer) {
     // Buffer is interleaved stereo: numFrames = totalFloats / 2
     int numFrames = totalFloats / 2;
     jfloat* buf = env->GetFloatArrayElements(buffer, nullptr);
+    if (buf == nullptr) return;  // OOM pinning the buffer; skip this render block
     sEngine.process(buf, numFrames);
     env->ReleaseFloatArrayElements(buffer, buf, 0); // 0 = copy back
 }
@@ -210,7 +212,13 @@ JNIEXPORT jint JNICALL
 JNI_FN(nativeGetViz)(JNIEnv *env, jobject thiz,
                      jint channel, jfloatArray outBuf, jintArray lastReadPos) {
     jint* rp = env->GetIntArrayElements(lastReadPos, nullptr);
+    if (rp == nullptr) return 0;
     jfloat* buf = env->GetFloatArrayElements(outBuf, nullptr);
+    if (buf == nullptr) {
+        // Release the array we already pinned before bailing, else it leaks.
+        env->ReleaseIntArrayElements(lastReadPos, rp, JNI_ABORT);
+        return 0;
+    }
     int count = sEngine.getViz(channel, buf, env->GetArrayLength(outBuf), rp);
     env->ReleaseFloatArrayElements(outBuf, buf, 0);
     env->ReleaseIntArrayElements(lastReadPos, rp, 0);
@@ -241,7 +249,12 @@ JNI_FN(nativeSetAutomation)(JNIEnv *env, jobject thiz,
                              jfloatArray jtimes, jfloatArray jvalues,
                              jint count) {
     jfloat* times = env->GetFloatArrayElements(jtimes, nullptr);
+    if (times == nullptr) return;
     jfloat* values = env->GetFloatArrayElements(jvalues, nullptr);
+    if (values == nullptr) {
+        env->ReleaseFloatArrayElements(jtimes, times, JNI_ABORT);
+        return;
+    }
     sEngine.setAutomation(target, voiceIndex, times, values, count);
     env->ReleaseFloatArrayElements(jtimes, times, JNI_ABORT);
     env->ReleaseFloatArrayElements(jvalues, values, JNI_ABORT);

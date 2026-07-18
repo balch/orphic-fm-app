@@ -329,6 +329,7 @@ class SynthEngineMonitor(
         pulsarVizJob = monitoringScope.launch(dispatcherProvider.io) {
             val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
             val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
+            var lastVoidGain = 1f
             while (isActive) {
                 nativeBridge.nativeGetPulsarViz(
                     pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
@@ -340,12 +341,22 @@ class SynthEngineMonitor(
                     val data = _pulsarTrackVizFlows[t].value
                     trackLevels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
                 }
+                // Void Anomaly gain: a single live scalar (1.0 = idle), same channel
+                // shape as beat_phase below — only the latest sample matters, so read
+                // straight off the ring rather than accumulating a history flow.
+                vizReadPosBuf[0] = pulsarReadPos[VIZ_PULSAR_VOID_GAIN]
+                val voidGainCount = nativeBridge.nativeGetViz(VIZ_PULSAR_VOID_GAIN, pulsarVizBuf, vizReadPosBuf)
+                pulsarReadPos[VIZ_PULSAR_VOID_GAIN] = vizReadPosBuf[0]
+                if (voidGainCount > 0) {
+                    lastVoidGain = pulsarVizBuf[voidGainCount - 1].coerceIn(0f, 1f)
+                }
                 _pulsarVizFlow.value = PulsarVizData(
                     stepGates = Array(PULSAR_NUM_TRACKS) { t -> BooleanArray(PULSAR_MAX_STEPS) { s -> pulsarGates[t * PULSAR_MAX_STEPS + s] } },
                     stepVelocities = Array(PULSAR_NUM_TRACKS) { t -> FloatArray(PULSAR_MAX_STEPS) { s -> pulsarVelocities[t * PULSAR_MAX_STEPS + s] } },
                     playheads = pulsarPlayheads.copyOf(),
                     stepCounts = pulsarStepCounts.copyOf(),
                     trackLevels = trackLevels,
+                    voidGain = lastVoidGain,
                     activeEngines = pulsarActiveEngines.copyOf(),
                 )
 
@@ -583,7 +594,8 @@ class SynthEngineMonitor(
         private const val VIZ_TIDES_CH3 = 28
         private const val VIZ_PULSAR_TRACK_0 = 29
         private const val VIZ_BEAT_PHASE = 37
-        private const val VIZ_CHANNEL_COUNT = 38  // 29 + 8 pulsar tracks + beat_phase
+        private const val VIZ_PULSAR_VOID_GAIN = 38  // Void Anomaly live gain (1.0 = idle)
+        private const val VIZ_CHANNEL_COUNT = 39  // 29 + 8 pulsar tracks + beat_phase + void_gain
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

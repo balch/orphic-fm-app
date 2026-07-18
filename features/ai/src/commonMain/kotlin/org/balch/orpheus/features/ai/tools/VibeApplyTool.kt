@@ -8,8 +8,11 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import org.balch.orpheus.core.ai.ToolProvider
@@ -17,9 +20,11 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.ai.AiVibeArchive
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
+import org.balch.orpheus.features.pulsar.models.Anomaly
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VoidAnomaly
 
 /**
  * JSON config for decoding agent-emitted vibes.
@@ -35,6 +40,11 @@ import org.balch.orpheus.features.pulsar.models.Vibe
  * (TrackRole/SoloMode/PitchEvolution, which carry parametrized data-class subtypes) are left
  * strict on purpose, so a genuinely malformed role still surfaces for self-correction.
  *
+ * [Anomaly] gets the same net via [InertVoidAnomalyDeserializer]: the guide documents only the
+ * "void"/"lick" types, so an invented one (e.g. `{"type":"sweep", ...}`) is a rare-hallucination
+ * path — it degrades to a declared-but-auto-inert [VoidAnomaly] instead of crashing the whole
+ * apply into the retry loop.
+ *
  * Essential, default-less fields (name/bpm/rootNote/scaleType/genre/tracks) stay strict too.
  */
 val vibeApplyJson = Json {
@@ -44,7 +54,22 @@ val vibeApplyJson = Json {
     serializersModule = SerializersModule {
         polymorphicDefaultDeserializer(CompingStyle::class) { CompingStyle.PAD.serializer() }
         polymorphicDefaultDeserializer(LickMode::class) { LickMode.None.serializer() }
+        polymorphicDefaultDeserializer(Anomaly::class) { InertVoidAnomalyDeserializer }
     }
+}
+
+/**
+ * Fallback for an unknown [Anomaly] `"type"` (see the [vibeApplyJson] KDoc). The
+ * `polymorphicDefaultDeserializer` mechanism can only pick a deserialization strategy — it cannot
+ * construct an instance — so this delegates to [VoidAnomaly]'s serializer (unknown keys are
+ * dropped by `ignoreUnknownKeys`) and then zeroes `probability`: the stock serializer alone would
+ * keep the default 4% auto-fire chance. The result is a declared-but-auto-inert void — it never
+ * fires on its own, though the manual anomaly trigger can still arm it.
+ */
+private object InertVoidAnomalyDeserializer : DeserializationStrategy<VoidAnomaly> {
+    override val descriptor: SerialDescriptor = VoidAnomaly.serializer().descriptor
+    override fun deserialize(decoder: Decoder): VoidAnomaly =
+        VoidAnomaly.serializer().deserialize(decoder).copy(probability = 0f)
 }
 
 @LLMDescription("Arguments for applying a Pulsar vibe (built by editing a pulsar_get_vibe template) to the live engine.")
