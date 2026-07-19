@@ -67,7 +67,8 @@ Then read a specific one with the Read tool (they're normal JSON files on disk).
 ```bash
 adb shell pm list packages | grep org.balch.djapp        # find the installed package
 PKG=org.balch.djapp.ai.debug
-adb exec-out run-as "$PKG" ls files/ai-vibes/             # list
+adb exec-out run-as "$PKG" ls -1 files/ai-vibes/          # list (-1: on-device ls defaults to
+                                                            # multi-column even when piped)
 adb exec-out run-as "$PKG" cat files/ai-vibes/<file>.json > ./<file>.json   # pull one
 ```
 
