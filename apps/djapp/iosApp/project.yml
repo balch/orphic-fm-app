@@ -17,7 +17,9 @@ targets:
     info:
       path: DjApp/Info.plist
       properties:
-        CFBundleDisplayName: "Orphic DJ"
+        CFBundleDisplayName: "$(APP_DISPLAY_NAME)"
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: false
         LSRequiresIPhoneOS: true
         UIRequiredDeviceCapabilities:
           - arm64
@@ -36,16 +38,87 @@ targets:
         UILaunchStoryboardName: LaunchScreen
         CADisableMinimumFrameDurationOnPhone: true
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app
-      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
-        - "$(inherited)"
-        - "$(SRCROOT)/../shared/build/bin/iosArm64/debugFramework"
-      FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
-        - "$(inherited)"
-        - "$(SRCROOT)/../shared/build/bin/iosSimulatorArm64/debugFramework"
-      OTHER_LDFLAGS:
-        - "$(inherited)"
-        - "-framework"
-        - "DjAppShared"
-      ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app
+        APP_DISPLAY_NAME: "Orphic DJ"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-framework"
+          - "DjAppShared"
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+      configs:
+        Debug:
+          FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../shared/build/bin/iosArm64/debugFramework"
+          FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../shared/build/bin/iosSimulatorArm64/debugFramework"
+        Release:
+          FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../shared/build/bin/iosArm64/releaseFramework"
+          FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../shared/build/bin/iosSimulatorArm64/releaseFramework"
+
+  DjAppAi:
+    type: application
+    platform: iOS
+    sources:
+      - path: DjApp
+        excludes:
+          - Info.plist
+    info:
+      path: DjApp/Info.plist
+      properties:
+        CFBundleDisplayName: "$(APP_DISPLAY_NAME)"
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: false
+        LSRequiresIPhoneOS: true
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - audio
+        NSBluetoothAlwaysUsageDescription: "Bluetooth is used to connect MIDI controllers"
+        UILaunchStoryboardName: LaunchScreen
+        CADisableMinimumFrameDurationOnPhone: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app.ai
+        PRODUCT_MODULE_NAME: DjAppAiApp
+        APP_DISPLAY_NAME: "Orphic DJ AI"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        OTHER_SWIFT_FLAGS: "-DUSING_AI"
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-framework"
+          - "DjAppAi"
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+      configs:
+        Debug:
+          FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../ai/build/bin/iosArm64/debugFramework"
+          FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../ai/build/bin/iosSimulatorArm64/debugFramework"
+        Release:
+          FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../ai/build/bin/iosArm64/releaseFramework"
+          FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
+            - "$(inherited)"
+            - "$(SRCROOT)/../ai/build/bin/iosSimulatorArm64/releaseFramework"
+
+

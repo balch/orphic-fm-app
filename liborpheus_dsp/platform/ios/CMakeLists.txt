@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(orpheus_dsp_ios CXX)
+project(orpheus_dsp_ios CXX OBJCXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,3 +23,12 @@ add_subdirectory(
     "${CMAKE_CURRENT_SOURCE_DIR}/../.."
     "${CMAKE_CURRENT_BINARY_DIR}/orpheus_dsp"
 )
+
+# ── iOS-only audio host (ObjC++) ─────────────────
+# Added here, not in the root CMakeLists, so desktop/Android/WASM builds
+# never see the .mm file.
+set(ORPHEUS_IOS_AUDIO_SRC
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/ios/orpheus_ios_audio.mm")
+target_sources(orpheus_dsp PRIVATE "${ORPHEUS_IOS_AUDIO_SRC}")
+set_source_files_properties("${ORPHEUS_IOS_AUDIO_SRC}"
+    PROPERTIES COMPILE_FLAGS "-fobjc-arc")

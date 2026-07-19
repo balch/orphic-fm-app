@@ -1,5 +1,9 @@
 import UIKit
+#if USING_AI
+import DjAppAi
+#else
 import DjAppShared
+#endif
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -16,3 +20,4 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 }
+

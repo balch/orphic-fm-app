@@ -1,4 +1,4 @@
-headers = orpheus_dsp.h
-headerFilter = orpheus_dsp.h
+headers = orpheus_dsp.h orpheus_ios_audio.h
+headerFilter = orpheus_dsp.h orpheus_ios_audio.h
 staticLibraries = liborpheus_dsp.a
-# libraryPaths are set in build.gradle.kts via compilerOpts for correct absolute paths
+linkerOpts = -framework AVFoundation -framework Foundation

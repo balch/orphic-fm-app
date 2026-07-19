@@ -95,6 +95,12 @@ struct OrpheusEngine {
     // Atomic: written from JNI thread, read from audio thread
     std::atomic<OrpheusGraph*> graph{nullptr};
 
+    // Render epoch: incremented at the end of every orpheus_engine_process.
+    // load_patch uses it as a grace period — after swapping graphs it waits
+    // for one advance before freeing the old graph, so an in-flight block
+    // can never touch freed memory.
+    std::atomic<uint64_t> blocks_rendered{0};
+
     // Plaits voices (direct engine render, no LPG/limiter)
     OrpheusVoice voices_dsp[kNumVoices];
     uint8_t voice_alloc_buffers[kNumVoices][kVoiceAllocBytes];

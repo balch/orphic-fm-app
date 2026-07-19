@@ -48,13 +48,13 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.djapp.variant.mergeTabContributions
+import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjViewModel
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
-import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -314,7 +314,13 @@ private fun DjAppHeaderRow(
     val effects = LocalLiquidEffects.current
 
     Row(
-        modifier = modifier.fillMaxWidth(),
+        // iOS: push the header below the Dynamic Island / notch (the status bar is hidden, but the
+        // Island still reserves top safe area). Resolves to zero on Android/desktop, so the shipped
+        // edge-to-edge layout there is unchanged. The VizBackground behind this still fills into the
+        // cutout — only this foreground chrome is inset.
+        modifier = modifier
+            .windowInsetsPadding(platformSafeAreaInsets().only(WindowInsetsSides.Top))
+            .fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

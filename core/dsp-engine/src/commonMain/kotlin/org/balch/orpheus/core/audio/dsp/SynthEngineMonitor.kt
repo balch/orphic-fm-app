@@ -199,8 +199,16 @@ class SynthEngineMonitor(
         flow: MutableStateFlow<FloatArray>
     ) {
         nativeBridge.nativeGetTurntableViz(deck, buf)
-        // Only emit if there's actual data (check if any sample is non-zero)
-        flow.value = buf.copyOf()
+        // An empty flow means cold start or a viz restart (stopTurntableViz
+        // resets to FloatArray(0)): emit once to establish the sized buffer,
+        // otherwise idle decks would never render the silent groove ring.
+        val hasData = buf.any { it != 0f }
+        val current = flow.value
+        val mustSeed = current.isEmpty()
+        val currentSilent = current.isEmpty() || current.all { it == 0f }
+        if (mustSeed || hasData || !currentSilent) {
+            flow.value = buf.copyOf()
+        }
     }
 
     private fun appendToVizRing(ring: FloatArray, src: FloatArray, count: Int): FloatArray {
@@ -330,6 +338,18 @@ class SynthEngineMonitor(
             val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
             val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
             var lastVoidGain = 1f
+            // Previous-tick snapshots for change gating: emitting PulsarVizData
+            // allocates ~16 arrays; at 60fps that is ~1000 allocs/sec even when
+            // the step grid is static. Compare raw bridge buffers first and
+            // skip the emission (and all its allocations) on no-change ticks.
+            val prevGates = BooleanArray(pulsarGates.size)
+            val prevVelocities = FloatArray(pulsarVelocities.size)
+            val prevPlayheads = IntArray(pulsarPlayheads.size)
+            val prevStepCounts = IntArray(pulsarStepCounts.size)
+            val prevActiveEngines = IntArray(pulsarActiveEngines.size)
+            val prevTrackLevels = FloatArray(PULSAR_NUM_TRACKS)
+            var prevVoidGain = -1f
+            var everEmitted = false
             while (isActive) {
                 nativeBridge.nativeGetPulsarViz(
                     pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
@@ -350,15 +370,35 @@ class SynthEngineMonitor(
                 if (voidGainCount > 0) {
                     lastVoidGain = pulsarVizBuf[voidGainCount - 1].coerceIn(0f, 1f)
                 }
-                _pulsarVizFlow.value = PulsarVizData(
-                    stepGates = Array(PULSAR_NUM_TRACKS) { t -> BooleanArray(PULSAR_MAX_STEPS) { s -> pulsarGates[t * PULSAR_MAX_STEPS + s] } },
-                    stepVelocities = Array(PULSAR_NUM_TRACKS) { t -> FloatArray(PULSAR_MAX_STEPS) { s -> pulsarVelocities[t * PULSAR_MAX_STEPS + s] } },
-                    playheads = pulsarPlayheads.copyOf(),
-                    stepCounts = pulsarStepCounts.copyOf(),
-                    trackLevels = trackLevels,
-                    voidGain = lastVoidGain,
-                    activeEngines = pulsarActiveEngines.copyOf(),
-                )
+
+                val changed = !everEmitted ||
+                    lastVoidGain != prevVoidGain ||
+                    !pulsarPlayheads.contentEquals(prevPlayheads) ||
+                    !trackLevels.contentEquals(prevTrackLevels) ||
+                    !pulsarGates.contentEquals(prevGates) ||
+                    !pulsarVelocities.contentEquals(prevVelocities) ||
+                    !pulsarStepCounts.contentEquals(prevStepCounts) ||
+                    !pulsarActiveEngines.contentEquals(prevActiveEngines)
+
+                if (changed) {
+                    _pulsarVizFlow.value = PulsarVizData(
+                        stepGates = Array(PULSAR_NUM_TRACKS) { t -> BooleanArray(PULSAR_MAX_STEPS) { s -> pulsarGates[t * PULSAR_MAX_STEPS + s] } },
+                        stepVelocities = Array(PULSAR_NUM_TRACKS) { t -> FloatArray(PULSAR_MAX_STEPS) { s -> pulsarVelocities[t * PULSAR_MAX_STEPS + s] } },
+                        playheads = pulsarPlayheads.copyOf(),
+                        stepCounts = pulsarStepCounts.copyOf(),
+                        trackLevels = trackLevels,
+                        voidGain = lastVoidGain,
+                        activeEngines = pulsarActiveEngines.copyOf(),
+                    )
+                    pulsarGates.copyInto(prevGates)
+                    pulsarVelocities.copyInto(prevVelocities)
+                    pulsarPlayheads.copyInto(prevPlayheads)
+                    pulsarStepCounts.copyInto(prevStepCounts)
+                    pulsarActiveEngines.copyInto(prevActiveEngines)
+                    trackLevels.copyInto(prevTrackLevels)
+                    prevVoidGain = lastVoidGain
+                    everEmitted = true
+                }
 
                 delay(VIZ_POLL_INTERVAL)
             }

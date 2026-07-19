@@ -7,6 +7,9 @@
 #if defined(__SSE__)
 #include <xmmintrin.h>
 #endif
+#ifndef __EMSCRIPTEN__
+#include <thread>
+#endif
 extern "C" {
 
 // Reset static DSP state for units that use singletons.
@@ -191,6 +194,29 @@ void orpheus_engine_destroy(OrpheusEngine* engine) {
     }
 }
 
+// Free a graph that was just swapped out, waiting for any in-flight audio
+// block to finish with it first. The render thread loads the graph pointer
+// once per process call, so one blocks_rendered advance after the swap
+// proves no block that started before the swap is still running. If audio
+// is idle the counter never advances and the timeout expires — freeing
+// immediately is then safe because nothing is reading the old graph.
+// The one-advance proof holds only because a single thread calls
+// orpheus_engine_process per engine; a second concurrent render caller
+// (offline export, a second host) would require revisiting this.
+static void orpheus_graph_retire(OrpheusEngine* engine, OrpheusGraph* old_graph) {
+#ifndef __EMSCRIPTEN__
+    uint64_t epoch = engine->blocks_rendered.load(std::memory_order_acquire);
+    for (int i = 0; i < 100; i++) {  // up to ~100ms grace
+        if (engine->blocks_rendered.load(std::memory_order_acquire) != epoch) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+#endif
+    // WASM is single-threaded: loader and renderer share one thread, so no
+    // in-flight block can exist and the wait (which would never advance) is
+    // skipped entirely.
+    orpheus_graph_free(old_graph);
+}
+
 int orpheus_engine_load_patch(OrpheusEngine* engine,
                               const uint8_t* descriptor, size_t length) {
     auto* new_graph = new OrpheusGraph();
@@ -203,13 +229,9 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
     // Dump graph topology on load
     orpheus_graph_dump_exec_order(new_graph);
 
-    // Atomic swap: audio thread sees new graph after release.
-    // WARNING: immediate free of old graph is only safe when called before
-    // audio processing starts (e.g., at startup or during nativeLoadGraph).
-    // If hot-swapping while audio is running, defer the free to avoid a
-    // use-after-free race with the audio callback.
+    // Atomic swap: audio thread sees the new graph at its next block.
     auto* old = engine->graph.exchange(new_graph, std::memory_order_acq_rel);
-    orpheus_graph_free(old);
+    if (old) orpheus_graph_retire(engine, old);
     return 0;
 }
 
@@ -546,6 +568,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
     float elapsed_us = std::chrono::duration<float, std::micro>(t1 - t0).count();
     float buffer_us = (static_cast<float>(num_frames) / engine->sample_rate) * 1e6f;
     engine->cpu_load.store(elapsed_us / buffer_us, std::memory_order_relaxed);
+
+    engine->blocks_rendered.fetch_add(1, std::memory_order_release);
 }
 
 // Max frames per callback — CoreAudio typically uses 512 or 1024.

@@ -221,6 +221,7 @@ if(BUILD_TESTS)
         test/test_voices.cpp
         test/test_lpg.cpp
         test/test_engine_render.cpp
+        test/test_graph_swap.cpp
         test/test_effects.cpp
         test/test_graph.cpp
         test/test_output_chain.cpp

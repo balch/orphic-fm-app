@@ -427,9 +427,9 @@ class DspSynthEngine(
         // (still hear mute clicks because the master gain path is alive,
         // but no Pulsar beats / no instrument output).
         nativeBridge.setOnEngineRecreatedCallback {
-            // Callback runs on Oboe's error thread; hop to a coroutine so we
-            // don't block error handling and so the JNI calls happen on a
-            // sane scope.
+            // Callback runs on a platform-chosen thread (Oboe's error thread
+            // on Android, the main queue on iOS); hop to a coroutine so we
+            // don't block it and so the native calls happen on a sane scope.
             appCoroutineScope.launch {
                 log.info { "C++ engine recreated — reloading graph + syncing port state" }
                 loadGraphAndSync()
