@@ -137,6 +137,7 @@ object VibeCatalog {
         "Comp Reggae" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
         "Comp Ska" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
         "Vanished Skyline" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        "Kaleidoscope Drift" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "opus 4.8")),
     )
 
     /**
