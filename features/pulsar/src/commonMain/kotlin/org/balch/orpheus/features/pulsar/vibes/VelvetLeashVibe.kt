@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
@@ -223,6 +224,9 @@ class VelvetLeashVibe : VibeProvider {
                 loopLength = 0, // 4 beats of notes, no rest — wraps twice across the 32-step pattern
             ),
             lickMutation = 0.42f,
+            anomalies = listOf(
+                WahAnomaly(probability = .2f),
+            ),
             band = Band(
                 members = listOf(
                     BandMember(

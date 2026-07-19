@@ -1,6 +1,16 @@
 package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
+import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 
 enum class Album(val title: String) {
     STEALTH("Stealth"),
@@ -82,6 +92,10 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param tension Build-and-release arc configuration.
  * @param arrangement Optional section-based structure (verse, chorus, solo, etc.)
  * @param effects Delay and reverb tuning for this vibe.
+ * @param lickWah Optional per-track lick-wah voice. Tracks whose [TrackRole.Melodic.wahLick] is
+ *   set filter their rendered audio through this tempo-synced bandpass wah before it accumulates
+ *   into the mix — a standing timbral insert, independent of the [WahAnomaly]. Null = no track
+ *   filters (the insert stays inert even if a track opts in).
  * @param anomalies Rare dramatic events (see [Anomaly]) the Anomaly Engine may fire — e.g. a
  *   [VoidAnomaly] drop-to-silence or a [LickAnomaly] original-riff swap. Empty = none; the vibe
  *   then ignores the manual anomaly trigger. At most one anomaly of each concrete type.
@@ -113,6 +127,7 @@ data class Vibe(
     val progressionAnchor: ProgressionAnchor = ProgressionAnchor.EVERY_4,
     val progressionDriftRange: Float = 0.5f,
     val effects: VibeEffects = VibeEffects(),
+    val lickWah: WahParams? = null,
     val anomalies: List<Anomaly> = emptyList(),
 ) {
     init {
@@ -128,6 +143,27 @@ data class Vibe(
         // anomaly type may appear at most once.
         require(anomalies.filterIsInstance<VoidAnomaly>().size <= 1) {
             "Vibe.anomalies may contain at most one VoidAnomaly"
+        }
+        require(anomalies.filterIsInstance<WahAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one WahAnomaly"
+        }
+        require(anomalies.filterIsInstance<CrossfadeAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one CrossfadeAnomaly"
+        }
+        require(anomalies.filterIsInstance<CutAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one CutAnomaly"
+        }
+        require(anomalies.filterIsInstance<SwellAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one SwellAnomaly"
+        }
+        require(anomalies.filterIsInstance<TapeAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one TapeAnomaly"
+        }
+        require(anomalies.filterIsInstance<ScratchAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one ScratchAnomaly"
+        }
+        require(anomalies.filterIsInstance<FilterAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one FilterAnomaly"
         }
         val lickAnomalies = anomalies.filterIsInstance<LickAnomaly>()
         require(lickAnomalies.size <= 1) {

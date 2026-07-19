@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.pulsar.models
+package org.balch.orpheus.features.pulsar.anonmalies
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 /**
  * Config for the Void Anomaly — a rare, dramatic "everything sinks toward
  * silence and swells back" moment. An [Anomaly] subtype: list it in
- * [Vibe.anomalies] to enable it. Auto-fires per section at [probability]; also
+ * [org.balch.orpheus.features.pulsar.models.Vibe.anomalies] to enable it. Auto-fires per section at [probability]; also
  * force-fired all-at-once by the manual anomaly trigger on any vibe that
  * declares it (the void only arms while a section graph is active, which
  * also gates the live trigger).

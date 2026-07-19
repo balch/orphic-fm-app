@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -28,7 +29,12 @@ class VoidAnomalyTest {
 
     @Test
     fun rejectsInvertedFloorRange() {
-        assertFailsWith<IllegalArgumentException> { VoidAnomaly(floorBarsMin = 3f, floorBarsMax = 1f) }
+        assertFailsWith<IllegalArgumentException> {
+            VoidAnomaly(
+                floorBarsMin = 3f,
+                floorBarsMax = 1f
+            )
+        }
     }
 
     @Test

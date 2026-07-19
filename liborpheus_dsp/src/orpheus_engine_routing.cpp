@@ -1080,6 +1080,49 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < 8)
                 engine->pulsar_void_data[idx].store(value, std::memory_order_relaxed);
         }
+        else if (std::strncmp(symbol, "lick_wah_data_", 14) == 0) {
+            // Per-track lick-wah insert bank. Longer prefix than "wah_data_" and "lick_data_",
+            // so it needs its own branch — neither shorter prefix matches "lick_wah_data_N"
+            // (differ at index 0 / index 5 respectively), so ordering here is not load-bearing.
+            int idx = std::atoi(symbol + 14);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_lick_wah_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "wah_data_", 9) == 0) {
+            int idx = std::atoi(symbol + 9);
+            if (idx >= 0 && idx < 10)
+                engine->pulsar_wah_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "crossfade_data_", 15) == 0) {
+            int idx = std::atoi(symbol + 15);
+            if (idx >= 0 && idx < 5)
+                engine->pulsar_crossfade_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "cut_data_", 9) == 0) {
+            int idx = std::atoi(symbol + 9);
+            if (idx >= 0 && idx < 7)
+                engine->pulsar_cut_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "swell_data_", 11) == 0) {
+            int idx = std::atoi(symbol + 11);
+            if (idx >= 0 && idx < 6)
+                engine->pulsar_swell_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "tape_data_", 10) == 0) {
+            int idx = std::atoi(symbol + 10);
+            if (idx >= 0 && idx < 4)
+                engine->pulsar_tape_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "scratch_data_", 13) == 0) {
+            int idx = std::atoi(symbol + 13);
+            if (idx >= 0 && idx < 4)
+                engine->pulsar_scratch_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "filter_data_", 12) == 0) {
+            int idx = std::atoi(symbol + 12);
+            if (idx >= 0 && idx < 4)
+                engine->pulsar_filter_data[idx].store(value, std::memory_order_relaxed);
+        }
         else if (std::strcmp(symbol, "anomaly_request") == 0)
             engine->pulsar_anomaly_request.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strncmp(symbol, "section_track_comping_", 22) == 0) {

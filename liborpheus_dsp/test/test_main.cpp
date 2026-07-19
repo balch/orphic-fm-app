@@ -65,6 +65,9 @@ static TestSuite suites[] = {
     {"comping",         run_pulsar_comping_tests,  true},
     {"pulsar_signal",   run_pulsar_signal_tests,   true},
     {"pulsar_void",    run_pulsar_void_tests,     true},
+    {"wah_core",        run_wah_core_tests,        true},
+    {"pulsar_lick_wah", run_pulsar_lick_wah_tests, true},
+    {"pulsar_anomaly_arm", run_pulsar_anomaly_arm_tests, true},
     {"pulsar_lick_select", run_pulsar_lick_select_tests, true},
     {"tension",         run_pulsar_tension_tests,  true},
     {"pulsar_solos",    run_pulsar_solos_tests,    true},
@@ -97,6 +100,10 @@ static TestSuite suites[] = {
     {"master_leslie",   run_master_leslie_tests,    true},
     {"master_fader_pulsar", run_master_fader_pulsar_routing_tests, true},
     {"master_tape_stop_pulsar", run_master_tape_stop_pulsar_routing_tests, true},
+    {"master_crossfade", run_master_crossfade_tests, true},
+    {"master_swell",    run_master_swell_tests,    true},
+    {"master_cut",      run_master_cut_tests,      true},
+    {"master_wah",      run_master_wah_tests,      true},
     {"graph-swap",      run_graph_swap_tests,      true},
 };
 

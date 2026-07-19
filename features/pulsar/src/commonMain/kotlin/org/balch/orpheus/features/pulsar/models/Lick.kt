@@ -81,7 +81,7 @@ sealed class LickMode {
  *
  * Rotation is NORMAL, always-on behavior driven at section boundaries, so the vibe needs an
  * arrangement; without one, the pool falls back to a single load-time pick. The rare "swap in an
- * original riff" event that used to live here is now a [LickAnomaly] in [Vibe.anomalies].
+ * original riff" event that used to live here is now a [org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly] in [Vibe.anomalies].
  */
 @Serializable
 data class LickRotation(
@@ -96,7 +96,7 @@ data class LickRotation(
 
     companion object {
         /**
-         * Max bank slots. Bounds `pool` PLUS any [LickAnomaly] lick sharing the C++ lick bank
+         * Max bank slots. Bounds `pool` PLUS any [org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly] lick sharing the C++ lick bank
          * (validated together in [Vibe.init]). MUST equal C++ kMaxLickPool.
          */
         const val MAX_LICK_POOL = 4

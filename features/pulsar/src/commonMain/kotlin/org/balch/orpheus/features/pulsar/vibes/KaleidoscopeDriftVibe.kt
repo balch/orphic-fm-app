@@ -19,7 +19,7 @@ import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
-import org.balch.orpheus.features.pulsar.models.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
@@ -43,7 +43,7 @@ import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeProvider
-import org.balch.orpheus.features.pulsar.models.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 
 /**
  * Kaleidoscope Drift — generated from an AI-archived vibe JSON by tools:vibe-codegen (NOT hand-authored).

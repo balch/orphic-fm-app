@@ -10,7 +10,6 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.json.Json
@@ -20,11 +19,11 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.ai.AiVibeArchive
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
-import org.balch.orpheus.features.pulsar.models.Anomaly
+import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.Vibe
-import org.balch.orpheus.features.pulsar.models.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 
 /**
  * JSON config for decoding agent-emitted vibes.

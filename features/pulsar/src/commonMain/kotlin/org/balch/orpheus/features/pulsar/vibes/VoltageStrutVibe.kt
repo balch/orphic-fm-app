@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
@@ -80,6 +81,9 @@ class VoltageStrutVibe : VibeProvider {
                 loopLength = 4,
             ),
             lickMutation = 0.35f,
+            anomalies = listOf(
+                CrossfadeAnomaly(probability = .005f)
+            ),
             band = Band(
                 members = listOf(
                     BandMember(

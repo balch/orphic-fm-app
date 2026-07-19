@@ -10,10 +10,17 @@ import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.models.Anomaly
-import org.balch.orpheus.features.pulsar.models.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
+import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.models.Vibe
-import org.balch.orpheus.features.pulsar.models.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import kotlin.math.roundToInt
 
 /**
@@ -26,6 +33,13 @@ internal fun oneDecimal(f: Float): String = ((f * 10).roundToInt() / 10.0).toStr
 internal fun anomalyTag(a: Anomaly): String = when (a) {
     is VoidAnomaly -> "void"
     is LickAnomaly -> "lick"
+    is WahAnomaly -> "wah"
+    is CrossfadeAnomaly -> "crossfade"
+    is CutAnomaly -> "cut"
+    is SwellAnomaly -> "swell"
+    is TapeAnomaly -> "tape"
+    is ScratchAnomaly -> "scratch"
+    is FilterAnomaly -> "filter"
 }
 
 /**

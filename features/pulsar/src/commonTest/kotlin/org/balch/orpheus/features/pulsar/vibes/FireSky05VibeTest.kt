@@ -1,6 +1,6 @@
 package org.balch.orpheus.features.pulsar.vibes
 
-import org.balch.orpheus.features.pulsar.models.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

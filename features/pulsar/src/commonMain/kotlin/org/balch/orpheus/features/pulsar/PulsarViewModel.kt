@@ -57,27 +57,35 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
+import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
-import org.balch.orpheus.features.pulsar.models.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SoloBehavior
 import org.balch.orpheus.features.pulsar.models.SoloMarkovConfig
 import org.balch.orpheus.features.pulsar.models.SoloMode
+import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.WahParams
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
-import org.balch.orpheus.features.pulsar.models.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
@@ -1851,6 +1859,148 @@ class PulsarViewModel(
         voidData.forEachIndexed { i, v ->
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "void_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Wah Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val wa = vibe.anomalies.filterIsInstance<WahAnomaly>().firstOrNull()
+        val wahData = floatArrayOf(
+            wa?.probability ?: 0f,
+            wa?.durationBarsMin ?: 2f,
+            wa?.durationBarsMax ?: 4f,
+            wa?.voice?.rateDivision ?: 8f,
+            wa?.voice?.depth ?: 1f,
+            wa?.voice?.resonanceQ ?: 3f,
+            wa?.voice?.centerHz ?: 800f,
+            wa?.voice?.sweepOctaves ?: 1.3f,
+            wa?.voice?.wet ?: 1f,
+            if (wa != null) 1f else 0f, // [9] declared flag — manual trigger fires only on declaring vibes
+        )
+        wahData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "wah_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Crossfade Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val ca = vibe.anomalies.filterIsInstance<CrossfadeAnomaly>().firstOrNull()
+        val crossfadeData = floatArrayOf(
+            ca?.probability ?: 0f,
+            ca?.durationBarsMin ?: 1f,
+            ca?.durationBarsMax ?: 2f,
+            ca?.depth ?: 0f,
+            if (ca != null) 1f else 0f, // [4] declared flag — manual trigger fires only on declaring vibes
+        )
+        crossfadeData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "crossfade_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Swell Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val sw = vibe.anomalies.filterIsInstance<SwellAnomaly>().firstOrNull()
+        val swellData = floatArrayOf(
+            sw?.probability ?: 0f,
+            sw?.durationBarsMin ?: 2f,
+            sw?.durationBarsMax ?: 4f,
+            sw?.startLevel ?: 1f,
+            sw?.peakLevel ?: 1.3f,
+            if (sw != null) 1f else 0f, // [5] declared flag — manual trigger fires only on declaring vibes
+        )
+        swellData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "swell_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Cut Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val cu = vibe.anomalies.filterIsInstance<CutAnomaly>().firstOrNull()
+        val cutData = floatArrayOf(
+            cu?.probability ?: 0f,
+            cu?.durationBarsMin ?: 1f,
+            cu?.durationBarsMax ?: 2f,
+            cu?.gateRate ?: 2f,
+            cu?.duty ?: 0.5f,
+            cu?.depth ?: 0f,
+            if (cu != null) 1f else 0f, // [6] declared flag — manual trigger fires only on declaring vibes
+        )
+        cutData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "cut_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Tape Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val ta = vibe.anomalies.filterIsInstance<TapeAnomaly>().firstOrNull()
+        val tapeData = floatArrayOf(
+            ta?.probability ?: 0f,
+            ta?.durationBarsMin ?: 1f,
+            ta?.durationBarsMax ?: 2f,
+            if (ta != null) 1f else 0f, // [3] declared flag — manual trigger fires only on declaring vibes
+        )
+        tapeData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "tape_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Scratch Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val sc = vibe.anomalies.filterIsInstance<ScratchAnomaly>().firstOrNull()
+        val scratchData = floatArrayOf(
+            sc?.probability ?: 0f,
+            sc?.durationBarsMin ?: 1f,
+            sc?.durationBarsMax ?: 2f,
+            if (sc != null) 1f else 0f, // [3] declared flag — manual trigger fires only on declaring vibes
+        )
+        scratchData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "scratch_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Filter Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val fi = vibe.anomalies.filterIsInstance<FilterAnomaly>().firstOrNull()
+        val filterData = floatArrayOf(
+            fi?.probability ?: 0f,
+            fi?.durationBarsMin ?: 2f,
+            fi?.durationBarsMax ?: 4f,
+            if (fi != null) 1f else 0f, // [3] declared flag — manual trigger fires only on declaring vibes
+        )
+        filterData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "filter_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Per-track lick-wah insert config bank. NOT an anomaly — a standing per-track filter.
+        // [0]=track opt-in bitmask (bit t set => track t has wahLick), [1]=rateDivision [2]=depth
+        // [3]=resonanceQ [4]=centerHz [5]=sweepOctaves [6]=wet [7]=declared flag. Order MUST match
+        // the C++ unpack in orpheus_unit_pulsar.cpp load_vibe. Inert unless declared AND mask != 0.
+        var lickWahMask = 0
+        vibe.tracks.forEachIndexed { t, tv ->
+            if ((tv.role as? TrackRole.Melodic)?.wahLick == true) lickWahMask = lickWahMask or (1 shl t)
+        }
+        val lw = vibe.lickWah ?: WahParams()
+        val lickWahData = floatArrayOf(
+            lickWahMask.toFloat(),
+            lw.rateDivision,
+            lw.depth,
+            lw.resonanceQ,
+            lw.centerHz,
+            lw.sweepOctaves,
+            lw.wet,
+            if (vibe.lickWah != null && lickWahMask != 0) 1f else 0f, // [7] declared flag
+        )
+        lickWahData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_wah_data_$i"), FloatValue(v)
             )
         }
 

@@ -65,6 +65,10 @@
 #include "orpheus_master_scratch.h"
 #include "orpheus_master_filter.h"
 #include "orpheus_master_leslie.h"
+#include "orpheus_master_wah.h"
+#include "orpheus_master_crossfade.h"
+#include "orpheus_master_cut.h"
+#include "orpheus_master_swell.h"
 
 #include <atomic>
 #include <cstring>
@@ -141,6 +145,14 @@ struct OrpheusEngine {
     orpheus::MasterFilter master_filter_r;
     orpheus::MasterLeslie master_leslie_l;
     orpheus::MasterLeslie master_leslie_r;
+    orpheus::MasterWah master_wah_l;
+    orpheus::MasterWah master_wah_r;
+    orpheus::MasterCrossfade master_crossfade_l;
+    orpheus::MasterCrossfade master_crossfade_r;
+    orpheus::MasterCut master_cut_l;
+    orpheus::MasterCut master_cut_r;
+    orpheus::MasterSwell master_swell_l;
+    orpheus::MasterSwell master_swell_r;
 
     // Per-voice stereo pan (-1..+1, constant-power)
     // Defaults match Kotlin: 0-1 center, 2-3 left(-0.3), 4-5 right(0.3), 6 left(-0.7), 7 right(0.7), 8-11 center
@@ -955,6 +967,43 @@ struct OrpheusEngine {
     // [4]=floorMax, [5]=rampUp, [6]=ghost, [7]=declared flag (1.0 when the vibe declares a
     // VoidAnomaly; gates the manual trigger).
     std::atomic<float> pulsar_void_data[8] = {};
+    // Wah Anomaly: 10-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=rateDivision,
+    // [4]=depth, [5]=resonanceQ, [6]=centerHz, [7]=sweepOctaves, [8]=wet, [9]=declared flag
+    // (1.0 when the vibe declares a WahAnomaly; gates the manual trigger).
+    std::atomic<float> pulsar_wah_data[10] = {};
+    // Crossfade Anomaly: 5-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=depth,
+    // [4]=declared flag (1.0 when the vibe declares a CrossfadeAnomaly; gates the manual
+    // trigger).
+    std::atomic<float> pulsar_crossfade_data[5] = {};
+    // Cut Anomaly: 7-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=gateRate,
+    // [4]=duty, [5]=depth, [6]=declared flag (1.0 when the vibe declares a CutAnomaly;
+    // gates the manual trigger).
+    std::atomic<float> pulsar_cut_data[7] = {};
+    // Swell Anomaly: 6-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=startLevel,
+    // [4]=peakLevel, [5]=declared flag (1.0 when the vibe declares a SwellAnomaly; gates the
+    // manual trigger). peakLevel may intentionally exceed 1.0 — not clamped.
+    std::atomic<float> pulsar_swell_data[6] = {};
+    // Tape Anomaly: 4-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=declared flag
+    // (1.0 when the vibe declares a TapeAnomaly; gates the manual trigger). Arms the EXISTING
+    // master_tape_stop_l/r members (already in the master chain for the scratch-outro feature) —
+    // no new engine effect member here.
+    std::atomic<float> pulsar_tape_data[4] = {};
+    // Scratch Anomaly: 4-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=declared flag
+    // (1.0 when the vibe declares a ScratchAnomaly; gates the manual trigger). Arms the EXISTING
+    // master_scratch_l/r members (already in the master chain for the section-exit scratch
+    // feature) — no new engine effect member here.
+    std::atomic<float> pulsar_scratch_data[4] = {};
+    // Filter Anomaly: 4-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=declared flag
+    // (1.0 when the vibe declares a FilterAnomaly; gates the manual trigger). Arms the EXISTING
+    // master_filter_l/r members (already in the master chain) — no new engine effect member here.
+    std::atomic<float> pulsar_filter_data[4] = {};
+    // Per-track lick-wah insert: 8-float config bank [0]=track opt-in bitmask (bit t set => track
+    // t filters its rendered audio through the shared WahVoice), [1]=rateDivision [2]=depth
+    // [3]=resonanceQ [4]=centerHz [5]=sweepOctaves [6]=wet [7]=declared flag (1.0 when the vibe
+    // supplies lickWah AND at least one track opts in). NOT an anomaly — a standing per-track
+    // filter applied inside the pulsar unit's per-track accumulation. Inert (byte-identical) when
+    // declared flag is 0.
+    std::atomic<float> pulsar_lick_wah_data[8] = {};
     // Anomaly manual-trigger counter (edge-detected in the pulsar unit).
     std::atomic<int>   pulsar_anomaly_request{0};
     // Per-track section overrides. Stride: 8 sections × 8 tracks. -1 sentinel

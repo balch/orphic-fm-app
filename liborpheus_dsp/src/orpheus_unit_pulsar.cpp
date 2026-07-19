@@ -13,6 +13,7 @@
 #include "pulsar_mod_ranges.h"
 #include "pulsar_comping.h"
 #include "pulsar_rng.h"
+#include "pulsar_anomaly_arm.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -1467,6 +1468,118 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // this back to full too rather than gliding it (nothing to click against).
     state->void_state.gain_smoothed = 1.0f;
 
+    // Wah Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=rateDivision [4]=depth [5]=resonanceQ
+    // [6]=centerHz [7]=sweepOctaves [8]=wet [9]=declared flag. Loaded unconditionally,
+    // but (like the void) only ARMS while an arrangement is active.
+    state->wah_config.probability        = engine->pulsar_wah_data[0].load(std::memory_order_relaxed);
+    state->wah_config.dur_min            = engine->pulsar_wah_data[1].load(std::memory_order_relaxed);
+    state->wah_config.dur_max            = engine->pulsar_wah_data[2].load(std::memory_order_relaxed);
+    state->wah_config.voice.rate_division = engine->pulsar_wah_data[3].load(std::memory_order_relaxed);
+    state->wah_config.voice.depth        = engine->pulsar_wah_data[4].load(std::memory_order_relaxed);
+    state->wah_config.voice.resonance_q  = engine->pulsar_wah_data[5].load(std::memory_order_relaxed);
+    state->wah_config.voice.center_hz    = engine->pulsar_wah_data[6].load(std::memory_order_relaxed);
+    state->wah_config.voice.sweep_octaves = engine->pulsar_wah_data[7].load(std::memory_order_relaxed);
+    state->wah_config.voice.wet          = engine->pulsar_wah_data[8].load(std::memory_order_relaxed);
+    // [9] is the explicit "this vibe declares the wah anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a WahAnomaly). The manual trigger only arms the wah
+    // when this is set — no default-shape fallback for undeclared vibes.
+    state->wah_declared = engine->pulsar_wah_data[9].load(std::memory_order_relaxed) > 0.5f;
+
+    // Crossfade Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=depth [4]=declared flag. Loaded unconditionally,
+    // but (like the void/wah) only ARMS while an arrangement is active.
+    state->crossfade_config.probability = engine->pulsar_crossfade_data[0].load(std::memory_order_relaxed);
+    state->crossfade_config.dur_min     = engine->pulsar_crossfade_data[1].load(std::memory_order_relaxed);
+    state->crossfade_config.dur_max     = engine->pulsar_crossfade_data[2].load(std::memory_order_relaxed);
+    state->crossfade_config.depth       = engine->pulsar_crossfade_data[3].load(std::memory_order_relaxed);
+    // [4] is the explicit "this vibe declares the crossfade anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a CrossfadeAnomaly). The manual trigger only arms the
+    // crossfade when this is set — no default-shape fallback for undeclared vibes.
+    state->crossfade_declared = engine->pulsar_crossfade_data[4].load(std::memory_order_relaxed) > 0.5f;
+
+    // Cut Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=gateRate [4]=duty [5]=depth [6]=declared flag.
+    // Loaded unconditionally, but (like the void/wah/crossfade) only ARMS while an
+    // arrangement is active.
+    state->cut_config.probability = engine->pulsar_cut_data[0].load(std::memory_order_relaxed);
+    state->cut_config.dur_min     = engine->pulsar_cut_data[1].load(std::memory_order_relaxed);
+    state->cut_config.dur_max     = engine->pulsar_cut_data[2].load(std::memory_order_relaxed);
+    state->cut_config.gate_rate   = engine->pulsar_cut_data[3].load(std::memory_order_relaxed);
+    state->cut_config.duty        = engine->pulsar_cut_data[4].load(std::memory_order_relaxed);
+    state->cut_config.depth       = engine->pulsar_cut_data[5].load(std::memory_order_relaxed);
+    // [6] is the explicit "this vibe declares the cut anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a CutAnomaly). The manual trigger only arms the
+    // cut when this is set — no default-shape fallback for undeclared vibes.
+    state->cut_declared = engine->pulsar_cut_data[6].load(std::memory_order_relaxed) > 0.5f;
+
+    // Swell Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=startLevel [4]=peakLevel [5]=declared flag.
+    // Loaded unconditionally, but (like the void/wah/crossfade/cut) only ARMS while an
+    // arrangement is active. peakLevel may intentionally exceed 1.0 — not clamped.
+    state->swell_config.probability  = engine->pulsar_swell_data[0].load(std::memory_order_relaxed);
+    state->swell_config.dur_min      = engine->pulsar_swell_data[1].load(std::memory_order_relaxed);
+    state->swell_config.dur_max      = engine->pulsar_swell_data[2].load(std::memory_order_relaxed);
+    state->swell_config.start_level  = engine->pulsar_swell_data[3].load(std::memory_order_relaxed);
+    state->swell_config.peak_level   = engine->pulsar_swell_data[4].load(std::memory_order_relaxed);
+    // [5] is the explicit "this vibe declares the swell anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a SwellAnomaly). The manual trigger only arms the
+    // swell when this is set — no default-shape fallback for undeclared vibes.
+    state->swell_declared = engine->pulsar_swell_data[5].load(std::memory_order_relaxed) > 0.5f;
+
+    // Tape Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=declared flag. Loaded unconditionally, but
+    // (like the void/wah/crossfade/cut/swell) only ARMS while an arrangement is active.
+    state->tape_config.probability = engine->pulsar_tape_data[0].load(std::memory_order_relaxed);
+    state->tape_config.dur_min     = engine->pulsar_tape_data[1].load(std::memory_order_relaxed);
+    state->tape_config.dur_max     = engine->pulsar_tape_data[2].load(std::memory_order_relaxed);
+    // [3] is the explicit "this vibe declares the tape anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a TapeAnomaly). The manual trigger only arms the
+    // tape stop when this is set — no default-shape fallback for undeclared vibes.
+    state->tape_declared = engine->pulsar_tape_data[3].load(std::memory_order_relaxed) > 0.5f;
+
+    // Scratch Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=declared flag. Loaded unconditionally, but
+    // (like the void/wah/crossfade/cut/swell/tape) only ARMS while an arrangement is active.
+    state->scratch_config.probability = engine->pulsar_scratch_data[0].load(std::memory_order_relaxed);
+    state->scratch_config.dur_min     = engine->pulsar_scratch_data[1].load(std::memory_order_relaxed);
+    state->scratch_config.dur_max     = engine->pulsar_scratch_data[2].load(std::memory_order_relaxed);
+    // [3] is the explicit "this vibe declares the scratch anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a ScratchAnomaly). The manual trigger only arms the
+    // scratch when this is set — no default-shape fallback for undeclared vibes.
+    state->scratch_declared = engine->pulsar_scratch_data[3].load(std::memory_order_relaxed) > 0.5f;
+
+    // Filter Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=prob [1]=durMin [2]=durMax [3]=declared flag. Loaded unconditionally, but
+    // (like the void/wah/crossfade/cut/swell/tape/scratch) only ARMS while an arrangement
+    // is active.
+    state->filter_config.probability = engine->pulsar_filter_data[0].load(std::memory_order_relaxed);
+    state->filter_config.dur_min     = engine->pulsar_filter_data[1].load(std::memory_order_relaxed);
+    state->filter_config.dur_max     = engine->pulsar_filter_data[2].load(std::memory_order_relaxed);
+    // [3] is the explicit "this vibe declares the filter anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a FilterAnomaly). The manual trigger only arms the
+    // filter when this is set — no default-shape fallback for undeclared vibes.
+    state->filter_declared = engine->pulsar_filter_data[3].load(std::memory_order_relaxed) > 0.5f;
+
+    // Per-track lick-wah insert bank. Order mirrors the Kotlin marshal in PulsarViewModel:
+    // [0]=track opt-in bitmask [1]=rateDivision [2]=depth [3]=resonanceQ [4]=centerHz
+    // [5]=sweepOctaves [6]=wet [7]=declared flag. NOT an anomaly — a standing per-track filter
+    // applied inside the per-track accumulation loop. Reset each voice's filter + LFO phase on
+    // load so a new vibe starts clean.
+    state->lick_wah_mask                  = (uint8_t)(engine->pulsar_lick_wah_data[0].load(std::memory_order_relaxed));
+    state->lick_wah_params.rate_division  = engine->pulsar_lick_wah_data[1].load(std::memory_order_relaxed);
+    state->lick_wah_params.depth          = engine->pulsar_lick_wah_data[2].load(std::memory_order_relaxed);
+    state->lick_wah_params.resonance_q    = engine->pulsar_lick_wah_data[3].load(std::memory_order_relaxed);
+    state->lick_wah_params.center_hz      = engine->pulsar_lick_wah_data[4].load(std::memory_order_relaxed);
+    state->lick_wah_params.sweep_octaves  = engine->pulsar_lick_wah_data[5].load(std::memory_order_relaxed);
+    state->lick_wah_params.wet            = engine->pulsar_lick_wah_data[6].load(std::memory_order_relaxed);
+    state->lick_wah_declared = engine->pulsar_lick_wah_data[7].load(std::memory_order_relaxed) > 0.5f;
+    for (int t = 0; t < kNumPulsarTracks; t++) state->lick_wah_voice[t].Init();
+
+    // Play-scoped RNG for Master* anomaly rolls/durations. Stirred like void_seed via
+    // base_seed (which already folds in the wall clock), with a distinct salt.
+    state->master_anomaly_seed = base_seed ^ 0x5A17F00Du;
+
     // Clear any stale outro request so a request from a prior vibe does not
     // bleed into the new arrangement. Placed after arrangement loading so that
     // it always runs regardless of whether arr_active is set.
@@ -2084,12 +2197,73 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     // Anomaly Engine: edge-detect the manual trigger counter and fire every
                     // anomaly this vibe DECLARES. A vibe with no declared anomaly ignores the
                     // gesture entirely (no default fallback). Registry point: future anomaly
-                    // types (scratch/tape/sweep) add their declared-check + fire here.
+                    // types (scratch/sweep) add their declared-check + fire here.
                     int anomaly_req = engine->pulsar_anomaly_request.load(std::memory_order_acquire);
                     if (anomaly_req != state->prev_anomaly_request) {
                         state->prev_anomaly_request = anomaly_req;
                         if (state->void_declared && !state->void_state.armed) {
                             arm_void_manual(state->void_state, state->void_config, state->void_seed);
+                        }
+                        if (state->wah_declared && !engine->master_wah_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->wah_config.dur_min,
+                                                           state->wah_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            engine->master_wah_l.arm(samples, sample_rate, state->wah_config.voice);
+                            engine->master_wah_r.arm(samples, sample_rate, state->wah_config.voice);
+                        }
+                        if (state->crossfade_declared && !engine->master_crossfade_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->crossfade_config.dur_min,
+                                                           state->crossfade_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            float depth = std::clamp(state->crossfade_config.depth, 0.0f, 1.0f);
+                            engine->master_crossfade_l.arm(samples, sample_rate, depth);
+                            engine->master_crossfade_r.arm(samples, sample_rate, depth);
+                        }
+                        if (state->cut_declared && !engine->master_cut_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->cut_config.dur_min,
+                                                           state->cut_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            engine->master_cut_l.arm(samples, sample_rate, state->cut_config.gate_rate,
+                                                     state->cut_config.duty, state->cut_config.depth);
+                            engine->master_cut_r.arm(samples, sample_rate, state->cut_config.gate_rate,
+                                                     state->cut_config.duty, state->cut_config.depth);
+                        }
+                        if (state->swell_declared && !engine->master_swell_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->swell_config.dur_min,
+                                                           state->swell_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            engine->master_swell_l.arm(samples, sample_rate, state->swell_config.start_level,
+                                                       state->swell_config.peak_level);
+                            engine->master_swell_r.arm(samples, sample_rate, state->swell_config.start_level,
+                                                       state->swell_config.peak_level);
+                        }
+                        if (state->tape_declared && !engine->master_tape_stop_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->tape_config.dur_min,
+                                                           state->tape_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            engine->master_tape_stop_l.arm(samples);
+                            engine->master_tape_stop_r.arm(samples);
+                        }
+                        if (state->scratch_declared && !engine->master_scratch_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->scratch_config.dur_min,
+                                                           state->scratch_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            engine->master_scratch_l.arm(samples, sample_rate, 0);
+                            engine->master_scratch_r.arm(samples, sample_rate, 0x55555555u);
+                        }
+                        if (state->filter_declared && !engine->master_filter_l.is_active()) {
+                            float bars = anomaly_draw_bars(state->filter_config.dur_min,
+                                                           state->filter_config.dur_max,
+                                                           state->master_anomaly_seed);
+                            int samples = anomaly_arm_samples(bars, samples_per_step);
+                            engine->master_filter_l.arm(samples, sample_rate, 0);
+                            engine->master_filter_r.arm(samples, sample_rate, 7);
                         }
                         if (state->lick_pool_count > 0 && state->lick_anomaly_index >= 0) {
                             state->force_lick_anomaly = true;   // one-shot; consumed at the next lick resolve
@@ -2248,6 +2422,102 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             static_cast<float>(state->tracks[0].step_count);
                         arm_void_auto(state->void_state, state->void_config,
                                       state->section_total_steps, state->void_seed);
+
+                        // Wah Anomaly: roll the auto trigger at the section boundary.
+                        if (state->wah_declared && state->wah_config.probability > 0.0f &&
+                            !engine->master_wah_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->wah_config.probability) {
+                                float bars = anomaly_draw_bars(state->wah_config.dur_min,
+                                                               state->wah_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                engine->master_wah_l.arm(samples, sample_rate, state->wah_config.voice);
+                                engine->master_wah_r.arm(samples, sample_rate, state->wah_config.voice);
+                            }
+                        }
+
+                        // Crossfade Anomaly: roll the auto trigger at the section boundary.
+                        if (state->crossfade_declared && state->crossfade_config.probability > 0.0f &&
+                            !engine->master_crossfade_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->crossfade_config.probability) {
+                                float bars = anomaly_draw_bars(state->crossfade_config.dur_min,
+                                                               state->crossfade_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                float depth = std::clamp(state->crossfade_config.depth, 0.0f, 1.0f);
+                                engine->master_crossfade_l.arm(samples, sample_rate, depth);
+                                engine->master_crossfade_r.arm(samples, sample_rate, depth);
+                            }
+                        }
+
+                        // Cut Anomaly: roll the auto trigger at the section boundary.
+                        if (state->cut_declared && state->cut_config.probability > 0.0f &&
+                            !engine->master_cut_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->cut_config.probability) {
+                                float bars = anomaly_draw_bars(state->cut_config.dur_min,
+                                                               state->cut_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                engine->master_cut_l.arm(samples, sample_rate, state->cut_config.gate_rate,
+                                                         state->cut_config.duty, state->cut_config.depth);
+                                engine->master_cut_r.arm(samples, sample_rate, state->cut_config.gate_rate,
+                                                         state->cut_config.duty, state->cut_config.depth);
+                            }
+                        }
+
+                        // Swell Anomaly: roll the auto trigger at the section boundary.
+                        if (state->swell_declared && state->swell_config.probability > 0.0f &&
+                            !engine->master_swell_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->swell_config.probability) {
+                                float bars = anomaly_draw_bars(state->swell_config.dur_min,
+                                                               state->swell_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                engine->master_swell_l.arm(samples, sample_rate, state->swell_config.start_level,
+                                                           state->swell_config.peak_level);
+                                engine->master_swell_r.arm(samples, sample_rate, state->swell_config.start_level,
+                                                           state->swell_config.peak_level);
+                            }
+                        }
+
+                        // Tape Anomaly: roll the auto trigger at the section boundary.
+                        if (state->tape_declared && state->tape_config.probability > 0.0f &&
+                            !engine->master_tape_stop_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->tape_config.probability) {
+                                float bars = anomaly_draw_bars(state->tape_config.dur_min,
+                                                               state->tape_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                engine->master_tape_stop_l.arm(samples);
+                                engine->master_tape_stop_r.arm(samples);
+                            }
+                        }
+
+                        // Scratch Anomaly: roll the auto trigger at the section boundary.
+                        if (state->scratch_declared && state->scratch_config.probability > 0.0f &&
+                            !engine->master_scratch_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->scratch_config.probability) {
+                                float bars = anomaly_draw_bars(state->scratch_config.dur_min,
+                                                               state->scratch_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                engine->master_scratch_l.arm(samples, sample_rate, 0);
+                                engine->master_scratch_r.arm(samples, sample_rate, 0x55555555u);
+                            }
+                        }
+
+                        // Filter Anomaly: roll the auto trigger at the section boundary.
+                        if (state->filter_declared && state->filter_config.probability > 0.0f &&
+                            !engine->master_filter_l.is_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->filter_config.probability) {
+                                float bars = anomaly_draw_bars(state->filter_config.dur_min,
+                                                               state->filter_config.dur_max,
+                                                               state->master_anomaly_seed);
+                                int samples = anomaly_arm_samples(bars, samples_per_step);
+                                engine->master_filter_l.arm(samples, sample_rate, 0);
+                                engine->master_filter_r.arm(samples, sample_rate, 7);
+                            }
+                        }
                     }
 
                     // ── Fire Sky .5f: per-section rotation + rare anomaly override ──
@@ -3466,6 +3736,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     }
                 }
             }
+        }
+
+        // ── Per-track lick-wah insert ──
+        // Standing bandpass wah (NOT an anomaly): filter this track's fully-rendered,
+        // enveloped buffer in place ONCE per block, before it accumulates into out_l/out_r
+        // and the sends below (both read track_buffer). Gated so undeclared/unflagged tracks
+        // are completely untouched (zero cost, byte-identical output).
+        if (state->lick_wah_declared && (state->lick_wah_mask & (1 << t))) {
+            state->lick_wah_voice[t].process(track_buffer, num_frames,
+                                             state->lick_wah_params, samples_per_step, sample_rate);
         }
 
         // ── Mix to stereo with constant-power pan ──

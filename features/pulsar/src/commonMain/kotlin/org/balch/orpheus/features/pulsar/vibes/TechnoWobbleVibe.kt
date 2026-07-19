@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -121,6 +122,9 @@ class TechnoWobbleVibe : VibeProvider {
                 loopLength = 8,
             ),
             lickMutation = 0.35f,  // mostly static — mechanical, but drifts over long arc
+            anomalies = listOf(
+                TapeAnomaly(),
+            ),
             band = Band(
                 members = listOf(
                     BandMember(

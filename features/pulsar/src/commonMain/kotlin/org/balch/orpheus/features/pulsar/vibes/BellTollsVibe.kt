@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
@@ -255,6 +256,9 @@ class BellTollsVibe : VibeProvider {
                 outroIndex = sectionList.lastIndex,
                 sections = sectionList,
                 lengthSeconds = 180..300,
+            ),
+            anomalies = listOf(
+                WahAnomaly(probability = .05f),
             ),
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.A,

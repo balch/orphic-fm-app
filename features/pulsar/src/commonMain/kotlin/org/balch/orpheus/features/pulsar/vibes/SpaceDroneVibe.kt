@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
@@ -176,6 +177,9 @@ class SpaceDroneVibe : VibeProvider {
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
                 sections = sectionList,
+            ),
+            anomalies = listOf(
+                SwellAnomaly(),
             ),
             energy = 0.30f,
             complexity = 0.40f,

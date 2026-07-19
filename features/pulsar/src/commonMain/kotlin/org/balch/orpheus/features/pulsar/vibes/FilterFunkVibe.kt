@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
@@ -170,6 +171,9 @@ class FilterFunkVibe : VibeProvider {
                 ),
             ),
             lickMutation = 0.6f,
+            anomalies = listOf(
+                FilterAnomaly(probability = .1f)
+            ),
             band = Band(
                 members = listOf(
                     BandMember(

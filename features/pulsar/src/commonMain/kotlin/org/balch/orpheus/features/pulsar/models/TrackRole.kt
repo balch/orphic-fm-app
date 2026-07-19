@@ -40,6 +40,13 @@ sealed class TrackRole {
          * unaffected. 0 = play the lick as written.
          */
         val lickDegreeOffset: Int = 0,
+        /**
+         * When true, this track's rendered audio is filtered through a per-track
+         * tempo-synced bandpass wah ([Vibe.lickWah]) before it accumulates into the
+         * mix — a standing timbral insert, independent of the wah anomaly. Off by
+         * default (zero cost, byte-identical output).
+         */
+        val wahLick: Boolean = false,
     ) : TrackRole()
 
     /** Chord voicings — progression-following, comping patterns. */

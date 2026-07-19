@@ -3,6 +3,7 @@
 #include "orpheus_voice.h"
 #include "orpheus_unit_chaos.h"
 #include "pulsar_void.h"
+#include "orpheus_wah_core.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
 #include "stmlib/dsp/filter.h"
@@ -624,6 +625,79 @@ struct BandSoloState {
     int solo_lick_octave = -1;
 };
 
+// Wah Anomaly config (unpacked from pulsar_wah_data). Mirrors the Kotlin
+// WahAnomaly: a probability + duration range plus the WahParams voice armed
+// onto MasterWah.
+struct WahAnomalyConfig {
+    float probability = 0.0f;
+    float dur_min = 2.0f;
+    float dur_max = 4.0f;
+    orpheus::WahParams voice;
+};
+
+// Crossfade Anomaly config (unpacked from pulsar_crossfade_data). Mirrors the
+// Kotlin CrossfadeAnomaly: a probability + duration range plus the dip depth
+// armed onto MasterCrossfade.
+struct CrossfadeConfig {
+    float probability = 0.0f;
+    float dur_min = 1.0f;
+    float dur_max = 2.0f;
+    float depth = 0.0f;
+};
+
+// Cut Anomaly config (unpacked from pulsar_cut_data). Mirrors the Kotlin
+// CutAnomaly: a probability + duration range plus the rhythmic gate armed
+// onto MasterCut.
+struct CutConfig {
+    float probability = 0.0f;
+    float dur_min = 1.0f;
+    float dur_max = 2.0f;
+    float gate_rate = 2.0f;
+    float duty = 0.5f;
+    float depth = 0.0f;
+};
+
+// Swell Anomaly config (unpacked from pulsar_swell_data). Mirrors the Kotlin
+// SwellAnomaly: a probability + duration range plus the start/peak levels
+// armed onto MasterSwell. peak_level may intentionally exceed 1.0 — not clamped.
+struct SwellConfig {
+    float probability = 0.0f;
+    float dur_min = 2.0f;
+    float dur_max = 4.0f;
+    float start_level = 1.0f;
+    float peak_level = 1.3f;
+};
+
+// Tape Anomaly config (unpacked from pulsar_tape_data). Mirrors the Kotlin
+// TapeAnomaly: a probability + duration range. Arms the EXISTING
+// master_tape_stop_l/r members (already in the master chain) — no voice
+// params to carry, unlike Wah.
+struct TapeConfig {
+    float probability = 0.0f;
+    float dur_min = 1.0f;
+    float dur_max = 2.0f;
+};
+
+// Scratch Anomaly config (unpacked from pulsar_scratch_data). Mirrors the Kotlin
+// ScratchAnomaly: a probability + duration range. Arms the EXISTING
+// master_scratch_l/r members (already in the master chain for the section-exit
+// scratch feature) — no voice params to carry, unlike Wah.
+struct ScratchConfig {
+    float probability = 0.0f;
+    float dur_min = 1.0f;
+    float dur_max = 2.0f;
+};
+
+// Filter Anomaly config (unpacked from pulsar_filter_data). Mirrors the Kotlin
+// FilterAnomaly: a probability + duration range. Arms the EXISTING
+// master_filter_l/r members (already in the master chain) — no voice params
+// to carry, unlike Wah.
+struct FilterConfig {
+    float probability = 0.0f;
+    float dur_min = 2.0f;
+    float dur_max = 4.0f;
+};
+
 // ── Persistent state (heap-allocated on first process call) ──────────────
 static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 
@@ -704,6 +778,47 @@ struct PulsarState {
     uint32_t void_seed = 0;             // play-scoped RNG, independent of mutation_seed
     int prev_anomaly_request = 0;       // edge-detect mirror of pulsar_anomaly_request
     bool void_declared = false;         // true when this vibe opts into the void (void_data[7])
+
+    // Wah Anomaly (dispatched by the Anomaly Engine, arms MasterWah on the master bus)
+    WahAnomalyConfig wah_config;
+    bool wah_declared = false;          // true when this vibe opts into the wah (wah_data[9])
+
+    // Crossfade Anomaly (dispatched by the Anomaly Engine, arms MasterCrossfade on the master bus)
+    CrossfadeConfig crossfade_config;
+    bool crossfade_declared = false;    // true when this vibe opts into the crossfade (crossfade_data[4])
+
+    // Cut Anomaly (dispatched by the Anomaly Engine, arms MasterCut on the master bus)
+    CutConfig cut_config;
+    bool cut_declared = false;          // true when this vibe opts into the cut (cut_data[6])
+
+    // Swell Anomaly (dispatched by the Anomaly Engine, arms MasterSwell on the master bus)
+    SwellConfig swell_config;
+    bool swell_declared = false;        // true when this vibe opts into the swell (swell_data[5])
+
+    // Tape Anomaly (dispatched by the Anomaly Engine, arms the EXISTING
+    // master_tape_stop_l/r on the master bus)
+    TapeConfig tape_config;
+    bool tape_declared = false;         // true when this vibe opts into the tape stop (tape_data[3])
+
+    // Scratch Anomaly (dispatched by the Anomaly Engine, arms the EXISTING
+    // master_scratch_l/r on the master bus)
+    ScratchConfig scratch_config;
+    bool scratch_declared = false;      // true when this vibe opts into the scratch (scratch_data[3])
+
+    // Filter Anomaly (dispatched by the Anomaly Engine, arms the EXISTING
+    // master_filter_l/r on the master bus)
+    FilterConfig filter_config;
+    bool filter_declared = false;       // true when this vibe opts into the filter (filter_data[3])
+
+    // Per-track lick-wah insert (NOT an anomaly): a standing bandpass wah applied to each
+    // opted-in track's rendered buffer, in place, before it accumulates into the mix. One
+    // WahVoice per track so each keeps its own filter + LFO phase. Inert unless lick_wah_declared.
+    orpheus::WahParams lick_wah_params;
+    orpheus::WahVoice lick_wah_voice[kNumPulsarTracks];
+    uint8_t lick_wah_mask = 0;          // bit t set => track t filters through lick_wah_voice[t]
+    bool lick_wah_declared = false;     // true when the vibe supplies lickWah AND a track opts in
+
+    uint32_t master_anomaly_seed = 0;   // play-scoped RNG for Master* anomaly rolls/durations
     bool force_lick_anomaly = false;    // one-shot: force the OG lick anomaly at the next resolve
     float section_total_steps = 0.0f;   // drawn section length in steps, snapshot at entry
 

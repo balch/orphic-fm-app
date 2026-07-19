@@ -158,6 +158,10 @@ set(ORPHEUS_SRC
     "src/orpheus_master_scratch.cpp"
     "src/orpheus_master_filter.cpp"
     "src/orpheus_master_leslie.cpp"
+    "src/orpheus_master_crossfade.cpp"
+    "src/orpheus_master_swell.cpp"
+    "src/orpheus_master_cut.cpp"
+    "src/orpheus_master_wah.cpp"
     "src/chaos/lorenz.cpp"
     "src/chaos/rossler.cpp"
     "src/chaos/duffing.cpp"
@@ -255,6 +259,9 @@ if(BUILD_TESTS)
         test/test_pulsar_solos.cpp
         test/test_pulsar_sections.cpp
         test/test_pulsar_void.cpp
+        test/test_wah_core.cpp
+        test/test_pulsar_lick_wah.cpp
+        test/test_pulsar_anomaly_arm.cpp
         test/test_pulsar_lick_select.cpp
         test/test_pulsar_timing.cpp
         test/test_pulsar_lick_marshalling.cpp
@@ -284,6 +291,10 @@ if(BUILD_TESTS)
         test/test_master_leslie.cpp
         test/test_master_fader_pulsar_routing.cpp
         test/test_master_tape_stop_pulsar_routing.cpp
+        test/test_master_crossfade.cpp
+        test/test_master_swell.cpp
+        test/test_master_cut.cpp
+        test/test_master_wah.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

@@ -2,6 +2,9 @@ package org.balch.orpheus.features.pulsar.models
 
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -10,7 +13,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Serialization + validation contract for the sealed [Anomaly] hierarchy on [Vibe.anomalies].
+ * Serialization + validation contract for the sealed [org.balch.orpheus.features.pulsar.anonmalies.Anomaly] hierarchy on [Vibe.anomalies].
  * The C++ atomic wire format is untouched by this migration; these tests pin the Kotlin schema.
  */
 class AnomalyTest {
@@ -33,8 +36,13 @@ class AnomalyTest {
             lickRotation = null,
             anomalies = listOf(
                 VoidAnomaly(
-                    probability = 0.2f, floorLevel = 0.1f, rampDownBars = 2.5f,
-                    floorBarsMin = 0.5f, floorBarsMax = 3.0f, rampUpBars = 0.75f, ghostIntensity = 0.8f,
+                    probability = 0.2f,
+                    floorLevel = 0.1f,
+                    rampDownBars = 2.5f,
+                    floorBarsMin = 0.5f,
+                    floorBarsMax = 3.0f,
+                    rampUpBars = 0.75f,
+                    ghostIntensity = 0.8f,
                 ),
                 LickAnomaly(lick = smallLick, chance = 0.3f),
             ),
@@ -99,6 +107,22 @@ class AnomalyTest {
     }
 
     @Test
+    fun rejects_duplicate_wah_anomaly() {
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(anomalies = listOf(WahAnomaly(), WahAnomaly()))
+        }
+    }
+
+    @Test
+    fun wah_anomaly_round_trips_with_its_discriminator() {
+        val vibe = base.copy(anomalies = listOf(WahAnomaly(probability = 0.1f)))
+        val encoded = json.encodeToString(Vibe.serializer(), vibe)
+        assertTrue(encoded.contains("\"type\":\"wah\""), "missing wah discriminator: $encoded")
+        val decoded = json.decodeFromString(Vibe.serializer(), encoded)
+        assertEquals(vibe.anomalies, decoded.anomalies)
+    }
+
+    @Test
     fun rejects_duplicate_lick_anomaly() {
         assertFailsWith<IllegalArgumentException> {
             base.copy(
@@ -129,7 +153,11 @@ class AnomalyTest {
     @Test
     fun lick_anomaly_over_a_single_lick_is_valid() {
         // A LickAnomaly with only vibe.lick (no rotation) is allowed: C++ treats it as a rotation-of-1.
-        val vibe = base.copy(lick = smallLick, lickRotation = null, anomalies = listOf(LickAnomaly(lick = smallLick)))
+        val vibe = base.copy(lick = smallLick, lickRotation = null, anomalies = listOf(
+            LickAnomaly(
+                lick = smallLick
+            )
+        ))
         assertNotNull(vibe.anomalies.filterIsInstance<LickAnomaly>().singleOrNull())
     }
 }

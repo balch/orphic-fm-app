@@ -29,6 +29,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.SoloMode
+import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
@@ -67,6 +68,9 @@ class DeepSpaceVibe : VibeProvider {
                     LickStep(scaleDegree = 6, duration = 1.0f, velocity = 0.5f),   // B — dip below root
                 ),
                 loopLength = 8,
+            ),
+            anomalies = listOf(
+                SwellAnomaly(),
             ),
             lickMutation = 0.6f,
             lickOctave = 3,        // octave 3 (MIDI 37-49, deep bass)
