@@ -102,7 +102,10 @@ collect_android() {
     # "run-as: not debuggable" / "ls: No such file" noise no matter which stream it lands on, and
     # naturally skips non-debuggable builds and devices where no vibe has been applied yet.
     local listing files f
-    listing="$(adb_cmd exec-out run-as "$pkg" sh -c "ls $ANDROID_SUBDIR 2>/dev/null" 2>/dev/null || true)"
+    # -1 forces one entry per line: toybox's `ls` on-device defaults to multi-column output
+    # even when piped through exec-out (it doesn't detect the non-tty the way GNU ls does),
+    # which previously merged multiple filenames onto one "line" and corrupted the pull.
+    listing="$(adb_cmd exec-out run-as "$pkg" sh -c "ls -1 $ANDROID_SUBDIR 2>/dev/null" 2>/dev/null || true)"
     files="$(printf '%s\n' "$listing" | grep -E '\.json$' || true)"
     [ -z "$files" ] && continue
     found_any=1
