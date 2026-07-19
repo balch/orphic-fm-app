@@ -152,7 +152,13 @@ class FireSkyVibe : VibeProvider {
             name = name,
             lick = aiLick,
             lickMutation = 0.25f,
-            stepCount = 32
+            lickRotation = LickRotation(pool = listOf(aiLick, tweakLick)),
+            anomalies = listOf(
+                // A rare flash of the founding hook, stated exactly; also fired by
+                // the manual anomaly trigger.
+                LickAnomaly(lick = ogLick, chance = 0.02f),
+            ),
+            stepCount = 32,
         )
     }
 }
@@ -172,14 +178,14 @@ class FireSky05Vibe : VibeProvider {
     override val vibe: Vibe by lazy {
         FireSkyVibeBase(baseBpm = 60f, halfTimeMult = 1.0f, buildExitScratchMs = 0).vibe.copy(
             name = name,
-            lick = aiLick,  // fallback seed; the pool overrides it at load
-            lickRotation = LickRotation(pool = listOf(aiLick, tweakLick)),
+            lick = tweakLick,  // fallback seed; the pool overrides it at load
+            lickRotation = LickRotation(pool = listOf(tweakLick, aiLick)),
             anomalies = listOf(
                 // A rare flash of the founding hook, stated exactly; also fired by
                 // the manual anomaly trigger.
                 LickAnomaly(lick = ogLick, chance = 0.02f),
             ),
-            lickMutation = 0.10f,
+            lickMutation = 0.20f,
             stepCount = 32,
         )
     }
