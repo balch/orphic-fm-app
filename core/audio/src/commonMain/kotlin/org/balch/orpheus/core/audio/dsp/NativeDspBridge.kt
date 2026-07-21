@@ -70,7 +70,21 @@ interface NativeDspBridge {
      * should marshal to a safe coroutine scope before doing real work.
      *
      * Default: no-op. Platforms whose audio engine never recreates itself
-     * (current desktop/iOS/wasm) don't need to override.
+     * (current desktop/wasm) don't need to override.
      */
     fun setOnEngineRecreatedCallback(callback: (() -> Unit)?) {}
+
+    /**
+     * Register a callback fired when the active audio output route's device
+     * disappears (e.g. a Bluetooth speaker powering off — iOS route change
+     * reason `oldDeviceUnavailable`). Feeds the auto-pause etiquette in
+     * PlaybackController via DspSynthEngine's AudioRouteMonitor flow.
+     *
+     * Runs on whatever thread the platform delivers route events on (iOS:
+     * the main queue); consumers must not block.
+     *
+     * Default: no-op. Platforms without route-loss awareness (current
+     * desktop/wasm/Android) don't need to override.
+     */
+    fun setOnAudioRouteLostCallback(callback: (() -> Unit)?) {}
 }

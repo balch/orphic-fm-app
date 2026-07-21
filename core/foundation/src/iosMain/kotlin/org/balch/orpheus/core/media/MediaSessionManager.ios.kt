@@ -74,21 +74,19 @@ actual class MediaSessionManager {
             MPRemoteCommandHandlerStatusSuccess
         }
 
-        // Wire next/prev track AND skipForward/skipBackward to the same
-        // handler. Empirically, iOS only renders the artwork-rich Now Playing
-        // layout when the skip commands are also enabled with a
-        // preferredIntervals — without them, the widget falls back to a
-        // compact layout and the album art doesn't display. The skip pair
-        // ends up rendered as ⏩15 / ⏪15 icons; the buttons themselves
-        // still cycle vibes correctly, and the alternative (track-only) trades
-        // away the artwork. TODO: revisit when we figure out the layout
-        // heuristic — there may be another property that triggers the rich
-        // layout without forcing the seek-by-N icon style.
+        // Next/prev track cycle vibes and render as proper ⏮ / ⏭ glyphs.
+        //
+        // History: an earlier build ALSO enabled skipForward/skipBackward
+        // (15s) because the Now Playing widget appeared to need them for the
+        // artwork-rich layout. That observation was made while a resource
+        // packaging bug kept the static posters' bytes null on iOS (see the
+        // "Copy Compose Resources" phase in apps/djapp/iosApp/project.yml),
+        // so the "compact layout" was very likely just the no-artwork
+        // rendering. If artwork ever fails to render rich again, re-test
+        // against a build where the artwork bytes are confirmed present
+        // before reaching for the skip-command workaround — it costs the
+        // ⏩15/⏪15 icon style.
         cc.nextTrackCommand.addTargetWithHandler { _ ->
-            handler?.onSkipNext()
-            MPRemoteCommandHandlerStatusSuccess
-        }
-        cc.skipForwardCommand.addTargetWithHandler { _ ->
             handler?.onSkipNext()
             MPRemoteCommandHandlerStatusSuccess
         }
@@ -96,13 +94,6 @@ actual class MediaSessionManager {
             handler?.onSkipPrevious()
             MPRemoteCommandHandlerStatusSuccess
         }
-        cc.skipBackwardCommand.addTargetWithHandler { _ ->
-            handler?.onSkipPrevious()
-            MPRemoteCommandHandlerStatusSuccess
-        }
-
-        cc.skipForwardCommand.preferredIntervals = listOf<Any?>(15.0)
-        cc.skipBackwardCommand.preferredIntervals = listOf<Any?>(15.0)
 
         cc.playCommand.setEnabled(true)
         cc.pauseCommand.setEnabled(true)
@@ -110,8 +101,10 @@ actual class MediaSessionManager {
         cc.stopCommand.setEnabled(true)
         cc.nextTrackCommand.setEnabled(true)
         cc.previousTrackCommand.setEnabled(true)
-        cc.skipForwardCommand.setEnabled(true)
-        cc.skipBackwardCommand.setEnabled(true)
+        // Explicitly off: enabled-but-targetless skip commands still reserve
+        // the seek-icon layout slots on some iOS versions.
+        cc.skipForwardCommand.setEnabled(false)
+        cc.skipBackwardCommand.setEnabled(false)
 
         isActive = true
         // Replay any metadata that arrived before activation so the Now
@@ -130,8 +123,6 @@ actual class MediaSessionManager {
         cc.stopCommand.removeTarget(null)
         cc.nextTrackCommand.removeTarget(null)
         cc.previousTrackCommand.removeTarget(null)
-        cc.skipForwardCommand.removeTarget(null)
-        cc.skipBackwardCommand.removeTarget(null)
 
         MPNowPlayingInfoCenter.defaultCenter().nowPlayingInfo = null
 
@@ -196,6 +187,10 @@ actual class MediaSessionManager {
                 val artwork = MPMediaItemArtwork(boundsSize = size) { _ -> image }
                 info[MPMediaItemPropertyArtwork] = artwork
             } else {
+                // Bytes arrived but UIImage refused them — surface it, this
+                // is the difference between "producer sent nothing" and
+                // "decode failed" when debugging blank artwork on device.
+                log.warn { "Artwork decode failed (${artworkBytes.size} bytes) — dropping artwork" }
                 info.remove(MPMediaItemPropertyArtwork)
             }
         } else {

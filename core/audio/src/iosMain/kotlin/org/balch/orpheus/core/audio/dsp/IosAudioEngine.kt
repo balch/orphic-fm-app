@@ -64,10 +64,14 @@ import orpheus_dsp.orpheus_ios_audio_stop
 import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.AVAudioSessionInterruptionNotification
+import platform.AVFAudio.AVAudioSessionInterruptionReasonKey
+import platform.AVFAudio.AVAudioSessionInterruptionReasonRouteDisconnected
 import platform.AVFAudio.AVAudioSessionInterruptionTypeBegan
 import platform.AVFAudio.AVAudioSessionInterruptionTypeEnded
 import platform.AVFAudio.AVAudioSessionInterruptionTypeKey
 import platform.AVFAudio.AVAudioSessionRouteChangeNotification
+import platform.AVFAudio.AVAudioSessionRouteChangeReasonKey
+import platform.AVFAudio.AVAudioSessionRouteChangeReasonOldDeviceUnavailable
 import platform.AVFAudio.AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
 import platform.AVFAudio.sampleRate
 import platform.AVFAudio.setActive
@@ -75,14 +79,25 @@ import platform.AVFAudio.setPreferredIOBufferDuration
 import platform.AVFAudio.setPreferredSampleRate
 import platform.Foundation.NSNotification
 import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSNumber
 import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSRecursiveLock
 import platform.QuartzCore.CACurrentMediaTime
+import platform.darwin.DISPATCH_TIME_NOW
 import platform.darwin.NSObjectProtocol
+import platform.darwin.dispatch_after
+import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_time
 import kotlin.concurrent.Volatile
 
 private const val TARGET_SAMPLE_RATE = 48000.0
 private const val TARGET_BUFFER_DURATION = 256.0 / TARGET_SAMPLE_RATE // ~5.3ms
+
+// A Bluetooth device powering off leaves the media server mid-transition for
+// a few hundred ms; host starts fail transiently in that window. 5 × 300ms
+// comfortably covers observed teardown times without retrying forever.
+private const val MAX_HOST_START_RETRIES = 5
+private const val HOST_START_RETRY_DELAY_MS = 300L
 
 /**
  * iOS AudioEngine backed by the ObjC++ audio host in liborpheus_dsp
@@ -107,10 +122,24 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
     private var audioHost: CPointer<OrpheusIosAudio>? = null
     @Volatile
     private var _isRunning = false
+    // Written from the DspSynthEngine start path (Default dispatcher), read
+    // on the main queue — @Volatile for rigorous cross-thread visibility.
+    @Volatile
     private var engineRecreatedCallback: (() -> Unit)? = null
+    @Volatile
+    private var routeLostCallback: (() -> Unit)? = null
     private var _sampleRate: Int = TARGET_SAMPLE_RATE.toInt()
     private var interruptionObserver: NSObjectProtocol? = null
     private var routeChangeObserver: NSObjectProtocol? = null
+
+    // Guarded by engineLock. Consecutive failed host starts; a fresh route
+    // change resets the budget so each user-visible event gets full retries.
+    private var hostStartRetries = 0
+
+    // Guarded by engineLock. Bumped by stop() so a queued retry block from a
+    // previous lifecycle can never restart audio the user deliberately
+    // stopped — the block compares its captured generation before acting.
+    private var retryGeneration = 0
 
     private inline fun <T> withEngine(block: (CPointer<OrpheusEngine>) -> T): T? {
         engineLock.lock()
@@ -139,15 +168,16 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                 if (audioHost == null) {
                     audioHost = orpheus_ios_audio_create(engine, _sampleRate.toDouble())
                 }
-                val rc = orpheus_ios_audio_start(audioHost)
-                _isRunning = rc == 0
-                if (rc != 0) log.error { "orpheus_ios_audio_start failed: $rc" }
+                startHostLocked()
             } finally {
                 engineLock.unlock()
             }
             registerNotifications()
         } catch (e: Exception) {
             log.error(e) { "Failed to start audio engine" }
+            // Transient failures (session config mid-route-transition) are
+            // recoverable — let the retry path re-run the full init.
+            scheduleHostStartRetry()
         }
     }
 
@@ -157,6 +187,10 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         unregisterNotifications()
         engineLock.lock()
         try {
+            // Invalidate any queued host-start retry: a deliberate stop must
+            // not be resurrected by a stale dispatch block firing later.
+            retryGeneration++
+            hostStartRetries = 0
             // Destroy the host first: it stops AVAudioEngine, which
             // synchronizes with the render thread. Only after that is it
             // safe to destroy the C++ engine the render block was reading.
@@ -176,6 +210,10 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
 
     override fun setOnEngineRecreatedCallback(callback: (() -> Unit)?) {
         engineRecreatedCallback = callback
+    }
+
+    override fun setOnAudioRouteLostCallback(callback: (() -> Unit)?) {
+        routeLostCallback = callback
     }
 
     override fun getCpuLoad(): Float = withEngine { eng ->
@@ -202,31 +240,34 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
 
     private fun configureAudioSession() {
         val session = AVAudioSession.sharedInstance()
-        try {
-            session.setCategory(AVAudioSessionCategoryPlayback, error = null)
-            session.setPreferredSampleRate(sampleRate = TARGET_SAMPLE_RATE, error = null)
-            session.setPreferredIOBufferDuration(duration = TARGET_BUFFER_DURATION, error = null)
-            session.setActive(true, error = null)
-
-            _sampleRate = session.sampleRate.toInt()
-            dspSampleRate = _sampleRate.toFloat()
-            log.info { "Audio session configured: sampleRate=$_sampleRate" }
-        } catch (e: Exception) {
-            log.error(e) { "Failed to configure audio session" }
-            throw e
+        // These return false instead of throwing when error = null is passed —
+        // check every result or failures vanish silently. Activation in
+        // particular can be refused for a beat while a Bluetooth device is
+        // tearing down; the host start then fails and the retry path
+        // re-activates, so log-and-continue is correct here.
+        if (!session.setCategory(AVAudioSessionCategoryPlayback, error = null)) {
+            log.warn { "setCategory(playback) failed" }
         }
+        session.setPreferredSampleRate(sampleRate = TARGET_SAMPLE_RATE, error = null)
+        session.setPreferredIOBufferDuration(duration = TARGET_BUFFER_DURATION, error = null)
+        if (!session.setActive(true, error = null)) {
+            log.warn { "setActive(true) failed — host start will fail and retry" }
+        }
+
+        _sampleRate = session.sampleRate.toInt()
+        dspSampleRate = _sampleRate.toFloat()
+        log.info { "Audio session configured: sampleRate=$_sampleRate" }
     }
 
     private fun deactivateAudioSession() {
-        try {
-            AVAudioSession.sharedInstance().setActive(
-                active = false,
-                withOptions = AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation,
-                error = null
-            )
-        } catch (e: Exception) {
-            log.warn(e) { "Failed to deactivate audio session" }
-        }
+        val deactivated = AVAudioSession.sharedInstance().setActive(
+            active = false,
+            withOptions = AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation,
+            error = null
+        )
+        // Refusal here (media server busy during a route transition) is
+        // harmless — the session deactivates when the app's I/O goes idle.
+        if (!deactivated) log.warn { "setActive(false) refused — continuing" }
     }
 
     // ── Notification handling ─────────────────────────
@@ -245,7 +286,7 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
             name = AVAudioSessionRouteChangeNotification,
             `object` = AVAudioSession.sharedInstance(),
             queue = NSOperationQueue.mainQueue
-        ) { _ -> handleRouteChange() }
+        ) { notification -> handleRouteChange(notification) }
     }
 
     private fun unregisterNotifications() {
@@ -258,17 +299,44 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
 
     private fun handleInterruption(notification: NSNotification?) {
         val userInfo = notification?.userInfo ?: return
-        val typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? Long ?: return
-        when (typeValue.toULong()) {
+        // Foundation hands us a platform NSNumber here. Kotlin/Native does
+        // NOT bridge those in `as? Long` casts (only its own boxed numbers),
+        // so the old cast silently nulled and every interruption fell
+        // through unhandled. Go through NSNumber explicitly.
+        val typeValue = (userInfo[AVAudioSessionInterruptionTypeKey] as? NSNumber)
+            ?.unsignedLongValue ?: return
+        when (typeValue) {
             AVAudioSessionInterruptionTypeBegan -> {
-                log.info { "Audio session interruption began" }
+                // iOS 14.5+: a vanishing route (BT speaker powered off) can
+                // arrive as an interruption with reason routeDisconnected —
+                // and Apple documents that NO matching Ended ever follows it.
+                // Parking the host and waiting would recreate the dead-audio
+                // trap through a side door; treat it as a route event instead.
+                val reasonValue = (userInfo[AVAudioSessionInterruptionReasonKey] as? NSNumber)
+                    ?.unsignedLongValue
+                val routeDied = reasonValue == AVAudioSessionInterruptionReasonRouteDisconnected
+                log.info { "Audio session interruption began (routeDisconnected=$routeDied)" }
                 engineLock.lock()
                 try {
+                    // Queued retries must not fight the system for audio
+                    // while we're interrupted.
+                    retryGeneration++
                     audioHost?.let { orpheus_ios_audio_stop(it) }
+                    _isRunning = false
+                    if (routeDied) {
+                        // No Ended will come. Fresh user-visible event —
+                        // full retry budget, revive once the teardown
+                        // window passes.
+                        hostStartRetries = 0
+                        scheduleHostStartRetry()
+                    }
                 } finally {
                     engineLock.unlock()
                 }
-                _isRunning = false
+                // Outside the lock, like handleRouteChange: pause etiquette
+                // must also apply when the route loss surfaces as an
+                // interruption instead of (or before) a route change.
+                if (routeDied) routeLostCallback?.invoke()
             }
             AVAudioSessionInterruptionTypeEnded -> {
                 log.info { "Audio session interruption ended" }
@@ -276,7 +344,12 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                 if (!reactivated) log.warn { "Audio session reactivation failed after interruption" }
                 engineLock.lock()
                 try {
-                    audioHost?.let { _isRunning = orpheus_ios_audio_start(it) == 0 }
+                    // Fresh budget: retries burned mid-interruption (while
+                    // another session held audio) must not exhaust recovery.
+                    hostStartRetries = 0
+                    // Guard, don't null-tolerate: a null host means we were
+                    // deliberately stopped — never revive audio from here.
+                    if (audioHost != null) startHostLocked()
                 } finally {
                     engineLock.unlock()
                 }
@@ -284,8 +357,10 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         }
     }
 
-    private fun handleRouteChange() {
-        val newRate = AVAudioSession.sharedInstance().sampleRate.toInt()
+    private fun handleRouteChange(notification: NSNotification?) {
+        val reason = (notification?.userInfo?.get(AVAudioSessionRouteChangeReasonKey) as? NSNumber)
+            ?.unsignedLongValue
+        val deviceLost = reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable
         var recreated = false
         engineLock.lock()
         try {
@@ -295,31 +370,130 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                 _isRunning = false
                 return
             }
-            if (newRate == _sampleRate) {
-                // Same rate: rebuild only the audio host so the new route is
-                // picked up. The C++ engine (graph, port state, Pulsar recipe)
-                // survives. No reload, no audible reset.
-                log.info { "Audio route changed (rate unchanged), rebuilding audio host" }
-                audioHost?.let { orpheus_ios_audio_destroy(it) }
-                audioHost = orpheus_ios_audio_create(engine, _sampleRate.toDouble())
-                _isRunning = orpheus_ios_audio_start(audioHost) == 0
-            } else {
-                // Rate changed: the C++ engine is rate-bound, so rebuild
-                // everything, then tell DspSynthEngine to reload the wiring
-                // graph + port state into the fresh engine (same contract as
-                // Android's Oboe recreate path). stop()/start() re-enter the
-                // recursive lock on this thread, which is fine.
-                log.info { "Audio route changed ($_sampleRate -> $newRate), full engine rebuild" }
-                stop()
-                start()
-                recreated = true
-            }
+            // Each user-visible route event gets a fresh retry budget.
+            hostStartRetries = 0
+            recreated = rebuildForCurrentRoute()
         } finally {
             engineLock.unlock()
         }
-        // Fire outside the lock: the consumer launches a coroutine that calls
-        // back into withEngine, and it should never contend with this handler.
+        // Fire outside the lock: the consumers launch coroutines that call
+        // back into withEngine, and they should never contend with this handler.
         if (recreated) engineRecreatedCallback?.invoke()
+        if (deviceLost) {
+            // The active output device vanished (BT speaker powered off).
+            // PlaybackController auto-pauses via this — Apple's convention of
+            // not continuing through the built-in speaker unprompted.
+            log.info { "Audio route device became unavailable — notifying route-lost callback" }
+            routeLostCallback?.invoke()
+        }
+    }
+
+    /**
+     * Rebuild audio output for whatever route the session now reports.
+     * Must hold [engineLock]; requires [engine] != null. Returns true when
+     * the C++ engine itself was recreated (rate change), so the caller can
+     * fire [engineRecreatedCallback] outside the lock.
+     */
+    private fun rebuildForCurrentRoute(): Boolean {
+        val session = AVAudioSession.sharedInstance()
+        val newRate = session.sampleRate.toInt()
+        // A mid-teardown session can report 0/garbage — never let that drive
+        // a full rebuild that would create a 0 Hz C++ engine. Take the
+        // same-rate path (last known good rate) and let retry sort it out.
+        return if (newRate <= 0 || newRate == _sampleRate) {
+            // Same rate: rebuild only the audio host so the new route is
+            // picked up. The C++ engine (graph, port state, Pulsar recipe)
+            // survives. No reload, no audible reset.
+            log.info { "Rebuilding audio host (rate unchanged at $_sampleRate)" }
+            // A Bluetooth teardown can deactivate the session out from under
+            // us; reactivate (idempotent when already active) or the host
+            // start below fails with a session error.
+            if (!session.setActive(true, error = null)) {
+                log.warn { "setActive(true) refused during host rebuild — start may fail and retry" }
+            }
+            audioHost?.let { orpheus_ios_audio_destroy(it) }
+            audioHost = orpheus_ios_audio_create(engine, _sampleRate.toDouble())
+            startHostLocked()
+            false
+        } else {
+            // Rate changed: the C++ engine is rate-bound, so rebuild
+            // everything, then tell DspSynthEngine to reload the wiring
+            // graph + port state into the fresh engine (same contract as
+            // Android's Oboe recreate path). stop()/start() re-enter the
+            // recursive lock on this thread, which is fine. A start failure
+            // inside schedules its own retry.
+            log.info { "Audio route rate changed ($_sampleRate -> $newRate), full engine rebuild" }
+            stop()
+            start()
+            true
+        }
+    }
+
+    /**
+     * Start the current [audioHost]. Must hold [engineLock]. On failure,
+     * schedules a capped retry — one-shot starts are unreliable while a
+     * Bluetooth device is tearing down, and without a retry a single miss
+     * left audio dead until app relaunch (UI alive, play/pause inert).
+     */
+    private fun startHostLocked() {
+        val rc = orpheus_ios_audio_start(audioHost)
+        _isRunning = rc == 0
+        if (rc == 0) {
+            hostStartRetries = 0
+        } else {
+            log.error { "orpheus_ios_audio_start failed: $rc" }
+            scheduleHostStartRetry()
+        }
+    }
+
+    private fun scheduleHostStartRetry() {
+        val attempt: Int
+        val gen: Int
+        engineLock.lock()
+        try {
+            if (hostStartRetries >= MAX_HOST_START_RETRIES) {
+                log.error {
+                    "Audio host failed after $MAX_HOST_START_RETRIES retries — " +
+                        "giving up until the next route change"
+                }
+                return
+            }
+            hostStartRetries++
+            attempt = hostStartRetries
+            gen = retryGeneration
+        } finally {
+            engineLock.unlock()
+        }
+        log.info { "Audio host start retry $attempt/$MAX_HOST_START_RETRIES in ${HOST_START_RETRY_DELAY_MS}ms" }
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, HOST_START_RETRY_DELAY_MS * 1_000_000L),
+            dispatch_get_main_queue(),
+        ) {
+            var recreated = false
+            var startedFromNothing = false
+            engineLock.lock()
+            try {
+                // Deliberately stopped since this was queued — do not revive.
+                if (retryGeneration != gen) return@dispatch_after
+                // Recovered some other way (route change beat us to it).
+                if (_isRunning) return@dispatch_after
+                log.info { "Audio host start retry $attempt firing" }
+                if (engine == null) {
+                    // First-launch start() failed before creating the engine —
+                    // re-run the whole init path.
+                    start()
+                    startedFromNothing = engine != null
+                } else {
+                    recreated = rebuildForCurrentRoute()
+                }
+            } finally {
+                engineLock.unlock()
+            }
+            // A brand-new engine has no graph — DspSynthEngine must load it
+            // (same contract as the rate-change rebuild), else audio renders
+            // silence even with a healthy host.
+            if (recreated || startedFromNothing) engineRecreatedCallback?.invoke()
+        }
     }
 
     // ── NativeDspBridge implementation ────────────────

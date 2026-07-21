@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.engagement.EngagementAction
 import org.balch.orpheus.core.engagement.EngagementTracker
@@ -43,6 +44,7 @@ class PlaybackController(
     private val overlayProducer: OverlaySubtitleProducer? = null,
     private val skipHandler: SkipHandler? = null,
     private val playFromMediaIdHandler: PlayFromMediaIdHandler? = null,
+    private val audioRouteMonitor: AudioRouteMonitor? = null,
 ) : MediaSessionActionHandler {
     private val log = logging("PlaybackController")
 
@@ -220,6 +222,19 @@ class PlaybackController(
         // operator is needed here.
         scope.launch {
             metadataSnapshotFlow.collect { snapshot -> pushMetadata(snapshot) }
+        }
+        // Output-device-loss etiquette (Apple convention): when the active
+        // route's device vanishes — Bluetooth speaker powered off — pause
+        // instead of continuing through the built-in speaker. Deliberately
+        // the sticky pause() path (not onPauseFromFocusLoss): the user must
+        // explicitly resume; no later route/focus event may auto-revive audio.
+        audioRouteMonitor?.let { monitor ->
+            scope.launch {
+                monitor.audioRouteLostFlow.collect {
+                    log.info { "Audio route lost — auto-pausing" }
+                    pause()
+                }
+            }
         }
         // All media actions (play/pause/stop/skip/playFromMediaId) route through
         // the MediaSessionActionHandler interface set above. No parallel lambda

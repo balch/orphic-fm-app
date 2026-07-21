@@ -71,3 +71,20 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.ui.tooling)
 }
+
+// The iOS app is built via bare xcodegen + xcodebuild (no
+// embedAndSignAppleFrameworkForXcode integration), so nothing triggers the
+// KMP resource aggregation that integration would run. Hang it off the
+// framework link tasks so project.yml's "Copy Compose Resources" phase
+// always finds a fresh aggregated-resources tree to bundle. Without it,
+// Res.readBytes on device throws MissingResourceException and album art
+// silently degrades to null (macOS/Android never hit this — their
+// pipelines package resources themselves).
+listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
+    .forEach { (linkSuffix, kmpTarget) ->
+        listOf("Debug", "Release").forEach { buildType ->
+            tasks.named("link${buildType}Framework$linkSuffix") {
+                dependsOn("${kmpTarget}AggregateResources")
+            }
+        }
+    }

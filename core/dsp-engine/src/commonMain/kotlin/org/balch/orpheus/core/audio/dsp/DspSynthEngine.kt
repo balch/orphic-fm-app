@@ -5,11 +5,13 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
@@ -45,7 +47,13 @@ import org.balch.orpheus.plugins.duolfo.VoicePlugin
  * This class forwards control changes and manages plugin state.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
+@ContributesBinding(AppScope::class, binding = binding<SynthEngine>())
+@ContributesBinding(AppScope::class, binding = binding<AudioRouteMonitor>())
+// Metro treats T and T? as DISTINCT type keys — the non-null binding above
+// cannot satisfy PlaybackController's optional `AudioRouteMonitor? = null`
+// param; without this nullable contribution Metro silently injects the
+// default null and auto-pause is dead in every graph (builds stay green).
+@ContributesBinding(AppScope::class, binding = binding<AudioRouteMonitor?>())
 @Inject
 class DspSynthEngine(
     private val audioEngine: AudioEngine,
@@ -56,7 +64,7 @@ class DspSynthEngine(
     private val synthController: SynthController,
     private val wiringGraphProvider: WiringGraphProvider,
     private val appCoroutineScope: AppCoroutineScope,
-) : SynthEngine {
+) : SynthEngine, AudioRouteMonitor {
 
     private val log = logging("DspSynthEngine")
 
@@ -72,6 +80,13 @@ class DspSynthEngine(
     // path; subscribers (e.g. PulsarPlaybackBridge) re-push their state on tick.
     private val _engineRecreatedFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     override val engineRecreatedFlow: SharedFlow<Unit> = _engineRecreatedFlow.asSharedFlow()
+
+    // AudioRouteMonitor: fed by the platform audio engine when the active
+    // output device vanishes (iOS BT speaker off). PlaybackController
+    // collects this and auto-pauses. extraBufferCapacity=1 so the
+    // main-queue callback's tryEmit never drops the (single) event.
+    private val _audioRouteLostFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val audioRouteLostFlow: SharedFlow<Unit> = _audioRouteLostFlow.asSharedFlow()
 
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
         setPluginPort(ps.uri, ps.symbol, value)
@@ -438,6 +453,14 @@ class DspSynthEngine(
                 // map — most importantly the per-vibe Pulsar recipe.
                 _engineRecreatedFlow.tryEmit(Unit)
             }
+        }
+
+        // Route-loss etiquette feed: the platform engine fires this when the
+        // active output device disappears (iOS: BT speaker powered off).
+        // tryEmit is non-suspending — safe on the platform's delivery thread.
+        nativeBridge.setOnAudioRouteLostCallback {
+            log.info { "Audio route lost — notifying subscribers" }
+            _audioRouteLostFlow.tryEmit(Unit)
         }
 
         // Poll monitor data from C++ via native bridge

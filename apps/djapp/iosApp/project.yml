@@ -62,6 +62,31 @@ targets:
           FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
             - "$(inherited)"
             - "$(SRCROOT)/../shared/build/bin/iosSimulatorArm64/releaseFramework"
+    # Compose Multiplatform resources (album art posters etc.) are read at
+    # runtime from <app bundle>/compose-resources/ (the CMP iOS reader's
+    # fallback for statically linked frameworks). The bare xcodegen build has
+    # no embedAndSignAppleFrameworkForXcode integration to copy them, so do
+    # it here. Source tree is produced by the gradle framework link (the
+    # link*FrameworkIos* tasks depend on *AggregateResources — see
+    # apps/djapp/shared/build.gradle.kts).
+    postBuildScripts:
+      - name: Copy Compose Resources
+        basedOnDependencyAnalysis: false
+        script: |
+          case "$PLATFORM_NAME" in
+            iphoneos) KMP_TARGET=iosArm64 ;;
+            iphonesimulator) KMP_TARGET=iosSimulatorArm64 ;;
+            *) echo "warning: unsupported PLATFORM_NAME='$PLATFORM_NAME' — skipping compose resources"; exit 0 ;;
+          esac
+          SRC="$SRCROOT/../shared/build/kotlin-multiplatform-resources/aggregated-resources/$KMP_TARGET"
+          DST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/compose-resources"
+          if [ -d "$SRC" ]; then
+            mkdir -p "$DST"
+            rsync -a --delete "$SRC/" "$DST/"
+            echo "Copied compose resources ($KMP_TARGET) into $DST"
+          else
+            echo "warning: no compose resources at $SRC — run the gradle framework build first"
+          fi
 
   DjAppAi:
     type: application

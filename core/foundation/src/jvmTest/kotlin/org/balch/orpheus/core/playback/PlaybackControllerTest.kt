@@ -3,9 +3,13 @@ package org.balch.orpheus.core.playback
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.engagement.DefaultEngagementTracker
@@ -28,6 +32,14 @@ private class FakeMetadata(
 
 private class FakeOverlay(initial: String? = null) : OverlaySubtitleProducer {
     override val overlayFlow = MutableStateFlow(initial)
+}
+
+private class FakeRouteMonitor : AudioRouteMonitor {
+    private val _routeLost = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val audioRouteLostFlow: SharedFlow<Unit> = _routeLost.asSharedFlow()
+    fun emitRouteLost() {
+        check(_routeLost.tryEmit(Unit)) { "route-lost emission dropped" }
+    }
 }
 
 private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
@@ -55,6 +67,7 @@ private fun build(
     playFromId: PlayFromMediaIdHandler? = null,
     muteCalls: MutableList<PlaybackState> = mutableListOf(),
     focusGranted: Boolean = true,
+    routeMonitor: AudioRouteMonitor? = null,
 ): Built {
     val scope = testScope()
     val ssm = MediaSessionStateManager(scope)
@@ -73,6 +86,7 @@ private fun build(
         overlayProducer = overlay,
         skipHandler = skip,
         playFromMediaIdHandler = playFromId,
+        audioRouteMonitor = routeMonitor,
     )
     return Built(controller, muteCalls, ssm, msm, tracker)
 }
@@ -334,6 +348,44 @@ class PlaybackControllerTest {
         assertEquals(PlaybackState.Stopped, built.controller.state.value)
         assertTrue(muteCalls.isEmpty())
         assertEquals(0, built.msm.userPausedCount)
+    }
+
+    // ── Audio route loss (output device vanished) ──────────────────────────
+
+    // Apple convention: when the active output device disappears (Bluetooth
+    // speaker powered off), pause instead of continuing through the built-in
+    // speaker. The pause is STICKY like a user pause — notifyUserPaused must
+    // fire so no later focus-gain/route event auto-resumes playback.
+    @Test fun `route lost while Playing auto-pauses sticky`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val monitor = FakeRouteMonitor()
+        val built = build(muteCalls = muteCalls, routeMonitor = monitor)
+        built.controller.play()
+        val userPausedBefore = built.msm.userPausedCount
+
+        monitor.emitRouteLost()
+
+        assertEquals(PlaybackState.Paused, built.controller.state.value)
+        assertEquals(
+            listOf<PlaybackState>(PlaybackState.Playing, PlaybackState.Paused),
+            muteCalls,
+        )
+        assertEquals(
+            userPausedBefore + 1,
+            built.msm.userPausedCount,
+            "route-loss pause must be sticky (user-paused) so nothing auto-resumes",
+        )
+    }
+
+    @Test fun `route lost while not Playing leaves state untouched`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        val monitor = FakeRouteMonitor()
+        val built = build(muteCalls = muteCalls, routeMonitor = monitor)
+
+        monitor.emitRouteLost()
+
+        assertEquals(PlaybackState.Stopped, built.controller.state.value)
+        assertTrue(muteCalls.isEmpty())
     }
 
     // Regression for the [user-pause -> transient-loss -> gain] auto-resume bug:
