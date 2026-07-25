@@ -27,25 +27,35 @@ class BlackCatOgVibe : VibeProvider {
     // Bar 1: root anchor, breath, stutter, then the pentatonic climb to the 5th.
     // Bar 2: over the top (b7 -> octave), then the walk back down home. Pure
     // pentatonic — the b5 (degree 3) never appears; that color belongs to the lead.
-    private val ogLick = Lick(
-        steps = listOf(
-            // Bar 1 — the climb
-            LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.95f),   // C# root anchor
-            LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (breath)
-            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.88f),   // C# stutter pickup
-            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.84f),   // E  b3 ┐
-            LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.86f),   // F# 4  │ the climb
-            LickStep(scaleDegree = 4, duration = 1.0f, velocity = 0.92f),   // G# 5  ┘ held
-            // Bar 2 — over the top, then home
-            LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.86f),   // B  b7
-            LickStep(scaleDegree = 6, duration = 0.5f, velocity = 0.94f),   // C# octave — the peak
-            LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.82f),   // B  b7
-            LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.80f),   // G# 5
-            LickStep(scaleDegree = 1, duration = 1.0f, velocity = 0.85f),   // E  b3
-            LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.96f),   // C# home — ring into the loop
-        ),
-        loopLength = 8,  // 2 bars; steps sum to 8.0 exactly
-    )
+    private val ogLick by lazy {
+        Lick(
+            steps = listOf(
+                // Bar 1 — the climb
+                LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.95f),   // C# root anchor
+                LickStep(scaleDegree = -1, duration = 0.5f, velocity = 0.0f),   // (breath)
+                LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.88f),   // C# stutter pickup
+                LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.84f),   // E  b3 ┐
+                LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.86f),   // F# 4  │ the climb
+                LickStep(scaleDegree = 4, duration = 1.0f, velocity = 0.92f),   // G# 5  ┘ held
+                // Bar 2 — over the top, then home
+                LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.86f),   // B  b7
+                LickStep(
+                    scaleDegree = 6,
+                    duration = 0.5f,
+                    velocity = 0.94f
+                ),   // C# octave — the peak
+                LickStep(scaleDegree = 5, duration = 0.5f, velocity = 0.82f),   // B  b7
+                LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.80f),   // G# 5
+                LickStep(scaleDegree = 1, duration = 1.0f, velocity = 0.85f),   // E  b3
+                LickStep(
+                    scaleDegree = 0,
+                    duration = 1.0f,
+                    velocity = 0.96f
+                ),   // C# home — ring into the loop
+            ),
+            loopLength = 8,  // 2 bars; steps sum to 8.0 exactly
+        )
+    }
 
     override val vibe: Vibe by lazy {
         BlackCatVibe().vibe.copy(name = name, lick = ogLick, lickMutation = 0.08f)

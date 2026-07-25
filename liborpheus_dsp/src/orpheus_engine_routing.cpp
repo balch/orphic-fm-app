@@ -1059,6 +1059,32 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_lick_anomaly_chance = value;
         else if (std::strcmp(symbol, "lick_pool_count") == 0)
             engine->pulsar_lick_pool_count.store(static_cast<int>(value), std::memory_order_release);
+        else if (std::strncmp(symbol, "bass_line_data_", 15) == 0) {
+            int idx = std::atoi(symbol + 15);
+            int step = idx / OrpheusEngine::kLickFieldsPerStep;
+            int field = idx % OrpheusEngine::kLickFieldsPerStep;
+            if (step >= 0 && step < OrpheusEngine::kMaxLickSteps) {
+                switch (field) {
+                    case 0: engine->pulsar_bass_line[step].scale_degree = static_cast<int8_t>(value); break;
+                    case 1: engine->pulsar_bass_line[step].duration = value; break;
+                    case 2: engine->pulsar_bass_line[step].velocity = value; break;
+                    case 3: engine->pulsar_bass_line[step].glide_rate = value; break;  // -1 = use track default
+                }
+            }
+        }
+        else if (std::strcmp(symbol, "bass_line_loop") == 0)
+            engine->pulsar_bass_line_loop.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bass_line_mutation") == 0)
+            engine->pulsar_bass_line_mutation.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bass_line_octave") == 0)
+            engine->pulsar_bass_line_octave.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bass_line_length") == 0)
+            engine->pulsar_bass_line_length.store(static_cast<int>(value), std::memory_order_release);
+        else if (std::strncmp(symbol, "track_lick_source_", 18) == 0) {
+            int idx = std::atoi(symbol + 18);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_track_lick_source[idx].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
         // ── Arrangement / Sections ──
         else if (std::strcmp(symbol, "arrangement_active") == 0)
             engine->pulsar_arrangement_active.store(static_cast<int>(value), std::memory_order_relaxed);

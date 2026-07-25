@@ -265,6 +265,7 @@ if(BUILD_TESTS)
         test/test_pulsar_lick_select.cpp
         test/test_pulsar_timing.cpp
         test/test_pulsar_lick_marshalling.cpp
+        test/test_pulsar_bass_line.cpp
         test/test_pulsar_lick_offset.cpp
         test/test_pulsar_outro_request.cpp
         test/test_oboe_buffer.cpp

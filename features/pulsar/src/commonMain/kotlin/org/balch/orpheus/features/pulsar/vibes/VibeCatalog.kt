@@ -98,6 +98,7 @@ object VibeCatalog {
         "Velvet Leash" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock")),
         "Voltage Strut" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         "Lost In Space" to CatalogEntry(VibeStatus.LIVE, tags = listOf("ambient")),
+        "Odysseus Lore" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "wah", "psych")),
 
 // -----------------------------
         "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),

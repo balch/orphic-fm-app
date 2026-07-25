@@ -744,6 +744,15 @@ struct PulsarState {
     int current_lick_index = -1;             // bank slot currently rendered (-1 = single-lick)
     uint32_t lick_select_seed = 0;           // play-scoped RNG, independent of mutation/void
 
+    // Bass line channel (copied from engine atomics on vibe load). Sibling of
+    // state->lick; rotation and anomaly swaps never touch these buffers.
+    int bass_line_length = 0;
+    int bass_line_loop_length = 0;
+    PulsarLickStep bass_line[kMaxLickSteps];
+    PulsarLickStep original_bass_line[kMaxLickSteps];
+    float bass_line_mutation = 0.5f;
+    int bass_line_octave = -1;
+
     // Lick evolution spurt state
     bool in_spurt = false;
     int spurt_bars_remaining = 0;
@@ -832,6 +841,10 @@ struct PulsarState {
     // each evolving degree against this so the octave-jump idiom can't run away
     // now that the live lick is audibly rendered (SOLO-1).
     int8_t live_lick_base_degrees[kMaxLickSteps] = {};
+    // True while the live lick was seeded from the bass channel (the soloing
+    // member's lick tracks are BASS-source). Render-back then uses the bass
+    // line's loop length and octave instead of the lead lick's.
+    bool live_lick_bass_channel = false;
 
     // Arrangement read-back (written by audio thread, read by viz polling)
     // relaxed atomics: zero overhead on ARM/x86 for aligned ints, standards-compliant

@@ -66,16 +66,23 @@ enum class ScaleType(val scaleIndex: Int) {
  * 2. Set **energy/complexity/space/mood/deep** macro defaults (0-1).
  *    These are the starting positions of the 5 knobs the user can tweak live.
  * 3. Define 8 **tracks** with engines, density, volume, and effect sends.
- * 4. Optionally add a **lick** (bass riff pattern) and set `lickMode = LickMode.Fill` on one track.
+ * 4. Optionally add a **lick** (LEAD riff pattern) and set `lickMode = LickMode.Fill` on one track.
+ *    An optional separate bass figure goes on **bassLine** with a `lickSource = BASS` track.
  * 5. Tune **effects** for the delay/reverb character.
  * 6. Set **tension** for build-and-release arcs.
  * 7. Optionally add an **arrangement** for section-based structure (verse/chorus/solo).
  *
  * @param name Display name for the vibe selector.
  * @param tracks Exactly 8 tracks. See [TrackVoice] for per-track tuning.
- * @param lick Optional bass riff pattern. Tracks with `lickMode` set to Squash or Fill play this.
+ * @param lick Optional lead riff pattern. Tracks with `lickMode` set to Squash or Fill play this.
  * @param lickMutation How much the lick varies on repeat, 0-1. 0 = exact, 0.5 = moderate drift.
  * @param lickOctave MIDI octave for the lick. -1 = auto (midpoint of noteRange), 0-8 = explicit.
+ * @param lickRotation Rotation pool that swaps the lead lick per section. See [LickRotation].
+ * @param bassLine Optional second authored pattern, rendered by tracks whose
+ *   [TrackRole.Melodic.lickSource] is BASS. Sibling of [lick]; rotation and lick
+ *   anomalies never touch it.
+ * @param bassLineMutation How much the bass line varies on repeat, 0-1. Independent of [lickMutation].
+ * @param bassLineOctave MIDI octave for the bass line. -1 = auto (midpoint of noteRange), 0-8 = explicit.
  * @param seed Random seed for pattern generation. Same seed = same patterns. 0 = random.
  * @param bpm Tempo in beats per minute.
  * @param envelopeType Global envelope mode: AD (punchy), TIDES (sustain while held), BLEND (energy-driven mix).
@@ -109,6 +116,9 @@ data class Vibe(
     val lickMutation: Float = 0.5f,
     val lickOctave: Int = -1,
     val lickRotation: LickRotation? = null,
+    val bassLine: Lick? = null,
+    val bassLineMutation: Float = 0.5f,
+    val bassLineOctave: Int = -1,
     val band: Band? = null,
     val seed: Int = 0,
     val bpm: Float,
@@ -180,6 +190,17 @@ data class Vibe(
         require((lickRotation?.pool?.size ?: 0) + lickAnomalies.size <= LickRotation.MAX_LICK_POOL) {
             "lick bank (rotation pool ${lickRotation?.pool?.size ?: 0} + ${lickAnomalies.size} lick " +
                 "anomaly) exceeds MAX_LICK_POOL=${LickRotation.MAX_LICK_POOL}"
+        }
+        // Bass line channel: the data and the opt-in must arrive together, both ways.
+        val bassLickTracks = tracks.count { tv ->
+            val m = tv.role as? TrackRole.Melodic
+            m != null && m.lickSource == LickSource.BASS && m.lickMode != LickMode.None
+        }
+        require(bassLine == null || bassLickTracks > 0) {
+            "Vibe.bassLine is set but no melodic track has lickSource = BASS with a lickMode"
+        }
+        require(bassLickTracks == 0 || bassLine != null) {
+            "$bassLickTracks track(s) set lickSource = BASS but Vibe.bassLine is null"
         }
     }
 }

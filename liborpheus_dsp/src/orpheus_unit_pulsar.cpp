@@ -150,7 +150,7 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
     }
 
     // ── Lick evolution spurt state machine ──
-    if (state->lick_length > 0) {
+    if (state->lick_length > 0 || state->bass_line_length > 0) {
         if (state->in_spurt) {
             state->spurt_bars_remaining--;
             if (state->spurt_bars_remaining <= 0) {
@@ -167,6 +167,20 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                     if (std::fabs(vel_drift) > 0.2f) {
                         state->lick[i].velocity = state->original_lick[i].velocity
                             + std::max(-0.2f, std::min(vel_drift, 0.2f));
+                    }
+                }
+                // Bass channel gets the same bounded-drift snap-back.
+                if (state->bass_line_length > 0) {
+                    int bass_drift_max = std::max(1,
+                        static_cast<int>(state->bass_line_mutation * 4.0f + 0.5f));
+                    for (int i = 0; i < state->bass_line_length; i++) {
+                        int drift = state->bass_line[i].scale_degree
+                                  - state->original_bass_line[i].scale_degree;
+                        if (std::abs(drift) > bass_drift_max) {
+                            state->bass_line[i].scale_degree =
+                                state->original_bass_line[i].scale_degree
+                                + std::max(-bass_drift_max, std::min(drift, bass_drift_max));
+                        }
                     }
                 }
                 state->in_spurt = false;
@@ -638,6 +652,24 @@ static void reload_vibe_tension(OrpheusEngine* engine, PulsarState* state) {
         state->tension.track_evo_weight[i] = engine->pulsar_track_evo_weight[i].load(std::memory_order_relaxed);
 }
 
+// Which authored channel a lick track renders. BASS tracks read the bass line
+// buffers; everything else reads the lead lick (rotation/anomaly capable).
+struct LickChannel {
+    const PulsarLickStep* lick;
+    int length;
+    int loop_length;
+    float mutation;
+    int octave;
+};
+static LickChannel track_lick_channel(PulsarState* state, OrpheusEngine* engine, int t) {
+    if (engine->pulsar_track_lick_source[t].load(std::memory_order_relaxed) == 1) {
+        return { state->bass_line, state->bass_line_length, state->bass_line_loop_length,
+                 state->bass_line_mutation, state->bass_line_octave };
+    }
+    return { state->lick, state->lick_length, state->lick_loop_length,
+             state->lick_mutation, state->lick_octave };
+}
+
 // Copy lick-pool slot `idx` into the active lick buffers (state->lick / original_lick).
 // Resets drift so the swapped lick starts from its pristine form.
 static void apply_pool_lick(PulsarState* state, int idx) {
@@ -655,7 +687,7 @@ static void apply_pool_lick(PulsarState* state, int idx) {
 // anomaly swap. Mirrors the déjà-vu render loop (orpheus_unit_pulsar.cpp:2414-2435):
 // derives root/scale/note-range/step-count from the live engine atomics.
 static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, uint32_t seed) {
-    if (state->lick_length <= 0) return;
+    if (state->lick_length <= 0 && state->bass_line_length <= 0) return;
     int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
     if (si < 0) si = 0;
     if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
@@ -666,8 +698,6 @@ static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, ui
     int step_count_cfg = engine->pulsar_step_count.load(std::memory_order_relaxed);
     if (step_count_cfg <= 0) step_count_cfg = 16;
     if (step_count_cfg > kMaxPulsarSteps) step_count_cfg = kMaxPulsarSteps;  // guard ts.steps[kMaxPulsarSteps]
-    float eff_mutation = state->in_spurt
-        ? std::min(1.0f, state->lick_mutation * 3.0f) : state->lick_mutation;
     for (int rt = 0; rt < kNumPulsarTracks; rt++) {
         PulsarTrackState& rts = state->tracks[rt];
         TrackRole r_role = static_cast<TrackRole>(engine->pulsar_track_role[rt].load(std::memory_order_relaxed));
@@ -675,10 +705,14 @@ static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, ui
         LickMode r_lick_mode = static_cast<LickMode>(
             engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
         if (r_lick_mode == LickMode::NONE) continue;
-        render_lick_into_track(rts, rt, state->lick, state->lick_length,
-                               eff_mutation, root, scale, seed,
-                               rts.bar_strategy, step_count_cfg, state->lick_octave,
-                               rg_lo, rg_hi, state->lick_loop_length,
+        LickChannel ch = track_lick_channel(state, engine, rt);
+        if (ch.length <= 0) continue;
+        float ch_mut = state->in_spurt
+            ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+        render_lick_into_track(rts, rt, ch.lick, ch.length,
+                               ch_mut, root, scale, seed,
+                               rts.bar_strategy, step_count_cfg, ch.octave,
+                               rg_lo, rg_hi, ch.loop_length,
                                engine->pulsar_track_lick_degree_offset[rt].load(std::memory_order_relaxed));
     }
 }
@@ -699,6 +733,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     std::memset(state->live_lick_base_degrees, 0, sizeof(state->live_lick_base_degrees));
     state->live_lick_length = 0;
     state->live_lick_active = false;
+    state->live_lick_bass_channel = false;
     for (int t = 0; t < kNumPulsarTracks; t++) {
         state->tracks[t].anchor_indices[0] = -1;
         state->tracks[t].anchor_indices[1] = -1;
@@ -827,9 +862,32 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->active_rotation_index = lick_pick_rotation(state->lick_select_seed, pool_count);
         state->current_lick_index = state->active_rotation_index;
         apply_pool_lick(state, state->active_rotation_index);  // overrides state->lick
+        // apply_pool_lick just overrode state->lick/lick_length with the selected
+        // pool member — re-sync the load-scoped local so the render loop below
+        // (including the generative else-branch's apply_bar_strategy at ~line 1101)
+        // sees the same buffer+length pair the déjà-vu and regenerate paths use.
+        // Without this, pooled vibes rendered pool data at the fallback lick's
+        // length on the initial load only.
+        lick_len = state->lick_length;
     } else {
         state->current_lick_index = -1;
     }
+
+    // Read bass line channel (length acts as acquire fence, same contract as lick)
+    int bass_len = engine->pulsar_bass_line_length.load(std::memory_order_acquire);
+    if (bass_len > kMaxLickSteps) bass_len = kMaxLickSteps;
+    state->bass_line_length = bass_len;
+    int bass_loop = engine->pulsar_bass_line_loop.load(std::memory_order_relaxed);
+    state->bass_line_loop_length = (bass_loop > 0) ? bass_loop : bass_len;
+    for (int i = 0; i < bass_len; i++) {
+        state->bass_line[i].scale_degree = engine->pulsar_bass_line[i].scale_degree;
+        state->bass_line[i].duration     = engine->pulsar_bass_line[i].duration;
+        state->bass_line[i].velocity     = engine->pulsar_bass_line[i].velocity;
+        state->bass_line[i].glide_rate   = engine->pulsar_bass_line[i].glide_rate;
+    }
+    state->bass_line_mutation = engine->pulsar_bass_line_mutation.load(std::memory_order_relaxed);
+    state->bass_line_octave   = engine->pulsar_bass_line_octave.load(std::memory_order_relaxed);
+    std::memcpy(state->original_bass_line, state->bass_line, sizeof(PulsarLickStep) * bass_len);
 
     int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
     int scale_idx = engine->pulsar_scale_index.load(std::memory_order_relaxed);
@@ -940,6 +998,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             engine->pulsar_track_evo_pitch_mode[t].load(std::memory_order_relaxed));
         ts.evo_voicing_tension = engine->pulsar_track_evo_voicing_tension[t].load(std::memory_order_relaxed);
 
+        LickChannel ch = track_lick_channel(state, engine, t);
+        float ch_mut = state->in_spurt
+            ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+
         if (role == TrackRole::CHORDAL) {
             // CHORDAL: walk rhythm template, stab chord root (CHD renders voicing)
             ts.step_count = step_count_config;
@@ -968,7 +1030,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             // plays BASE without going through mutate_patterns(), so we lose
             // one increment up front and need to compensate.
             ts.bars_since_fill = 1;
-        } else if (lick_len > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
+        } else if (ch.length > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
             const int lick_deg_off =
                 engine->pulsar_track_lick_degree_offset[t].load(std::memory_order_relaxed);
             if (lick_mode == LickMode::FILL) {
@@ -981,33 +1043,33 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 ts.half_loop_len = bar1_len;
                 if (bar_strategy == BarStrategy::CALL_RESPONSE) {
                     bar_strategy_call_response(ts.steps, step_count_config,
-                                               state->lick, lick_len,
-                                               eff_mutation,
+                                               ch.lick, ch.length,
+                                               ch_mut,
                                                static_cast<uint8_t>(root), scale,
                                                base_seed ^ (t * 7919u),
-                                               state->lick_octave,
+                                               ch.octave,
                                                genre.note_range_low, genre.note_range_high,
-                                               state->lick_loop_length,
+                                               ch.loop_length,
                                                lick_deg_off);
                 } else {
-                    generate_lick_pattern(ts.steps, ts.step_count, state->lick, lick_len,
-                                          eff_mutation, static_cast<uint8_t>(root), scale,
+                    generate_lick_pattern(ts.steps, ts.step_count, ch.lick, ch.length,
+                                          ch_mut, static_cast<uint8_t>(root), scale,
                                           base_seed ^ (t * 7919u), 0,
-                                          state->lick_octave,
+                                          ch.octave,
                                           genre.note_range_low, genre.note_range_high,
-                                          state->lick_loop_length,
+                                          ch.loop_length,
                                           lick_deg_off);
                 }
                 // No bar strategy — FILL owns the full pattern
             } else {
                 // SQUASH: lick compressed to bar1_len, bar strategy handles bar 2
                 ts.step_count = bar1_len;
-                generate_lick_pattern(ts.steps, bar1_len, state->lick, lick_len,
-                                      eff_mutation, static_cast<uint8_t>(root), scale,
+                generate_lick_pattern(ts.steps, bar1_len, ch.lick, ch.length,
+                                      ch_mut, static_cast<uint8_t>(root), scale,
                                       base_seed ^ (t * 7919u), 0,
-                                      state->lick_octave,
+                                      ch.octave,
                                       genre.note_range_low, genre.note_range_high,
-                                      state->lick_loop_length,
+                                      ch.loop_length,
                                       lick_deg_off);
                 // Apply bar strategy for bar 2
                 if (step_count_config > 16) {
@@ -1015,10 +1077,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                        static_cast<uint8_t>(root), scale,
                                        engine->pulsar_energy.load(std::memory_order_relaxed),
                                        engine->pulsar_complexity.load(std::memory_order_relaxed),
-                                       state->lick, lick_len, eff_mutation,
+                                       ch.lick, ch.length, ch_mut,
                                        base_seed ^ (t * 13331u),
-                                       state->lick_octave,
-                                       state->lick_loop_length,
+                                       ch.octave,
+                                       ch.loop_length,
                                        lick_deg_off);
                 }
             }
@@ -2323,22 +2385,52 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                         // Start solo: new SoloMode system > band system > legacy
                         if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
-                            // Initialize live lick for LickBuilder mode
-                            if (sec.solo_mode == SoloModeId::LICK_BUILDER && state->lick_length > 0) {
-                                // Copy from struct-of-arrays lick into separate live buffers
-                                int n = state->lick_length < kMaxLickSteps ? state->lick_length : kMaxLickSteps;
-                                state->live_lick_length = n;
-                                state->live_lick_active = true;
-                                for (int i = 0; i < n; i++) {
-                                    state->live_lick_degrees[i] = state->lick[i].scale_degree;
-                                    state->live_lick_durations[i] = state->lick[i].duration;
-                                    state->live_lick_velocities[i] = state->lick[i].velocity;
-                                    // MUT-4: snapshot the section-entry degrees to clamp drift against.
-                                    state->live_lick_base_degrees[i] = state->lick[i].scale_degree;
-                                }
-                            }
                             start_band_solo(state->band_solo_state, state->band_solo_config,
                                             sec, state->tracks, state->mutation_seed);
+                            // Initialize live lick for LickBuilder mode, seeding from the
+                            // SOLOIST's channel: a BASS-source lead mutates the bass line,
+                            // not the lead lick ("owned and mutated by the bass player").
+                            if (sec.solo_mode == SoloModeId::LICK_BUILDER) {
+                                int lead = state->band_solo_state.lead_member;
+                                bool bass_lead = false;
+                                if (lead >= 0) {
+                                    const BandMemberParam& lm = state->band_solo_config.members[lead];
+                                    for (int ti = 0; ti < lm.track_count; ti++) {
+                                        int rt = lm.tracks[ti];
+                                        if (rt < 0 || rt >= kNumPulsarTracks) continue;
+                                        LickMode m = static_cast<LickMode>(
+                                            engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
+                                        if (m == LickMode::NONE) continue;
+                                        // First lick track decides (mixed-source members
+                                        // are allowed but take the first; same rule as
+                                        // track_lick_channel).
+                                        bass_lead = engine->pulsar_track_lick_source[rt].load(
+                                            std::memory_order_relaxed) == 1;
+                                        break;
+                                    }
+                                }
+                                const PulsarLickStep* src = nullptr;
+                                int src_len = 0;
+                                if (bass_lead && state->bass_line_length > 0) {
+                                    src = state->bass_line; src_len = state->bass_line_length;
+                                } else if (state->lick_length > 0) {
+                                    src = state->lick; src_len = state->lick_length;
+                                    bass_lead = false;  // fell back to the lead channel
+                                }
+                                state->live_lick_bass_channel = bass_lead;
+                                if (src != nullptr) {
+                                    int n = src_len < kMaxLickSteps ? src_len : kMaxLickSteps;
+                                    state->live_lick_length = n;
+                                    state->live_lick_active = true;
+                                    for (int i = 0; i < n; i++) {
+                                        state->live_lick_degrees[i] = src[i].scale_degree;
+                                        state->live_lick_durations[i] = src[i].duration;
+                                        state->live_lick_velocities[i] = src[i].velocity;
+                                        // MUT-4: snapshot section-entry degrees to clamp drift.
+                                        state->live_lick_base_degrees[i] = src[i].scale_degree;
+                                    }
+                                }
+                            }
                         } else {
                             if (state->band_solo_state.active) {
                                 clear_band_solo(state->band_solo_state, state->tracks);
@@ -2602,9 +2694,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (sec_adv.solo_mode == SoloModeId::LICK_BUILDER &&
                             state->band_solo_state.lead_member >= 0) {
                             int lead = state->band_solo_state.lead_member;
-                            // Fallback: no authored lick (e.g. DogHouseVibe) -> snapshot the
-                            // leading member's first MELODIC track's current steps into the
-                            // live lick so LickBuilder has a starting line to mutate.
+                            // Fallback: seed the live lick by snapshotting the leading
+                            // member's first MELODIC track's gated steps into a starting line
+                            // for LickBuilder to mutate. This guard catches two cases:
+                            // (a) nothing authored in either channel (e.g. DogHouseVibe);
+                            // (b) a LEAD-channel soloist in a bass-only vibe (channel is empty
+                            // but solo still needs a line to build on). WARNING: do NOT add a
+                            // bass_line_length guard here; that widening was reverted in 73d94bbb
+                            // because it silently muted lead soloists in bass-only vibes.
                             if (!state->live_lick_active && state->lick_length == 0) {
                                 // Search for a MELODIC source: prefer the lead member's
                                 // tracks, then fall back to any melodic track in the band.
@@ -2640,6 +2737,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                     if (n > 0) {
                                         state->live_lick_length = n;
                                         state->live_lick_active = true;
+                                        state->live_lick_bass_channel = false;
                                         for (int i = 0; i < n; i++)
                                             state->live_lick_base_degrees[i] = state->live_lick_degrees[i];
                                     }
@@ -2708,7 +2806,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                     state->band_solo_state.outgoing_last_note,
                                     static_cast<int>(rroot), rscale,
                                     static_cast<int>(nr_low), static_cast<int>(nr_high));
-                                if (chosen < 0) chosen = state->lick_octave;
+                                if (chosen < 0) chosen = state->live_lick_bass_channel
+                                    ? state->bass_line_octave : state->lick_octave;
                                 state->band_solo_state.solo_lick_octave = chosen;
                             }
                             int oct = state->band_solo_state.solo_lick_octave;
@@ -2729,7 +2828,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                        rtrk.bar_strategy, rtrk.step_count,
                                                        oct,
                                                        nr_low, nr_high,
-                                                       state->lick_loop_length,
+                                                       state->live_lick_bass_channel
+                                                           ? state->bass_line_loop_length
+                                                           : state->lick_loop_length,
                                                        engine->pulsar_track_lick_degree_offset[rt].load(
                                                            std::memory_order_relaxed));
                             }
@@ -2891,17 +2992,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         LickMode r_lick_mode = static_cast<LickMode>(
                             engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
                         bool r_use_lick = (r_lick_mode != LickMode::NONE);
-                        if (state->lick_length > 0 && r_use_lick && !perc) {
+                        LickChannel ch = track_lick_channel(state, engine, rt);
+                        if (ch.length > 0 && r_use_lick && !perc) {
                             // Shared lick->track render (#5): honors CALL_RESPONSE,
                             // else loops the lick. Genre note range (rg) matches the
                             // load path — the old hardcoded 36/72 here shifted the
                             // octave on every déjà-vu reset (#4 note-range fix).
-                            render_lick_into_track(rts, rt, state->lick, state->lick_length,
-                                                   eff_mutation, static_cast<uint8_t>(rr), rscale,
+                            float ch_mut = state->in_spurt
+                                ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+                            render_lick_into_track(rts, rt, ch.lick, ch.length,
+                                                   ch_mut, static_cast<uint8_t>(rr), rscale,
                                                    reset_seed, bs, step_count_cfg,
-                                                   state->lick_octave,
+                                                   ch.octave,
                                                    rg.note_range_low, rg.note_range_high,
-                                                   state->lick_loop_length,
+                                                   ch.loop_length,
                                                    engine->pulsar_track_lick_degree_offset[rt].load(
                                                        std::memory_order_relaxed));
                         } else {

@@ -928,6 +928,15 @@ struct OrpheusEngine {
     int   pulsar_lick_anomaly_index  = -1;     // bank slot of anomaly lick, or -1
     std::atomic<int> pulsar_lick_pool_count{0}; // # rotation members; 0 = disabled (release fence)
 
+    // Bass line channel: a second authored pattern, sibling of pulsar_lick (NOT a
+    // pool slot; rotation and lick anomalies stay lead-only). Same publish contract:
+    // step data is plain, guarded by pulsar_bass_line_length's release store.
+    std::atomic<int> pulsar_bass_line_length{0};    // 0 = no bass line
+    std::atomic<int> pulsar_bass_line_loop{0};      // beats; 0 = no rest padding
+    LickStepAtomic pulsar_bass_line[kMaxLickSteps];
+    std::atomic<float> pulsar_bass_line_mutation{0.5f};
+    std::atomic<int> pulsar_bass_line_octave{-1};   // -1 = auto (midpoint of noteRange)
+
     std::atomic<int64_t> pulsar_seed{0};           // 0 = random seed each load
 
     // ── Pulsar Tension ──
@@ -1117,6 +1126,9 @@ struct OrpheusEngine {
     // lick (parallel harmony vs the lead, e.g. -2 = a fourth below in a 7-note
     // scale). Sounding notes only; rests are unaffected.
     std::atomic<int>   pulsar_track_lick_degree_offset[8] = {};
+    // Which authored channel a lick track renders: 0 = LEAD (pulsar_lick,
+    // rotation/anomaly capable), 1 = BASS (pulsar_bass_line).
+    std::atomic<int>   pulsar_track_lick_source[8] = {};
     std::atomic<int>   pulsar_track_comping_style[8] = {};  // CompingStyleId: 0=PAD, 1=FUNK, 2=ROCK, 3=CUSTOM
     std::atomic<int>   pulsar_track_arp_mode[8] = {};       // ArpModeId: 0=AUTO, 1=ALWAYS, 2=NEVER
     std::atomic<float> pulsar_track_arp_speed[8] = {};      // 0.0-1.0

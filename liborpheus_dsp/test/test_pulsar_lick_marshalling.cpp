@@ -48,6 +48,104 @@ static void push_lick_via_routing(OrpheusEngine* engine, int step_count) {
     orpheus_engine_set_port(engine, PULSAR_URI, "lick_length", static_cast<float>(step_count));
 }
 
+// Push a bass line through the routing decode with ramps DIFFERENT from
+// push_lick_via_routing so cross-channel contamination is unmistakable:
+// degree=7-(i%8), duration=0.5+i*0.02, velocity=0.9-i*0.002, glide=0.2+i*0.0002.
+// bass_line_length is written LAST per the release-fence contract.
+static void push_bass_line_via_routing(OrpheusEngine* engine, int step_count) {
+    for (int i = 0; i < step_count; i++) {
+        int base = i * OrpheusEngine::kLickFieldsPerStep;
+        char sym[36];
+        snprintf(sym, sizeof(sym), "bass_line_data_%d", base + 0);
+        orpheus_engine_set_port(engine, PULSAR_URI, sym, static_cast<float>(7 - (i % 8)));
+        snprintf(sym, sizeof(sym), "bass_line_data_%d", base + 1);
+        orpheus_engine_set_port(engine, PULSAR_URI, sym, 0.5f + i * 0.02f);
+        snprintf(sym, sizeof(sym), "bass_line_data_%d", base + 2);
+        orpheus_engine_set_port(engine, PULSAR_URI, sym, 0.9f - i * 0.002f);
+        snprintf(sym, sizeof(sym), "bass_line_data_%d", base + 3);
+        orpheus_engine_set_port(engine, PULSAR_URI, sym, 0.2f + i * 0.0002f);
+    }
+    orpheus_engine_set_port(engine, PULSAR_URI, "bass_line_loop", 16.0f);
+    orpheus_engine_set_port(engine, PULSAR_URI, "bass_line_mutation", 0.25f);
+    orpheus_engine_set_port(engine, PULSAR_URI, "bass_line_octave", 2.0f);
+    orpheus_engine_set_port(engine, PULSAR_URI, "bass_line_length", static_cast<float>(step_count));
+}
+
+// ── Bass channel arrives independently of the lead lick ────────────────────
+static bool test_bass_line_marshalling_roundtrip() {
+    printf("\n=== Test: bass line round-trips alongside the lead lick, no bleed ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+    engine->pulsar_seed.store(424242, std::memory_order_relaxed);  // pin RNG (avoid wall-clock re-stir)
+
+    constexpr int kSteps = 21;
+    push_lick_via_routing(engine, 32);        // lead channel, existing ramps
+    push_bass_line_via_routing(engine, kSteps);
+    orpheus_engine_set_port(engine, PULSAR_URI, "track_lick_source_3", 1.0f);
+
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = (ps != nullptr);
+    if (ok) {
+        bool len_ok = (ps->bass_line_length == kSteps) && (ps->lick_length == 32);
+        printf("  bass_line_length=%d (exp %d), lick_length=%d (exp 32) -- %s\n",
+               ps->bass_line_length, kSteps, ps->lick_length, len_ok ? "OK" : "FAIL");
+        bool fields_ok = true;
+        for (int i = 0; i < kSteps; i++) {
+            const PulsarLickStep& s = ps->bass_line[i];
+            if (!(s.scale_degree == static_cast<int8_t>(7 - (i % 8)) &&
+                  approx(s.duration, 0.5f + i * 0.02f) &&
+                  approx(s.velocity, 0.9f - i * 0.002f) &&
+                  approx(s.glide_rate, 0.2f + i * 0.0002f))) {
+                fields_ok = false;
+                printf("  MISMATCH at bass step %d\n", i);
+            }
+        }
+        // Lead lick untouched by the bass push (cross-contamination check)
+        bool lead_ok = (ps->lick[0].scale_degree == 0) && approx(ps->lick[0].duration, 1.0f);
+        bool scalars_ok = approx(ps->bass_line_mutation, 0.25f) && (ps->bass_line_octave == 2) &&
+                          (ps->bass_line_loop_length == 16);
+        bool src_ok = engine->pulsar_track_lick_source[3].load(std::memory_order_relaxed) == 1 &&
+                      engine->pulsar_track_lick_source[4].load(std::memory_order_relaxed) == 0;
+        printf("  fields=%s lead-untouched=%s scalars=%s source-flag=%s\n",
+               fields_ok ? "OK" : "FAIL", lead_ok ? "OK" : "FAIL",
+               scalars_ok ? "OK" : "FAIL", src_ok ? "OK" : "FAIL");
+        ok = len_ok && fields_ok && lead_ok && scalars_ok && src_ok;
+    }
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+// ── No bass line pushed: state stays empty, original_bass_line matches ──────
+static bool test_bass_line_absent_is_inert() {
+    printf("\n=== Test: absent bass line loads as length 0 ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+    engine->pulsar_seed.store(424242, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = (ps != nullptr) && (ps->bass_line_length == 0);
+    printf("  bass_line_length=%d (exp 0) -- %s\n", ps ? ps->bass_line_length : -1, ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 // ── Test 1: full 32-step lick round-trips with field order intact ──────────
 static bool test_lick_marshalling_roundtrip() {
     printf("\n=== Test: 32-step lick round-trips Kotlin->C++ with field order intact ===\n");
@@ -380,6 +478,8 @@ bool run_pulsar_marshalling_tests() {
     tally(test_lick_marshalling_wrong_stride_detected());
     tally(test_lick_marshalling_roundtrip_64());
     tally(test_pulsar_viz_export_within_consumer_bounds());
+    tally(test_bass_line_marshalling_roundtrip());
+    tally(test_bass_line_absent_is_inert());
     printf("\nPulsar lick marshalling tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

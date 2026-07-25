@@ -102,3 +102,11 @@ data class LickRotation(
         const val MAX_LICK_POOL = 4
     }
 }
+
+/**
+ * Which authored pattern channel a lick track renders.
+ * [LEAD] plays [Vibe.lick] (rotation/anomaly capable). [BASS] plays [Vibe.bassLine],
+ * the bass-owned channel with its own mutation and octave.
+ */
+@Serializable
+enum class LickSource { LEAD, BASS }

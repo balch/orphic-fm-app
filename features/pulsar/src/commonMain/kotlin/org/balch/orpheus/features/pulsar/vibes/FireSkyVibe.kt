@@ -6,6 +6,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
@@ -22,9 +23,8 @@ import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
-import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
-import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.LickMode
+import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
@@ -51,59 +51,65 @@ import org.balch.orpheus.features.pulsar.models.chords
 
 // The founding 2-bar hook (BLUES: 0=G,1=Bb/b3,2=C/4,3=Db/b5,4=D/5,5=F/b7) — the OG A/B
 // reference and Fire Sky .5f's rare anomaly flash.
-private val ogLick = Lick(
-    steps = listOf(
-        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
-        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
-        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.85f),
-        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.90f),
-    ),
-    loopLength = 8,
-)
+private val ogLick by lazy {
+    Lick(
+        steps = listOf(
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
+            LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.85f),
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 2, duration = 1.0f, velocity = 0.85f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.90f),
+        ),
+        loopLength = 8,
+    )
+}
 
-private val aiLick = Lick(
-    steps = listOf(
-        // bar 1 — the climb, stated once: G D F, the b7 rings out the bar
-        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.90f),
-        LickStep(scaleDegree = 5, duration = 3.0f, velocity = 0.88f),  // the hook lands — let ring
-        // bar 2 — the answer: climb again, but fall through the b5 to home
-        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.90f),
-        LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.72f),  // the b5, descending crush
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.82f),
-        LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.95f),  // home, rings 2 beats
-    ),
-    loopLength = 8,
-)
+private val aiLick by lazy {
+    Lick(
+        steps = listOf(
+            // bar 1 — the climb, stated once: G D F, the b7 rings out the bar
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.90f),
+            LickStep(scaleDegree = 5, duration = 3.0f, velocity = 0.88f),  // the hook lands — let ring
+            // bar 2 — the answer: climb again, but fall through the b5 to home
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 4, duration = 0.5f, velocity = 0.90f),
+            LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.72f),  // the b5, descending crush
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.82f),
+            LickStep(scaleDegree = 0, duration = 2.0f, velocity = 0.95f),  // home, rings 2 beats
+        ),
+        loopLength = 8,
+    )
+}
 
-private val tweakLick = Lick(
-    steps = listOf(
-        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
-        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
-        LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
-        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
-        LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
-        LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),
-        LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.90f),
-        LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),
-        LickStep(scaleDegree = 3, duration = 1.0f, velocity = 0.90f),
-    ),
-    loopLength = 8,
-)
+private val tweakLick by lazy {
+    Lick(
+        steps = listOf(
+            LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
+            LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.70f),
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
+            LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.95f),
+            LickStep(scaleDegree = 1, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.85f),
+            LickStep(scaleDegree = 2, duration = 0.5f, velocity = 0.80f),
+            LickStep(scaleDegree = 1, duration = 0.25f, velocity = 0.90f),
+            LickStep(scaleDegree = 0, duration = 0.25f, velocity = 0.70f),
+            LickStep(scaleDegree = 3, duration = 1.0f, velocity = 0.90f),
+        ),
+        loopLength = 8,
+    )
+}
 
 /**
  * Fire Sky (OG) — FROZEN A/B reference: the founding hook stated exactly, kept so riff

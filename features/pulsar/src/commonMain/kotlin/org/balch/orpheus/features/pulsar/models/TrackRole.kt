@@ -47,6 +47,12 @@ sealed class TrackRole {
          * default (zero cost, byte-identical output).
          */
         val wahLick: Boolean = false,
+        /**
+         * Which authored channel this track renders when [lickMode] is Squash or Fill.
+         * [LickSource.LEAD] (default) plays the vibe's lick; [LickSource.BASS] plays
+         * [Vibe.bassLine], owned and mutated independently of the lead.
+         */
+        val lickSource: LickSource = LickSource.LEAD,
     ) : TrackRole()
 
     /** Chord voicings — progression-following, comping patterns. */

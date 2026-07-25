@@ -55,37 +55,38 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
-import org.balch.orpheus.features.pulsar.models.ChordFollow
-import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.models.ChordFollow
+import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
-import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
-import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
+import org.balch.orpheus.features.pulsar.models.LickSource
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
-import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SoloBehavior
 import org.balch.orpheus.features.pulsar.models.SoloMarkovConfig
 import org.balch.orpheus.features.pulsar.models.SoloMode
-import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
-import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
-import org.balch.orpheus.features.pulsar.models.WahParams
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
-import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
-import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.models.WahParams
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
@@ -1191,6 +1192,11 @@ class PulsarViewModel(
                 is LickMode.Fill -> 2
             })
             trackLickDegreeOffsetIds[i].value = IntValue(tv.lickDegreeOffset)
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "track_lick_source_$i"),
+                FloatValue(
+                    if ((tv.role as? TrackRole.Melodic)?.lickSource == LickSource.BASS) 1f else 0f
+                ))
             trackCompingStyleIds[i].value = IntValue(compingStyleToInt(tv.chordComping?.style))
             trackArpModeIds[i].value = IntValue(tv.chordComping?.arpMode?.ordinal ?: 0)
             trackArpSpeedIds[i].value = FloatValue(tv.chordComping?.arpSpeed ?: 0.2f)
@@ -1314,6 +1320,42 @@ class PulsarViewModel(
         } else {
             lickLoopLengthId.value = IntValue(0)
             lickLengthId.value = IntValue(0)
+        }
+
+        // Push bass line channel (Pattern B dynamic controls; data first,
+        // bass_line_length last as release fence, mirroring the lead-lick contract).
+        val bassLine = vibe.bassLine
+        if (bassLine != null) {
+            bassLine.steps.forEachIndexed { i, step ->
+                val base = i * Lick.LICK_FIELDS_PER_STEP
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "bass_line_data_$base"),
+                    FloatValue(step.scaleDegree.toFloat()))
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "bass_line_data_${base + 1}"),
+                    FloatValue(step.duration))
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "bass_line_data_${base + 2}"),
+                    FloatValue(step.velocity))
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "bass_line_data_${base + 3}"),
+                    FloatValue(step.glideRate))
+            }
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "bass_line_mutation"),
+                FloatValue(vibe.bassLineMutation))
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "bass_line_octave"),
+                FloatValue(vibe.bassLineOctave.toFloat()))
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "bass_line_loop"),
+                FloatValue(bassLine.loopLength.toFloat()))
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "bass_line_length"),
+                FloatValue(bassLine.steps.size.toFloat()))
+        } else {
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "bass_line_length"), FloatValue(0f))
         }
 
         // Push lick rotation pool (Pattern B dynamic controls: bank data first,
