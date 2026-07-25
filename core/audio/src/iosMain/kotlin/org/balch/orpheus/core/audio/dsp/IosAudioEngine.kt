@@ -94,10 +94,18 @@ private const val TARGET_SAMPLE_RATE = 48000.0
 private const val TARGET_BUFFER_DURATION = 256.0 / TARGET_SAMPLE_RATE // ~5.3ms
 
 // A Bluetooth device powering off leaves the media server mid-transition for
-// a few hundred ms; host starts fail transiently in that window. 5 × 300ms
-// comfortably covers observed teardown times without retrying forever.
+// a few hundred ms; host starts fail transiently in that window.
+//
+// Delays double per attempt (300/600/1200/2400/4800ms, ~9.3s total) rather
+// than staying flat. Teardown is usually quick, but when it runs long a flat
+// 5 × 300ms budget expires while the route is still settling, and once the
+// budget is spent only a *new* route change revives audio — which never
+// arrives when the vanished device was the last route event. Nothing else
+// re-attempts: DspSynthEngine.start() early-returns after the first launch,
+// so a spent budget means silence until relaunch. Backoff buys ~6x the
+// window while still refusing to retry forever.
 private const val MAX_HOST_START_RETRIES = 5
-private const val HOST_START_RETRY_DELAY_MS = 300L
+private const val HOST_START_BASE_RETRY_DELAY_MS = 300L
 
 /**
  * iOS AudioEngine backed by the ObjC++ audio host in liborpheus_dsp
@@ -254,7 +262,19 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
             log.warn { "setActive(true) failed — host start will fail and retry" }
         }
 
-        _sampleRate = session.sampleRate.toInt()
+        // Same hazard rebuildForCurrentRoute() guards against, on the path
+        // that actually creates the C++ engine: a session that just refused
+        // activation (or is mid-teardown) can report 0, and start() would
+        // feed that straight into orpheus_engine_create() — a 0 Hz engine
+        // that renders nothing until some later route change rebuilds it.
+        // Keep the last known good rate; _sampleRate starts at
+        // TARGET_SAMPLE_RATE, so there is always a sane value to fall back to.
+        val reportedRate = session.sampleRate.toInt()
+        if (reportedRate > 0) {
+            _sampleRate = reportedRate
+        } else {
+            log.warn { "Session reported sampleRate=$reportedRate — keeping last known good $_sampleRate" }
+        }
         dspSampleRate = _sampleRate.toFloat()
         log.info { "Audio session configured: sampleRate=$_sampleRate" }
     }
@@ -464,9 +484,10 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         } finally {
             engineLock.unlock()
         }
-        log.info { "Audio host start retry $attempt/$MAX_HOST_START_RETRIES in ${HOST_START_RETRY_DELAY_MS}ms" }
+        val delayMs = HOST_START_BASE_RETRY_DELAY_MS shl (attempt - 1)
+        log.info { "Audio host start retry $attempt/$MAX_HOST_START_RETRIES in ${delayMs}ms" }
         dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, HOST_START_RETRY_DELAY_MS * 1_000_000L),
+            dispatch_time(DISPATCH_TIME_NOW, delayMs * 1_000_000L),
             dispatch_get_main_queue(),
         ) {
             var recreated = false
