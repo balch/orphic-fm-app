@@ -2022,24 +2022,32 @@ class PulsarViewModel(
         }
 
         // Per-track lick-wah insert config bank. NOT an anomaly — a standing per-track filter.
-        // [0]=track opt-in bitmask (bit t set => track t has wahLick), [1]=rateDivision [2]=depth
-        // [3]=resonanceQ [4]=centerHz [5]=sweepOctaves [6]=wet [7]=declared flag. Order MUST match
-        // the C++ unpack in orpheus_unit_pulsar.cpp load_vibe. Inert unless declared AND mask != 0.
+        // [0] = track opt-in bitmask (bit t set => track t filters through its own wah voice).
+        // Then WahParams.FIELDS floats per track at 1 + t * FIELDS, in WahParams declaration
+        // order: rateDivision, depth, resonanceQ, centerHz, sweepOctaves, wet. Order and stride
+        // MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        //
+        // Resolution per track: wahLick opts in, TrackRole.Melodic.wahParams voices it, and a
+        // null falls back to the vibe-wide Vibe.lickWah. A track that opts in with no params
+        // available either way stays OUT of the mask, so the insert is inert (as before) rather
+        // than running a default filter nobody asked for.
         var lickWahMask = 0
+        val lickWahData = FloatArray(1 + vibe.tracks.size * WahParams.FIELDS)
         vibe.tracks.forEachIndexed { t, tv ->
-            if ((tv.role as? TrackRole.Melodic)?.wahLick == true) lickWahMask = lickWahMask or (1 shl t)
+            val melodic = tv.role as? TrackRole.Melodic
+            val p = if (melodic?.wahLick == true) (melodic.wahParams ?: vibe.lickWah) else null
+            if (p != null) {
+                lickWahMask = lickWahMask or (1 shl t)
+                val base = 1 + t * WahParams.FIELDS
+                lickWahData[base] = p.rateDivision
+                lickWahData[base + 1] = p.depth
+                lickWahData[base + 2] = p.resonanceQ
+                lickWahData[base + 3] = p.centerHz
+                lickWahData[base + 4] = p.sweepOctaves
+                lickWahData[base + 5] = p.wet
+            }
         }
-        val lw = vibe.lickWah ?: WahParams()
-        val lickWahData = floatArrayOf(
-            lickWahMask.toFloat(),
-            lw.rateDivision,
-            lw.depth,
-            lw.resonanceQ,
-            lw.centerHz,
-            lw.sweepOctaves,
-            lw.wet,
-            if (vibe.lickWah != null && lickWahMask != 0) 1f else 0f, // [7] declared flag
-        )
+        lickWahData[0] = lickWahMask.toFloat()
         lickWahData.forEachIndexed { i, v ->
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "lick_wah_data_$i"), FloatValue(v)

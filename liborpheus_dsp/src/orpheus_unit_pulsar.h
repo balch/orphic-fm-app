@@ -15,6 +15,10 @@ static constexpr int kMaxSections = 8;
 static constexpr int kMaxSectionTransitions = 8;
 static constexpr int kMarkovIntervals = 15;
 static constexpr int kMaxSoloPhrase = 8;
+// Track 3 is hard-wired to the bass bus in every scene regardless of engine (see the
+// PULSAR_BUS_BASS branch in orpheus_unit_pulsar.cpp). Header-scoped so the wah-anomaly
+// eligibility predicate below and the C++ test harness can both see it.
+static constexpr int kBassTrack = 3;  // tracks 3=BASS (pulsar_pattern_gen.h:323)
 
 struct PulsarStep {
     uint8_t note;      // MIDI note number (quantized to current scale)
@@ -627,13 +631,70 @@ struct BandSoloState {
 
 // Wah Anomaly config (unpacked from pulsar_wah_data). Mirrors the Kotlin
 // WahAnomaly: a probability + duration range plus the WahParams voice armed
-// onto MasterWah.
+// onto the eligible LEAD tracks, one per-track insert each. Never armed onto the
+// master bus: filtering the summed mix wahs the drums, which is the whole reason
+// this config drives a per-track path instead of a master-bus stage.
 struct WahAnomalyConfig {
     float probability = 0.0f;
     float dur_min = 2.0f;
     float dur_max = 4.0f;
     orpheus::WahParams voice;
 };
+
+// ── Wah Anomaly: lead-only eligibility ──────────────────────────────────
+// The wah anomaly is a LEAD effect, applied per track. A track qualifies only when
+// it is melodic, is not reading the bass line channel, and is not the hard-wired
+// bass track. Drums, chordal pads, and the bass are all excluded. Pure functions of
+// the pushed atomics so the test harness can pin the contract with no engine fixture.
+//   role        — pulsar_track_role[t]        (0 = PERC, 1 = MELODIC, 2 = CHORDAL)
+//   lick_source — pulsar_track_lick_source[t] (1 = BASS, 0 = LEAD)
+inline bool wah_anomaly_track_eligible(int role, int lick_source, int t) {
+    return role == static_cast<int>(TrackRole::MELODIC)
+        && lick_source != 1
+        && t != kBassTrack;
+}
+
+// Bitmask of eligible tracks. 0 means the anomaly must NOT fire at all — there is
+// deliberately no master-bus fallback, since that is the bug this path replaces.
+inline uint8_t wah_anomaly_lead_mask(const int* roles, const int* lick_sources) {
+    uint8_t mask = 0;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        if (wah_anomaly_track_eligible(roles[t], lick_sources[t], t))
+            mask = static_cast<uint8_t>(mask | (1 << t));
+    }
+    return mask;
+}
+
+// Per-sample parameter morph for the wah-anomaly TAKEOVER path. A lead that already
+// carries the standing lick-wah insert keeps running its ONE WahVoice, and every
+// WahParams field is interpolated from the standing params toward the anomaly params
+// by the anomaly's trapezoid envelope. env == 0 reproduces `from` bit-for-bit, so the
+// entry AND the return are both continuous: one resonant bandpass per track, never
+// two cascaded. Interpolating rate_division moves the LFO increment continuously;
+// the phase itself is never reset, so there is nothing to click against.
+inline orpheus::WahParams wah_params_lerp(const orpheus::WahParams& from,
+                                          const orpheus::WahParams& to, float env) {
+    orpheus::WahParams p;
+    p.rate_division = from.rate_division + (to.rate_division - from.rate_division) * env;
+    p.depth         = from.depth         + (to.depth         - from.depth)         * env;
+    p.resonance_q   = from.resonance_q   + (to.resonance_q   - from.resonance_q)   * env;
+    p.center_hz     = from.center_hz     + (to.center_hz     - from.center_hz)     * env;
+    p.sweep_octaves = from.sweep_octaves + (to.sweep_octaves - from.sweep_octaves) * env;
+    p.wet           = from.wet           + (to.wet           - from.wet)           * env;
+    return p;
+}
+
+// Trapezoid wet/morph envelope for an armed wah-anomaly window: 15% ramp in, flat
+// sustain, 15% ramp out. Matches the master-bus wah envelope this path replaces, so
+// the sweep shape is unchanged by the reroute. `left` counts DOWN from `total`.
+inline float wah_anomaly_env(int left, int total) {
+    if (total <= 0) return 0.0f;
+    const float ramp = 0.15f;
+    const float x = 1.0f - static_cast<float>(left) / static_cast<float>(total);
+    return (x < ramp)          ? x / ramp
+         : (x > 1.0f - ramp)   ? (1.0f - x) / ramp
+                               : 1.0f;
+}
 
 // Crossfade Anomaly config (unpacked from pulsar_crossfade_data). Mirrors the
 // Kotlin CrossfadeAnomaly: a probability + duration range plus the dip depth
@@ -788,9 +849,25 @@ struct PulsarState {
     int prev_anomaly_request = 0;       // edge-detect mirror of pulsar_anomaly_request
     bool void_declared = false;         // true when this vibe opts into the void (void_data[7])
 
-    // Wah Anomaly (dispatched by the Anomaly Engine, arms MasterWah on the master bus)
+    // Wah Anomaly (dispatched by the Anomaly Engine, arms a per-track insert on the
+    // eligible LEAD tracks — see wah_anomaly_lead_mask above. Unlike every sibling
+    // anomaly below, it does NOT touch the master bus.)
     WahAnomalyConfig wah_config;
     bool wah_declared = false;          // true when this vibe opts into the wah (wah_data[9])
+    // Armed-window state for the per-track wah anomaly. anomaly_wah_mask is resolved
+    // ONCE at arm time: roles can be pushed live, but the window must not change which
+    // tracks it filters mid-sweep. samples_left > 0 is the single "armed" predicate, and
+    // it is decremented exactly once per BLOCK (at t == 0 in the per-track loop), never
+    // once per track — a per-track decrement would burn the window 8x too fast and
+    // desync the per-track LFO phases. In-class initializers matter here: PulsarState is
+    // heap-allocated once per engine and only selected POD fields are explicitly zeroed.
+    orpheus::WahParams anomaly_wah_params;   // snapshot of wah_config.voice at arm time
+    int      anomaly_wah_samples_total = 0;
+    int      anomaly_wah_samples_left  = 0;
+    uint8_t  anomaly_wah_mask = 0;           // bit t set => track t is in the armed window
+    // Fresh voices for eligible tracks with NO standing lick wah. A takeover track
+    // reuses lick_wah_voice[t] instead, so its Svf state and LFO phase stay continuous.
+    orpheus::WahVoice anomaly_wah_voice[kNumPulsarTracks];
 
     // Crossfade Anomaly (dispatched by the Anomaly Engine, arms MasterCrossfade on the master bus)
     CrossfadeConfig crossfade_config;
@@ -822,10 +899,16 @@ struct PulsarState {
     // Per-track lick-wah insert (NOT an anomaly): a standing bandpass wah applied to each
     // opted-in track's rendered buffer, in place, before it accumulates into the mix. One
     // WahVoice per track so each keeps its own filter + LFO phase. Inert unless lick_wah_declared.
-    orpheus::WahParams lick_wah_params;
+    // While the wah anomaly is armed on the same track, the anomaly TAKES OVER this voice by
+    // morphing lick_wah_params toward anomaly_wah_params rather than adding a second filter.
+    // "One voice per track, own phase" is exactly what makes that takeover click-free.
+    // Params are per track too, so a bass can rock a bar-long sweep down low while a lead
+    // works a quarter-note pedal up in the vowel range. Costs nothing at render time: the
+    // voice loop already ran per track, this only changes which params it reads.
+    orpheus::WahParams lick_wah_params[kNumPulsarTracks];
     orpheus::WahVoice lick_wah_voice[kNumPulsarTracks];
     uint8_t lick_wah_mask = 0;          // bit t set => track t filters through lick_wah_voice[t]
-    bool lick_wah_declared = false;     // true when the vibe supplies lickWah AND a track opts in
+    bool lick_wah_declared = false;     // true when at least one track resolved wah params
 
     uint32_t master_anomaly_seed = 0;   // play-scoped RNG for Master* anomaly rolls/durations
     bool force_lick_anomaly = false;    // one-shot: force the OG lick anomaly at the next resolve

@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickSource
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -42,13 +43,18 @@ import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
 
 /**
- * Odysseus Lore — slow psychedelic power-trio lament with a wah-drenched lead.
+ * Odysseus Lore — slow psychedelic lament for a heavy quartet, twin guitars over a
+ * walking bass.
  *
- * A descending Andalusian bassline (the vibe's whole spine) walks D-C-Bb-A under
- * a standing tempo-synced wah on the lead. Structure breathes verse -> driven jam
- * -> hard cut back to the slow verse. First vibe on the bass line channel and the
- * per-track lick-wah insert: the bass owns its authored figure, the lead owns its
- * wah phrases, and LickBuilder jams mutate whichever channel the soloist owns.
+ * A descending bassline (the vibe's whole spine) walks D-C-Bb-A under two guitars
+ * moving in diatonic thirds, on a drum kit that plays the room rather than the click.
+ * Structure breathes verse -> driven jam -> hard cut back to the slow verse.
+ *
+ * First vibe on the bass line channel and on per-track wah voicing: the bass rocks a
+ * slow pedal low in the spectrum while the lead works a quarter-note pedal up in the
+ * vowel range, two pedals at two rates at once. The bass owns its authored figure, the
+ * lead owns its wah phrases, the harmony guitar shadows the lead a third above, and
+ * LickBuilder jams mutate whichever channel the soloist owns.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
@@ -70,7 +76,7 @@ class OdysseusLoreVibe : VibeProvider {
             stepCount = 64,   // 4-bar pattern = one full pass of the 4-chord descent
             genre = GenreProfile(
                 swingAmount = 0.06f,
-                ghostProbability = 0.18f,
+                ghostProbability = 0.3f,   // busy hands: ghost strokes filling between the backbeats
                 noteRangeLow = 45,
                 noteRangeHigh = 69,
                 rhythmDensity = RhythmPattern.BACKBEAT.density,
@@ -99,40 +105,26 @@ class OdysseusLoreVibe : VibeProvider {
             lickMutation = 0.45f,
             lickOctave = -1,
 
-            // The spine: four descending anchors (D C Bb A), one bar each, each
-            // stated long, restated short, and answered with an upper-neighbor
-            // walk. FIXED chordFollow renders it exactly as written.
+            // The spine: four descending anchors (D C Bb A), one per bar, each landing
+            // ON the downbeat with a 16th pickup that slurs into the next. glideRate
+            // lives on the ANCHOR, not the pickup: the engine slides from the previous
+            // pitch INTO the step carrying the rate, so a rate on a same-pitch pickup
+            // slides nowhere. No rests either — a rest clears prev_step_gated and the
+            // following glide is skipped. FIXED chordFollow renders it as written.
             bassLine = Lick(
                 steps = listOf(
-                    // Bar 1 — D anchor
-                    LickStep(7, 1.5f, 0.92f),
-                    LickStep(-1, 0.5f, 0f),
-                    LickStep(7, 0.5f, 0.7f),
-                    LickStep(9, 0.5f, 0.62f),
-                    LickStep(8, 1.0f, 0.78f),
-                    // Bar 2 — C anchor
-                    LickStep(6, 1.5f, 0.9f),
-                    LickStep(-1, 0.5f, 0f),
-                    LickStep(6, 0.5f, 0.68f),
-                    LickStep(8, 0.5f, 0.6f),
-                    LickStep(7, 1.0f, 0.76f),
-                    // Bar 3 — Bb anchor
-                    LickStep(5, 1.5f, 0.9f),
-                    LickStep(-1, 0.5f, 0f),
-                    LickStep(5, 0.5f, 0.68f),
-                    LickStep(7, 0.5f, 0.6f),
-                    LickStep(6, 1.0f, 0.76f),
-                    // Bar 4 — A anchor, then walk the octave back up to D
-                    LickStep(4, 1.0f, 0.92f),
-                    LickStep(-1, 0.5f, 0f),
-                    LickStep(4, 0.5f, 0.7f),
-                    LickStep(5, 0.5f, 0.72f),
-                    LickStep(6, 0.5f, 0.74f),
-                    LickStep(7, 1.0f, 0.8f, glideRate = 0.25f),
+                    LickStep(7, 3.75f, 0.95f, glideRate = 0.5f),                   // bar 1 — D2
+                    LickStep(7, 0.25f, 0.45f),                   //   pickup, lifts into C
+                    LickStep(6, 3.75f, 0.90f, glideRate = 0.5f), // bar 2 — C2, slurs down
+                    LickStep(6, 0.25f, 0.45f),
+                    LickStep(5, 3.75f, 0.90f, glideRate = 0.5f), // bar 3 — Bb1
+                    LickStep(5, 0.25f, 0.45f),
+                    LickStep(4, 3.75f, 0.95f, glideRate = 0.5f),  // bar 4 — A1, holds the bar
+                    LickStep(4, 0.25f, 0.45f),  // bar 4 — A1,
                 ),
-                loopLength = 16,  // exactly the 4-bar cycle, no rest padding
+                loopLength = 16,  // 16 beats of notes = the full 64-step pattern, no padding
             ),
-            bassLineMutation = 0.25f,  // the hook stays recognizable
+            bassLineMutation = 0f,     // pinned while dialing in; raise once it sounds right
             bassLineOctave = 2,        // D2 register descent (38 -> 36 -> 34 -> 33)
 
             lickWah = WahParams(
@@ -144,38 +136,62 @@ class OdysseusLoreVibe : VibeProvider {
                 wet = 0.9f,
             ),
             anomalies = listOf(
-                WahAnomaly(probability = 0.03f),  // rare whole-mix wah moment
+                // Rare lead-only wah sweep. Eligible tracks here are the melodic leads 4 and 6;
+                // the bass (3) and the pad (5) stay dry, as do the drums. Track 4 already runs
+                // the standing lickWah above, so the anomaly TAKES OVER that one filter for its
+                // armed duration rather than stacking a second bandpass on it. Track 6 has no
+                // standing wah, so it gets a fresh one that fades in and back out.
+                WahAnomaly(probability = 0.03f),
             ),
 
             tracks = listOf(
-                // 0 — kick: steady rock anchor
-                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.85f).let { kick ->
+                // 0 — kick: the floor of the whole thing. Long vactrol decay so each hit
+                // booms instead of clicking, and harmonics/timbre locked (min == max) so the
+                // Mood knob cannot thin the drum out from under the jam. Locking via the
+                // macro map rather than pinHarmonics keeps tension-evolution alive.
+                OrpheusEngine(
+                    engineId = OrpheusEngineId.BD, volume = 1f,
+                    lpgDecay = 0.72f, lpgColour = 0.35f,
+                ).let { kick ->
                     TrackVoice(
                         engineEdm = kick, engineSpace = kick,
                         role = TrackRole.Percussive,
-                        density = 0.45f,
+                        density = 0.62f,
                         barStrategy = BarStrategy.REPEAT,
                         envelopeProfile = EnvelopeProfile.RHYTHM,
-                        macroMap = TrackMacroMap.RHYTHM,
+                        macroMap = TrackMacroMap.RHYTHM.copy(
+                            moodHarmonics = MacroTarget(0.58f, 0.58f),  // fat, driven kick
+                            moodTimbre = MacroTarget(0.62f, 0.62f),     // long decay
+                        ),
                     )
                 },
-                // 1 — snare/toms: backbeat with tom-leaning fills
-                OrpheusEngine(engineId = OrpheusEngineId.SD, volume = 0.8f).let { snare ->
+                // 1 — snare + toms: the fills are the point. Big and loose, landing hard on
+                // the backbeat and spilling into tom rolls between the walkdown anchors.
+                OrpheusEngine(
+                    engineId = OrpheusEngineId.SD, volume = 0.95f,
+                    lpgDecay = 0.6f,
+                ).let { snare ->
                     TrackVoice(
                         engineEdm = snare, engineSpace = snare,
                         role = TrackRole.Percussive,
-                        density = 0.4f,
+                        density = 0.56f,
                         barStrategy = BarStrategy.FILL,
                         envelopeProfile = EnvelopeProfile.RHYTHM,
-                        macroMap = TrackMacroMap.RHYTHM,
+                        macroMap = TrackMacroMap.RHYTHM.copy(
+                            moodTimbre = MacroTarget(0.6f, 0.6f),  // body over crack
+                        ),
                     )
                 },
-                // 2 — hat/ride wash
-                OrpheusEngine(engineId = OrpheusEngineId.HH, volume = 0.55f).let { hat ->
+                // 2 — ride wash: rides the whole jam rather than ticking a hat. Louder and
+                // busier than a backbeat hat wants, which is exactly the point.
+                OrpheusEngine(
+                    engineId = OrpheusEngineId.HH, volume = 0.7f,
+                    lpgDecay = 0.55f, reverbSend = 0.15f,
+                ).let { ride ->
                     TrackVoice(
-                        engineEdm = hat, engineSpace = hat,
+                        engineEdm = ride, engineSpace = ride,
                         role = TrackRole.Percussive,
-                        density = 0.5f,
+                        density = 0.62f,
                         barStrategy = BarStrategy.MUTATE,
                         envelopeProfile = EnvelopeProfile.RHYTHM,
                         macroMap = TrackMacroMap.RHYTHM,
@@ -183,7 +199,7 @@ class OdysseusLoreVibe : VibeProvider {
                 },
                 // 3 — THE bass: owns the bass line channel
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.WSH, volume = 0.85f,
+                    engineId = OrpheusEngineId.PD, volume = 0.85f,
                     noteRangeLow = 33, noteRangeHigh = 45,
                 ).let { bass ->
                     TrackVoice(
@@ -193,6 +209,21 @@ class OdysseusLoreVibe : VibeProvider {
                             chordFollow = ChordFollow.FIXED,  // the phrase IS the progression
                             lickMode = LickMode.Fill,
                             lickSource = LickSource.BASS,
+                            // The bassist works their own pedal: slow and low, against the
+                            // lead's quarter-note rock. One sweep per two bars = two per pass
+                            // of the walkdown. Centered where the bass's harmonics live rather
+                            // than its fundamentals (D2 is 73 Hz): 380 Hz +/- 1.4 octaves spans
+                            // 144 Hz to 1 kHz. Wet stays near half because a full-wet bandpass
+                            // would strip the low end this track exists to provide.
+                            wahLick = true,
+                            wahParams = WahParams(
+                                rateDivision = 0.5f,
+                                depth = 0.9f,
+                                resonanceQ = 2.5f,
+                                centerHz = 380f,
+                                sweepOctaves = 1.4f,
+                                wet = 0.55f,
+                            ),
                         ),
                         density = 0.6f,
                         barStrategy = BarStrategy.REPEAT,
@@ -220,41 +251,63 @@ class OdysseusLoreVibe : VibeProvider {
                         macroMap = TrackMacroMap.MELODIC,
                     )
                 },
-                // 5 — pad haze: thin organ-adjacent bed
+                // 5 — organ haze: was a thin bed, now a real presence under the jam. The
+                // slow mod LFO gives it drift so it breathes instead of sitting flat; a
+                // DRONE profile is one of the two things that enable that LFO at all.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.ENS, volume = 0.35f,
-                    holdProbability = 0.85f, reverbSend = 0.45f,
+                    engineId = OrpheusEngineId.ENS, volume = 0.5f,
+                    holdProbability = 0.9f, reverbSend = 0.58f,
+                    modLfoRate = 0.05f, modLfoDepth = 0.4f,
+                    reverbBrightness = 0.4f,
                 ).let { pad ->
                     TrackVoice(
                         engineEdm = pad, engineSpace = pad,
                         role = TrackRole.Chordal(),
-                        density = 0.25f,
+                        density = 0.36f,
                         barStrategy = BarStrategy.REPEAT,
                         envelopeProfile = EnvelopeProfile.DRONE,
                         macroMap = TrackMacroMap.EFFECT,
                     )
                 },
-                // 6 — psych swirl: sparse granular color
+                // 6 — psych swirl: granular color, up from "barely there" to "noticed".
+                // Still INDEPENDENT so it drifts across the bar lines rather than locking.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.GRN, volume = 0.3f, reverbSend = 0.5f,
+                    engineId = OrpheusEngineId.GRN, volume = 0.45f,
+                    reverbSend = 0.62f, delaySend = 0.3f,
+                    modLfoRate = 0.07f, modLfoDepth = 0.45f,
                 ).let { swirl ->
                     TrackVoice(
                         engineEdm = swirl, engineSpace = swirl,
                         role = TrackRole.Melodic(chordFollow = ChordFollow.FIXED),
-                        density = 0.12f,
+                        density = 0.2f,
                         barStrategy = BarStrategy.INDEPENDENT,
                         envelopeProfile = EnvelopeProfile.EFFECT,
                         macroMap = TrackMacroMap.EFFECT,
                     )
                 },
-                // 7 — silent spare (power trio: nobody else on stage)
-                OrpheusEngine(engineId = OrpheusEngineId.NSE, volume = 0f).let { spare ->
+                // 7 — harmony guitar: the second player. Renders the SAME lick as track 4
+                // shifted +2 scale degrees, which in a 7-note scale is a diatonic third
+                // above — the twin-lead sound. CALL_RESPONSE matches the lead's phrasing so
+                // the two move as one line, not two. Sits under the lead in level, and stays
+                // dry: a third wah against the lead's quarter-note pedal and the bass's slow
+                // one would be mud. Give it its own wahParams if you want that.
+                OrpheusEngine(
+                    engineId = OrpheusEngineId.WSH, volume = 0.6f,
+                    noteRangeLow = 57, noteRangeHigh = 79,
+                    delaySend = 0.22f, reverbSend = 0.34f,
+                ).let { harmony ->
                     TrackVoice(
-                        engineEdm = spare, engineSpace = spare,
-                        role = TrackRole.Percussive,
-                        density = 0f,
-                        envelopeProfile = EnvelopeProfile.EFFECT,
-                        macroMap = TrackMacroMap.EFFECT,
+                        engineEdm = harmony,
+                        engineSpace = harmony.copy(engineId = OrpheusEngineId.VA),
+                        role = TrackRole.Melodic(
+                            chordFollow = ChordFollow.FIXED,
+                            lickMode = LickMode.Fill,
+                            lickDegreeOffset = 2,
+                        ),
+                        density = 0.42f,
+                        barStrategy = BarStrategy.CALL_RESPONSE,
+                        envelopeProfile = EnvelopeProfile.MELODIC,
+                        macroMap = TrackMacroMap.MELODIC,
                     )
                 },
             ),
@@ -263,7 +316,9 @@ class OdysseusLoreVibe : VibeProvider {
                 members = listOf(
                     BandMember(name = "Drummer", tracks = listOf(0, 1, 2), alwaysActive = true),
                     BandMember(name = "Bassist", tracks = listOf(3)),
-                    BandMember(name = "Guitarist", tracks = listOf(4)),
+                    // Both guitars move as one member: the harmony tracks the lead in
+                    // thirds, so handing the solo to "Guitarist" hands it to the pair.
+                    BandMember(name = "Guitarist", tracks = listOf(4, 7)),
                     BandMember(name = "Haze", tracks = listOf(5, 6)),
                 ),
                 handoffMatrix = bandMatrix(
@@ -309,7 +364,7 @@ class OdysseusLoreVibe : VibeProvider {
                     // 0 INTRO — the bass alone states the lament; band swells in
                     Section(
                         name = "intro",
-                        barsMin = 1, barsMax = 2,
+                        barsMin = 2, barsMax = 2,
                         macroOverrides = MacroOverrides(energy = 0.7f, space = 1.2f),
                         trackOverrides = mapOf(
                             0 to TrackSectionOverride(density = 0.15f),
@@ -318,22 +373,22 @@ class OdysseusLoreVibe : VibeProvider {
                             4 to TrackSectionOverride(density = 0f),
                             5 to TrackSectionOverride(density = 0f),
                             6 to TrackSectionOverride(density = 0f),
+                            7 to TrackSectionOverride(density = 0f),  // both guitars out
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
                     // 1 VERSE — slow full-band groove under the wah
                     Section(
                         name = "verse",
-                        barsMin = 2, barsMax = 3,
+                        barsMin = 2, barsMax = 4,
                         transitions = listOf(
-                            SectionTransition(2, 0.8f, transitionBars = 1),
-                            SectionTransition(3, 0.1f),
+                            SectionTransition(2, 1f, transitionBars = 1),
                         ),
                     ),
                     // 2 JAM — driven; LickBuilder trades mutate the soloist's channel
                     Section(
                         name = "jam",
-                        barsMin = 2, barsMax = 4,
+                        barsMin = 4, barsMax = 8,
                         macroOverrides = MacroOverrides(
                             energy = 1.35f, complexity = 1.3f, space = 0.85f, mood = 1.1f,
                         ),
@@ -346,7 +401,7 @@ class OdysseusLoreVibe : VibeProvider {
                     // 3 OUTRO — the lament dissolves
                     Section(
                         name = "outro",
-                        barsMin = 1, barsMax = 2,
+                        barsMin = 2, barsMax = 2,
                         macroOverrides = MacroOverrides(energy = 0.55f, space = 1.5f),
                         transitions = emptyList(),
                     ),

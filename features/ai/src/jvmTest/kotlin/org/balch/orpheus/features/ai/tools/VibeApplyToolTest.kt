@@ -10,6 +10,7 @@ import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.TremoloTideVibe
 import kotlin.test.Test
@@ -97,7 +98,7 @@ class VibeApplyToolTest {
 
     @Test
     fun `unknown anomaly type degrades to an auto-inert void instead of failing`() {
-        // The guide documents only the "void" and "lick" anomaly types, so an agent-invented one
+        // The guide documents only the "void", "lick" and "wah" anomaly types, so an invented one
         // (e.g. {"type":"sweep"}) is a rare-hallucination path — but it must degrade, not crash
         // the whole apply into the retry loop. InertVoidAnomalyDeserializer decodes it as a
         // VoidAnomaly with probability zeroed: still declared (the manual anomaly trigger can
@@ -114,11 +115,18 @@ class VibeApplyToolTest {
 
     @Test
     fun `known anomaly types still decode exactly`() {
-        // The fallback must not swallow the real subtypes — round-trip a declared void + lick pair.
+        // The fallback must not swallow the real subtypes. Round-trip one of each documented type.
+        // The wah is here because the guide now teaches the agent to author it: "wah" is a
+        // registered sealed subtype, so it must decode to a real WahAnomaly with its authored
+        // probability intact, NOT get quietly rewritten into an auto-inert void by the fallback.
         val lick = Lick(listOf(LickStep(0, 0.5f)), loopLength = 8)
         val vibe = DogHouseVibe().vibe.copy(
             lick = lick,
-            anomalies = listOf(VoidAnomaly(probability = 0.2f), LickAnomaly(lick = lick, chance = 0.3f)),
+            anomalies = listOf(
+                VoidAnomaly(probability = 0.2f),
+                LickAnomaly(lick = lick, chance = 0.3f),
+                WahAnomaly(probability = 0.05f),
+            ),
         )
         val result = decodeVibe(vibeApplyJson, vibeApplyJson.encodeToString(vibe))
         assertTrue(result.isSuccess, "decode failed: ${result.exceptionOrNull()?.message}")

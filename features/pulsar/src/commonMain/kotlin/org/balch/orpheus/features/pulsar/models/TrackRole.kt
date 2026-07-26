@@ -43,10 +43,22 @@ sealed class TrackRole {
         /**
          * When true, this track's rendered audio is filtered through a per-track
          * tempo-synced bandpass wah ([Vibe.lickWah]) before it accumulates into the
-         * mix — a standing timbral insert, independent of the wah anomaly. Off by
+         * mix: a standing timbral insert. While the wah anomaly is armed on this
+         * track it drives this same filter with its own params for the armed
+         * duration, so the track never runs two bandpasses at once. Off by
          * default (zero cost, byte-identical output).
          */
         val wahLick: Boolean = false,
+        /**
+         * Per-track voicing for this track's [wahLick] insert. Null = inherit [Vibe.lickWah],
+         * the vibe-wide default. Set it when instruments need different pedals at once: a
+         * bass rocking a bar-long sweep low in the spectrum under a lead on a quarter-note
+         * pedal up in the vowel range. Ignored unless [wahLick] is true.
+         *
+         * Costs nothing extra to run — every track already owns its own filter and LFO
+         * phase, so this only decides which params that filter reads.
+         */
+        val wahParams: WahParams? = null,
         /**
          * Which authored channel this track renders when [lickMode] is Squash or Fill.
          * [LickSource.LEAD] (default) plays the vibe's lick; [LickSource.BASS] plays

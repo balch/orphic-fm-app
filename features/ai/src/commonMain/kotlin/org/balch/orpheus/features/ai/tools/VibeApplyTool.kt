@@ -40,9 +40,10 @@ import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
  * strict on purpose, so a genuinely malformed role still surfaces for self-correction.
  *
  * [Anomaly] gets the same net via [InertVoidAnomalyDeserializer]: the guide documents only the
- * "void"/"lick" types, so an invented one (e.g. `{"type":"sweep", ...}`) is a rare-hallucination
- * path — it degrades to a declared-but-auto-inert [VoidAnomaly] instead of crashing the whole
- * apply into the retry loop.
+ * "void"/"lick"/"wah" types, so an invented one (e.g. `{"type":"sweep", ...}`) is a
+ * rare-hallucination path. It degrades to a declared-but-auto-inert [VoidAnomaly] instead of
+ * crashing the whole apply into the retry loop. The three documented types are registered sealed
+ * subtypes, so they decode exactly and never hit this fallback.
  *
  * Essential, default-less fields (name/bpm/rootNote/scaleType/genre/tracks) stay strict too.
  */

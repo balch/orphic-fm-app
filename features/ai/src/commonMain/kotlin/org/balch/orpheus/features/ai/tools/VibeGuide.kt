@@ -169,6 +169,35 @@ riff over whatever lick is playing, reverting after. Requires a lick source (`li
 `chance` (0..1) is the per-~2-bar-statement swap probability; keep it low. The anomaly lick shares the
 lick bank, so `lickRotation.pool` size + 1 must be ≤ 4 (MAX_LICK_POOL). See section 10's riff recipe.
 
+STANDING WAH (not an anomaly) — `lickWah` on the vibe plus `wahLick: true` on a Melodic track:
+an always-on tempo-synced bandpass on that track's audio. Any melodic track may opt in, the bass
+line channel included. The six voice fields are rateDivision (4 = quarter-note rock of the pedal,
+1 = one sweep per bar, 0.5 = one per two bars, 0.25 = one per four), depth, resonanceQ, centerHz,
+sweepOctaves, wet.
+A track may also set `wahParams` to voice its own pedal instead of inheriting `lickWah`, which is
+how two players wah at once without sounding like one pedal: e.g. a bass on rateDivision 0.5,
+centerHz 380, wet 0.55 under a lead on rateDivision 4, centerHz 750, wet 0.9. Match centerHz to the
+instrument's register — a bass wants 300-450, a lead 700-900 — and keep a bass's wet near 0.5, since
+a full-wet bandpass strips the low end the track exists to provide. `wahParams` without
+`wahLick: true` is rejected: the params would never run.
+
+WAH — `{"type":"wah", ...}`: a rare few bars where the lead voices swing under a sweeping
+tempo-synced wah while the drums, chords, and bass line stay dry. It is a per-track insert, not a
+whole-mix effect. A track is eligible only when its role is Melodic, its `lickSource` is LEAD (the
+default), and it is not track index 3 (always the bass). Percussive and Chordal tracks are never
+filtered, so a vibe with no melodic lead never fires this at all. Give the vibe at least one
+melodic non-bass track before declaring it.
+- probability (0..1): chance the wah auto-fires at each section entry. Keep it low (0.02-0.06) so it
+  stays a surprise; the ship default is 0.03. Set 0 and it only fires from the manual trigger.
+- durationBarsMin / durationBarsMax: the armed length in musical bars, drawn per occurrence.
+- voice: the sweep itself. rateDivision (4 = quarter-note rock of the pedal, 8 = eighths), depth,
+  resonanceQ (higher = sharper vowel), centerHz, sweepOctaves, wet. Same six fields as `lickWah`.
+If an eligible lead already sets `wahLick`, the anomaly takes that track's existing wah over for the
+armed duration instead of stacking a second filter on it, so make `voice` clearly different from
+`lickWah` (a faster rateDivision, a tighter resonanceQ) or the moment will not read as a change.
+Best on vibes built around a real lead voice: rock, psych, funk, blues. Skip it on pad-only or
+drum-driven vibes, where nothing is eligible.
+
 ## 10. Translation recipes — feel -> settings
 The highest-value part: translate a described feel into concrete parameter choices.
 

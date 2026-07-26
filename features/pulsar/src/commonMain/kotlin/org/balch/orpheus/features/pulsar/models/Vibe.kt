@@ -101,7 +101,8 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param effects Delay and reverb tuning for this vibe.
  * @param lickWah Optional per-track lick-wah voice. Tracks whose [TrackRole.Melodic.wahLick] is
  *   set filter their rendered audio through this tempo-synced bandpass wah before it accumulates
- *   into the mix — a standing timbral insert, independent of the [WahAnomaly]. Null = no track
+ *   into the mix, a standing timbral insert. While a [WahAnomaly] is armed on such a track it
+ *   drives this same filter with its own params instead of stacking a second one. Null = no track
  *   filters (the insert stays inert even if a track opts in).
  * @param anomalies Rare dramatic events (see [Anomaly]) the Anomaly Engine may fire — e.g. a
  *   [VoidAnomaly] drop-to-silence or a [LickAnomaly] original-riff swap. Empty = none; the vibe
@@ -201,6 +202,14 @@ data class Vibe(
         }
         require(bassLickTracks == 0 || bassLine != null) {
             "$bassLickTracks track(s) set lickSource = BASS but Vibe.bassLine is null"
+        }
+        // Per-track wah params only mean something on a track that opted into the insert.
+        val orphanWah = tracks.withIndex().filter { (_, tv) ->
+            val m = tv.role as? TrackRole.Melodic
+            m != null && m.wahParams != null && !m.wahLick
+        }.map { it.index }
+        require(orphanWah.isEmpty()) {
+            "track(s) $orphanWah set wahParams but wahLick = false — the params would never run"
         }
     }
 }

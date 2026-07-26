@@ -67,6 +67,7 @@ static TestSuite suites[] = {
     {"pulsar_void",    run_pulsar_void_tests,     true},
     {"wah_core",        run_wah_core_tests,        true},
     {"pulsar_lick_wah", run_pulsar_lick_wah_tests, true},
+    {"pulsar_wah_anomaly", run_pulsar_wah_anomaly_tests, true},
     {"pulsar_anomaly_arm", run_pulsar_anomaly_arm_tests, true},
     {"pulsar_lick_select", run_pulsar_lick_select_tests, true},
     {"tension",         run_pulsar_tension_tests,  true},
@@ -104,7 +105,6 @@ static TestSuite suites[] = {
     {"master_crossfade", run_master_crossfade_tests, true},
     {"master_swell",    run_master_swell_tests,    true},
     {"master_cut",      run_master_cut_tests,      true},
-    {"master_wah",      run_master_wah_tests,      true},
     {"graph-swap",      run_graph_swap_tests,      true},
 };
 

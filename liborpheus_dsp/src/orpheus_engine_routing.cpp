@@ -1111,7 +1111,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             // so it needs its own branch — neither shorter prefix matches "lick_wah_data_N"
             // (differ at index 0 / index 5 respectively), so ordering here is not load-bearing.
             int idx = std::atoi(symbol + 14);
-            if (idx >= 0 && idx < 8)
+            constexpr int kLickWahBankSize =
+                static_cast<int>(sizeof(OrpheusEngine::pulsar_lick_wah_data) /
+                                 sizeof(OrpheusEngine::pulsar_lick_wah_data[0]));
+            if (idx >= 0 && idx < kLickWahBankSize)
                 engine->pulsar_lick_wah_data[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "wah_data_", 9) == 0) {

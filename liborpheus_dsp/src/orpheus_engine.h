@@ -65,7 +65,6 @@
 #include "orpheus_master_scratch.h"
 #include "orpheus_master_filter.h"
 #include "orpheus_master_leslie.h"
-#include "orpheus_master_wah.h"
 #include "orpheus_master_crossfade.h"
 #include "orpheus_master_cut.h"
 #include "orpheus_master_swell.h"
@@ -145,8 +144,6 @@ struct OrpheusEngine {
     orpheus::MasterFilter master_filter_r;
     orpheus::MasterLeslie master_leslie_l;
     orpheus::MasterLeslie master_leslie_r;
-    orpheus::MasterWah master_wah_l;
-    orpheus::MasterWah master_wah_r;
     orpheus::MasterCrossfade master_crossfade_l;
     orpheus::MasterCrossfade master_crossfade_r;
     orpheus::MasterCut master_cut_l;
@@ -1006,13 +1003,17 @@ struct OrpheusEngine {
     // (1.0 when the vibe declares a FilterAnomaly; gates the manual trigger). Arms the EXISTING
     // master_filter_l/r members (already in the master chain) — no new engine effect member here.
     std::atomic<float> pulsar_filter_data[4] = {};
-    // Per-track lick-wah insert: 8-float config bank [0]=track opt-in bitmask (bit t set => track
-    // t filters its rendered audio through the shared WahVoice), [1]=rateDivision [2]=depth
-    // [3]=resonanceQ [4]=centerHz [5]=sweepOctaves [6]=wet [7]=declared flag (1.0 when the vibe
-    // supplies lickWah AND at least one track opts in). NOT an anomaly — a standing per-track
-    // filter applied inside the pulsar unit's per-track accumulation. Inert (byte-identical) when
-    // declared flag is 0.
-    std::atomic<float> pulsar_lick_wah_data[8] = {};
+    // Per-track lick-wah insert config bank. [0] = track opt-in bitmask (bit t set => track t
+    // filters its rendered audio through its OWN WahVoice, voiced by its OWN params). Then
+    // kLickWahFields floats per track at 1 + t * kLickWahFields, in orpheus::WahParams
+    // declaration order: rateDivision, depth, resonanceQ, centerHz, sweepOctaves, wet.
+    // NOT an anomaly — a standing per-track filter applied inside the pulsar unit's per-track
+    // accumulation. Inert (byte-identical) when the mask is 0. A track is only in the mask when
+    // params were resolvable for it, so there is no separate "declared" flag.
+    // (literal 8 tracks, matching the pulsar_track_* banks above — kNumPulsarTracks lives in
+    // orpheus_unit_pulsar.h, which includes this header, so it is not visible here.)
+    static constexpr int kLickWahFields = 6;   // MUST equal Kotlin WahParams.FIELDS
+    std::atomic<float> pulsar_lick_wah_data[1 + 8 * kLickWahFields] = {};
     // Anomaly manual-trigger counter (edge-detected in the pulsar unit).
     std::atomic<int>   pulsar_anomaly_request{0};
     // Per-track section overrides. Stride: 8 sections × 8 tracks. -1 sentinel
