@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.balch.orpheus.core.audio.AudioHostRepair
 import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -42,6 +43,17 @@ private class FakeRouteMonitor : AudioRouteMonitor {
     }
 }
 
+private class FakeHostRepair(
+    private val onEnsure: () -> Unit = {},
+) : AudioHostRepair {
+    var ensureCallCount = 0
+        private set
+    override fun ensureAudioHostRunning() {
+        ensureCallCount++
+        onEnsure()
+    }
+}
+
 private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
     override val main get() = d
     override val io get() = d
@@ -68,6 +80,7 @@ private fun build(
     muteCalls: MutableList<PlaybackState> = mutableListOf(),
     focusGranted: Boolean = true,
     routeMonitor: AudioRouteMonitor? = null,
+    hostRepair: AudioHostRepair? = null,
 ): Built {
     val scope = testScope()
     val ssm = MediaSessionStateManager(scope)
@@ -87,6 +100,7 @@ private fun build(
         skipHandler = skip,
         playFromMediaIdHandler = playFromId,
         audioRouteMonitor = routeMonitor,
+        audioHostRepair = hostRepair,
     )
     return Built(controller, muteCalls, ssm, msm, tracker)
 }
@@ -386,6 +400,44 @@ class PlaybackControllerTest {
 
         assertEquals(PlaybackState.Stopped, built.controller.state.value)
         assertTrue(muteCalls.isEmpty())
+    }
+
+    // ── Audio host repair (platform host died silently) ────────────────────
+
+    // play() must reach the platform engine directly — routing through
+    // SynthOrchestrator.start()/DspSynthEngine.start() would be a silent
+    // no-op once already "started", so PlaybackController holds this edge
+    // itself and fires it on every play() that actually transitions.
+    @Test fun `play invokes audio host repair before unmuting`() = runTest {
+        val muteCalls = mutableListOf<PlaybackState>()
+        var muteCountAtRepair = -1
+        val hostRepair = FakeHostRepair(onEnsure = { muteCountAtRepair = muteCalls.size })
+        val built = build(muteCalls = muteCalls, hostRepair = hostRepair)
+
+        built.controller.play()
+
+        assertEquals(1, hostRepair.ensureCallCount)
+        assertEquals(
+            0,
+            muteCountAtRepair,
+            "repair must run before the sink unmutes: the sink must see 0 mute calls at the " +
+                "moment repair fires, so the repair is requested on the same tap that unmutes " +
+                "rather than one tap later",
+        )
+        assertEquals(PlaybackState.Playing, built.controller.state.value)
+    }
+
+    // Repair must not fire on a play() the app was denied — a future edit
+    // that hoisted the repair call above the focus gate at
+    // PlaybackController.kt:68 would trip this.
+    @Test fun `play does not invoke audio host repair when focus is denied`() = runTest {
+        val hostRepair = FakeHostRepair()
+        val built = build(focusGranted = false, hostRepair = hostRepair)
+
+        built.controller.play()
+
+        assertEquals(0, hostRepair.ensureCallCount)
+        assertEquals(PlaybackState.Stopped, built.controller.state.value)
     }
 
     // Regression for the [user-pause -> transient-loss -> gain] auto-resume bug:

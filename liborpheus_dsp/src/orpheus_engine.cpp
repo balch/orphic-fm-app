@@ -628,4 +628,8 @@ float orpheus_engine_master_volume_now(OrpheusEngine* engine) {
     return engine->master_fader_l.current();
 }
 
+uint64_t orpheus_engine_blocks_rendered(OrpheusEngine* engine) {
+    return engine ? engine->blocks_rendered.load(std::memory_order_acquire) : 0;
+}
+
 }  // extern "C"

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.AudioHostRepair
 import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.engagement.EngagementAction
@@ -45,6 +46,7 @@ class PlaybackController(
     private val skipHandler: SkipHandler? = null,
     private val playFromMediaIdHandler: PlayFromMediaIdHandler? = null,
     private val audioRouteMonitor: AudioRouteMonitor? = null,
+    private val audioHostRepair: AudioHostRepair? = null,
 ) : MediaSessionActionHandler {
     private val log = logging("PlaybackController")
 
@@ -68,6 +70,11 @@ class PlaybackController(
             return
         }
         _state.value = PlaybackState.Playing
+        // Repair the platform audio host BEFORE unmuting. The host can die
+        // with no app-visible event (iOS: AVAudioEngine stops itself on a
+        // hardware config change) — without this, the resume button flips
+        // our own state to Playing while the underlying engine stays dead.
+        audioHostRepair?.ensureAudioHostRunning()
         muteSink.apply(PlaybackState.Playing)
         mediaSessionManager.activate()
         mediaSessionManager.updatePlaybackState(true)

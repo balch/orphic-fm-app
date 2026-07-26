@@ -81,7 +81,8 @@ interface NativeDspBridge {
      * PlaybackController via DspSynthEngine's AudioRouteMonitor flow.
      *
      * Runs on whatever thread the platform delivers route events on (iOS:
-     * the main queue); consumers must not block.
+     * the audio host's serial queue, which the main-queue notification
+     * handler hops to before doing any work); consumers must not block.
      *
      * Default: no-op. Platforms without route-loss awareness (current
      * desktop/wasm/Android) don't need to override.

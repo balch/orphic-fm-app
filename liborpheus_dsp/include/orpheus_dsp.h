@@ -86,6 +86,16 @@ void orpheus_engine_master_filter(OrpheusEngine* engine, int samples);
 /** Read the current master volume (post-fader, instantaneous). */
 float orpheus_engine_master_volume_now(OrpheusEngine* engine);
 
+// Monotonic count of DSP blocks rendered. Advances only while the audio host
+// is actually driving the engine, so it is the liveness ground truth for the
+// iOS host watchdog: AVAudioEngine can report isRunning while producing no
+// audio, and the host's own `rendering` gate is never cleared when iOS stops
+// the engine itself.
+//
+// Resets to 0 when the engine is recreated, so consumers must test for
+// CHANGE, not for increase.
+uint64_t orpheus_engine_blocks_rendered(OrpheusEngine* engine);
+
 // ── Monitoring (polled at ~60fps from UI thread) ─
 typedef struct {
     float peak_left;

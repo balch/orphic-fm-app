@@ -37,4 +37,16 @@ interface AudioEngine {
     fun getPort(uri: String, symbol: String): Float = 0f
     /** Trigger a drum voice (type 0=BD, 1=SD, 2=HH) */
     fun triggerDrum(type: Int, accent: Float) {}
+
+    /**
+     * Verify the host is actually rendering and repair it if not. Default
+     * no-op — platforms whose host cannot die out from under them (Android,
+     * Desktop, WASM) need no override.
+     *
+     * `IosAudioEngine.ensureRunning` is the one override: it kicks the
+     * AVAudioEngine host watchdog immediately instead of waiting for the next
+     * scheduled poll. It hands the pass to the audio host's serial queue and
+     * returns immediately, so callers on the main thread do not block.
+     */
+    fun ensureRunning() {}
 }

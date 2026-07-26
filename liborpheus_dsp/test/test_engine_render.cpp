@@ -55,6 +55,47 @@ static bool test_polyphonic_engine_render() {
     return all_pass;
 }
 
+static bool test_blocks_rendered_counter() {
+    printf("\n=== Test: blocks_rendered counter (iOS watchdog liveness signal) ===\n");
+    bool pass = true;
+
+    // Null engine must not crash and must report 0.
+    uint64_t null_result = orpheus_engine_blocks_rendered(nullptr);
+    bool null_ok = (null_result == 0);
+    printf("  null engine: blocks_rendered=%llu %s\n",
+           (unsigned long long)null_result, null_ok ? "OK" : "FAIL");
+    pass &= null_ok;
+
+    // Fresh engine starts at 0.
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    uint64_t fresh = orpheus_engine_blocks_rendered(engine);
+    bool fresh_ok = (fresh == 0);
+    printf("  fresh engine: blocks_rendered=%llu %s\n",
+           (unsigned long long)fresh, fresh_ok ? "OK" : "FAIL");
+    pass &= fresh_ok;
+
+    // Advances after a deinterleaved render (the iOS render path).
+    float left[128], right[128];
+    orpheus_engine_process_deinterleaved(engine, left, right, 128);
+    uint64_t after_one = orpheus_engine_blocks_rendered(engine);
+    bool advanced_ok = (after_one > fresh);
+    printf("  after 1 deinterleaved block: blocks_rendered=%llu %s\n",
+           (unsigned long long)after_one, advanced_ok ? "OK" : "FAIL (did not advance!)");
+    pass &= advanced_ok;
+
+    // Advances again on a subsequent block.
+    orpheus_engine_process_deinterleaved(engine, left, right, 128);
+    uint64_t after_two = orpheus_engine_blocks_rendered(engine);
+    bool advanced_again_ok = (after_two > after_one);
+    printf("  after 2 deinterleaved blocks: blocks_rendered=%llu %s\n",
+           (unsigned long long)after_two, advanced_again_ok ? "OK" : "FAIL (did not advance!)");
+    pass &= advanced_again_ok;
+
+    orpheus_engine_destroy(engine);
+    printf("blocks_rendered counter test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 static bool test_mod_source_routing() {
     printf("\n=== Test: Mod source routing (OFF/FM/LFO/FLUX) ===\n");
 
@@ -139,6 +180,7 @@ bool run_engine_render_tests() {
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_full_engine_render());
     tally(test_polyphonic_engine_render());
+    tally(test_blocks_rendered_counter());
     tally(test_mod_source_routing());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

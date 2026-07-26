@@ -6,11 +6,14 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.AudioHostRepair
 import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.ModSource
@@ -54,6 +57,11 @@ import org.balch.orpheus.plugins.duolfo.VoicePlugin
 // param; without this nullable contribution Metro silently injects the
 // default null and auto-pause is dead in every graph (builds stay green).
 @ContributesBinding(AppScope::class, binding = binding<AudioRouteMonitor?>())
+@ContributesBinding(AppScope::class, binding = binding<AudioHostRepair>())
+// Same T vs T? trap as AudioRouteMonitor above — PlaybackController's
+// optional `AudioHostRepair? = null` param needs the nullable contribution
+// too, or the repair edge silently never fires.
+@ContributesBinding(AppScope::class, binding = binding<AudioHostRepair?>())
 @Inject
 class DspSynthEngine(
     private val audioEngine: AudioEngine,
@@ -64,7 +72,7 @@ class DspSynthEngine(
     private val synthController: SynthController,
     private val wiringGraphProvider: WiringGraphProvider,
     private val appCoroutineScope: AppCoroutineScope,
-) : SynthEngine, AudioRouteMonitor {
+) : SynthEngine, AudioRouteMonitor, AudioHostRepair {
 
     private val log = logging("DspSynthEngine")
 
@@ -432,10 +440,15 @@ class DspSynthEngine(
         if (monitor.startRequested || audioEngine.isRunning) return
         monitor.startRequested = true
         log.debug { "Starting Shared Audio Engine..." }
-        audioEngine.start()
-        loadGraphAndSync()
 
-        // Subscribe to the audio engine's "C++ engine recreated" event.
+        // Subscribe to the audio engine's "C++ engine recreated" event
+        // BEFORE audioEngine.start(). Neither callback depends on a started
+        // engine, and registering them after start() leaves a window where a
+        // route event arriving between the platform host's own notification
+        // registration and here finds both callbacks null and is silently
+        // dropped — losing a graph reload (permanent silence) or an
+        // auto-pause.
+        //
         // On Android (Oboe), an audio output route change with a different
         // sample rate destroys+recreates the DSP engine — the new engine has
         // NO graph until we reload it. Without this, audio stays silent
@@ -443,8 +456,9 @@ class DspSynthEngine(
         // but no Pulsar beats / no instrument output).
         nativeBridge.setOnEngineRecreatedCallback {
             // Callback runs on a platform-chosen thread (Oboe's error thread
-            // on Android, the main queue on iOS); hop to a coroutine so we
-            // don't block it and so the native calls happen on a sane scope.
+            // on Android, the audio host's serial queue on iOS); hop to a
+            // coroutine so we don't block it and so the native calls happen
+            // on a sane scope.
             appCoroutineScope.launch {
                 log.info { "C++ engine recreated — reloading graph + syncing port state" }
                 loadGraphAndSync()
@@ -463,6 +477,9 @@ class DspSynthEngine(
             _audioRouteLostFlow.tryEmit(Unit)
         }
 
+        audioEngine.start()
+        loadGraphAndSync()
+
         // Poll monitor data from C++ via native bridge
         monitor.startMonitoring()
         // Start viz polling if it was requested before the engine was running
@@ -476,12 +493,31 @@ class DspSynthEngine(
         _graphReady.complete(Unit)
     }
 
+    // Serializes loadGraphAndSync(). Two callers can reach it concurrently:
+    // start() on the orchestrator's Default thread, and the engine-recreated
+    // callback on appCoroutineScope. Registering that callback BEFORE
+    // audioEngine.start() (see start(), where it fixes a dropped-event window)
+    // is what makes the overlap real on iOS: if the platform start() throws
+    // before creating the engine, the host watchdog builds one itself and
+    // fires the callback while start() is still on its way to its own load.
+    //
+    // Not a memory-safety fix. The C++ side swaps the graph pointer with an
+    // atomic exchange and each caller retires exactly what it swapped out.
+    // What interleaves badly is the sandwich: the two syncNativeBridgeState()
+    // passes would straddle two graph generations, so port values can land
+    // against a graph that is replaced a moment later and read as defaults.
+    private val graphLoadLock = SynchronizedObject()
+
     /**
      * Push wiring graph + cached port state into the (possibly fresh) native
      * engine. Called on initial start AND any time the C++ engine is
      * recreated under us.
+     *
+     * Serialized on [graphLoadLock]: a second caller waits and then re-runs
+     * the whole sandwich, which is what we want — it re-syncs against
+     * whichever graph generation ended up current.
      */
-    private fun loadGraphAndSync() {
+    private fun loadGraphAndSync() = synchronized(graphLoadLock) {
         syncNativeBridgeState() // Re-sync after C++ engine is (re)created
         nativeBridge.nativeLoadGraph(wiringGraphProvider.buildGraph()).also { result ->
             log.info { "nativeLoadGraph result: $result" }
@@ -517,6 +553,17 @@ class DspSynthEngine(
         _graphReady = kotlinx.coroutines.CompletableDeferred()
         log.debug { "Audio Engine Stopped" }
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // AudioHostRepair Implementation
+    // ═══════════════════════════════════════════════════════════
+
+    // Forwards straight to the platform engine. This is the edge
+    // PlaybackController.play() uses to reach the host directly — start()
+    // above is latched by monitor.startRequested and is a silent no-op once
+    // the engine has already been started once, so it cannot repair a host
+    // that died out from under an already-"started" DspSynthEngine.
+    override fun ensureAudioHostRunning() = audioEngine.ensureRunning()
 
     // ═══════════════════════════════════════════════════════════
     // DELEGATIONS & FACADE METHODS

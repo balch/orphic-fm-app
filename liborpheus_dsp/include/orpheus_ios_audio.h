@@ -39,6 +39,27 @@ void orpheus_ios_audio_destroy(OrpheusIosAudio* host);
 // 1 while the AVAudioEngine is running, else 0.
 int orpheus_ios_audio_is_running(OrpheusIosAudio* host);
 
+// Register a callback fired when AVAudioEngine reports a configuration change.
+// Per AVAudioEngine.h, the engine STOPS ITSELF before posting this, so the
+// callback is the only in-band notice that audio has died.
+//
+// CRITICAL: the callback runs on AVAudioEngine's internal dispatch queue.
+// It must only signal. Destroying the host from inside it deadlocks against
+// the engine's synchronous teardown.
+//
+// May be invoked with a null ctx during host teardown. The callback must
+// tolerate that rather than assume a live context.
+//
+// `ctx` must outlive orpheus_ios_audio_destroy. The retraction order inside
+// destroy prevents a torn cb/ctx pair, but an invocation already past its cb
+// load can still read the live ctx and call through it after destroy has
+// returned. So ctx must NOT be freed in response to destroy: bind it to
+// something that lives as long as the owner of the host (on Kotlin/Native,
+// one long-lived StableRef, never one per host instance).
+void orpheus_ios_audio_set_config_change_callback(OrpheusIosAudio* host,
+                                                  void (*cb)(void*),
+                                                  void* ctx);
+
 #ifdef __cplusplus
 }
 #endif
