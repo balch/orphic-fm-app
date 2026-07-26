@@ -910,13 +910,9 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->active_rotation_index = lick_pick_rotation(state->lick_select_seed, pool_count);
         state->current_lick_index = state->active_rotation_index;
         apply_pool_lick(state, state->active_rotation_index);  // overrides state->lick
-        // apply_pool_lick just overrode state->lick/lick_length with the selected
-        // pool member — re-sync the load-scoped local so the render loop below
-        // (including the generative else-branch's apply_bar_strategy at ~line 1101)
-        // sees the same buffer+length pair the déjà-vu and regenerate paths use.
-        // Without this, pooled vibes rendered pool data at the fallback lick's
-        // length on the initial load only.
-        lick_len = state->lick_length;
+        // No load-scoped re-sync needed after this override: every render call in the
+        // loop below resolves its buffer through track_lick_channel(), which reads
+        // state->lick / state->lick_length live.
     } else {
         state->current_lick_index = -1;
     }
@@ -943,11 +939,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     if (scale_idx >= static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])))
         scale_idx = static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])) - 1;
     const PulsarScale& scale = kPulsarScales[scale_idx];
-
-    // Effective mutation: spurt amplifies 3x, capped at 1.0
-    float eff_mutation = state->in_spurt
-        ? std::min(1.0f, state->lick_mutation * 3.0f)
-        : state->lick_mutation;
 
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
@@ -1046,6 +1037,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             engine->pulsar_track_evo_pitch_mode[t].load(std::memory_order_relaxed));
         ts.evo_voicing_tension = engine->pulsar_track_evo_voicing_tension[t].load(std::memory_order_relaxed);
 
+        // This track's authored channel (LEAD lick or BASS line) and its effective
+        // mutation — the tension spurt amplifies 3x, capped at 1.0. Every render call
+        // below reads these, including the generative branch: mutation is per CHANNEL,
+        // so a BASS-source track must never be rendered at the lead's mutation.
         LickChannel ch = track_lick_channel(state, engine, t);
         float ch_mut = state->in_spurt
             ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
@@ -1150,14 +1145,20 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                    density_ovr, nr_low, nr_high, eng_note_min);
 
             if (step_count_config > 16) {
+                // CALL_RESPONSE is the one bar strategy that renders a lick, and a track
+                // landing in this branch (lickMode NONE, or an empty channel) still gets
+                // one for bar 2. Feed it THIS track's channel: a lickSource = BASS track
+                // has to answer with the bass line, at bass mutation and bass octave. The
+                // sibling lick branch above already resolves `ch`; this call used to
+                // hardcode state->lick, so a BASS-source track here rendered the LEAD riff.
                 apply_bar_strategy(ts, t, bar_strategy, (role == TrackRole::PERCUSSIVE), genre,
                                    static_cast<uint8_t>(root), scale,
                                    engine->pulsar_energy.load(std::memory_order_relaxed),
                                    engine->pulsar_complexity.load(std::memory_order_relaxed),
-                                   state->lick, lick_len, eff_mutation,
+                                   ch.lick, ch.length, ch_mut,
                                    base_seed ^ (t * 13331u),
-                                   state->lick_octave,
-                                   state->lick_loop_length);
+                                   ch.octave,
+                                   ch.loop_length);
             }
         }
 
@@ -3077,11 +3078,6 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     if (step_count_cfg > kMaxPulsarSteps) step_count_cfg = kMaxPulsarSteps;
                     int bar1_reset = (step_count_cfg > 16) ? 16 : step_count_cfg;
 
-                    // Effective mutation: spurt amplifies 3x, capped at 1.0
-                    float eff_mutation = state->in_spurt
-                        ? std::min(1.0f, state->lick_mutation * 3.0f)
-                        : state->lick_mutation;
-
                     for (int rt = 0; rt < kNumPulsarTracks; rt++) {
                         PulsarTrackState& rts = state->tracks[rt];
                         TrackRole r_role = static_cast<TrackRole>(engine->pulsar_track_role[rt].load(std::memory_order_relaxed));
@@ -3091,14 +3087,17 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         LickMode r_lick_mode = static_cast<LickMode>(
                             engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
                         bool r_use_lick = (r_lick_mode != LickMode::NONE);
+                        // Per-channel buffer + effective mutation (spurt amplifies 3x,
+                        // capped at 1.0). Resolved before the branch because BOTH arms
+                        // need it: the generative arm's CALL_RESPONSE renders a lick too.
                         LickChannel ch = track_lick_channel(state, engine, rt);
+                        float ch_mut = state->in_spurt
+                            ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
                         if (ch.length > 0 && r_use_lick && !perc) {
                             // Shared lick->track render (#5): honors CALL_RESPONSE,
                             // else loops the lick. Genre note range (rg) matches the
                             // load path — the old hardcoded 36/72 here shifted the
                             // octave on every déjà-vu reset (#4 note-range fix).
-                            float ch_mut = state->in_spurt
-                                ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
                             render_lick_into_track(rts, rt, ch.lick, ch.length,
                                                    ch_mut, static_cast<uint8_t>(rr), rscale,
                                                    reset_seed, bs, step_count_cfg,
@@ -3123,13 +3122,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                    0, hold_prob, hold_min, hold_max,
                                                    density_ovr, nr_low, nr_high, eng_nm);
                             if (step_count_cfg > 16) {
+                                // Same channel contract as the load path: CALL_RESPONSE
+                                // renders bar 2 from a lick even here, so it must be THIS
+                                // track's channel, not state->lick unconditionally.
                                 apply_bar_strategy(rts, rt, bs, perc, rg,
                                                    static_cast<uint8_t>(rr), rscale,
                                                    energy, complexity,
-                                                   state->lick, state->lick_length, eff_mutation,
+                                                   ch.lick, ch.length, ch_mut,
                                                    reset_seed ^ (rt * 13331u),
-                                                   state->lick_octave,
-                                                   state->lick_loop_length);
+                                                   ch.octave,
+                                                   ch.loop_length);
                             }
                         }
                     }

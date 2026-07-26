@@ -306,6 +306,128 @@ static bool test_lick_builder_seeds_from_bass_channel() {
     return ok;
 }
 
+// ── Generative CALL_RESPONSE must answer from the track's OWN channel ──
+//
+// A track with lickMode NONE takes the "no lick — generative pattern" branch in
+// load_vibe (and its déjà-vu twin in mutate_patterns). CALL_RESPONSE is still a
+// lick-driven strategy there: apply_bar_strategy renders a lick for bar 2 whenever
+// lick_length > 0, falling back to a plain repeat otherwise. Both call sites used to
+// hardcode state->lick / state->lick_length / lick_mutation / lick_octave, so a
+// lickSource = BASS track in that branch answered with the LEAD riff, at the lead's
+// mutation and the lead's octave. The sibling lick branch next to it already resolved
+// the per-track LickChannel correctly, which is what made this easy to miss.
+//
+// Pinned by flipping ONLY lick_source and demanding the render moves. The REPEAT
+// control is what makes it precise: REPEAT renders no lick at all, so there the
+// channel must make no difference whatsoever. Without that control, "the two runs
+// differ" could be satisfied by any other channel-dependent path.
+struct GenStepsResult {
+    int step_count = 0;
+    uint8_t note[kMaxPulsarSteps] = {};
+    bool gate[kMaxPulsarSteps] = {};
+    int first_note = -1;
+};
+
+static GenStepsResult run_generative_case(int bar_strategy, int lick_source) {
+    GenStepsResult r;
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_cosmic_techno(engine);
+    engine->pulsar_seed.store(424242, std::memory_order_relaxed);
+    push_two_channels(engine);   // lead = degree 0 / octave 3, bass = degree 4 / octave 2
+    // 32 steps: apply_bar_strategy only runs when step_count > 16, and CALL_RESPONSE
+    // needs both bars to lay out its call and its answer.
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    // Track 4 is melodic with NO lick mode, which is exactly what routes it into the
+    // generative branch rather than the lick branch.
+    engine->pulsar_track_role[4].store(1, std::memory_order_relaxed);          // MELODIC
+    engine->pulsar_track_lick_mode[4].store(0, std::memory_order_relaxed);     // NONE
+    engine->pulsar_track_bar_strategy[4].store(bar_strategy, std::memory_order_relaxed);
+    engine->pulsar_track_lick_source[4].store(lick_source, std::memory_order_relaxed);
+    engine->pulsar_track_chord_follow[4].store(2, std::memory_order_relaxed);  // FIXED
+    engine->pulsar_track_lick_degree_offset[4].store(0, std::memory_order_relaxed);
+    // Force the generative pattern to actually fire notes. Cosmic Techno's own track-4
+    // density leaves this branch empty across all 32 steps, which would make the REPEAT
+    // control below compare two silences and pass without proving anything. CALL_RESPONSE
+    // is unaffected either way: bar_strategy_call_response clears every step and rewrites
+    // both halves from the lick, so it never reads the generated pattern.
+    engine->pulsar_track_density_override[4].store(0.9f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+
+    PulsarState* ps = engine->pulsar_state;
+    if (ps) {
+        r.step_count = ps->tracks[4].step_count;
+        if (r.step_count > kMaxPulsarSteps) r.step_count = kMaxPulsarSteps;
+        for (int i = 0; i < r.step_count; i++) {
+            r.note[i] = ps->tracks[4].steps[i].note;
+            r.gate[i] = ps->tracks[4].steps[i].gate;
+            if (r.first_note < 0 && r.gate[i]) r.first_note = r.note[i];
+        }
+    }
+    orpheus_engine_destroy(engine);
+    return r;
+}
+
+static bool steps_identical(const GenStepsResult& a, const GenStepsResult& b) {
+    if (a.step_count != b.step_count || a.step_count == 0) return false;
+    for (int i = 0; i < a.step_count; i++) {
+        if (a.gate[i] != b.gate[i]) return false;
+        if (a.gate[i] && a.note[i] != b.note[i]) return false;
+    }
+    return true;
+}
+
+static bool test_generative_call_response_uses_track_channel() {
+    printf("\n=== Test: generative CALL_RESPONSE answers from the track's own channel ===\n");
+
+    GenStepsResult cr_lead = run_generative_case(3, 0);  // CALL_RESPONSE + LEAD
+    GenStepsResult cr_bass = run_generative_case(3, 1);  // CALL_RESPONSE + BASS
+    GenStepsResult rp_lead = run_generative_case(0, 0);  // REPEAT + LEAD  (control)
+    GenStepsResult rp_bass = run_generative_case(0, 1);  // REPEAT + BASS  (control)
+
+    // Non-vacuity: the branch has to have actually rendered something on both runs,
+    // or "they differ" would be comparing two silences.
+    bool rendered = cr_lead.first_note >= 0 && cr_bass.first_note >= 0;
+    // The bug, directly: before the fix both runs rendered the LEAD riff and were
+    // byte-identical.
+    bool cr_differs = !steps_identical(cr_lead, cr_bass);
+    // Direction: the bass channel is authored an octave lower (octave 2 vs 3), and the
+    // octave dominates the degree difference, so the bass answer must sit below the lead's.
+    bool bass_lower = rendered && cr_bass.first_note < cr_lead.first_note;
+    // Control: REPEAT renders no lick, so the channel is irrelevant and the two runs
+    // must stay identical. This is what proves cr_differs came from the lick render.
+    // It only means that if REPEAT actually produced notes — two empty patterns are
+    // identical for free, which would make the control worthless.
+    bool repeat_rendered = rp_lead.first_note >= 0 && rp_bass.first_note >= 0;
+    bool repeat_same = repeat_rendered && steps_identical(rp_lead, rp_bass);
+
+    printf("  CALL_RESPONSE: lead first note=%d, bass first note=%d, steps=%d/%d\n",
+           cr_lead.first_note, cr_bass.first_note, cr_lead.step_count, cr_bass.step_count);
+    printf("  rendered=%s channel_changes_render=%s bass_lower=%s\n",
+           rendered ? "OK" : "FAIL", cr_differs ? "OK" : "FAIL", bass_lower ? "OK" : "FAIL");
+    printf("  REPEAT control: lead first note=%d, bass first note=%d, rendered=%s identical=%s\n",
+           rp_lead.first_note, rp_bass.first_note,
+           repeat_rendered ? "OK" : "FAIL", repeat_same ? "OK" : "FAIL");
+    if (!repeat_rendered)
+        printf("  FAIL: REPEAT control produced no notes, so 'identical' is vacuous\n");
+    if (!cr_differs)
+        printf("  FAIL: flipping lick_source changed nothing — the generative branch is "
+               "still rendering state->lick regardless of the track's channel\n");
+    if (!repeat_same)
+        printf("  FAIL: REPEAT is channel-sensitive, so the CALL_RESPONSE difference above "
+               "is not attributable to the lick render\n");
+
+    bool ok = rendered && cr_differs && bass_lower && repeat_same;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_bass_line_tests() {
     printf("\n========== PULSAR BASS LINE TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -313,6 +435,7 @@ bool run_pulsar_bass_line_tests() {
     tally(test_two_channel_render_distinct());
     tally(test_bass_only_vibe_renders());
     tally(test_lick_builder_seeds_from_bass_channel());
+    tally(test_generative_call_response_uses_track_channel());
     printf("\nPulsar bass line tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
