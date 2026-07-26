@@ -1,37 +1,16 @@
 package org.balch.orpheus.features.bass
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.BassEngine
@@ -41,6 +20,7 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
+import org.balch.orpheus.ui.widgets.EnumDropdown
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.roundToInt
 
@@ -106,6 +86,7 @@ fun BassPanel(
                 displayName = { it.displayName },
                 onSelected = actions.setEngine,
                 color = bassColors.panelColor,
+                labelColor = bassColors.panelColor.copy(alpha = 0.7f),
             )
 
             // Scale dropdown
@@ -116,6 +97,7 @@ fun BassPanel(
                 displayName = { it.displayName },
                 onSelected = actions.setScale,
                 color = bassColors.panelColor,
+                labelColor = bassColors.panelColor.copy(alpha = 0.7f),
             )
 
             // Root note dropdown — bass-friendly notes across 2 octaves
@@ -126,6 +108,8 @@ fun BassPanel(
                 displayName = { midiNoteToName(it) },
                 onSelected = { actions.setRootNote(it) },
                 color = bassColors.panelColor,
+                labelColor = bassColors.panelColor.copy(alpha = 0.7f),
+                menuWidth = 112.dp,
             )
         }
 
@@ -305,92 +289,6 @@ fun BassPanel(
         }
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared private widgets
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Generic compact dropdown for any enum type with a displayName.
- */
-@Composable
-private fun <T> EnumDropdown(
-    label: String,
-    selectedDisplay: String,
-    entries: List<T>,
-    displayName: (T) -> String,
-    onSelected: (T) -> Unit,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.7f),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-        )
-
-        Spacer(Modifier.height(2.dp))
-
-        Box(
-            modifier = Modifier
-                .clickable { expanded = true }
-                .clip(RoundedCornerShape(6.dp))
-                .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = selectedDisplay,
-                    color = color,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Select $label",
-                    tint = color,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(OrpheusColors.panelSurface),
-            ) {
-                entries.forEach { entry ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = displayName(entry),
-                                color = if (displayName(entry) == selectedDisplay) color else Color.White,
-                            )
-                        },
-                        onClick = {
-                            onSelected(entry)
-                            expanded = false
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Previews

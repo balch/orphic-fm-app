@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.pulsar
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -20,15 +19,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,7 +38,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -60,108 +52,22 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.widgets.EnginePickerButton
+import org.balch.orpheus.ui.widgets.EnumDropdown
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.time.Duration.Companion.milliseconds
 
-@Composable
-private fun <T> EnumDropdown(
-    label: String,
-    selectedDisplay: String,
-    entries: List<T>,
-    displayName: (T) -> String,
-    onSelected: (T) -> Unit,
-    color: Color,
-    modifier: Modifier = Modifier,
-    onLongPress: (() -> Unit)? = null,
-    /**
-     * 0f..1f — how strongly this dropdown should show the "armed"/"active" tint,
-     * mirroring the ENDING pill's outroArmed-driven background below. Used by the
-     * VIBE dropdown: firing the manual anomaly trigger sets a steady floor (see
-     * PulsarViewModel.anomalyArmed), and the Void Anomaly's live gain lifts it
-     * further while the duck is actually audible (see PulsarVizData.voidGain).
-     */
-    highlight: Float = 0f,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val backgroundColor by animateColorAsState(
-        targetValue = lerp(
-            OrpheusColors.darkVoid.copy(alpha = 0.6f),
-            OrpheusColors.cosmicPurple,
-            highlight.coerceIn(0f, 1f),
-        ),
-        animationSpec = tween(200),
-    )
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = color.lighten(),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-        )
-
-        Spacer(Modifier.height(2.dp))
-
-        Box(
-            modifier = Modifier
-                .combinedClickable(
-                    onClick = { expanded = true },
-                    onLongClick = onLongPress,
-                )
-                .clip(RoundedCornerShape(6.dp))
-                .background(backgroundColor)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = selectedDisplay,
-                    color = color,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Select $label",
-                    tint = color,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(OrpheusColors.panelSurface),
-            ) {
-                entries.forEach { entry ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = displayName(entry),
-                                color = if (displayName(entry) == selectedDisplay) color else Color.White,
-                            )
-                        },
-                        onClick = {
-                            onSelected(entry)
-                            expanded = false
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
+/**
+ * Index lists for the ROOT and SCALE dropdowns.
+ *
+ * Hoisted to top level on purpose: building these inline with `.indices.toList()` allocated a
+ * fresh `List` on every recomposition, and because `List` is an unstable type that also defeated
+ * skipping for both dropdowns. PulsarPanel's body recomposes at visualization frame rate (it
+ * reads `vizData`), so that was a per-frame allocation plus a per-frame recompose.
+ */
+private val PULSAR_NOTE_INDICES: List<Int> = PULSAR_NOTE_NAMES.indices.toList()
+private val PULSAR_SCALE_INDICES: List<Int> = PULSAR_SCALE_NAMES.indices.toList()
 
 /**
  * Pulsar Beat Machine panel.
@@ -221,24 +127,29 @@ fun PulsarPanel(
                 color = OrpheusColors.cosmicPurple,
                 onLongPress = actions.onTriggerAnomaly,
                 highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - vizData.voidGain),
+                // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
+                menuWidth = 200.dp,
             )
 
             EnumDropdown(
                 label = "ROOT",
                 selectedDisplay = PULSAR_NOTE_NAMES[state.rootNote],
-                entries = PULSAR_NOTE_NAMES.indices.toList(),
+                entries = PULSAR_NOTE_INDICES,
                 displayName = { PULSAR_NOTE_NAMES[it] },
                 onSelected = actions.setRootNote,
                 color = OrpheusColors.cosmicPurple,
+                // M3's own DropdownMenu floor, so short note names look as they always did.
+                menuWidth = 112.dp,
             )
 
             EnumDropdown(
                 label = "SCALE",
                 selectedDisplay = PULSAR_SCALE_NAMES[state.scaleIndex],
-                entries = PULSAR_SCALE_NAMES.indices.toList(),
+                entries = PULSAR_SCALE_INDICES,
                 displayName = { PULSAR_SCALE_NAMES[it] },
                 onSelected = actions.setScale,
                 color = OrpheusColors.cosmicPurple,
+                menuWidth = 140.dp,
             )
 
             // Envelope mode toggle

@@ -1,5 +1,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
+// Vibe catalog tier for this run: live | wip | shelf (see VibeCatalog / VibeCatalogPolicy).
+// Desktop is the ear-test harness, so `-Pcatalog=wip` surfaces works-in-progress vibes in the
+// picker. Defaults to `live` so a plain `:run` matches what ships.
+val catalog = (findProperty("catalog") as String?) ?: "live"
+
 plugins {
     id("orpheus.desktop.app")
     id("org.jetbrains.compose.hot-reload")
@@ -45,6 +50,7 @@ compose.desktop {
             "-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}",
             "-Dorpheus.engine=cpp"
         )
+        jvmArgs += "-Dcatalog=$catalog"
         val nativePath = System.getProperty("orpheus.native.path", "")
         if (nativePath.isNotEmpty()) {
             jvmArgs += "-Djava.library.path=$nativePath"

@@ -327,9 +327,13 @@ class PulsarViewModel(
     private val curatedProviders: List<VibeProvider> =
         VibeCatalog.curate(vibeProviders, visibleThrough = vibeCatalogPolicy.catalogLevel)
 
-    // Lazy: the full vibeList materializes only when first iterated (e.g.
-    // user opens the vibe dropdown or restoreSavedState looks up a name).
-    // Until then, only the initial vibeFlow.value vibe is constructed.
+    // Lazy only in the sense that construction is deferred past PulsarViewModel's own init:
+    // the first read materializes EVERY curated Vibe at once. In the app that first read is
+    // PulsarPanel's `remember { pulsar.vibeList }`, which runs when the panel first composes,
+    // NOT when the user opens the VIBE dropdown. So on a WIP-tier build this builds all ~47
+    // Vibe bodies on the UI thread at panel-show time. If that ever shows up as startup jank,
+    // the fix is to hand the picker `vibeNames` (already cheap) and resolve the Vibe on
+    // selection — don't just move the `remember`, which would put the same cost on open.
     override val vibeList: List<Vibe> by lazy {
         curatedProviders.map { it.vibe }
     }
