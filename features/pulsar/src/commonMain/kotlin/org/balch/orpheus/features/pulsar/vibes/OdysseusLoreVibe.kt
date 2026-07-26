@@ -53,8 +53,9 @@ import org.balch.orpheus.features.pulsar.models.row
  * First vibe on the bass line channel and on per-track wah voicing: the bass rocks a
  * slow pedal low in the spectrum while the lead works a quarter-note pedal up in the
  * vowel range, two pedals at two rates at once. The bass owns its authored figure, the
- * lead owns its wah phrases, the harmony guitar shadows the lead a third above, and
- * LickBuilder jams mutate whichever channel the soloist owns.
+ * lead owns its wah phrases, the second guitar reads the same lick a third above and
+ * drifts off it the way a second player does, and LickBuilder jams mutate whichever
+ * channel the soloist owns.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
@@ -136,11 +137,15 @@ class OdysseusLoreVibe : VibeProvider {
                 wet = 0.9f,
             ),
             anomalies = listOf(
-                // Rare lead-only wah sweep. Eligible tracks here are the melodic leads 4 and 6;
-                // the bass (3) and the pad (5) stay dry, as do the drums. Track 4 already runs
-                // the standing lickWah above, so the anomaly TAKES OVER that one filter for its
-                // armed duration rather than stacking a second bandpass on it. Track 6 has no
-                // standing wah, so it gets a fresh one that fades in and back out.
+                // Rare lead-only wah sweep. Eligibility is role-driven, so it covers every
+                // melodic non-bass track: 4 (lead), 6 (harmony guitar) and 7 (the swirl, which
+                // is Melodic even though it reads as texture). The bass (3) is excluded by the
+                // bass-channel clause despite carrying its own standing wah, and the pad (5)
+                // and the kit are excluded by role. Track 4 already runs the standing lickWah
+                // above, so the anomaly TAKES OVER that one filter for its armed duration
+                // rather than stacking a second bandpass on it; 6 and 7 have no standing wah,
+                // so they get fresh voices that fade in and back out. Pinned by
+                // WahAnomalyTest.odysseusLoreIsTheShippedTakeoverCase.
                 WahAnomaly(probability = 0.03f),
             ),
 
@@ -269,28 +274,44 @@ class OdysseusLoreVibe : VibeProvider {
                         macroMap = TrackMacroMap.EFFECT,
                     )
                 },
-                // 6 — psych swirl: granular color, up from "barely there" to "noticed".
-                // Still INDEPENDENT so it drifts across the bar lines rather than locking.
-                OrpheusEngine(
-                    engineId = OrpheusEngineId.GRN, volume = 0.45f,
-                    reverbSend = 0.62f, delaySend = 0.3f,
-                    modLfoRate = 0.07f, modLfoDepth = 0.45f,
-                ).let { swirl ->
-                    TrackVoice(
-                        engineEdm = swirl, engineSpace = swirl,
-                        role = TrackRole.Melodic(chordFollow = ChordFollow.FIXED),
-                        density = 0.2f,
-                        barStrategy = BarStrategy.INDEPENDENT,
-                        envelopeProfile = EnvelopeProfile.EFFECT,
-                        macroMap = TrackMacroMap.EFFECT,
-                    )
-                },
-                // 7 — harmony guitar: the second player. Renders the SAME lick as track 4
-                // shifted +2 scale degrees, which in a 7-note scale is a diatonic third
-                // above — the twin-lead sound. CALL_RESPONSE matches the lead's phrasing so
-                // the two move as one line, not two. Sits under the lead in level, and stays
-                // dry: a third wah against the lead's quarter-note pedal and the bass's slow
-                // one would be mud. Give it its own wahParams if you want that.
+                // 6 — second guitar. MUST NOT live on track 7: that index is the FX slot, and
+                // its note-ons are probability-gated by compute_fx_probability(energy,
+                // complexity), which is flat zero unless energy < 0.4 or (complexity > 0.7 and
+                // energy > 0.6). This vibe's base macros are 0.55 / 0.4 and the jam's 1.35x/1.3x
+                // only lift them to 0.74 / 0.52, so a lead parked on 7 would never fire a note
+                // outside the outro. Index carries behavior independently of TrackRole; see the
+                // branches on `t` in orpheus_unit_pulsar.cpp.
+                //
+                // Track 6 is not free of that either: tracks >= 5 are the texture band, so this
+                // voice is scaled by texture_energy_curve(energy), a notch pinned at 0.05 across
+                // energy 0.45..0.55 that ramps back to 1.0 by 0.65. Base energy 0.55 sits exactly
+                // on the notch floor, so the harmony is a whisper in the VERSE (no override) and
+                // full in the JAM (0.74) and the OUTRO (0.30). That reads as a second player who
+                // sits out the verse and comes in for the jam, which is the arrangement we want,
+                // but it is forced rather than chosen: tracks 0-2 are the kit, 3 is the bass bus
+                // and 4 is the lead, so track 4 is the ONLY slot with no texture duck. Lifting
+                // the harmony into the verse means base energy >= 0.65, which drives the whole
+                // lament harder and narrows the verse-to-jam contrast the structure is built on.
+                //
+                // It plays the same lick as track 4 offset +2 scale degrees, a diatonic third in
+                // a 7-note scale. It will NOT lock to the lead in parallel thirds, and that is
+                // not tunable from here. The lick render is seeded per track (seed ^ track *
+                // 7919u), so at lickMutation 0.45 roughly half the call-half notes are perturbed
+                // differently on each guitar. lickDegreeOffset is applied AFTER mutation
+                // (bar_strategy_call_response), so the third is exact only where the two happen
+                // to agree.
+                //
+                // Zeroing mutation would NOT fix it, so don't bother trying: mutation is
+                // channel-wide (Vibe.lickMutation / bassLineMutation, no per-track field exists),
+                // and the CALL_RESPONSE answer half picks its transform as `seed % 4` off that
+                // same salted seed, so at mutation 0 one guitar can invert the contour while the
+                // other transposes up a third. A true locked harmony needs an engine-side "render
+                // this track from track N's steps" flag. Both guitars keep CALL_RESPONSE anyway
+                // because that makes them PHRASE together, call then answer, which is the part
+                // that reads as one section. Two players reading one chart, not a doubling.
+                //
+                // Stays dry on purpose: a third wah against the lead's quarter-note pedal and the
+                // bass's slow one would be mud. Give it its own wahParams if you want that.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH, volume = 0.6f,
                     noteRangeLow = 57, noteRangeHigh = 79,
@@ -310,16 +331,35 @@ class OdysseusLoreVibe : VibeProvider {
                         macroMap = TrackMacroMap.MELODIC,
                     )
                 },
+                // 7 — psych swirl: granular color, up from "barely there" to "noticed".
+                // Still INDEPENDENT so it drifts across the bar lines rather than locking.
+                // On the FX slot deliberately, swapped here from track 6: the probability gate
+                // that silences a lead is exactly right for a texture voice, so the swirl now
+                // surfaces at low energy and again when the jam drives complexity up.
+                OrpheusEngine(
+                    engineId = OrpheusEngineId.GRN, volume = 0.45f,
+                    reverbSend = 0.62f, delaySend = 0.3f,
+                    modLfoRate = 0.07f, modLfoDepth = 0.45f,
+                ).let { swirl ->
+                    TrackVoice(
+                        engineEdm = swirl, engineSpace = swirl,
+                        role = TrackRole.Melodic(chordFollow = ChordFollow.FIXED),
+                        density = 0.2f,
+                        barStrategy = BarStrategy.INDEPENDENT,
+                        envelopeProfile = EnvelopeProfile.EFFECT,
+                        macroMap = TrackMacroMap.EFFECT,
+                    )
+                },
             ),
 
             band = Band(
                 members = listOf(
                     BandMember(name = "Drummer", tracks = listOf(0, 1, 2), alwaysActive = true),
                     BandMember(name = "Bassist", tracks = listOf(3)),
-                    // Both guitars move as one member: the harmony tracks the lead in
-                    // thirds, so handing the solo to "Guitarist" hands it to the pair.
-                    BandMember(name = "Guitarist", tracks = listOf(4, 7)),
-                    BandMember(name = "Haze", tracks = listOf(5, 6)),
+                    // Both guitars move as one member: they read the same lick a third apart,
+                    // so handing the solo to "Guitarist" hands it to the pair.
+                    BandMember(name = "Guitarist", tracks = listOf(4, 6)),
+                    BandMember(name = "Haze", tracks = listOf(5, 7)),
                 ),
                 handoffMatrix = bandMatrix(
                     //            DRUM  BASS  GTR   HAZE
@@ -370,10 +410,10 @@ class OdysseusLoreVibe : VibeProvider {
                             0 to TrackSectionOverride(density = 0.15f),
                             1 to TrackSectionOverride(density = 0f),
                             2 to TrackSectionOverride(density = 0f),
-                            4 to TrackSectionOverride(density = 0f),
+                            4 to TrackSectionOverride(density = 0f),  // lead guitar out
                             5 to TrackSectionOverride(density = 0f),
-                            6 to TrackSectionOverride(density = 0f),
-                            7 to TrackSectionOverride(density = 0f),  // both guitars out
+                            6 to TrackSectionOverride(density = 0f),  // harmony guitar out
+                            7 to TrackSectionOverride(density = 0f),
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
