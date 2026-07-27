@@ -144,6 +144,15 @@ data class Section(
      *  Bars are counted in the same units as [barsMin]/[barsMax]. Prototype: ramps toward
      *  full base tempo (1.0×); see PulsarViewModel accelerando. Useful range 1..2. */
     val bpmRampBars: Int = 0,
+    /** Carry an in-flight band solo across THIS section's entry seam. When true
+     *  and a solo is active as this section begins (and this section declares a
+     *  [soloMode]), the engine skips the section-entry solo reset: same soloist,
+     *  same member roles, same evolving LickBuilder live lick and Jam phrase
+     *  memory — continuing under THIS section's solo parameters. When no solo is
+     *  in flight, a normal fresh solo start (with this section's probability
+     *  roll) happens instead. Default false = today's full reset. Use on chained
+     *  jam stages so the jam develops across them instead of restarting. */
+    val jamCarry: Boolean = false,
 ) {
     init {
         customProgression?.let { validateProgression(it, "Section.customProgression") }

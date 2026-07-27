@@ -6,6 +6,7 @@
 #include "../src/pulsar_band_solo.h"
 #include "../src/pulsar_rng.h"
 #include "../src/pulsar_handoff.h"
+#include "stmlib/utils/random.h"  // pin the global noise RNG for reproducible integration tests
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -1733,6 +1734,470 @@ static bool test_master_scratch_freezes_pulsar_clock() {
     return ok;
 }
 
+// ── Task 3: Section.jamCarry — solo survives the section seam ───────────────
+//
+// Push a 2-section (2 bars each), A<->B arrangement wired for jamCarry testing:
+// a 2-member melodic band (member 0 = track 3, member 1 = track 4; neither
+// always_active, both eligible to lead) with non-zero handoff/pull-in rows in
+// BOTH directions and bars_per_lead 2..2 — matching the section length, so
+// advance_band_solo's OWN pull-in/expiry machinery (unrelated to jamCarry)
+// lands a normal mid-solo handoff on the section's own 2nd bar, before any
+// section seam is reached. This lets the tests below track "whoever is
+// currently soloing" rather than assuming a single lead never rotates.
+//
+// Section 0 always solos LICK_BUILDER at `sec0_solo_probability`, with a fast
+// (1.0) mutation rate so a real mutation lands within its 2 bars. Section 1
+// solos at `sec1_solo_mode` / probability 1.0, but its mutation rate is
+// FROZEN at 0.0 — so a carried live lick is byte-stable across section 1's
+// own bars. That isolates the jamCarry gate as the only possible source of
+// change right at the seam, making an exact memcmp meaningful instead of
+// racing an unrelated per-bar mutate pass. `sec1_jam_carry` writes slot 16.
+//
+// The arrangement starts in section 1 (no solo — load_vibe's initial-section
+// entry never starts a band solo; only the per-bar section_changed handler
+// does), so the FIRST section_changed event is the transition INTO section 0,
+// and section 0 gets its own (uncarried, since section 0 never sets jamCarry)
+// solo start before the section-0 -> section-1 seam under test.
+static void push_jam_carry_band_arrangement(OrpheusEngine* engine,
+                                            float sec0_solo_probability,
+                                            int sec1_solo_mode,
+                                            float sec1_jam_carry) {
+    push_two_section_ab_arrangement(engine, 2);
+
+    constexpr int kSectionStride = 21;
+    // Section 0: LICK_BUILDER solo, fast mutation, never carries in.
+    engine->pulsar_section_data[0 * kSectionStride + 9].store(
+        static_cast<float>(static_cast<int>(SoloModeId::LICK_BUILDER)), std::memory_order_relaxed);
+    engine->pulsar_section_data[0 * kSectionStride + 10].store(sec0_solo_probability, std::memory_order_relaxed);
+    engine->pulsar_section_data[0 * kSectionStride + 11].store(1.0f, std::memory_order_relaxed);  // mutation_rate (fast)
+    engine->pulsar_section_data[0 * kSectionStride + 12].store(0.5f, std::memory_order_relaxed);  // lick_influence
+    engine->pulsar_section_data[0 * kSectionStride + 13].store(2.0f, std::memory_order_relaxed);  // solo_bars_min
+    engine->pulsar_section_data[0 * kSectionStride + 14].store(4.0f, std::memory_order_relaxed);  // solo_bars_max
+    engine->pulsar_section_data[0 * kSectionStride + 16].store(0.0f, std::memory_order_relaxed);  // jamCarry = false
+
+    // Section 1: mode/probability under test, mutation frozen, jamCarry per param.
+    int s1 = 1 * kSectionStride;
+    engine->pulsar_section_data[s1 + 9].store(static_cast<float>(sec1_solo_mode), std::memory_order_relaxed);
+    engine->pulsar_section_data[s1 + 10].store(1.0f, std::memory_order_relaxed);   // solo_probability
+    engine->pulsar_section_data[s1 + 11].store(0.0f, std::memory_order_relaxed);   // mutation_rate (frozen)
+    engine->pulsar_section_data[s1 + 12].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_section_data[s1 + 13].store(2.0f, std::memory_order_relaxed);
+    engine->pulsar_section_data[s1 + 14].store(4.0f, std::memory_order_relaxed);
+    engine->pulsar_section_data[s1 + 16].store(sec1_jam_carry, std::memory_order_relaxed);  // jamCarry (slot 16)
+
+    // Band config: member 0 = track 3, member 1 = track 4 (both MELODIC per
+    // setup_cosmic_techno's role table), neither always_active.
+    engine->pulsar_band_active.store(1, std::memory_order_relaxed);
+    engine->pulsar_band_member_count.store(2, std::memory_order_relaxed);
+    for (int i = 0; i < 96; i++)
+        engine->pulsar_band_member_data[i].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[0 + 0].store(1.0f, std::memory_order_relaxed);    // track_count
+    engine->pulsar_band_member_data[0 + 1].store(3.0f, std::memory_order_relaxed);    // tracks[0] = 3
+    engine->pulsar_band_member_data[0 + 9].store(0.0f, std::memory_order_relaxed);    // always_active = false
+    engine->pulsar_band_member_data[0 + 10].store(0.7f, std::memory_order_relaxed);   // loudness
+    engine->pulsar_band_member_data[0 + 11].store(0.9f, std::memory_order_relaxed);   // creativity (high: mutation lands fast)
+    engine->pulsar_band_member_data[12 + 0].store(1.0f, std::memory_order_relaxed);   // track_count
+    engine->pulsar_band_member_data[12 + 1].store(4.0f, std::memory_order_relaxed);   // tracks[0] = 4
+    engine->pulsar_band_member_data[12 + 9].store(0.0f, std::memory_order_relaxed);   // always_active = false
+    engine->pulsar_band_member_data[12 + 10].store(0.8f, std::memory_order_relaxed);  // loudness
+    engine->pulsar_band_member_data[12 + 11].store(0.9f, std::memory_order_relaxed);  // creativity
+
+    // Non-zero handoff/pull-in rows in BOTH directions. Engine-level storage is
+    // Kotlin-packed stride-member_count (N=2 here); the C++ unpack re-packs it
+    // into the consumers' stride-kMaxBandMembers layout (see BAND-01).
+    for (int i = 0; i < 64; i++) {
+        engine->pulsar_band_handoff_matrix[i].store(0.0f, std::memory_order_relaxed);
+        engine->pulsar_band_pull_in_matrix[i].store(0.0f, std::memory_order_relaxed);
+    }
+    engine->pulsar_band_handoff_matrix[0 * 2 + 1].store(1.0f, std::memory_order_relaxed);  // 0 -> 1
+    engine->pulsar_band_handoff_matrix[1 * 2 + 0].store(1.0f, std::memory_order_relaxed);  // 1 -> 0
+    engine->pulsar_band_pull_in_matrix[0 * 2 + 1].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_band_pull_in_matrix[1 * 2 + 0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_band_bars_per_lead_min.store(2, std::memory_order_relaxed);
+    engine->pulsar_band_bars_per_lead_max.store(2, std::memory_order_relaxed);
+    engine->pulsar_band_pull_in_bars_min.store(1, std::memory_order_relaxed);
+    engine->pulsar_band_pull_in_bars_max.store(1, std::memory_order_relaxed);
+    engine->pulsar_band_improv_carryover.store(0.7f, std::memory_order_relaxed);
+    engine->pulsar_band_probability.store(1.0f, std::memory_order_relaxed);
+
+    for (int i = 0; i < 8 * 15; i++)
+        engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
+    for (int i = 0; i < 8 * 6; i++)
+        engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
+    for (int i = 0; i < 8 * 15; i++)
+        engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);
+
+    // Start in section 1 (see file comment above for why).
+    engine->pulsar_arrangement_intro_index.store(1, std::memory_order_relaxed);
+
+    engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
+}
+
+// Shared setup for the three jamCarry tests: cosmic-techno base vibe (tracks 3
+// and 4 are MELODIC), a pinned 4-step authored lick, and both RNGs pinned per
+// the project's anti-flake convention.
+static void setup_jam_carry_engine_base(OrpheusEngine* engine, const int8_t authored_degrees[4]) {
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);  // isolate solo-driven changes
+    setup_cosmic_techno(engine);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+
+    engine->pulsar_seed.store(0x5EED, std::memory_order_relaxed);
+    stmlib::Random::Seed(0x5EED);
+
+    engine->pulsar_lick[0] = {authored_degrees[0], 0.5f, 0.8f};
+    engine->pulsar_lick[1] = {authored_degrees[1], 0.5f, 0.8f};
+    engine->pulsar_lick[2] = {authored_degrees[2], 0.5f, 0.8f};
+    engine->pulsar_lick[3] = {authored_degrees[3], 0.5f, 0.8f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+}
+
+static bool test_jam_carry_preserves_solo_across_section_seam() {
+    printf("\n=== Test: jamCarry preserves lead + live lick across seam ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    static const int8_t kAuthoredDegrees[4] = {0, 2, 4, 1};
+    setup_jam_carry_engine_base(engine, kAuthoredDegrees);
+    push_jam_carry_band_arrangement(engine, /*sec0_solo_probability=*/1.0f,
+                                    /*sec1_solo_mode=*/static_cast<int>(SoloModeId::LICK_BUILDER),
+                                    /*sec1_jam_carry=*/1.0f);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    int last_loop = -1;
+    int prev_section = -1;
+    bool saw_active_in_section0 = false;
+    int lead_before = -1;
+    int8_t lick_before[kMaxLickSteps] = {};
+    bool reached_seam = false;
+
+    for (int i = 0; i < 2000 && !reached_seam; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count == last_loop) continue;
+        last_loop = ps->loop_count;
+
+        int cur = ps->section_state.current_section;
+        // Track the LATEST section-0 bar (not just the first): bars_per_lead
+        // == section length means a normal mid-solo handoff can land on
+        // section 0's own 2nd bar, unrelated to jamCarry. What must survive
+        // the seam is whatever is CURRENTLY soloing right before it.
+        if (cur == 0 && ps->band_solo_state.active) {
+            saw_active_in_section0 = true;
+            lead_before = ps->band_solo_state.lead_member;
+            std::memcpy(lick_before, ps->live_lick_degrees, sizeof(lick_before));
+        }
+        if (prev_section == 0 && cur == 1) {
+            reached_seam = true;
+        }
+        prev_section = cur;
+    }
+
+    PulsarState* ps = engine->pulsar_state;
+    bool mutated_before_seam = saw_active_in_section0 &&
+        std::memcmp(lick_before, kAuthoredDegrees, sizeof(kAuthoredDegrees)) != 0;
+    bool still_active = ps && ps->band_solo_state.active;
+    bool same_lead = ps && ps->band_solo_state.lead_member == lead_before;
+    bool same_lick = ps && std::memcmp(ps->live_lick_degrees, lick_before, sizeof(lick_before)) == 0;
+
+    printf("  reached_seam=%s saw_active_in_section0=%s mutated_before_seam=%s\n",
+           reached_seam ? "yes" : "no", saw_active_in_section0 ? "yes" : "no",
+           mutated_before_seam ? "yes" : "no");
+    printf("  lead_before=%d lead_after=%d -- %s\n",
+           lead_before, ps ? ps->band_solo_state.lead_member : -999, same_lead ? "OK" : "FAIL");
+    printf("  still_active=%s -- %s\n", still_active ? "yes" : "no", still_active ? "OK" : "FAIL");
+    printf("  same_lick=%s -- %s\n", same_lick ? "yes" : "no", same_lick ? "OK" : "FAIL");
+
+    bool ok = reached_seam && saw_active_in_section0 && mutated_before_seam &&
+              still_active && same_lead && same_lick;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+static bool test_no_jam_carry_resets_solo_at_section_seam() {
+    printf("\n=== Test: default (no jamCarry) still fully resets ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    static const int8_t kAuthoredDegrees[4] = {0, 2, 4, 1};
+    setup_jam_carry_engine_base(engine, kAuthoredDegrees);
+    // Identical fixture to the carry test above, except section 1's jamCarry
+    // (slot 16) is left at its default false.
+    push_jam_carry_band_arrangement(engine, /*sec0_solo_probability=*/1.0f,
+                                    /*sec1_solo_mode=*/static_cast<int>(SoloModeId::LICK_BUILDER),
+                                    /*sec1_jam_carry=*/0.0f);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    int last_loop = -1;
+    int prev_section = -1;
+    bool saw_active_in_section0 = false;
+    int8_t lick_before[kMaxLickSteps] = {};
+    bool reached_seam = false;
+
+    for (int i = 0; i < 2000 && !reached_seam; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count == last_loop) continue;
+        last_loop = ps->loop_count;
+
+        int cur = ps->section_state.current_section;
+        if (cur == 0 && ps->band_solo_state.active) {
+            saw_active_in_section0 = true;
+            std::memcpy(lick_before, ps->live_lick_degrees, sizeof(lick_before));
+        }
+        if (prev_section == 0 && cur == 1) {
+            reached_seam = true;
+        }
+        prev_section = cur;
+    }
+
+    PulsarState* ps = engine->pulsar_state;
+    // Confirm mutation actually landed in section 0 before the seam — otherwise
+    // "matches authored after the seam" would be true trivially, not because a
+    // reset/re-seed happened.
+    bool mutated_before_seam = saw_active_in_section0 &&
+        std::memcmp(lick_before, kAuthoredDegrees, sizeof(kAuthoredDegrees)) != 0;
+    bool reseeded = ps &&
+        std::memcmp(ps->live_lick_degrees, kAuthoredDegrees, sizeof(kAuthoredDegrees)) == 0;
+
+    printf("  reached_seam=%s saw_active_in_section0=%s mutated_before_seam=%s\n",
+           reached_seam ? "yes" : "no", saw_active_in_section0 ? "yes" : "no",
+           mutated_before_seam ? "yes" : "no");
+    printf("  reseeded_to_authored_after_seam=%s -- %s\n",
+           reseeded ? "yes" : "no", reseeded ? "OK" : "FAIL");
+
+    bool ok = reached_seam && saw_active_in_section0 && mutated_before_seam && reseeded;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+static bool test_jam_carry_fallbacks() {
+    printf("\n=== Test: jamCarry fallbacks (no solo in flight / into NONE) ===\n");
+
+    static const int8_t kAuthoredDegrees[4] = {0, 2, 4, 1};
+    bool pass_a;
+    {
+        // (a) Section 0's solo probability is 0 so it never actually starts a
+        // solo — nothing is in flight. Section 1 sets jamCarry with probability
+        // 1.0: with nothing to carry, it must fall back to a normal fresh
+        // start (active becomes true), not stay permanently inactive.
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit;
+        std::memset(&unit, 0, sizeof(unit));
+        unit.type = UNIT_PULSAR;
+        unit.enabled = true;
+
+        setup_jam_carry_engine_base(engine, kAuthoredDegrees);
+        push_jam_carry_band_arrangement(engine, /*sec0_solo_probability=*/0.0f,
+                                        /*sec1_solo_mode=*/static_cast<int>(SoloModeId::LICK_BUILDER),
+                                        /*sec1_jam_carry=*/1.0f);
+
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+        int last_loop = -1;
+        int prev_section = -1;
+        bool saw_active_in_section0 = false;
+        bool reached_seam = false;
+        for (int i = 0; i < 2000 && !reached_seam; i++) {
+            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            PulsarState* ps = engine->pulsar_state;
+            if (!ps) continue;
+            if (ps->loop_count == last_loop) continue;
+            last_loop = ps->loop_count;
+            int cur = ps->section_state.current_section;
+            if (cur == 0 && ps->band_solo_state.active) saw_active_in_section0 = true;
+            if (prev_section == 0 && cur == 1) reached_seam = true;
+            prev_section = cur;
+        }
+
+        PulsarState* ps = engine->pulsar_state;
+        bool active_after = ps && ps->band_solo_state.active;
+        // Precondition check: section 0's solo_probability is 0 in this
+        // sub-case, so nothing should ever have been in flight there. Without
+        // this, a hypothetical bug that carried an ACTUALLY-active section-0
+        // solo into section 1 would also read active_after == true and this
+        // test couldn't tell the difference from the fresh-start fallback.
+        pass_a = reached_seam && !saw_active_in_section0 && active_after;
+        printf("  (a) no solo in flight, jamCarry into section 1: saw_active_in_section0=%s (expected no) "
+               "active=%s (expected yes) -- %s\n",
+               saw_active_in_section0 ? "yes" : "no",
+               active_after ? "yes" : "no", pass_a ? "PASS" : "FAIL");
+
+        orpheus_engine_destroy(engine);
+    }
+
+    bool pass_b;
+    {
+        // (b) Section 0 solos for real (probability 1.0). Section 1 sets
+        // jamCarry but is solo-less (mode NONE): carry must never keep a solo
+        // alive in a solo-less section — the else-branch clear still runs.
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit;
+        std::memset(&unit, 0, sizeof(unit));
+        unit.type = UNIT_PULSAR;
+        unit.enabled = true;
+
+        setup_jam_carry_engine_base(engine, kAuthoredDegrees);
+        push_jam_carry_band_arrangement(engine, /*sec0_solo_probability=*/1.0f,
+                                        /*sec1_solo_mode=*/static_cast<int>(SoloModeId::NONE),
+                                        /*sec1_jam_carry=*/1.0f);
+
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+        int last_loop = -1;
+        int prev_section = -1;
+        bool saw_active_in_section0 = false;
+        bool reached_seam = false;
+        for (int i = 0; i < 2000 && !reached_seam; i++) {
+            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            PulsarState* ps = engine->pulsar_state;
+            if (!ps) continue;
+            if (ps->loop_count == last_loop) continue;
+            last_loop = ps->loop_count;
+            int cur = ps->section_state.current_section;
+            if (cur == 0 && ps->band_solo_state.active) saw_active_in_section0 = true;
+            if (prev_section == 0 && cur == 1) reached_seam = true;
+            prev_section = cur;
+        }
+
+        PulsarState* ps = engine->pulsar_state;
+        bool active_after = ps && ps->band_solo_state.active;
+        pass_b = reached_seam && saw_active_in_section0 && !active_after;
+        printf("  (b) soloing into a NONE section, jamCarry set: active=%s (expected no) -- %s\n",
+               active_after ? "yes" : "no", pass_b ? "PASS" : "FAIL");
+
+        orpheus_engine_destroy(engine);
+    }
+
+    bool ok = pass_a && pass_b;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// A drum-led span carried into a JAM section must not survive: should_drum_lead
+// (LICK_BUILDER-only) can leave the always-active Drummer as lead_member when a
+// vamp's bars expire. If the carry gate blindly honors jamCarry, that kit-only
+// lead crosses into JAM's render block, which needs the lead's first MELODIC
+// track -- gets -1 for a drummer, and generates nothing while the band stays
+// SUPPORT-ducked. The gate must fall back to a fresh (eligibility-filtered)
+// start instead. Reuses the jamCarry fixture, but section 1 is JAM (not
+// LICK_BUILDER) and a third, always-active, kit-only band member (the
+// Drummer, mapped to track 0 -- PERC per setup_cosmic_techno) is added.
+// always_active members never win normal lead selection (select_next_lead /
+// select_initial_lead both zero their weight -- see pulsar_band_solo.h), so
+// the only way the drummer becomes lead is should_drum_lead's handoff
+// override; rather than rely on its ~12%-per-bar roll landing, this test
+// pokes band_solo_state directly to force that state deterministically.
+static bool test_jam_carry_requires_eligible_lead_into_jam_section() {
+    printf("\n=== Test: jamCarry into JAM requires an eligible (non-drum) lead ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    static const int8_t kAuthoredDegrees[4] = {0, 2, 4, 1};
+    setup_jam_carry_engine_base(engine, kAuthoredDegrees);
+    // Section 0 = LICK_BUILDER (the only mode should_drum_lead ever fires in),
+    // section 1 = JAM with jamCarry set -- the peak under test.
+    push_jam_carry_band_arrangement(engine, /*sec0_solo_probability=*/1.0f,
+                                    /*sec1_solo_mode=*/static_cast<int>(SoloModeId::JAM),
+                                    /*sec1_jam_carry=*/1.0f);
+
+    // Third band member: always-active, kit-only Drummer on track 0 (PERC).
+    constexpr int kDrummerMember = 2;
+    engine->pulsar_band_member_count.store(3, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[kDrummerMember * 12 + 0].store(1.0f, std::memory_order_relaxed);   // track_count
+    engine->pulsar_band_member_data[kDrummerMember * 12 + 1].store(0.0f, std::memory_order_relaxed);   // tracks[0] = 0 (PERC)
+    engine->pulsar_band_member_data[kDrummerMember * 12 + 9].store(1.0f, std::memory_order_relaxed);   // always_active = true
+    engine->pulsar_band_member_data[kDrummerMember * 12 + 10].store(0.9f, std::memory_order_relaxed);  // loudness
+    engine->pulsar_band_member_data[kDrummerMember * 12 + 11].store(0.5f, std::memory_order_relaxed);  // creativity
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    int last_loop = -1;
+    int prev_section = -1;
+    bool saw_active_in_section0 = false;
+    bool reached_seam = false;
+
+    for (int i = 0; i < 2000 && !reached_seam; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count == last_loop) continue;
+        last_loop = ps->loop_count;
+
+        int cur = ps->section_state.current_section;
+        if (cur == 0 && ps->band_solo_state.active) {
+            saw_active_in_section0 = true;
+            // Simulate a mid-drum-span expiry: install the always-active
+            // drummer as lead, exactly as should_drum_lead's handoff override
+            // would. Re-applied every bar in section 0 so whichever bar turns
+            // out to be section 0's last, the drummer is still lead the
+            // instant the seam is crossed on the next bar boundary.
+            int prev_lead = ps->band_solo_state.lead_member;
+            if (prev_lead != kDrummerMember) {
+                if (prev_lead >= 0 && prev_lead < kMaxBandMembers) {
+                    ps->band_solo_state.member_role[prev_lead] = MemberSoloRole::SUPPORT;
+                }
+                ps->band_solo_state.lead_member = kDrummerMember;
+                ps->band_solo_state.member_role[kDrummerMember] = MemberSoloRole::LEADING;
+            }
+        }
+        if (prev_section == 0 && cur == 1) {
+            reached_seam = true;
+        }
+        prev_section = cur;
+    }
+
+    PulsarState* ps = engine->pulsar_state;
+    bool still_active = ps && ps->band_solo_state.active;
+    bool lead_is_drummer = ps && ps->band_solo_state.lead_member == kDrummerMember;
+    bool lead_owns_melodic = ps && member_can_lead_solo(
+        ps->band_solo_config, ps->band_solo_state.lead_member, ps->tracks, kNumPulsarTracks);
+
+    printf("  reached_seam=%s saw_active_in_section0=%s\n",
+           reached_seam ? "yes" : "no", saw_active_in_section0 ? "yes" : "no");
+    printf("  lead_after=%d (drummer=%d) still_active=%s lead_owns_melodic=%s -- %s\n",
+           ps ? ps->band_solo_state.lead_member : -999, kDrummerMember,
+           still_active ? "yes" : "no", lead_owns_melodic ? "yes" : "no",
+           (still_active && !lead_is_drummer && lead_owns_melodic) ? "OK" : "FAIL");
+
+    // The drum-led span must NOT survive the seam into JAM: solo stays active,
+    // but handed to a member that actually owns a melodic track -- never the
+    // kit-only drummer, which would render nothing while the band stays ducked.
+    bool ok = reached_seam && saw_active_in_section0 && still_active &&
+              !lead_is_drummer && lead_owns_melodic;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -1772,6 +2237,10 @@ bool run_pulsar_sections_tests() {
     tally(test_midi_lick_degree_roundtrip_and_synth());
     tally(test_synthesize_lick_below_root_renders_notes_not_rests());
     tally(test_generate_jam_solo_line());
+    tally(test_jam_carry_preserves_solo_across_section_seam());
+    tally(test_no_jam_carry_resets_solo_at_section_seam());
+    tally(test_jam_carry_fallbacks());
+    tally(test_jam_carry_requires_eligible_lead_into_jam_section());
     printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

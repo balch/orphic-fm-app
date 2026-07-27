@@ -48,7 +48,8 @@ import org.balch.orpheus.features.pulsar.models.row
  *
  * A descending bassline (the vibe's whole spine) walks D-C-Bb-A under two guitars
  * moving in diatonic thirds, on a drum kit that plays the room rather than the click.
- * Structure breathes verse -> driven jam -> hard cut back to the slow verse.
+ * Structure breathes verse -> rise -> Dm vamp -> free-improv peak -> hard cut back to
+ * the slow verse; the jam is the centerpiece (2-3 minutes most plays).
  *
  * First vibe on the bass line channel and on per-track wah voicing: the bass rocks a
  * slow pedal low in the spectrum while the lead works a quarter-note pedal up in the
@@ -277,16 +278,19 @@ class OdysseusLoreVibe : VibeProvider {
                 // 6 — second guitar. MUST NOT live on track 7: that index is the FX slot, and
                 // its note-ons are probability-gated by compute_fx_probability(energy,
                 // complexity), which is flat zero unless energy < 0.4 or (complexity > 0.7 and
-                // energy > 0.6). This vibe's base macros are 0.55 / 0.4 and the jam's 1.35x/1.3x
-                // only lift them to 0.74 / 0.52, so a lead parked on 7 would never fire a note
-                // outside the outro. Index carries behavior independently of TrackRole; see the
-                // branches on `t` in orpheus_unit_pulsar.cpp.
+                // energy > 0.6). This vibe's base macros are 0.55 / 0.4; rise and vamp only lift
+                // them to 0.66 / 0.46 and 0.69 / 0.52, but the peak's 1.5x/1.8x pushes them to
+                // 0.83 / 0.72, so a lead parked on 7 now fires at the peak (complexity > 0.7 and
+                // energy > 0.6) as well as the outro. Index carries behavior independently of
+                // TrackRole; see the branches on `t` in orpheus_unit_pulsar.cpp.
                 //
                 // Track 6 is not free of that either: tracks >= 5 are the texture band, so this
                 // voice is scaled by texture_energy_curve(energy), a notch pinned at 0.05 across
                 // energy 0.45..0.55 that ramps back to 1.0 by 0.65. Base energy 0.55 sits exactly
-                // on the notch floor, so the harmony is a whisper in the VERSE (no override) and
-                // full in the JAM (0.74) and the OUTRO (0.30). That reads as a second player who
+                // on the notch floor, so the harmony is a whisper in the VERSE (no override),
+                // full from the RISE (0.66) through the VAMP (0.69) and PEAK (0.83), and just
+                // as full in the OUTRO (0.30): the curve is full below 0.35 too, not just by
+                // 0.65, notched only across 0.45..0.55. That reads as a second player who
                 // sits out the verse and comes in for the jam, which is the arrangement we want,
                 // but it is forced rather than chosen: tracks 0-2 are the kit, 3 is the bass bus
                 // and 4 is the lead, so track 4 is the ONLY slot with no texture duck. Lifting
@@ -355,10 +359,10 @@ class OdysseusLoreVibe : VibeProvider {
             band = Band(
                 members = listOf(
                     BandMember(name = "Drummer", tracks = listOf(0, 1, 2), alwaysActive = true),
-                    BandMember(name = "Bassist", tracks = listOf(3)),
+                    BandMember(name = "Bassist", tracks = listOf(3), loudness = 0.8f),
                     // Both guitars move as one member: they read the same lick a third apart,
                     // so handing the solo to "Guitarist" hands it to the pair.
-                    BandMember(name = "Guitarist", tracks = listOf(4, 6)),
+                    BandMember(name = "Guitarist", tracks = listOf(4, 6), loudness = 0.85f),
                     BandMember(name = "Haze", tracks = listOf(5, 7)),
                 ),
                 handoffMatrix = bandMatrix(
@@ -398,8 +402,8 @@ class OdysseusLoreVibe : VibeProvider {
 
             arrangement = Arrangement(
                 introIndex = 0,
-                outroIndex = 3,
-                lengthSeconds = 180..300,
+                outroIndex = 5,
+                lengthSeconds = 360..420,
                 sections = listOf(
                     // 0 INTRO — the bass alone states the lament; band swells in
                     Section(
@@ -417,28 +421,74 @@ class OdysseusLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
-                    // 1 VERSE — slow full-band groove under the wah
+                    // 1 VERSE — slow full-band groove under the wah; frames the jam
                     Section(
                         name = "verse",
                         barsMin = 2, barsMax = 4,
-                        transitions = listOf(
-                            SectionTransition(2, 1f, transitionBars = 1),
-                        ),
+                        transitions = listOf(SectionTransition(2, 1f, transitionBars = 1)),
                     ),
-                    // 2 JAM — driven; LickBuilder trades mutate the soloist's channel
+                    // 2 RISE — the band leans in over the descent. Energy 0.55*1.2 = 0.66
+                    // crosses the texture-curve knee, so the harmony guitar wakes HERE
+                    // (it whispers in the verse). Solo probability 0.95 because the roll
+                    // happens ONCE per section entry — 0.55 left ~45% of jams soloist-free.
                     Section(
-                        name = "jam",
-                        barsMin = 4, barsMax = 8,
+                        name = "rise",
+                        barsMin = 6, barsMax = 8,
                         macroOverrides = MacroOverrides(
-                            energy = 1.35f, complexity = 1.3f, space = 0.85f, mood = 1.1f,
+                            energy = 1.2f, complexity = 1.15f, space = 0.9f, mood = 1.05f,
                         ),
-                        soloMode = SoloMode.LickBuilder(probability = 0.55f, mutationRate = 0.5f),
-                        transitions = listOf(
-                            // Hard cut home: "right back into the slower section"
-                            SectionTransition(1, 1f, transitionBars = 0),
-                        ),
+                        soloMode = SoloMode.LickBuilder(probability = 0.95f, mutationRate = 0.5f),
+                        transitions = listOf(SectionTransition(3, 1f, transitionBars = 2)),
                     ),
-                    // 3 OUTRO — the lament dissolves
+                    // 3 VAMP — the harmony freezes on i (Dm) while the bass keeps the
+                    // authored descent: ostinato floor under a frozen sky. Deliberately
+                    // NO chordFollow override on the bass — trigger-time transposition
+                    // would flatten a bassist's LickBuilder solo to roots. The descent
+                    // departs organically when the Bassist trades and mutates it.
+                    // jamCarry: the solo that started in RISE walks in mid-stride.
+                    Section(
+                        name = "vamp",
+                        barsMin = 8, barsMax = 10,
+                        jamCarry = true,
+                        customProgression = chords(0),
+                        chordsPerBar = 1,
+                        macroOverrides = MacroOverrides(
+                            energy = 1.25f, complexity = 1.3f, space = 1.1f, mood = 1.1f,
+                        ),
+                        soloMode = SoloMode.LickBuilder(probability = 0.95f, mutationRate = 0.6f),
+                        transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
+                    ),
+                    // 4 PEAK — free improv over the vamp: SoloMode.Jam generates a
+                    // chord-anchored line each bar and hands 70% of its interval
+                    // character to the next soloist. complexity 0.4*1.8 = 0.72 plus
+                    // energy 0.55*1.5 = 0.83 opens track 7's fx gate, so the swirl
+                    // joins exactly at the climax. Spurts (lick mutation x3, then
+                    // reeled back) fire often via the tension override; innerBars
+                    // stays 8 so the sawtooth peak (0.875) still crosses the 0.85
+                    // auto-spurt threshold. outerBars is meaningless inside a
+                    // single visit, so disabled.
+                    Section(
+                        name = "peak",
+                        barsMin = 8, barsMax = 12,
+                        jamCarry = true,
+                        customProgression = chords(0),
+                        chordsPerBar = 1,
+                        macroOverrides = MacroOverrides(
+                            energy = 1.5f, complexity = 1.8f, space = 0.8f, mood = 1.15f,
+                        ),
+                        soloMode = SoloMode.Jam(probability = 1.0f),
+                        tensionOverride = TensionProfile(
+                            innerBars = 8,
+                            outerBars = 0,
+                            outerDepth = 0f,
+                            volume = 0.35f,
+                            timing = 0.15f,
+                            spurtChance = 0.2f,
+                        ),
+                        // Hard cut home: the biggest bar slams into the slow verse.
+                        transitions = listOf(SectionTransition(1, 1f, transitionBars = 0)),
+                    ),
+                    // 5 OUTRO — the lament dissolves (terminal; reached only when armed)
                     Section(
                         name = "outro",
                         barsMin = 2, barsMax = 2,

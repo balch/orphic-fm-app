@@ -41,6 +41,7 @@ import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
@@ -187,6 +188,23 @@ class PulsarSectionProgressionPushTest {
         // Section 1: active=0; data slots stay at their initialized 0.
         assertEquals(0, intPort("section_comping_humanization_active_1"),
             "section 1 humanization active flag should be 0")
+    }
+
+    @Test
+    fun `section jamCarry is pushed to section_data slot 16`() = runTest(testDispatcher) {
+        val sections = listOf(
+            Section(name = "verse", barsMin = 2, barsMax = 2,
+                transitions = listOf(SectionTransition(1, 1f))),
+            Section(name = "jam", barsMin = 2, barsMax = 2, jamCarry = true,
+                transitions = listOf(SectionTransition(0, 1f))),
+        )
+        val vibe = pushTestVibe(sections = sections)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0f, floatPort("section_data_${0 * 21 + 16}"))
+        assertEquals(1f, floatPort("section_data_${1 * 21 + 16}"))
     }
 }
 

@@ -952,6 +952,36 @@ static bool test_break_exempts_lead_member_tracks() {
     return ok;
 }
 
+static bool test_solo_mod_slew_produces_intermediate_values() {
+    printf("\n=== Test: kSoloModSlew crossfades instead of snapping ===\n");
+
+    // The largest possible solo mod target magnitude is LEADING density at
+    // loudness 1.0: 0.15 + 0.3 * 1.0 = 0.45. The crossfade contract: one
+    // per-bar slew step must NOT fully cover a typical swing, so handoffs
+    // ramp over multiple bars instead of hard-stepping at the boundary.
+    float duck = slew_toward(0.0f, -0.18f, kSoloModSlew);   // SUPPORT duck
+    bool duck_intermediate = duck > -0.18f && duck < 0.0f;
+    printf("  duck after 1 bar = %.3f (target -0.18) -- %s\n",
+           duck, duck_intermediate ? "OK" : "FAIL");
+
+    float boost = slew_toward(0.0f, 0.45f, kSoloModSlew);   // max LEADING boost
+    bool boost_intermediate = boost > 0.0f && boost < 0.45f;
+    printf("  max boost after 1 bar = %.3f (target 0.45) -- %s\n",
+           boost, boost_intermediate ? "OK" : "FAIL");
+
+    // Convergence: the biggest swing must still settle within 4 bars.
+    float v = 0.0f;
+    int bars = 0;
+    while (v != 0.45f && bars < 16) { v = slew_toward(v, 0.45f, kSoloModSlew); bars++; }
+    bool converges = bars <= 4;
+    printf("  max boost converged in %d bars (<= 4) -- %s\n",
+           bars, converges ? "OK" : "FAIL");
+
+    bool pass = duck_intermediate && boost_intermediate && converges;
+    printf("  Solo mod slew: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_pulsar_solos_tests() {
     printf("\n========== PULSAR SOLOS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -972,6 +1002,7 @@ bool run_pulsar_solos_tests() {
     tally(test_jam_solo_shared_line());
     tally(test_jam_improv_generated_and_carryover());
     tally(test_break_exempts_lead_member_tracks());
+    tally(test_solo_mod_slew_produces_intermediate_values());
     printf("\nPulsar solos tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

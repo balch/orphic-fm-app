@@ -1639,7 +1639,7 @@ class PulsarViewModel(
                 setSection(13, (sectionSolo as? SoloMode.LongFill)?.barsMin?.toFloat() ?: 2f)
                 setSection(14, (sectionSolo as? SoloMode.LongFill)?.barsMax?.toFloat() ?: 4f)
                 setSection(15, 0f) // set below (exit scratch)
-                setSection(16, 0f) // reserved
+                setSection(16, 0f) // slot 16 written below (jamCarry)
                 setSection(17, 0f) // reserved
             } else {
                 // No solo in this section
@@ -1652,6 +1652,11 @@ class PulsarViewModel(
             // section's clock while the scratch runs (0 = none). Written after the
             // solo block so it wins over the reserved-0 set in both branches.
             setSection(15, section.exitScratchMs.toFloat())
+
+            // Slot 16: jamCarry — carry an in-flight band solo across this
+            // section's entry (see Section.jamCarry). Written after the solo
+            // block so it wins over the reserved-0 writes in both branches.
+            setSection(16, if (section.jamCarry) 1f else 0f)
 
             // Section-level comping overrides (slots 18-20); -1.0 = no override
             setSection(18, compingStyleOrSentinel(section.compingStyle))

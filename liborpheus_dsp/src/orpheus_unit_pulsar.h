@@ -20,6 +20,12 @@ static constexpr int kMaxSoloPhrase = 8;
 // eligibility predicate below and the C++ test harness can both see it.
 static constexpr int kBassTrack = 3;  // tracks 3=BASS (pulsar_pattern_gen.h:323)
 
+// Per-bar slew rate for solo level/density crossfades (handoff crossfade +
+// solo-end fade-out share it). Hoisted here so tests can pin the crossfade
+// contract, same as kBassTrack. A full swing must take multiple bars — see
+// test_solo_mod_slew_produces_intermediate_values.
+static constexpr float kSoloModSlew = 0.15f;
+
 struct PulsarStep {
     uint8_t note;      // MIDI note number (quantized to current scale)
     uint8_t raw_note;  // original unquantized note — re-quantize from this on scale change
@@ -542,6 +548,10 @@ struct SectionParam {
     // unit arms the scratch at the section flip and freezes its own clock while the
     // scratch is active, so the incoming section holds until the scratch drops.
     int exit_scratch_ms = 0;
+    // Carry an in-flight band solo across this section's ENTRY (slot 16).
+    // Gates only the section-entry solo reset block; see the section_changed
+    // handler in orpheus_unit_pulsar.cpp.
+    bool jam_carry = false;
 };
 
 struct ArrangementParams {

@@ -42,13 +42,6 @@ static_assert(sizeof(OrpheusEngine::pulsar_lick_wah_data) /
 
 static constexpr float kTidesNorm = 0.125f;
 
-// Per-bar slew rate for solo level/density crossfades. A full role swing
-// resolves in ~1 bar (0.5 of the swing per bar). Used in two sibling blocks
-// (handoff crossfade + solo-end fade-out); keep them in sync via this constant.
-static constexpr float kSoloModSlew = 0.5f;
-// kBassTrack now lives in orpheus_unit_pulsar.h so the wah-anomaly eligibility
-// predicate (and the test harness) can see it.
-
 // ═══════════════════════════════════════════════════════════════════════
 // Pulsar Beat Machine — Clock, Sequencer, Voice Rendering
 // ═══════════════════════════════════════════════════════════════════════
@@ -1284,6 +1277,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             sec.exit_scratch_ms = static_cast<int>(
                 engine->pulsar_section_data[base + 15].load(std::memory_order_relaxed));
 
+            // Slot 16: jamCarry — continue an in-flight band solo across this
+            // section's entry seam (see SectionParam::jam_carry).
+            sec.jam_carry =
+                engine->pulsar_section_data[base + 16].load(std::memory_order_relaxed) > 0.5f;
+
             // Per-track section overrides; -1 = no override (per-track wins over section-level)
             {
                 int tbase = s * kNumPulsarTracks;
@@ -2479,8 +2477,32 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         state->tension_intensity  = 0.0f;
                         state->tension_evo_smooth = 0.0f;
 
-                        // Start solo: new SoloMode system > band system > legacy
-                        if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
+                        // Start solo: new SoloMode system > band system > legacy.
+                        // Section.jamCarry: when a band solo is already in flight
+                        // and the incoming section keeps soloing, skip the reset —
+                        // same lead, same roles, same live lick and phrase memory,
+                        // continuing under the incoming section's solo params
+                        // (every per-bar consumer reads the CURRENT SectionParam,
+                        // so mode/mutation switch over automatically).
+                        // Exception: a carry INTO a JAM section additionally requires
+                        // the carried lead to pass member_can_lead_solo. should_drum_lead
+                        // (LICK_BUILDER-only) can leave the always-active Drummer as
+                        // lead_member when a vamp's bars expire; JAM's render block needs
+                        // the lead's first MELODIC track, gets -1 for a kit-only Drummer,
+                        // and generates nothing while the band stays SUPPORT-ducked. A
+                        // carried LICK_BUILDER lead is unaffected — drum leads are
+                        // legitimate there.
+                        bool jam_carried = sec.jam_carry &&
+                                           state->band_solo_state.active &&
+                                           sec.solo_mode != SoloModeId::NONE &&
+                                           state->has_band_solo &&
+                                           (sec.solo_mode != SoloModeId::JAM ||
+                                            member_can_lead_solo(state->band_solo_config,
+                                                                 state->band_solo_state.lead_member,
+                                                                 state->tracks, kNumPulsarTracks));
+                        if (jam_carried) {
+                            // Intentionally nothing: the jam walks across the seam.
+                        } else if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
                             start_band_solo(state->band_solo_state, state->band_solo_config,
                                             sec, state->tracks, state->mutation_seed);
                             // Initialize live lick for LickBuilder mode, seeding from the
@@ -2738,7 +2760,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         advance_band_solo(state->band_solo_state, state->band_solo_config,
                                           sec_adv, state->tracks, state->mutation_seed);
                         // Slew smoothed volume/density mods toward freshly-written targets
-                        // so solo handoffs crossfade over ~1 bar instead of snapping.
+                        // so solo handoffs resolve over a few bars (2-3 at typical mod
+                        // magnitudes, via kSoloModSlew) instead of snapping.
                         for (int st = 0; st < kNumPulsarTracks; st++) {
                             state->tracks[st].solo_volume_mod_current =
                                 slew_toward(state->tracks[st].solo_volume_mod_current,
@@ -2966,7 +2989,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     // Solo-end fade-out: when solo clears, targets are zeroed by
                     // clear_solo_modifiers but the per-bar slew above no longer runs
                     // (guarded by band_solo_state.active). Slew _current toward 0
-                    // here so the snap-back crossfades over ~1 bar.
+                    // here so the snap-back resolves over a few bars (2-3 at typical
+                    // mod magnitudes, via kSoloModSlew) instead of snapping.
                     if (!state->band_solo_state.active) {
                         for (int st = 0; st < kNumPulsarTracks; st++) {
                             PulsarTrackState& sts = state->tracks[st];
