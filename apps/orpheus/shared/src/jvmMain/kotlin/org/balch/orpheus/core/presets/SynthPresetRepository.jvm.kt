@@ -1,7 +1,9 @@
 package org.balch.orpheus.core.presets
 
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -14,6 +16,7 @@ import java.io.File
  * JVM implementation of SynthPresetRepository using JSON files.
  * Stores presets in ~/.config/orpheus/presets/
  */
+@SingleIn(AppScope::class)
 @Inject
 class JvmSynthPresetRepository : SynthPresetRepository {
     private val log = logging("JvmSynthPresetRepository")

@@ -1,7 +1,9 @@
 package org.balch.orpheus.core.preferences
 
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
@@ -11,6 +13,7 @@ import org.w3c.dom.set
 /**
  * WASM implementation of AppPreferencesRepository using browser localStorage.
  */
+@SingleIn(AppScope::class)
 @Inject
 class WasmAppPreferencesRepository : BaseAppPreferencesRepository() {
     private val log = logging("WasmAppPreferencesRepository")

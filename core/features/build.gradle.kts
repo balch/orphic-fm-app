@@ -19,10 +19,12 @@ kotlin {
 
             // DI
             api(libs.metro.runtime)
-            implementation(libs.metrox.viewmodel)
+            // api: InjectedViewModelFactory extends MetroViewModelFactory in its public signature,
+            // and app graphs inherit ViewModelGraph from here.
+            api(libs.metrox.viewmodel)
 
             // Lifecycle (ViewModel base class for SynthFeatureRegistry)
-            implementation(libs.androidx.lifecycle.viewmodel)
+            api(libs.androidx.lifecycle.viewmodel)
 
             // Coroutines & concurrency
             implementation(libs.kotlinx.coroutines.core)

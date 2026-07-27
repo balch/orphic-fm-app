@@ -1,13 +1,16 @@
 package org.balch.orpheus.core.preferences
 
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSUserDefaults
 
 /**
  * iOS implementation of AppPreferencesRepository using NSUserDefaults.
  */
+@SingleIn(AppScope::class)
 @Inject
 class IosAppPreferencesRepository : BaseAppPreferencesRepository() {
     private val log = logging("IosAppPreferencesRepository")

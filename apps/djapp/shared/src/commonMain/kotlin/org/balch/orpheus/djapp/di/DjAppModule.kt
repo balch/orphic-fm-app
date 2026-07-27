@@ -1,6 +1,7 @@
 package org.balch.orpheus.djapp.di
 
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Multibinds
 import dev.zacsweers.metro.Provides
@@ -27,8 +28,28 @@ import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 
 @ContributesTo(AppScope::class)
 interface DjAppModule {
+    /**
+     * `allowEmpty` because the `og` edition has no `:apps:djapp:ai` on its classpath, so nothing
+     * contributes an `AiTabContribution` and the set is legitimately empty. Metro treats empty
+     * multibindings as an error unless you say so here.
+     */
     @Multibinds(allowEmpty = true)
     fun djTabContributions(): Set<DjTabContribution>
+
+    /**
+     * The four playback hooks `PlaybackController` takes as optional constructor params.
+     *
+     * Bound to the NULLABLE type on purpose. Metro treats `T` and `T?` as distinct type keys, so a
+     * non-null binding will not satisfy `skipHandler: SkipHandler? = null`; the param would
+     * silently fall back to its default and next/prev would quietly stop working.
+     */
+    @Binds val TimerOverlayProducer.bindOverlayProducer: OverlaySubtitleProducer?
+
+    @Binds val PulsarSkipHandler.bindSkipHandler: SkipHandler?
+
+    @Binds val PulsarVibePicker.bindPlayFromMediaIdHandler: PlayFromMediaIdHandler?
+
+    @Binds val PulsarMetadataProducer.bindMetadataProducer: MetadataProducer
 
     companion object {
         @Provides
@@ -54,17 +75,5 @@ interface DjAppModule {
         @SingleIn(AppScope::class)
         fun provideTimerFeature(holder: FeatureGraphHolder): TimerFeature =
             holder.featureGraph.featureCollection.getFeature(TimerViewModel::class)
-
-        @Provides
-        fun provideMetadataProducer(p: PulsarMetadataProducer): MetadataProducer = p
-
-        @Provides
-        fun provideOverlayProducer(p: TimerOverlayProducer): OverlaySubtitleProducer? = p
-
-        @Provides
-        fun provideSkipHandler(h: PulsarSkipHandler): SkipHandler? = h
-
-        @Provides
-        fun providePlayFromMediaIdHandler(h: PulsarVibePicker): PlayFromMediaIdHandler? = h
     }
 }

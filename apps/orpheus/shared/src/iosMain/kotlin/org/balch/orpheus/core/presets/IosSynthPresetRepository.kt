@@ -1,13 +1,16 @@
 package org.balch.orpheus.core.presets
 
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.json.Json
 import platform.Foundation.NSUserDefaults
 
 /**
  * iOS implementation of SynthPresetRepository using NSUserDefaults.
  */
+@SingleIn(AppScope::class)
 @Inject
 class IosSynthPresetRepository : SynthPresetRepository {
     private val log = logging("IosSynthPresetRepository")

@@ -1,6 +1,7 @@
 package org.balch.orpheus.di
 
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -36,6 +37,19 @@ import org.balch.orpheus.playback.OrpheusMetadataProducer
  */
 @ContributesTo(AppScope::class)
 interface OrpheusModule {
+    /**
+     * The three playback hooks `PlaybackController` takes as optional constructor params.
+     *
+     * Bound to the NULLABLE type on purpose. Metro treats `T` and `T?` as distinct type keys, so a
+     * non-null binding will not satisfy `overlayProducer: OverlaySubtitleProducer? = null`; the
+     * param would silently fall back to its default and the feature would just never fire.
+     */
+    @Binds val TimerOverlayProducer.bindOverlayProducer: OverlaySubtitleProducer?
+
+    @Binds val PulsarSkipHandler.bindSkipHandler: SkipHandler?
+
+    @Binds val OrpheusMetadataProducer.bindMetadataProducer: MetadataProducer
+
     companion object Companion {
         @Provides
         @SingleIn(AppScope::class)
@@ -74,15 +88,11 @@ interface OrpheusModule {
         fun provideAiOptionsFeature(holder: FeatureGraphHolder): AiOptionsFeature =
             holder.featureGraph.featureCollection.getFeature(AiOptionsViewModel::class)
 
-        @Provides
-        fun provideMetadataProducer(p: OrpheusMetadataProducer): MetadataProducer = p
-
-        @Provides
-        fun provideOverlayProducer(p: TimerOverlayProducer): OverlaySubtitleProducer? = p
-
-        @Provides
-        fun provideSkipHandler(h: PulsarSkipHandler): SkipHandler? = h
-
+        /**
+         * No `@Binds` counterpart: Orpheus has no media-ID browse tree, so this is an explicit
+         * null. It still has to be bound. `PlayFromMediaIdHandler?` is its own type key and Metro
+         * would otherwise use the constructor default, which is the same result but silently.
+         */
         @Provides
         fun providePlayFromMediaIdHandler(): PlayFromMediaIdHandler? = null
     }

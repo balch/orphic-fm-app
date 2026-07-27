@@ -12,17 +12,33 @@ import org.balch.orpheus.core.audio.dsp.buildDefaultWiringGraph
 import org.balch.orpheus.core.audio.dsp.jsCreateDspWorker
 import org.balch.orpheus.core.audio.dsp.jsSendSetPortCmd
 import org.balch.orpheus.core.audio.dsp.jsSetupWorkerListener
-import org.balch.orpheus.di.OrpheusGraph
+import org.balch.orpheus.di.OrpheusGraphWasm
 
 /** Check if the URL has a ?noworker query parameter to disable Worker DSP */
 private fun jsHasNoWorkerFlag(): Boolean =
     js("new URLSearchParams(window.location.search).has('noworker')")
 
 fun main() {
-    val graph = createGraphFactory<OrpheusGraph.Factory>().create()
+    val graph = createGraphFactory<OrpheusGraphWasm.Factory>().create()
 
     // Wire up logging to UI
     KmLogging.addLogger(graph.consoleLogger)
+
+    // Eagerly initialize PlaybackController so its init {} subscribes to flows at
+    // startup. The browser has a real media session (navigator.mediaSession), so
+    // this is not Android-only.
+    graph.playbackController
+    // Eagerly initialize PulsarPlaybackBridge. It is the only caller of
+    // setPulsarActive, so without it Pulsar never registers as an audio-activity
+    // source and the OS media controls drop while the beat machine is running.
+    graph.pulsarPlaybackBridge
+    // Eagerly initialize PulsarSongEnding so its init {} collectors observe
+    // playback/arrangement state at startup. Without this touch the singleton
+    // is never created and song-ending stays silently disabled.
+    graph.pulsarSongEnding
+    // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
+    // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
+    graph.pulsarSongAdvancer
 
     val useWorker = !jsHasNoWorkerFlag()
     var workerProxy: DspWorkerProxy? = null

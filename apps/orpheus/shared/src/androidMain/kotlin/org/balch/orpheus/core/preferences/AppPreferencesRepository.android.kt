@@ -2,7 +2,9 @@ package org.balch.orpheus.core.preferences
 
 import android.content.Context
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import java.io.File
@@ -12,6 +14,7 @@ import java.io.File
  * Stores preferences as JSON in the app's files directory.
  * Context is injected via DI.
  */
+@SingleIn(AppScope::class)
 @Inject
 class AndroidAppPreferencesRepository(
     private val context: Context

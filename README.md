@@ -153,6 +153,12 @@ build-logic/         Convention plugins for consistent KMP module config
 
 Every DSP module implements `DspPlugin` and declares its ports through a type-safe Kotlin DSL. Plugins register via [Metro](https://github.com/ZacSweers/metro) DI with `@ContributesIntoSet` and are discovered at compile time. No runtime reflection, no service loaders.
 
+### Dependency Injection
+
+Three scopes: `AppScope` holds the audio engine and repositories, a `FeatureScope` child graph holds every feature ViewModel and AI tool, and `HeaderPanelScope` materializes the Orpheus panel set. Feature modules contribute to `FeatureScope` and never reference an app, so both apps share the same 20+ feature modules and differ only in bindings (wiring graph, restore strategy, playback mode, metadata producer).
+
+Each platform declares its own `@DependencyGraph`, and the DJ app declares its in the entry modules. Metro merges contributions at the module declaring the graph, so placement determines what gets wired. Component tables, the per-app binding differences, and the eager-root list are in [di-architecture.md](docs/di-architecture.md).
+
 ### Event Routing
 
 `SynthController` is the central bus. Every control event carries an `origin` (`MIDI`, `UI`, `SEQUENCER`, `TIDAL`, `AI`, `EVO`) so the system knows who's driving a parameter and avoids conflicts. ViewModels observe `StateFlow` and update UI state based on events that happen throughout the system.

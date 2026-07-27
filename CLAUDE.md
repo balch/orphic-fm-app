@@ -12,6 +12,14 @@ When fixing bugs, trace the root cause through the full signal/data path before 
 
 For DSP code specifically: understand whether values are linear vs exponential, what buffer sizes are expected, and how the signal chain transforms data at each stage.
 
+## Dependency Injection
+
+See `docs/di-architecture.md` for the Metro layout: the seven `@DependencyGraph` declarations and
+where each is declared, the three scopes (`AppScope`, `FeatureScope`, `HeaderPanelScope`), the
+supporting types (`FeatureGraphHolder`, `FeatureCollection`, `SynthFeatureRegistry`,
+`InjectedViewModelFactory`), the per-app binding differences, the eager-root list, and the
+constraints (`T` vs `T?` type keys, unscopable `@Binds`, `() -> T` for AppScope-to-FeatureScope).
+
 ## ViewModel Pattern
 
 See `.claude/skills/panel-viewmodel-feature/` for the full MVI pattern (Symbol -> Plugin -> ViewModel -> Panel -> Registration), DI annotations, viz integration, and new module checklist. Canonical reference: `LfoViewModel.kt` in `features/lfo/`.

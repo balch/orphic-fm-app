@@ -13,12 +13,6 @@ import org.balch.orpheus.djapp.di.DjAppGraph
  *
  * Common members (including the eager Pulsar roots) are inherited from [DjAppGraph]; only the
  * factory is declared here.
- *
- * Known benign warning at build time:
- *   [Metro/SuspiciousUnusedMultibinding] Set<FeaturePanel> has N source bindings but no consumer at
- *   AppScope. The Set is consumed by HeaderViewModel inside the child ViewModelGraph (FeatureScope);
- *   Metro's analyzer aggregates at AppScope and doesn't trace into the child graph's consumers.
- *   Behavior is correct.
  */
 @DependencyGraph(AppScope::class)
 interface DjAppGraphDesktop : DjAppGraph {

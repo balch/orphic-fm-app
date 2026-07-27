@@ -10,7 +10,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.diamondedge.logging.KmLogging
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.createGraphFactory
-import org.balch.orpheus.di.OrpheusGraph
+import org.balch.orpheus.di.OrpheusGraphAndroid
 
 /**
  * Application class that holds the DI graph.
@@ -24,15 +24,15 @@ class OrpheusApplication : Application() {
 
     private val log = logging("OrpheusApplication")
 
-    lateinit var graph: OrpheusGraph
+    lateinit var graph: OrpheusGraphAndroid
         private set
-    
+
     override fun onCreate() {
         super.onCreate()
-        
+
         // Create the DI graph ONCE at Application level with Application
         // This survives Activity recreation on configuration changes
-        graph = createGraphFactory<OrpheusGraph.Factory>().create(
+        graph = createGraphFactory<OrpheusGraphAndroid.Factory>().create(
             this,
         )
 
