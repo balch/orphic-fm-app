@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -147,6 +148,10 @@ private class AnchoredMenuPositionProvider(private val gapPx: Int) : PopupPositi
  * Because a lazy list cannot report intrinsics, the menu needs an explicit [menuWidth] where
  * `DropdownMenu` auto-sized itself; entries wider than that ellipsize. M3 clamped its own
  * auto-width to 112dp..280dp, so that is the sensible range to pick from.
+ *
+ * An [OrpheusVerticalScrollbar] tinted with [color] rides the trailing edge, so a menu capped at
+ * [menuMaxHeight] reads as scrollable on sight instead of looking like the whole list. It hides
+ * itself when [entries] fits without scrolling, so short menus are unchanged.
  *
  * @param selectedDisplay display string of the current selection, matched against [displayName]
  *   to highlight and scroll to the active row.
@@ -288,33 +293,55 @@ private fun <T> EnumDropdownMenu(
             color = OrpheusColors.panelSurface,
             shadowElevation = MenuShadowElevation,
         ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .width(menuWidth)
-                    .heightIn(max = menuMaxHeight)
-                    .padding(vertical = MenuContainerVerticalPadding),
-            ) {
-                items(entries.size) { index ->
-                    val entry = entries[index]
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = MenuRowMinHeight)
-                            .clickable { onSelected(entry) }
-                            .padding(horizontal = MenuRowHorizontalPadding),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        // Selection reads as accent-colored label only, exactly as the old
-                        // DropdownMenuItem did. No background tint, no weight change.
-                        Text(
-                            text = displayName(entry),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (index == selectedIndex) color else Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+            Box {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .width(menuWidth)
+                        .heightIn(max = menuMaxHeight)
+                        .padding(vertical = MenuContainerVerticalPadding),
+                ) {
+                    items(entries.size) { index ->
+                        val entry = entries[index]
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = MenuRowMinHeight)
+                                .clickable { onSelected(entry) }
+                                .padding(horizontal = MenuRowHorizontalPadding),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            // Selection reads as accent-colored label only, exactly as the old
+                            // DropdownMenuItem did. No background tint, no weight change.
+                            Text(
+                                text = displayName(entry),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (index == selectedIndex) color else Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
+                }
+
+                // The bar cannot simply fillMaxHeight() alongside the list: this Box wraps its
+                // content, and a LazyColumn reports no intrinsics, so no resolved height exists
+                // to fill until the list is measured. matchParentSize() reads the Box's final
+                // size without feeding back into it, and the inner alignment then parks the bar
+                // on the trailing edge at its own thickness. Vertical padding matches the list's
+                // so the track lines up with the scrolling viewport rather than the surface.
+                // Rows inset their text by 12dp, which clears the 8dp bar.
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .padding(vertical = MenuContainerVerticalPadding),
+                    contentAlignment = Alignment.TopEnd,
+                ) {
+                    OrpheusVerticalScrollbar(
+                        state = listState,
+                        modifier = Modifier.fillMaxHeight(),
+                        color = color,
+                    )
                 }
             }
         }
@@ -330,6 +357,29 @@ private fun EnumDropdownPreview() {
                 label = "VIBE",
                 selectedDisplay = "Dog House",
                 entries = listOf("Bell Tolls", "Dog House", "Filter Funk", "Lost In Space"),
+                displayName = { it },
+                onSelected = {},
+                color = OrpheusColors.cosmicPurple,
+            )
+        }
+    }
+}
+
+/**
+ * Catalog-sized menu, so the scrollbar is actually on screen.
+ *
+ * The four-entry preview above never overflows [menuMaxHeight], which means it never renders an
+ * [OrpheusVerticalScrollbar] at all and can't catch a regression in the thumb.
+ */
+@Preview
+@Composable
+private fun EnumDropdownLongListPreview() {
+    OrpheusTheme {
+        Box(Modifier.background(OrpheusColors.blackHoleBackground).padding(16.dp)) {
+            EnumDropdown(
+                label = "VIBE",
+                selectedDisplay = "Vibe 24",
+                entries = List(47) { "Vibe ${it + 1}" },
                 displayName = { it },
                 onSelected = {},
                 color = OrpheusColors.cosmicPurple,
