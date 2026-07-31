@@ -2,7 +2,6 @@ package org.balch.orpheus.features.tides
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -21,6 +20,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.TidesSymbol
 
@@ -141,7 +141,7 @@ interface TidesFeature : SynthFeature<TidesUiState, TidesPanelActions> {
  * clock/gate routing.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(TidesFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class TidesViewModel(
     synthController: SynthController,
@@ -230,6 +230,6 @@ class TidesViewModel(
             }
 
         @Composable
-        fun feature(): TidesFeature = synthFeature<TidesViewModel, TidesFeature>()
+        fun feature(): TidesFeature = synthFeature<TidesFeature>()
     }
 }

@@ -152,7 +152,7 @@ interface TidesFeature : SynthFeature<TidesUiState, TidesPanelActions> {
 **5. ViewModel class**:
 ```kotlin
 @Inject
-@ClassKey(TidesViewModel::class)
+@SynthFeatureKey(TidesFeature::class)   // key by the INTERFACE, not the ViewModel
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class TidesViewModel(
     private val synthController: SynthController,
@@ -195,7 +195,7 @@ class TidesViewModel(
             }
 
         @Composable
-        fun feature(): TidesFeature = synthFeature<TidesViewModel, TidesFeature>()
+        fun feature(): TidesFeature = synthFeature<TidesFeature>()
     }
 }
 ```
@@ -349,7 +349,7 @@ companion object {
 - [ ] Plugin in `core/plugins/<name>/` with `@ContributesIntoSet(..., binding = binding<DspPlugin>())`
 - [ ] PanelId added to `FeaturePanel.kt` companion
 - [ ] Feature interface extending `SynthFeature<S, A>` with `SynthControlDescriptor`
-- [ ] ViewModel with `@ClassKey` + `@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())`
+- [ ] ViewModel with `@SynthFeatureKey(<Name>Feature::class)` + `@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())` — the key is the feature **interface**, which is also what `synthFeature<<Name>Feature>()` asks for
 - [ ] Panel composable consuming feature flows and actions
 - [ ] PanelRegistration with `@ContributesIntoSet(..., binding = binding<FeaturePanel>())`
 - [ ] Viz flows added to SynthEngine interface + SignalMonitorViz

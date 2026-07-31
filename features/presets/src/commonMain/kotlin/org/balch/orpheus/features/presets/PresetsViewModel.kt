@@ -3,7 +3,6 @@ package org.balch.orpheus.features.presets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -19,6 +18,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
@@ -77,7 +77,7 @@ interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
  * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(PresetsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class PresetsViewModel(
     private val presetsRepository: PresetsRepository,
@@ -264,6 +264,6 @@ class PresetsViewModel(
 
         @Composable
         fun feature(): PresetsFeature =
-            synthFeature<PresetsViewModel, PresetsFeature>()
+            synthFeature<PresetsFeature>()
     }
 }

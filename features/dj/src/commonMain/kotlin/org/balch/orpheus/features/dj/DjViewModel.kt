@@ -3,7 +3,6 @@ package org.balch.orpheus.features.dj
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -30,6 +29,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.DjDrop
@@ -141,7 +141,7 @@ private sealed interface DjIntent {
  * Includes a physics coroutine that simulates platter motor/friction behavior at ~60Hz.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(DjFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DjViewModel(
     synthController: SynthController,
@@ -436,6 +436,6 @@ class DjViewModel(
 
         @Composable
         fun feature(): DjFeature =
-            synthFeature<DjViewModel, DjFeature>()
+            synthFeature<DjFeature>()
     }
 }

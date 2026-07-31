@@ -2,7 +2,6 @@ package org.balch.orpheus.features.timer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -25,6 +24,7 @@ import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -88,7 +88,7 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
 }
 
 @Inject
-@ClassKey
+@SynthFeatureKey(TimerFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class TimerViewModel(
     private val synthEngine: SynthEngine,
@@ -308,6 +308,6 @@ class TimerViewModel(
             }
 
         @Composable
-        fun feature(): TimerFeature = synthFeature<TimerViewModel, TimerFeature>()
+        fun feature(): TimerFeature = synthFeature<TimerFeature>()
     }
 }

@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.visualizations
 
 import androidx.compose.runtime.Composable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -17,6 +16,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
@@ -75,7 +75,7 @@ interface VizFeature : SynthFeature<VizUiState, VizPanelActions> {
  * dispatched to [DispatcherProvider.default].
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(VizFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class VizViewModel(
     visualizations: Set<Visualization>,
@@ -278,6 +278,6 @@ class VizViewModel(
 
         @Composable
         fun feature(): VizFeature =
-            synthFeature<VizViewModel, VizFeature>()
+            synthFeature<VizFeature>()
     }
 }

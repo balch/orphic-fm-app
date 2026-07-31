@@ -19,12 +19,9 @@ import org.balch.orpheus.core.playback.OverlaySubtitleProducer
 import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.core.playback.SkipHandler
 import org.balch.orpheus.features.ai.AiOptionsFeature
-import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.playback.PulsarSkipHandler
 import org.balch.orpheus.features.timer.TimerFeature
-import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 import org.balch.orpheus.playback.OrpheusMetadataProducer
 
@@ -76,17 +73,17 @@ interface OrpheusModule {
         @Provides
         @SingleIn(AppScope::class)
         fun providePulsarFeature(holder: FeatureGraphHolder): PulsarFeature =
-            holder.featureGraph.featureCollection.getFeature(PulsarViewModel::class)
+            holder.featureGraph.featureCollection.getFeature(PulsarFeature::class)
 
         @Provides
         @SingleIn(AppScope::class)
         fun provideTimerFeature(holder: FeatureGraphHolder): TimerFeature =
-            holder.featureGraph.featureCollection.getFeature(TimerViewModel::class)
+            holder.featureGraph.featureCollection.getFeature(TimerFeature::class)
 
         @Provides
         @SingleIn(AppScope::class)
         fun provideAiOptionsFeature(holder: FeatureGraphHolder): AiOptionsFeature =
-            holder.featureGraph.featureCollection.getFeature(AiOptionsViewModel::class)
+            holder.featureGraph.featureCollection.getFeature(AiOptionsFeature::class)
 
         /**
          * No `@Binds` counterpart: Orpheus has no media-ID browse tree, so this is an explicit

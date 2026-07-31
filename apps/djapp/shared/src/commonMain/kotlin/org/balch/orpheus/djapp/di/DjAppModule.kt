@@ -18,12 +18,10 @@ import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.core.playback.SkipHandler
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
 import org.balch.orpheus.features.pulsar.playback.PulsarSkipHandler
 import org.balch.orpheus.features.pulsar.playback.PulsarVibePicker
 import org.balch.orpheus.features.timer.TimerFeature
-import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 
 @ContributesTo(AppScope::class)
@@ -69,11 +67,11 @@ interface DjAppModule {
         @Provides
         @SingleIn(AppScope::class)
         fun providePulsarFeature(holder: FeatureGraphHolder): PulsarFeature =
-            holder.featureGraph.featureCollection.getFeature(PulsarViewModel::class)
+            holder.featureGraph.featureCollection.getFeature(PulsarFeature::class)
 
         @Provides
         @SingleIn(AppScope::class)
         fun provideTimerFeature(holder: FeatureGraphHolder): TimerFeature =
-            holder.featureGraph.featureCollection.getFeature(TimerViewModel::class)
+            holder.featureGraph.featureCollection.getFeature(TimerFeature::class)
     }
 }

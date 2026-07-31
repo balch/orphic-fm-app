@@ -2,7 +2,6 @@ package org.balch.orpheus.features.lfo
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -24,6 +23,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
@@ -166,7 +166,7 @@ interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
  * Knob values (0..1) map exponentially to frequency (0..10 Hz) for DuoLFO.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(LfoFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LfoViewModel(
     private val synthController: SynthController,
@@ -344,6 +344,6 @@ class LfoViewModel(
 
         @Composable
         fun feature(): LfoFeature =
-            synthFeature<LfoViewModel, LfoFeature>()
+            synthFeature<LfoFeature>()
     }
 }

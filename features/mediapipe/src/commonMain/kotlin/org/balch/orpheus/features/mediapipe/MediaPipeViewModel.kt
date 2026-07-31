@@ -3,7 +3,6 @@ package org.balch.orpheus.features.mediapipe
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -25,6 +24,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.gestures.AslCategory
 import org.balch.orpheus.core.gestures.AslEvent
@@ -140,7 +140,7 @@ interface MediaPipeFeature : SynthFeature<MediaPipeUiState, MediaPipePanelAction
  * via AslInteractionEngine and SynthController.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(MediaPipeFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class MediaPipeViewModel(
     private val handTracker: HandTracker,
@@ -886,6 +886,6 @@ class MediaPipeViewModel(
 
         @Composable
         fun feature(): MediaPipeFeature =
-            synthFeature<MediaPipeViewModel, MediaPipeFeature>()
+            synthFeature<MediaPipeFeature>()
     }
 }

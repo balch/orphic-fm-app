@@ -89,14 +89,19 @@ interface SynthFeature<S, A> {
  * Retrieve a feature from the [SynthFeatureRegistry] via [LocalSynthFeatures].
  * Used as default parameter values in panel composables.
  *
- * Usage: `val feature: MyFeature = synthFeature<MyViewModel, MyFeature>()`
+ * Usage: `val feature: LfoFeature = synthFeature<LfoFeature>()`
+ *
+ * The type argument is the feature interface, which is also its [SynthFeatureKey]. Naming it
+ * once is what makes this safe: the older two-parameter form took the ViewModel class *and*
+ * the return type as unrelated type parameters, so `synthFeature<LfoViewModel, DelayFeature>()`
+ * compiled and threw `ClassCastException` at first composition. Asking for the wrong feature is
+ * now a compile error.
+ *
+ * One case is still only caught at runtime: a ViewModel implements its feature interface, so it
+ * satisfies the `SynthFeature<*, *>` bound and `synthFeature<LfoViewModel>()` compiles. It is not
+ * the registered key, so it fails on first composition with a message naming the class. Always
+ * name the **interface**, never the ViewModel.
  */
-@Suppress("UNCHECKED_CAST")
 @Composable
-inline fun <reified F : Any, S, A> synthFeature(): SynthFeature<S, A> =
-    LocalSynthFeatures.current.getFeature<SynthFeature<S, A>>(F::class)
-
-@Suppress("UNCHECKED_CAST")
-@Composable
-inline fun <reified F : Any, R> synthFeature(): R =
-    LocalSynthFeatures.current.getFeature<R>(F::class)
+inline fun <reified F : SynthFeature<*, *>> synthFeature(): F =
+    LocalSynthFeatures.current.getFeature(F::class)

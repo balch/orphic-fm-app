@@ -34,12 +34,12 @@ class SynthFeatureRegistry(
 ) : ViewModel() {
     private val collection: FeatureCollection = holder.featureGraph.featureCollection
 
-    fun <T> getFeature(key: KClass<*>): T = collection.getFeature(key)
+    fun <T : SynthFeature<*, *>> getFeature(key: KClass<T>): T = collection.getFeature(key)
 
     val allFeatures: Collection<SynthFeature<*, *>> get() = collection.allFeatures
 
     val keyActions: Map<Key, List<KeyBinding>> get() = collection.keyActions
 }
 
-/** Typed convenience — usage: `registry.feature<VoiceViewModel, VoicesFeature>()` */
-inline fun <reified VM : Any, reified F> SynthFeatureRegistry.feature(): F = getFeature(VM::class)
+/** Typed convenience — usage: `registry.feature<VoicesFeature>()` */
+inline fun <reified F : SynthFeature<*, *>> SynthFeatureRegistry.feature(): F = getFeature(F::class)

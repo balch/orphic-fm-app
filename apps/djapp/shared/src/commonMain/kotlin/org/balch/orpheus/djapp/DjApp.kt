@@ -25,9 +25,7 @@ import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.djapp.di.DjAppGraph
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
-import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
@@ -51,7 +49,7 @@ fun DjApp(
         CompositionLocalProvider(LocalSynthFeatures provides registry) {
             val liquidState = rememberLiquidState()
             val dialogLiquidState = rememberLiquidState()
-            val vizFeature: VizFeature = registry.feature<VizViewModel, VizFeature>()
+            val vizFeature: VizFeature = registry.feature<VizFeature>()
             val vizState by vizFeature.stateFlow.collectAsState()
             val liquidEffects = vizState.liquidEffects
 
@@ -85,7 +83,7 @@ fun DjApp(
             }
 
             // Pick a new random visualization on each vibe transition
-            val pulsarFeature: PulsarFeature = registry.feature<PulsarViewModel, PulsarFeature>()
+            val pulsarFeature: PulsarFeature = registry.feature<PulsarFeature>()
             LaunchedEffect(Unit) {
                 pulsarFeature.vibeFlow
                     .distinctUntilChangedBy { it.name }

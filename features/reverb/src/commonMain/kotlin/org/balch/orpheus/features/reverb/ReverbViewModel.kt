@@ -2,7 +2,6 @@ package org.balch.orpheus.features.reverb
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -23,6 +22,7 @@ import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
@@ -95,7 +95,7 @@ interface ReverbFeature : SynthFeature<ReverbUiState, ReverbPanelActions> {
 }
 
 @Inject
-@ClassKey
+@SynthFeatureKey(ReverbFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class ReverbViewModel(
     synthController: SynthController,
@@ -169,6 +169,6 @@ class ReverbViewModel(
 
         @Composable
         fun feature(): ReverbFeature =
-            synthFeature<ReverbViewModel, ReverbFeature>()
+            synthFeature<ReverbFeature>()
     }
 }

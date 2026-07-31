@@ -3,7 +3,6 @@ package org.balch.orpheus.features.ai
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -17,6 +16,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEvent
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
@@ -88,7 +88,7 @@ internal fun instrumentLines(vibe: Vibe): List<String> =
     vibe.tracks.mapIndexed { i, t -> "t$i  ${t.engineEdm.engineId}  ${t.role::class.simpleName}" }
 
 @Inject
-@ClassKey
+@SynthFeatureKey(VibeCreateFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class VibeCreateViewModel(
     private val agent: OrpheusAgent,
@@ -147,6 +147,6 @@ class VibeCreateViewModel(
 
         @Composable
         fun feature(): VibeCreateFeature =
-            synthFeature<VibeCreateViewModel, VibeCreateUiState, VibeCreatePanelActions>() as VibeCreateFeature
+            synthFeature<VibeCreateFeature>()
     }
 }

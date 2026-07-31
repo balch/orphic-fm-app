@@ -69,14 +69,14 @@ fun CompactPortraitScreen(
     modifier: Modifier = Modifier,
 ) {
     val registry = LocalSynthFeatures.current
-    val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeViewModel, MediaPipeFeature>()
+    val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeFeature>()
     CompactPortraitLayout(
-        headerFeature = registry.feature<HeaderViewModel, HeaderFeature>(),
-        voiceFeature = registry.feature<VoiceViewModel, VoicesFeature>(),
-        vizFeature = registry.feature<VizViewModel, VizFeature>(),
-        distortionFeature = registry.feature<DistortionViewModel, DistortionFeature>(),
-        aiFeature = registry.feature<AiOptionsViewModel, AiOptionsFeature>(),
-        chatFeature = registry.feature<ChatViewModel, ChatFeature>(),
+        headerFeature = registry.feature<HeaderFeature>(),
+        voiceFeature = registry.feature<VoicesFeature>(),
+        vizFeature = registry.feature<VizFeature>(),
+        distortionFeature = registry.feature<DistortionFeature>(),
+        aiFeature = registry.feature<AiOptionsFeature>(),
+        chatFeature = registry.feature<ChatFeature>(),
         mediaPipeFeature = mediaPipeFeature,
         keyActions = registry.keyActions,
         modifier = modifier,

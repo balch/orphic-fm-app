@@ -2,7 +2,6 @@ package org.balch.orpheus.features.bass
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -25,6 +24,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.BassSymbol
 
@@ -155,7 +155,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(BassFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class BassViewModel(
     synthController: SynthController,
@@ -290,6 +290,6 @@ class BassViewModel(
 
         @Composable
         fun feature(): BassFeature =
-            synthFeature<BassViewModel, BassFeature>()
+            synthFeature<BassFeature>()
     }
 }

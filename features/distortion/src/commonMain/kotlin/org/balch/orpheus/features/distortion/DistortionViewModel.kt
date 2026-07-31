@@ -2,7 +2,6 @@ package org.balch.orpheus.features.distortion
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -26,6 +25,7 @@ import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
@@ -105,7 +105,7 @@ interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelAct
  * Keeps SynthEngine dependency for peakFlow monitoring and StereoMode (non-port state).
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(DistortionFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DistortionViewModel(
     private val engine: SynthEngine,
@@ -205,6 +205,6 @@ class DistortionViewModel(
 
         @Composable
         fun feature(): DistortionFeature =
-            synthFeature<DistortionViewModel, DistortionFeature>()
+            synthFeature<DistortionFeature>()
     }
 }

@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.key.Key
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -25,6 +24,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.input.KeyAction
 import org.balch.orpheus.core.input.KeyBinding
@@ -129,7 +129,7 @@ interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
 }
 
 @Inject
-@ClassKey
+@SynthFeatureKey(SpeechFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class SpeechViewModel(
     synthController: SynthController,
@@ -363,6 +363,6 @@ class SpeechViewModel(
 
         @Composable
         fun feature(): SpeechFeature =
-            synthFeature<SpeechViewModel, SpeechFeature>()
+            synthFeature<SpeechFeature>()
     }
 }

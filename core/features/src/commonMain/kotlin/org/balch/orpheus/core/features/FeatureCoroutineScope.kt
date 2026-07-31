@@ -10,8 +10,11 @@ import org.balch.orpheus.core.di.FeatureScope
 /**
  * Shared coroutine scope for all [SynthFeature] instances.
  *
- * Replaces `viewModelScope` from ViewModel. Cancelled by [SynthFeatureRegistry.onCleared]
- * when the app's ViewModelStore is cleared.
+ * Replaces `viewModelScope` from ViewModel.
+ *
+ * Lifecycle: nothing calls [cancel] in production. [SynthFeatureRegistry] deliberately does not
+ * override `onCleared()` (see its KDoc), so this scope lives for the process. [cancel] and
+ * [onCleared] exist for tests and for any future owner with a real teardown point.
  */
 @SingleIn(FeatureScope::class)
 @Inject

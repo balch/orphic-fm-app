@@ -16,7 +16,6 @@ import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.models.Album
 import java.util.Locale
 
@@ -29,7 +28,7 @@ class DjMediaLibraryService : MediaLibraryService() {
         try {
             val graph = DjAppApplication.getGraph(this)
             graph.featureGraphHolder.featureGraph.featureCollection
-                .getFeature<PulsarFeature>(PulsarViewModel::class)
+                .getFeature(PulsarFeature::class)
         } catch (e: Exception) {
             log.warn { "PulsarFeature not available: ${e.message}" }
             null

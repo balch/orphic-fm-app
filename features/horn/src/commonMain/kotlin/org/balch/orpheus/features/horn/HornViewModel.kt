@@ -2,7 +2,6 @@ package org.balch.orpheus.features.horn
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -24,6 +23,7 @@ import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
@@ -102,7 +102,7 @@ interface HornFeature : SynthFeature<HornUiState, HornPanelActions> {
 }
 
 @Inject
-@ClassKey
+@SynthFeatureKey(HornFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class HornViewModel(
     synthController: SynthController,
@@ -181,6 +181,6 @@ class HornViewModel(
 
         @Composable
         fun feature(): HornFeature =
-            synthFeature<HornViewModel, HornFeature>()
+            synthFeature<HornFeature>()
     }
 }

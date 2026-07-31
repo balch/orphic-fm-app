@@ -2,7 +2,6 @@ package org.balch.orpheus.features.grains
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -23,6 +22,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
@@ -130,7 +130,7 @@ interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(GrainsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class GrainsViewModel(
     synthController: SynthController,
@@ -232,6 +232,6 @@ class GrainsViewModel(
 
         @Composable
         fun feature(): GrainsFeature =
-            synthFeature<GrainsViewModel, GrainsFeature>()
+            synthFeature<GrainsFeature>()
     }
 }

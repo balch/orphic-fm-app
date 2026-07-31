@@ -20,16 +20,12 @@ import org.balch.orpheus.core.features.SynthFeatureRegistry
 import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.di.OrpheusGraph
 import org.balch.orpheus.features.ai.AiOptionsFeature
-import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.ChatDialog
 import org.balch.orpheus.features.debug.DebugBottomBar
 import org.balch.orpheus.features.debug.DebugFeature
-import org.balch.orpheus.features.debug.DebugViewModel
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerOverlay
-import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
-import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
@@ -51,7 +47,7 @@ fun App(
         val registry: SynthFeatureRegistry = metroViewModel()
 
         CompositionLocalProvider(LocalSynthFeatures provides registry) {
-            val vizFeature: VizFeature = registry.feature<VizViewModel, VizFeature>()
+            val vizFeature: VizFeature = registry.feature<VizFeature>()
             val vizState by vizFeature.stateFlow.collectAsState()
             val liquidState = rememberLiquidState()
 
@@ -62,8 +58,8 @@ fun App(
             val dialogLiquidState = rememberLiquidState()
 
             // Get AI feature for chat dialog state
-            val aiFeature: AiOptionsFeature = registry.feature<AiOptionsViewModel, AiOptionsFeature>()
-            val timerFeature: TimerFeature = registry.feature<TimerViewModel, TimerFeature>()
+            val aiFeature: AiOptionsFeature = registry.feature<AiOptionsFeature>()
+            val timerFeature: TimerFeature = registry.feature<TimerFeature>()
             val aiState by aiFeature.stateFlow.collectAsState()
             val showChatDialog = aiState.showChatDialog
             val dialogPosition = aiState.dialogPosition
@@ -110,7 +106,7 @@ fun App(
 
                                 // Persistent Debug Bar
                                 DebugBottomBar(
-                                    debugFeature = registry.feature<DebugViewModel, DebugFeature>(),
+                                    debugFeature = registry.feature<DebugFeature>(),
                                 )
                             }
                         }

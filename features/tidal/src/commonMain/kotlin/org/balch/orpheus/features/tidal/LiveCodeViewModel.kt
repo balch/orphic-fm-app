@@ -5,7 +5,6 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -21,6 +20,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
@@ -107,7 +107,7 @@ sealed class LiveCodeIntent {
  * Delegates to TidalRepl for REPL evaluation lifecycle.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(LiveCodeFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
@@ -704,6 +704,6 @@ d4 $ slow 2 $ note "<c2 g2 e2 b2>"
 
         @Composable
         fun feature(): LiveCodeFeature =
-             synthFeature<LiveCodeViewModel, LiveCodeUiState, LiveCodePanelActions>() as LiveCodeFeature
+             synthFeature<LiveCodeFeature>()
     }
 }

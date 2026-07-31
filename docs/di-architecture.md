@@ -82,7 +82,8 @@ merged and no synthetic Set is emitted.
 | Type | Scope | Why it exists |
 |---|---|---|
 | `FeatureGraphHolder` | `AppScope` | Calls `FeatureGraph.Factory.create()` once behind a `lazy` and caches it. Without it, the Compose tree and the Android `MediaBrowserService` would each build their own child graph and their own `PulsarViewModel`, and the second one's `init` would overwrite `MediaSessionManager`'s callback slots. |
-| `FeatureCollection` | `FeatureScope` | Owns the `KClass -> () -> SynthFeature` provider map, creates features on first access, caches them under a reentrant lock, and closes `AutoCloseable` features on teardown. |
+| `FeatureCollection` | `FeatureScope` | Owns the `KClass<out SynthFeature<*, *>> -> () -> SynthFeature` provider map, creates features on first access, and caches them under a reentrant lock. |
+| `SynthFeatureKey` | n/a | Map key for the feature multibinding, typed `KClass<out SynthFeature<*, *>>`. Features register under their **public interface**, so the key and the looked-up type are the same symbol. |
 | `SynthFeatureRegistry` | `AppScope`, in the ViewModel map | A `ViewModel`-shaped accessor so Compose can reach the feature graph through `ViewModelStore`. Deliberately does not override `onCleared`, because the graph outlives the Activity. |
 | `InjectedViewModelFactory` | `AppScope` | Backs `MetroViewModelFactory` from the three `MetroViewModelMultibindings` maps. Lives in `:core:features` so both apps get it with no per-app wiring. |
 | `HeaderPanelGraph` | `HeaderPanelScope` | Materializes `Set<FeaturePanel>`. Created by `HeaderViewModel`. |
@@ -108,8 +109,8 @@ Say you want an A/B deck with two Pulsar panels side by side. The DI side is one
 val deckA = featureGraphFactory.create()
 val deckB = featureGraphFactory.create()
 
-val pulsarA: PulsarFeature = deckA.featureCollection.getFeature(PulsarViewModel::class)
-val pulsarB: PulsarFeature = deckB.featureCollection.getFeature(PulsarViewModel::class)
+val pulsarA: PulsarFeature = deckA.featureCollection.getFeature(PulsarFeature::class)
+val pulsarB: PulsarFeature = deckB.featureCollection.getFeature(PulsarFeature::class)
 // pulsarA !== pulsarB
 ```
 
@@ -138,15 +139,26 @@ audio path is the actual work.
 
 ### Why feature ViewModels are not `@SingleIn(FeatureScope::class)`
 
-They are unscoped, and `FeatureCollection` is what makes them single-instance. This is deliberate:
-`FeatureCollection.close()` closes every `AutoCloseable` feature and clears the cache. If the
-ViewModels were FeatureScope singletons, the graph would keep handing back the closed instances after
+They are unscoped, and `FeatureCollection` is what makes them single-instance. The original reason:
+`FeatureCollection.close()` closes every `AutoCloseable` feature and clears the cache, so if the
+ViewModels were FeatureScope singletons the graph would keep handing back closed instances after
 that. Unscoped means the next `getFeature()` builds a fresh one.
 
-The invariant this depends on: **do not inject a feature ViewModel by its concrete type.** That
-bypasses the cache and yields a second unscoped instance the UI does not observe. Go through
-`FeatureCollection`, or through the `PulsarFeature` / `TimerFeature` / `AiOptionsFeature` providers in
-the app module.
+**That hazard is currently theoretical.** Nothing calls `FeatureCollection.close()` in production.
+`SynthFeatureRegistry` deliberately does not override `onCleared()` (the graph it exposes is
+AppScope-scoped and outlives the Activity), so process death is the only teardown. Six features
+implement `AutoCloseable` — `AiOptionsViewModel`, `DrumBeatsViewModel`, `EvoViewModel`,
+`LiveCodeViewModel`, `MidiViewModel`, `VizViewModel` — and none of them are ever closed.
+
+So the unscoped choice is not currently buying what this section says it buys. Scoping the
+ViewModels to `FeatureScope` and injecting the feature interfaces directly would let Metro verify
+each one at compile time instead of at first composition. That is a live option, not a defect;
+it is written down here so the next person weighs it rather than inheriting the constraint.
+
+Until that changes, the invariant still holds: **do not inject a feature ViewModel by its concrete
+type.** That bypasses the cache and yields a second unscoped instance the UI does not observe. Go
+through `FeatureCollection`, or through the `PulsarFeature` / `TimerFeature` / `AiOptionsFeature`
+providers in the app module.
 
 ## What the two apps wire differently
 

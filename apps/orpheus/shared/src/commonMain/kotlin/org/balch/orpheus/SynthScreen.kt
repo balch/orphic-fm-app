@@ -19,7 +19,6 @@ import org.balch.orpheus.core.midi.LearnTarget
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
 import org.balch.orpheus.features.midi.MidiFeature
-import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen
@@ -73,7 +72,7 @@ fun SynthScreen(
     var isDialogActive by remember { mutableStateOf(false) }
 
     val registry = LocalSynthFeatures.current
-    val midiFeature: MidiFeature = registry.feature<MidiViewModel, MidiFeature>()
+    val midiFeature: MidiFeature = registry.feature<MidiFeature>()
     val midiState by midiFeature.stateFlow.collectAsState()
 
     val highlightedControls by controlHighlightEventBus.highlightedControls.collectAsState()

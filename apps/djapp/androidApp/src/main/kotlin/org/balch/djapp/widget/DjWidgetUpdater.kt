@@ -12,9 +12,7 @@ import kotlinx.coroutines.launch
 import org.balch.djapp.DjAppGraphAndroid
 import org.balch.orpheus.djapp.widget.DjWidgetRefresh
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.timer.TimerFeature
-import org.balch.orpheus.features.timer.TimerViewModel
 
 /**
  * Observes playback / vibe / artwork / timer state and refreshes the
@@ -37,8 +35,8 @@ class DjWidgetUpdater(
             // by the time Application.onCreate runs this, so give up if it throws.
             val sources = runCatching {
                 val collection = graph.featureGraphHolder.featureGraph.featureCollection
-                val pulsar = collection.getFeature<PulsarFeature>(PulsarViewModel::class)
-                val timer = collection.getFeature<TimerFeature>(TimerViewModel::class)
+                val pulsar = collection.getFeature(PulsarFeature::class)
+                val timer = collection.getFeature(TimerFeature::class)
                 listOf(
                     graph.playbackController.state,
                     pulsar.vibeFlow,

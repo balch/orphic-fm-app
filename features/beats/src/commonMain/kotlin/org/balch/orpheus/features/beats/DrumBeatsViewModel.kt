@@ -2,7 +2,6 @@ package org.balch.orpheus.features.beats
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -25,6 +24,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
@@ -125,7 +125,7 @@ interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
  * PatternGenerator state is updated as a side effect alongside controlFlow-driven state changes.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(DrumBeatsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DrumBeatsViewModel(
     private val synthEngine: SynthEngine,
@@ -345,7 +345,7 @@ class DrumBeatsViewModel(
 
         @Composable
         fun feature(): DrumBeatsFeature =
-            synthFeature<DrumBeatsViewModel, DrumBeatsFeature>()
+            synthFeature<DrumBeatsFeature>()
     }
 }
 

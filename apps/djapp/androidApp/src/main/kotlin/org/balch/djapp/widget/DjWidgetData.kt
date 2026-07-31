@@ -7,7 +7,6 @@ import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerUiState
-import org.balch.orpheus.features.timer.TimerViewModel
 
 /**
  * Resolves the live DI-graph state flows the widget renders from.
@@ -39,7 +38,7 @@ object DjWidgetData {
         val graph = (context.applicationContext as DjAppApplication).graph
         val metadata: MetadataProducer = graph.metadataProducer
         val timer = graph.featureGraphHolder.featureGraph.featureCollection
-            .getFeature<TimerFeature>(TimerViewModel::class)
+            .getFeature(TimerFeature::class)
         return Sources(
             title = metadata.titleFlow,        // vibe name
             subtitle = metadata.subtitleFlow,  // album title

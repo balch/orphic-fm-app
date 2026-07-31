@@ -2,7 +2,6 @@ package org.balch.orpheus.features.warps
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -22,6 +21,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
@@ -110,7 +110,7 @@ interface WarpsFeature : SynthFeature<WarpsUiState, WarpsPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(WarpsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class WarpsViewModel(
     synthController: SynthController,
@@ -193,6 +193,6 @@ class WarpsViewModel(
 
         @Composable
         fun feature(): WarpsFeature =
-            synthFeature<WarpsViewModel, WarpsFeature>()
+            synthFeature<WarpsFeature>()
     }
 }

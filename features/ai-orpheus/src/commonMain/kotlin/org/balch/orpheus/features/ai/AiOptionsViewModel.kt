@@ -2,7 +2,6 @@ package org.balch.orpheus.features.ai
 
 import androidx.compose.runtime.Composable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -35,6 +34,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
@@ -130,7 +130,7 @@ interface AiOptionsFeature : SynthFeature<AiOptionsUiState, AiOptionsPanelAction
  * - Chat: Open chat dialog
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(AiOptionsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
@@ -919,6 +919,6 @@ class AiOptionsViewModel(
 
         @Composable
         fun feature(): AiOptionsFeature =
-            synthFeature<AiOptionsViewModel, AiOptionsFeature>()
+            synthFeature<AiOptionsFeature>()
     }
 }

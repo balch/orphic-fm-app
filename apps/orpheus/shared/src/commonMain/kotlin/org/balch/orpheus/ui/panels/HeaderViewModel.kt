@@ -3,7 +3,6 @@ package org.balch.orpheus.ui.panels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -28,6 +27,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.panels.PanelSet
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
@@ -86,7 +86,7 @@ private sealed class HeaderIntent {
  */
 @OptIn(FlowPreview::class)
 @Inject
-@ClassKey
+@SynthFeatureKey(HeaderFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class HeaderViewModel(
     panelExpansionEventBus: PanelExpansionEventBus,
@@ -166,7 +166,7 @@ class HeaderViewModel(
                         is HeaderIntent.Single -> {
                             log.debug { "HeaderViewModel: setExpanded(${intent.panelId.id}, ${intent.expanded})" }
                             state.copy(
-                                expandedPanels = state.expandedPanels.put(intent.panelId, intent.expanded)
+                                expandedPanels = state.expandedPanels.putting(intent.panelId, intent.expanded)
                             )
                         }
                         is HeaderIntent.ApplySet -> buildInitialState(intent.panelSet)
@@ -247,6 +247,6 @@ class HeaderViewModel(
 
         @Composable
         fun feature(): HeaderFeature =
-            synthFeature<HeaderViewModel, HeaderFeature>()
+            synthFeature<HeaderFeature>()
     }
 }

@@ -24,13 +24,10 @@ import kotlinx.coroutines.delay
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.features.mediapipe.MediaPipeFeature
-import org.balch.orpheus.features.mediapipe.MediaPipeViewModel
 import org.balch.orpheus.features.midi.MidiFeature
-import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
 import org.balch.orpheus.features.voice.LeftPanelMode
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
-import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.ui.FactoryPanelSets
@@ -38,7 +35,6 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
-import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
@@ -53,10 +49,10 @@ fun DesktopSynthScreen(
     focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
     val registry = LocalSynthFeatures.current
-    val headerFeature: HeaderFeature = registry.feature<HeaderViewModel, HeaderFeature>()
-    val voiceFeature: VoicesFeature = registry.feature<VoiceViewModel, VoicesFeature>()
-    val midiFeature: MidiFeature = registry.feature<MidiViewModel, MidiFeature>()
-    val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeViewModel, MediaPipeFeature>()
+    val headerFeature: HeaderFeature = registry.feature<HeaderFeature>()
+    val voiceFeature: VoicesFeature = registry.feature<VoicesFeature>()
+    val midiFeature: MidiFeature = registry.feature<MidiFeature>()
+    val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeFeature>()
     val panels = remember { headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen) }
     val voiceState by voiceFeature.stateFlow.collectAsState()
     val rightQuad = voiceState.selectedRightQuad

@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.pulsar.mixer
 
 import androidx.compose.runtime.Composable
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -21,6 +20,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.engagement.EngagementAction
 import org.balch.orpheus.core.engagement.EngagementTracker
@@ -59,7 +59,7 @@ private sealed interface MixerIntent {
  * flow used by DistortionPanel.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(MixerFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class MixerViewModel(
     engine: SynthEngine,
@@ -222,6 +222,6 @@ class MixerViewModel(
 
         @Composable
         fun feature(): MixerFeature =
-            synthFeature<MixerViewModel, MixerFeature>()
+            synthFeature<MixerFeature>()
     }
 }

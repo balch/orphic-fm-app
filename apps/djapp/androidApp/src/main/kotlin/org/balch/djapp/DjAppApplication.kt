@@ -33,7 +33,7 @@ class DjAppApplication : Application() {
                 featureProvider = {
                     try {
                         graph.featureGraphHolder.featureGraph.featureCollection
-                            .getFeature<PulsarFeature>(PulsarViewModel::class)
+                            .getFeature(PulsarFeature::class)
                     } catch (_: Exception) { null }
                 },
             )

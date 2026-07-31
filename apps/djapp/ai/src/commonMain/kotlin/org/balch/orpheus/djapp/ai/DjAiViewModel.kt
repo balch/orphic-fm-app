@@ -2,7 +2,6 @@ package org.balch.orpheus.djapp.ai
 
 import androidx.compose.runtime.Composable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -21,6 +20,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.features.ai.AgentActivityEvent
@@ -227,7 +227,7 @@ internal fun reduceVibeEvent(e: VibeCreateEvent, s: DjAiUiState): DjAiUiState = 
  * pure reducers, and delegates key / model management to the shared repositories.
  */
 @Inject
-@ClassKey
+@SynthFeatureKey(DjAiFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DjAiViewModel(
     private val agent: OrpheusAgent,
@@ -389,6 +389,6 @@ class DjAiViewModel(
 
         @Composable
         fun feature(): DjAiFeature =
-            synthFeature<DjAiViewModel, DjAiFeature>()
+            synthFeature<DjAiFeature>()
     }
 }

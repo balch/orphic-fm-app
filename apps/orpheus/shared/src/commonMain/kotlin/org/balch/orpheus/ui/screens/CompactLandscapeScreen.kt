@@ -73,10 +73,10 @@ fun CompactLandscapeScreen(
     val effects = LocalLiquidEffects.current
 
     val registry = LocalSynthFeatures.current
-    val voiceFeature: VoicesFeature = registry.feature<VoiceViewModel, VoicesFeature>()
-    val presetsFeature: PresetsFeature = registry.feature<PresetsViewModel, PresetsFeature>()
-    val vizFeature: VizFeature = registry.feature<VizViewModel, VizFeature>()
-    val sequencerFeature: DrawSequencerFeature = registry.feature<DrawSequencerViewModel, DrawSequencerFeature>()
+    val voiceFeature: VoicesFeature = registry.feature<VoicesFeature>()
+    val presetsFeature: PresetsFeature = registry.feature<PresetsFeature>()
+    val vizFeature: VizFeature = registry.feature<VizFeature>()
+    val sequencerFeature: DrawSequencerFeature = registry.feature<DrawSequencerFeature>()
 
     val keyActions = registry.keyActions
 

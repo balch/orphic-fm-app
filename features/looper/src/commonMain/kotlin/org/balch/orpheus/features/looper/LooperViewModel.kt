@@ -3,7 +3,6 @@ package org.balch.orpheus.features.looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -22,6 +21,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
@@ -69,7 +69,7 @@ interface LooperFeature : SynthFeature<LooperUiState, LooperActions> {
 }
 
 @Inject
-@ClassKey
+@SynthFeatureKey(LooperFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LooperViewModel(
     private val synth: SynthEngine,
@@ -206,6 +206,6 @@ class LooperViewModel(
 
         @Composable
         fun feature(): LooperFeature =
-            synthFeature<LooperViewModel, LooperFeature>()
+            synthFeature<LooperFeature>()
     }
 }

@@ -15,7 +15,6 @@ import org.balch.djapp.DjAppGraphAndroid
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.timer.TimerWidgetCommand
@@ -31,11 +30,11 @@ private fun graphOf(context: Context): DjAppGraphAndroid =
 
 private fun timerOf(graph: DjAppGraphAndroid): TimerFeature =
     graph.featureGraphHolder.featureGraph.featureCollection
-        .getFeature(TimerViewModel::class)
+        .getFeature(TimerFeature::class)
 
 private fun pulsarOf(graph: DjAppGraphAndroid): PulsarFeature =
     graph.featureGraphHolder.featureGraph.featureCollection
-        .getFeature(PulsarViewModel::class)
+        .getFeature(PulsarFeature::class)
 
 /**
  * The vibe name a skip will land on — same cycle rule as [PulsarSkipHandler].
