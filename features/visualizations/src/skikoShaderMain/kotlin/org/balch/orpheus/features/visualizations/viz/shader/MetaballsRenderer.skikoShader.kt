@@ -17,30 +17,34 @@ import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 
 /**
- * JVM/Desktop implementation using Skiko's RuntimeShaderBuilder.
+ * SkSL metaballs, shared by every target that runs the shader path.
+ *
+ * `RuntimeEffect` and `RuntimeShaderBuilder` come from skiko, so this compiles for JVM, WASM and
+ * iOS alike. iOS opts out and keeps its own stub: it has never rendered this viz, and switching it
+ * on is a visual change rather than the deduplication this file is doing.
  */
 actual class MetaballsRenderer {
     private var runtimeEffect: RuntimeEffect? = null
     private var shaderBuilder: RuntimeShaderBuilder? = null
-    
+
     init {
         try {
             runtimeEffect = RuntimeEffect.makeForShader(MetaballsShaderSource.SKSL_SOURCE)
             shaderBuilder = runtimeEffect?.let { RuntimeShaderBuilder(it) }
         } catch (e: Exception) {
-            // Shader compilation failed - will fall back to Canvas
-            // Shader compilation failed — will fall back to Canvas rendering
+            // Shader compilation failed — isSupported() goes false and the caller falls back to
+            // the Canvas path below.
         }
     }
-    
+
     actual fun isSupported(): Boolean = shaderBuilder != null
-    
+
     actual fun dispose() {
         shaderBuilder = null
         runtimeEffect?.close()
         runtimeEffect = null
     }
-    
+
     fun getShaderBrush(
         width: Float,
         height: Float,
@@ -51,8 +55,7 @@ actual class MetaballsRenderer {
         time: Float
     ): ShaderBrush? {
         val builder = shaderBuilder ?: return null
-        
-        // Set resolution
+
         builder.uniform("resolution", width, height)
         builder.uniform("time", time)
         builder.uniform("ballCount", minOf(blobs.size, config.maxBalls))
@@ -60,35 +63,32 @@ actual class MetaballsRenderer {
         builder.uniform("glowIntensity", config.glowIntensity)
         builder.uniform("lfoMod", lfoModulation)
         builder.uniform("masterEnergy", masterEnergy)
-        
+
         // Pack balls data: x, y, radius, energy (4 floats per ball)
         val ballsData = FloatArray(16 * 4)
         val colorsData = FloatArray(16 * 4)
-        
+
         blobs.take(16).forEachIndexed { index, blob ->
             val offset = index * 4
             ballsData[offset] = blob.x
             ballsData[offset + 1] = blob.y
             ballsData[offset + 2] = blob.radius
             ballsData[offset + 3] = blob.energy
-            
+
             colorsData[offset] = blob.color.red
             colorsData[offset + 1] = blob.color.green
             colorsData[offset + 2] = blob.color.blue
             colorsData[offset + 3] = blob.alpha
         }
-        
+
         builder.uniform("balls", ballsData)
         builder.uniform("colors", colorsData)
-        
+
         val shader = builder.makeShader()
         return ShaderBrush(shader.asComposeShader())
     }
 }
 
-/**
- * JVM/Desktop MetaballsCanvas implementation.
- */
 @Composable
 actual fun MetaballsCanvas(
     modifier: Modifier,
@@ -99,13 +99,12 @@ actual fun MetaballsCanvas(
     time: Float
 ) {
     val renderer = remember { MetaballsRenderer() }
-    
+
     DisposableEffect(Unit) {
         onDispose { renderer.dispose() }
     }
-    
+
     if (renderer.isSupported()) {
-        // Shader-based rendering
         Canvas(modifier = modifier.fillMaxSize()) {
             val brush = renderer.getShaderBrush(
                 width = size.width,
@@ -116,13 +115,12 @@ actual fun MetaballsCanvas(
                 masterEnergy = masterEnergy,
                 time = time
             )
-            
+
             if (brush != null) {
                 drawRect(brush = brush)
             }
         }
     } else {
-        // Fallback to Canvas-based rendering
         MetaballsCanvasFallback(
             modifier = modifier,
             blobs = blobs,
@@ -133,7 +131,9 @@ actual fun MetaballsCanvas(
 }
 
 /**
- * Canvas-based fallback rendering (same as current VizBackground approach).
+ * Canvas-based fallback for when the SkSL shader won't compile. Same approach as VizBackground:
+ * one additively-blended radial gradient per blob, which reads as blobs but not as metaballs,
+ * since nothing merges them.
  */
 @Composable
 private fun MetaballsCanvasFallback(
@@ -145,20 +145,19 @@ private fun MetaballsCanvasFallback(
     Canvas(modifier = modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-        
-        // Draw each blob with radial gradient
+
         blobs.forEach { blob ->
             val screenX = blob.x * width
             val screenY = (1f - blob.y) * height
             val screenRadius = blob.radius * height
-            
+
             if (screenRadius < 2f) return@forEach
-            
+
             val effectiveAlpha = (blob.alpha * blob.energy.coerceIn(0.3f, 1f)).coerceIn(0f, 1f)
             val brightCore = blob.color.copy(alpha = effectiveAlpha * 0.9f)
             val coreColor = blob.color.copy(alpha = effectiveAlpha * 0.7f)
             val glowColor = blob.color.copy(alpha = effectiveAlpha * 0.35f)
-            
+
             drawCircle(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
