@@ -305,6 +305,7 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
 class PulsarViewModel(
     private val synthController: SynthController,
     synthEngine: SynthEngine,
+    private val pulsarSession: PulsarSession,
     private val globalTempo: GlobalTempo,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val presetLoader: PresetLoader,
@@ -618,10 +619,24 @@ class PulsarViewModel(
 
     private val selectedTrackFlow = MutableStateFlow<Int?>(null)
     private val _trackMutedFlow = MutableStateFlow(List(8) { false })
-    // Initial vibe = the first provider in class-name order. Forces ONE
-    // vibe at construction; the other 25 stay lazy until vibeList is
-    // iterated (e.g. by restoreSavedState or the dropdown).
-    override val vibeFlow = MutableStateFlow(curatedProviders.first().vibe)
+    // Initial vibe = the first provider in class-name order. Forces ONE vibe at construction;
+    // the other 25 stay lazy until vibeList is iterated. Declared here — not in an init{}
+    // further down — so it precedes _state's initializer below, which reads vibeFlow.value.
+    //
+    // PulsarFeature promises a non-null vibe, so the ViewModel holds it and mirrors every
+    // write into PulsarSession, whose flow stays null until this first push (see setVibe).
+    private val _vibeFlow = MutableStateFlow(curatedProviders.first().vibe)
+    override val vibeFlow: StateFlow<Vibe> = _vibeFlow.asStateFlow()
+
+    init {
+        pulsarSession.updateVibe(_vibeFlow.value)
+    }
+
+    /** Single write path for the current vibe. Keeps the AppScope mirror in lockstep. */
+    private fun setVibe(vibe: Vibe) {
+        _vibeFlow.value = vibe
+        pulsarSession.updateVibe(vibe)
+    }
     private val restoreComplete = CompletableDeferred<Unit>()
     private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
@@ -680,46 +695,12 @@ class PulsarViewModel(
         }
     }
 
-    private val _arrangementState = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
-    override val arrangementStateFlow: StateFlow<PulsarArrangementState> = _arrangementState.asStateFlow()
-
-    init {
-        // Always-on enrichment of the C++ arrangement state. Runs regardless of
-        // UI subscription so per-section BPM and per-track override collectors
-        // (below) see fresh data — and so media-session consumers (Android Auto)
-        // stay current without a panel being rendered. Idle when the engine
-        // emits nothing, so battery cost is event-driven, not subscription-driven.
-        scope.launch(dispatcherProvider.io) {
-            synthEngine.pulsarArrangementStateFlow
-                .filterNotNull()
-                .map { state ->
-                    // Enrich with band member names if band solos are configured
-                    val vibe = vibeFlow.value
-                    val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
-                    val memberNames = vibe.band?.members?.map { it.name }
-                    val enriched = if (memberNames != null) {
-                        state.copy(
-                            bandSolo = true,
-                            bandMemberNames = memberNames,
-                        )
-                    } else state
-
-                    val sectionName = section?.name ?: "section-${state.sectionIndex}"
-                    if (enriched.soloActive && enriched.soloTrack >= 0) {
-                        val name = if (enriched.bandSolo) {
-                            enriched.bandMemberNames.getOrElse(enriched.soloTrack) { "?" }
-                        } else {
-                            PULSAR_TRACK_NAMES.getOrElse(enriched.soloTrack) { "?" }
-                        }
-                        log.debug { "Solo active: $name section=$sectionName" }
-                    } else {
-                        log.debug { "Section: $sectionName bar=${state.barsElapsed}/${state.barsTotal}" }
-                    }
-                    enriched
-                }
-                .collect { _arrangementState.value = it }
-        }
-    }
+    // Enrichment collector moved to PulsarSession (Step 1 of the PulsarSession extraction):
+    // it was already self-sufficient given synthEngine and vibeFlow, both of which
+    // PulsarSession now owns directly. Delegating here keeps this always-on for AppScope
+    // consumers (media-session on Android Auto) exactly as before — PulsarSession's own
+    // init{} subscribes regardless of whether this ViewModel has been constructed.
+    override val arrangementStateFlow: StateFlow<PulsarArrangementState> get() = pulsarSession.arrangementStateFlow
 
     // ═══════════════════════════════════════════════════════════
     // Actions
@@ -1101,7 +1082,7 @@ class PulsarViewModel(
     override fun applyVibe(vibe: Vibe) {
         log.info { "applyVibe name=${vibe.name} bpm=${vibe.bpm} tracks=${vibe.tracks.size} sections=${vibe.arrangement?.sections?.size ?: 0}" }
         // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends.
-        vibeFlow.value = vibe
+        setVibe(vibe)
         // A new song starts here. Must be explicit, not a vibeFlow observation:
         // a re-apply of the playing vibe emits nothing, stranding the outro.
         // Before pushArrangement so the cleared port precedes its fence.

@@ -67,9 +67,11 @@ class PulsarBassLinePushTest {
             )
         }
         val tempo = GlobalTempo(BassPushTestAudioEngine())
+        val engine = SongEndingStubSynthEngine()
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = SongEndingStubSynthEngine(),
+            synthEngine = engine,
+            pulsarSession = PulsarSession(engine, makeAppCoroutineScope(testDispatcher), BassPushTestDispatchers(testDispatcher)),
             globalTempo = tempo,
             appPreferencesRepository = BassPushTestPrefs(),
             presetLoader = PresetLoader(PortRegistry(emptySet()), tempo, controller),

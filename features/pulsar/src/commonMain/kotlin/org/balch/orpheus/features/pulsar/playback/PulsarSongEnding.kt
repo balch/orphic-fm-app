@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
@@ -23,116 +24,93 @@ import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
-import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.util.currentTimeMillis
 import kotlin.concurrent.Volatile
 
 /**
- * Owns the song-ending lifecycle: tracks playing-time, evaluates the random
- * trigger at each bar boundary, captures the final section once the C++
- * Markov picker rolls there, and emits [SongEndingEvent] for the advancer.
- *
- * Lives outside [PulsarFeature]/[org.balch.orpheus.features.pulsar.PulsarViewModel]
- * for the same reason [PulsarPlaybackBridge] does: injecting
- * [PlaybackController] into the ViewModel creates a Metro DI cycle.
- *
- * Eagerly instantiated via the platform DI graphs so the collectors start at
- * app launch.
- */
-/**
- * Read-only event source + observable state for song-ending. Implemented by
- * [PulsarSongEnding] in production; a fake implementation is used in tests
- * that exercise [PulsarSongAdvancer] without booting the full song-ending
- * pipeline.
+ * Read-only event source + observable state for song-ending. [PulsarSongEnding] implements it
+ * in production; tests exercising [PulsarSongAdvancer] use a fake.
  */
 interface SongEndingEventSource {
     val songEndingEvents: SharedFlow<SongEndingEvent>
 
     /**
-     * Index of the section identified as the song's final section, or `-1`
-     * when no outro has been triggered for the current song. Observable so the
-     * UI can mark the in-flight final section with the upcoming transition
-     * style (e.g., "verse 3/8 — TAPE").
+     * The song's final section, or `-1` when no outro is armed. Observable so the UI can
+     * label the in-flight final section with its transition style ("verse 3/8 — TAPE").
      */
     val finalSectionIndex: StateFlow<Int>
 
     /**
-     * True from the moment the outro is armed (either by the random/maxVibe
-     * trigger or by a manual [armOutro] call) until the song ends and state
-     * resets on the next vibe change. UI shows this as a highlighted pill so
-     * the user knows their manual arm took effect.
+     * True from the moment the outro is armed until the song ends and state resets on the
+     * next vibe. Shown as a highlighted pill so a manual arm visibly takes effect.
      */
     val endingTriggered: StateFlow<Boolean>
 
     /**
-     * The transition style that will fire when this vibe ends. For concrete
-     * styles this mirrors the configured style; for `RANDOM` it's the pre-rolled
-     * substyle (re-rolled once per vibe change), so the pill/suffix never show
-     * "RANDOM" when a real pick has already been made. [PulsarSongAdvancer]
-     * also reads this when building the spec passed to the runner, so the
-     * displayed style is always the one that fires.
+     * The style that will fire when this vibe ends. For `RANDOM` this is the pre-rolled
+     * substyle, re-rolled once per vibe change, so the UI never displays "RANDOM" after a
+     * real pick. [PulsarSongAdvancer] reads it too, so the shown style is the one that fires.
      */
     val resolvedTransitionStyle: StateFlow<TransitionStyle>
 
     /**
-     * Manually arm the outro — equivalent to the auto-trigger firing. The
-     * next C++ section change becomes the song's final section. No-op if
-     * the outro is already armed for the current song. Doesn't require
-     * `enabled = true` — manual arming is an explicit user intent.
+     * Manually arm the outro, equivalent to the auto-trigger firing. No-op if already armed.
+     * Ignores `enabled` — a manual arm is explicit user intent.
      */
     fun armOutro()
 
     /**
-     * A new song starts now. Resets playing-time, armed/final-section state,
-     * and the sticky C++ `arrangement_outro_request` port.
+     * A new song starts now. Resets playing-time, armed/final-section state, and the sticky
+     * C++ `arrangement_outro_request` port.
      *
-     * MUST be called from every `applyVibe()`, including re-applies of the
-     * playing vibe — `vibeFlow` is a StateFlow and emits nothing on an equal
-     * value, so it cannot drive this. Skipping it strands the song in its
-     * outro forever. Call BEFORE pushing the arrangement so the cleared port
-     * precedes the `arrangement_generation` fence.
+     * MUST be called from every `applyVibe()`, including re-applies of the playing vibe:
+     * `vibeFlow` is a StateFlow and emits nothing on an equal value, so it cannot drive this,
+     * and skipping it strands the song in its outro forever. Call BEFORE pushing the
+     * arrangement so the cleared port precedes the `arrangement_generation` fence.
      */
     fun onVibeApplied()
 }
+
+/**
+ * Owns the song-ending lifecycle: tracks playing-time, evaluates the random trigger at each bar
+ * boundary, captures the final section once the C++ Markov picker rolls there, and emits
+ * [SongEndingEvent] for the advancer. Eagerly instantiated so collectors start at app launch.
+ *
+ * Lives outside [org.balch.orpheus.features.pulsar.PulsarViewModel] for the same reason
+ * [PulsarPlaybackBridge] does: injecting [PlaybackController] into the ViewModel creates a Metro
+ * cycle. Reads vibe/arrangement state through [PulsarSession] instead.
+ */
 
 @SingleIn(AppScope::class)
 @Inject
 @ContributesBinding(AppScope::class)
 class PulsarSongEnding(
-    // Lazy provider: PulsarFeature is implemented by PulsarViewModel, which
-    // takes SongEndingEventSource (this class) as a constructor parameter.
-    // Resolving PulsarFeature eagerly here forms a DI cycle that crashes the
-    // app at launch with StackOverflowError. All uses live inside
-    // scope.launch { ... } so we can defer resolution until after the graph
-    // is fully built.
-    pulsarFeatureProvider: () -> PulsarFeature,
+    // Eager, not a () -> PulsarFeature provider: PulsarSession depends on nothing that
+    // depends back on a feature, so there is no cycle left to defer around.
+    private val pulsarSession: PulsarSession,
     private val playbackController: PlaybackController,
     private val preferences: SongEndingPreferences,
     private val transitionPreferences: TransitionPreferences,
     private val synthController: SynthController,
     private val scope: AppCoroutineScope,
 ) : SongEndingEventSource {
-    private val pulsarFeature: PulsarFeature by lazy(pulsarFeatureProvider)
     private val log = logging("PulsarSongEnding")
 
     private val _events = MutableSharedFlow<SongEndingEvent>(extraBufferCapacity = 4)
     /** Hot stream of song-ending events. [PulsarSongAdvancer] subscribes for auto-advance. */
     override val songEndingEvents: SharedFlow<SongEndingEvent> = _events.asSharedFlow()
 
-    // Test hook for deterministic RANDOM resolution. Production uses
-    // `List.random()`; tests inject a picker that returns a known element.
+    // Test hook for deterministic RANDOM resolution.
     internal var randomPicker: (List<TransitionStyle>) -> TransitionStyle = { it.random() }
 
-    // Default to FADE so the panel has a sensible value to display before the
-    // first vibeFlow emission (matches the pre-existing PulsarPanelActions
-    // default spec).
+    // FADE so the panel shows something sane before the first vibe emission, matching
+    // PulsarPanelActions' default spec.
     private val _resolvedTransitionStyle = MutableStateFlow(TransitionStyle.FADE)
     override val resolvedTransitionStyle: StateFlow<TransitionStyle> =
         _resolvedTransitionStyle.asStateFlow()
 
     @Volatile private var playingMillis: Long = 0L
-    // Long.MIN_VALUE = "not currently ticking" (sentinel chosen so a real
-    // wall-clock or test-scheduler value of 0 still counts as ticking).
     @Volatile private var lastTickMillis: Long = NOT_TICKING
     private val _endingTriggered = MutableStateFlow(false)
     override val endingTriggered: StateFlow<Boolean> = _endingTriggered.asStateFlow()
@@ -162,19 +140,16 @@ class PulsarSongEnding(
             }
         }
         scope.launch {
-            pulsarFeature.arrangementStateFlow.collect { state ->
+            pulsarSession.arrangementStateFlow.collect { state ->
                 onArrangementTick(state)
             }
         }
-        // Per-song state resets from onVibeApplied(), not from vibeFlow.
-        //
-        // Pre-roll the transition style so the UI and [PulsarSongAdvancer] show
-        // the same pick, never "RANDOM". Stays keyed on the vibe NAME unlike
-        // the reset above: the pick belongs to the vibe, not the play-through,
-        // so an engine recreation must not re-roll it under the user.
+        // Pre-roll the transition style so the UI and PulsarSongAdvancer show the same pick,
+        // never "RANDOM". Keyed on vibe NAME, not the play-through (per-song state resets via
+        // onVibeApplied): the pick belongs to the vibe, so an engine recreation must not re-roll it.
         scope.launch {
             combine(
-                pulsarFeature.vibeFlow.distinctUntilChangedBy { it.name },
+                pulsarSession.vibeFlow.filterNotNull().distinctUntilChangedBy { it.name },
                 transitionPreferences.defaultFlow,
             ) { vibe, defaultSpec ->
                 val spec = vibe.arrangement?.transitionOut ?: defaultSpec
@@ -186,10 +161,9 @@ class PulsarSongEnding(
     }
 
     /**
-     * Resolve [TransitionSpec.style] to a concrete (non-RANDOM) style. For
-     * RANDOM, picks from `spec.randomPool` or — if empty — every style with
-     * `TransitionStyle.isSafe = true`. [TransitionSpec]'s init block guarantees
-     * the pool never contains RANDOM, so the recursion is bounded at one step.
+     * Resolve [TransitionSpec.style] to a concrete style. RANDOM picks from `spec.randomPool`,
+     * or every `isSafe` style when empty. [TransitionSpec]'s init guarantees the pool excludes
+     * RANDOM, so this bottoms out in one step.
      */
     private fun resolveStyle(spec: TransitionSpec): TransitionStyle {
         if (spec.style != TransitionStyle.RANDOM) return spec.style
@@ -201,40 +175,33 @@ class PulsarSongEnding(
 
     private fun onArrangementTick(state: PulsarArrangementState) {
         if (state.sectionIndex < 0) return  // unknown / no arrangement
+        // No vibe pushed yet — no song to end. Snapshotted so one tick reads one vibe.
+        val vibe = pulsarSession.vibeFlow.value ?: return
 
-        // SongEnded fires when the final section ENDS — either because the
-        // section transitioned out (normal arrangement) or because the section
-        // looped back to bar 0 (terminal section with no transitions, which the
-        // C++ Markov picker re-enters indefinitely).
+        // SongEnded fires when the final section ENDS: it either transitioned out, or looped
+        // back to bar 0 (a terminal section, which the C++ Markov picker re-enters forever).
         if (_endingTriggered.value && _finalSectionIndex.value >= 0) {
             val transitionedOut = lastObservedSectionIndex == _finalSectionIndex.value
                 && state.sectionIndex != _finalSectionIndex.value
-            // The `lastObservedSectionIndex == finalSectionIndex` guard ensures we
-            // only count a TRUE loop (bar 0 re-entry while already in the final
-            // section) — not the bars-reset that happens when we first ENTER the
-            // final section from another one. Without it, capturing
-            // finalSectionIndex ahead of arrival (see triggerOutro) would fire a
-            // premature SongEnded on the entry bar.
+            // The lastObservedSectionIndex guard counts only a TRUE loop, not the bars-reset
+            // on first ENTERING the final section. Without it, capturing finalSectionIndex
+            // ahead of arrival (see triggerOutro) fires a premature SongEnded on the entry bar.
             val sectionLooped = state.sectionIndex == _finalSectionIndex.value
                 && lastObservedSectionIndex == _finalSectionIndex.value
                 && lastObservedBarsElapsed >= 0
                 && state.barsElapsed < lastObservedBarsElapsed
             if (transitionedOut || sectionLooped) {
-                val name = pulsarFeature.vibeFlow.value.name
-                // Recovery net: both conditions are edge-triggered, so a second
-                // edge (a full section later) means the last SongEnded never
-                // produced a vibe change. The C++ outro pin means re-emitting
-                // is the only escape. PulsarSongAdvancer drops stale re-emits
-                // by vibe name so an in-flight transition isn't double-fired.
+                val name = vibe.name
+                // Recovery net: both conditions are edge-triggered, so a second edge means the
+                // last SongEnded never produced a vibe change, and the C++ outro pin makes
+                // re-emitting the only escape. The advancer drops stale re-emits by vibe name.
                 if (songEndedEmitted) {
                     log.warn { "still in the final section after SongEnded: $name — re-emitting" }
                 } else {
                     log.info { "song ended: $name (transitionedOut=$transitionedOut sectionLooped=$sectionLooped)" }
                 }
-                // Latch only on a successful emit. If the buffer/subscriber drops
-                // it (tryEmit == false), leave songEndedEmitted false so the next
-                // section loop retries — otherwise a single dropped SongEnded
-                // would strand the song in the outro forever.
+                // Latch only on a successful emit, so a dropped SongEnded retries on the next
+                // section loop instead of stranding the song in its outro forever.
                 if (_events.tryEmit(SongEndingEvent.SongEnded(name))) {
                     songEndedEmitted = true
                 } else {
@@ -255,7 +222,7 @@ class PulsarSongEnding(
         // Trigger evaluation (only fires once per song). Reads min/max from the
         // active arrangement; vibes without an arrangement never end.
         if (!_endingTriggered.value && preferences.enabledFlow.value) {
-            val arr = pulsarFeature.vibeFlow.value.arrangement
+            val arr = vibe.arrangement
             if (arr != null) {
                 val minS = arr.minVibeSeconds
                 val maxS = arr.maxVibeSeconds
@@ -272,29 +239,16 @@ class PulsarSongEnding(
             }
         }
 
-        // Structural terminal-outro safety net. A vibe can declare its outro
-        // section TERMINAL (transitions = emptyList(), e.g. TechnoWobble's
-        // `drift`). If that same section is also reachable via normal Markov
-        // edges, the C++ engine can walk into it on its own and then self-loop
-        // it forever (select_next_section returns `current` for a zero-transition
-        // section). When that happens BEFORE any timed/manual arm, the loop-back
-        // detection above never wakes (it is gated on _endingTriggered) and the
-        // song drones in the outro indefinitely. Arm the outro the moment we
-        // observe the arrangement sitting in a terminal outro section so the
-        // existing sectionLooped detection ends the song on its next loop.
+        // Structural terminal-outro safety net. A vibe can mark its outro section terminal
+        // (no transitions, e.g. TechnoWobble's `drift`); if the Markov walk reaches it before
+        // any arm, C++ self-loops it forever and the loop-back detection above never wakes
+        // (it is gated on _endingTriggered). Arming here lets sectionLooped end the next loop.
         //
-        // Fires regardless of `preferences.enabledFlow`: a section the vibe marks
-        // structurally terminal is a hard end of the arrangement, distinct from
-        // the optional *timed* auto-end the preference governs. Detection-only
-        // cannot un-trap the engine (its sole re-route target is this same
-        // outro_index), so ending the song is the only non-stuck behavior.
-        //
-        // Gated on `minVibeSeconds`: if the Markov walk reaches the terminal
-        // outro early, hold the arm until the minimum song length so the song
-        // isn't cut short. Playing-time still accrues in PLAYS mode, so this
-        // gate works whether or not the auto-end preference is on.
+        // Ignores enabledFlow: a structurally terminal section is a hard end of the
+        // arrangement, not the optional timed auto-end, and detection alone cannot un-trap the
+        // engine. Gated on minVibeSeconds so an early walk doesn't cut the song short.
         if (!_endingTriggered.value) {
-            val arr = pulsarFeature.vibeFlow.value.arrangement
+            val arr = vibe.arrangement
             val outroIdx = arr?.outroIndex ?: -1
             val outroSection = arr?.sections?.getOrNull(outroIdx)
             val playingS = (playingMillisLive() / 1000L).toInt()
@@ -311,11 +265,7 @@ class PulsarSongEnding(
         lastObservedBarsElapsed = state.barsElapsed
     }
 
-    /**
-     * Manual outro arm — exposed via [SongEndingEventSource.armOutro]. Routes
-     * through the same internal `triggerOutro()` so the UI path and the
-     * auto-trigger path produce identical state.
-     */
+    /** Routes through the same `triggerOutro()` as the auto-trigger, for identical state. */
     override fun armOutro() {
         if (_endingTriggered.value) return
         log.info { "armOutro() invoked manually" }
@@ -323,16 +273,17 @@ class PulsarSongEnding(
     }
 
     private fun triggerOutro() {
+        // Reachable manually via armOutro(); with no vibe loaded there is no song to end.
+        val vibe = pulsarSession.vibeFlow.value ?: run {
+            log.warn { "outro requested before any vibe was applied — ignoring" }
+            return
+        }
         _endingTriggered.value = true
-        // When the arrangement names a dedicated outro section, the C++ engine
-        // pins current_section to outro_index at the next boundary and re-routes
-        // there every boundary after (the outro request is sticky). Capture it as
-        // the final section NOW. The change-based capture in onArrangementTick()
-        // only fires on a section-index CHANGE, which never happens when we arm
-        // while already in the outro section (e.g. Tremolo Tide's breakdown, whose
-        // outroIndex == lastIndex) — leaving finalSectionIndex at -1 forever, so
-        // SongEnded never fires and the section loops endlessly.
-        val outroIndex = pulsarFeature.vibeFlow.value.arrangement?.outroIndex ?: -1
+        // C++ pins current_section to outro_index once armed (the request is sticky), so
+        // capture the final section NOW. onArrangementTick's capture needs a section-index
+        // CHANGE, which never comes when we arm while already in the outro section (e.g.
+        // Tremolo Tide's breakdown, outroIndex == lastIndex), stranding it at -1 forever.
+        val outroIndex = vibe.arrangement?.outroIndex ?: -1
         if (outroIndex >= 0) {
             _finalSectionIndex.value = outroIndex
         }
@@ -340,7 +291,7 @@ class PulsarSongEnding(
             PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
             IntValue(1),
         )
-        val name = pulsarFeature.vibeFlow.value.name
+        val name = vibe.name
         log.info { "outro triggered for $name (finalSection=${_finalSectionIndex.value})" }
         _events.tryEmit(SongEndingEvent.OutroTriggered(name))
     }
@@ -369,9 +320,8 @@ class PulsarSongEnding(
     }
 
     /**
-     * Live playing-time read: persisted accrual plus the in-flight delta if
-     * the engine is currently in [PlaybackState.Playing]. Computed on read so
-     * we don't need a periodic refresh coroutine.
+     * Accrued playing-time plus the in-flight delta when playing. Computed on read so no
+     * periodic refresh coroutine is needed.
      */
     private fun playingMillisLive(): Long {
         val base = playingMillis

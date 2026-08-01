@@ -2,20 +2,16 @@ package org.balch.orpheus.playback
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.TestSynthEngine
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.TestDispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMode
-import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
-import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.ai.AiOptionsFeature
-import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarPanelActions
-import org.balch.orpheus.features.pulsar.PulsarUiState
+import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -55,16 +51,6 @@ private fun sampleVibe(
     },
 )
 
-private class FakePulsarFeature(initial: Vibe) : PulsarFeature {
-    override val vibeList = listOf(initial)
-    override val vibeFlow = MutableStateFlow(initial)
-    override fun applyVibe(vibe: Vibe) { vibeFlow.value = vibe }
-    override val arrangementStateFlow: StateFlow<PulsarArrangementState> =
-        MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
-    override val stateFlow: StateFlow<PulsarUiState> get() = TODO("not used in producer tests")
-    override val actions: PulsarPanelActions get() = TODO("not used in producer tests")
-}
-
 private class FakeAiFeature(initialMode: PlaybackMode = PlaybackMode.USER) : AiOptionsFeature {
     override val currentMode = MutableStateFlow(initialMode)
     override val stateFlow get() = TODO("not used in producer tests")
@@ -76,7 +62,7 @@ class OrpheusMetadataProducerTest {
     private data class Harness(
         val producer: OrpheusMetadataProducer,
         val ai: FakeAiFeature,
-        val pulsar: FakePulsarFeature,
+        val pulsarSession: PulsarSession,
         val mediaState: MediaSessionStateManager,
     )
 
@@ -90,12 +76,16 @@ class OrpheusMetadataProducerTest {
     ): Harness {
         val dispatchers = TestDispatcherProvider(UnconfinedTestDispatcher())
         val scope = AppCoroutineScope(dispatchers)
-        val pulsarFeature = FakePulsarFeature(sampleVibe(vibeName, bpm, album))
-        val pulsarMetadata = PulsarMetadataProducer({ pulsarFeature }, scope, dispatchers)
+        // Real PulsarSession, not a PulsarFeature fake. Mirrors production, where the
+        // producer only ever reads PulsarSession.vibeFlow.
+        val pulsarSession = PulsarSession(TestSynthEngine(), scope, dispatchers).apply {
+            updateVibe(sampleVibe(vibeName, bpm, album))
+        }
+        val pulsarMetadata = PulsarMetadataProducer(pulsarSession, scope, dispatchers)
         val aiFeature = FakeAiFeature(mode)
         val mediaState = MediaSessionStateManager(scope).apply { setEvoActive(evoActive) }
         val producer = OrpheusMetadataProducer(aiFeature, pulsarMetadata, mediaState, scope)
-        return Harness(producer, aiFeature, pulsarFeature, mediaState)
+        return Harness(producer, aiFeature, pulsarSession, mediaState)
     }
 
     @Test fun `AI active title is Orpheus`() = runTest {

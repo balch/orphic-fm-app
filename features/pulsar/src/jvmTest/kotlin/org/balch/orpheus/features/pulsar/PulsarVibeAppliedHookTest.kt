@@ -60,13 +60,17 @@ class PulsarVibeAppliedHookTest {
             )
         }
         val tempo = GlobalTempo(HookTestAudioEngine())
+        val engine = SongEndingStubSynthEngine()
+        val dispatchers = HookTestDispatchers(testDispatcher)
+        val appScope = makeAppCoroutineScope(testDispatcher)
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = SongEndingStubSynthEngine(),
+            synthEngine = engine,
+            pulsarSession = PulsarSession(engine, appScope, dispatchers),
             globalTempo = tempo,
             appPreferencesRepository = HookTestPrefs(),
             presetLoader = PresetLoader(PortRegistry(emptySet()), tempo, controller),
-            dispatcherProvider = HookTestDispatchers(testDispatcher),
+            dispatcherProvider = dispatchers,
             scope = FeatureCoroutineScope(),
             vibeProviders = setOf(HookTestVibeProvider(vibe)),
             playbackMode = PulsarPlaybackMode.EXPLICIT,

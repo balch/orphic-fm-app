@@ -14,7 +14,10 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
+import org.balch.orpheus.features.pulsar.FixturesDispatchers
 import org.balch.orpheus.features.pulsar.MutablePrefs
+import org.balch.orpheus.features.pulsar.PulsarSession
+import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
 import org.balch.orpheus.features.pulsar.makeSongEnding
@@ -74,6 +77,9 @@ class PulsarSongEndingTest {
             "expected ~10s of accrued time, got ${harness.songEnding.playingMillisForTest}",
         )
 
+        // Mirrors PulsarViewModel.applyVibe: pushes the new vibe AND explicitly
+        // resets song-ending state via onVibeApplied() — a mere vibeFlow change no
+        // longer resets on its own (see PulsarSongEnding's KDoc).
         harness.feature.applyVibe(mkMinimalVibe("Other"))
         advanceUntilIdle()
         assertEquals(0L, harness.songEnding.playingMillisForTest)
@@ -86,7 +92,7 @@ class PulsarSongEndingTest {
         harness.prefs.enabledFlow.value = true
         harness.playbackController.play()
         advanceTimeBy(60_000L)  // 60s < 150s default min
-        harness.feature.arrangement.value = PulsarArrangementState(
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(
             sectionIndex = 0, barsElapsed = 1, barsTotal = 8,
             soloActive = false, soloTrack = -1, soloMode = 0,
         )
@@ -100,7 +106,7 @@ class PulsarSongEndingTest {
         harness.prefs.enabledFlow.value = true
         harness.playbackController.play()
         advanceTimeBy(301_000L)  // > 300s max
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
         runCurrent()
         assertEquals(true, harness.songEnding.endingTriggeredForTest)
     }
@@ -111,7 +117,7 @@ class PulsarSongEndingTest {
         harness.prefs.enabledFlow.value = false
         harness.playbackController.play()
         advanceTimeBy(310_000L)
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
         runCurrent()
         assertEquals(false, harness.songEnding.endingTriggeredForTest)
     }
@@ -123,12 +129,12 @@ class PulsarSongEndingTest {
         harness.playbackController.play()
         advanceTimeBy(160_000L)
 
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
         runCurrent()
         assertTrue(harness.songEnding.endingTriggeredForTest)
         assertEquals(-1, harness.songEnding.finalSectionIndexForTest)
 
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
         runCurrent()
         assertEquals(5, harness.songEnding.finalSectionIndexForTest)
     }
@@ -145,20 +151,20 @@ class PulsarSongEndingTest {
         runCurrent()
 
         // Trigger.
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
         runCurrent()
         // Move into final outro section (5).
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 0, 4, false, -1, 0)
         runCurrent()
         // Tick through the outro.
-        harness.feature.arrangement.value = PulsarArrangementState(5, 1, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 1, 4, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(5, 2, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 2, 4, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(5, 3, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 3, 4, false, -1, 0)
         runCurrent()
         // Outro loops back to bar 0 of itself (terminal section with no transitions).
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 0, 4, false, -1, 0)
         runCurrent()
 
         assertTrue(
@@ -179,13 +185,13 @@ class PulsarSongEndingTest {
         val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
         runCurrent()
 
-        harness.feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(5, 7, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 7, 8, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(0, 0, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 0, 8, false, -1, 0)
         runCurrent()
 
         assertTrue(collected.any { it is SongEndingEvent.OutroTriggered }, "OutroTriggered emitted")
@@ -209,7 +215,7 @@ class PulsarSongEndingTest {
         harness.playbackController.play()
 
         // Song is currently in the outro section (1), part-way through.
-        harness.feature.arrangement.value = PulsarArrangementState(1, 2, 6, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(1, 2, 6, false, -1, 0)
         runCurrent()
 
         // User presses ENDING while already in section 1.
@@ -233,16 +239,16 @@ class PulsarSongEndingTest {
         runCurrent()
 
         // In the outro section (1), mid-way.
-        harness.feature.arrangement.value = PulsarArrangementState(1, 2, 6, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(1, 2, 6, false, -1, 0)
         runCurrent()
         // Arm while in section 1.
         harness.songEnding.armOutro()
         runCurrent()
         // Section 1 keeps playing (index never changes — engine pins it here).
-        harness.feature.arrangement.value = PulsarArrangementState(1, 4, 6, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(1, 4, 6, false, -1, 0)
         runCurrent()
         // Section 1 loops back to bar 0 of itself.
-        harness.feature.arrangement.value = PulsarArrangementState(1, 0, 6, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(1, 0, 6, false, -1, 0)
         runCurrent()
 
         assertTrue(
@@ -263,14 +269,14 @@ class PulsarSongEndingTest {
         runCurrent()
 
         // In section 0, several bars in.
-        harness.feature.arrangement.value = PulsarArrangementState(0, 5, 8, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 5, 8, false, -1, 0)
         runCurrent()
         // Arm while NOT in the outro section.
         harness.songEnding.armOutro()
         runCurrent()
         // Engine routes into the outro section (1): barsElapsed resets to 0. This
         // must NOT be mistaken for a loop of the final section.
-        harness.feature.arrangement.value = PulsarArrangementState(1, 0, 6, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(1, 0, 6, false, -1, 0)
         runCurrent()
 
         assertTrue(
@@ -310,14 +316,14 @@ class PulsarSongEndingTest {
         runCurrent()
 
         // Normal Markov play rolls into the terminal outro section (2). Unarmed.
-        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(2, 2, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 2, 4, false, -1, 0)
         runCurrent()
         // Engine self-loops the terminal section back to bar 0.
-        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
         runCurrent()
 
         assertTrue(
@@ -343,11 +349,11 @@ class PulsarSongEndingTest {
         // outro section here must NOT end the song: the minimum length wins, so
         // the auto-arm holds off until minVibeSeconds.
         advanceTimeBy(30_000L)
-        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
         runCurrent()
-        harness.feature.arrangement.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
         runCurrent()
 
         assertEquals(
@@ -374,7 +380,7 @@ class PulsarSongEndingTest {
         harness.songEnding.randomPicker = { pool -> offeredPool = pool; pool.first() }
 
         // Apply a vibe whose transition-out is RANDOM (empty pool => safe-styles fallback).
-        harness.feature.applyVibe(
+        harness.pulsarSession.updateVibe(
             mkMinimalVibe("Rnd", transitionOut = TransitionSpec(TransitionStyle.RANDOM)),
         )
         advanceUntilIdle()
@@ -427,8 +433,9 @@ private class TestHarness(
     random: (Float, Float) -> Float = { _, _ -> 0.5f },
     initialVibe: org.balch.orpheus.features.pulsar.models.Vibe = mkMinimalVibe("Test"),
 ) {
-    val feature = FakePulsarFeature(vibeList = listOf(initialVibe), initial = initialVibe)
+    val synthEngine = SongEndingStubSynthEngine()
     val prefs = MutablePrefs()
+    val feature = FakePulsarFeature(vibeList = listOf(initialVibe), initial = initialVibe)
     val synthController: SynthController = SynthController().apply {
         val ports = mutableMapOf<String, PortValue>()
         setDelegates(
@@ -436,11 +443,20 @@ private class TestHarness(
             getter = { id -> ports["${id.uri}:${id.symbol}"] },
         )
     }
-    private val scope = makeAppCoroutineScope(UnconfinedTestDispatcher(testScope.testScheduler))
+    private val dispatcher = UnconfinedTestDispatcher(testScope.testScheduler)
+    private val scope = makeAppCoroutineScope(dispatcher)
+    val pulsarSession = PulsarSession(synthEngine, scope, FixturesDispatchers(dispatcher))
     val playbackController = makeStubPlaybackController(scope)
+
+    init {
+        // FakePulsarFeature has no wiring of its own to PulsarSession — mirrors
+        // PulsarViewModel.applyVibe pushing into it directly (PulsarSession.updateVibe).
+        scope.launch { feature.vibeFlow.collect { pulsarSession.updateVibe(it) } }
+    }
 
     val songEnding = makeSongEnding(
         feature = feature,
+        pulsarSession = pulsarSession,
         playbackController = playbackController,
         preferences = prefs,
         synthController = synthController,

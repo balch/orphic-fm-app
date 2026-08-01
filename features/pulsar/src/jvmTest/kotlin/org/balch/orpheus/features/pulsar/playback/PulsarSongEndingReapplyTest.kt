@@ -15,7 +15,10 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
+import org.balch.orpheus.features.pulsar.FixturesDispatchers
 import org.balch.orpheus.features.pulsar.MutablePrefs
+import org.balch.orpheus.features.pulsar.PulsarSession
+import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
 import org.balch.orpheus.features.pulsar.makeSongEnding
@@ -162,11 +165,21 @@ private class ReapplyHarness(private val testScope: TestScope) {
         )
     }
 
-    private val scope = makeAppCoroutineScope(UnconfinedTestDispatcher(testScope.testScheduler))
+    private val dispatcher = UnconfinedTestDispatcher(testScope.testScheduler)
+    private val scope = makeAppCoroutineScope(dispatcher)
     val playbackController = makeStubPlaybackController(scope)
+    val synthEngine = SongEndingStubSynthEngine()
+    val pulsarSession = PulsarSession(synthEngine, scope, FixturesDispatchers(dispatcher))
+
+    init {
+        // FakePulsarFeature has no wiring of its own to PulsarSession — mirrors
+        // PulsarViewModel.applyVibe pushing into it directly (PulsarSession.updateVibe).
+        scope.launch { feature.vibeFlow.collect { pulsarSession.updateVibe(it) } }
+    }
 
     val songEnding = makeSongEnding(
         feature = feature,
+        pulsarSession = pulsarSession,
         playbackController = playbackController,
         preferences = prefs,
         synthController = synthController,
@@ -185,7 +198,9 @@ private class ReapplyHarness(private val testScope: TestScope) {
     fun tickOutro(barsElapsed: Int) = tick(1, barsElapsed)
 
     private fun tick(sectionIndex: Int, barsElapsed: Int) {
-        feature.arrangement.value = PulsarArrangementState(
+        // PulsarSongEnding now reads arrangement state via PulsarSession, which is
+        // fed by the SynthEngine — not FakePulsarFeature.arrangementStateFlow.
+        synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(
             sectionIndex = sectionIndex,
             barsElapsed = barsElapsed,
             barsTotal = 4,

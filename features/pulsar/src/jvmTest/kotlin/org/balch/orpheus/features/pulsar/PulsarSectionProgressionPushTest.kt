@@ -90,6 +90,7 @@ class PulsarSectionProgressionPushTest {
         return PulsarViewModel(
             synthController = controller,
             synthEngine = engine,
+            pulsarSession = PulsarSession(engine, appScope, PushTestDispatchers(testDispatcher)),
             globalTempo = tempo,
             appPreferencesRepository = PushTestPrefs(),
             presetLoader = PresetLoader(portRegistry, tempo, controller),

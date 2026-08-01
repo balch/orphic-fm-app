@@ -8,56 +8,45 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.playback.MetadataProducer
-import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import orpheus.features.pulsar.generated.resources.Res
 
 /**
- * Pulsar-as-primary-metadata: title is the current vibe name, subtitle is
- * the album title. Used directly by DJApp; wrapped by OrpheusMetadataProducer in
- * Orpheus (which can prefer AI-mode subtitle when active).
+ * Pulsar-as-primary-metadata: title is the current vibe name, subtitle the album title. Used
+ * directly by DJApp; wrapped by OrpheusMetadataProducer in Orpheus.
  *
- * For each vibe, [artworkPngFlow] emits PNG-encoded album art:
- *  - STEALTH: procedurally rendered via [AlbumArtRenderer] (seeded by vibe name).
- *  - RIF / ZERO_TO_ONE: static WebP poster decoded from compose resources and
- *    re-encoded as PNG for cross-platform consumption (macOS NSImage on older
- *    OSes won't decode WebP directly).
+ * [artworkPngFlow] emits PNG album art per vibe: STEALTH renders procedurally via
+ * [AlbumArtRenderer], RIF/ZERO_TO_ONE decode a static WebP and re-encode as PNG (older macOS
+ * NSImage won't decode WebP).
  *
- * Cached per vibe name so repeat metadata pushes reuse the *same* ByteArray
- * instance. This is load-bearing: PlaybackController de-dupes metadata via the
- * StateFlow's built-in equal-emission dropping (there is no distinctUntilChanged
- * operator anymore), and its snapshot compares artwork by reference, so a
- * fresh-but-identical array on every push would defeat the de-dupe and re-emit
- * artwork on each tick. Keep returning the cached instance per vibe — do not
- * copy/re-encode the bytes on the cache-hit path.
+ * Art is cached per vibe name and the *same* ByteArray instance must be returned on a hit.
+ * This is load-bearing: PlaybackController de-dupes on StateFlow equal-emission dropping and
+ * compares artwork by reference, so a fresh-but-identical array would re-emit on every tick.
  */
 @SingleIn(AppScope::class)
 @Inject
 class PulsarMetadataProducer(
-    // Lazy provider breaks the static DI cycle (PulsarFeature → PulsarViewModel
-    // → PulsarSongEnding → PlaybackController → MetadataProducer → here).
-    // But that alone is not enough — invoking the provider on a Default-pool
-    // worker while AWT is still building the Metro graph deadlocks two threads
-    // on adjacent BaseDoubleCheck locks. Launching on `dispatcherProvider.main`
-    // queues the resolution past AWT's current composition event, so by the
-    // time the provider fires, the graph is fully built and no other thread
-    // is contending for those locks.
-    pulsarFeatureProvider: () -> PulsarFeature,
+    // Was a () -> PulsarFeature lazy provider dodging the DI cycle (PulsarFeature →
+    // PulsarViewModel → PulsarSongEnding → PlaybackController → MetadataProducer → here),
+    // which also needed a main-dispatch deferral to avoid deadlocking on adjacent
+    // BaseDoubleCheck locks while AWT built the graph. PulsarSession retires both.
+    pulsarSession: PulsarSession,
     scope: AppCoroutineScope,
     dispatcherProvider: DispatcherProvider,
 ) : MetadataProducer {
 
-    // Defaults match PlaybackController.snapshotOf's title.ifEmpty { "Orpheus" }
-    // fallback, so the brief window before the init coroutine fires looks the
-    // same as the empty-title case the snapshot code already handles.
+    // Matches PlaybackController.snapshotOf's title.ifEmpty { "Orpheus" } fallback, so the
+    // window before the first vibe looks like the empty-title case it already handles.
     private val _title = MutableStateFlow("Orpheus")
     private val _subtitle = MutableStateFlow("")
     private val _artwork = MutableStateFlow<ByteArray?>(null)
@@ -67,10 +56,8 @@ class PulsarMetadataProducer(
     override val artworkPngFlow: StateFlow<ByteArray?> = _artwork.asStateFlow()
 
     private val log = com.diamondedge.logging.logging("PulsarMetadataProducer")
-    // Guarded by [cacheLock]. Today the upstream Flow has a single collector
-    // (SharingStarted.Eagerly + AppScope), so contention is theoretical — but
-    // the lock makes the read-test/write-update sequence safe if a future
-    // refactor adds a second collector or a parallel flatMapMerge.
+    // Contention is theoretical today (one collector), but the lock keeps the read-test/
+    // write-update sequence safe if a second collector or a parallel merge ever appears.
     private val cacheLock = Mutex()
     private var cachedArtworkVibe: String? = null
     private var cachedArtworkBytes: ByteArray? = null
@@ -78,9 +65,7 @@ class PulsarMetadataProducer(
     @OptIn(ExperimentalResourceApi::class)
     private suspend fun renderArtworkBytes(vibe: Vibe): ByteArray? = cacheLock.withLock {
         if (cachedArtworkVibe == vibe.name) return@withLock cachedArtworkBytes
-        // Wrap in try/catch so a missing native lib (e.g. Skia not on a test
-        // classpath) returns null artwork rather than crashing the producer.
-        // Production rendering paths get Skia via Compose Multiplatform.
+        // A missing native lib (Skia off a test classpath) yields null artwork, not a crash.
         val bytes: ByteArray? = try {
             when (vibe.album) {
                 Album.STEALTH ->
@@ -92,9 +77,7 @@ class PulsarMetadataProducer(
             log.warn(t) { "Album art render failed for ${vibe.name}; emitting null artwork" }
             null
         }
-        // Don't cache transient failures — a future render attempt may
-        // succeed (e.g. Skia loaded later, transient resource read error).
-        // Only persist the cache when we have actual bytes.
+        // Only cache real bytes: a failure may be transient and worth retrying.
         if (bytes != null) {
             cachedArtworkVibe = vibe.name
             cachedArtworkBytes = bytes
@@ -105,30 +88,24 @@ class PulsarMetadataProducer(
     @OptIn(ExperimentalResourceApi::class)
     private suspend fun loadStaticArt(path: String): ByteArray? {
         val webpBytes = Res.readBytes(path)
-        // Decode and re-encode as PNG: macOS NSImage doesn't decode WebP on
-        // older OSes, and PNG is the lingua franca of MPMediaItemArtwork.
+        // PNG is the lingua franca of MPMediaItemArtwork; older macOS NSImage won't take WebP.
         return webpBytes.decodeToImageBitmap().toPngBytes()
     }
 
     init {
-        // Outer launch on Main: deferred behind AWT's current composition pass,
-        // so pulsarFeatureProvider() resolves only after the graph is built.
-        scope.launch(dispatcherProvider.main) {
-            val pulsarFeature = pulsarFeatureProvider()
-            // Title/subtitle are pure mappings — single collect on default.
-            launch(dispatcherProvider.default) {
-                pulsarFeature.vibeFlow.collect { vibe ->
-                    _title.value = vibe.name
-                    _subtitle.value = vibe.album.title
-                }
+        // No main-dispatched deferral needed: pulsarSession is a plain AppScope dependency,
+        // not a lazily-resolved feature, so there's no graph-building race to queue behind.
+        // filterNotNull holds the defaults above until a real vibe exists.
+        scope.launch(dispatcherProvider.default) {
+            pulsarSession.vibeFlow.filterNotNull().collect { vibe ->
+                _title.value = vibe.name
+                _subtitle.value = vibe.album.title
             }
-            // Artwork uses collectLatest so a rapid vibe change cancels an
-            // in-flight render — matches the prior `stateIn` + slow `map`
-            // semantics, which would also discard intermediates.
-            launch(dispatcherProvider.default) {
-                pulsarFeature.vibeFlow.collectLatest { vibe ->
-                    _artwork.value = renderArtworkBytes(vibe)
-                }
+        }
+        // collectLatest so a rapid vibe change cancels an in-flight render.
+        scope.launch(dispatcherProvider.default) {
+            pulsarSession.vibeFlow.filterNotNull().collectLatest { vibe ->
+                _artwork.value = renderArtworkBytes(vibe)
             }
         }
     }

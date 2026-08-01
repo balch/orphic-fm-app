@@ -110,6 +110,7 @@ class PulsarBpmSyncTest {
         return PulsarViewModel(
             synthController = controller,
             synthEngine = engine,
+            pulsarSession = PulsarSession(engine, appScope, dispatchers),
             globalTempo = globalTempo,
             appPreferencesRepository = StubPreferences(),
             presetLoader = PresetLoader(portRegistry, globalTempo, controller),

@@ -101,9 +101,11 @@ class PulsarSectionBpmTest {
             )
         }
         val portRegistry = PortRegistry(emptySet())
+        val pulsarSession = PulsarSession(engine, makeAppCoroutineScope(testDispatcher), TestDispatchers(testDispatcher))
         return PulsarViewModel(
             synthController = controller,
             synthEngine = engine,
+            pulsarSession = pulsarSession,
             globalTempo = globalTempo,
             appPreferencesRepository = prefs,
             presetLoader = PresetLoader(portRegistry, globalTempo, controller),

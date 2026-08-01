@@ -15,7 +15,9 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
+import org.balch.orpheus.features.pulsar.FixturesDispatchers
 import org.balch.orpheus.features.pulsar.MutablePrefs
+import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
@@ -55,11 +57,18 @@ class PulsarSongEndingIntegrationTest {
                 getter = { id -> ports["${id.uri}:${id.symbol}"] },
             )
         }
-        val scope = makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = makeAppCoroutineScope(dispatcher)
         val playbackController = makeStubPlaybackController(scope)
+        val pulsarSession = PulsarSession(engine, scope, FixturesDispatchers(dispatcher))
+        // The advancer applies vibes through `feature`, but PulsarSongEnding reads
+        // PulsarSession. Bridge them the way PulsarViewModel.applyVibe does.
+        val bridgeJob = launch { feature.vibeFlow.collect { pulsarSession.updateVibe(it) } }
+        runCurrent()
 
         val songEnding = makeSongEnding(
             feature = feature,
+            pulsarSession = pulsarSession,
             playbackController = playbackController,
             preferences = prefs,
             synthController = synthController,
@@ -95,25 +104,25 @@ class PulsarSongEndingIntegrationTest {
         advanceTimeBy(160_000L)
 
         // Tick a bar in section 0 → triggers.
-        feature.arrangement.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
+        engine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 8, false, -1, 0)
         advanceUntilIdle()
         // C++ routes us to final section 5.
-        feature.arrangement.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
+        engine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 0, 8, false, -1, 0)
         advanceUntilIdle()
         // Last bar of final section.
-        feature.arrangement.value = PulsarArrangementState(5, 7, 8, false, -1, 0)
+        engine.pulsarArrangementStateFlow.value = PulsarArrangementState(5, 7, 8, false, -1, 0)
         advanceUntilIdle()
         // Boundary out — SongEnded fires AND advancer flips vibe to "Second";
         // the vibe-change in turn resets PulsarSongEnding's per-song state via
         // its vibeFlow collector.
-        feature.arrangement.value = PulsarArrangementState(0, 0, 8, false, -1, 0)
+        engine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 0, 8, false, -1, 0)
         advanceUntilIdle()
 
         assertTrue(collected.any { it is SongEndingEvent.OutroTriggered }, "OutroTriggered emitted")
         assertTrue(collected.any { it is SongEndingEvent.SongEnded }, "SongEnded emitted")
         assertEquals("Second", feature.vibeFlow.value.name, "advancer flipped to next vibe")
-        // After the advance, PulsarSongEnding's vibe-change collector resets
-        // per-song state for the new vibe — endingTriggered must be false again.
+        // The advancer's applyVibeByName -> FakePulsarFeature.applyVibe -> onVibeApplied()
+        // (wired by makeSongEnding) resets PulsarSongEnding's per-song state for the new vibe.
         assertEquals(
             false,
             songEnding.endingTriggeredForTest,
@@ -122,5 +131,6 @@ class PulsarSongEndingIntegrationTest {
         assertTrue(advancer.enabled)
 
         collectorJob.cancel()
+        bridgeJob.cancel()
     }
 }

@@ -2,18 +2,12 @@ package org.balch.orpheus.features.pulsar.playback
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
-import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
-import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarPanelActions
-import org.balch.orpheus.features.pulsar.PulsarUiState
+import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -52,16 +46,6 @@ private fun sampleVibe(
     },
 )
 
-private class FakePulsarFeature(initial: Vibe) : PulsarFeature {
-    override val vibeList = listOf(initial)
-    override val vibeFlow = MutableStateFlow(initial)
-    override fun applyVibe(vibe: Vibe) {}
-    override val arrangementStateFlow: StateFlow<PulsarArrangementState> =
-        MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
-    override val stateFlow: StateFlow<PulsarUiState> get() = TODO("not used in producer tests")
-    override val actions: PulsarPanelActions get() = TODO("not used in producer tests")
-}
-
 private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
     override val main get() = d
     override val io get() = d
@@ -75,28 +59,44 @@ class PulsarMetadataProducerTest {
     private fun testDispatchers(): DispatcherProvider =
         TestDispatchers(UnconfinedTestDispatcher())
 
+    /**
+     * Real [PulsarSession] seeded with [initial], not a fake. Mirrors production, where the
+     * producer only ever reads `PulsarSession.vibeFlow`.
+     */
+    private fun buildProducer(initial: Vibe): Pair<PulsarSession, PulsarMetadataProducer> =
+        buildProducer().also { (session, _) -> session.updateVibe(initial) }
+
+    /** No vibe pushed — the AppScope window before PulsarViewModel is ever constructed. */
+    private fun buildProducer(): Pair<PulsarSession, PulsarMetadataProducer> {
+        val dispatchers = testDispatchers()
+        val scope = AppCoroutineScope(dispatchers)
+        val session = PulsarSession(NoOpSynthEngine(), scope, dispatchers)
+        return session to PulsarMetadataProducer(session, scope, dispatchers)
+    }
+
     @Test fun `title is initial vibe name`() = runTest {
-        val feature = FakePulsarFeature(sampleVibe(name = "Initial Vibe"))
-        val producer = testDispatchers().let { d ->
-            PulsarMetadataProducer({ feature }, AppCoroutineScope(d), d)
-        }
+        val (_, producer) = buildProducer(sampleVibe(name = "Initial Vibe"))
         assertEquals("Initial Vibe", producer.titleFlow.value)
     }
 
     @Test fun `subtitle is initial album title`() = runTest {
-        val feature = FakePulsarFeature(sampleVibe(album = Album.ZERO_TO_ONE))
-        val producer = testDispatchers().let { d ->
-            PulsarMetadataProducer({ feature }, AppCoroutineScope(d), d)
-        }
+        val (_, producer) = buildProducer(sampleVibe(album = Album.ZERO_TO_ONE))
         assertEquals(Album.ZERO_TO_ONE.title, producer.subtitleFlow.value)
     }
 
     @Test fun `title updates when vibe changes`() = runTest {
-        val feature = FakePulsarFeature(sampleVibe(name = "First"))
-        val producer = testDispatchers().let { d ->
-            PulsarMetadataProducer({ feature }, AppCoroutineScope(d), d)
-        }
-        feature.vibeFlow.value = sampleVibe(name = "Second")
+        val (session, producer) = buildProducer(sampleVibe(name = "First"))
+        session.updateVibe(sampleVibe(name = "Second"))
         assertEquals("Second", producer.titleFlow.value)
+    }
+
+    @Test fun `no vibe yet publishes the neutral defaults, not a placeholder`() = runTest {
+        val (session, producer) = buildProducer()
+        assertEquals("Orpheus", producer.titleFlow.value, "a placeholder vibe must never reach the media session")
+        assertEquals("", producer.subtitleFlow.value)
+        assertEquals(null, producer.artworkPngFlow.value)
+
+        session.updateVibe(sampleVibe(name = "Real"))
+        assertEquals("Real", producer.titleFlow.value, "the first real vibe still lands")
     }
 }

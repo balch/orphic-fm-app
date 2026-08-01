@@ -63,9 +63,11 @@ class PulsarLickOffsetPushTest {
             )
         }
         val tempo = GlobalTempo(OffsetTestAudioEngine())
+        val engine = SongEndingStubSynthEngine()
         return PulsarViewModel(
             synthController = controller,
-            synthEngine = SongEndingStubSynthEngine(),
+            synthEngine = engine,
+            pulsarSession = PulsarSession(engine, makeAppCoroutineScope(testDispatcher), OffsetTestDispatchers(testDispatcher)),
             globalTempo = tempo,
             appPreferencesRepository = OffsetTestPrefs(),
             presetLoader = PresetLoader(PortRegistry(emptySet()), tempo, controller),

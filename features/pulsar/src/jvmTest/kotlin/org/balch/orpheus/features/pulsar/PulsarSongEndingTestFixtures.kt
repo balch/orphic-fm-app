@@ -151,10 +151,12 @@ internal fun makeAppCoroutineScope(
  * The only sanctioned way to build a real [PulsarSongEnding] over a
  * [FakePulsarFeature]. Wiring `feature.onVibeApplied` by hand is easy to forget,
  * and forgetting it silently disables the per-song reset the whole class exists
- * to perform.
+ * to perform. Also takes the [PulsarSession] [PulsarSongEnding] reads its flows from;
+ * bridge `feature.vibeFlow` into it if a test needs the two in sync.
  */
 internal fun makeSongEnding(
     feature: FakePulsarFeature,
+    pulsarSession: PulsarSession,
     playbackController: PlaybackController,
     preferences: SongEndingPreferences,
     synthController: org.balch.orpheus.core.controller.SynthController,
@@ -162,7 +164,7 @@ internal fun makeSongEnding(
     transitionPreferences: TransitionPreferences = StubTransitionPreferences(),
 ): org.balch.orpheus.features.pulsar.playback.PulsarSongEnding =
     org.balch.orpheus.features.pulsar.playback.PulsarSongEnding(
-        pulsarFeatureProvider = { feature },
+        pulsarSession = pulsarSession,
         playbackController = playbackController,
         preferences = preferences,
         transitionPreferences = transitionPreferences,
@@ -246,16 +248,16 @@ internal class MutablePrefs : SongEndingPreferences {
 }
 
 /**
- * No-op [SynthEngine] suitable for song-ending and advancer tests. Only
- * `setMasterVolume`/`getMasterVolume` carry real state — everything else is a
- * stub. Mirrors the duplicated stubs that previously lived in
- * `PulsarSongEndingTest.StubEngine` and
- * `PulsarSongAdvancerTest.StubSynthEngineForAdvancer`. Named
- * `SongEndingStubSynthEngine` to avoid colliding with the file-private
- * `StubSynthEngine` in `PulsarBpmSyncTest.kt`.
+ * No-op [SynthEngine] for song-ending and advancer tests. Only
+ * `setMasterVolume`/`getMasterVolume` and [pulsarArrangementStateFlow] carry real state.
+ * Named to avoid colliding with the file-private `StubSynthEngine` in `PulsarBpmSyncTest.kt`.
  */
 internal open class SongEndingStubSynthEngine : SynthEngine {
     @Volatile private var masterVolume: Float = 1.0f
+
+    // Settable so tests can drive PulsarSession's arrangement-state producer, which now
+    // enriches from this engine rather than from FakePulsarFeature's backing field.
+    override val pulsarArrangementStateFlow = MutableStateFlow<PulsarArrangementState?>(null)
 
     override fun start() = Unit
     override fun stop() = Unit
