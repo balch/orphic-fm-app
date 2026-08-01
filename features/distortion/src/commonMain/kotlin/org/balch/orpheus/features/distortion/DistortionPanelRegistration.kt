@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class DistortionPanelRegistration(
+    private val feature: DistortionFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.DISTORTION
@@ -31,7 +32,7 @@ class DistortionPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         DistortionPanel(
-            feature = DistortionViewModel.feature(),
+            feature = feature,
             outVizFlow = synthEngine.masterOutVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,

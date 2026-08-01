@@ -2,8 +2,10 @@ package org.balch.orpheus.features.timer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -88,8 +90,10 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(TimerFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<TimerFeature>())
 class TimerViewModel(
     private val synthEngine: SynthEngine,
     private val masterVolumeRamp: MasterVolumeRamp,

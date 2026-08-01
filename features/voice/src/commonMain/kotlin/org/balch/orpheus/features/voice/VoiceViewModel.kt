@@ -2,8 +2,10 @@ package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.input.key.Key
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -162,8 +164,10 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
  * Keeps SynthEngine dependency for non-port operations (gate, hold, wobble, bend, slide, peak).
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(VoicesFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<VoicesFeature>())
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,

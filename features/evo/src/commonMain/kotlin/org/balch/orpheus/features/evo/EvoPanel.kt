@@ -41,7 +41,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 @Composable
 fun EvoPanel(
     modifier: Modifier = Modifier,
-    evoFeature: EvoFeature = EvoViewModel.feature(),
+    evoFeature: EvoFeature,
     isExpanded: Boolean,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,

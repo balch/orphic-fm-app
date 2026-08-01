@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.draw
 
 import androidx.compose.runtime.Composable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,8 +20,10 @@ interface DrawSequencerFeature: SynthFeature<DrawSequencerUiState, DrawSequencer
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DrawSequencerFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DrawSequencerFeature>())
 class DrawSequencerViewModel : DrawSequencerFeature {
     private val _state = MutableStateFlow(DrawSequencerUiState())
     override val stateFlow: StateFlow<DrawSequencerUiState> = _state.asStateFlow()

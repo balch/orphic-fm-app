@@ -82,7 +82,7 @@ merged and no synthetic Set is emitted.
 | Type | Scope | Why it exists |
 |---|---|---|
 | `FeatureGraphHolder` | `AppScope` | Calls `FeatureGraph.Factory.create()` once behind a `lazy` and caches it. Without it, the Compose tree and the Android `MediaBrowserService` would each build their own child graph and their own `PulsarViewModel`, and the second one's `init` would overwrite `MediaSessionManager`'s callback slots. |
-| `FeatureCollection` | `FeatureScope` | Owns the `KClass<out SynthFeature<*, *>> -> () -> SynthFeature` provider map, creates features on first access, and caches them under a reentrant lock. |
+| `FeatureCollection` | `FeatureScope` | Typed index over the `KClass<out SynthFeature<*, *>> -> () -> SynthFeature` multibinding, for iteration (`allFeatures`, `keyActions`) and for the non-DI composable lookup path. Holds **no state and no lock** — instance identity belongs to Metro. Adding a cache here reintroduces the startup deadlock. |
 | `SynthFeatureKey` | n/a | Map key for the feature multibinding, typed `KClass<out SynthFeature<*, *>>`. Features register under their **public interface**, so the key and the looked-up type are the same symbol. |
 | `SynthFeatureRegistry` | `AppScope`, in the ViewModel map | A `ViewModel`-shaped accessor so Compose can reach the feature graph through `ViewModelStore`. Deliberately does not override `onCleared`, because the graph outlives the Activity. |
 | `InjectedViewModelFactory` | `AppScope` | Backs `MetroViewModelFactory` from the three `MetroViewModelMultibindings` maps. Lives in `:core:features` so both apps get it with no per-app wiring. |
@@ -137,28 +137,64 @@ per-instance control IDs (a symbol namespace or instance index), a second `pulsa
 wiring graph, and a second set of ports in the C++ unit. `FeatureScope` removes the DI obstacle; the
 audio path is the actual work.
 
-### Why feature ViewModels are not `@SingleIn(FeatureScope::class)`
+### Feature ViewModels are FeatureScope singletons
 
-They are unscoped, and `FeatureCollection` is what makes them single-instance. The original reason:
-`FeatureCollection.close()` closes every `AutoCloseable` feature and clears the cache, so if the
-ViewModels were FeatureScope singletons the graph would keep handing back closed instances after
-that. Unscoped means the next `getFeature()` builds a fresh one.
+Every feature ViewModel carries four annotations:
 
-**That hazard is currently theoretical.** Nothing calls `FeatureCollection.close()` in production.
-`SynthFeatureRegistry` deliberately does not override `onCleared()` (the graph it exposes is
-AppScope-scoped and outlives the Activity), so process death is the only teardown. Six features
-implement `AutoCloseable` — `AiOptionsViewModel`, `DrumBeatsViewModel`, `EvoViewModel`,
-`LiveCodeViewModel`, `MidiViewModel`, `VizViewModel` — and none of them are ever closed.
+```kotlin
+@Inject
+@SingleIn(FeatureScope::class)
+@SynthFeatureKey(LfoFeature::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<LfoFeature>())
+class LfoViewModel(...) : LfoFeature
+```
 
-So the unscoped choice is not currently buying what this section says it buys. Scoping the
-ViewModels to `FeatureScope` and injecting the feature interfaces directly would let Metro verify
-each one at compile time instead of at first composition. That is a live option, not a defect;
-it is written down here so the next person weighs it rather than inheriting the constraint.
+- `@SingleIn` is what makes it single-instance. Metro memoizes it in a `DoubleCheck` provider field
+  on the generated `FeatureGraphImpl`.
+- `@ContributesIntoMap` puts it in the multibinding, which backs `FeatureCollection.allFeatures`,
+  and through that `keyActions` (keyboard dispatch) and the AI tools' `synthControl` descriptors.
+- `@ContributesBinding` makes the interface directly injectable.
 
-Until that changes, the invariant still holds: **do not inject a feature ViewModel by its concrete
-type.** That bypasses the cache and yields a second unscoped instance the UI does not observe. Go
-through `FeatureCollection`, or through the `PulsarFeature` / `TimerFeature` / `AiOptionsFeature`
-providers in the app module.
+**The map entry and the direct binding are the same object.** Confirmed in bytecode: the provider
+field is `getfield`'d straight into the multibinding's `MapProviderFactory.Builder.put`, so
+`getFeature(LfoFeature::class)` and an injected `LfoFeature` cannot diverge.
+
+```
+getfield      lfoViewModelProvider
+invokevirtual MapProviderFactory$Builder.put
+```
+
+**Instance identity belongs to Metro, not to `FeatureCollection`.** The collection used to keep its
+own cache, which was a second memoization layer over the same objects. Because it held its lock
+across `provider()` — arbitrary ViewModel construction that re-enters DI — a Metro `DoubleCheck`
+taken in the opposite order on another thread produced an AB-BA deadlock that hung startup. See the
+`FeatureCollection.lock` history and `FeatureProviderScopeGuardTest`. The collection is now a pure
+index: **never give it a cache or a lock.**
+
+**A missing `@SingleIn` fails silently.** Metro is perfectly happy to build an unscoped binding; it
+just hands out a fresh ViewModel per resolve. Feature ViewModels register themselves with `AppScope`
+singletons in their `init` blocks — `MediaSessionManager`'s callback slots are `var` fields — so the
+second instance overwrites the first and the notification drives a ViewModel the UI never observes.
+`FeatureScopeGuardTest` fails the build for a missing scope, and for a `@SynthFeatureKey` naming an
+interface the class does not implement.
+
+**Injecting by concrete ViewModel type is still wrong.** Inject the interface (`LfoFeature`), never
+`LfoViewModel`. The key is the interface, so a lookup by ViewModel class fails at runtime.
+
+### Who injects and who looks up
+
+| Consumer | How it gets the feature |
+|---|---|
+| `*PanelRegistration` (a Metro `@Inject` class in `HeaderPanelScope`) | constructor injection |
+| Panel composables | a parameter, passed down by the registration |
+| `App.kt`, `*Screen.kt`, `DjAppScreen.kt` | `LocalSynthFeatures` — no constructor to inject into |
+| AI tools, `keyActions` | `FeatureCollection.allFeatures` |
+
+18 features still expose a companion `feature()` accessor, purely because a non-DI composable reads
+them. The other 15 dropped theirs. Before deleting an accessor, check for **both** spellings —
+`XViewModel.feature()` and `registry.feature<XFeature>()`. Searching only one misclassified four
+features during the original migration.
 
 ## What the two apps wire differently
 

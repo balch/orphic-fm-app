@@ -48,7 +48,7 @@ private val stepCountPresets = listOf(4, 8, 12, 16)
 
 @Composable
 fun BassPanel(
-    feature: BassFeature = BassViewModel.feature(),
+    feature: BassFeature,
     outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,

@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class ReverbPanelRegistration(
+    private val feature: ReverbFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.REVERB
@@ -31,7 +32,7 @@ class ReverbPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         ReverbPanel(
-            feature = ReverbViewModel.feature(),
+            feature = feature,
             inVizFlow = synthEngine.reverbInVizFlow,
             outVizFlow = synthEngine.reverbOutVizFlow,
             modifier = modifier,

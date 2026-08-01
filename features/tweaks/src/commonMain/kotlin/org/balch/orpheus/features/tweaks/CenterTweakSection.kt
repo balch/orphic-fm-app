@@ -40,7 +40,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 @Composable
 fun CenterControlSection(
     voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    beatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
+    beatsFeature: DrumBeatsFeature,
     modifier: Modifier = Modifier,
 ) {
     val voiceState by voiceFeature.stateFlow.collectAsState()

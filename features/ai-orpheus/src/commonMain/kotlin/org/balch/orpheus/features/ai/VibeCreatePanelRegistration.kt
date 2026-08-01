@@ -12,7 +12,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class VibeCreatePanelRegistration : FeaturePanel {
+class VibeCreatePanelRegistration(
+    private val feature: VibeCreateFeature,
+) : FeaturePanel {
     override val panelId = PanelId.VIBE_CREATE
     override val description = "AI-created Pulsar vibe"
     override val weight = 1.0f
@@ -27,7 +29,7 @@ class VibeCreatePanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         VibeCreatePanel(
-            feature = VibeCreateViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

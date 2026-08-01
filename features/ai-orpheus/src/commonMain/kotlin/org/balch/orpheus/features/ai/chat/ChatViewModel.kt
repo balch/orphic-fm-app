@@ -2,8 +2,10 @@ package org.balch.orpheus.features.ai.chat
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,8 +48,10 @@ interface ChatFeature : SynthFeature<ChatUiState, ChatPanelActions> {
  * ViewModel for the AI chat panel.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(ChatFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<ChatFeature>())
 class ChatViewModel(
     private val agent: OrpheusAgent,
     private val scope: FeatureCoroutineScope,

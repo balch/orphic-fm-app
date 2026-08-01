@@ -2,8 +2,10 @@ package org.balch.orpheus.features.horn
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,8 +104,10 @@ interface HornFeature : SynthFeature<HornUiState, HornPanelActions> {
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(HornFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<HornFeature>())
 class HornViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,

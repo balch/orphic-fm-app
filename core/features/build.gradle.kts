@@ -30,5 +30,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.atomicfu)
         }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
     }
 }

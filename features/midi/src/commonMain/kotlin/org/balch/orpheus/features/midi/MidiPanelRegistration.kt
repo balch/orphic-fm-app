@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class MidiPanelRegistration : FeaturePanel {
+class MidiPanelRegistration(
+    private val feature: MidiFeature,
+) : FeaturePanel {
     override val panelId = PanelId.MIDI
     override val description = "Assign MIDI commands to control the synthesizer"
     override val weight = 0.5f
@@ -28,7 +30,7 @@ class MidiPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         MidiPanel(
-            feature = MidiViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

@@ -2,8 +2,10 @@ package org.balch.orpheus.features.reverb
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,8 +97,10 @@ interface ReverbFeature : SynthFeature<ReverbUiState, ReverbPanelActions> {
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(ReverbFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<ReverbFeature>())
 class ReverbViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,

@@ -3,8 +3,10 @@ package org.balch.orpheus.features.mediapipe
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -140,8 +142,10 @@ interface MediaPipeFeature : SynthFeature<MediaPipeUiState, MediaPipePanelAction
  * via AslInteractionEngine and SynthController.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(MediaPipeFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<MediaPipeFeature>())
 class MediaPipeViewModel(
     private val handTracker: HandTracker,
     private val synthController: SynthController,

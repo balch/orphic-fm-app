@@ -52,7 +52,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
 fun DrumBeatsPanel(
-    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
+    drumBeatsFeature: DrumBeatsFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

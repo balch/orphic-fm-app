@@ -25,7 +25,7 @@ import org.balch.orpheus.ui.widgets.VerticalToggle
  */
 @Composable
 fun DelayFeedbackPanel(
-    feature: DelayFeature = DelayViewModel.feature(),
+    feature: DelayFeature,
     inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     fbVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),

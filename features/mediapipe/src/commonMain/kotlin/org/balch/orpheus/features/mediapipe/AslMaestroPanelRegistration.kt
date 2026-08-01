@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class AslMaestroPanelRegistration : FeaturePanel {
+class AslMaestroPanelRegistration(
+    private val feature: MediaPipeFeature,
+) : FeaturePanel {
     override val panelId = PanelId.ASL_MAESTRO
     override val description = "Camera hand tracking gesture control"
     override val weight = 1.0f
@@ -28,7 +30,7 @@ class AslMaestroPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         AslMaestroPanel(
-            feature = MediaPipeViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

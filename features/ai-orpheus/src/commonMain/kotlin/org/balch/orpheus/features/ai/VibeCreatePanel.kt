@@ -63,7 +63,7 @@ interface VibeCreateFeature : SynthFeature<VibeCreateUiState, VibeCreatePanelAct
 
 @Composable
 fun VibeCreatePanel(
-    feature: VibeCreateFeature = VibeCreateViewModel.feature(),
+    feature: VibeCreateFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean = true,
     onExpandedChange: ((Boolean) -> Unit)? = null,

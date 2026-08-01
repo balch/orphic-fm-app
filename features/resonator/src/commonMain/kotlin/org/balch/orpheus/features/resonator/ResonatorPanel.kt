@@ -63,7 +63,7 @@ private val RingsPanelColor = OrpheusColors.lakersGold
 
 @Composable
 fun ResonatorPanel(
-    feature: ResonatorFeature = ResonatorViewModel.feature(),
+    feature: ResonatorFeature,
     inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,

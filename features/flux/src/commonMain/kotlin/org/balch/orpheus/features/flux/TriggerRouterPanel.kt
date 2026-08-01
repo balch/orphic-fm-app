@@ -45,9 +45,9 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 @Composable
 fun TriggerRouterPanel(
     modifier: Modifier = Modifier,
-    drumFeature: DrumFeature = DrumViewModel.feature(),
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
-    bassFeature: BassFeature = BassViewModel.feature(),
+    drumFeature: DrumFeature,
+    voiceFeature: VoicesFeature,
+    bassFeature: BassFeature,
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit
 ) {

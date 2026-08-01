@@ -2,8 +2,10 @@ package org.balch.orpheus.features.distortion
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,8 +107,10 @@ interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelAct
  * Keeps SynthEngine dependency for peakFlow monitoring and StereoMode (non-port state).
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DistortionFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DistortionFeature>())
 class DistortionViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,

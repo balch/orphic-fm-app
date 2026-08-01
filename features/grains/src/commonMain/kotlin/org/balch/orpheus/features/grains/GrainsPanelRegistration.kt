@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class GrainsPanelRegistration(
+    private val feature: GrainsFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.GRAINS
@@ -31,7 +32,7 @@ class GrainsPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         GrainsPanel(
-            feature = GrainsViewModel.feature(),
+            feature = feature,
             inVizFlow = synthEngine.grainsInVizFlow,
             outVizFlow = synthEngine.grainsOutVizFlow,
             modifier = modifier,

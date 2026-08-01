@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class BeatsPanelRegistration : FeaturePanel {
+class BeatsPanelRegistration(
+    private val drumBeatsFeature: DrumBeatsFeature,
+) : FeaturePanel {
     override val panelId = PanelId.BEATS
     override val description = "Drum Patterns Panel"
     override val weight = 1.25f
@@ -28,7 +30,7 @@ class BeatsPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         DrumBeatsPanel(
-            drumBeatsFeature = DrumBeatsViewModel.feature(),
+            drumBeatsFeature = drumBeatsFeature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

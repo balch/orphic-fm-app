@@ -85,7 +85,7 @@ import kotlin.math.sin
 
 @Composable
 fun SpeechPanel(
-    feature: SpeechFeature = SpeechViewModel.feature(),
+    feature: SpeechFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

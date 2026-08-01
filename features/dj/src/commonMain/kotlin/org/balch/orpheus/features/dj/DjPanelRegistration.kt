@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class DjPanelRegistration(
+    private val feature: DjFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.DJ
@@ -38,7 +39,7 @@ class DjPanelRegistration(
         }
 
         DjPanel(
-            feature = DjViewModel.feature(),
+            feature = feature,
             vizFlowA = synthEngine.djVizFlowA,
             vizFlowB = synthEngine.djVizFlowB,
             outVizFlow = synthEngine.djOutVizFlow,

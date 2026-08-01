@@ -1,10 +1,11 @@
 package org.balch.orpheus.features.drum
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.key.Key
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.input.KeyAction
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
@@ -214,8 +214,10 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
  * Keeps SynthEngine for triggerDrum() (imperative operation).
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DrumFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DrumFeature>())
 class DrumViewModel(
     private val synthEngine: SynthEngine,
     synthController: SynthController,
@@ -439,9 +441,5 @@ class DrumViewModel(
                 override val stateFlow: StateFlow<DrumUiState> = MutableStateFlow(state)
                 override val actions: DrumPanelActions = DrumPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): DrumFeature =
-            synthFeature<DrumFeature>()
     }
 }

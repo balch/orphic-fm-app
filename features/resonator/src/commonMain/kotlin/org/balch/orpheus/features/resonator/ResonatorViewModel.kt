@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.resonator
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +23,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 
 enum class ResonatorMode(val displayName: String) {
@@ -132,8 +132,10 @@ interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelAction
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(ResonatorFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<ResonatorFeature>())
 class ResonatorViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -211,9 +213,5 @@ class ResonatorViewModel(
                 override val stateFlow: StateFlow<ResonatorUiState> = MutableStateFlow(state)
                 override val actions: ResonatorPanelActions = ResonatorPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): ResonatorFeature =
-            synthFeature<ResonatorFeature>()
     }
 }

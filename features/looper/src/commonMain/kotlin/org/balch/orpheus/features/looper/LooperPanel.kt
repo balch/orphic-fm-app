@@ -58,7 +58,7 @@ private val PlayColor = OrpheusColors.looperGreen
 
 @Composable
 fun LooperPanel(
-    feature: LooperFeature = LooperViewModel.feature(),
+    feature: LooperFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

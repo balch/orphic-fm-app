@@ -1,10 +1,11 @@
 package org.balch.orpheus.features.looper
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
@@ -22,7 +23,6 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
 data class LooperUiState(
@@ -69,8 +69,10 @@ interface LooperFeature : SynthFeature<LooperUiState, LooperActions> {
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(LooperFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<LooperFeature>())
 class LooperViewModel(
     private val synth: SynthEngine,
     scope: FeatureCoroutineScope,
@@ -203,9 +205,5 @@ class LooperViewModel(
                 override val stateFlow: StateFlow<LooperUiState> = MutableStateFlow(state)
                 override val actions: LooperActions = LooperActions.EMPTY
             }
-
-        @Composable
-        fun feature(): LooperFeature =
-            synthFeature<LooperFeature>()
     }
 }

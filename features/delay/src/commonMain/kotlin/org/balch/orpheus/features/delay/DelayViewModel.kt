@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.delay
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 
 @Immutable
@@ -113,8 +113,10 @@ interface DelayFeature : SynthFeature<DelayUiState, DelayPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DelayFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DelayFeature>())
 class DelayViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -187,9 +189,5 @@ class DelayViewModel(
                 override val stateFlow: StateFlow<DelayUiState> = MutableStateFlow(state)
                 override val actions: DelayPanelActions = DelayPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): DelayFeature =
-            synthFeature<DelayFeature>()
     }
 }

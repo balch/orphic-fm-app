@@ -3,8 +3,10 @@ package org.balch.orpheus.ui.panels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
@@ -86,8 +88,10 @@ private sealed class HeaderIntent {
  */
 @OptIn(FlowPreview::class)
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(HeaderFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<HeaderFeature>())
 class HeaderViewModel(
     panelExpansionEventBus: PanelExpansionEventBus,
     headerPanelGraphFactory: HeaderPanelGraph.Factory,

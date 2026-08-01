@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class WarpsPanelRegistration(
+    private val feature: WarpsFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.WARPS
@@ -31,7 +32,7 @@ class WarpsPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         WarpsPanel(
-            feature = WarpsViewModel.feature(),
+            feature = feature,
             carrierVizFlow = synthEngine.warpsCarrierVizFlow,
             modulatorVizFlow = synthEngine.warpsModVizFlow,
             outputVizFlow = synthEngine.warpsOutVizFlow,

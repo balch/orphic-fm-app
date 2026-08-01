@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.tides
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.TidesSymbol
 
 @Immutable
@@ -141,8 +141,10 @@ interface TidesFeature : SynthFeature<TidesUiState, TidesPanelActions> {
  * clock/gate routing.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(TidesFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<TidesFeature>())
 class TidesViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -228,8 +230,5 @@ class TidesViewModel(
                 override val stateFlow: StateFlow<TidesUiState> = MutableStateFlow(state)
                 override val actions: TidesPanelActions = TidesPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): TidesFeature = synthFeature<TidesFeature>()
     }
 }

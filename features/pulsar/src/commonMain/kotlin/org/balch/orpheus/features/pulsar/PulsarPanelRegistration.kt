@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class PulsarPanelRegistration(
+    private val pulsar: PulsarFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.PULSAR
@@ -31,7 +32,7 @@ class PulsarPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         PulsarPanel(
-            pulsar = PulsarViewModel.feature(),
+            pulsar = pulsar,
             vizFlow = synthEngine.pulsarVizFlow,
             trackVizFlows = synthEngine.pulsarTrackVizFlows,
             modifier = modifier,

@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class AiOptionsPanelRegistration : FeaturePanel {
+class AiOptionsPanelRegistration(
+    private val feature: AiOptionsFeature,
+) : FeaturePanel {
     override val panelId = PanelId.AI
     override val description = "Panel allowing user to select a patch"
     override val weight = 0.6f
@@ -28,7 +30,7 @@ class AiOptionsPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         AiOptionsPanel(
-            feature = AiOptionsViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

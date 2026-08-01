@@ -10,11 +10,14 @@ import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class TweaksPanelRegistration : FeaturePanel {
+class TweaksPanelRegistration(
+    private val voiceFeature: VoicesFeature,
+) : FeaturePanel {
     override val panelId = PanelId.TWEAKS
     override val description = "Modulation tweaks panel"
     override val weight = 0.5f
@@ -29,7 +32,7 @@ class TweaksPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         ModTweaksPanel(
-            voiceFeature = VoiceViewModel.feature(),
+            voiceFeature = voiceFeature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

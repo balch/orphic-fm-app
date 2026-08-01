@@ -45,7 +45,7 @@ import org.balch.orpheus.ui.widgets.learnable
 
 @Composable
 fun GrainsPanel(
-    feature: GrainsFeature = GrainsViewModel.feature(),
+    feature: GrainsFeature,
     inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,

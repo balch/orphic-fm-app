@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class PresetsPanelRegistration : FeaturePanel {
+class PresetsPanelRegistration(
+    private val feature: PresetsFeature,
+) : FeaturePanel {
     override val panelId = PanelId.PRESETS
     override val description = "Panel allowing user to select a patch"
     override val weight = 1.0f
@@ -28,7 +30,7 @@ class PresetsPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         PresetsPanel(
-            feature = PresetsViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

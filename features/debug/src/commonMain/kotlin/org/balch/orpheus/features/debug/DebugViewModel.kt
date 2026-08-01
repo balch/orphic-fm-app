@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.debug
 
 import androidx.compose.runtime.Composable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,8 +48,10 @@ interface DebugFeature : SynthFeature<DebugUiState, DebugPanelActions> {
  * Combines engine monitoring flows with console logs into a unified UI state.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DebugFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DebugFeature>())
 class DebugViewModel(
     private val engine: SynthEngine,
     private val consoleLogger: ConsoleLogger,

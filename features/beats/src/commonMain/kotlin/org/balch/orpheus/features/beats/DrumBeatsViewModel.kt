@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.beats
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,7 +26,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
@@ -125,15 +125,17 @@ interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
  * PatternGenerator state is updated as a side effect alongside controlFlow-driven state changes.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DrumBeatsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DrumBeatsFeature>())
 class DrumBeatsViewModel(
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
     private val scope: FeatureCoroutineScope
-) : DrumBeatsFeature, AutoCloseable {
+) : DrumBeatsFeature {
 
     // Control flows for beats ports
     private val xFlow = synthController.controlFlow(BeatsSymbol.X.controlId)
@@ -332,20 +334,12 @@ class DrumBeatsViewModel(
         uiIntents.tryEmit(DrumBeatsIntent.TickStep(0))
     }
 
-    override fun close() {
-        stopClock()
-    }
-
     companion object {
         fun previewFeature(state: BeatsUiState = BeatsUiState()): DrumBeatsFeature =
             object : DrumBeatsFeature {
                 override val stateFlow: StateFlow<BeatsUiState> = MutableStateFlow(state)
                 override val actions: DrumBeatsPanelActions = DrumBeatsPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): DrumBeatsFeature =
-            synthFeature<DrumBeatsFeature>()
     }
 }
 

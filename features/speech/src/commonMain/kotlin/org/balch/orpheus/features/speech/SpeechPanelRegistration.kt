@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class SpeechPanelRegistration : FeaturePanel {
+class SpeechPanelRegistration(
+    private val feature: SpeechFeature,
+) : FeaturePanel {
     override val panelId = PanelId.SPEECH
     override val description = "Speech synthesis panel showing AI speech output"
     override val weight = 1.0f
@@ -28,7 +30,7 @@ class SpeechPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         SpeechPanel(
-            feature = SpeechViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

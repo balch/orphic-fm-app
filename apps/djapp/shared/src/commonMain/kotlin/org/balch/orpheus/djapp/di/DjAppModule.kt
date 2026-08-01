@@ -64,13 +64,34 @@ interface DjAppModule {
         @Provides
         fun provideAgentGreetingMode(): AgentGreetingMode = AgentGreetingMode.ON_FIRST_PROMPT
 
+        /**
+         * DELIBERATELY UNSCOPED. Do not add `@SingleIn(AppScope::class)` here.
+         *
+         * It buys nothing. `PulsarViewModel` is `@SingleIn(FeatureScope::class)`, so Metro already
+         * memoizes the one instance inside the feature graph and `getFeature` returns that same
+         * object on every call. A scope here adds no memoization, only an AppScope `DoubleCheck`
+         * whose monitor would be held across this entire body, and this body is a cross-graph
+         * call Metro can neither see nor order.
+         *
+         * A monitor held across exactly that kind of hidden edge is what used to hang Baton's
+         * startup four launches out of five: an AB-BA deadlock between a scoped provider's
+         * `DoubleCheck` and `FeatureCollection`'s then-extant cache lock, with `jstack` naming
+         * both monitors. The collection's cache and lock are gone, so that specific cycle cannot
+         * re-form, but the rule stands: bridge providers stay unscoped and cheap.
+         *
+         * Guarded by `FeatureProviderScopeGuardTest` in `:core:features`.
+         */
         @Provides
-        @SingleIn(AppScope::class)
         fun providePulsarFeature(holder: FeatureGraphHolder): PulsarFeature =
             holder.featureGraph.featureCollection.getFeature(PulsarFeature::class)
 
+        /**
+         * DELIBERATELY UNSCOPED for the same reason as [providePulsarFeature] above: the
+         * ViewModel behind this is already `@SingleIn(FeatureScope::class)`, so a scope here adds
+         * no memoization, only a `DoubleCheck` monitor held across a cross-graph call. Do not add
+         * `@SingleIn(AppScope::class)`.
+         */
         @Provides
-        @SingleIn(AppScope::class)
         fun provideTimerFeature(holder: FeatureGraphHolder): TimerFeature =
             holder.featureGraph.featureCollection.getFeature(TimerFeature::class)
     }

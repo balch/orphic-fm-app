@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class TidesPanelRegistration(
+    private val tides: TidesFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.TIDES
@@ -31,7 +32,7 @@ class TidesPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         TidesPanel(
-            tides = TidesViewModel.feature(),
+            tides = tides,
             vizCh0Flow = synthEngine.tidesCh0VizFlow,
             vizCh1Flow = synthEngine.tidesCh1VizFlow,
             vizCh2Flow = synthEngine.tidesCh2VizFlow,

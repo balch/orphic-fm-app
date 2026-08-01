@@ -3,8 +3,10 @@ package org.balch.orpheus.features.midi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -47,8 +49,10 @@ interface MidiFeature : SynthFeature<MidiUiState, MidiPanelActions> {
  * SynthController and all MidiViewModel instances share the same state.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(MidiFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<MidiFeature>())
 class MidiViewModel(
     val midiController: MidiController,
     private val midiRepository: MidiMappingRepository,
@@ -56,7 +60,7 @@ class MidiViewModel(
     private val midiInputHandler: MidiInputHandler,
     private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope
-) : MidiFeature, AutoCloseable {
+) : MidiFeature {
 
     private val log = logging("MidiViewModel")
 
@@ -245,10 +249,6 @@ class MidiViewModel(
         _isConnected.value = false
     }
 
-    override fun close() {
-        stop()
-    }
-    
     companion object {
         fun previewFeature(state: MidiUiState = MidiUiState(isConnected = true, deviceName = "Mock Device")): MidiFeature =
             object : MidiFeature {

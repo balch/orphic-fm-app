@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.visualizations
 
 import androidx.compose.runtime.Composable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -75,15 +77,17 @@ interface VizFeature : SynthFeature<VizUiState, VizPanelActions> {
  * dispatched to [DispatcherProvider.default].
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(VizFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<VizFeature>())
 class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope
-) : VizFeature, AutoCloseable {
+) : VizFeature {
 
     override val actions = VizPanelActions(
         onSelectViz = { selectVisualization(it) },
@@ -257,14 +261,6 @@ class VizViewModel(
         }
     }
     
-    override fun close() {
-        // Called synchronously at DI-scope teardown. At that point the Compose frame loop
-        // is no longer active (the UI has already been torn down), so calling onDeactivate()
-        // here does not race with the frame loop.
-        _currentViz.value.onDeactivate()
-        dynamicEffectsJob?.cancel()
-    }
-
     companion object {
         fun previewFeature(state: VizUiState = VizUiState(
             selectedViz = OffViz(),

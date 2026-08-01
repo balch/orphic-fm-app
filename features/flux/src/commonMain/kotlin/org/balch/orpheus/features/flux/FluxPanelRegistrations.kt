@@ -10,14 +10,21 @@ import org.balch.orpheus.core.di.HeaderPanelScope
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
+import org.balch.orpheus.features.bass.BassFeature
 import org.balch.orpheus.features.bass.BassViewModel
+import org.balch.orpheus.features.drum.DrumFeature
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class TriggerRouterPanelRegistration : FeaturePanel {
+class TriggerRouterPanelRegistration(
+    private val drumFeature: DrumFeature,
+    private val voiceFeature: VoicesFeature,
+    private val bassFeature: BassFeature,
+) : FeaturePanel {
     override val panelId = PanelId.FLUX_TRIGGERS
     override val description = "Assigns sounds to Flux outputs"
     override val weight = 0.8f
@@ -32,9 +39,9 @@ class TriggerRouterPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         TriggerRouterPanel(
-            drumFeature = DrumViewModel.feature(),
-            voiceFeature = VoiceViewModel.feature(),
-            bassFeature = BassViewModel.feature(),
+            drumFeature = drumFeature,
+            voiceFeature = voiceFeature,
+            bassFeature = bassFeature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,
@@ -63,6 +70,7 @@ class TriggerRouterPanelRegistration : FeaturePanel {
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class FluxPanelRegistration(
+    private val flux: FluxFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.FLUX
@@ -79,7 +87,7 @@ class FluxPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         FluxPanel(
-            flux = FluxViewModel.feature(),
+            flux = flux,
             cvVizFlow = synthEngine.fluxCvVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,

@@ -2,8 +2,10 @@ package org.balch.orpheus.djapp.ai
 
 import androidx.compose.runtime.Composable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -227,8 +229,10 @@ internal fun reduceVibeEvent(e: VibeCreateEvent, s: DjAiUiState): DjAiUiState = 
  * pure reducers, and delegates key / model management to the shared repositories.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DjAiFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DjAiFeature>())
 class DjAiViewModel(
     private val agent: OrpheusAgent,
     private val activityEventBus: AgentActivityEventBus,

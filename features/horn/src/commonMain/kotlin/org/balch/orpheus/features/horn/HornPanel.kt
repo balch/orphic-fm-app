@@ -424,6 +424,13 @@ private fun CabinetCrossSectionAnimation(
         val cornerRadius = 10f
         val shelfY = h * 0.5f
 
+        // Both paddles size off (w - cabinetPadding * 2 - 16), which goes negative once the
+        // panel collapses to a narrow strip. A radial gradient with radius <= 0 makes Skia's
+        // makeRadialGradient return nullptr, and skiko turns that into
+        // "RuntimeException: Can't wrap nullptr" on the AWT event thread, killing the window.
+        // Nothing to draw at that size anyway.
+        if (w - cabinetPadding * 2f - 16f <= 0f || h - cabinetPadding * 2f <= 0f) return@Canvas
+
         // Cabinet outline
         drawRoundRect(
             color = CrimsonBorder,

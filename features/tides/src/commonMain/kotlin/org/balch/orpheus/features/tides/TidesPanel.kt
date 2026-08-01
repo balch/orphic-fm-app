@@ -61,7 +61,7 @@ private fun tidesSmoothName(value: Float) = interpolatedName(value, smoothNames)
  */
 @Composable
 fun TidesPanel(
-    tides: TidesFeature = TidesViewModel.feature(),
+    tides: TidesFeature,
     vizCh0Flow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     vizCh1Flow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     vizCh2Flow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),

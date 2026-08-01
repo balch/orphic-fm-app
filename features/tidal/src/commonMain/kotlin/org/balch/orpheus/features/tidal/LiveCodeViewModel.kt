@@ -1,12 +1,13 @@
 package org.balch.orpheus.features.tidal
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +22,6 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -107,8 +107,10 @@ sealed class LiveCodeIntent {
  * Delegates to TidalRepl for REPL evaluation lifecycle.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(LiveCodeFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<LiveCodeFeature>())
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
     private val repl: TidalRepl,
@@ -118,7 +120,7 @@ class LiveCodeViewModel(
     private val synthEngine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope
-) : LiveCodeFeature, AutoCloseable {
+) : LiveCodeFeature {
 
     override val actions = LiveCodePanelActions(
         setCode = ::updateCode,
@@ -557,10 +559,6 @@ class LiveCodeViewModel(
         _intents.value = LiveCodeIntent.DeleteLine
     }
     
-    override fun close() {
-        scheduler.stop()
-    }
-    
     companion object {
         /**
          * Example patterns for users to learn from.
@@ -701,9 +699,5 @@ d4 $ slow 2 $ note "<c2 g2 e2 b2>"
                 override val actions: LiveCodePanelActions = LiveCodePanelActions.EMPTY
                 override val triggers: Flow<TidalScheduler.TriggerEvent> = emptyFlow()
             }
-
-        @Composable
-        fun feature(): LiveCodeFeature =
-             synthFeature<LiveCodeFeature>()
     }
 }

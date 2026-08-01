@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.lfo
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
@@ -166,8 +166,10 @@ interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
  * Knob values (0..1) map exponentially to frequency (0..10 Hz) for DuoLFO.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(LfoFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<LfoFeature>())
 class LfoViewModel(
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -341,9 +343,5 @@ class LfoViewModel(
                 override val stateFlow: StateFlow<LfoUiState> = MutableStateFlow(state)
                 override val actions: LfoPanelActions = LfoPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): LfoFeature =
-            synthFeature<LfoFeature>()
     }
 }

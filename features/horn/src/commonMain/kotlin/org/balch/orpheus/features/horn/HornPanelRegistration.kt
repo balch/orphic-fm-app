@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class HornPanelRegistration(
+    private val feature: HornFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.HORN
@@ -31,7 +32,7 @@ class HornPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         HornPanel(
-            feature = HornViewModel.feature(),
+            feature = feature,
             inVizFlow = synthEngine.hornInVizFlow,
             outVizFlow = synthEngine.hornOutVizFlow,
             hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,

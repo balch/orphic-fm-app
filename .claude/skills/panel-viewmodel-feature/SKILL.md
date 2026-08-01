@@ -152,8 +152,10 @@ interface TidesFeature : SynthFeature<TidesUiState, TidesPanelActions> {
 **5. ViewModel class**:
 ```kotlin
 @Inject
+@SingleIn(FeatureScope::class)          // REQUIRED — without it Metro builds a new VM per resolve
 @SynthFeatureKey(TidesFeature::class)   // key by the INTERFACE, not the ViewModel
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<TidesFeature>())
 class TidesViewModel(
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -195,7 +197,9 @@ class TidesViewModel(
             }
 
         @Composable
-        fun feature(): TidesFeature = synthFeature<TidesFeature>()
+        // Only add this if a NON-DI composable reads the feature (App.kt, a *Screen.kt,
+        // DjAppScreen.kt). A *PanelRegistration must inject TidesFeature instead.
+        // fun feature(): TidesFeature = synthFeature<TidesFeature>()
     }
 }
 ```
@@ -213,7 +217,7 @@ class TidesViewModel(
 ```kotlin
 @Composable
 fun TidesPanel(
-    feature: TidesFeature = TidesViewModel.feature(),
+    feature: TidesFeature,   // required — the registration injects it and passes it down
     vizFlows: List<StateFlow<FloatArray>> = emptyList(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
@@ -247,9 +251,12 @@ fun TidesPanel(
 
 ```kotlin
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
+@ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class TidesPanelRegistration(
     private val synthEngine: SynthEngine,
+    // Inject the feature INTERFACE. Do not call TidesViewModel.feature() here — this is a
+    // DI-constructed class, so Metro can verify the binding at build time.
+    private val feature: TidesFeature,
 ) : FeaturePanel {
     override val panelId = PanelId.TIDES
     override val description = "Function generator with 4 channels"
@@ -265,7 +272,7 @@ class TidesPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         TidesPanel(
-            feature = TidesViewModel.feature(),
+            feature = feature,
             vizFlows = listOf(
                 synthEngine.tidesCh0VizFlow,
                 synthEngine.tidesCh1VizFlow,
@@ -349,9 +356,10 @@ companion object {
 - [ ] Plugin in `core/plugins/<name>/` with `@ContributesIntoSet(..., binding = binding<DspPlugin>())`
 - [ ] PanelId added to `FeaturePanel.kt` companion
 - [ ] Feature interface extending `SynthFeature<S, A>` with `SynthControlDescriptor`
-- [ ] ViewModel with `@SynthFeatureKey(<Name>Feature::class)` + `@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())` — the key is the feature **interface**, which is also what `synthFeature<<Name>Feature>()` asks for
-- [ ] Panel composable consuming feature flows and actions
-- [ ] PanelRegistration with `@ContributesIntoSet(..., binding = binding<FeaturePanel>())`
+- [ ] ViewModel with **all four**: `@SingleIn(FeatureScope::class)` + `@SynthFeatureKey(<Name>Feature::class)` + `@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())` + `@ContributesBinding(FeatureScope::class, binding = binding<<Name>Feature>())`. The key is the feature **interface**. Missing `@SingleIn` silently gives a new ViewModel per resolve — `FeatureScopeGuardTest` catches it
+- [ ] Panel composable taking the feature as a **required** parameter, no `= <Name>ViewModel.feature()` default
+- [ ] PanelRegistration with `@ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())` that **constructor-injects** `<Name>Feature`
+- [ ] Companion `feature()` accessor ONLY if a non-DI composable (`App.kt`, a `*Screen.kt`) reads it
 - [ ] Viz flows added to SynthEngine interface + SignalMonitorViz
 - [ ] Both `:core:plugins:<name>` and `:features:<name>` added to `apps/orpheus/shared/build.gradle.kts`
 - [ ] `previewFeature()` and `preview()` companions for Compose previews

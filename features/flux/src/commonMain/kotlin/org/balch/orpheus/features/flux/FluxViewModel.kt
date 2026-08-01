@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.flux
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 
 @Immutable
@@ -181,8 +181,10 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(FluxFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<FluxFeature>())
 class FluxViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -300,8 +302,5 @@ class FluxViewModel(
                 override val stateFlow: StateFlow<FluxUiState> = MutableStateFlow(state)
                 override val actions: FluxPanelActions = FluxPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): FluxFeature = synthFeature<FluxFeature>()
     }
 }

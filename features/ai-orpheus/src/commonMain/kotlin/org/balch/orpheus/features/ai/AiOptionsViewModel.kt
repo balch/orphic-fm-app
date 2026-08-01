@@ -2,8 +2,10 @@ package org.balch.orpheus.features.ai
 
 import androidx.compose.runtime.Composable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -130,8 +132,10 @@ interface AiOptionsFeature : SynthFeature<AiOptionsUiState, AiOptionsPanelAction
  * - Chat: Open chat dialog
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(AiOptionsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<AiOptionsFeature>())
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
     private val synthAgentFactory: SynthControlAgent.Factory,
@@ -148,7 +152,7 @@ class AiOptionsViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val scope: FeatureCoroutineScope,
-) : AiOptionsFeature, AutoCloseable {
+) : AiOptionsFeature {
 
     private val log = logging("AiOptionsViewModel")
 
@@ -904,10 +908,6 @@ class AiOptionsViewModel(
             aiControlLog = aiControlLog
         )
     )
-
-    override fun close() {
-        stopAllAgents()
-    }
 
     companion object {
         fun previewFeature(state: AiOptionsUiState = AiOptionsUiState()): AiOptionsFeature =

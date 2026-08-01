@@ -37,7 +37,7 @@ import org.balch.orpheus.ui.widgets.drumEngineLabel
 
 @Composable
 fun DrumsPanel(
-    drumFeature: DrumFeature = DrumViewModel.feature(),
+    drumFeature: DrumFeature,
     drumOutVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,

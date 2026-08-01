@@ -1,10 +1,11 @@
 package org.balch.orpheus.features.evo
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,7 +24,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.plugin.symbols.EvoSymbol
 
@@ -89,8 +89,10 @@ interface EvoFeature : SynthFeature<EvoUiState, EvoPanelActions> {
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(EvoFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<EvoFeature>())
 class EvoViewModel(
     strategies: Set<AudioEvolutionStrategy>,
     private val synthEngine: SynthEngine,
@@ -98,7 +100,7 @@ class EvoViewModel(
     private val dispatcherProvider: DispatcherProvider,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val scope: FeatureCoroutineScope
-) : EvoFeature, AutoCloseable {
+) : EvoFeature {
 
     private val log = logging("EvoViewModel")
 
@@ -249,12 +251,6 @@ class EvoViewModel(
         evoJob = null
     }
 
-    override fun close() {
-        stopEvolutionLoop()
-        stateFlow.value.selectedStrategy.onDeactivate()
-        log.debug { "EvoViewModel cleared" }
-    }
-
     companion object {
         private object PreviewStrategy : AudioEvolutionStrategy {
             override val id = "preview"
@@ -280,10 +276,6 @@ class EvoViewModel(
                 override val stateFlow: StateFlow<EvoUiState> = MutableStateFlow(state)
                 override val actions: EvoPanelActions = EvoPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): EvoFeature =
-            synthFeature<EvoFeature>()
     }
 }
 

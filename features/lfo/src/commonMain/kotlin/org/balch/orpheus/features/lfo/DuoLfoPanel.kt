@@ -73,7 +73,7 @@ private fun LfoUiState.toModeOption(): LfoModeOption = when (source) {
  */
 @Composable
 fun DuoLfoPanel(
-    feature: LfoFeature = LfoViewModel.feature(),
+    feature: LfoFeature,
     vizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     vizCh1Flow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     vizCh2Flow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),

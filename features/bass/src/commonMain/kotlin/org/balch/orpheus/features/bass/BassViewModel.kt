@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.bass
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.BassSymbol
 
 @Immutable
@@ -155,8 +155,10 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(BassFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<BassFeature>())
 class BassViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
@@ -287,9 +289,5 @@ class BassViewModel(
                 override val stateFlow: StateFlow<BassUiState> = MutableStateFlow(state)
                 override val actions: BassPanelActions = BassPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): BassFeature =
-            synthFeature<BassFeature>()
     }
 }

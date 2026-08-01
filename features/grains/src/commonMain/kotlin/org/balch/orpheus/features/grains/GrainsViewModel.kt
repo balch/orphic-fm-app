@@ -1,9 +1,10 @@
 package org.balch.orpheus.features.grains
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +24,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
 import org.balch.orpheus.plugins.grains.GrainsMode
@@ -130,8 +130,10 @@ interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(GrainsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<GrainsFeature>())
 class GrainsViewModel(
     synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
@@ -229,9 +231,5 @@ class GrainsViewModel(
                 override val stateFlow: StateFlow<GrainsUiState> = MutableStateFlow(state)
                 override val actions: GrainsPanelActions = GrainsPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): GrainsFeature =
-            synthFeature<GrainsFeature>()
     }
 }

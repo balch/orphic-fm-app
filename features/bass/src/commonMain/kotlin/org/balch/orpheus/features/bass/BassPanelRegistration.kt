@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class BassPanelRegistration(
+    private val feature: BassFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.BASS
@@ -31,7 +32,7 @@ class BassPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         BassPanel(
-            feature = BassViewModel.feature(),
+            feature = feature,
             outVizFlow = synthEngine.bassOutVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,

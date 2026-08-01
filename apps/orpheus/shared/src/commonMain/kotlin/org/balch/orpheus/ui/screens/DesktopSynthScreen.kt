@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.feature
+import org.balch.orpheus.features.beats.DrumBeatsFeature
 import org.balch.orpheus.features.mediapipe.MediaPipeFeature
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.tweaks.CenterControlSection
@@ -49,6 +50,9 @@ fun DesktopSynthScreen(
     focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
     val registry = LocalSynthFeatures.current
+    // CenterControlSection lives in :features:tweaks and takes this as a parameter now, so the
+    // screen resolves it here. DrumBeatsViewModel no longer exposes a companion accessor.
+    val beatsFeature: DrumBeatsFeature = registry.feature<DrumBeatsFeature>()
     val headerFeature: HeaderFeature = registry.feature<HeaderFeature>()
     val voiceFeature: VoicesFeature = registry.feature<VoicesFeature>()
     val midiFeature: MidiFeature = registry.feature<MidiFeature>()
@@ -126,6 +130,7 @@ fun DesktopSynthScreen(
 
                     CenterControlSection(
                         voiceFeature = voiceFeature,
+                        beatsFeature = beatsFeature,
                         modifier = Modifier
                             .fillMaxHeight()
                             .weight(0.4f)

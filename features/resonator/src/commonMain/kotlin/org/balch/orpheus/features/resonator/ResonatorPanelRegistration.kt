@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class ResonatorPanelRegistration(
+    private val feature: ResonatorFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.RESONATOR
@@ -31,7 +32,7 @@ class ResonatorPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         ResonatorPanel(
-            feature = ResonatorViewModel.feature(),
+            feature = feature,
             inVizFlow = synthEngine.resoInVizFlow,
             outVizFlow = synthEngine.resoOutVizFlow,
             modifier = modifier,

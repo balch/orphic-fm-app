@@ -51,7 +51,7 @@ private data class WarpsColors(
 )
 @Composable
 fun WarpsPanel(
-    feature: WarpsFeature = WarpsViewModel.feature(),
+    feature: WarpsFeature,
     carrierVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modulatorVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     outputVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),

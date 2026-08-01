@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class MixerPanelRegistration(
+    private val feature: MixerFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.MIXER
@@ -31,7 +32,7 @@ class MixerPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         MixerPanel(
-            feature = MixerViewModel.feature(),
+            feature = feature,
             trackVizFlows = synthEngine.pulsarTrackVizFlows,
             masterOutVizFlow = synthEngine.masterOutVizFlow,
             modifier = modifier,

@@ -16,6 +16,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class LfoPanelRegistration(
     private val synthEngine: SynthEngine,
+    private val feature: LfoFeature,
 ) : FeaturePanel {
     override val panelId = PanelId.LFO
     override val description = "Provide wave patterns to produce sounds"
@@ -31,7 +32,7 @@ class LfoPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         DuoLfoPanel(
-            feature = LfoViewModel.feature(),
+            feature = feature,
             vizFlow = synthEngine.lfoVizFlow,
             vizCh1Flow = synthEngine.lfoCh1VizFlow,
             vizCh2Flow = synthEngine.lfoCh2VizFlow,

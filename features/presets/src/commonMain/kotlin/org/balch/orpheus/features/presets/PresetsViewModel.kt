@@ -3,8 +3,10 @@ package org.balch.orpheus.features.presets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -77,8 +79,10 @@ interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
  * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(PresetsFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<PresetsFeature>())
 class PresetsViewModel(
     private val presetsRepository: PresetsRepository,
     private val presetLoader: PresetLoader,

@@ -13,7 +13,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
-class LooperPanelRegistration : FeaturePanel {
+class LooperPanelRegistration(
+    private val feature: LooperFeature,
+) : FeaturePanel {
     override val panelId = PanelId.LOOPER
     override val description = "Record and replay audio"
     override val weight = 1.0f
@@ -28,7 +30,7 @@ class LooperPanelRegistration : FeaturePanel {
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         LooperPanel(
-            feature = LooperViewModel.feature(),
+            feature = feature,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

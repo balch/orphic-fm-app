@@ -1,11 +1,12 @@
 package org.balch.orpheus.features.speech
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.input.key.Key
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,7 +26,6 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.input.KeyAction
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.plugin.PortValue
@@ -129,8 +129,10 @@ interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
 }
 
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(SpeechFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<SpeechFeature>())
 class SpeechViewModel(
     synthController: SynthController,
     private val synthEngine: SynthEngine,
@@ -360,9 +362,5 @@ class SpeechViewModel(
                 override val stateFlow: StateFlow<SpeechUiState> = MutableStateFlow(state)
                 override val actions: SpeechPanelActions = SpeechPanelActions.EMPTY
             }
-
-        @Composable
-        fun feature(): SpeechFeature =
-            synthFeature<SpeechFeature>()
     }
 }

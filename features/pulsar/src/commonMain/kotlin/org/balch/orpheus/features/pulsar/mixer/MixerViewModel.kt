@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.pulsar.mixer
 
 import androidx.compose.runtime.Composable
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,8 +61,10 @@ private sealed interface MixerIntent {
  * flow used by DistortionPanel.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(MixerFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<MixerFeature>())
 class MixerViewModel(
     engine: SynthEngine,
     synthController: SynthController,

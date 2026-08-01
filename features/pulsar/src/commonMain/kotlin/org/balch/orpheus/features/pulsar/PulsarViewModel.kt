@@ -3,8 +3,10 @@ package org.balch.orpheus.features.pulsar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
@@ -295,8 +297,10 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
  */
 @OptIn(FlowPreview::class)
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(PulsarFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<PulsarFeature>())
 class PulsarViewModel(
     private val synthController: SynthController,
     synthEngine: SynthEngine,

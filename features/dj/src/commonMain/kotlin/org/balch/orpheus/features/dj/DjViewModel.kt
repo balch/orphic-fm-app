@@ -3,8 +3,10 @@ package org.balch.orpheus.features.dj
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -141,8 +143,10 @@ private sealed interface DjIntent {
  * Includes a physics coroutine that simulates platter motor/friction behavior at ~60Hz.
  */
 @Inject
+@SingleIn(FeatureScope::class)
 @SynthFeatureKey(DjFeature::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+@ContributesBinding(FeatureScope::class, binding = binding<DjFeature>())
 class DjViewModel(
     synthController: SynthController,
     private val dispatchers: DispatcherProvider,
@@ -434,8 +438,11 @@ class DjViewModel(
                 override val actions: DjPanelActions = DjPanelActions.EMPTY
             }
 
+        /**
+         * Kept for `DjAppScreen`, which is a plain composable with no constructor to inject into.
+         * `DjPanelRegistration` injects [DjFeature] directly and does not use this.
+         */
         @Composable
-        fun feature(): DjFeature =
-            synthFeature<DjFeature>()
+        fun feature(): DjFeature = synthFeature<DjFeature>()
     }
 }

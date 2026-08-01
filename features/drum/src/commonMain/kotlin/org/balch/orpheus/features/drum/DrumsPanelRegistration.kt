@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class DrumsPanelRegistration(
+    private val drumFeature: DrumFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.DRUMS
@@ -31,7 +32,7 @@ class DrumsPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         DrumsPanel(
-            drumFeature = DrumViewModel.feature(),
+            drumFeature = drumFeature,
             drumOutVizFlow = synthEngine.drumOutVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,

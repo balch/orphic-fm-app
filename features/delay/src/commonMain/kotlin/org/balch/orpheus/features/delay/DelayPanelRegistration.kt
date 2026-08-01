@@ -15,6 +15,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Inject
 @ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class DelayPanelRegistration(
+    private val feature: DelayFeature,
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
     override val panelId = PanelId.DELAY
@@ -31,7 +32,7 @@ class DelayPanelRegistration(
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
         DelayFeedbackPanel(
-            feature = DelayViewModel.feature(),
+            feature = feature,
             inVizFlow = synthEngine.delayInVizFlow,
             fbVizFlow = synthEngine.delayFbVizFlow,
             outVizFlow = synthEngine.delayOutVizFlow,
