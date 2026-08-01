@@ -1,0 +1,7 @@
+# This directory holds deployment credentials — the Play service-account key,
+# an App Store Connect API key (.p8), signing keys, etc.
+# Deny-all so no credential format (present or future) can ever be committed.
+# Only the documentation is tracked.
+*
+!.gitignore
+!README.md

@@ -4,7 +4,7 @@ options:
   deploymentTarget:
     iOS: "15.0"
 settings:
-  DEVELOPMENT_TEAM: ""
+  DEVELOPMENT_TEAM: "X5YQC8CHTP"
   CODE_SIGN_STYLE: Automatic
 targets:
   DjApp:
@@ -35,7 +35,7 @@ targets:
         UIBackgroundModes:
           - audio
         NSBluetoothAlwaysUsageDescription: "Bluetooth is used to connect MIDI controllers"
-        UILaunchStoryboardName: LaunchScreen
+        UILaunchScreen: {}
         CADisableMinimumFrameDurationOnPhone: true
     settings:
       base:
@@ -116,7 +116,7 @@ targets:
         UIBackgroundModes:
           - audio
         NSBluetoothAlwaysUsageDescription: "Bluetooth is used to connect MIDI controllers"
-        UILaunchStoryboardName: LaunchScreen
+        UILaunchScreen: {}
         CADisableMinimumFrameDurationOnPhone: true
     settings:
       base:
