@@ -18,7 +18,7 @@ The convention plugin reads two things at configuration time:
 - `gitVersionCode = git rev-list --count HEAD` — every commit bumps this by 1.
 - `gitVersionName = git describe --tags --always --dirty` — resolves to the tag if HEAD is exactly tagged, otherwise something like `v1.1.0-3-gabc1234`, otherwise the short SHA.
 
-The AAB / APK base name gets `-v$versionTag` appended automatically (`base.archivesName.set("$archivesBase-v$versionTag")`). So when HEAD is exactly at a `vX.Y.Z` tag, you get clean filenames like `djapp-v1.1.1-release.aab`. When it isn't, you get a noisier suffix. **Always tag before building distributable variants.**
+The AAB / APK base name gets `-v$versionTag` appended automatically (`base.archivesName.set("$archivesBase-v$versionTag")`), and the flavor + build type follow. So when HEAD is exactly at a `vX.Y.Z` tag, you get clean filenames like `djapp-v1.9.0-og-release.aab`. When it isn't, you get a noisier suffix. **Always tag before building distributable variants.**
 
 Debug-like build types (`debug`, `debugRelease`) pin to `versionCode = 1` and `versionName = "dev"` so installs aren't invalidated by every commit. Only `release` and `benchmark` use the git-derived numbers.
 
@@ -57,25 +57,38 @@ Tag-message structure mirrors what ends up in the GitHub release body. Keep bull
 
 ### 3. Build the AAB (Play Console upload format)
 
+**Flavors matter.** The app has an `edition` dimension with two flavors: `og` (appId
+`org.balch.djapp`) and `ai` (appId `org.balch.djapp.ai`, adds INTERNET and the AI deps).
+**`og` is the flavor that ships to the Play Store.** The unqualified `bundleRelease` /
+`assembleRelease` tasks build *every* release variant, so name the flavor explicitly:
+
 ```bash
-./gradlew :apps:djapp:androidApp:bundleRelease
+./gradlew :apps:djapp:androidApp:bundleOgRelease
 ```
 
-Output: `apps/djapp/androidApp/build/outputs/bundle/release/djapp-v1.X.Y-release.aab`
+Output: `apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-v1.X.Y-og-release.aab`
+
+Note the flavor appears in three places — the task name (`bundleOgRelease`), the output
+directory (`bundle/ogRelease/`), and the filename (`-og-release`).
 
 This is the file you upload to Play Console. Signed with the release keystore if `keystore.properties` exists at the repo root, otherwise the debug key (which Play will reject).
 
 ### 4. Build the APK (sideload distribution)
 
 ```bash
-./gradlew :apps:djapp:androidApp:assembleRelease
+./gradlew :apps:djapp:androidApp:assembleOgRelease
 ```
 
-Output: `apps/djapp/androidApp/build/outputs/apk/release/djapp-v1.X.Y-release.apk`
+Output: `apps/djapp/androidApp/build/outputs/apk/og/release/djapp-v1.X.Y-og-release.apk`
 
-This is a **single universal APK** containing both `arm64-v8a` and `x86_64` ABIs (the convention plugin sets `abiFilters` but no `splits.abi` block, so they go in one file). Friendlier than per-ABI APKs for testers who don't know their architecture. Typically ~7–8 MB.
+The APK path splits the flavor and build type into **separate directories** (`apk/og/release/`),
+unlike the bundle's single combined `bundle/ogRelease/`. Easy to get wrong; `find`ing the
+freshly-built file is faster than guessing.
 
-The two builds reuse most intermediates, so running them in series is fine; running them back-to-back via `./gradlew :apps:djapp:androidApp:bundleRelease :apps:djapp:androidApp:assembleRelease` works too.
+This is a **single universal APK** containing both `arm64-v8a` and `x86_64` ABIs (the convention plugin sets `abiFilters` but no `splits.abi` block, so they go in one file). Friendlier than per-ABI APKs for testers who don't know their architecture. Typically ~8–9 MB.
+
+The two builds reuse most intermediates, so running them back-to-back works:
+`./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease`.
 
 ### 5. Push the tag
 
@@ -107,15 +120,23 @@ The signed AAB is uploaded to Play via **Gradle Play Publisher (GPP)**, not by h
 retired 2026-06-22). Publish the bundle built in step 3:
 
 ```bash
-./gradlew --no-configuration-cache :apps:djapp:androidApp:publishReleaseBundle -PplayTrack=alpha
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha
 ```
 
-`publishReleaseBundle` builds + signs + uploads the AAB and assigns it to the track in one
-task. There is **no `--track` CLI flag** — the track is the `-PplayTrack=<id>` Gradle
-property read by `play { track.set(...) }` in `apps/djapp/androidApp/build.gradle.kts`. Omit
-it and it defaults to `internal`. Success looks like GPP logging
+`publishOgReleaseBundle` builds + signs + uploads the AAB and assigns it to the track in one
+task. Use the **flavor-qualified** name: bare `publishReleaseBundle` would publish every
+release variant, and `ai` is not a Play Store app. There is **no `--track` CLI flag** — the
+track is the `-PplayTrack=<id>` Gradle property read by `play { track.set(...) }` in
+`apps/djapp/androidApp/build.gradle.kts`. Omit it and it defaults to `internal`. Success
+looks like GPP logging
 `Updating [completed] release (org.balch.djapp:[<versionCode>]) in track 'alpha'` then
 `Committing changes`.
+
+**`publishOgReleaseBundle` does not touch the store listing.** It uploads the bundle and the
+`release-notes/` text for that release only. Title, descriptions and graphics move via
+`publishListing` / `publishOgApps`, so when the user says "leave the listing alone", the
+bundle task is already the right choice — just don't edit `src/main/play/` and the previous
+"What's New" copy carries over verbatim.
 
 **The "What's New" Play notes are a file**, separate from the GitHub release body:
 `apps/djapp/androidApp/src/main/play/release-notes/en-US/default.txt`. GPP sends whatever is
@@ -126,11 +147,11 @@ in-app-update flow, add `-PplayUpdatePriority=5` (un-deferrable) or `4` (after 3
 (no rebuild, no fresh review of the bytes):
 
 ```bash
-./gradlew :apps:djapp:androidApp:promoteReleaseArtifact \
+./gradlew :apps:djapp:androidApp:promoteOgReleaseArtifact \
   --from-track <source> --promote-track alpha --version-code <N> --release-status completed
 ```
 
-Re-running `publishReleaseBundle` for a versionCode that's already uploaded is a no-op
+Re-running `publishOgReleaseBundle` for a versionCode that's already uploaded is a no-op
 (duplicate versionCode → GPP reports `UP-TO-DATE`); use promote for that case.
 
 Full Play-publishing details (service account, credentials lookup, the androidpublisher-scoped
@@ -163,8 +184,8 @@ The body should feel useful to a developer scanning the release page, not like a
 
 ## Artifacts
 
-The signed Play-Console-ready bundle is attached: **`djapp-v1.X.Y-release.aab`**.
-A universal sideload APK is also attached: **`djapp-v1.X.Y-release.apk`**.
+The signed Play-Console-ready bundle is attached: **`djapp-v1.X.Y-og-release.aab`**.
+A universal sideload APK is also attached: **`djapp-v1.X.Y-og-release.apk`**.
 
 ## Full changelog
 
@@ -201,12 +222,12 @@ EOF
 git push origin v1.X.Y --force
 
 # 3. Rebuild artifacts at the new SHA.
-./gradlew :apps:djapp:androidApp:bundleRelease :apps:djapp:androidApp:assembleRelease
+./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease
 
 # 4. Replace the artifacts on the release. --clobber overwrites the existing file.
 gh release upload v1.X.Y \
-  apps/djapp/androidApp/build/outputs/bundle/release/djapp-v1.X.Y-release.aab \
-  apps/djapp/androidApp/build/outputs/apk/release/djapp-v1.X.Y-release.apk \
+  apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-v1.X.Y-og-release.aab \
+  apps/djapp/androidApp/build/outputs/apk/og/release/djapp-v1.X.Y-og-release.apk \
   --clobber
 
 # 5. Edit the release notes to mention the new change.
@@ -275,10 +296,12 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | List recent tags | `git tag --sort=-creatordate \| head -10` |
 | Show tag annotation | `git for-each-ref refs/tags/vX.Y.Z --format="%(contents)"` |
 | Commits since last tag | `git log vX.Y.Z..HEAD --oneline` |
-| Build AAB | `./gradlew :apps:djapp:androidApp:bundleRelease` |
-| Build universal APK | `./gradlew :apps:djapp:androidApp:assembleRelease` |
-| AAB output path | `apps/djapp/androidApp/build/outputs/bundle/release/djapp-vX.Y.Z-release.aab` |
-| APK output path | `apps/djapp/androidApp/build/outputs/apk/release/djapp-vX.Y.Z-release.apk` |
+| Build AAB (shipping flavor) | `./gradlew :apps:djapp:androidApp:bundleOgRelease` |
+| Build universal APK | `./gradlew :apps:djapp:androidApp:assembleOgRelease` |
+| AAB output path | `apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-vX.Y.Z-og-release.aab` |
+| APK output path | `apps/djapp/androidApp/build/outputs/apk/og/release/djapp-vX.Y.Z-og-release.apk` |
+| Publish to a Play track | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha` |
+| List real task names | `./gradlew :apps:djapp:androidApp:tasks --all \| grep -iE "^bundle\|^publish"` |
 | Push a tag | `git push origin vX.Y.Z` |
 | Force-update a published tag | `git push origin vX.Y.Z --force` |
 | List GitHub releases | `gh release list --limit 10` |
@@ -293,6 +316,8 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 - **Filename has a `-N-gSHA` suffix** (e.g. `djapp-v1.1.0-3-gabc1234-release.aab`): HEAD isn't on a tag. Either tag HEAD first, or check out the right tag.
 - **Filename says `-dirty`**: working tree has uncommitted changes. Stash or commit first.
 - **`gh release create` fails with "release already exists"**: the release exists but maybe without binaries — use `gh release upload <tag> <file>` to add assets, or `gh release edit` to update notes.
-- **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleRelease`.
+- **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease`.
+- **Built artifact isn't where you expected**: the flavor segment moves between the bundle and APK trees (`bundle/ogRelease/` vs `apk/og/release/`). `find apps/djapp/androidApp/build/outputs -name "*-v1.X.Y-*"` beats guessing.
+- **You built the `ai` flavor by mistake**: it carries appId `org.balch.djapp.ai` and the INTERNET permission. Play will treat it as a different app. Rebuild with the `Og` task.
 - **AAB is unsigned**: `keystore.properties` is missing at the repo root. The convention plugin silently falls back to the debug signing config in that case. Play Console will reject the upload.
 - **A commit landed after the tag and you want the tag to include it**: see "add one more commit to a published release" above.
