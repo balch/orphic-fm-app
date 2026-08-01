@@ -126,7 +126,7 @@
     },
     "org.balch.orpheus.plugins.bass:mix": {
       "type": "float",
-      "value": 0.0
+      "value": 0.8099995
     },
     "org.balch.orpheus.plugins.bass:lfo_mix": {
       "type": "float",
@@ -134,15 +134,15 @@
     },
     "org.balch.orpheus.plugins.bass:trigger_source": {
       "type": "int",
-      "value": 0
+      "value": 2
     },
     "org.balch.orpheus.plugins.bass:pitch_source": {
       "type": "int",
-      "value": 0
+      "value": 2
     },
     "org.balch.orpheus.plugins.bass:timbre_source": {
       "type": "int",
-      "value": 0
+      "value": 1
     },
     "org.balch.orpheus.plugins.bass:accent_amount": {
       "type": "float",
