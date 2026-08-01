@@ -229,7 +229,7 @@ class VoltageStrutVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.55f,
-                    harmonics = 0.4902f,                           // DX2 idx 16 "Xylophone" — base
+                    harmonics = 0.4902f,                           // DX2 bucket edge: idx 15 "Clav 3" or 16 "Xylophone" by prior load
                     harmonicsMacroSource = MacroSource.ENERGY,     // drop brightens, break dims
                     harmonicsMacroRange = 0.05f,                   // ±~1.5 patches: Clav 3 ↔ Xylophone ↔ Marimba ↔ Vibe 1
                     timbre = 0.55f,

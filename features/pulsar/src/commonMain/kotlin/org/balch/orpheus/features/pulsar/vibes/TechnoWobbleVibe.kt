@@ -313,7 +313,7 @@ class TechnoWobbleVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
                     volume = 0.40f,             // EFFECT macroMap energyVolume(0.2-0.5) scales this; lands ~0.17 in grind, ~0.20 in stab, ~0.12 in pulse/drift. Fall has its own volume=0.55 trackOverride that supersedes this.
-                    harmonics = 0.490f,         // DX3 idx 16 "ENTRIX" — cinematic synth-pad centerpoint of the bank (auto-pinned)
+                    harmonics = 0.490f,         // DX3 idx 15 "Cirrus" — cinematic synth-pad (auto-pinned, ear-tuned)
                     harmonicsModulation = 0.12f,// ±0.12 LFO sweep — long held notes hear ~4 patches walk across their duration; replicates the "end of fall" patch-sweep character in any section where notes hold long enough
                     harmonicsMacroRange = 0.30f,// Section-driven cinematic-pad arc: fall whispers in *Planets/Soft touch (atmospheric), grind sits at ENTRIX/Mal Poly (mid-pad core), stab climbs to Etherial5a/Airy/Boron A (lush airy peak). Stays entirely in the synth-pad family.
                     harmonicsMacroSource = MacroSource.MOOD, // explicit (default)

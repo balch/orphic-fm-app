@@ -322,7 +322,7 @@ class SwampSwaggerVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.40f,
-                    harmonics = 0.551f, // DX2 idx 18 "Vibe 1" (auto-pinned)
+                    harmonics = 0.551f, // DX2 idx 17 "Marimba" (auto-pinned, ear-tuned)
                     modLfoRate = 0.10f,
                     modLfoDepth = 0.30f, // motor vibrato
                     modLfoShape = 0.40f,

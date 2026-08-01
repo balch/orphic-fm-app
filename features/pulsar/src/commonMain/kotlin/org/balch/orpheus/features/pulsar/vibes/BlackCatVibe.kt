@@ -380,11 +380,13 @@ class BlackCatVibe : VibeProvider {
                 // Track 4 — HORNS (DX3 brass, auto-pinned patch selector): short punchy
                 // stabs into the hook's rest pockets. FUNK_STABS supplies the syncopated
                 // velocity pattern; near-simultaneous arp reads as a section hit.
-                // 0.888 = idx 29 "Brass 1"; space slot 0.919 = idx 30 "Brass 6 BC".
+                // 0.888 = idx 28 "Syn orch"; space slot 0.919 sits on a bucket edge and
+                // loads idx 29 "Brass 1" or 30 "Brass 6 BC" depending on the previously
+                // loaded patch. Both ear-tuned — see fm_patches.md on legacy edge values.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
                     volume = 0.48f,
-                    harmonics = 0.888f,       // DX3 idx 29 "Brass 1" (auto-pinned)
+                    harmonics = 0.888f,       // DX3 idx 28 "Syn orch" (auto-pinned, ear-tuned)
                     timbre = 0.58f,           // a touch above center = horn-like edge
                     morph = 0.50f,
                     noteRangeLow = 56,        // G#3

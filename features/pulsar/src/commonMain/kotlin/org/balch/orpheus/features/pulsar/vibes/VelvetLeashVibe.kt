@@ -356,7 +356,7 @@ class VelvetLeashVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.78f,
-                    harmonics = 0.4596f,                            // DX2 idx 15 "Clav 3" — base
+                    harmonics = 0.4596f,                            // DX2 bucket edge: idx 14 "Harpsich" or 15 "Clav 3" by prior load
                     harmonicsMacroSource = MacroSource.COMPLEXITY,  // busier sections shift mallet character
                     harmonicsMacroRange = 0.04f,                    // ±~1 patch: Harpsich ↔ Clav 3 ↔ Xylophone
                     timbre = 0.5f,

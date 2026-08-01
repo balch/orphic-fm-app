@@ -611,8 +611,9 @@ private class FireSkyVibeBase(
                     )
                 },
                 // Track 5 — Organ, the Hammond layer — Chordal, sustained.
-                // DX3 harmonics is an auto-pinned 32-step patch selector: 0.031 = "Hammond",
-                // 0.092 = "60s organ" (space slot). Do not interpolate.
+                // DX3 harmonics is an auto-pinned 32-step patch selector: 0.031 = idx 1 "Hammond";
+                // the space slot's 0.092 sits on a bucket edge and loads idx 2 "E organ 3" or
+                // 3 "60s organ" by prior load. Both ear-tuned. Do not interpolate.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.VA,
                     volume = 0.50f,
@@ -631,7 +632,7 @@ private class FireSkyVibeBase(
                             engineId = OrpheusEngineId.DX3,
                             harmonics = 0.092f,
                             reverbSend = 0.32f
-                        ),  // "60s organ", wetter
+                        ),  // organ-family edge value, wetter
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
                             comping = ChordComping(

@@ -463,7 +463,7 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
             OrpheusEngine(
                 engineId = OrpheusEngineId.DX3,
                 volume = 0.45f,
-                harmonics = 0.582f,              // DX3 idx 19 "Etherial5a" — pad family
+                harmonics = 0.582f,              // DX3 bucket edge: idx 18 "Textures 6" or 19 "Etherial5a" — pad family
                 harmonicsMacroRange = 0.07f,     // ±~2 patches: airy ↔ ethereal ↔ mal poly
                 timbre = 0.55f, morph = 0.5f,
                 noteRangeLow = 60, noteRangeHigh = 84,

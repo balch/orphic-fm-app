@@ -453,7 +453,9 @@ class RustBeltVibe : VibeProvider {
                 ).let { organ ->
                     TrackVoice(
                         engineEdm = organ,
-                        engineSpace = organ.copy(harmonics = 0.092f, reverbSend = 0.34f),  // "60s organ", wetter
+                        // 0.092f is a bucket edge: idx 2 "E organ 3" or 3 "60s organ" by prior
+                        // load. Ear-tuned, left as-is — see fm_patches.md on legacy edge values.
+                        engineSpace = organ.copy(harmonics = 0.092f, reverbSend = 0.34f),  // wetter
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
                             comping = ChordComping(

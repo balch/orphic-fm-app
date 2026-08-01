@@ -440,7 +440,7 @@ class ArmyStompVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2,
                     volume = 0.60f,
-                    harmonics = 0.153f,              // DX2 idx 5 "Clav E pno" — base
+                    harmonics = 0.153f,              // DX2 idx 4 "Mark III" — base (ear-tuned)
                     harmonicsMacroRange = 0.03f,     // tight ±~1: Mark III ↔ Clav E pno ↔ Syn Clav
                     noteRangeLow = 52,
                     noteRangeHigh = 67,

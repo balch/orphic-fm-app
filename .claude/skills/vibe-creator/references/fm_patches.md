@@ -40,26 +40,37 @@ p->envelope_control = parameters.morph;    // DX7-style envelope rate/level scal
 
 ### The harmonics → patch math
 
-The quantizer math is `patch = round(harmonics * 1.02 * 32) = round(harmonics * 32.64)`, clamped to `[0, 31]`. **The bucket centerpoint for patch index N is `N / 32.64`.** That is the value that lands cleanly inside bucket N — it has the largest margin to either neighbor. To target patch N, set:
+The quantizer is `stmlib::HysteresisQuantizer2`, initialised at `six_op_engine.cc:76` as `Init(32, 0.005f, false)`. The `false` is `symmetric`, and it is the whole story: it makes the quantizer set `scale_ = 32` and **`offset_ = -0.5`**, which cancels stmlib's usual `+ 0.5f` rounding step and turns the map into a **floor, not a round**:
 
 ```
-harmonics = N / 32.64
+q = int(harmonics * 1.02 * 32 - 0.5 + sign * 0.005 + 0.5)
+  = int(harmonics * 32.64 ± 0.005)          clamped to [0, 31]
 ```
 
-Centerpoint values pre-computed (3-decimal-rounded, all safe-inside-bucket):
+So **bucket N spans `harmonics ∈ [N / 32.64, (N + 1) / 32.64)`** — about a 0.0306-wide window per patch — and `N / 32.64` is the bucket's *lower edge*, not its centre. **The centerpoint for patch index N is `(N + 0.5) / 32.64`.** That is the value with the largest margin to either neighbour. To target patch N, set:
+
+```
+harmonics = (N + 0.5) / 32.64
+```
+
+> **Do not drop either term.** Writing `N / 32.64` puts you exactly on the edge, where the internal value lands on `N − 0.5` and the hysteresis decides the outcome — it resolves to **N − 1** for any previously loaded patch below N, including a freshly initialised engine. That form round-trips 1 of 32 indices. Dropping the `1.02` instead (`(N + 0.5) / 32`) round-trips 26 of 32, drifting off by one from index 25 up. Only `(N + 0.5) / 32.64` round-trips all 32.
+
+Centerpoint values pre-computed (3-decimal-rounded, each verified to resolve to its own patch from every one of the 32 possible prior patches):
 
 | Idx | Harm | Idx | Harm | Idx | Harm | Idx | Harm |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 | 0.000 | 8 | 0.245 | 16 | 0.490 | 24 | 0.735 |
-| 1 | 0.031 | 9 | 0.276 | 17 | 0.521 | 25 | 0.766 |
-| 2 | 0.061 | 10 | 0.306 | 18 | 0.551 | 26 | 0.797 |
-| 3 | 0.092 | 11 | 0.337 | 19 | 0.582 | 27 | 0.827 |
-| 4 | 0.123 | 12 | 0.368 | 20 | 0.613 | 28 | 0.858 |
-| 5 | 0.153 | 13 | 0.398 | 21 | 0.643 | 29 | 0.888 |
-| 6 | 0.184 | 14 | 0.429 | 22 | 0.674 | 30 | 0.919 |
-| 7 | 0.214 | 15 | 0.460 | 23 | 0.705 | 31 | 0.950 |
+| 0 | 0.015 | 8 | 0.260 | 16 | 0.506 | 24 | 0.751 |
+| 1 | 0.046 | 9 | 0.291 | 17 | 0.536 | 25 | 0.781 |
+| 2 | 0.077 | 10 | 0.322 | 18 | 0.567 | 26 | 0.812 |
+| 3 | 0.107 | 11 | 0.352 | 19 | 0.597 | 27 | 0.843 |
+| 4 | 0.138 | 12 | 0.383 | 20 | 0.628 | 28 | 0.873 |
+| 5 | 0.169 | 13 | 0.414 | 21 | 0.659 | 29 | 0.904 |
+| 6 | 0.199 | 14 | 0.444 | 22 | 0.689 | 30 | 0.934 |
+| 7 | 0.230 | 15 | 0.475 | 23 | 0.720 | 31 | 0.965 |
 
-Bucket N spans `harmonics ∈ [(N − 0.5) / 32.64, (N + 0.5) / 32.64)` — about a 0.0306-wide window per patch. The hysteresis quantizer adds 0.005f stickiness so float jitter won't flip patches near boundaries, but **don't write boundary values**: a number like `(N + 0.5) / 32.64` is the *right edge* of bucket N and rounds into N+1 with normal float arithmetic. Always pick the centerpoint above.
+The 0.005f hysteresis adds stickiness so float jitter won't flip patches mid-render, but it is far narrower than a bucket and cannot rescue an edge value — **never write a boundary value**. The contract is pinned by `PinPatchCalculatorTest` in `features/pulsar/src/jvmTest/`, which ports the quantizer exactly and asserts all 32 indices round-trip from every prior state.
+
+> **Reading older vibes:** files written before this correction used the lower-edge formula, so a comment like `harmonics = 0.551f // idx 18` is usually off by one (0.551 actually loads idx 17). Those values were tuned by ear and are *correct as sounds* — the index and patch name in the comment are what's wrong. Don't "fix" the numbers; trust the ear, not the label.
 
 ## Bank → Engine mapping
 

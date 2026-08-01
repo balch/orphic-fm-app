@@ -264,7 +264,7 @@ static bool test_pin_escapes_evolution() {
 static bool test_pinned_harmonics_walks_when_modulation_nonzero() {
     printf("\n  Test 5: pin + harmonicsModulation walks within bounded window\n");
     bool pass = true;
-    constexpr float kBase = 0.582f;          // DX3 idx 19 "Etherial5a" centerpoint
+    constexpr float kBase = 0.582f;          // legacy DX3 anchor (bucket edge: idx 18/19)
     constexpr float kModDepth = 0.05f;       // ±0.05 swing requested
     constexpr int   kBlocks = 256;           // long enough for slow LFO to complete cycles
 
@@ -320,7 +320,7 @@ static bool test_pinned_harmonics_walks_when_modulation_nonzero() {
 static bool test_macro_walk_on_dx_pinned_harmonics() {
     printf("\n  Test 6: pin + harmonicsMacroRange walks DX harmonics with mood\n");
     bool pass = true;
-    constexpr float kBase = 0.551f;        // DX idx 18 "Spiral" centerpoint
+    constexpr float kBase = 0.551f;        // legacy DX anchor (loads idx 17 "Insert 1")
     constexpr float kRange = 0.10f;        // ±0.10 across a full mood sweep
     constexpr float kTol = 0.005f;
 
@@ -431,7 +431,7 @@ static bool test_macro_walk_skipped_on_non_dx() {
 static bool test_pin_modulation_plus_macro_walk_compose() {
     printf("\n  Test 8: pin + harmonicsModulation + harmonicsMacroRange compose\n");
     bool pass = true;
-    constexpr float kBase     = 0.551f;        // DX idx 18 "Spiral"
+    constexpr float kBase     = 0.551f;        // legacy DX anchor (loads idx 17 "Insert 1")
     constexpr float kModDepth = 0.03f;         // small LFO swing
     constexpr float kRange    = 0.10f;         // larger macro walk
     constexpr int   kBlocks   = 256;

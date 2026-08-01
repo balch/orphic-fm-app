@@ -164,7 +164,7 @@ class SixtiesRebelVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX, // Solid bass
                     volume = 0.80f,
-                    harmonics = 0.5208f, // DX idx 17 (preserves current audible patch; pre-pin comment claimed "Solid bass"=idx 0 — flag for listen-test re-tune)
+                    harmonics = 0.5208f, // DX bucket edge: idx 16 "CS-80" or 17 "Insert 1" by prior load — flag for listen-test re-tune
                     noteRangeLow = 40,
                     noteRangeHigh = 52,
                 ).let { bass ->
@@ -202,7 +202,7 @@ class SixtiesRebelVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2, // Guit acous
                     volume = 0.50f,
-                    harmonics = 0.5208f, // DX2 idx 17 (preserves current audible patch; pre-pin comment claimed "Guit acous"=idx 11 — flag for listen-test re-tune)
+                    harmonics = 0.5208f, // DX2 bucket edge: idx 16 "Xylophone" or 17 "Marimba" by prior load — flag for listen-test re-tune
                 ).let { strums ->
                     TrackVoice(
                         engineEdm = strums,
@@ -223,7 +223,7 @@ class SixtiesRebelVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX2, // Steinway
                     volume = 0.45f,
-                    harmonics = 0.5208f, // DX2 idx 17 (preserves current audible patch; pre-pin comment claimed "Steinway"=idx 10 — flag for listen-test re-tune)
+                    harmonics = 0.5208f, // DX2 bucket edge: idx 16 "Xylophone" or 17 "Marimba" by prior load — flag for listen-test re-tune
                     reverbSend = 0.30f,
                 ).let { piano ->
                     TrackVoice(

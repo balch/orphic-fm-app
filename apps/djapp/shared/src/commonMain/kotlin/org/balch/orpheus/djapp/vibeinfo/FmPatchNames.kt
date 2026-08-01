@@ -1,7 +1,7 @@
 package org.balch.orpheus.djapp.vibeinfo
 
 import org.balch.orpheus.core.audio.OrpheusEngineId
-import kotlin.math.roundToInt
+import kotlin.math.floor
 
 /**
  * SixOp FM (DX / DX2 / DX3) patch-bank names.
@@ -12,8 +12,21 @@ import kotlin.math.roundToInt
  * but each loads a different 32-patch bank (`voice.cc`: bank = engine.id - 2).
  *
  * On a SixOp engine the **`harmonics` value is a patch selector** (not a tone control): it is
- * quantized to one of 32 patches per bank via `patch = round(harmonics * 1.02 * 32)` clamped to
- * `[0, 31]` (`six_op_engine.cc`). The bucket centerpoint for patch N is `N / 32.64`.
+ * quantized to one of 32 patches per bank by `stmlib::HysteresisQuantizer2`, initialised at
+ * `six_op_engine.cc:76` as `Init(32, 0.005f, false)`. That final `false` (`symmetric`) sets
+ * `offset_ = -0.5`, cancelling stmlib's usual `+ 0.5` rounding step, so the map **floors**:
+ *
+ *     patch = floor(harmonics * 1.02 * 32) = floor(harmonics * 32.64), clamped to [0, 31]
+ *
+ * Bucket N therefore spans `harmonics ∈ [N / 32.64, (N + 1) / 32.64)` and its centre — the value
+ * to write when authoring — is `(N + 0.5) / 32.64`. Rounding instead of flooring names the patch
+ * one index too high for roughly half of all inputs.
+ *
+ * The real quantizer is stateful: its 0.005f hysteresis nudges the result by one when a value sits
+ * within 0.005/32.64 (~0.00015) of a bucket edge, depending on the previously loaded patch. This
+ * lookup is stateless and reproduces the *from-below* branch — what a freshly loaded vibe gets —
+ * by subtracting the hysteresis, which is why the `- 0.005f` below is not decoration. Without it
+ * the lookup names the patch one too high for edge values just above a boundary.
  */
 internal object FmPatchNames {
 
@@ -46,13 +59,25 @@ internal object FmPatchNames {
     )
 
     /**
+     * The name of patch [patchIndex] in [engineId]'s bank, or `null` when [engineId] is not a
+     * DX-family engine or [patchIndex] is outside `[0, 31]`. Use when the index is already known;
+     * [patchNameFor] when starting from a `harmonics` value.
+     */
+    fun patchNameAt(engineId: OrpheusEngineId, patchIndex: Int): String? {
+        val bank = engineId.id - 2
+        if (bank !in BANKS.indices || patchIndex !in 0..31) return null
+        return BANKS[bank][patchIndex]
+    }
+
+    /**
      * The specific SixOp patch name for [engineId] at [harmonics], or `null` when [engineId] is
      * not a DX-family engine (caller should fall back to `engineId.displayName`).
      */
     fun patchNameFor(engineId: OrpheusEngineId, harmonics: Float): String? {
         val bank = engineId.id - 2
         if (bank !in BANKS.indices) return null
-        val idx = (harmonics * 32.64f).roundToInt().coerceIn(0, 31)
+        // Mirrors the engine's own multiply order; the -0.005f is the from-below hysteresis.
+        val idx = floor(harmonics * 1.02f * 32f - 0.005f).toInt().coerceIn(0, 31)
         return BANKS[bank][idx]
     }
 }

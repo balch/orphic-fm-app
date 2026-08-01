@@ -348,7 +348,7 @@ class DogHouseVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX,
                     volume = 0.20f,
-                    harmonics = 0.551f,          // DX idx 18 "Spiral" — base patch
+                    harmonics = 0.551f,          // DX idx 17 "Insert 1" — base patch (ear-tuned)
                     harmonicsMacroRange = 0.10f, // mood knob walks ±~3 patches around base
                     // harmonicsMacroSource defaults to MOOD (matches pre-pin behavior)
                     noteRangeLow = 45,

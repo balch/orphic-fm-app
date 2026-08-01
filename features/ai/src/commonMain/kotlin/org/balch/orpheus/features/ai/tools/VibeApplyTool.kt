@@ -165,9 +165,10 @@ class VibeApplyTool(
                   pad ENS/STR/CHD/GRN/ADD · texture MOD/PAR/SPK/SWM/NES/TRN.
                 DX FAMILY (DX/DX2/DX3): 'harmonics' is NOT a tone knob — it is a 32-patch selector
                 (quantized, auto-pinned). Set it deliberately to pick a patch; to land on patch index N
-                use harmonics = N / (32 * 1.02). Never leave a DX engine's harmonics arbitrary or it
-                loads a random patch and sounds wrong. Set harmonics/timbre/morph explicitly on any
-                engine you swap in.
+                use harmonics = (N + 0.5) / (32 * 1.02). The + 0.5 is required: it aims at the middle
+                of patch N's zone, and dropping it lands on the zone's edge and loads patch N-1.
+                Never leave a DX engine's harmonics arbitrary or it loads a random patch and sounds
+                wrong. Set harmonics/timbre/morph explicitly on any engine you swap in.
                 If this returns success=false, read the message, fix the JSON, and call again.
             """.trimIndent(),
         ) {

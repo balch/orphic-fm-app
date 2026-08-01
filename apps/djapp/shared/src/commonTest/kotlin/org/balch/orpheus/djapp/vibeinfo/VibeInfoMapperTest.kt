@@ -104,12 +104,63 @@ class VibeInfoMapperTest {
 
     @Test
     fun `FmPatchNames maps harmonics to the specific bank patch`() {
+        // The engine floors (harmonics * 32.64), it does not round — see
+        // FmPatchNames' KDoc and PinPatchCalculatorTest.
         assertEquals("Solid bass", FmPatchNames.patchNameFor(OrpheusEngineId.DX, 0.000f))   // bank0 idx0
-        assertEquals("Xylophone",  FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.490f))  // bank1 idx16
+        assertEquals("Clav 3",     FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.490f))  // bank1 idx15
         assertEquals("Marimba",    FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.521f))  // bank1 idx17
         assertEquals("Br trumpet", FmPatchNames.patchNameFor(OrpheusEngineId.DX3, 0.950f))  // bank2 idx31
-        assertEquals("Brass 1",    FmPatchNames.patchNameFor(OrpheusEngineId.DX3, 0.888f))  // bank2 idx29
-        assertEquals("Xylophone",  FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.5f))    // default → round(16.32)=16
+        assertEquals("Syn orch",   FmPatchNames.patchNameFor(OrpheusEngineId.DX3, 0.888f))  // bank2 idx28
+        assertEquals("Xylophone",  FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.5f))    // floor(16.32)=16
+    }
+
+    /**
+     * Values taken verbatim from shipped vibes whose own comments name the patch
+     * one index too high — the pre-fix authoring formula aimed at a bucket's lower
+     * edge. These pin the patch that actually sounds.
+     */
+    @Test
+    fun `FmPatchNames reports the patch that actually loads for shipped vibe anchors`() {
+        // DogHouseVibe track 4 EDM — comment says idx 18 "Spiral"
+        assertEquals("Insert 1", FmPatchNames.patchNameFor(OrpheusEngineId.DX, 0.551f))
+        // SwampSwaggerVibe — comment says idx 18 "Vibe 1"
+        assertEquals("Marimba", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.551f))
+        // ArmyStompVibe lead EDM — comment says idx 5 "Clav E pno"
+        assertEquals("Mark III", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.153f))
+    }
+
+    /**
+     * Anchors that sit inside the 0.005 hysteresis band just *above* a bucket edge.
+     * A plain `floor(harmonics * 32.64)` names these one index too high; the real
+     * engine resolves them downward on a fresh load. Guards the `- 0.005f` term.
+     */
+    @Test
+    fun `FmPatchNames resolves edge anchors the way a fresh engine load does`() {
+        // RustBelt / FireSky / BluesBurn organ space slot — 0.092 * 32.64 = 3.003
+        assertEquals("E organ 3", FmPatchNames.patchNameFor(OrpheusEngineId.DX3, 0.092f))
+        // VelvetLeashVibe — 0.4596 * 32.64 = 15.001
+        assertEquals("Harpsich", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.4596f))
+        // VoltageStrutVibe — 0.4902 * 32.64 = 16.000
+        assertEquals("Clav 3", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.4902f))
+    }
+
+    /**
+     * The centred formula the vibe-creator skill now documents must resolve to the
+     * patch it targets for all 32 indices in every bank.
+     */
+    @Test
+    fun `FmPatchNames round-trips the documented centre formula for all 32 patches`() {
+        val banks = listOf(OrpheusEngineId.DX, OrpheusEngineId.DX2, OrpheusEngineId.DX3)
+        for (engineId in banks) {
+            for (patch in 0..31) {
+                val harmonics = (patch + 0.5f) / (32f * 1.02f)
+                assertEquals(
+                    FmPatchNames.patchNameAt(engineId, patch),
+                    FmPatchNames.patchNameFor(engineId, harmonics),
+                    "centre($patch) = $harmonics should name patch $patch on $engineId",
+                )
+            }
+        }
     }
 
     @Test

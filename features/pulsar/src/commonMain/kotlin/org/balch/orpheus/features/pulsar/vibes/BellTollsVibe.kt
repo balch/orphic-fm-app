@@ -390,8 +390,10 @@ class BellTollsVibe : VibeProvider {
                 // EDM = DX2 idx 21 "Bells" (chromatic-percussion family); macro walk shifts
                 //   mood-up sections toward "Tub Bells"/"Gong 2" and mood-down sections
                 //   toward "Bell C"/"Glockenspl".
-                // Space = DX3 idx 19 "Etherial5a" (evolving pad family); macro walk shifts
-                //   toward "Airy"/"Boron A" in brighter moods and "Textures 6"/"Mal Poly" in
+                // Space = DX3 idx 18 "Textures 6" / 19 "Etherial5a" — 0.582f is a bucket-edge
+                //   value, so which of the two loads depends on the previously loaded patch.
+                //   Either way it stays in the evolving pad family; the macro walk shifts
+                //   toward "Airy"/"Boron A" in brighter moods and "Mal Poly" in
                 //   darker moods. The chorus section's mood=1.25 override automatically
                 //   selects a brighter bell + brighter pad for the lift; the dub section's
                 //   mood=1.1 nudges it slightly without overshooting.
@@ -408,7 +410,7 @@ class BellTollsVibe : VibeProvider {
                         engineEdm = lead,
                         engineSpace = lead.copy(
                             engineId = OrpheusEngineId.DX3,
-                            harmonics = 0.582f,           // DX3 idx 19 "Etherial5a"
+                            harmonics = 0.582f,           // DX3 bucket edge: idx 18 "Textures 6" or 19 "Etherial5a"
                             harmonicsMacroRange = 0.05f,  // Mal Poly ↔ Etherial5a ↔ Airy
                         ),
                         role = TrackRole.Melodic(lickMode = LickMode.Fill),
