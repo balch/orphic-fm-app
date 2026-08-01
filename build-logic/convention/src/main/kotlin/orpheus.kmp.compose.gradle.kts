@@ -32,7 +32,14 @@ kotlin {
     android {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
-        withHostTest {}
+        // returnDefaultValues: host tests link against the mockable android.jar, whose
+        // methods throw RuntimeException("... not mocked") instead of running. Every
+        // module logs through KmLogging, and its Android platform calls android.util.Log,
+        // so any commonTest that touches production code dies on the first log line.
+        // Defaults turn those stubs into no-ops. Robolectric is the heavier alternative
+        // and stays available per-module (see core/foundation), but it cannot cover
+        // commonTest, which also compiles for wasmJs and iOS where @RunWith does not exist.
+        withHostTest { isReturnDefaultValues = true }
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_21)

@@ -21,8 +21,10 @@ kotlin {
             implementation(projects.core.pluginApi)
             implementation(libs.kotlinx.datetime)
         }
-        jvmTest.dependencies {
-            implementation(libs.kotlin.test)
+        // kotlin("test") comes from the orpheus.kmp.compose convention plugin.
+        // coroutines-test must live here, not jvmTest: commonTest is compiled by
+        // every target (wasmJs, iOS, androidHostTest), and deps only flow downward.
+        commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)
         }
     }

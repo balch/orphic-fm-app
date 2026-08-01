@@ -89,6 +89,18 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param rootNote Musical root note.
  * @param scaleType Musical scale.
  * @param genre Genre-level parameters (swing, ghost notes, note range, chord style).
+ * All four macros below ([energy], [complexity], [space], [mood]) are ABSOLUTE levels
+ * and share one rule: the engine clamps each to 0-1 (`orpheus_unit_pulsar.cpp`) before
+ * anything reads it, so authoring above 1.0 saturates rather than boosting. It is not a
+ * perfect no-op — the clamp is applied after slewing, so an out-of-range target reaches
+ * 1.0 sooner and takes longer to fall back once a section cuts it — but the steady-state
+ * value is identical to 1.0, which makes above-1.0 a de-facto authoring mistake.
+ *
+ * Do not confuse these with the same-named fields on [MacroOverrides]: those are
+ * per-section MULTIPLIERS applied on top of these (1.0 = no change), where values above
+ * 1.0 are legitimate and expected. Because the clamp precedes the multiply, a baseline
+ * near 1.0 leaves a boost section no headroom — keep `base * maxSectionBoost <= 1.0`.
+ *
  * @param energy Starting energy level 0-1. Higher = louder, denser, more driving.
  * @param complexity Starting complexity 0-1. Higher = more swing, more variation, busier patterns.
  * @param space Starting space level 0-1. Higher = longer decays, more reverb/delay sends.

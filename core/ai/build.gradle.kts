@@ -1,12 +1,27 @@
 import com.codingfeline.buildkonfig.compiler.FieldSpec
-import java.io.FileInputStream
-import java.util.Properties
 
-val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        load(FileInputStream(localPropertiesFile))
+/**
+ * API keys resolve from any Gradle property source, then the matching environment variable
+ * (for CI). In practice that means ~/.gradle/gradle.properties, which is the intended home:
+ * it sits outside every checkout, so a key there cannot ride along in a diff or a zipped
+ * working copy. Deliberately NOT read from local.properties, which is routinely opened to
+ * diagnose sdk.dir / org.gradle.java.home problems and leaks whatever is stored beside them.
+ *
+ * Note this is a convention, not an enforced boundary: providers.gradleProperty also reads
+ * the repo-root gradle.properties, which IS tracked. Putting a key there would be worse than
+ * local.properties, not better. Keep them in the user-level file.
+ *
+ * A missing key yields "", which leaves that provider unavailable at runtime rather than
+ * failing the build, so contributors without keys can still build the app.
+ */
+fun apiKey(name: String): String {
+    val value = providers.gradleProperty(name).orNull
+        ?: providers.environmentVariable(name).orNull
+        ?: ""
+    if (value.isEmpty()) {
+        logger.warn("$name not set — add it to ~/.gradle/gradle.properties to enable that AI provider.")
     }
+    return value
 }
 
 plugins {
@@ -57,11 +72,9 @@ buildkonfig {
 
     defaultConfigs {
         val geminiKey = "GEMINI_API_KEY"
-        val geminiApiKey = localProperties.getProperty(geminiKey) ?: ""
-        buildConfigField(FieldSpec.Type.STRING, geminiKey, geminiApiKey)
+        buildConfigField(FieldSpec.Type.STRING, geminiKey, apiKey(geminiKey))
 
         val anthropicKey = "ANTHROPIC_API_KEY"
-        val anthropicApiKey = localProperties.getProperty(anthropicKey) ?: ""
-        buildConfigField(FieldSpec.Type.STRING, anthropicKey, anthropicApiKey)
+        buildConfigField(FieldSpec.Type.STRING, anthropicKey, apiKey(anthropicKey))
     }
 }

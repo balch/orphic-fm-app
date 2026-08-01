@@ -23,7 +23,9 @@ kotlin {
     android {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
-        withHostTest {}
+        // See orpheus.kmp.compose.gradle.kts — android.util.Log via KmLogging would
+        // otherwise throw "not mocked" on the first log line of any commonTest.
+        withHostTest { isReturnDefaultValues = true }
 
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_21)
