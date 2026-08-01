@@ -255,6 +255,50 @@ static bool test_half_lick_last_bar_jams_the_answer() {
     return window_ok && entered && stayed && relocked && noop;
 }
 
+// Fire Sky's shipped shape: a JAM_INVERTED lead-in hands off to a solo that carries no
+// tension override, so the solo plays the riff answer-first and the section AFTER the
+// solo re-locks. The solo is barsMin=4/barsMax=6, so this must hold for every length it
+// can draw — an arrangement "bar" is one track-0 wrap (32 steps), which is a whole lick
+// loop, so solo length cannot change the phase either way.
+static bool test_inverted_lead_in_spans_exactly_the_solo() {
+    printf("\n=== Test: JAM_INVERTED lead-in inverts the solo, then returns ===\n");
+    bool ok = true;
+    for (int solo_bars = 4; solo_bars <= 6; solo_bars++) {
+        PulsarTrackState lead{};
+        lead.step_count = 32;
+        lead.half_loop_len = 16;
+        lead.playhead = 0;
+
+        // lead-in: 2 arrangement bars under JAM_INVERTED. Releases on the final boundary.
+        constexpr int kLeadInSteps = 2 * 32;
+        for (int s = 0; s < kLeadInSteps; s++) {
+            HalfLickMode m = (s == kLeadInSteps - 1) ? HalfLickMode::OFF
+                                                     : HalfLickMode::JAM_INVERTED;
+            pulsar_advance_playhead(lead, m);
+        }
+        bool solo_opens_inverted = (lead.playhead == 16 && lead.phase_inverted);
+
+        // solo: no override, so half-lick stays OFF for its whole duration.
+        bool held = true;
+        for (int s = 0; s < solo_bars * 32; s++) {
+            pulsar_advance_playhead(lead, HalfLickMode::OFF);
+        }
+        held = (lead.playhead == 16);   // back where it started, still bar-2-first
+
+        // The boundary out of the solo arms the re-lock (as the section handler does).
+        if (lead.phase_inverted) { lead.phase_inverted = false; lead.resync_pending = true; }
+        pulsar_advance_playhead(lead, HalfLickMode::OFF);
+        bool returned = (lead.playhead == 0);
+
+        bool pass = solo_opens_inverted && held && returned;
+        ok = ok && pass;
+        printf("  %d-bar solo: opens@%d inverted=%d, holds=%d, returns@%d -- %s\n",
+               solo_bars, 16, solo_opens_inverted ? 1 : 0, held ? 1 : 0,
+               lead.playhead, pass ? "PASS" : "FAIL");
+    }
+    return ok;
+}
+
 // The mirror case the latch also fixes: half-lick ENGAGING partway through bar 2 must
 // not jump the playhead into the middle of bar 1. It finishes the loop it is on.
 static bool test_half_lick_engage_midloop_does_not_jump() {
@@ -528,6 +572,7 @@ bool run_pulsar_tension_tests() {
     tally(test_half_lick_inverted_holds_then_relocks());
     tally(test_half_lick_engage_midloop_does_not_jump());
     tally(test_half_lick_last_bar_jams_the_answer());
+    tally(test_inverted_lead_in_spans_exactly_the_solo());
     tally(test_tension_chromatic_passing_math());
     // Lick evolution spurt tests
     tally(test_spurt_triggers_at_tension_peak());
