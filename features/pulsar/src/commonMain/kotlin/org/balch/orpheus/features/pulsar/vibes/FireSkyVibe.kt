@@ -301,7 +301,7 @@ private class FireSkyVibeBase(
 
     private val leadInTension = baseTension.copy(
         innerBars = 2,  // fast tension ramp so the tone actually moves within the short build
-        tonal = baseTension.tonal.copy(halfLick = HalfLick.JAM, octaveShift = false),
+        tonal = baseTension.tonal.copy(halfLick = HalfLick.JAM_INVERTED, octaveShift = false),
         evolution = baseTension.evolution.copy(
             timbreLow = 0.20f, timbreHigh = 0.75f, timbreProbability = 0.85f,
             morphLow = 0.30f, morphHigh = 0.72f, morphProbability = 0.75f,
@@ -401,13 +401,13 @@ private class FireSkyVibeBase(
                     6 to TrackSectionOverride(chordFollow = ChordFollow.FIXED),  // double pinned WITH the lead — unison slam
                 ),
             ),
-            // 4: solo — band jams over the groove; lead develops the riff (FOLLOW kept).
+            // 4: lead-in - jam the first bar of the riff
             Section(
                 name = "lead-in",
                 barsMin = 2, barsMax = 2,
                 tensionOverride = leadInTension,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 5, weight = 1.0f, transitionBars = liftBars),  // -> chorus
+                    SectionTransition(targetIndex = 5, weight = 1.0f, transitionBars = liftBars),  // -> solo
                 ),
                 recencyDecay = 0.4f,
                 macroOverrides = MacroOverrides(
@@ -415,9 +415,10 @@ private class FireSkyVibeBase(
                 ),
                 soloMode = SoloMode.LongFill(probability = 0.85f),
             ),
+            // 5: solo — band jams over the groove; lead develops the riff (FOLLOW kept).
             Section(
                 name = "solo",
-                barsMin = 4, barsMax = 4,
+                barsMin = 4, barsMax = 6,
                 transitions = listOf(
                     SectionTransition(targetIndex = 3, weight = 0.33f, transitionBars = liftBars),  // -> chorus
                     SectionTransition(targetIndex = 2, weight = 0.33f, transitionBars = liftBars),  // -> verse
@@ -432,7 +433,7 @@ private class FireSkyVibeBase(
                     6 to TrackSectionOverride(density = 0.40f),  // double thins while the lead jams
                 ),
             ),
-            // 5: breakdown — stripped to bass + drums + organ. Locked to 4 bars =
+            // 6: breakdown — stripped to bass + drums + organ. Locked to 4 bars =
             //    one long anticipation build into the chorus (bigLift).
             Section(
                 name = "breakdown",
@@ -450,7 +451,7 @@ private class FireSkyVibeBase(
                     6 to TrackSectionOverride(density = 0.0f),   // riff double out
                 ),
             ),
-            // 6: outro — the climactic stomp: riff full-throttle, everyone in, pinned FIXED.
+            // 7: outro — the climactic stomp: riff full-throttle, everyone in, pinned FIXED.
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 6,
@@ -692,7 +693,7 @@ private class FireSkyVibeBase(
                         role = TrackRole.Melodic(
                             chordFollow = ChordFollow.FOLLOW,
                             lickMode = LickMode.Fill,      // follows the lead's riff
-                            lickDegreeOffset = -2,         // parallel fourths below (SOTW voicing)
+                            lickDegreeOffset = -2,         // parallel fourths below
                         ),
                         pan = 0.24f,          // spread against the lead at 0.05
                         density = 0.92f,      // fires with the lead; independent seed = loose double
