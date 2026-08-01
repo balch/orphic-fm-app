@@ -322,7 +322,19 @@ A decent default (see `DogHouseVibe`, `ArmyStompVibe`) is 4 members — Drummer/
       section boundary. Use it when you want a section to open with the riff's answer
       phrase instead of its hook. It reads as a turned-around riff, so it is a strong
       flavor: set it on the section BEFORE the one you want turned around.
-  - Only affects `LickMode.Fill` licks. `LickMode.Squash` licks are already one bar.
+    - `HalfLick.JAM_LAST_BAR` — jams the riff's LAST bar (the answer phrase) instead of
+      its first, then re-locks to bar 1 on release. Reads as a turnaround into whatever
+      follows. Pairs naturally with `JAM` for a lead-in/lead-out sandwich around a solo:
+      `JAM` states the hook going in, `JAM_LAST_BAR` states the answer coming out.
+  - `JAM` and `JAM_INVERTED` both jam bar 1. Only `JAM_LAST_BAR` jams a different bar —
+    it shifts the loop window rather than shortening it.
+  - Only affects `LickMode.Fill` licks. `LickMode.Squash` licks are already one bar, so
+    every mode is a no-op on them.
+
+**Section budget.** An arrangement may declare up to `Arrangement.MAX_SECTIONS` (12)
+sections and `MAX_SECTION_TRANSITIONS` (8) outgoing edges each. Both mirror C++ constants
+in `liborpheus_dsp/src/pulsar_limits.h` and are enforced by `PulsarSectionLimitsTest`.
+Exceeding sections throws at `Arrangement.<init>`; exceeding edges is clamped silently.
 - `evolution`: `EvolutionTension` — timbre/morph/harmonics drift ranges and probabilities across the tension cycle. `attackPoint` 0-1 is where the peak lives; `releaseSpeed` is how fast it snaps back.
 - `spurtChance`: per-bar random burst probability (0 = tension-only).
 

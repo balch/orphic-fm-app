@@ -32,6 +32,16 @@ enum class HalfLick {
      * wrapped. See `test_half_lick_release_keeps_riff_phase`.
      */
     JAM_INVERTED,
+
+    /**
+     * Loop the lick's LAST bar rather than its first, so the section jams the riff's
+     * answer phrase instead of its hook. On release the riff re-locks to bar 1, which
+     * makes this read as a turnaround into whatever follows.
+     *
+     * Unlike [JAM] and [JAM_INVERTED] this shifts the loop window rather than
+     * shortening it, so it has no effect on a lick that is already one bar.
+     */
+    JAM_LAST_BAR,
 }
 
 /**

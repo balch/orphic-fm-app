@@ -112,8 +112,13 @@ the lick's first bar so the opening figure repeats while its tone evolves, then 
 release — this is the normal choice for a build or lead-in. "JAM_INVERTED" = same truncation, but on
 release the riff resumes on bar 2 and stays a bar out of phase with the harmony until the next
 section boundary, so the following section opens with the riff's answer phrase instead of its hook.
+"JAM_LAST_BAR" = jam the riff's LAST bar (its answer phrase) instead of its first, then re-lock to
+bar 1 on release; it reads as a turnaround, and pairs well with JAM for a lead-in/lead-out sandwich
+around a solo. Note JAM and JAM_INVERTED both jam bar 1 — only JAM_LAST_BAR jams a different bar.
 JAM_INVERTED is a strong, deliberate flavor; prefer JAM unless the brief calls for a turned-around
-riff. Either only affects Fill licks — Squash licks are already one bar.
+riff. All of them only affect Fill licks — Squash licks are already one bar.
+
+An arrangement may declare at most 12 sections, each with at most 8 outgoing transitions.
 
 ## 7. Sections (Arrangement)
 A section graph lets the vibe tell a story: intro → verse → chorus → solo → breakdown → outro. Each

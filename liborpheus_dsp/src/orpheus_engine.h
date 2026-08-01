@@ -2,6 +2,7 @@
 
 #include "orpheus_dsp.h"
 #include "orpheus_compat.h"
+#include "pulsar_limits.h"
 #include "orpheus_graph.h"
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
@@ -968,7 +969,7 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_intro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_request{0};
-    std::atomic<float> pulsar_section_data[8 * 21] = {};
+    std::atomic<float> pulsar_section_data[kMaxSections * kSectionDataFields] = {};
     // Void Anomaly: 8-float config bank [0]=prob, [1]=floor, [2]=rampDown, [3]=floorMin,
     // [4]=floorMax, [5]=rampUp, [6]=ghost, [7]=declared flag (1.0 when the vibe declares a
     // VoidAnomaly; gates the manual trigger).
@@ -1020,29 +1021,29 @@ struct OrpheusEngine {
     // means "no override — use the track's base value". Read at vibe load and
     // consulted at section transitions for chordal pattern regeneration and
     // per-voice rendering (inversion / arp_mode / chord_follow).
-    std::atomic<int>   pulsar_section_track_comping_style[8 * 8] = {};
-    std::atomic<int>   pulsar_section_track_inversion[8 * 8] = {};
-    std::atomic<int>   pulsar_section_track_arp_mode[8 * 8] = {};
-    std::atomic<int>   pulsar_section_track_chord_follow[8 * 8] = {};
+    std::atomic<int>   pulsar_section_track_comping_style[kMaxSections * kNumPulsarTracks] = {};
+    std::atomic<int>   pulsar_section_track_inversion[kMaxSections * kNumPulsarTracks] = {};
+    std::atomic<int>   pulsar_section_track_arp_mode[kMaxSections * kNumPulsarTracks] = {};
+    std::atomic<int>   pulsar_section_track_chord_follow[kMaxSections * kNumPulsarTracks] = {};
     // Per-section outgoing edges. Stride: 8 sections × 8 edges × 3 floats per edge.
     // Field layout per edge: 0=target_index, 1=weight, 2=transition_bars (pre-roll
     // ramp into the destination, in bars; 0 = hard cut at the boundary).
-    std::atomic<float> pulsar_section_transitions[8 * 8 * 3] = {};
+    std::atomic<float> pulsar_section_transitions[kMaxSections * kMaxSectionTransitions * 3] = {};
     // --- Per-section progression override ---
     // 0 = no override, 1..12 = override length.
-    std::atomic<int>   pulsar_section_progression_length[8] = {};   // [MAX_SECTIONS]
+    std::atomic<int>   pulsar_section_progression_length[kMaxSections] = {};   // [MAX_SECTIONS]
     // Degree values 0..6 (I..VII). Only slots [0..length) are meaningful.
     // Stride: 8 sections × 12 chords (kMaxProgressionLength) — keep in lockstep
     // with PulsarViewModel.pushArrangement (section_progression_degree_${s*12+i}).
-    std::atomic<int>   pulsar_section_progression_degrees[8 * 12] = {};
+    std::atomic<int>   pulsar_section_progression_degrees[kMaxSections * kSectionProgressionSlots] = {};
     // Per-chord glide override applied on transition into each chord. 0 = no glide.
-    std::atomic<float> pulsar_section_progression_glides[8 * 12] = {};
+    std::atomic<float> pulsar_section_progression_glides[kMaxSections * kSectionProgressionSlots] = {};
     // 0 = no override, 1..4 = override value.
-    std::atomic<int>   pulsar_section_chords_per_bar[8] = {};
+    std::atomic<int>   pulsar_section_chords_per_bar[kMaxSections] = {};
 
     // --- Per-section tension override ---
     // 0 = no override, 1 = read from pulsar_section_tension_data[s*21..].
-    std::atomic<int>   pulsar_section_tension_active[8] = {};
+    std::atomic<int>   pulsar_section_tension_active[kMaxSections] = {};
     // Field layout mirrors the vibe-level pulsar_tension_* scalars:
     //   0=inner_bars, 1=outer_bars, 2=outer_depth, 3=volume, 4=timing,
     //   5=octave_shift, 6=key_shift, 7=half_lick, 8=chromatic_passing,
@@ -1050,13 +1051,13 @@ struct OrpheusEngine {
     //   12=evo_morph_low, 13=evo_morph_high, 14=evo_morph_prob,
     //   15=evo_harm_low, 16=evo_harm_high, 17=evo_harm_prob,
     //   18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
-    std::atomic<float> pulsar_section_tension_data[8 * 21] = {};
+    std::atomic<float> pulsar_section_tension_data[kMaxSections * kSectionDataFields] = {};
 
     // --- Per-section comping humanization override (for ALL CHORDAL tracks) ---
     // 0 = no override, 1 = read from pulsar_section_comping_humanization_data[s*4..].
-    std::atomic<int>   pulsar_section_comping_humanization_active[8] = {};
+    std::atomic<int>   pulsar_section_comping_humanization_active[kMaxSections] = {};
     // Field layout: 0=drop_prob, 1=ghost_prob, 2=octave_jump_prob, 3=extension_prob.
-    std::atomic<float> pulsar_section_comping_humanization_data[8 * 4] = {};
+    std::atomic<float> pulsar_section_comping_humanization_data[kMaxSections * kSectionCompingHumanFields] = {};
 
     std::atomic<float> pulsar_track_solo_behavior[8 * 15] = {};
     std::atomic<float> pulsar_track_ducking[8 * 6] = {};

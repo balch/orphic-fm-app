@@ -214,6 +214,20 @@ data class Arrangement(
     }
 
     companion object {
-        const val MAX_SECTIONS = 8
+        /**
+         * Sections per arrangement. MUST equal `kMaxSections` in
+         * `liborpheus_dsp/src/pulsar_limits.h` — the arrangement crosses into the audio
+         * thread through preallocated atomic arrays sized from that constant, and the
+         * routing layer SILENTLY DROPS writes past the bound. `PulsarSectionLimitsTest`
+         * parses the header and fails if these drift apart.
+         */
+        const val MAX_SECTIONS = 12
+
+        /**
+         * Outgoing transitions per section, and the stride this side writes with. MUST
+         * equal `kMaxSectionTransitions`. Distinct from [MAX_SECTIONS]: they were both 8
+         * for a long time, which hid a stride mismatch in the C++ transition unpack.
+         */
+        const val MAX_SECTION_TRANSITIONS = 8
     }
 }

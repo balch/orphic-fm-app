@@ -66,6 +66,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
@@ -1558,8 +1559,9 @@ class PulsarViewModel(
      *   15=transition_count, 16=reserved, 17=reserved,
      *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override
      *
-     * section_transitions[s * 8 * 3 + t * 3 + field]:
-     *   0=targetIndex, 1=weight, 2=transitionBars (up to 8 transitions per section)
+     * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
+     *   0=targetIndex, 1=weight, 2=transitionBars
+     *   Stride is edges-per-section, NOT sections — see Arrangement.MAX_SECTION_TRANSITIONS.
      *
      * track_solo_behavior[t * 15 + field]:
      *   0=volume_boost, 1=density_boost, 2=timbre_min, 3=timbre_max,
@@ -1694,7 +1696,7 @@ class PulsarViewModel(
 
             // Transitions for this section (up to 8 edges × 3 floats per edge:
             // [target_index, weight, transition_bars]).
-            val transBase = s * 8 * 3
+            val transBase = s * Arrangement.MAX_SECTION_TRANSITIONS * 3
             section.transitions.forEachIndexed { t, tr ->
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 3}"),

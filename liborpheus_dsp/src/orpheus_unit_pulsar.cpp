@@ -1367,7 +1367,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             }
 
             // Unpack transitions for this section (3 floats per edge: target, weight, transition_bars)
-            int trans_base = (s * kMaxSections) * 3;
+            // Stride is edges-per-section, NOT sections. This read used kMaxSections for
+            // years and was only correct because both constants happened to be 8; the
+            // Kotlin writer (PulsarViewModel) has always used the edge count.
+            int trans_base = (s * kMaxSectionTransitions) * 3;
             for (int e = 0; e < sec.transition_count; e++) {
                 sec.transitions[e].target_index = static_cast<int>(engine->pulsar_section_transitions[trans_base + e * 3 + 0].load(std::memory_order_relaxed));
                 sec.transitions[e].weight        = engine->pulsar_section_transitions[trans_base + e * 3 + 1].load(std::memory_order_relaxed);

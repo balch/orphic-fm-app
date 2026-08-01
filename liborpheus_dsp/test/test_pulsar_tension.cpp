@@ -207,6 +207,54 @@ static bool test_half_lick_inverted_holds_then_relocks() {
     return ok && held && relocked;
 }
 
+// JAM_LAST_BAR shifts the loop window instead of shortening it, so the section jams the
+// riff's answer phrase. Entering from bar 1 must snap into the window rather than run
+// past it, and releasing must re-lock to bar 1.
+static bool test_half_lick_last_bar_jams_the_answer() {
+    printf("\n=== Test: JAM_LAST_BAR loops the last bar, then re-locks to bar 1 ===\n");
+    PulsarTrackState lead{};
+    lead.step_count = 32;
+    lead.half_loop_len = 16;
+    lead.playhead = 0;
+
+    PulsarLoopWindow win = pulsar_effective_loop_window(lead, HalfLickMode::JAM_LAST_BAR);
+    bool window_ok = win.start == 16 && win.len == 16;
+    printf("  window = [%d, %d) (want [16, 32)) -- %s\n",
+           win.start, win.start + win.len, window_ok ? "PASS" : "FAIL");
+
+    // Run a few steps of bar 1, then engage. The playhead is outside the new window,
+    // so it must snap to its start rather than keep climbing.
+    for (int step = 0; step < 5; step++) pulsar_advance_playhead(lead, HalfLickMode::OFF);
+    pulsar_advance_playhead(lead, HalfLickMode::JAM_LAST_BAR);
+    bool entered = lead.playhead == 16;
+    printf("  entered at playhead %d (want 16) -- %s\n", lead.playhead, entered ? "PASS" : "FAIL");
+
+    // It must stay inside [16, 32) for a full pass, never touching bar 1.
+    bool stayed = true;
+    for (int step = 0; step < 48; step++) {
+        pulsar_advance_playhead(lead, HalfLickMode::JAM_LAST_BAR);
+        if (lead.playhead < 16 || lead.playhead >= 32) stayed = false;
+    }
+    printf("  stayed inside the last bar over 48 steps -- %s\n", stayed ? "PASS" : "FAIL");
+
+    // Release: the riff re-locks to bar 1 rather than stranding in bar 2.
+    pulsar_advance_playhead(lead, HalfLickMode::OFF);
+    bool relocked = lead.playhead == 0;
+    printf("  re-locked to playhead %d on release (want 0) -- %s\n",
+           lead.playhead, relocked ? "PASS" : "FAIL");
+
+    // A one-bar lick has no last bar to jam — must be a no-op, not an empty window.
+    PulsarTrackState oneBar{};
+    oneBar.step_count = 16;
+    oneBar.half_loop_len = 16;
+    PulsarLoopWindow ow = pulsar_effective_loop_window(oneBar, HalfLickMode::JAM_LAST_BAR);
+    bool noop = ow.start == 0 && ow.len == 16;
+    printf("  one-bar lick is a no-op: [%d, %d) -- %s\n",
+           ow.start, ow.start + ow.len, noop ? "PASS" : "FAIL");
+
+    return window_ok && entered && stayed && relocked && noop;
+}
+
 // The mirror case the latch also fixes: half-lick ENGAGING partway through bar 2 must
 // not jump the playhead into the middle of bar 1. It finishes the loop it is on.
 static bool test_half_lick_engage_midloop_does_not_jump() {
@@ -479,6 +527,7 @@ bool run_pulsar_tension_tests() {
     tally(test_half_lick_release_keeps_riff_phase());
     tally(test_half_lick_inverted_holds_then_relocks());
     tally(test_half_lick_engage_midloop_does_not_jump());
+    tally(test_half_lick_last_bar_jams_the_answer());
     tally(test_tension_chromatic_passing_math());
     // Lick evolution spurt tests
     tally(test_spurt_triggers_at_tension_peak());

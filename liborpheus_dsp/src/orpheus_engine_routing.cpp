@@ -1098,7 +1098,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_arrangement_outro_request.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strncmp(symbol, "section_data_", 13) == 0) {
             int idx = std::atoi(symbol + 13);
-            if (idx >= 0 && idx < 8 * 21)
+            if (idx >= 0 && idx < kMaxSections * kSectionDataFields)
                 engine->pulsar_section_data[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "void_data_", 10) == 0) {
@@ -1156,74 +1156,74 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_anomaly_request.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strncmp(symbol, "section_track_comping_", 22) == 0) {
             int idx = std::atoi(symbol + 22);
-            if (idx >= 0 && idx < 8 * 8)
+            if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
                 engine->pulsar_section_track_comping_style[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_track_inversion_", 24) == 0) {
             int idx = std::atoi(symbol + 24);
-            if (idx >= 0 && idx < 8 * 8)
+            if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
                 engine->pulsar_section_track_inversion[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_track_arp_mode_", 23) == 0) {
             int idx = std::atoi(symbol + 23);
-            if (idx >= 0 && idx < 8 * 8)
+            if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
                 engine->pulsar_section_track_arp_mode[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_track_chord_follow_", 27) == 0) {
             int idx = std::atoi(symbol + 27);
-            if (idx >= 0 && idx < 8 * 8)
+            if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
                 engine->pulsar_section_track_chord_follow[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_transitions_", 20) == 0) {
             int idx = std::atoi(symbol + 20);
-            if (idx >= 0 && idx < 8 * 8 * 3)
+            if (idx >= 0 && idx < kMaxSections * kMaxSectionTransitions * 3)
                 engine->pulsar_section_transitions[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_progression_active_", 27) == 0) {
             int idx = std::atoi(symbol + 27);
-            if (idx >= 0 && idx < 8)
+            if (idx >= 0 && idx < kMaxSections)
                 engine->pulsar_section_progression_length[idx].store(
                     static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_progression_degree_", 27) == 0) {
             int idx = std::atoi(symbol + 27);
-            if (idx >= 0 && idx < 8 * 12)
+            if (idx >= 0 && idx < kMaxSections * kSectionProgressionSlots)
                 engine->pulsar_section_progression_degrees[idx].store(
                     static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_progression_glide_", 26) == 0) {
             int idx = std::atoi(symbol + 26);
-            if (idx >= 0 && idx < 8 * 12)
+            if (idx >= 0 && idx < kMaxSections * kSectionProgressionSlots)
                 engine->pulsar_section_progression_glides[idx].store(
                     value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_chords_per_bar_", 23) == 0) {
             int idx = std::atoi(symbol + 23);
-            if (idx >= 0 && idx < 8)
+            if (idx >= 0 && idx < kMaxSections)
                 engine->pulsar_section_chords_per_bar[idx].store(
                     static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_tension_active_", 23) == 0) {
             int idx = std::atoi(symbol + 23);
-            if (idx >= 0 && idx < 8)
+            if (idx >= 0 && idx < kMaxSections)
                 engine->pulsar_section_tension_active[idx].store(
                     static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_tension_data_", 21) == 0) {
             int idx = std::atoi(symbol + 21);
-            if (idx >= 0 && idx < 8 * 21)
+            if (idx >= 0 && idx < kMaxSections * kSectionDataFields)
                 engine->pulsar_section_tension_data[idx].store(
                     value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_comping_humanization_active_", 36) == 0) {
             int idx = std::atoi(symbol + 36);
-            if (idx >= 0 && idx < 8)
+            if (idx >= 0 && idx < kMaxSections)
                 engine->pulsar_section_comping_humanization_active[idx].store(
                     static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_comping_humanization_data_", 34) == 0) {
             int idx = std::atoi(symbol + 34);
-            if (idx >= 0 && idx < 8 * 4)
+            if (idx >= 0 && idx < kMaxSections * kSectionCompingHumanFields)
                 engine->pulsar_section_comping_humanization_data[idx].store(
                     value, std::memory_order_relaxed);
         }
