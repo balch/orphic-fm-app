@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.MutablePrefs
 import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
+import org.balch.orpheus.features.pulsar.makeSongEnding
 import org.balch.orpheus.features.pulsar.makeStubPlaybackController
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import kotlin.test.Test
@@ -57,11 +58,10 @@ class PulsarSongEndingIntegrationTest {
         val scope = makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler))
         val playbackController = makeStubPlaybackController(scope)
 
-        val songEnding = PulsarSongEnding(
-            pulsarFeatureProvider = { feature },
+        val songEnding = makeSongEnding(
+            feature = feature,
             playbackController = playbackController,
             preferences = prefs,
-            transitionPreferences = StubTransitionPreferences(),
             synthController = synthController,
             scope = scope,
         ).apply {

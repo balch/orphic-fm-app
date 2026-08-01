@@ -88,6 +88,17 @@ internal class StubSongEndingEventSource :
     override val resolvedTransitionStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle> =
         MutableStateFlow(TransitionStyle.FADE)
     override fun armOutro() { /* no-op for VM-construction tests */ }
+
+    var vibeAppliedCount: Int = 0
+        private set
+
+    /** Runs inside onVibeApplied() so a test can snapshot surrounding state. */
+    var onVibeAppliedObserver: () -> Unit = {}
+
+    override fun onVibeApplied() {
+        vibeAppliedCount++
+        onVibeAppliedObserver()
+    }
 }
 
 /**
@@ -104,7 +115,17 @@ internal class FakePulsarFeature(
     val arrangement: MutableStateFlow<PulsarArrangementState> = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
     override val arrangementStateFlow: kotlinx.coroutines.flow.StateFlow<PulsarArrangementState> = arrangement
     override val vibeNames: List<String> = vibeList.map { it.name }
-    override fun applyVibe(vibe: Vibe) { vibeFlow.value = vibe }
+
+    /**
+     * Mirrors `PulsarViewModel.applyVibe()`'s `onVibeApplied()` call. Do not set
+     * this by hand: build the pair with [makeSongEnding], which wires it.
+     */
+    var onVibeApplied: () -> Unit = {}
+
+    override fun applyVibe(vibe: Vibe) {
+        vibeFlow.value = vibe
+        onVibeApplied()
+    }
     override fun applyVibeByName(name: String): Boolean {
         val v = vibeList.firstOrNull { it.name == name } ?: return false
         applyVibe(v)
@@ -125,6 +146,31 @@ internal class FixturesDispatchers(private val d: CoroutineDispatcher) : Dispatc
 internal fun makeAppCoroutineScope(
     dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
 ): AppCoroutineScope = AppCoroutineScope(FixturesDispatchers(dispatcher))
+
+/**
+ * The only sanctioned way to build a real [PulsarSongEnding] over a
+ * [FakePulsarFeature]. Wiring `feature.onVibeApplied` by hand is easy to forget,
+ * and forgetting it silently disables the per-song reset the whole class exists
+ * to perform.
+ */
+internal fun makeSongEnding(
+    feature: FakePulsarFeature,
+    playbackController: PlaybackController,
+    preferences: SongEndingPreferences,
+    synthController: org.balch.orpheus.core.controller.SynthController,
+    scope: AppCoroutineScope,
+    transitionPreferences: TransitionPreferences = StubTransitionPreferences(),
+): org.balch.orpheus.features.pulsar.playback.PulsarSongEnding =
+    org.balch.orpheus.features.pulsar.playback.PulsarSongEnding(
+        pulsarFeatureProvider = { feature },
+        playbackController = playbackController,
+        preferences = preferences,
+        transitionPreferences = transitionPreferences,
+        synthController = synthController,
+        scope = scope,
+    ).also { songEnding ->
+        feature.onVibeApplied = { songEnding.onVibeApplied() }
+    }
 
 /**
  * Build a minimal, real [PulsarSongEnding] stack — `PulsarViewModel` only

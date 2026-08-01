@@ -31,6 +31,7 @@ class PulsarSongAdvancerTest {
         override val resolvedTransitionStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle> =
             resolvedStyleFlow
         override fun armOutro() {}
+        override fun onVibeApplied() {}
     }
 
     /** Records calls into the runner so tests can assert on resolved [TransitionSpec]. */
@@ -40,6 +41,21 @@ class PulsarSongAdvancerTest {
             kotlinx.coroutines.flow.MutableStateFlow(null)
         override suspend fun runTransition(spec: TransitionSpec, applyNext: suspend () -> Unit) {
             specs += spec
+            applyNext()
+        }
+    }
+
+    /**
+     * Holds the transition open for [preApplyMs] before swapping the vibe, so a
+     * test can queue a second event while the collector is suspended.
+     */
+    private class DelayingRunner(private val preApplyMs: Long) : PulsarTransitionRunner {
+        val specs = mutableListOf<TransitionSpec>()
+        override val activeStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle?> =
+            kotlinx.coroutines.flow.MutableStateFlow(null)
+        override suspend fun runTransition(spec: TransitionSpec, applyNext: suspend () -> Unit) {
+            specs += spec
+            kotlinx.coroutines.delay(preApplyMs)
             applyNext()
         }
     }
@@ -74,6 +90,34 @@ class PulsarSongAdvancerTest {
         source.emitter.tryEmit(SongEndingEvent.SongEnded("C"))
         advanceUntilIdle()
         assertEquals("A", feature.vibeFlow.value.name)
+    }
+
+    @Test
+    fun `stale SongEnded queued during a transition does not double-advance`() = runTest {
+        val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"), mkMinimalVibe("C"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        val source = FakeSongEndingEventSource()
+        val runner = DelayingRunner(preApplyMs = 1_000L)
+        val advancer = PulsarSongAdvancer(
+            feature, source, StubTransitionPreferences(), runner,
+            makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler)),
+        )
+        @Suppress("UNUSED_EXPRESSION") advancer
+
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceTimeBy(100L)
+        assertEquals("A", feature.vibeFlow.value.name, "sanity: transition still in flight")
+
+        // Recovery-net re-emit, buffered until runTransition returns. By then
+        // applyNext has moved us to B; acting on it would skip to C.
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceUntilIdle()
+
+        assertEquals(
+            "B", feature.vibeFlow.value.name,
+            "a re-emit naming the song we already left must be dropped, not advanced past",
+        )
+        assertEquals(1, runner.specs.size, "only one transition should have run")
     }
 
     @Test

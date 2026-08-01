@@ -1101,8 +1101,11 @@ class PulsarViewModel(
     override fun applyVibe(vibe: Vibe) {
         log.info { "applyVibe name=${vibe.name} bpm=${vibe.bpm} tracks=${vibe.tracks.size} sections=${vibe.arrangement?.sections?.size ?: 0}" }
         // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends.
-        // PulsarSongEnding observes vibeFlow and resets its own state on change.
         vibeFlow.value = vibe
+        // A new song starts here. Must be explicit, not a vibeFlow observation:
+        // a re-apply of the playing vibe emits nothing, stranding the outro.
+        // Before pushArrangement so the cleared port precedes its fence.
+        songEndingEventSource.onVibeApplied()
         // globalTempo will be set to vibe.bpm below — that is the 1.0× baseline
         // for the section-BPM collector to compose multipliers against.
         lastSectionMult = 1.0f

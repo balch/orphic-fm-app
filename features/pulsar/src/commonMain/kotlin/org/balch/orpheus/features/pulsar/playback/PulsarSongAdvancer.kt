@@ -38,6 +38,13 @@ class PulsarSongAdvancer(
                 val names = pulsarFeature.vibeNames
                 if (names.isEmpty()) return@collect
                 val currentName = pulsarFeature.vibeFlow.value.name
+                // PulsarSongEnding re-emits SongEnded every outro loop as a
+                // recovery net. One queued behind an in-flight runTransition
+                // arrives after the swap; acting on it would skip the new song.
+                if (event.vibeName != currentName) {
+                    log.info { "stale SongEnded(${event.vibeName}); now playing $currentName — ignoring" }
+                    return@collect
+                }
                 val idx = names.indexOf(currentName)
                 val nextIndex = ((idx + 1) % names.size).coerceAtLeast(0)
                 val nextName = names[nextIndex]

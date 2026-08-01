@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
@@ -82,6 +81,18 @@ interface SongEndingEventSource {
      * `enabled = true` — manual arming is an explicit user intent.
      */
     fun armOutro()
+
+    /**
+     * A new song starts now. Resets playing-time, armed/final-section state,
+     * and the sticky C++ `arrangement_outro_request` port.
+     *
+     * MUST be called from every `applyVibe()`, including re-applies of the
+     * playing vibe — `vibeFlow` is a StateFlow and emits nothing on an equal
+     * value, so it cannot drive this. Skipping it strands the song in its
+     * outro forever. Call BEFORE pushing the arrangement so the cleared port
+     * precedes the `arrangement_generation` fence.
+     */
+    fun onVibeApplied()
 }
 
 @SingleIn(AppScope::class)
@@ -155,18 +166,12 @@ class PulsarSongEnding(
                 onArrangementTick(state)
             }
         }
-        // Reset song-ending state on every vibe change. drop(1) skips the
-        // initial value emission (no reset on first observation).
-        scope.launch {
-            pulsarFeature.vibeFlow
-                .distinctUntilChangedBy { it.name }
-                .drop(1)
-                .collect { onVibeChanged() }
-        }
-        // Pre-roll the transition style per vibe so the UI shows the actually
-        // selected style (not "RANDOM") and so [PulsarSongAdvancer] uses the
-        // same pick when firing. Re-resolves on vibe change or when the user
-        // edits the configured spec.
+        // Per-song state resets from onVibeApplied(), not from vibeFlow.
+        //
+        // Pre-roll the transition style so the UI and [PulsarSongAdvancer] show
+        // the same pick, never "RANDOM". Stays keyed on the vibe NAME unlike
+        // the reset above: the pick belongs to the vibe, not the play-through,
+        // so an engine recreation must not re-roll it under the user.
         scope.launch {
             combine(
                 pulsarFeature.vibeFlow.distinctUntilChangedBy { it.name },
@@ -201,7 +206,7 @@ class PulsarSongEnding(
         // section transitioned out (normal arrangement) or because the section
         // looped back to bar 0 (terminal section with no transitions, which the
         // C++ Markov picker re-enters indefinitely).
-        if (_endingTriggered.value && _finalSectionIndex.value >= 0 && !songEndedEmitted) {
+        if (_endingTriggered.value && _finalSectionIndex.value >= 0) {
             val transitionedOut = lastObservedSectionIndex == _finalSectionIndex.value
                 && state.sectionIndex != _finalSectionIndex.value
             // The `lastObservedSectionIndex == finalSectionIndex` guard ensures we
@@ -216,7 +221,16 @@ class PulsarSongEnding(
                 && state.barsElapsed < lastObservedBarsElapsed
             if (transitionedOut || sectionLooped) {
                 val name = pulsarFeature.vibeFlow.value.name
-                log.info { "song ended: $name (transitionedOut=$transitionedOut sectionLooped=$sectionLooped)" }
+                // Recovery net: both conditions are edge-triggered, so a second
+                // edge (a full section later) means the last SongEnded never
+                // produced a vibe change. The C++ outro pin means re-emitting
+                // is the only escape. PulsarSongAdvancer drops stale re-emits
+                // by vibe name so an in-flight transition isn't double-fired.
+                if (songEndedEmitted) {
+                    log.warn { "still in the final section after SongEnded: $name — re-emitting" }
+                } else {
+                    log.info { "song ended: $name (transitionedOut=$transitionedOut sectionLooped=$sectionLooped)" }
+                }
                 // Latch only on a successful emit. If the buffer/subscriber drops
                 // it (tryEmit == false), leave songEndedEmitted false so the next
                 // section loop retries — otherwise a single dropped SongEnded
@@ -332,16 +346,10 @@ class PulsarSongEnding(
     }
 
     /**
-     * Reset all song-ending state. Driven internally by the [pulsarFeature.vibeFlow]
-     * collector so a vibe switch automatically clears playing-time, the trigger flag,
-     * and the C++ outro request.
-     *
-     * Volume management during transitions is owned exclusively by
-     * [PulsarTransitionRunner] — both the auto-advance path
-     * ([PulsarSongAdvancer]) and the manual-skip path ([PulsarSkipHandler])
-     * route through it. This method only resets bookkeeping.
+     * Reset all song-ending state. Bookkeeping only: volume during transitions
+     * is owned exclusively by [PulsarTransitionRunner].
      */
-    private fun onVibeChanged() {
+    override fun onVibeApplied() {
         playingMillis = 0L
         lastTickMillis = if (playbackController.state.value == PlaybackState.Playing) {
             nowMillis()

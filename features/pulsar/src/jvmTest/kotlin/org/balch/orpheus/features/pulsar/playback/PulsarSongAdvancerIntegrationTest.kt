@@ -46,6 +46,7 @@ class PulsarSongAdvancerIntegrationTest {
         override val resolvedTransitionStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle> =
             resolvedStyleFlow
         override fun armOutro() {}
+        override fun onVibeApplied() {}
         suspend fun emit(event: SongEndingEvent) = _events.emit(event)
     }
 
