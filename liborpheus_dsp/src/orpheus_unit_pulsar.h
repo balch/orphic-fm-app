@@ -216,6 +216,16 @@ static_assert(kNumPulsarScales == sizeof(kPulsarScales) / sizeof(kPulsarScales[0
 
 enum PulsarEnvPhase { ENV_IDLE, ENV_ATTACK, ENV_SUSTAIN, ENV_DECAY };
 
+// How a FILL lick loops while truncated, and how its phase resolves on release.
+// Mirrors `HalfLick` in TensionProfile.kt — the values are the wire encoding carried
+// by tension slot 7, so do not reorder.
+enum class HalfLickMode : int {
+    OFF          = 0,  // no truncation; the lick plays its full length
+    JAM          = 1,  // loop bar 1; on release the riff re-locks to bar 1
+    JAM_INVERTED = 2,  // loop bar 1; on release spill into bar 2 and stay a bar out of
+                       // phase until the next section boundary re-locks it
+};
+
 struct PulsarTrackState {
     OrpheusVoice voice;
     // Per-track Braids macro oscillator. Used when engine_index >= 100.
@@ -235,6 +245,20 @@ struct PulsarTrackState {
     // `half_loop_len` steps of the full step_count). 0 = not a FILL lick / no truncation.
     // Set at load_vibe for FILL melodic leads; gated at render time on tension.half_lick.
     int half_loop_len = 0;
+    // Loop length the playhead is CURRENTLY traversing, latched at each wrap, plus the
+    // half-lick mode that owned it. The effective length can change mid-loop (a section
+    // flip runs during track 0's boundary, before this track advances), and wrapping
+    // against the new length would strand the playhead past its old wrap point. 0 =
+    // not yet latched; adopt the effective length on the next advance.
+    int wrap_len = 0;
+    HalfLickMode wrap_mode = HalfLickMode::OFF;
+    // Set when a JAM_INVERTED release deliberately left this track a bar out of phase.
+    // Cleared by the section-boundary re-lock, which arms `resync_pending`.
+    bool phase_inverted = false;
+    // Armed at a section boundary; the track's next advance lands the playhead on 0.
+    // Deferred rather than assigned directly because the section handler runs during
+    // track 0's boundary, before this track has advanced for the same step.
+    bool resync_pending = false;
     int engine_index;
     float volume;
     float pan;
@@ -381,11 +405,57 @@ struct PulsarTrackState {
 // mode: when half_lick is active AND this track carries a truncatable FILL lick
 // (half_loop_len set to its first-bar length), the playhead loops only that first
 // bar so the opening figure repeats/jams. Otherwise the full step_count is used.
-inline int pulsar_effective_loop_len(const PulsarTrackState& ts, bool half_lick) {
-    if (half_lick && ts.half_loop_len > 0 && ts.half_loop_len < ts.step_count) {
+inline int pulsar_effective_loop_len(const PulsarTrackState& ts, HalfLickMode mode) {
+    if (mode != HalfLickMode::OFF && ts.half_loop_len > 0 && ts.half_loop_len < ts.step_count) {
         return ts.half_loop_len;
     }
     return ts.step_count;
+}
+
+// Advance one step boundary, wrapping against the loop the playhead is ACTUALLY
+// traversing rather than whatever length is in effect right now.
+//
+// The two lengths differ for exactly one boundary whenever a section flip toggles
+// half-lick, because the flip runs inside track 0's boundary handling while `t` is the
+// outer render loop — track 0 clears the mode before this track advances for the same
+// step. Wrapping against the restored length there leaves a truncated lead sitting on
+// `half_loop_len` (bar 2) instead of 0, one bar out of phase with the chord grid for
+// the rest of the song. Latching the length at each wrap makes the change take effect
+// at a musical boundary, and also fixes the mirror case where half-lick ENGAGES
+// mid-loop and would otherwise jump the playhead into the middle of bar 1.
+//
+// JAM_INVERTED opts into the un-wrapped behavior deliberately and marks the track so
+// the next section boundary re-locks it.
+inline void pulsar_advance_playhead(PulsarTrackState& ts, HalfLickMode mode) {
+    const int loop_len = pulsar_effective_loop_len(ts, mode);
+
+    if (ts.resync_pending) {
+        ts.resync_pending = false;
+        ts.playhead   = 0;
+        ts.wrap_len   = loop_len;
+        ts.wrap_mode  = mode;
+        return;
+    }
+    if (ts.wrap_len <= 0) {           // first advance after load: adopt as-is
+        ts.wrap_len  = loop_len;
+        ts.wrap_mode = mode;
+    }
+
+    ts.playhead++;
+    if (ts.playhead < ts.wrap_len) return;
+
+    if (ts.wrap_mode == HalfLickMode::JAM_INVERTED && loop_len > ts.wrap_len) {
+        // Deliberate inversion: the truncated loop just ended and the full lick is
+        // back, so let the playhead run on into bar 2 instead of wrapping. The riff
+        // states its answer phrase first and stays inverted until the re-lock.
+        ts.wrap_len       = loop_len;
+        ts.wrap_mode      = mode;
+        ts.phase_inverted = true;
+        return;
+    }
+    ts.playhead  = 0;
+    ts.wrap_len  = loop_len;
+    ts.wrap_mode = mode;
 }
 
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
@@ -432,7 +502,7 @@ struct TensionParams {
     float timing = 0.2f;
     bool octave_shift = false;
     int key_shift = 0;
-    bool half_lick = false;
+    HalfLickMode half_lick = HalfLickMode::OFF;
     float chromatic_passing = 0.0f;
     float evo_timbre_low = 0.25f, evo_timbre_high = 0.55f, evo_timbre_prob = 0.7f;
     float evo_morph_low = -1.0f, evo_morph_high = -1.0f, evo_morph_prob = 0.5f;

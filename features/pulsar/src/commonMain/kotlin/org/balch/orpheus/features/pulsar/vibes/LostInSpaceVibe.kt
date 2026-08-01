@@ -18,6 +18,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
@@ -1100,7 +1101,7 @@ public class LostInSpaceVibe : VibeProvider {
         tonal = TonalTension(
           octaveShift = false,
           keyShift = 0,
-          halfLick = false,
+          halfLick = HalfLick.OFF,
           chromaticPassing = 0.0f,
         ),
         timing = 0.02f,

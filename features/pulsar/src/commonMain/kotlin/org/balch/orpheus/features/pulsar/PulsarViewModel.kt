@@ -1426,7 +1426,7 @@ class PulsarViewModel(
         tensionTimingId.value = FloatValue(t.timing)
         tensionOctaveShiftId.value = IntValue(if (t.tonal.octaveShift) 1 else 0)
         tensionKeyShiftId.value = IntValue(t.tonal.keyShift)
-        tensionHalfLickId.value = IntValue(if (t.tonal.halfLick) 1 else 0)
+        tensionHalfLickId.value = IntValue(t.tonal.halfLick.ordinal)
         tensionChromaticPassingId.value = FloatValue(t.tonal.chromaticPassing)
         val e = t.evolution
         tensionEvoTimbreLowId.value = FloatValue(e.timbreLow)
@@ -1755,7 +1755,7 @@ class PulsarViewModel(
                 setTension(4,  to.timing)
                 setTension(5,  if (to.tonal.octaveShift) 1f else 0f)
                 setTension(6,  to.tonal.keyShift.toFloat())
-                setTension(7,  if (to.tonal.halfLick) 1f else 0f)
+                setTension(7,  to.tonal.halfLick.ordinal.toFloat())
                 setTension(8,  to.tonal.chromaticPassing)
                 setTension(9,  to.evolution.timbreLow)
                 setTension(10, to.evolution.timbreHigh)

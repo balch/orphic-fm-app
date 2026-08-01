@@ -20,6 +20,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
@@ -219,7 +220,7 @@ class ArmyStompVibe : VibeProvider {
                     volume = 0.30f,
                     tonal = TonalTension(
                         octaveShift = true,
-                        halfLick = true,
+                        halfLick = HalfLick.JAM,
                         chromaticPassing = 0.30f,
                     ),
                     timing = 0.35f,
@@ -568,7 +569,7 @@ class ArmyStompVibe : VibeProvider {
                 spurtChance = 0.25f,
                 innerBars = 8, outerBars = 24, outerDepth = 0.6f,
                 volume = 0.4f,
-                tonal = TonalTension(octaveShift = true, halfLick = true, chromaticPassing = 0.15f),
+                tonal = TonalTension(octaveShift = true, halfLick = HalfLick.JAM, chromaticPassing = 0.15f),
                 timing = 0.2f,
                 evolution = EvolutionTension(
                     timbreLow = 0.25f, timbreHigh = 0.55f, timbreProbability = 0.8f,

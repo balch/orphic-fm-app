@@ -96,7 +96,7 @@ static bool test_tension_struct_defaults() {
            && std::fabs(tp.timing - 0.2f) < 0.001f
            && !tp.octave_shift
            && tp.key_shift == 0
-           && !tp.half_lick
+           && tp.half_lick == HalfLickMode::OFF
            && std::fabs(tp.chromatic_passing) < 0.001f
            && std::fabs(tp.evo_timbre_low - 0.25f) < 0.001f
            && std::fabs(tp.evo_morph_low - (-1.0f)) < 0.001f;
@@ -111,24 +111,123 @@ static bool test_half_lick_effective_loop_len() {
     PulsarTrackState fill{};
     fill.step_count = 32;
     fill.half_loop_len = 16;
-    bool ok = pulsar_effective_loop_len(fill, true)  == 16   // jam the first bar
-           && pulsar_effective_loop_len(fill, false) == 32;  // full riff at the drop
+    bool ok = pulsar_effective_loop_len(fill, HalfLickMode::JAM)          == 16  // jam bar 1
+           && pulsar_effective_loop_len(fill, HalfLickMode::JAM_INVERTED) == 16  // same truncation
+           && pulsar_effective_loop_len(fill, HalfLickMode::OFF)          == 32; // full riff at the drop
 
     // A non-FILL track (half_loop_len = 0) is never truncated, even under half_lick —
     // so drums/bass keep their full pattern while the lead jams.
     PulsarTrackState perc{};
     perc.step_count = 32;
     perc.half_loop_len = 0;
-    ok = ok && pulsar_effective_loop_len(perc, true) == 32;
+    ok = ok && pulsar_effective_loop_len(perc, HalfLickMode::JAM) == 32;
 
     // Guard: a 16-step vibe whose bar1 == step_count is a no-op (no phantom truncation).
     PulsarTrackState oneBar{};
     oneBar.step_count = 16;
     oneBar.half_loop_len = 16;
-    ok = ok && pulsar_effective_loop_len(oneBar, true) == 16;
+    ok = ok && pulsar_effective_loop_len(oneBar, HalfLickMode::JAM) == 16;
 
     printf("  half_lick loop length -- %s\n", ok ? "PASS" : "FAIL");
     return ok;
+}
+
+// Releasing half_lick must not leave the riff a bar out of phase.
+//
+// The section flip fires inside track 0's boundary handling, and the render loop is
+// `for t { for b { ... } }` — track 0 is fully advanced (clearing half_lick) BEFORE the
+// lead is advanced in that same step boundary. So the lead reaches its final increment
+// with playhead == half_loop_len - 1 but loop_len already back to step_count:
+//
+//     (15 + 1) % 32 == 16      instead of wrapping to 0
+//
+// The lead resumes on bar 2 and stays 16 steps out of phase with track 0 for the rest
+// of the song — the riff plays answer-first, permanently. Reproduces Fire Sky's
+// "lead-in inverts the riff" bug; the arrangement length is irrelevant, since every
+// section is a whole number of track-0 wraps (32 steps) and therefore always leaves
+// the truncated lead sitting on half_loop_len - 1.
+// Run a `mode` lead-in of 2 track-0 wraps, releasing on the final boundary exactly as
+// the section flip does, and report where the riff resumes.
+static int playhead_after_lead_in(HalfLickMode mode) {
+    PulsarTrackState lead{};
+    lead.step_count = 32;
+    lead.half_loop_len = 16;
+    lead.playhead = 0;
+
+    constexpr int kLeadInSteps = 64;   // 2 arrangement bars = 2 track-0 wraps
+    for (int step = 0; step < kLeadInSteps; step++) {
+        // Final boundary: track 0 wrapped, advance_section ran, tension reverted.
+        HalfLickMode active = (step == kLeadInSteps - 1) ? HalfLickMode::OFF : mode;
+        pulsar_advance_playhead(lead, active);
+    }
+    return lead.playhead;
+}
+
+static bool test_half_lick_release_keeps_riff_phase() {
+    printf("\n=== Test: releasing half_lick resumes the riff on bar 1, not bar 2 ===\n");
+    int jam = playhead_after_lead_in(HalfLickMode::JAM);
+    bool ok = jam == 0;
+    printf("  JAM playhead after lead-in = %d (want 0 = bar 1) -- %s\n",
+           jam, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// JAM_INVERTED keeps the old phase flip, but as a declared behavior with a defined end.
+static bool test_half_lick_inverted_holds_then_relocks() {
+    printf("\n=== Test: JAM_INVERTED enters on bar 2, then re-locks at the next section ===\n");
+    PulsarTrackState lead{};
+    lead.step_count = 32;
+    lead.half_loop_len = 16;
+    lead.playhead = 0;
+
+    constexpr int kLeadInSteps = 64;
+    for (int step = 0; step < kLeadInSteps; step++) {
+        HalfLickMode active =
+            (step == kLeadInSteps - 1) ? HalfLickMode::OFF : HalfLickMode::JAM_INVERTED;
+        pulsar_advance_playhead(lead, active);
+    }
+    bool ok = lead.playhead == 16 && lead.phase_inverted;
+    printf("  entered next section at playhead %d (want 16 = bar 2), inverted=%d -- %s\n",
+           lead.playhead, lead.phase_inverted ? 1 : 0, ok ? "PASS" : "FAIL");
+
+    // It must STAY inverted across the whole section, not drift back on its own.
+    for (int step = 0; step < 32; step++) pulsar_advance_playhead(lead, HalfLickMode::OFF);
+    bool held = lead.playhead == 16;
+    printf("  still bar-2-first one full statement later: playhead %d -- %s\n",
+           lead.playhead, held ? "PASS" : "FAIL");
+
+    // The section boundary arms the re-lock (mirrors the handler in the render loop).
+    lead.phase_inverted = false;
+    lead.resync_pending = true;
+    pulsar_advance_playhead(lead, HalfLickMode::OFF);
+    bool relocked = lead.playhead == 0;
+    printf("  re-locked at next section boundary: playhead %d (want 0) -- %s\n",
+           lead.playhead, relocked ? "PASS" : "FAIL");
+
+    return ok && held && relocked;
+}
+
+// The mirror case the latch also fixes: half-lick ENGAGING partway through bar 2 must
+// not jump the playhead into the middle of bar 1. It finishes the loop it is on.
+static bool test_half_lick_engage_midloop_does_not_jump() {
+    printf("\n=== Test: engaging half_lick mid-loop finishes the current pass ===\n");
+    PulsarTrackState lead{};
+    lead.step_count = 32;
+    lead.half_loop_len = 16;
+    lead.playhead = 0;
+    for (int step = 0; step < 20; step++) pulsar_advance_playhead(lead, HalfLickMode::OFF);
+    // Playhead is at 20, mid bar 2. Engage half-lick.
+    pulsar_advance_playhead(lead, HalfLickMode::JAM);
+    bool ok = lead.playhead == 21;   // continues, does not snap to (20+1) % 16 == 5
+    printf("  playhead %d after engaging at 20 (want 21, not 5) -- %s\n",
+           lead.playhead, ok ? "PASS" : "FAIL");
+
+    // Once it completes the 32-step pass it adopts the 16-step loop.
+    for (int step = 0; step < 11; step++) pulsar_advance_playhead(lead, HalfLickMode::JAM);
+    bool adopted = lead.playhead == 0 && lead.wrap_len == 16;
+    printf("  adopted the truncated loop at the wrap: playhead %d wrap_len %d -- %s\n",
+           lead.playhead, lead.wrap_len, adopted ? "PASS" : "FAIL");
+    return ok && adopted;
 }
 
 static bool test_tension_chromatic_passing_math() {
@@ -377,6 +476,9 @@ bool run_pulsar_tension_tests() {
     tally(test_tension_evolution_attack_point());
     tally(test_tension_struct_defaults());
     tally(test_half_lick_effective_loop_len());
+    tally(test_half_lick_release_keeps_riff_phase());
+    tally(test_half_lick_inverted_holds_then_relocks());
+    tally(test_half_lick_engage_midloop_does_not_jump());
     tally(test_tension_chromatic_passing_math());
     // Lick evolution spurt tests
     tally(test_spurt_triggers_at_tension_peak());

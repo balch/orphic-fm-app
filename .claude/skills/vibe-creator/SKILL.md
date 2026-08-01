@@ -312,6 +312,17 @@ A decent default (see `DogHouseVibe`, `ArmyStompVibe`) is 4 members — Drummer/
 - `volume`: how much tension affects track volumes.
 - `timing`: how much tension affects timing tightness.
 - `tonal`: `TonalTension(octaveShift, keyShift, halfLick, chromaticPassing)`.
+  - `halfLick` is a `HalfLick` enum, not a boolean:
+    - `HalfLick.OFF` (default) — the FILL lick plays its full length.
+    - `HalfLick.JAM` — loop only the lick's first bar so the opening figure repeats
+      while its tone evolves. On release the riff re-locks to bar 1. This is what a
+      plain `halfLick = true` used to mean, and it is what you almost always want.
+    - `HalfLick.JAM_INVERTED` — same truncation, but on release the riff deliberately
+      resumes on bar 2 and stays a bar out of phase with the harmony until the next
+      section boundary. Use it when you want a section to open with the riff's answer
+      phrase instead of its hook. It reads as a turned-around riff, so it is a strong
+      flavor: set it on the section BEFORE the one you want turned around.
+  - Only affects `LickMode.Fill` licks. `LickMode.Squash` licks are already one bar.
 - `evolution`: `EvolutionTension` — timbre/morph/harmonics drift ranges and probabilities across the tension cycle. `attackPoint` 0-1 is where the peak lives; `releaseSpeed` is how fast it snaps back.
 - `spurtChance`: per-bar random burst probability (0 = tension-only).
 

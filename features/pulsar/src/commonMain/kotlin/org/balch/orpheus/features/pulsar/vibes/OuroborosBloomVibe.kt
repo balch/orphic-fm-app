@@ -18,6 +18,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
@@ -1114,7 +1115,7 @@ public class OuroborosBloomVibe : VibeProvider {
           tonal = TonalTension(
             octaveShift = true,
             keyShift = 0,
-            halfLick = true,
+            halfLick = HalfLick.JAM,
             chromaticPassing = 0.3f,
           ),
           timing = 0.05f,

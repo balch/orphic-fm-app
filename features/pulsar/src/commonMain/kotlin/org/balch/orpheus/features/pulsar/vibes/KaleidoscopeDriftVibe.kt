@@ -18,6 +18,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickMode
@@ -1110,7 +1111,7 @@ public class KaleidoscopeDriftVibe : VibeProvider {
           tonal = TonalTension(
             octaveShift = true,
             keyShift = 0,
-            halfLick = false,
+            halfLick = HalfLick.OFF,
             chromaticPassing = 0.2f,
           ),
           timing = 0.03f,

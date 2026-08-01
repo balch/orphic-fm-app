@@ -25,6 +25,7 @@ import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
@@ -1149,7 +1150,7 @@ public class VanishedSkylineVibe : VibeProvider {
           tonal = TonalTension(
             octaveShift = true,
             keyShift = 0,
-            halfLick = false,
+            halfLick = HalfLick.OFF,
             chromaticPassing = 0.15f,
           ),
           timing = 0.2f,

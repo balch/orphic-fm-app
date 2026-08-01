@@ -107,6 +107,14 @@ innerBars >= 8 if you want those moments. volume (0..1) = how much tension affec
 timing (0..1) = how much it tightens or loosens step timing. tonal.octaveShift and tonal.keyShift
 let tension briefly push the melody up an octave or shift key at the peak.
 
+tonal.halfLick is an enum, NOT a boolean. "OFF" = the lick plays its full length. "JAM" = loop only
+the lick's first bar so the opening figure repeats while its tone evolves, then re-lock to bar 1 on
+release — this is the normal choice for a build or lead-in. "JAM_INVERTED" = same truncation, but on
+release the riff resumes on bar 2 and stays a bar out of phase with the harmony until the next
+section boundary, so the following section opens with the riff's answer phrase instead of its hook.
+JAM_INVERTED is a strong, deliberate flavor; prefer JAM unless the brief calls for a turned-around
+riff. Either only affects Fill licks — Squash licks are already one bar.
+
 ## 7. Sections (Arrangement)
 A section graph lets the vibe tell a story: intro → verse → chorus → solo → breakdown → outro. Each
 section has barsMin/Max (how long it lives before picking a transition), macroOverrides (multipliers

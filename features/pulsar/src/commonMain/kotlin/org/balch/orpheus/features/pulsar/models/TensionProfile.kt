@@ -3,20 +3,52 @@ package org.balch.orpheus.features.pulsar.models
 import kotlinx.serialization.Serializable
 
 /**
+ * How a FILL lick loops while a tension profile truncates it, and what happens to the
+ * riff's phase when that truncation is released.
+ *
+ * The ordinals are the wire values sent to the C++ engine (tension slot 7, mirrored by
+ * `HalfLickMode` in `orpheus_unit_pulsar.h`). Do not reorder.
+ */
+@Serializable
+enum class HalfLick {
+    /** No truncation. The lick plays its full length. */
+    OFF,
+
+    /**
+     * Loop only the lick's first bar so the opening figure repeats and "jams" while
+     * mutation/evolution churn its tone. On release the riff re-locks to bar 1, staying
+     * aligned with the chord grid.
+     */
+    JAM,
+
+    /**
+     * [JAM], but on release the riff deliberately spills into bar 2 and stays one bar
+     * out of phase with the harmony until the next section boundary re-locks it. The
+     * section states its answer phrase first, which reads as a turned-around riff.
+     *
+     * This is the *intentional* form of a bug that used to happen to every [JAM]
+     * section: the section flip runs during track 0's boundary, so a truncated lead
+     * reached its final increment with the loop length already restored and never
+     * wrapped. See `test_half_lick_release_keeps_riff_phase`.
+     */
+    JAM_INVERTED,
+}
+
+/**
  * Pitch/scale modifications applied during high-tension moments.
  * @param octaveShift If true, melodic tracks may shift up an octave at peak tension.
  * @param keyShift Semitones to shift the root at peak tension. 0 = none, 5 = up a 4th.
- * @param halfLick If true, a FILL lick loops only its first bar (the first 16 of the 32
- *   steps) so the opening figure repeats and "jams" while mutation/evolution churn its
- *   tone. Best set per-section via [Section.tensionOverride] to jam in one section (e.g.
- *   a build) and play the full lick elsewhere. No effect on SQUASH licks (already 1 bar).
+ * @param halfLick Whether a FILL lick loops only its first bar (the first 16 of the 32
+ *   steps), and how its phase resolves on release. Best set per-section via
+ *   [Section.tensionOverride] to jam in one section (e.g. a build) and play the full
+ *   lick elsewhere. No effect on SQUASH licks (already 1 bar).
  * @param chromaticPassing Probability of inserting chromatic passing tones at high tension, 0-1.
  */
 @Serializable
 data class TonalTension(
     val octaveShift: Boolean = false,
     val keyShift: Int = 0,
-    val halfLick: Boolean = false,
+    val halfLick: HalfLick = HalfLick.OFF,
     val chromaticPassing: Float = 0.0f,
 )
 

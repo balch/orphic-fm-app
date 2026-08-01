@@ -643,7 +643,8 @@ static void reload_vibe_tension(OrpheusEngine* engine, PulsarState* state) {
     state->tension.timing            = engine->pulsar_tension_timing.load(std::memory_order_relaxed);
     state->tension.octave_shift      = engine->pulsar_tension_octave_shift.load(std::memory_order_relaxed) != 0;
     state->tension.key_shift         = engine->pulsar_tension_key_shift.load(std::memory_order_relaxed);
-    state->tension.half_lick         = engine->pulsar_tension_half_lick.load(std::memory_order_relaxed) != 0;
+    state->tension.half_lick         = static_cast<HalfLickMode>(
+        engine->pulsar_tension_half_lick.load(std::memory_order_relaxed));
     state->tension.chromatic_passing = engine->pulsar_tension_chromatic_passing.load(std::memory_order_relaxed);
     state->tension.evo_timbre_low    = engine->pulsar_tension_evo_timbre_low.load(std::memory_order_relaxed);
     state->tension.evo_timbre_high   = engine->pulsar_tension_evo_timbre_high.load(std::memory_order_relaxed);
@@ -1330,7 +1331,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     sec.tension_override.timing             = L(4);
                     sec.tension_override.octave_shift       = (L(5) != 0.0f);
                     sec.tension_override.key_shift          = static_cast<int>(L(6));
-                    sec.tension_override.half_lick          = (L(7) != 0.0f);
+                    sec.tension_override.half_lick          = static_cast<HalfLickMode>(
+                        static_cast<int>(L(7)));
                     sec.tension_override.chromatic_passing  = L(8);
                     sec.tension_override.evo_timbre_low     = L(9);
                     sec.tension_override.evo_timbre_high    = L(10);
@@ -2318,8 +2320,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             int prev_playhead = ts.playhead;
             // Tension half-lick: a FILL lead loops only its first bar while active,
             // so the opening figure repeats/jams (its tone still breathes via evolution).
-            int loop_len = pulsar_effective_loop_len(ts, state->tension.half_lick);
-            ts.playhead = (ts.playhead + 1) % loop_len;
+            // The helper latches the loop length at each wrap so a mid-loop mode change
+            // cannot strand the playhead past its old wrap point.
+            pulsar_advance_playhead(ts, state->tension.half_lick);
 
             // Advance chord progression on track 0 step boundaries
             if (t == 0) {
@@ -2467,6 +2470,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // Reload vibe tension so a prior section's override does not
                             // leak forward into a section with no override of its own.
                             reload_vibe_tension(engine, state);
+                        }
+
+                        // --- Re-lock any track a JAM_INVERTED release left out of phase ---
+                        // The inversion is scoped to the section that follows the jam, so
+                        // this boundary ends it. Deferred via resync_pending because tracks
+                        // 1..7 have not advanced for this step yet — assigning playhead here
+                        // would land them on 1, not 0.
+                        for (int rt = 0; rt < kNumPulsarTracks; rt++) {
+                            PulsarTrackState& rts = state->tracks[rt];
+                            if (rts.phase_inverted) {
+                                rts.phase_inverted = false;
+                                rts.resync_pending = true;
+                            }
                         }
 
                         // --- Always reset the tension phase at section entry ---

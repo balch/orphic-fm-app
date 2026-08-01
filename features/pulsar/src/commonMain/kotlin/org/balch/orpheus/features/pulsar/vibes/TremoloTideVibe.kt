@@ -20,6 +20,7 @@ import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
@@ -183,7 +184,7 @@ class TremoloTideVibe : VibeProvider {
                     tonal = TonalTension(
                         octaveShift = true,
                         chromaticPassing = 0.15f,
-                        halfLick = true,
+                        halfLick = HalfLick.JAM,
                     ),
                     timing = 0.10f,
                     evolution = EvolutionTension(
@@ -252,7 +253,7 @@ class TremoloTideVibe : VibeProvider {
                     tonal = TonalTension(
                         octaveShift = false,
                         chromaticPassing = 0.02f,
-                        halfLick = true,
+                        halfLick = HalfLick.JAM,
                     ),
                     timing = 0.05f,                 // steady, almost frozen
                     evolution = EvolutionTension(

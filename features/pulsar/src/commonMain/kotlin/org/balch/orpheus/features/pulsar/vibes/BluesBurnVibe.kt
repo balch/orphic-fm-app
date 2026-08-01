@@ -20,6 +20,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
@@ -113,7 +114,7 @@ class BluesBurnVibe : VibeProvider {
     private val bigLiftBars = 4
 
     // The vibe's tension arc. Pulled out so the build section can .copy() it with
-    // halfLick = true (jam the first-bar hook) + wider tone evolution.
+    // halfLick = HalfLick.JAM (jam the first-bar hook) + wider tone evolution.
     private val baseTension = TensionProfile(
         innerBars = 7,   // >= 7 enables spurt + octave climax
         outerBars = 16,
@@ -134,7 +135,7 @@ class BluesBurnVibe : VibeProvider {
     // slow riff stays grounded. halfLick stays off — it's reserved for solo use later.
     private val buildTension = baseTension.copy(
         innerBars = 2,  // fast tension ramp so the tone actually moves within the short build
-        tonal = baseTension.tonal.copy(halfLick = false, octaveShift = false),
+        tonal = baseTension.tonal.copy(halfLick = HalfLick.OFF, octaveShift = false),
         evolution = baseTension.evolution.copy(
             timbreLow = 0.20f, timbreHigh = 0.75f, timbreProbability = 0.85f,
             morphLow = 0.30f, morphHigh = 0.72f, morphProbability = 0.75f,
@@ -144,7 +145,7 @@ class BluesBurnVibe : VibeProvider {
 
     private val leadInTension = baseTension.copy(
         innerBars = 2,  // fast tension ramp so the tone actually moves within the short build
-        tonal = baseTension.tonal.copy(halfLick = true, octaveShift = false),
+        tonal = baseTension.tonal.copy(halfLick = HalfLick.JAM, octaveShift = false),
         evolution = baseTension.evolution.copy(
             timbreLow = 0.20f, timbreHigh = 0.75f, timbreProbability = 0.85f,
             morphLow = 0.30f, morphHigh = 0.72f, morphProbability = 0.75f,
