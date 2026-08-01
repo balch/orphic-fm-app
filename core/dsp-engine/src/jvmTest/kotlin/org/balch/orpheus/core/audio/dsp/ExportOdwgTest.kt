@@ -4,19 +4,22 @@ import java.io.File
 import kotlin.test.Test
 
 /**
- * Exports the production wiring graph as an ODWG binary file
- * for use by the C++ test harness. Run with:
- *   ./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"
+ * Keeps the checked-in production wiring graph (`default_graph.odwg`) in sync with
+ * [buildDefaultWiringGraph], which the C++ test harness loads.
+ *
+ * By default this only **verifies** — it never writes to the working tree. Regenerate
+ * deliberately after changing the graph:
+ * ```
+ * ./gradlew :core:dsp-engine:exportOdwg
+ * ```
  */
 class ExportOdwgTest {
     @Test
-    fun exportDefaultGraph() {
-        val bytes = buildDefaultWiringGraph()
-        val outDir = File("../../liborpheus_dsp/test/data")
-        outDir.mkdirs()
-        val outFile = File(outDir, "default_graph.odwg")
-        outFile.writeBytes(bytes)
-        println("Wrote ${bytes.size} bytes to ${outFile.absolutePath}")
-        println("Graph contains ${bytes.size / 2} uint16 words")
+    fun defaultGraphFixtureMatchesWiringGraph() {
+        GeneratedFixture.sync(
+            file = File("../../liborpheus_dsp/test/data/default_graph.odwg"),
+            generated = buildDefaultWiringGraph(),
+            regenerateHint = "./gradlew :core:dsp-engine:exportOdwg",
+        )
     }
 }

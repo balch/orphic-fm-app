@@ -286,9 +286,12 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
 
 After changing wiring, regenerate the binary graph:
 ```bash
-./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"
+./gradlew :core:dsp-engine:exportOdwg
 ```
-CMake auto-runs this when building tests.
+A plain `jvmTest` only verifies the checked-in `default_graph.odwg` and fails if it
+drifted — it never rewrites it. CMake does not auto-run the export either (the
+`add_dependencies(orpheus_dsp_test export_graph)` hookup is commented out), so run the
+task yourself and commit the result.
 
 ## New DSP Module Checklist
 
@@ -319,4 +322,4 @@ CMake auto-runs this when building tests.
 | Reading atomics inside sample loop | Unnecessary overhead | Read once per block into local vars |
 | Unconditional modulation routing | Module affects others without user consent | Gate by explicit mod source selector |
 | Hash string mismatch with Kotlin symbol | `set_port` silently drops parameter | Match `engine_hash16("symbol")` to `PortSymbol.symbol` exactly |
-| Forgot to re-export ODWG after wiring change | Tests use stale graph | Run `./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"` |
+| Forgot to re-export ODWG after wiring change | `jvmTest` fails with an ODWG drift error | Run `./gradlew :core:dsp-engine:exportOdwg` and commit the result |

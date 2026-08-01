@@ -45,7 +45,7 @@ When reviewing ANY signal path change, run this pipeline:
 
 ```bash
 # Step 1: Regenerate ODWG from Kotlin (catches graph definition drift)
-./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"
+./gradlew :core:dsp-engine:exportOdwg
 
 # Step 2: Build C++ tests with fresh ODWG
 cd /Users/balch/Source/orphic-fm-app

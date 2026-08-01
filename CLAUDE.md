@@ -44,6 +44,17 @@ See `.claude/skills/dsp-implementation/` for C++ unit creation, engine atomics, 
   - List suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test --list`
   - Diagnose graph wiring: `ORPHEUS_DUMP_GRAPH=1 liborpheus_dsp/build-desktop/orpheus_dsp_test graph` — prints full exec order for every graph load. Silent by default to keep test output readable.
 
+## Generated C++ Test Fixtures
+
+`liborpheus_dsp/test/data/preset_*.h` and `default_graph.odwg` are generated from Kotlin and checked in for the C++ harness. **`jvmTest` only verifies them — it never writes to the working tree.** A drifted fixture fails the build with a line-level diff naming the source of truth.
+
+Regenerate deliberately, then commit the result:
+- Presets: `./gradlew :features:presets:exportPresets`
+- Wiring graph: `./gradlew :core:dsp-engine:exportOdwg`
+- Both, alongside a normal run: `./gradlew jvmTest -Pexport-fixtures`
+
+The headers are derived from `features/presets/.../composeResources/files/presets/*.json`. If a generated value looks wrong, fix the JSON — editing the header only hides the drift until the next regeneration.
+
 ## C++ Clang Diagnostics
 
 IDE clang errors in `liborpheus_dsp/` (e.g. "orpheus_dsp.h not found", "undeclared identifier stmlib") are **false positives** from the editor's built-in clang not having CMake include paths. The actual cmake build always succeeds. To fix these diagnostics, ensure `compile_commands.json` exists at the project root (symlinked from the cmake build directory). The `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` flag in the C++ test command above generates it automatically. **Do not treat these IDE diagnostics as build failures.**

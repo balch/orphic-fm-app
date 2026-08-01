@@ -18,11 +18,16 @@ DSP tests must verify **signal correctness at modulation destinations**, not jus
 **Always use the production graph** (`default_graph.odwg`) rather than hand-building test graphs. This ensures tests exercise the real execution order, wiring, and unit interactions.
 
 ### Pipeline
-1. **Kotlin exports** the graph: `./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"`
+1. **Kotlin exports** the graph: `./gradlew :core:dsp-engine:exportOdwg`
    - Source: `core/dsp-engine/src/jvmTest/kotlin/.../ExportOdwgTest.kt`
    - Calls `buildDefaultWiringGraph()` from `DefaultWiringGraph.kt`
    - Writes binary ODWG to `liborpheus_dsp/test/data/default_graph.odwg`
-2. **CMake auto-runs** this via `add_dependencies(orpheus_dsp_test export_graph)` — no manual step needed when building via cmake
+   - A plain `jvmTest` only **verifies** this file and fails if it drifted — it never
+     rewrites it, so builds can't leave spurious diffs. Regeneration is the explicit
+     task above (or `./gradlew jvmTest -Pexport-fixtures`).
+2. **CMake does not auto-run this.** The `export_graph` target exists but the
+   `add_dependencies(orpheus_dsp_test export_graph)` hookup is commented out (it needs
+   the Android SDK) — the checked-in file in `test/data/` is what C++ actually loads.
 3. **C++ tests load** via `load_production_graph(engine)` from `test_harness.h`
 4. **Process** via `orpheus_graph_process(graph, engine, buf, num_frames)` where `graph = engine->graph.load()`
 
@@ -46,7 +51,7 @@ orpheus_engine_destroy(engine);  // frees graph too
 ```
 
 ### When to Regenerate
-Re-export the graph (`./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"`) after changing:
+Re-export the graph (`./gradlew :core:dsp-engine:exportOdwg`) after changing:
 - `DefaultWiringGraph.kt` (unit wiring, execution order)
 - Adding/removing units or connections
 - Changing unit type enums in `orpheus_graph.h`

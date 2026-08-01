@@ -314,7 +314,7 @@ if(BUILD_TESTS)
     if(GRADLEW)
         add_custom_target(export_graph
             COMMAND ${GRADLEW} -p "${CMAKE_CURRENT_SOURCE_DIR}/.."
-                :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*" -q
+                :core:dsp-engine:exportOdwg -q
             COMMENT "Exporting production graph (default_graph.odwg)"
         )
         # add_dependencies(orpheus_dsp_test export_graph)  # Requires Android SDK; graph file in test/data/ suffices

@@ -2,8 +2,18 @@ plugins {
     id("orpheus.kmp.library")
 }
 
-// Export ODWG graph binaries for C++ test harness.
-// Run: ./gradlew :core:dsp-engine:exportOdwg
+// ── Generated ODWG graph binaries for the C++ test harness ────────────────────
+// `default_graph.odwg` is checked in, so a plain `jvmTest` only verifies it and
+// never writes to the working tree. (`dj_graph.odwg` is untracked and always
+// regenerated — see ExportDjAppOdwgTest.)
+//
+// Regenerate deliberately:
+//   ./gradlew :core:dsp-engine:exportOdwg
+//   ./gradlew jvmTest -Pexport-fixtures
+val fixtureWriteProperty = "orpheus.fixtures.write"
+val defaultGraphFixture = file("../../liborpheus_dsp/test/data/default_graph.odwg")
+val exportFixtures = providers.gradleProperty("export-fixtures").isPresent
+
 tasks.register<Test>("exportOdwg") {
     description = "Export wiring graph binaries (ODWG) for C++ tests"
     group = "verification"
@@ -12,6 +22,22 @@ tasks.register<Test>("exportOdwg") {
     filter {
         includeTestsMatching("*ExportOdwgTest*")
         includeTestsMatching("*ExportDjAppOdwgTest*")
+    }
+    systemProperty(fixtureWriteProperty, "true")
+    outputs.upToDateWhen { false }
+}
+
+tasks.named<Test>("jvmTest") {
+    if (exportFixtures) {
+        systemProperty(fixtureWriteProperty, "true")
+        outputs.upToDateWhen { false }
+    } else {
+        // Re-run verification when the checked-in graph is edited by hand, otherwise
+        // Gradle's up-to-date check would skip the guard and let drift through.
+        inputs.files(defaultGraphFixture)
+            .withPropertyName("cppGraphFixture")
+            .withPathSensitivity(PathSensitivity.NAME_ONLY)
+            .optional()
     }
 }
 
