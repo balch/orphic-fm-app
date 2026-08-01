@@ -21,6 +21,7 @@ targets:
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         LSRequiresIPhoneOS: true
+        CFBundleVersion: "2"
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -37,6 +38,7 @@ targets:
         NSBluetoothAlwaysUsageDescription: "Bluetooth is used to connect MIDI controllers"
         UILaunchScreen: {}
         CADisableMinimumFrameDurationOnPhone: true
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app
@@ -47,6 +49,7 @@ targets:
           - "-framework"
           - "DjAppShared"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        TARGETED_DEVICE_FAMILY: "1"
       configs:
         Debug:
           FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
@@ -102,6 +105,7 @@ targets:
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         LSRequiresIPhoneOS: true
+        CFBundleVersion: "2"
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -118,6 +122,7 @@ targets:
         NSBluetoothAlwaysUsageDescription: "Bluetooth is used to connect MIDI controllers"
         UILaunchScreen: {}
         CADisableMinimumFrameDurationOnPhone: true
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app.ai
@@ -130,6 +135,7 @@ targets:
           - "-framework"
           - "DjAppAi"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        TARGETED_DEVICE_FAMILY: "1"
       configs:
         Debug:
           FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
