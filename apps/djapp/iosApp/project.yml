@@ -21,7 +21,8 @@ targets:
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         LSRequiresIPhoneOS: true
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -50,6 +51,11 @@ targets:
           - "DjAppShared"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         TARGETED_DEVICE_FAMILY: "1"
+        # Fallback for ad-hoc Xcode builds; the archive script overrides both
+        # from git (nearest tag / total commit count) — see build-logic's
+        # orpheus.android.app.gradle.kts for the Android-side equivalent.
+        MARKETING_VERSION: "1.9.0"
+        CURRENT_PROJECT_VERSION: "3"
       configs:
         Debug:
           FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
@@ -105,7 +111,8 @@ targets:
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false
         LSRequiresIPhoneOS: true
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UIRequiredDeviceCapabilities:
           - arm64
         UISupportedInterfaceOrientations:
@@ -136,6 +143,11 @@ targets:
           - "DjAppAi"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         TARGETED_DEVICE_FAMILY: "1"
+        # Fallback for ad-hoc Xcode builds; the archive script overrides both
+        # from git (nearest tag / total commit count) — see build-logic's
+        # orpheus.android.app.gradle.kts for the Android-side equivalent.
+        MARKETING_VERSION: "1.9.0"
+        CURRENT_PROJECT_VERSION: "3"
       configs:
         Debug:
           FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]:
