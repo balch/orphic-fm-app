@@ -1,6 +1,6 @@
 ---
 name: release-djapp
-description: Use when cutting a new release of the DJ app (Orphic DJ) — tagging, building AAB + APK, creating a GitHub release with structured notes, attaching artifacts, and handling mid-release commit additions or backfilling releases for tags that already exist. Triggers on phrases like "cut a release", "tag v1.x.x", "release the dj app", "build a release aab", "create a github release", or "backfill releases for old tags". Use this skill even when the user only mentions one part of the flow (just tagging, just building) — the steps interlock and a tag without a release-notes plan tends to drift out of sync with the artifact on disk.
+description: Use when cutting a new release of the DJ app (Orphic DJ) — tagging, building AAB + APK, creating a GitHub release with structured notes, attaching artifacts, publishing to the Google Play alpha track and/or Apple TestFlight, and handling mid-release commit additions or backfilling releases for tags that already exist. Triggers on phrases like "cut a release", "tag v1.x.x", "release the dj app", "build a release aab", "create a github release", "publish to testflight", "publish to alpha", or "backfill releases for old tags". Use this skill even when the user only mentions one part of the flow (just tagging, just building, just iOS) — the steps interlock and a tag without a release-notes plan tends to drift out of sync with the artifact on disk.
 ---
 
 # Releasing the DJ App
@@ -158,6 +158,97 @@ Full Play-publishing details (service account, credentials lookup, the androidpu
 token recipe for raw `edits` API track queries, and per-version history) live in the
 `project_djapp_play_publishing` memory.
 
+### 8. Build + upload iOS to TestFlight
+
+Orphic DJ (OG edition, Xcode scheme `DjApp`, bundle `org.balch.djapp.app`) ships to the App
+Store / TestFlight the same way the Android side ships to Play: via CLI, authenticated with an
+App Store Connect **API key** rather than an interactive Xcode account session (the account
+session goes stale independently of the cert — see the `reference_apple_dev_team` memory).
+
+**Credentials — never hardcode these in a committed file:**
+
+- The `.p8` private key lives at `apps/djapp/play-store/.secrets/AuthKey_<KEYID>.p8`
+  (gitignored — confirm with `git check-ignore -v` before touching that directory).
+- The **Key ID** is the `<KEYID>` in the filename above.
+- The **Issuer ID** (a UUID) is account-level, from App Store Connect → Users and Access →
+  Integrations → App Store Connect API. It is **not** stored in this repo. Check the
+  `reference_apple_dev_team` / `ios-appstore-publishing` memories first; if neither has it,
+  ask the user or have them look it up in the ASC UI — don't guess, and don't paste it into
+  any file this skill or the repo tracks.
+
+**Prerequisites:** `xcodegen` (Homebrew), `DEVELOPMENT_TEAM` set in
+`apps/djapp/iosApp/project.yml`, and an `ExportOptions.plist` with
+`method: app-store-connect` (one already exists under
+`apps/djapp/iosApp/build/export-appstore*/ExportOptions.plist` — reuse it rather than
+recreating).
+
+```bash
+# 1. Regenerate the Xcode project from project.yml (picks up any project.yml edits).
+xcodegen generate --spec apps/djapp/iosApp/project.yml --project apps/djapp/iosApp
+
+# 2. Build the shared KMP framework for device, Release configuration.
+./gradlew --no-configuration-cache :apps:djapp:shared:linkReleaseFrameworkIosArm64
+
+# 3. Compute versions from git — same source of truth as Android, see the "iOS mirrors
+#    Android versioning" note below.
+TAG=$(git describe --tags --abbrev=0 --always)
+MARKETING_VERSION="${TAG#v}"
+CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD)
+
+# 4. Archive. ALL paths must be absolute — a relative -authenticationKeyPath hard-errors,
+#    and a relative -project silently resolves against the wrong cwd.
+xcodebuild -project <ABSOLUTE>/apps/djapp/iosApp/DjApp.xcodeproj -scheme DjApp \
+  -configuration Release -destination generic/platform=iOS \
+  -archivePath <ABSOLUTE>/DjApp.xcarchive \
+  -allowProvisioningUpdates \
+  -authenticationKeyPath <ABSOLUTE>/apps/djapp/play-store/.secrets/AuthKey_<KEYID>.p8 \
+  -authenticationKeyID <KEYID> -authenticationKeyIssuerID <ISSUER_ID> \
+  MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" \
+  archive > /tmp/xcodebuild-archive.log 2>&1
+echo "EXIT_CODE=$?"   # `xcodebuild ... | tee log` reports tee's exit (0) even on failure —
+                       # always redirect + check $? explicitly instead.
+
+# 5. Export the signed IPA.
+xcodebuild -exportArchive \
+  -exportOptionsPlist <ABSOLUTE>/apps/djapp/iosApp/build/export-appstore3/ExportOptions.plist \
+  -archivePath <ABSOLUTE>/DjApp.xcarchive \
+  -exportPath <ABSOLUTE>/export-appstore-vX.Y.Z \
+  -allowProvisioningUpdates \
+  -authenticationKeyPath <ABSOLUTE>/apps/djapp/play-store/.secrets/AuthKey_<KEYID>.p8 \
+  -authenticationKeyID <KEYID> -authenticationKeyIssuerID <ISSUER_ID> \
+  > /tmp/xcodebuild-export.log 2>&1
+
+# 6. Upload to App Store Connect. altool needs the key named exactly `AuthKey_<KEYID>.p8`
+#    in the dir pointed to by API_PRIVATE_KEYS_DIR.
+API_PRIVATE_KEYS_DIR=<ABSOLUTE>/apps/djapp/play-store/.secrets \
+  xcrun altool --upload-app -f <ABSOLUTE>/export-appstore-vX.Y.Z/DjApp.ipa --type ios \
+  --apiKey <KEYID> --apiIssuer <ISSUER_ID>
+```
+
+Success looks like `UPLOAD SUCCEEDED with no errors` plus a `Delivery UUID`. Apple then
+processes the build server-side (usually a few minutes) before it appears under TestFlight in
+App Store Connect — no separate "publish" step is needed for internal testers, unlike Play's
+track assignment.
+
+**iOS mirrors Android versioning, with one deliberate deviation.** `CURRENT_PROJECT_VERSION`
+uses the exact same `git rev-list --count HEAD` as Android's `versionCode` (monotonic forever,
+satisfies Apple's always-increasing build-number rule). `MARKETING_VERSION` uses
+`git describe --tags --abbrev=0 --always` (nearest tag only, **no** `-N-gHASH-dirty` suffix)
+rather than Android's full `--dirty` string — App Store Connect groups builds by
+`CFBundleShortVersionString`, so a suffix that changes every commit would fork every build into
+its own version group instead of stacking under one release.
+
+**Gotchas:**
+
+- The archive step itself signs with whatever identity matches (often "Apple Development");
+  the **export** step is what re-signs for distribution using a cloud-managed Distribution
+  cert — nothing shows in `security find-identity` for it, that's expected, not a failure.
+- If `xcodebuild` fails with a login/profile error, it's almost always the yearly Development
+  cert or the Xcode account session going stale — the API-key path above is what avoids
+  depending on that session at all. See `reference_apple_dev_team` memory.
+- `DjAppAi` is Android/desktop-only right now — there's no iOS AI-edition graph, so only the
+  `DjApp` (OG) scheme ships to TestFlight/App Store.
+
 ## Release-notes structure
 
 The body should feel useful to a developer scanning the release page, not like a marketing announcement. Group by what the user/operator cares about, lead with the highest-impact items. The template that has held up well across versions:
@@ -310,6 +401,9 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | Replace an asset | `gh release upload vX.Y.Z <file> --clobber` |
 | Edit notes | `gh release edit vX.Y.Z --notes "..."` |
 | Mark a release latest | `gh release edit vX.Y.Z --latest` |
+| Regenerate iOS Xcode project | `xcodegen generate --spec apps/djapp/iosApp/project.yml --project apps/djapp/iosApp` |
+| Build iOS release framework | `./gradlew :apps:djapp:shared:linkReleaseFrameworkIosArm64` |
+| Upload IPA to App Store Connect | `xcrun altool --upload-app -f <ipa> --type ios --apiKey <KEYID> --apiIssuer <ISSUER_ID>` |
 
 ## When something looks off
 
@@ -321,3 +415,5 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 - **You built the `ai` flavor by mistake**: it carries appId `org.balch.djapp.ai` and the INTERNET permission. Play will treat it as a different app. Rebuild with the `Og` task.
 - **AAB is unsigned**: `keystore.properties` is missing at the repo root. The convention plugin silently falls back to the debug signing config in that case. Play Console will reject the upload.
 - **A commit landed after the tag and you want the tag to include it**: see "add one more commit to a published release" above.
+- **iOS `xcodebuild archive`/`-exportArchive` fails with a login or provisioning-profile error**: the yearly Development cert or the Xcode account session has gone stale — see `reference_apple_dev_team` memory. Not a project misconfiguration.
+- **iOS build succeeds but you don't have the Issuer ID**: check the `reference_apple_dev_team` / `ios-appstore-publishing` memories first. Never store it (or the `.p8` key) in a committed file.
