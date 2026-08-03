@@ -60,11 +60,11 @@ class FilterFunkVibe : VibeProvider {
             // 0: groove — main funk pocket, tight 16ths
             Section(
                 name = "groove",
-                barsMin = 8, barsMax = 16,
+                barsMin = 4, barsMax = 6,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 1, weight = 0.4f),
-                    SectionTransition(targetIndex = 2, weight = 0.35f),
-                    SectionTransition(targetIndex = 3, weight = 0.25f),
+                    SectionTransition(targetIndex = 1, weight = 0.7f),
+                    SectionTransition(targetIndex = 2, weight = 0.25f),
+                    SectionTransition(targetIndex = 3, weight = 0.05f),
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = null,  // groove IS the baseline
@@ -80,7 +80,7 @@ class FilterFunkVibe : VibeProvider {
             //    so the build gets a recognizable, developing focal melody.
             Section(
                 name = "build",
-                barsMin = 4, barsMax = 8,
+                barsMin = 4, barsMax = 4,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.6f),
                     SectionTransition(targetIndex = 0, weight = 0.2f),
@@ -210,7 +210,7 @@ class FilterFunkVibe : VibeProvider {
                 pullInBarsMin = 2, pullInBarsMax = 4,
                 barsPerLeadMin = 2, barsPerLeadMax = 6,
             ),
-            energy = 0.51f,
+            energy = 0.49f,
             complexity = 0.25f,
             space = 0.4f,
             mood = 0.45f,
@@ -285,7 +285,7 @@ class FilterFunkVibe : VibeProvider {
                     )
                 },
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.TRIPLE_RING_MOD,
+                    engineId = OrpheusEngineId.WSH,
                     volume = .5f,
                     noteRangeLow = 45,
                     noteRangeHigh = 64,
@@ -295,7 +295,7 @@ class FilterFunkVibe : VibeProvider {
                     TrackVoice(
                         engineEdm = lead,
                         engineSpace = lead.copy(
-                            engineId = OrpheusEngineId.WSH,
+                            engineId = OrpheusEngineId.TRIPLE_RING_MOD,
                         ),
                         role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                         pan = -0.20f,
