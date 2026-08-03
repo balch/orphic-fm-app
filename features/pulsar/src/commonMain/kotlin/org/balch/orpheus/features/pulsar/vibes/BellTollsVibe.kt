@@ -111,7 +111,7 @@ class BellTollsVibe : VibeProvider {
             // groove -> dub: dubFade (long dreamy descent into the breakdown).
             Section(
                 name = "groove",
-                barsMin = 8, barsMax = 12,
+                barsMin = 8, barsMax = 10,
                 transitions = listOf(
                     SectionTransition(
                         targetIndex = 2,
@@ -179,7 +179,7 @@ class BellTollsVibe : VibeProvider {
             // dub -> groove / chorus: skankLift (re-emerging from the haze).
             Section(
                 name = "dub",
-                barsMin = 4, barsMax = 8,
+                barsMin = 4, barsMax = 6,
                 transitions = listOf(
                     SectionTransition(
                         targetIndex = 1,
@@ -210,7 +210,7 @@ class BellTollsVibe : VibeProvider {
             // solo -> dub: dubFade (long fade into the breakdown).
             Section(
                 name = "solo",
-                barsMin = 8, barsMax = 12,
+                barsMin = 8, barsMax = 10,
                 transitions = listOf(
                     SectionTransition(
                         targetIndex = 1,

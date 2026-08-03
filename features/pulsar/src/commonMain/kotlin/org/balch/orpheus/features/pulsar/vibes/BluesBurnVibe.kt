@@ -291,7 +291,7 @@ class BluesBurnVibe : VibeProvider {
             // 6: outro — the climactic stomp: riff full-throttle, everyone in, pinned FIXED.
             Section(
                 name = "outro",
-                barsMin = 4, barsMax = 6,
+                barsMin = 4, barsMax = 4,
                 macroOverrides = MacroOverrides(
                     energy = 1.5f, complexity = 0.5f, space = 0.5f, mood = 1.1f,
                 ),

@@ -50,7 +50,7 @@ import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
-// The founding 2-bar hook (BLUES: 0=G,1=Bb/b3,2=C/4,3=Db/b5,4=D/5,5=F/b7) — the OG A/B
+// Base 2-bar hook used for
 // reference and Fire Sky .5f's rare anomaly flash.
 private val ogLick by lazy {
     Lick(
@@ -163,7 +163,7 @@ class FireSkyVibe : VibeProvider {
             anomalies = listOf(
                 // A rare flash of the founding hook, stated exactly; also fired by
                 // the manual anomaly trigger.
-                LickAnomaly(lick = ogLick, chance = 0.02f),
+                LickAnomaly(lick = ogLick, chance = 0.005f),
             ),
             stepCount = 32,
         )
@@ -190,7 +190,7 @@ class FireSky05Vibe : VibeProvider {
             anomalies = listOf(
                 // A rare flash of the founding hook, stated exactly; also fired by
                 // the manual anomaly trigger.
-                LickAnomaly(lick = ogLick, chance = 0.02f),
+                LickAnomaly(lick = ogLick, chance = 0.005f),
             ),
             lickMutation = 0.20f,
             stepCount = 32,

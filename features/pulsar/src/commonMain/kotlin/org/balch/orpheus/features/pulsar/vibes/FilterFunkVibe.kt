@@ -105,7 +105,7 @@ class FilterFunkVibe : VibeProvider {
             //    backing present during the solos themselves.)
             Section(
                 name = "interlude",
-                barsMin = 8, barsMax = 16,
+                barsMin = 8, barsMax = 12,
                 transitions = listOf(
                     SectionTransition(targetIndex = 0, weight = 0.5f),
                     SectionTransition(targetIndex = 3, weight = 0.3f),
@@ -134,7 +134,7 @@ class FilterFunkVibe : VibeProvider {
             // 4: outro — low-energy wind-down on a fixed 2-chord progression
             Section(
                 name = "outro",
-                barsMin = 4, barsMax = 6,
+                barsMin = 4, barsMax = 4,
                 macroOverrides = MacroOverrides(
                     energy = 0.5f, complexity = 0.1f, space = 0.6f, mood = 1.6f,
                 ),

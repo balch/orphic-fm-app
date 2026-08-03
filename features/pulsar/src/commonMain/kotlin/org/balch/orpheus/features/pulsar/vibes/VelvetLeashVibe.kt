@@ -121,7 +121,7 @@ class VelvetLeashVibe : VibeProvider {
             //    clear, developing focal melody while the rest of the band ducks.
             Section(
                 name = "chorus",
-                barsMin = 4, barsMax = 8,
+                barsMin = 4, barsMax = 6,
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 0.55f),
                     SectionTransition(targetIndex = 3, weight = 0.30f),
@@ -142,7 +142,7 @@ class VelvetLeashVibe : VibeProvider {
             //    4–8 pattern bars = 8–16 musical bars = 2–4 walkdown cycles.
             Section(
                 name = "solo",
-                barsMin = 4, barsMax = 8,
+                barsMin = 4, barsMax = 6,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.50f),
                     SectionTransition(targetIndex = 1, weight = 0.30f),

@@ -139,7 +139,7 @@ class BlackCatVibe : VibeProvider {
             // 1: verse — the full pocket, baseline. One-chord vamp; the hook rules.
             Section(
                 name = "verse",
-                barsMin = 8, barsMax = 12,
+                barsMin = 8, barsMax = 10,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.55f, transitionBars = liftBars),  // -> lift
                     SectionTransition(targetIndex = 3, weight = 0.25f, transitionBars = liftBars),  // -> jam
@@ -174,7 +174,7 @@ class BlackCatVibe : VibeProvider {
             //    solo system owns the lead voice (RustBelt-proven), horns thin to accents.
             Section(
                 name = "jam",
-                barsMin = 8, barsMax = 16,
+                barsMin = 8, barsMax = 12,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.45f, transitionBars = liftBars),  // -> lift
                     SectionTransition(targetIndex = 1, weight = 0.35f, transitionBars = liftBars),  // -> verse

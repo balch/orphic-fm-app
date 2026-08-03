@@ -91,7 +91,7 @@ class SpaceDroneVibe : VibeProvider {
             // 1: drift — vibraphone melody enters, organ swells in, slow lick-build.
             Section(
                 name = "drift",
-                barsMin = 8, barsMax = 14,
+                barsMin = 8, barsMax = 12,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.5f),
                     SectionTransition(targetIndex = 3, weight = 0.3f),
@@ -106,7 +106,7 @@ class SpaceDroneVibe : VibeProvider {
             // 2: ascend — the percussion peak, full mallet roll, vibraphone reaches.
             Section(
                 name = "ascend",
-                barsMin = 8, barsMax = 12,
+                barsMin = 8, barsMax = 10,
                 transitions = listOf(
                     SectionTransition(targetIndex = 3, weight = 0.4f),
                     SectionTransition(targetIndex = 1, weight = 0.35f),
@@ -123,7 +123,7 @@ class SpaceDroneVibe : VibeProvider {
             // 3: void — strip back to drone and whisper, atonal middle.
             Section(
                 name = "void",
-                barsMin = 6, barsMax = 10,
+                barsMin = 6, barsMax = 8,
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 0.45f),
                     SectionTransition(targetIndex = 4, weight = 0.4f),
@@ -137,7 +137,7 @@ class SpaceDroneVibe : VibeProvider {
             // 4: return — reprise of the drift, fuller, the pilgrim arrives.
             Section(
                 name = "return",
-                barsMin = 6, barsMax = 12,
+                barsMin = 6, barsMax = 10,
                 transitions = listOf(
                     SectionTransition(targetIndex = 2, weight = 0.4f),
                     SectionTransition(targetIndex = 1, weight = 0.3f),
