@@ -1,13 +1,13 @@
 ---
 name: release-djapp
-description: Use when cutting a new release of the DJ app (Orphic DJ) — tagging, building AAB + APK, creating a GitHub release with structured notes, attaching artifacts, publishing to the Google Play alpha track and/or Apple TestFlight, and handling mid-release commit additions or backfilling releases for tags that already exist. Triggers on phrases like "cut a release", "tag v1.x.x", "release the dj app", "build a release aab", "create a github release", "publish to testflight", "publish to alpha", or "backfill releases for old tags". Use this skill even when the user only mentions one part of the flow (just tagging, just building, just iOS) — the steps interlock and a tag without a release-notes plan tends to drift out of sync with the artifact on disk.
+description: Use when cutting a new release of the DJ app (Orphic DJ) — tagging, building AAB + APK, creating a GitHub release with structured notes (without attaching binaries to the release), publishing to the Google Play alpha track and/or Apple TestFlight, and handling mid-release commit additions or backfilling releases for tags that already exist. Triggers on phrases like "cut a release", "tag v1.x.x", "release the dj app", "build a release aab", "create a github release", "publish to testflight", "publish to alpha", or "backfill releases for old tags". Use this skill even when the user only mentions one part of the flow (just tagging, just building, just iOS) — the steps interlock and a tag without a release-notes plan tends to drift out of sync with the artifact on disk.
 ---
 
 # Releasing the DJ App
 
 ## What this skill is for
 
-The DJ app's release pipeline has three artifacts (git tag → AAB → APK → GitHub release) that all need to stay in sync. The convention plugin (`build-logic/convention/src/main/kotlin/orpheus.android.app.gradle.kts`) derives versions from `git describe --tags --always --dirty`, so **the tag has to exist before the build** for the artifact name to come out right. If you build first you end up with a `djapp-v1.0-N-gSHA-release.aab` filename and a versionCode based on the rev-list count alone, which won't supersede previous Play Store uploads cleanly.
+The DJ app's release pipeline has three main components (git tag → AAB/APK build → Store upload & GitHub release) that all need to stay in sync. Note that we do **not** attach AAB/APK binaries to the GitHub release page anymore, as they are published directly to the Play/App stores. The convention plugin (`build-logic/convention/src/main/kotlin/orpheus.android.app.gradle.kts`) derives versions from `git describe --tags --always --dirty`, so **the tag has to exist before the build** for the artifact name to come out right. If you build first you end up with a `djapp-v1.0-N-gSHA-release.aab` filename and a versionCode based on the rev-list count alone, which won't supersede previous Play Store uploads cleanly.
 
 This skill captures the canonical flow plus the recovery paths for the common "I need to add one more commit" and "I never made a GitHub release for v1.0.0" cases.
 
@@ -98,7 +98,7 @@ git push origin v1.X.Y
 
 This is a visible action against the shared remote — fine without re-confirmation when the user explicitly asked for "cut a release" or "tag and release". Don't push tags they haven't explicitly created.
 
-### 6. Create the GitHub release
+### 6. Create the GitHub release (without attaching binaries)
 
 ```bash
 gh release create v1.X.Y \
@@ -106,9 +106,7 @@ gh release create v1.X.Y \
   --notes "$(cat <<'EOF'
 <release body — see "Release-notes structure" below>
 EOF
-)" \
-  path/to/djapp-v1.X.Y-release.aab \
-  path/to/djapp-v1.X.Y-release.apk
+)"
 ```
 
 Verify with `gh release view v1.X.Y` and surface the URL to the user.
@@ -275,8 +273,7 @@ The body should feel useful to a developer scanning the release page, not like a
 
 ## Artifacts
 
-The signed Play-Console-ready bundle is attached: **`djapp-v1.X.Y-og-release.aab`**.
-A universal sideload APK is also attached: **`djapp-v1.X.Y-og-release.apk`**.
+The signed Play-Console-ready bundle (`djapp-v1.X.Y-og-release.aab`) and universal sideload APK (`djapp-v1.X.Y-og-release.apk`) are built, but are not attached to this release. The bundle is published directly to the Play Store alpha closed testing track.
 
 ## Full changelog
 
@@ -289,7 +286,7 @@ A universal sideload APK is also attached: **`djapp-v1.X.Y-og-release.apk`**.
 - Explain *why* each change matters, especially for fixes — "X now does Y because the old behavior caused Z" is more useful than "X now does Y".
 - Bold the lead clause of each bullet so the page is scannable.
 - The "Full changelog" footer uses GitHub's auto-generated diff URL syntax — `vA.B.C...vX.Y.Z` becomes a link automatically.
-- Don't claim things the AAB doesn't actually do — the binary on the release page is what users get.
+- Don't claim things the binary doesn't actually do.
 
 **What NOT to include:**
 
@@ -312,16 +309,10 @@ EOF
 # 2. Force-push the tag.
 git push origin v1.X.Y --force
 
-# 3. Rebuild artifacts at the new SHA.
+# 3. Rebuild artifacts at the new SHA and re-publish them to Google Play / TestFlight.
 ./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease
 
-# 4. Replace the artifacts on the release. --clobber overwrites the existing file.
-gh release upload v1.X.Y \
-  apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-v1.X.Y-og-release.aab \
-  apps/djapp/androidApp/build/outputs/apk/og/release/djapp-v1.X.Y-og-release.apk \
-  --clobber
-
-# 5. Edit the release notes to mention the new change.
+# 4. Edit the release notes on GitHub to mention the new change.
 gh release edit v1.X.Y --notes "$(cat <<'EOF'
 <updated body — add the new commit under the appropriate section>
 EOF
@@ -355,12 +346,10 @@ gh release create vA.B.C \
   --notes "$(cat <<'EOF'
 <release body>
 EOF
-)" \
-  [path/to/aab if available] \
-  [path/to/apk if available]
+)"
 ```
 
-If the AAB for an old tag isn't on disk anymore (it was uploaded directly to Play Console and the build artifacts have been cleaned), create the release **without** binaries and note in the body: *"AAB for this version was uploaded directly to the Play Console — no artifact attached to this GitHub release."* Don't try to rebuild old AABs by checking out the tag and running the gradle build — the keystore is required for a valid signed AAB and the dependency graph at the time of the original build may not match what's resolvable now.
+Do not attach binaries to the GitHub release; they are uploaded directly to Google Play / App Store Connect.
 
 When backfilling multiple tags in one session, create them oldest-first so the natural ordering on the releases page matches release order. `gh release` automatically marks the last-created (newest tag chronologically by tag date, not creation order) as "Latest" — if the order ends up wrong, fix with:
 
@@ -397,8 +386,7 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | Force-update a published tag | `git push origin vX.Y.Z --force` |
 | List GitHub releases | `gh release list --limit 10` |
 | View a release | `gh release view vX.Y.Z` |
-| Create release | `gh release create vX.Y.Z --title "..." --notes "..." <files>` |
-| Replace an asset | `gh release upload vX.Y.Z <file> --clobber` |
+| Create release | `gh release create vX.Y.Z --title "..." --notes "..."` |
 | Edit notes | `gh release edit vX.Y.Z --notes "..."` |
 | Mark a release latest | `gh release edit vX.Y.Z --latest` |
 | Regenerate iOS Xcode project | `xcodegen generate --spec apps/djapp/iosApp/project.yml --project apps/djapp/iosApp` |
