@@ -13,7 +13,7 @@ interface VibeCatalogPolicyProvider {
         @Provides
         fun provideVibeCatalogPolicy(): VibeCatalogPolicy =
             VibeCatalogPolicy(
-                catalogLevel = if (kotlin.native.Platform.isDebugBinary) VibeStatus.WIP else VibeStatus.LIVE,
+                catalogLevel = VibeStatus.LIVE,
             )
     }
 }
