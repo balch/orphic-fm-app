@@ -210,8 +210,8 @@ class FilterFunkVibe : VibeProvider {
                 pullInBarsMin = 2, pullInBarsMax = 4,
                 barsPerLeadMin = 2, barsPerLeadMax = 6,
             ),
-            energy = 0.49f,
-            complexity = 0.25f,
+            energy = 0.5f,
+            complexity = 0.35f,
             space = 0.4f,
             mood = 0.45f,
             genre = GenreProfile(
