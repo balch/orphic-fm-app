@@ -50,6 +50,7 @@ liborpheus_dsp/test/data/*.odwg
 # C++ DSP build artifacts
 liborpheus_dsp/build_test/
 liborpheus_dsp/build-desktop/
+liborpheus_dsp/build-asan/
 liborpheus_dsp/platform/ios/build-*/
 liborpheus_dsp/.cache/
 
@@ -77,6 +78,10 @@ apps/djapp/play-store/.secrets/*.json
 
 # Local R8 / Perfetto analysis artifacts
 tmp/
+
+# iOS App Store build artifacts (xcodebuild archive/export output, ~100MB+ each)
+*.xcarchive/
+export-appstore-*/
 
 # Brainstorming visual-companion scratch
 .superpowers/

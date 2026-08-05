@@ -176,7 +176,7 @@ static bool test_void_config_unpacks_from_atomics() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Bank: [0]=prob [1]=floor [2]=rampDown [3]=floorMin [4]=floorMax [5]=rampUp [6]=ghost.
     // DISTINCT values in every slot so a bank-index transposition (e.g. rampDown
@@ -289,7 +289,7 @@ static bool test_void_dips_and_recovers() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     push_two_section_ab_arrangement(engine, /*bars_per_section=*/6);  // 6 arrangement bars
 
     // Force the void ON with a deterministic 1-bar floor and 1-bar ramps (arc = 3
@@ -395,7 +395,7 @@ static bool test_void_manual_trigger_fires_with_zero_probability() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     push_two_section_ab_arrangement(engine, 8);
 
     // Auto disabled, but the manual path fires because the vibe DECLARES the void.
@@ -423,7 +423,7 @@ static bool test_void_manual_trigger_fires_with_zero_probability() {
     engine->pulsar_anomaly_request.store(1, std::memory_order_release);
 
     // Phase-anchor the dip to the void's OWN armed state rather than a raw
-    // window min. Cosmic Techno's sparse tracks (density as low as 0.08) can
+    // window min. The baseline fixture's sparse tracks (density as low as 0.08) can
     // produce a near-silent 512-sample block from ordinary pattern gaps —
     // confirmed empirically: with the edge-detect/arm NOT yet wired up (so
     // void_state.armed can never become true), this same seed still produces
@@ -454,7 +454,7 @@ static bool test_void_manual_trigger_fires_with_zero_probability() {
 // deterministic proof (arm_void_manual is simply never called); the max-RMS check is
 // a looser sanity check that the engine keeps playing normally rather than having
 // broken silently. We deliberately do NOT assert a MIN-RMS floor across the window:
-// the sibling test above documents that Cosmic Techno's sparse tracks (density as low
+// the sibling test above documents that the baseline fixture's sparse tracks (density as low
 // as 0.08) already produce near-silent 512-sample blocks from ordinary pattern gaps,
 // so a naive min-RMS check would be flaky/wrong regardless of this fix.
 static bool test_void_manual_ignored_when_undeclared() {
@@ -464,7 +464,7 @@ static bool test_void_manual_ignored_when_undeclared() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     push_two_section_ab_arrangement(engine, 8);
 
     // Same shape as the sibling "fires" test above, EXCEPT [7] stays 0 (undeclared).
@@ -543,7 +543,7 @@ static bool test_void_anomaly_request_edge_detect() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Long section so no section boundary (which would void_reset the arc) falls
     // inside the test's processing window.
     push_two_section_ab_arrangement(engine, /*bars_per_section=*/64);
@@ -640,7 +640,7 @@ static bool test_void_ghost_bump_in_render() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     push_two_section_ab_arrangement(engine, /*bars_per_section=*/8);
 
     // Manual-only (probability 0 disables auto-fire): 2-bar floor on each side of a
@@ -718,7 +718,7 @@ static bool test_void_gain_never_steps() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     push_two_section_ab_arrangement(engine, /*bars_per_section=*/8);
 
     // Manual-only (probability forced to 0, matching test_void_ghost_bump_in_render's
@@ -807,7 +807,7 @@ static bool test_void_reset_glides_not_snaps() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     push_two_section_ab_arrangement(engine, /*bars_per_section=*/3);
 
     // Manual-only (probability 0, so arm_void_auto never re-arms after the reset).
@@ -908,7 +908,7 @@ static bool test_void_pause_resets_glow_to_idle() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Long sections: no boundary (and thus no void_reset) lands inside the window.
     push_two_section_ab_arrangement(engine, /*bars_per_section=*/64);
 

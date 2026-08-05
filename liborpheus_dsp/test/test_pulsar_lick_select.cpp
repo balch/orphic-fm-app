@@ -164,7 +164,7 @@ static bool test_lick_pool_round_trip() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Two 2-step rotation licks in slots 0 and 1; distinct degrees so the pick is checkable.
     const int F = OrpheusEngine::kLickFieldsPerStep;      // 4
@@ -214,7 +214,7 @@ static bool test_section_rotation_consistency() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
     auto putStep = [&](int slot, int step, float deg) {
@@ -268,7 +268,7 @@ static bool test_anomaly_forced_when_chance_one() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
     auto putStep = [&](int slot, int step, float deg) {
@@ -322,7 +322,7 @@ static bool test_manual_trigger_forces_lick_anomaly_once() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
     auto putStep = [&](int slot, int step, float deg) {
@@ -396,7 +396,7 @@ static bool test_regenerate_clamps_step_count() {
     unit.type = UNIT_PULSAR; unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Force track 4 to be a FILL melodic lick track so regenerate_lick_tracks renders it.
     engine->pulsar_track_role[4].store(1, std::memory_order_relaxed);       // MELODIC
     engine->pulsar_track_lick_mode[4].store(2, std::memory_order_relaxed);  // FILL

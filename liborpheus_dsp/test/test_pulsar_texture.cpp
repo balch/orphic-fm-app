@@ -312,14 +312,14 @@ bool run_pulsar_texture_tests() {
 
         engine->pulsar_playing.store(1, std::memory_order_relaxed);
         engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
         // Pin a fixed RNG seed so the generated texture is byte-reproducible.
-        // setup_cosmic_techno() stores seed=0, which makes load_vibe() stir the
+        // setup_fixture_baseline() stores seed=0, which makes load_vibe() stir the
         // base seed from wall-clock microseconds (steady_clock) — that made this
         // peak assertion flaky (observed 0.0005..0.1953 across runs, ~45% below
         // the 0.01 floor). A non-zero seed takes load_vibe()'s reproducible path
         // (base_seed = seed * 2654435761u, no clock stir). Must be set AFTER
-        // setup_cosmic_techno() (which zeroes the seed) and BEFORE
+        // setup_fixture_baseline() (which zeroes the seed) and BEFORE
         // trigger_vibe_load(). Seed 364 chosen by sweeping 1..400 with this exact
         // ambient setup: it yields a deterministic peak of ~0.3004, clearing the
         // 0.01 floor by ~30x. (174/400 seeds give peak < 0.02 here, which is why

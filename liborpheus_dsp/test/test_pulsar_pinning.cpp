@@ -46,7 +46,7 @@ static OrpheusEngine* make_playing_engine() {
 }
 
 // Configure track 0 with a specific engine and pinning flags.
-// Calls setup_cosmic_techno first (initialises all 8 tracks + genre),
+// Calls setup_fixture_baseline first (initialises all 8 tracks + genre),
 // then overrides track 0.
 static void setup_pin_test_track0(OrpheusEngine* engine,
                                    int engine_id,
@@ -54,7 +54,7 @@ static void setup_pin_test_track0(OrpheusEngine* engine,
                                    float timbre_val,
                                    float morph_val,
                                    bool pin_h, bool pin_t, bool pin_m) {
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Override track 0 engine (both slots identical so energy>0.6 picks EDM).
     engine->pulsar_track_engine_edm[0].store(engine_id, std::memory_order_relaxed);
     engine->pulsar_track_engine_space[0].store(engine_id, std::memory_order_relaxed);
@@ -503,7 +503,7 @@ static bool test_space_slot_pin_holds_harmonics() {
     constexpr float kTol = 1e-4f;
 
     OrpheusEngine* engine = make_playing_engine();
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Different engines per slot is what makes PULSAR_PICK actually read the
     // _space side when energy is low.
     engine->pulsar_track_engine_edm[0].store(kEngineIdDX2, std::memory_order_relaxed);

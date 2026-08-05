@@ -9,7 +9,7 @@
 #include "test_harness.h"
 #include <cstring>
 
-static void setup_cosmic_techno(OrpheusEngine* engine) {
+static void setup_fixture_baseline(OrpheusEngine* engine) {
     int edm[] = {21, 22, 23, 9, 14, 14, 17, 20};
     int space[] = {20, 17, 23, 19, 6, 14, 17, 19};
     float volumes[] = {0.90f, 0.60f, 0.65f, 0.75f, 0.55f, 0.40f, 0.30f, 0.25f};
@@ -46,7 +46,7 @@ static void setup_cosmic_techno(OrpheusEngine* engine) {
     engine->pulsar_seed.store(0, std::memory_order_relaxed);
 }
 
-static void setup_deep_space(OrpheusEngine* engine) {
+static void setup_fixture_sparse_slow(OrpheusEngine* engine) {
     int edm[] = {20, 17, 23, 19, 6, 14, 17, 19};
     int space[] = {20, 17, 23, 19, 6, 14, 17, 19};
     float volumes[] = {0.80f, 0.50f, 0.55f, 0.70f, 0.50f, 0.35f, 0.25f, 0.20f};
@@ -83,8 +83,8 @@ static void setup_deep_space(OrpheusEngine* engine) {
     engine->pulsar_seed.store(0, std::memory_order_relaxed);
 }
 
-// Dog House: E Phrygian, 85 BPM, blues progression, 32-step
-static void setup_dog_house(OrpheusEngine* engine) {
+// Blues fixture: E Phrygian, 85 BPM, blues progression, 32-step
+static void setup_fixture_blues(OrpheusEngine* engine) {
     int edm[] = {21, 22, 23, 9, 6, 19, 11, 20};
     int space[] = {21, 22, 23, 19, 6, 19, 11, 19};
     float volumes[] = {0.85f, 0.60f, 0.55f, 0.75f, 0.50f, 0.40f, 0.30f, 0.20f};
@@ -122,8 +122,8 @@ static void setup_dog_house(OrpheusEngine* engine) {
     engine->pulsar_seed.store(0, std::memory_order_relaxed);
 }
 
-// Garage Blitz: A major, 160 BPM, pop 4-chord, fast energy
-static void setup_garage_blitz(OrpheusEngine* engine) {
+// Dense/fast fixture: A major, 160 BPM, pop 4-chord, fast energy
+static void setup_fixture_dense_fast(OrpheusEngine* engine) {
     int edm[] = {21, 22, 23, 8, 14, 14, 17, 9};
     int space[] = {21, 22, 23, 8, 14, 14, 17, 9};
     float volumes[] = {0.90f, 0.75f, 0.70f, 0.80f, 0.60f, 0.45f, 0.35f, 0.30f};
@@ -156,45 +156,6 @@ static void setup_garage_blitz(OrpheusEngine* engine) {
 
     engine->pulsar_root_note.store(9, std::memory_order_relaxed);   // A
     engine->pulsar_scale_index.store(1, std::memory_order_relaxed); // Major
-    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
-    engine->pulsar_lick_length.store(0, std::memory_order_release);
-    engine->pulsar_seed.store(0, std::memory_order_relaxed);
-}
-
-// Slow Burn: F# dark, 72 BPM, dark progression, slow
-static void setup_slow_burn(OrpheusEngine* engine) {
-    int edm[] = {20, 17, 23, 0, 14, 19, 11, 19};
-    int space[] = {20, 17, 23, 19, 6, 19, 13, 19};
-    float volumes[] = {0.75f, 0.45f, 0.40f, 0.70f, 0.55f, 0.45f, 0.30f, 0.25f};
-    float pans[] = {0.0f, -0.15f, 0.20f, 0.0f, -0.25f, 0.30f, -0.35f, 0.00f};
-    int role[] = {0, 0, 0, 1, 1, 1, 1, 1};  // TrackRole: 0=PERC, 1=MELODIC
-    int envelopes[] = {0, 0, 0, 1, 1, 2, 2, 3};
-
-    for (int t = 0; t < 8; t++) {
-        engine->pulsar_track_engine_edm[t].store(edm[t], std::memory_order_relaxed);
-        engine->pulsar_track_engine_space[t].store(space[t], std::memory_order_relaxed);
-        engine->pulsar_track_volume[t].store(volumes[t], std::memory_order_relaxed);
-        engine->pulsar_track_pan[t].store(pans[t], std::memory_order_relaxed);
-        engine->pulsar_track_harmonics[t].store(0.5f, std::memory_order_relaxed);
-        engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
-        engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
-        engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
-    }
-
-    float density[] = {0.30f, 0.20f, 0.35f, 0.30f, 0.20f, 0.25f, 0.15f, 0.10f};
-    for (int i = 0; i < 8; i++)
-        engine->pulsar_genre_density[i].store(density[i], std::memory_order_relaxed);
-    engine->pulsar_genre_swing.store(0.08f, std::memory_order_relaxed);
-    engine->pulsar_genre_ghost_prob.store(0.15f, std::memory_order_relaxed);
-    engine->pulsar_genre_note_range_low.store(36, std::memory_order_relaxed);
-    engine->pulsar_genre_note_range_high.store(84, std::memory_order_relaxed);
-    engine->pulsar_genre_rhythm_density.store(0.0f, std::memory_order_relaxed);
-    engine->pulsar_genre_progression_style.store(6, std::memory_order_relaxed);  // Dark
-    engine->pulsar_genre_chords_per_bar.store(1, std::memory_order_relaxed);
-
-    engine->pulsar_root_note.store(6, std::memory_order_relaxed);   // F#
-    engine->pulsar_scale_index.store(0, std::memory_order_relaxed); // Minor
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     engine->pulsar_lick_length.store(0, std::memory_order_release);
     engine->pulsar_seed.store(0, std::memory_order_relaxed);

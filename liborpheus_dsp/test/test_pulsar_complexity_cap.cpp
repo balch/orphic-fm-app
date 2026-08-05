@@ -90,7 +90,7 @@ static bool test_percussive_step_count_locked_at_max_complexity() {
     engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
     engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
     engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     setup_role_aware_macros(engine);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     trigger_vibe_load(engine);
@@ -148,7 +148,7 @@ static bool test_no_step_count_mutation_at_0_8() {
     engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
     engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
     engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     setup_role_aware_macros(engine);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     trigger_vibe_load(engine);
@@ -208,7 +208,7 @@ static bool test_dejavu_reset_floor_at_least_8() {
     engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
     engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
     engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     setup_role_aware_macros(engine);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     trigger_vibe_load(engine);
@@ -266,7 +266,7 @@ static double cap4_avg_active_gates_for_budget(float probe_var_max) {
     engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
     engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
     engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     setup_role_aware_macros(engine);
 
     // Probe: MELODIC role, sparse base pattern (plenty of inactive steps for

@@ -498,7 +498,7 @@ static bool test_tension_evo_release_speed_decays_over_bars() {
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_energy.store(0.7f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Tension: inner cycle of 8 bars, no outer cycle. Intensity ramps
     // 0 -> 7/8 over 8 bars then wraps to 0 (a sharp target drop).
     engine->pulsar_tension_inner_bars.store(8, std::memory_order_relaxed);

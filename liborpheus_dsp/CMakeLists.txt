@@ -27,6 +27,16 @@ if(NOT DEFINED EURORACK_DIR)
 endif()
 message(STATUS "Eurorack source: ${EURORACK_DIR}")
 
+# ── AddressSanitizer (opt-in) ─────────────────────
+# Off by default; does not affect normal builds. Build with -DENABLE_ASAN=ON
+# to catch use-after-free/heap corruption. Applied at project scope (before
+# any add_library/add_executable below) so the whole link is instrumented.
+option(ENABLE_ASAN "Build with AddressSanitizer" OFF)
+if(ENABLE_ASAN)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address)
+endif()
+
 # ── Compat shim include (must come BEFORE eurorack includes) ──
 # This overrides stmlib.h macros for non-STM32 targets.
 set(COMPAT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")

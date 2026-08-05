@@ -371,7 +371,7 @@ static bool test_section_progression_override_applied() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Two-section arrangement, 1 bar each so transitions happen quickly.
     push_two_section_ab_arrangement(engine, 1);
@@ -433,7 +433,7 @@ static bool test_section_progression_inheritance_resets_index() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Vibe-level progression: [0, 3, 4, 5] (I - IV - V - VI).
     engine->pulsar_custom_progression_active.store(1, std::memory_order_relaxed);
@@ -547,7 +547,7 @@ static bool test_tension_phase_resets_without_override() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Vibe-level tension: inner_bars=4, outer_bars=0, volume=0.3
     // so tension_intensity rises from 0 -> 0.75 over 4 bars then wraps.
@@ -627,7 +627,7 @@ static bool test_tension_override_then_inherit() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Vibe-level tension: distinctive volume = 0.3
     engine->pulsar_tension_inner_bars.store(4, std::memory_order_relaxed);
@@ -734,7 +734,7 @@ static bool test_initial_section_tension_override_applied_on_load() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Vibe-level tension: distinctive base volume = 0.3
     engine->pulsar_tension_inner_bars.store(4, std::memory_order_relaxed);
@@ -808,7 +808,7 @@ static bool test_section_comping_humanization_override_loads() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Two-section arrangement so we have indices 0 and 1.
     push_two_section_ab_arrangement(engine, 1);
@@ -957,7 +957,7 @@ static bool test_section_macro_subbar_lerp() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // 2-section arrangement, 4 bars per section so we can observe a 4-bar ramp.
     push_two_section_ab_arrangement(engine, 4);
@@ -1586,10 +1586,10 @@ static bool test_fill_lick_48_steps_renders_and_wraps() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);  // pin RNG (avoid wall-clock re-stir)
 
-    // setup_cosmic_techno's role[] marks track 4 (keys) MELODIC — make it the
+    // setup_fixture_baseline's role[] marks track 4 (keys) MELODIC — make it the
     // FILL lead. Zero mutation so the authored lick renders byte-for-byte
     // (no random degree/velocity/duration perturbation from generate_lick_pattern).
     constexpr int kLeadTrack = 4;
@@ -1700,7 +1700,7 @@ static bool test_master_scratch_freezes_pulsar_clock() {
     unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
 
@@ -1786,7 +1786,7 @@ static void push_jam_carry_band_arrangement(OrpheusEngine* engine,
     engine->pulsar_section_data[s1 + 16].store(sec1_jam_carry, std::memory_order_relaxed);  // jamCarry (slot 16)
 
     // Band config: member 0 = track 3, member 1 = track 4 (both MELODIC per
-    // setup_cosmic_techno's role table), neither always_active.
+    // setup_fixture_baseline's role table), neither always_active.
     engine->pulsar_band_active.store(1, std::memory_order_relaxed);
     engine->pulsar_band_member_count.store(2, std::memory_order_relaxed);
     for (int i = 0; i < 96; i++)
@@ -1833,14 +1833,14 @@ static void push_jam_carry_band_arrangement(OrpheusEngine* engine,
     engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
 }
 
-// Shared setup for the three jamCarry tests: cosmic-techno base vibe (tracks 3
+// Shared setup for the three jamCarry tests: baseline fixture (tracks 3
 // and 4 are MELODIC), a pinned 4-step authored lick, and both RNGs pinned per
 // the project's anti-flake convention.
 static void setup_jam_carry_engine_base(OrpheusEngine* engine, const int8_t authored_degrees[4]) {
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);  // isolate solo-driven changes
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
 
     engine->pulsar_seed.store(0x5EED, std::memory_order_relaxed);
@@ -2104,7 +2104,7 @@ static bool test_jam_carry_fallbacks() {
 // SUPPORT-ducked. The gate must fall back to a fresh (eligibility-filtered)
 // start instead. Reuses the jamCarry fixture, but section 1 is JAM (not
 // LICK_BUILDER) and a third, always-active, kit-only band member (the
-// Drummer, mapped to track 0 -- PERC per setup_cosmic_techno) is added.
+// Drummer, mapped to track 0 -- PERC per setup_fixture_baseline) is added.
 // always_active members never win normal lead selection (select_next_lead /
 // select_initial_lead both zero their weight -- see pulsar_band_solo.h), so
 // the only way the drummer becomes lead is should_drum_lead's handoff

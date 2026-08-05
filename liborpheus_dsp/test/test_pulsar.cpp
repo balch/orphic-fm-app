@@ -4,9 +4,12 @@
 #include "../src/orpheus_graph.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
+#include "stmlib/utils/random.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+
+static constexpr uint32_t kPulsarTestSeed = 0xBEEFED;
 
 bool run_pulsar_tests() {
     printf("\n=== Pulsar Tests ===\n\n");
@@ -14,6 +17,7 @@ bool run_pulsar_tests() {
 
     // Shared engine — pulsar state is owned by engine->pulsar_state.
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    stmlib::Random::Seed(0xBADA55);
 
     GraphUnit unit;
     std::memset(&unit, 0, sizeof(unit));
@@ -26,7 +30,9 @@ bool run_pulsar_tests() {
 
         engine->pulsar_playing.store(1, std::memory_order_relaxed);
         engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
         engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
 
@@ -89,17 +95,17 @@ bool run_pulsar_tests() {
 
         bool viz_ok = true;
 
-        // All Cosmic Techno tracks use 16 steps
+        // All baseline fixture tracks use 16 steps
         int step_count = engine->pulsar_viz.step_counts[0];
         if (step_count != 16) {
             printf("    FAIL: step_counts[0] = %d (expected 16)\n", step_count);
             viz_ok = false;
         }
 
-        // Cosmic Techno kick has gate on step 0 (first step in pattern)
+        // Baseline fixture kick has gate on step 0 (first step in pattern)
         bool kick_step0 = engine->pulsar_viz.step_gates[0][0];
         if (!kick_step0) {
-            printf("    FAIL: step_gates[0][0] = false (expected true for Cosmic Techno kick)\n");
+            printf("    FAIL: step_gates[0][0] = false (expected true for baseline kick)\n");
             viz_ok = false;
         }
 
@@ -123,14 +129,16 @@ bool run_pulsar_tests() {
     {
         printf("  Test 4: Vibe switching works\n");
 
-        // Switch to Deep Space vibe
-        setup_deep_space(engine);
+        // Switch to the sparse/slow fixture
+        setup_fixture_sparse_slow(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
 
         // Process one block to trigger vibe load
         unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
-        // Verify step_counts are still 16 (Deep Space also uses 16 steps)
+        // Verify step_counts are still 16 (sparse/slow also uses 16 steps)
         int step_count = engine->pulsar_viz.step_counts[0];
         bool vibe_ok = (step_count == 16);
 
@@ -144,7 +152,7 @@ bool run_pulsar_tests() {
         vibe_ok = vibe_ok && (total_gates > 0);
 
         if (vibe_ok) {
-            printf("    PASS: deep space vibe loaded, step_counts[0]=%d, total_gates=%d\n",
+            printf("    PASS: sparse/slow vibe loaded, step_counts[0]=%d, total_gates=%d\n",
                    step_count, total_gates);
             pass++;
         } else {
@@ -190,7 +198,9 @@ bool run_pulsar_tests() {
         engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
 
         // Reset state by re-loading vibe
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
         unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
@@ -228,7 +238,9 @@ bool run_pulsar_tests() {
         engine->pulsar_space.store(0.3f, std::memory_order_relaxed);
 
         // Reset by re-loading vibe
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
         unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
@@ -244,7 +256,9 @@ bool run_pulsar_tests() {
 
         // Low energy run — count active gates in viz data
         engine->pulsar_energy.store(0.1f, std::memory_order_relaxed);
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
         unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
@@ -275,7 +289,9 @@ bool run_pulsar_tests() {
 
         engine->pulsar_energy.store(0.1f, std::memory_order_relaxed);
         engine->pulsar_complexity.store(0.5f, std::memory_order_relaxed);
-        setup_deep_space(engine);
+        setup_fixture_sparse_slow(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
 
         for (int i = 0; i < 500; i++) {
@@ -302,8 +318,10 @@ bool run_pulsar_tests() {
         engine->pulsar_complexity.store(1.0f, std::memory_order_relaxed);
         engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
 
-        // Re-load Cosmic Techno vibe (D minor)
-        setup_cosmic_techno(engine);
+        // Re-load the baseline fixture (D minor)
+        setup_fixture_baseline(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
         unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
@@ -340,13 +358,15 @@ bool run_pulsar_tests() {
 
         engine->pulsar_playing.store(1, std::memory_order_relaxed);
         engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-        setup_deep_space(engine);
+        setup_fixture_sparse_slow(engine);
         engine->pulsar_energy.store(0.7f, std::memory_order_relaxed);
         engine->pulsar_complexity.store(0.8f, std::memory_order_relaxed);
 
         // Override root to D (2) and scale to Pentatonic (2)
         engine->pulsar_root_note.store(2, std::memory_order_relaxed);
         engine->pulsar_scale_index.store(2, std::memory_order_relaxed);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
 
         // Run enough blocks to trigger mutations with note drift
@@ -374,25 +394,35 @@ bool run_pulsar_tests() {
     {
         printf("  Test 11: Per-track engine atomics override scene engines\n");
 
-        engine->pulsar_playing.store(1, std::memory_order_relaxed);
-        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-        setup_deep_space(engine);
-        trigger_vibe_load(engine);
-        engine->pulsar_energy.store(0.8f, std::memory_order_relaxed);
+        // Fresh engine: the shared `engine` accumulates playhead/mutation-history
+        // state from Tests 1-10 that made this test intermittently silent when reused.
+        OrpheusEngine* engine11 = orpheus_engine_create(48000.0f);
+        GraphUnit unit11;
+        std::memset(&unit11, 0, sizeof(unit11));
+        unit11.type = UNIT_PULSAR;
+        unit11.enabled = true;
+
+        engine11->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine11->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        setup_fixture_sparse_slow(engine11);
+        engine11->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
+        trigger_vibe_load(engine11);
+        engine11->pulsar_energy.store(0.8f, std::memory_order_relaxed);
 
         // Run one block to initialize and load vibe
-        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        unit_process_pulsar(&unit11, engine11, 512, 48000.0f);
 
         // Override track 0 (kick) to use FM (10) for both EDM and space
-        engine->pulsar_track_engine_edm[0].store(10, std::memory_order_relaxed);
-        engine->pulsar_track_engine_space[0].store(10, std::memory_order_relaxed);
+        engine11->pulsar_track_engine_edm[0].store(10, std::memory_order_relaxed);
+        engine11->pulsar_track_engine_space[0].store(10, std::memory_order_relaxed);
 
         // Run more blocks — should not crash and should produce output
         float peak = 0.0f;
         for (int i = 0; i < 50; i++) {
-            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            unit_process_pulsar(&unit11, engine11, 512, 48000.0f);
             for (int j = 0; j < 512; j++) {
-                float a = std::fabs(engine->pulsar_out_l[j]);
+                float a = std::fabs(engine11->pulsar_out_l[j]);
                 if (a > peak) peak = a;
             }
         }
@@ -404,31 +434,45 @@ bool run_pulsar_tests() {
             printf("    FAIL: per-track engine atomics — output silent (peak=%.4f)\n", peak);
             fail++;
         }
+
+        orpheus_engine_destroy(engine11);
     }
 
     // ── Test 12: Mix controls output level ──
     {
         printf("  Test 12: Mix controls output level\n");
 
-        engine->pulsar_playing.store(1, std::memory_order_relaxed);
-        engine->pulsar_energy.store(0.8f, std::memory_order_relaxed);
+        // Fresh engine: the shared `engine` accumulates playhead/mutation-history
+        // state from Tests 1-10 that made this test intermittently silent when reused.
+        OrpheusEngine* engine12 = orpheus_engine_create(48000.0f);
+        GraphUnit unit12;
+        std::memset(&unit12, 0, sizeof(unit12));
+        unit12.type = UNIT_PULSAR;
+        unit12.enabled = true;
+
+        engine12->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine12->pulsar_energy.store(0.8f, std::memory_order_relaxed);
+        setup_fixture_baseline(engine12);
+        engine12->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
+        trigger_vibe_load(engine12);
 
         // Mix = 0: should be silent
-        engine->pulsar_mix.store(0.0f, std::memory_order_relaxed);
-        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        engine12->pulsar_mix.store(0.0f, std::memory_order_relaxed);
+        unit_process_pulsar(&unit12, engine12, 512, 48000.0f);
         float peak_silent = 0.0f;
         for (int i = 0; i < 512; i++) {
-            float a = std::fabs(engine->pulsar_out_l[i]);
+            float a = std::fabs(engine12->pulsar_out_l[i]);
             if (a > peak_silent) peak_silent = a;
         }
 
         // Mix = 1: should produce output (run enough blocks for pattern to fire)
-        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        engine12->pulsar_mix.store(1.0f, std::memory_order_relaxed);
         float peak_full = 0.0f;
         for (int i = 0; i < 100; i++) {
-            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            unit_process_pulsar(&unit12, engine12, 512, 48000.0f);
             for (int j = 0; j < 512; j++) {
-                float a = std::fabs(engine->pulsar_out_l[j]);
+                float a = std::fabs(engine12->pulsar_out_l[j]);
                 if (a > peak_full) peak_full = a;
             }
         }
@@ -444,9 +488,9 @@ bool run_pulsar_tests() {
                    peak_silent, peak_full);
             fail++;
         }
-    }
 
-    orpheus_engine_destroy(engine);
+        orpheus_engine_destroy(engine12);
+    }
 
     // ── Test 13: PolySlopeGenerator shift→channel mapping (stack) ──
     {
@@ -648,8 +692,10 @@ bool run_pulsar_tests() {
     {
         printf("  Test 16: Drum tracks produce output with self-enveloped engines\n");
 
-        // Re-load Cosmic Techno vibe (drums active)
-        setup_cosmic_techno(engine);
+        // Re-load the baseline fixture (drums active)
+        setup_fixture_baseline(engine);
+        engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(engine);
         unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
@@ -704,6 +750,10 @@ bool run_pulsar_tests() {
             fail++;
         }
     }
+
+    // Shared `engine` is done being read here. Test 17 reused Test 16's render
+    // pass, so this is the first point after which nothing touches it again.
+    orpheus_engine_destroy(engine);
 
     // ── Test 18: Tides envelope duration varies by profile ──
     {
@@ -796,7 +846,7 @@ bool run_pulsar_tests() {
         lick_engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
         lick_engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
 
-        setup_cosmic_techno(lick_engine);
+        setup_fixture_baseline(lick_engine);
 
         // Write a simple 4-step lick: root-root-2nd-3rd
         lick_engine->pulsar_lick[0] = {0, 0.5f, 0.8f};
@@ -805,6 +855,8 @@ bool run_pulsar_tests() {
         lick_engine->pulsar_lick[3] = {2, 1.0f, 0.9f};
         lick_engine->pulsar_lick_length.store(4, std::memory_order_release);
         lick_engine->pulsar_lick_mutation.store(0.3f, std::memory_order_relaxed);
+        lick_engine->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(lick_engine);
 
         // Process ~3 seconds of audio
@@ -1087,7 +1139,7 @@ bool run_pulsar_tests() {
     }
 
     // ── Test: Vibe switch with zeroed volumes produces silence on muted tracks ──
-    // Reproduces the bug: play Cosmic Techno (all tracks active), switch to a
+    // Reproduces the bug: play the baseline fixture (all tracks active), switch to a
     // sparse vibe where most tracks have volume=0.  Muted tracks must produce
     // zero audio — no bleed from the previous vibe's voices/envelopes.
     {
@@ -1111,8 +1163,10 @@ bool run_pulsar_tests() {
         eng2->pulsar_step_count.store(16, std::memory_order_relaxed);
         eng2->pulsar_envelope_mode.store(0, std::memory_order_relaxed);
 
-        // Phase 1: Play Cosmic Techno for ~2 seconds (all tracks have volume > 0)
-        setup_cosmic_techno(eng2);
+        // Phase 1: Play the baseline fixture for ~2 seconds (all tracks have volume > 0)
+        setup_fixture_baseline(eng2);
+        eng2->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng2);
         for (int i = 0; i < 200; i++) {
             unit_process_pulsar(&u2, eng2, 512, 48000.0f);
@@ -1124,6 +1178,8 @@ bool run_pulsar_tests() {
         for (int t = 0; t < 8; t++) {
             eng2->pulsar_track_volume[t].store(sparse_volumes[t], std::memory_order_relaxed);
         }
+        eng2->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng2);
 
         // Process several blocks AFTER the vibe switch
@@ -1184,9 +1240,11 @@ bool run_pulsar_tests() {
         eng3->pulsar_playing.store(1, std::memory_order_relaxed);
         eng3->pulsar_mix.store(1.0f, std::memory_order_relaxed);
         eng3->clock_bpm.store(200.0f, std::memory_order_relaxed);  // fast BPM for rapid loops
-        setup_cosmic_techno(eng3);
+        setup_fixture_baseline(eng3);
         eng3->pulsar_energy.store(0.9f, std::memory_order_relaxed);
         eng3->pulsar_complexity.store(1.0f, std::memory_order_relaxed);  // max mutation
+        eng3->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng3);
 
         // Process ~60 seconds at 200 BPM — hundreds of loop boundaries with max mutation
@@ -1232,7 +1290,9 @@ bool run_pulsar_tests() {
         eng4->pulsar_playing.store(1, std::memory_order_relaxed);
         eng4->pulsar_mix.store(1.0f, std::memory_order_relaxed);
         eng4->clock_bpm.store(128.0f, std::memory_order_relaxed);
-        setup_deep_space(eng4);
+        setup_fixture_sparse_slow(eng4);
+        eng4->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng4);
 
         // Initialize the pulsar state
@@ -1257,7 +1317,9 @@ bool run_pulsar_tests() {
         eng4->pulsar_rv_lp_decay2 = 0.8f;
 
         // Switch to a different vibe — this triggers load_vibe on next process
-        setup_cosmic_techno(eng4);
+        setup_fixture_baseline(eng4);
+        eng4->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng4);
         unit_process_pulsar(&u4, eng4, 512, 48000.0f);
 
@@ -1309,8 +1371,10 @@ bool run_pulsar_tests() {
         eng5->pulsar_playing.store(1, std::memory_order_relaxed);
         eng5->pulsar_mix.store(1.0f, std::memory_order_relaxed);
         eng5->clock_bpm.store(180.0f, std::memory_order_relaxed);  // fast for more section transitions
-        setup_cosmic_techno(eng5);
+        setup_fixture_baseline(eng5);
         setup_jam_arrangement(eng5);
+        eng5->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng5);
 
         bool bar_overshoot = false;
@@ -1374,7 +1438,9 @@ bool run_pulsar_tests() {
 
         eng_b->pulsar_playing.store(1, std::memory_order_relaxed);
         eng_b->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-        setup_cosmic_techno(eng_b);
+        setup_fixture_baseline(eng_b);
+        eng_b->pulsar_seed.store(kPulsarTestSeed, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBADA55);
         trigger_vibe_load(eng_b);
         eng_b->clock_bpm.store(128.0f, std::memory_order_relaxed);
 
@@ -1432,12 +1498,15 @@ bool run_pulsar_tests() {
 
             e->pulsar_playing.store(1, std::memory_order_relaxed);
             e->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-            setup_cosmic_techno(e);
+            setup_fixture_baseline(e);
             // setup_jam_arrangement uses weighted transitions (s0->{0:0.6,1:0.4})
             // so the section walk is seed-driven, not deterministic.
             setup_jam_arrangement(e);
             e->pulsar_seed.store(seed, std::memory_order_relaxed);
             e->clock_bpm.store(240.0f, std::memory_order_relaxed);
+            // Deliberately NOT re-seeding stmlib::Random here: the two calls must
+            // start from different global RNG state so the equality assertion
+            // proves the walk depends only on pulsar_seed.
             trigger_vibe_load(e);
 
             std::vector<int> path;
@@ -1487,7 +1556,7 @@ bool run_pulsar_tests() {
             u.enabled = true;
             e->pulsar_playing.store(1, std::memory_order_relaxed);
             e->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-            setup_cosmic_techno(e);
+            setup_fixture_baseline(e);
             e->pulsar_seed.store(0, std::memory_order_relaxed);  // random
             e->clock_bpm.store(240.0f, std::memory_order_relaxed);
             trigger_vibe_load(e);

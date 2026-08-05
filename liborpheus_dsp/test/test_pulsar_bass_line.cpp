@@ -68,7 +68,7 @@ static bool test_two_channel_render_distinct() {
     unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
     push_two_channels(engine);
     setup_two_lick_tracks(engine);
@@ -109,7 +109,7 @@ static bool test_bass_only_vibe_renders() {
     unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
     push_two_channels(engine);
     orpheus_engine_set_port(engine, PULSAR_URI, "lick_length", 0.0f);  // kill the lead channel
@@ -254,7 +254,7 @@ static bool test_lick_builder_seeds_from_bass_channel() {
         unit.enabled = true;
         engine->pulsar_playing.store(1, std::memory_order_relaxed);
         engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
         engine->pulsar_seed.store(7777, std::memory_order_relaxed);
         push_two_channels(engine);
         setup_two_lick_tracks(engine);
@@ -337,7 +337,7 @@ static GenStepsResult run_generative_case(int bar_strategy, int lick_source) {
     unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
     push_two_channels(engine);   // lead = degree 0 / octave 3, bass = degree 4 / octave 2
     // 32 steps: apply_bar_strategy only runs when step_count > 16, and CALL_RESPONSE
@@ -351,7 +351,7 @@ static GenStepsResult run_generative_case(int bar_strategy, int lick_source) {
     engine->pulsar_track_lick_source[4].store(lick_source, std::memory_order_relaxed);
     engine->pulsar_track_chord_follow[4].store(2, std::memory_order_relaxed);  // FIXED
     engine->pulsar_track_lick_degree_offset[4].store(0, std::memory_order_relaxed);
-    // Force the generative pattern to actually fire notes. Cosmic Techno's own track-4
+    // Force the generative pattern to actually fire notes. The baseline fixture's own track-4
     // density leaves this branch empty across all 32 steps, which would make the REPEAT
     // control below compare two silences and pass without proving anything. CALL_RESPONSE
     // is unaffected either way: bar_strategy_call_response clears every step and rewrites

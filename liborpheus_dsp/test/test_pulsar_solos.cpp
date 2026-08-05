@@ -574,7 +574,7 @@ static bool test_jam_solo_shared_line() {
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
     engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);  // no mutate_patterns drift
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(4242, std::memory_order_relaxed);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     engine->pulsar_lick_length.store(0, std::memory_order_release);   // NO authored lick
@@ -623,7 +623,7 @@ static bool test_lickbuilder_lead_evolving_in_scale() {
     // change in the lead track's notes is the SOLO-1 live-lick render. Without
     // SOLO-1 the lead track is frozen (evolves=NO); with it, it evolves.
     engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Harmonic Minor (9), root G# (8) per the plan.
     engine->pulsar_root_note.store(8, std::memory_order_relaxed);
     engine->pulsar_scale_index.store(9, std::memory_order_relaxed);
@@ -759,7 +759,7 @@ static bool test_positive_density_makes_soloist_busier() {
         // gated steps — that head-room is what the density boost fills in.
         engine->pulsar_energy.store(0.5f, std::memory_order_relaxed);
         engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
-        setup_cosmic_techno(engine);
+        setup_fixture_baseline(engine);
         engine->pulsar_seed.store(31337, std::memory_order_relaxed);  // fixed
         engine->pulsar_step_count.store(16, std::memory_order_relaxed);
         // Make the track fully gated so the fire gate is the only thing that
@@ -874,7 +874,7 @@ static bool test_jam_improv_generated_and_carryover() {
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
     engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(909, std::memory_order_relaxed);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     engine->pulsar_lick_length.store(0, std::memory_order_release);

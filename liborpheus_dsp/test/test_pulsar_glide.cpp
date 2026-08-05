@@ -60,7 +60,7 @@ void push_lick(OrpheusEngine* engine, float step_glide) {
 // LickMode enum values from orpheus_unit_pulsar.h: 0=NONE, 1=SQUASH, 2=FILL.
 constexpr int kLickModeFill = 2;
 
-// Tracks 3, 4, 5, 7 are MELODIC in setup_cosmic_techno. Pick track 3 as the
+// Tracks 3, 4, 5, 7 are MELODIC in setup_fixture_baseline. Pick track 3 as the
 // designated lick track for these tests.
 constexpr int kLickTrack = 3;
 
@@ -72,7 +72,7 @@ void minimal_engine_setup(OrpheusEngine* engine, float bpm) {
     engine->pulsar_space.store(0.4f, std::memory_order_relaxed);
     engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
     engine->clock_bpm.store(bpm, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
     // Enable FILL lick on a melodic track so the lick steps actually gate.
     engine->pulsar_track_lick_mode[kLickTrack].store(

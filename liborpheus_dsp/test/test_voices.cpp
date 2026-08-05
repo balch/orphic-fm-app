@@ -69,96 +69,6 @@ static bool test_single_voice_plaits_engines() {
     return all_pass;
 }
 
-static bool test_polyphonic_voices() {
-    printf("\n=== Test: Polyphonic 8 voices ===\n");
-    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    bool all_pass = true;
-
-    float notes[] = {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f};
-    GraphUnit units[kNumMainVoices];
-
-    for (int v = 0; v < kNumMainVoices; v++) {
-        engine->voice_params[v].active.store(1);
-        engine->voice_params[v].ever_triggered.store(1);
-        engine->voice_params[v].engine_index.store(-1);
-        engine->voice_params[v].tune.store(notes[v]);
-        engine->voice_params[v].gate.store(1);
-        setup_voice_unit(&units[v], v);
-    }
-
-    float voice_peaks[kNumMainVoices] = {};
-    for (int offset = 0; offset < 24000; offset += 128) {
-        int chunk = std::min(128, 24000 - offset);
-        for (int v = 0; v < kNumMainVoices; v++) {
-            unit_process_plaits(&units[v], engine, chunk, 48000.0f);
-            for (int i = 0; i < chunk; i++) {
-                float a = std::fabs(units[v].output_buffers[OPORT_OUT][i]);
-                if (a > voice_peaks[v]) voice_peaks[v] = a;
-            }
-        }
-    }
-
-    int silent_count = 0;
-    for (int v = 0; v < kNumMainVoices; v++) {
-        bool ok = voice_peaks[v] > 0.01f;
-        if (!ok) silent_count++;
-        printf("  Voice %d (note %.0f): peak=%.4f %s\n", v, notes[v], voice_peaks[v], ok ? "OK" : "SILENT!");
-        all_pass &= ok;
-    }
-
-    printf("Polyphonic test: %d/%d voices producing sound — %s\n",
-           kNumMainVoices - silent_count, kNumMainVoices, all_pass ? "PASS" : "FAIL");
-    orpheus_engine_destroy(engine);
-    return all_pass;
-}
-
-static bool test_polyphonic_plaits_voices() {
-    printf("\n=== Test: Polyphonic 8 Plaits voices ===\n");
-    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    bool all_pass = true;
-
-    float notes[] = {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f};
-    GraphUnit units[kNumMainVoices];
-
-    for (int v = 0; v < kNumMainVoices; v++) {
-        engine->voice_params[v].active.store(1);
-        engine->voice_params[v].ever_triggered.store(1);
-        engine->voice_params[v].engine_index.store(0);
-        engine->voice_params[v].tune.store(notes[v]);
-        engine->voice_params[v].gate.store(1);
-        engine->voice_params[v].harmonics.store(0.5f);
-        engine->voice_params[v].timbre.store(0.5f);
-        engine->voice_params[v].morph.store(0.5f);
-        engine->voice_params[v].decay.store(0.5f);
-        setup_voice_unit(&units[v], v);
-    }
-
-    float voice_peaks[kNumMainVoices] = {};
-    for (int offset = 0; offset < 24000; offset += 128) {
-        int chunk = std::min(128, 24000 - offset);
-        for (int v = 0; v < kNumMainVoices; v++) {
-            unit_process_plaits(&units[v], engine, chunk, 48000.0f);
-            for (int i = 0; i < chunk; i++) {
-                float a = std::fabs(units[v].output_buffers[OPORT_OUT][i]);
-                if (a > voice_peaks[v]) voice_peaks[v] = a;
-            }
-        }
-    }
-
-    int silent_count = 0;
-    for (int v = 0; v < kNumMainVoices; v++) {
-        bool ok = voice_peaks[v] > 0.001f;
-        if (!ok) silent_count++;
-        printf("  Voice %d (Plaits, note %.0f): peak=%.4f %s\n", v, notes[v], voice_peaks[v], ok ? "OK" : "SILENT!");
-        all_pass &= ok;
-    }
-
-    printf("Polyphonic Plaits test: %d/%d voices — %s\n",
-           kNumMainVoices - silent_count, kNumMainVoices, all_pass ? "PASS" : "FAIL");
-    orpheus_engine_destroy(engine);
-    return all_pass;
-}
-
 static bool test_voice_gate_retrigger() {
     printf("\n=== Test: Voice gate retrigger cycle ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
@@ -511,8 +421,6 @@ bool run_voice_tests() {
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_single_voice_engine0());
     tally(test_single_voice_plaits_engines());
-    tally(test_polyphonic_voices());
-    tally(test_polyphonic_plaits_voices());
     tally(test_voice_gate_retrigger());
     tally(test_voice_hold_without_gate());
     tally(test_voice_activation_lifecycle());

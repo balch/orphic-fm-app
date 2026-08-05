@@ -18,14 +18,14 @@ static bool test_pulsar_chaos_renders_lorenz() {
     unit.type = UNIT_PULSAR;
     unit.enabled = true;
 
-    // Start from a working pulsar setup (cosmic techno) so all the upstream
+    // Start from a working pulsar setup (baseline fixture) so all the upstream
     // sequencer state (densities, scale, root, etc.) is sane.
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
 
     // Configure track 0 to play Lorenz (engine 200) on both EDM and Space slots.
-    // Override what cosmic_techno set for track 0.
+    // Override what the baseline fixture set for track 0.
     constexpr int kChaosLorenz = 200;
     engine->pulsar_track_engine_edm[0].store(kChaosLorenz, std::memory_order_relaxed);
     engine->pulsar_track_engine_space[0].store(kChaosLorenz, std::memory_order_relaxed);
@@ -39,7 +39,7 @@ static bool test_pulsar_chaos_renders_lorenz() {
     engine->pulsar_track_morph_space[0].store(1.0f, std::memory_order_relaxed);
 
     // Solo track 0 so we measure chaos output specifically (not muddied by
-    // the seven other cosmic-techno tracks).
+    // the seven other baseline-fixture tracks).
     solo_track(engine, 0);
 
     trigger_vibe_load(engine);

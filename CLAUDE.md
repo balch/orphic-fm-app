@@ -43,6 +43,7 @@ See `.claude/skills/dsp-implementation/` for C++ unit creation, engine atomics, 
   - Run specific suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test tides bass warps`
   - List suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test --list`
   - Diagnose graph wiring: `ORPHEUS_DUMP_GRAPH=1 liborpheus_dsp/build-desktop/orpheus_dsp_test graph` — prints full exec order for every graph load. Silent by default to keep test output readable.
+  - AddressSanitizer (opt-in, use a separate build dir): add `-DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug` to the cmake command above, e.g. `cmake -S liborpheus_dsp -B liborpheus_dsp/build-asan -DEURORACK_DIR=$EURORACK_DIR -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`. Default is OFF with zero effect on normal builds.
 
 ## Generated C++ Test Fixtures
 

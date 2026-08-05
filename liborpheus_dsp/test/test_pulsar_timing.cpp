@@ -104,7 +104,7 @@ void solo_pulsar_track(OrpheusEngine* engine, int track) {
 static bool test_swing_pair_sum() {
     printf("\n=== Test: swing keeps real tempo at nominal BPM ===\n");
     const float bpm = 120.0f;
-    OrpheusEngine* engine = make_engine(setup_cosmic_techno, bpm);
+    OrpheusEngine* engine = make_engine(setup_fixture_baseline, bpm);
     // Heavy swing via the genre floor (now consumed by the clock), and
     // energy=1 to disable the elastic-tempo wander.
     engine->pulsar_genre_swing.store(0.5f, std::memory_order_relaxed);
@@ -141,7 +141,7 @@ static bool test_subblock_onset_alignment() {
     // the 512-frame block so block-quantized onsets would show up as inter-
     // onset errors of up to ~500 samples.
     const float bpm = 130.0f;
-    OrpheusEngine* engine = make_engine(setup_dog_house, bpm);
+    OrpheusEngine* engine = make_engine(setup_fixture_blues, bpm);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);
     trigger_vibe_load(engine);
     // Straight time and no tempo wander: swing floor 0, complexity 0 (kills
@@ -150,7 +150,7 @@ static bool test_subblock_onset_alignment() {
     engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_energy.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_space.store(0.0f, std::memory_order_relaxed);
-    solo_pulsar_track(engine, 0);  // kick only (dog_house: engine 21 both slots)
+    solo_pulsar_track(engine, 0);  // kick only (blues fixture: engine 21 both slots)
     GraphUnit unit = make_unit();
 
     for (int b = 0; b < 400; b++) unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
@@ -197,7 +197,7 @@ static bool test_percussive_probability_floor() {
     // fall back between hits). Audio-independent, so quiet low-energy hits
     // still count.
     auto count_triggers = [&](float energy, float& peak_out) -> int {
-        OrpheusEngine* engine = make_engine(setup_dog_house, bpm);
+        OrpheusEngine* engine = make_engine(setup_fixture_blues, bpm);
         engine->pulsar_step_count.store(16, std::memory_order_relaxed);
         trigger_vibe_load(engine);
         engine->pulsar_genre_swing.store(0.0f, std::memory_order_relaxed);
@@ -245,7 +245,7 @@ static bool test_percussive_probability_floor() {
 // ── Test 4: percussive patterns don't accumulate mutations between resets ──
 static bool test_percussive_pattern_stability() {
     printf("\n=== Test: percussive pattern stability across loops ===\n");
-    OrpheusEngine* engine = make_engine(setup_cosmic_techno, 160.0f);
+    OrpheusEngine* engine = make_engine(setup_fixture_baseline, 160.0f);
     engine->pulsar_energy.store(1.0f, std::memory_order_relaxed);
     // Moderate complexity: mutation runs, deja-vu reset stays far out
     // (reset_interval = max(8, 32*(1-complexity)) loops).
@@ -313,7 +313,7 @@ static bool test_percussive_pattern_stability() {
 static bool test_elastic_tempo_bounded() {
     printf("\n=== Test: elastic tempo bounded at low energy ===\n");
     const float bpm = 120.0f;
-    OrpheusEngine* engine = make_engine(setup_cosmic_techno, bpm);
+    OrpheusEngine* engine = make_engine(setup_fixture_baseline, bpm);
     engine->pulsar_genre_swing.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_energy.store(0.2f, std::memory_order_relaxed);  // outro territory

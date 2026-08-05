@@ -77,7 +77,7 @@ static OrpheusEngine* make_pulsar_engine() {
     // Configure and start Pulsar.
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
 

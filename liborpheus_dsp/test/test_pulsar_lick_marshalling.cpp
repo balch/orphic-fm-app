@@ -81,7 +81,7 @@ static bool test_bass_line_marshalling_roundtrip() {
     unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);  // pin RNG (avoid wall-clock re-stir)
 
     constexpr int kSteps = 21;
@@ -135,7 +135,7 @@ static bool test_bass_line_absent_is_inert() {
     unit.enabled = true;
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
     trigger_vibe_load(engine);
     unit_process_pulsar(&unit, engine, 64, 48000.0f);
@@ -158,7 +158,7 @@ static bool test_lick_marshalling_roundtrip() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);  // pin RNG (avoid wall-clock re-stir)
 
     constexpr int kSteps = 32;  // current cap; this test is meant to characterize N=32 exactly
@@ -226,7 +226,7 @@ static bool test_lick_marshalling_no_truncation() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
 
     constexpr int kSteps = 32;
@@ -294,7 +294,7 @@ static bool test_lick_marshalling_wrong_stride_detected() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
 
     constexpr int kSteps = 32;
@@ -371,7 +371,7 @@ static bool test_lick_marshalling_roundtrip_64() {
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);  // pin RNG (avoid wall-clock re-stir)
 
     constexpr int kSteps = 64;  // the raised cap; must be kMaxLickSteps to not truncate

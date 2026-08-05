@@ -126,13 +126,13 @@ static void push_two_section_ab_arrangement(OrpheusEngine* engine, int bars_per_
 // Every field is set explicitly at each call site (no reliance on engine defaults),
 // per the DSP-test house rules.
 struct WahCase {
-    // Cosmic Techno's own roles are the baseline: {PERC,PERC,PERC,MEL,MEL,MEL,PERC,MEL}.
+    // The baseline fixture's own roles: {PERC,PERC,PERC,MEL,MEL,MEL,PERC,MEL}.
     // NOTE this makes tracks 3,4,5,7 melodic, so the default eligible mask is 0xB0
     // (4,5,7 — track 3 is excluded by the kBassTrack clause), NOT just track 4. Tests
     // that want a single eligible lead must say so explicitly; see kOneLeadOnTrack4.
     int   roles[8]        = {0, 0, 0, 1, 1, 1, 0, 1};
     int   lick_sources[8] = {0, 0, 0, 0, 0, 0, 0, 0};   // 0 = LEAD, 1 = BASS
-    // Per-track pattern density, mirroring setup_cosmic_techno's own genre densities so
+    // Per-track pattern density, mirroring setup_fixture_baseline's own genre densities so
     // the default case is unchanged. Overridable because the shipped melodic densities
     // are sparse (track 4 = 0.30, track 6 = 0.15): across a 1-bar window that regularly
     // yields a silent measurement range, and "is the wah audible" cannot be measured on
@@ -142,7 +142,7 @@ struct WahCase {
     // genre densities for the melodic tracks are sparse, so a test that has to measure a
     // filtered lead raises its track here.
     float density[8]      = {0, 0, 0, 0, 0, 0, 0, 0};
-    // Engine + envelope per track, defaulted to setup_cosmic_techno's own values so an
+    // Engine + envelope per track, defaulted to setup_fixture_baseline's own values so an
     // untouched case renders exactly as before. Overridable because giving a track the
     // MELODIC role does not give it a melodic VOICE: track 6 ships as NSE with envelope
     // profile 2 and renders silent as a lead, and a wah on silence is unmeasurable.
@@ -221,12 +221,12 @@ static Trace run_case(const WahCase& c) {
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
 
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     for (int t = 0; t < 8; t++) {
         engine->pulsar_track_role[t].store(c.roles[t], std::memory_order_relaxed);
         engine->pulsar_track_lick_source[t].store(c.lick_sources[t], std::memory_order_relaxed);
         engine->pulsar_track_mute[t].store(0, std::memory_order_relaxed);
-        // After setup_cosmic_techno (which writes the genre densities) and before the
+        // After setup_fixture_baseline (which writes the genre densities) and before the
         // vibe load, which is when the patterns are actually generated.
         engine->pulsar_track_density_override[t].store(c.density[t], std::memory_order_relaxed);
         engine->pulsar_track_engine_edm[t].store(c.engine_edm[t], std::memory_order_relaxed);
@@ -237,7 +237,7 @@ static Trace run_case(const WahCase& c) {
     push_wah_bank(engine, c);
     push_lick_wah_bank(engine, c);
 
-    // solo AFTER setup_cosmic_techno (which writes the volumes) and BEFORE the vibe
+    // solo AFTER setup_fixture_baseline (which writes the volumes) and BEFORE the vibe
     // load: ts.volume is latched once inside load_vibe, not re-read per block.
     solo_track(engine, c.solo);
     engine->pulsar_energy.store(1.0f, std::memory_order_relaxed);      // pins tempo drift to 0
@@ -334,7 +334,7 @@ static bool all_finite(const std::vector<float>& v) {
 }
 
 // Role layout with exactly ONE eligible lead, on track 4. Needed whenever a test pins
-// the mask to a single bit: Cosmic Techno's stock roles make 3,4,5,7 melodic, so the
+// the mask to a single bit: the baseline fixture's stock roles make 3,4,5,7 melodic, so the
 // stock eligible mask is 0xB0. Track 3 stays melodic here on purpose, so these cases
 // still exercise the kBassTrack exclusion rather than sidestepping it.
 static const int kOneLeadOnTrack4[8] = {0, 0, 0, 1, 1, 0, 0, 0};
@@ -889,7 +889,7 @@ static bool test_per_track_wah_params_are_independent() {
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
 
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // No solo here: solo_track() zeroes the other volumes, and this case needs BOTH
     // wah'd tracks rendering at once.
     for (int t = 0; t < kNumPulsarTracks; t++) {

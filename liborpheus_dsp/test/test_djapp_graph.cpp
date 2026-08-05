@@ -11,10 +11,10 @@
 #include <cstring>
 #include <cmath>
 
-static void setup_pulsar_cosmic_techno(OrpheusEngine* engine) {
+static void setup_pulsar_baseline(OrpheusEngine* engine) {
     engine->pulsar_playing.store(1);
     engine->pulsar_mix.store(1.0f);
-    setup_cosmic_techno(engine);
+    setup_fixture_baseline(engine);
     // Pin a non-zero seed so pattern generation is reproducible. With pulsar_seed==0,
     // load_vibe() re-stirs the RNG from wall-clock microseconds, so the generated bar
     // (and thus the reverb/delay TAIL level on stop) varies run-to-run — the rms>0.0001
@@ -84,7 +84,7 @@ static bool test_djapp_pulsar_through_graph() {
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
     // Enable Pulsar with a known vibe
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
 
     // Horn bypass so we isolate pulsar output reaching master
     engine->horn_mix.store(0.0f);
@@ -115,7 +115,7 @@ static bool test_djapp_horn_active() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->reverb_bypass.store(1);
     engine->delay_bypass.store(1);
     engine->drive_mix.store(0.0f);
@@ -129,7 +129,7 @@ static bool test_djapp_horn_active() {
     engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->reverb_bypass.store(1);
     engine->delay_bypass.store(1);
     engine->drive_mix.store(0.0f);
@@ -165,7 +165,7 @@ static bool test_djapp_distortion_active() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->reverb_bypass.store(1);
     engine->delay_bypass.store(1);
@@ -183,7 +183,7 @@ static bool test_djapp_distortion_active() {
     engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->reverb_bypass.store(1);
     engine->delay_bypass.store(1);
@@ -216,7 +216,7 @@ static bool test_djapp_reverb_active() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->delay_bypass.store(1);
     engine->drive_mix.store(0.0f);
@@ -262,7 +262,7 @@ static bool test_djapp_delay_active() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->reverb_bypass.store(1);
     engine->drive_mix.store(0.0f);
@@ -406,7 +406,7 @@ static bool test_djapp_horn_doppler_lr() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-        setup_pulsar_cosmic_techno(engine);
+        setup_pulsar_baseline(engine);
         engine->reverb_bypass.store(1);
         engine->delay_bypass.store(1);
         engine->drive_mix.store(0.0f);
@@ -504,7 +504,7 @@ static bool test_djapp_full_chain() {
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
     // Everything on
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
 
     engine->horn_mix.store(0.6f);
     engine->horn_speed.store(0.5f);
@@ -567,7 +567,7 @@ static bool test_djapp_drive_sweep() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-        setup_pulsar_cosmic_techno(engine);
+        setup_pulsar_baseline(engine);
         engine->horn_mix.store(0.0f);
         engine->reverb_bypass.store(1);
 
@@ -630,7 +630,7 @@ static bool test_djapp_distortion_mix() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-        setup_pulsar_cosmic_techno(engine);
+        setup_pulsar_baseline(engine);
         engine->horn_mix.store(0.0f);
         engine->reverb_bypass.store(1);
 
@@ -675,7 +675,7 @@ static bool test_djapp_distortion_mix() {
         // Render with mix=0
         OrpheusEngine* e0 = orpheus_engine_create(48000.0f);
         if (!load_dj_graph(e0)) { orpheus_engine_destroy(e0); return false; }
-        setup_pulsar_cosmic_techno(e0);
+        setup_pulsar_baseline(e0);
         e0->horn_mix.store(0.0f);
         e0->reverb_bypass.store(1);
         e0->delay_bypass.store(1);
@@ -692,7 +692,7 @@ static bool test_djapp_distortion_mix() {
         // Render with mix=1
         OrpheusEngine* e1 = orpheus_engine_create(48000.0f);
         if (!load_dj_graph(e1)) { orpheus_engine_destroy(e1); return false; }
-        setup_pulsar_cosmic_techno(e1);
+        setup_pulsar_baseline(e1);
         e1->horn_mix.store(0.0f);
         e1->reverb_bypass.store(1);
         e1->delay_bypass.store(1);
@@ -841,7 +841,7 @@ static bool test_djapp_pulsar_dedicated_delay() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->drive_mix.store(0.0f);
 
@@ -890,7 +890,7 @@ static bool test_djapp_pulsar_dedicated_reverb() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->drive_mix.store(0.0f);
 
@@ -938,7 +938,7 @@ static bool test_djapp_pulsar_effects_independent() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->drive_mix.store(0.0f);
 
@@ -968,7 +968,7 @@ static bool test_djapp_pulsar_effects_independent() {
     engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->drive_mix.store(0.0f);
     engine->reverb_bypass.store(1);
@@ -1001,7 +1001,7 @@ static bool test_djapp_pulsar_zero_sends() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
 
-    setup_pulsar_cosmic_techno(engine);
+    setup_pulsar_baseline(engine);
     engine->horn_mix.store(0.0f);
     engine->drive_mix.store(0.0f);
 
@@ -1052,7 +1052,7 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
     OrpheusEngine* e_delay = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(e_delay)) { orpheus_engine_destroy(e_delay); return false; }
 
-    setup_pulsar_cosmic_techno(e_delay);
+    setup_pulsar_baseline(e_delay);
     e_delay->horn_mix.store(0.0f);
     e_delay->drive_mix.store(0.0f);
     e_delay->reverb_bypass.store(1);
@@ -1074,7 +1074,7 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
     OrpheusEngine* e_reverb = orpheus_engine_create(48000.0f);
     if (!load_dj_graph(e_reverb)) { orpheus_engine_destroy(e_reverb); return false; }
 
-    setup_pulsar_cosmic_techno(e_reverb);
+    setup_pulsar_baseline(e_reverb);
     e_reverb->horn_mix.store(0.0f);
     e_reverb->drive_mix.store(0.0f);
     e_reverb->reverb_bypass.store(1);

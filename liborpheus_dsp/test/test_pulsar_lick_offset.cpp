@@ -37,10 +37,10 @@ static OrpheusEngine* make_offset_engine() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
-    setup_cosmic_techno(engine);   // root D(2), scale 0 = minor [0,2,3,5,7,8,10]
+    setup_fixture_baseline(engine);   // root D(2), scale 0 = minor [0,2,3,5,7,8,10]
     engine->pulsar_seed.store(424242, std::memory_order_relaxed);
     engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);  // deterministic render
-    // Tracks 4, 5, 7 are MELODIC in cosmic_techno; give them all the FILL lick.
+    // Tracks 4, 5, 7 are MELODIC in the baseline fixture; give them all the FILL lick.
     engine->pulsar_track_lick_mode[4].store(2, std::memory_order_relaxed);  // FILL, offset 0 (lead)
     engine->pulsar_track_lick_mode[5].store(2, std::memory_order_relaxed);  // FILL, offset +2
     engine->pulsar_track_lick_mode[7].store(2, std::memory_order_relaxed);  // FILL, offset -3

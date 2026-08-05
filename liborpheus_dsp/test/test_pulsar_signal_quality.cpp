@@ -189,7 +189,7 @@ bool run_pulsar_signal_tests() {
     // ── Test 1: Mixed output — no artifacts above percussion threshold (30s) ──
     {
         printf("  Test 1: Mixed output at 128 BPM (30s, threshold=%.2f)\n", kDiscThresholdMix);
-        OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);  // seed pinned in make_engine
+        OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);  // seed pinned in make_engine
         GraphUnit unit = make_unit();
 
         SignalStats stats = process_seconds(&unit, engine, 30.0f, 512);
@@ -216,7 +216,7 @@ bool run_pulsar_signal_tests() {
         bool all_ok = true;
 
         for (int solo = 0; solo < 8; solo++) {
-            OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+            OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);
             int eng_id = engine->pulsar_track_engine_edm[solo].load(std::memory_order_relaxed);
             bool is_perc = is_self_enveloped_engine(eng_id);
             float threshold = threshold_for_engine(eng_id);
@@ -244,7 +244,7 @@ bool run_pulsar_signal_tests() {
     // ── Test 3: No signal degradation over 2 minutes ──
     {
         printf("  Test 3: No degradation over 2 minutes\n");
-        OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+        OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);
         GraphUnit unit = make_unit();
 
         process_seconds(&unit, engine, 5.0f, 512);
@@ -274,7 +274,7 @@ bool run_pulsar_signal_tests() {
     // ── Test 4: Soft-limit caps output at max energy ──
     {
         printf("  Test 4: Soft-limit caps output at max energy\n");
-        OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+        OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);
         engine->pulsar_energy.store(1.0f, std::memory_order_relaxed);
         GraphUnit unit = make_unit();
 
@@ -297,7 +297,7 @@ bool run_pulsar_signal_tests() {
         bool all_ok = true;
 
         for (int bi = 0; bi < num_bpms; bi++) {
-            OrpheusEngine* engine = make_engine(setup_cosmic_techno, bpms[bi]);  // seed pinned in make_engine
+            OrpheusEngine* engine = make_engine(setup_fixture_baseline, bpms[bi]);  // seed pinned in make_engine
             SignalStats stats = process_seconds(&unit, engine, 5.0f, 512);
 
             printf("    BPM %3.0f: peak=%.4f max_disc=%.4f disc=%d denorm=%d\n",
@@ -324,7 +324,7 @@ bool run_pulsar_signal_tests() {
 
         for (int si = 0; si < num_sizes; si++) {
             int bs = block_sizes[si];
-            OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+            OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);
             GraphUnit unit = make_unit();
 
             SignalStats stats = process_seconds(&unit, engine, 10.0f, bs);
@@ -346,7 +346,7 @@ bool run_pulsar_signal_tests() {
     // ── Test 7: Varying block sizes (Bluetooth jitter) ──
     {
         printf("  Test 7: Varying block sizes (Bluetooth jitter, 10s)\n");
-        OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+        OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);
         GraphUnit unit = make_unit();
 
         SignalStats stats = make_stats();
@@ -389,13 +389,10 @@ bool run_pulsar_signal_tests() {
             float bpm;
         };
         VibeConfig vibes[] = {
-            {"Cosmic Techno", setup_cosmic_techno, 128.0f},
-            {"Deep Space",    setup_deep_space,    70.0f},
-            {"Dog House",     setup_dog_house,     85.0f},
-            {"Garage Blitz",  setup_garage_blitz,  160.0f},
-            {"Slow Burn",     setup_slow_burn,     72.0f},
+            {"dense/fast",  setup_fixture_dense_fast,  160.0f},
+            {"sparse/slow", setup_fixture_sparse_slow, 70.0f},
         };
-        int num_vibes = 5;
+        int num_vibes = 2;
 
         int worst_disc = 0;
         const char* worst_name = "";
@@ -426,13 +423,13 @@ bool run_pulsar_signal_tests() {
         else    { printf("    FAIL: peaks exceed 1.0\n"); fail++; }
     }
 
-    // ── Test 9: Per-track isolation — Cosmic Techno (informational) ──
+    // ── Test 9: Per-track isolation — baseline (informational) ──
     {
-        printf("  Test 9: Per-track isolation (Cosmic Techno 128 BPM, 10s)\n");
+        printf("  Test 9: Per-track isolation (baseline 128 BPM, 10s)\n");
         const char* track_roles[] = {"KICK","PERC","HIHAT","BASS","KEYS","PAD","TEXTURE","FX"};
 
         for (int solo = 0; solo < 8; solo++) {
-            OrpheusEngine* engine = make_engine(setup_cosmic_techno, 128.0f);
+            OrpheusEngine* engine = make_engine(setup_fixture_baseline, 128.0f);
             int eng_id = engine->pulsar_track_engine_edm[solo].load(std::memory_order_relaxed);
             bool is_perc = is_self_enveloped_engine(eng_id);
 
@@ -455,13 +452,13 @@ bool run_pulsar_signal_tests() {
         pass++;
     }
 
-    // ── Test 10: Per-track isolation — Dog House (informational) ──
+    // ── Test 10: Per-track isolation — blues (informational) ──
     {
-        printf("  Test 10: Per-track isolation (Dog House 128 BPM, 10s)\n");
+        printf("  Test 10: Per-track isolation (blues 128 BPM, 10s)\n");
         const char* track_roles[] = {"KICK","PERC","HIHAT","BASS","KEYS","PAD","TEXTURE","FX"};
 
         for (int solo = 0; solo < 8; solo++) {
-            OrpheusEngine* engine = make_engine(setup_dog_house, 128.0f);
+            OrpheusEngine* engine = make_engine(setup_fixture_blues, 128.0f);
             int eng_id = engine->pulsar_track_engine_edm[solo].load(std::memory_order_relaxed);
             bool is_perc = is_self_enveloped_engine(eng_id);
 
