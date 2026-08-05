@@ -34,7 +34,7 @@ kotlin {
 val eurorackDir = File(System.getProperty("user.home"), "Source/eurorack").absolutePath
 val emsdkDir = File(System.getProperty("user.home"), "emsdk")
 
-val buildWasmNative by tasks.registering(Exec::class) {
+val buildWasmNative = tasks.register<Exec>("buildWasmNative") {
     group = "build"
     description = "Build orpheus_dsp WASM module via Emscripten"
 
@@ -50,7 +50,7 @@ val buildWasmNative by tasks.registering(Exec::class) {
     )
 }
 
-val copyWasmDsp by tasks.registering(Copy::class) {
+val copyWasmDsp = tasks.register<Copy>("copyWasmDsp") {
     dependsOn(buildWasmNative)
     from("${rootProject.projectDir}/liborpheus_dsp/platform/wasm/build") {
         include("orpheus_dsp.js", "orpheus_dsp.wasm")

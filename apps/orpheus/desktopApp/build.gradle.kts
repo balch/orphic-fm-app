@@ -61,7 +61,7 @@ compose.desktop {
 // Native C++ DSP build (relocated from the shared module)
 val eurorackDir = File(System.getProperty("user.home"), "Source/eurorack").absolutePath
 
-val buildDesktopNative by tasks.registering(Exec::class) {
+val buildDesktopNative = tasks.register<Exec>("buildDesktopNative") {
     group = "build"
     description = "Build liborpheus_desktop native library for JVM desktop"
 

@@ -25,16 +25,12 @@ kotlin {
             // Coroutines (MidiController, MidiMappingStateHolder)
             implementation(libs.kotlinx.coroutines.core)
         }
-        val jvmMain by getting {
-            dependencies {
-                implementation(libs.ktmidi.jvm.desktop)
-                implementation(libs.coremidi4j)
-            }
+        jvmMain.dependencies {
+            implementation(libs.ktmidi.jvm.desktop)
+            implementation(libs.coremidi4j)
         }
-        val wasmJsMain by getting {
-            dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
-            }
+        wasmJsMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3")
         }
     }
 }

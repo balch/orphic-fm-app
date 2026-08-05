@@ -43,15 +43,11 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlinx.serialization.json)
         }
-        val jvmMain by getting {
-            dependencies {
-                implementation(libs.kotlinx.coroutines.core)
-            }
+        jvmMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
         }
-        val androidMain by getting {
-            dependencies {
-                implementation(libs.kotlinx.coroutines.core)
-            }
+        androidMain.dependencies {
+            implementation(libs.kotlinx.coroutines.core)
         }
     }
 }

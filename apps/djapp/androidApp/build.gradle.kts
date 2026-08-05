@@ -62,7 +62,7 @@ androidComponents {
     }
 }
 
-val verifyOgHasNoInternet by tasks.registering {
+val verifyOgHasNoInternet = tasks.register("verifyOgHasNoInternet") {
     group = "verification"
     description = "Fails if the OG edition's merged manifest requests android.permission.INTERNET."
 
