@@ -122,6 +122,24 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         gate_out,               // output: bool gate[size * kNumTChannels]
         static_cast<size_t>(num_frames));
 
+    // ── Step 4b: Pin the ramps to [0, 1) before anything reads them as phase ──
+    // OutputChannel feeds the ramp straight into LagProcessor::Process, which does
+    // Interpolate(lut_raised_cosine, phase, 256.0f). That reads BOTH table[idx] and
+    // table[idx + 1] with idx = phase * 256, and lut_raised_cosine holds 257 floats
+    // — so phase must stay strictly below 1.0 or table[257] reads off the end.
+    // TGenerator can land exactly on 1.0, which ASAN catches as a
+    // global-buffer-overflow. The !(v > 0) form also folds NaN to 0, since a NaN
+    // phase would make the static_cast<int32_t> in Interpolate undefined.
+    constexpr float kMaxRamp = 0.99999994f;  // largest float strictly below 1.0f
+    float* ramp_buffers[] = {
+        ramps.external, ramps.master, ramps.slave[0], ramps.slave[1]};
+    for (float* buf : ramp_buffers) {
+        for (int i = 0; i < num_frames; i++) {
+            if (!(buf[i] > 0.0f)) buf[i] = 0.0f;
+            else if (buf[i] >= 1.0f) buf[i] = kMaxRamp;
+        }
+    }
+
     // ── Step 5: Read XYGenerator parameters ──
     float x_spread = engine->marbles_x_spread.load(std::memory_order_relaxed);
     float x_bias = engine->marbles_x_bias.load(std::memory_order_relaxed);
