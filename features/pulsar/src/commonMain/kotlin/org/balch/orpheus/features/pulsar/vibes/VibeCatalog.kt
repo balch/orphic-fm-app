@@ -140,6 +140,9 @@ object VibeCatalog {
         "Vanished Skyline" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Kaleidoscope Drift" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "opus 4.8", "drone", "void")),
         "Ouroboros Bloom" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "sonnet 5", "drone", "void")),
+        "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        "Natalis Shimmer" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        "Bricklayer's Lament" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
     )
 
     /**
