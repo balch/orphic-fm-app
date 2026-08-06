@@ -1,6 +1,31 @@
 rootProject.name = "Orpheus"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
+// ── local.properties bootstrap ────────────────────────────────────────────────
+// The Android Gradle Plugin needs sdk.dir, and local.properties is gitignored, so it never
+// travels to a new worktree or a fresh clone. Its absence breaks EVERY Gradle task, not
+// just Android ones — :apps:djapp:androidApp is configured before task selection, so even
+// :features:pulsar:jvmTest dies with "SDK location not found". Deriving the path is
+// strictly better than making each checkout hand-copy the file.
+//
+// Only sdk.dir is written. An org.gradle.java.home line used to ride along in this file
+// and is inert: Gradle reads that key from gradle.properties, never from local.properties.
+val localPropsFile = file("local.properties")
+if (!localPropsFile.exists()) {
+    val home = System.getProperty("user.home")
+    val sdkDir = System.getenv("ANDROID_HOME")
+        ?: System.getenv("ANDROID_SDK_ROOT")
+        ?: listOf("$home/Library/Android/sdk", "$home/Android/Sdk")  // macOS, Linux
+            .firstOrNull { File(it).isDirectory }
+    if (sdkDir != null) {
+        localPropsFile.writeText("sdk.dir=$sdkDir\n")
+        logger.lifecycle("Generated local.properties with sdk.dir=$sdkDir")
+    }
+    // No SDK found: fall through deliberately. AGP's own "SDK location not found" error
+    // already names both the file and ANDROID_HOME, so inventing a second message here
+    // would only add a place for the two to disagree.
+}
+
 pluginManagement {
     includeBuild("build-logic/convention")
     repositories {
