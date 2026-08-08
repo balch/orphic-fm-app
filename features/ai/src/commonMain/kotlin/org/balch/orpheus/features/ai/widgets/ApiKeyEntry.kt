@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.proportional
 
 /**
  * Compact API key entry for the AiOptionsPanel.
@@ -73,7 +75,7 @@ fun ApiKeyEntryCompact(
     ) {
         Text(
             text = "🔑 Enter API Key",
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelMedium.proportional(),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             color = OrpheusColors.metallicBlue
@@ -146,7 +148,9 @@ fun ApiKeyEntryCompact(
                     containerColor = OrpheusColors.metallicBlue,
                     contentColor = OrpheusColors.sterlingSilver
                 ),
-                modifier = Modifier.height(32.dp)
+                // heightIn, not height: 32.dp is under ButtonDefaults.MinHeight, and a hard
+                // dp height cannot contain sp text once the user raises their font scale.
+                modifier = Modifier.heightIn(min = 32.dp)
             ) {
                 Text("Save", fontSize = 12.sp)
             }

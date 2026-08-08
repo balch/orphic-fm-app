@@ -42,6 +42,7 @@ import org.balch.orpheus.features.draw.DrawSequencerUiState
 import org.balch.orpheus.features.draw.SequencerPath
 import org.balch.orpheus.features.draw.SequencerPoint
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.CompactSecondsSlider
 
 /**
@@ -354,58 +355,61 @@ fun ExpandedDrawSequencerScreen(
 }
 
 @Preview(widthDp = 800, heightDp = 600)
+@Preview(widthDp = 800, heightDp = 600, name = "140%", fontScale = 1.4f)
 @Composable
 private fun ExpandedTweakSequencerScreenPreview() {
-    val samplePath = SequencerPath(
-        points = listOf(
-            SequencerPoint(0f, 0.5f),
-            SequencerPoint(0.3f, 0.8f),
-            SequencerPoint(0.6f, 0.2f),
-            SequencerPoint(1f, 0.6f)
-        ),
-        isComplete = true
-    )
-    
-    // We can use the PREVIEW mapper from the ViewModel
-    // but here we manually construct one to show the path data which is specific to this preview
-    val previewState = DrawSequencerUiState(
-        sequencer = DrawSequencerState(
-            config = DrawSequencerConfig(
-                enabled = true,
-                durationSeconds = 45f,
-                selectedParameters = listOf(
-                    DrawSequencerParameter.LFO_FREQ_A,
-                    DrawSequencerParameter.DELAY_TIME_1,
-                    DrawSequencerParameter.DIST_DRIVE
-                )
+    OrpheusTheme {
+        val samplePath = SequencerPath(
+            points = listOf(
+                SequencerPoint(0f, 0.5f),
+                SequencerPoint(0.3f, 0.8f),
+                SequencerPoint(0.6f, 0.2f),
+                SequencerPoint(1f, 0.6f)
             ),
-            paths = mapOf(
-                DrawSequencerParameter.LFO_FREQ_A to samplePath,
-                DrawSequencerParameter.DELAY_TIME_1 to SequencerPath(),
-                DrawSequencerParameter.DIST_DRIVE to SequencerPath()
-            ),
-            currentPosition = 0.4f
-        ),
-        activeParameter = DrawSequencerParameter.LFO_FREQ_A
-    )
+            isComplete = true
+        )
     
-    val previewActions = DrawSequencerPanelActions(
-        onPlay = {}, onPause = {}, onStop = {}, onTogglePlayPause = {},
-        onStartPath = { _, _ -> }, onAddPoint = { _, _ -> }, onRemovePointsAfter = { _, _ -> },
-        onClearPath = {}, onCompletePath = { _, _ -> },
-        onAddParameter = {}, onRemoveParameter = {}, onSelectActiveParameter = {},
-        onSetDuration = {}, onSetPlaybackMode = {}, onSetEnabled = {},
-        onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
-    )
+        // We can use the PREVIEW mapper from the ViewModel
+        // but here we manually construct one to show the path data which is specific to this preview
+        val previewState = DrawSequencerUiState(
+            sequencer = DrawSequencerState(
+                config = DrawSequencerConfig(
+                    enabled = true,
+                    durationSeconds = 45f,
+                    selectedParameters = listOf(
+                        DrawSequencerParameter.LFO_FREQ_A,
+                        DrawSequencerParameter.DELAY_TIME_1,
+                        DrawSequencerParameter.DIST_DRIVE
+                    )
+                ),
+                paths = mapOf(
+                    DrawSequencerParameter.LFO_FREQ_A to samplePath,
+                    DrawSequencerParameter.DELAY_TIME_1 to SequencerPath(),
+                    DrawSequencerParameter.DIST_DRIVE to SequencerPath()
+                ),
+                currentPosition = 0.4f
+            ),
+            activeParameter = DrawSequencerParameter.LFO_FREQ_A
+        )
+    
+        val previewActions = DrawSequencerPanelActions(
+            onPlay = {}, onPause = {}, onStop = {}, onTogglePlayPause = {},
+            onStartPath = { _, _ -> }, onAddPoint = { _, _ -> }, onRemovePointsAfter = { _, _ -> },
+            onClearPath = {}, onCompletePath = { _, _ -> },
+            onAddParameter = {}, onRemoveParameter = {}, onSelectActiveParameter = {},
+            onSetDuration = {}, onSetPlaybackMode = {}, onSetEnabled = {},
+            onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
+        )
 
-    val previewFeature = object : DrawSequencerFeature {
-        override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(previewState)
-        override val actions = previewActions
+        val previewFeature = object : DrawSequencerFeature {
+            override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(previewState)
+            override val actions = previewActions
+        }
+
+        ExpandedDrawSequencerScreen(
+            sequencerFeature = previewFeature,
+            onDismiss = {},
+            modifier = Modifier.fillMaxSize().padding(16.dp)
+        )
     }
-
-    ExpandedDrawSequencerScreen(
-        sequencerFeature = previewFeature,
-        onDismiss = {},
-        modifier = Modifier.fillMaxSize().padding(16.dp)
-    )
 }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.TidesSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
@@ -220,11 +221,14 @@ fun TidesPanel(
 
 @Suppress("StateFlowValueCalledInComposition")
 @Preview(widthDp = 500, heightDp = 280)
+@Preview(widthDp = 500, heightDp = 280, name = "140%", fontScale = 1.4f)
 @Composable
 private fun TidesPanelPreview() {
-    TidesPanel(
-        tides = TidesViewModel.previewFeature(),
-        isExpanded = true,
-        showCollapsedHeader = false
-    )
+    OrpheusTheme {
+        TidesPanel(
+            tides = TidesViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false
+        )
+    }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 
 /**
  * A compact button that cycles through a list of values when clicked.
@@ -72,7 +73,7 @@ fun <T> ValueCycleButton(
         ) {
             Text(
                 text = labelProvider(value),
-                style = MaterialTheme.typography.labelSmall.copy(
+                style = MaterialTheme.typography.labelSmall.proportional().copy(
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center

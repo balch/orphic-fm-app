@@ -45,6 +45,7 @@ import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.PI
@@ -611,7 +612,7 @@ private fun BrakeToggle(
     ) {
         Text(
             text = "BRAKE",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.proportional(),
             color = CrimsonHorn.copy(alpha = 0.7f),
             fontSize = 9.sp,
             fontWeight = FontWeight.Medium,
@@ -688,26 +689,6 @@ fun HornPanelBrakeEngagedPreview() {
 
                     mix = 0.75f,
                     brake = true,
-                )
-            ),
-            isExpanded = true,
-        )
-    }
-}
-
-@Preview(name = "Horn Panel — Full Speed", widthDp = 400, heightDp = 500)
-@Composable
-fun HornPanelFullSpeedPreview() {
-    OrpheusTheme {
-        HornPanel(
-            feature = HornViewModel.previewFeature(
-                HornUiState(
-                    speed = 1.0f,
-                    ratio = 0.5f,
-                    depth = 1.0f,
-
-                    mix = 1.0f,
-                    brake = false,
                 )
             ),
             isExpanded = true,

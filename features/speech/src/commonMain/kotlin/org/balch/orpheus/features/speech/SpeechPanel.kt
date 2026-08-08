@@ -78,6 +78,7 @@ import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusAssets
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.PI
@@ -703,49 +704,58 @@ private fun VoiceSelector(
 }
 
 @Preview(widthDp = 400, heightDp = 380)
+@Preview(widthDp = 400, heightDp = 380, name = "140%", fontScale = 1.4f)
 @Composable
 fun SpeechPanelPreview() {
-    SpeechPanel(
-        isExpanded = true,
-        feature = SpeechViewModel.previewFeature(
-            SpeechUiState(
-                textInput = "one of these days",
-                speechText = "One of these days I'm going to cut you a piece of ice cream cake",
-                isSpeaking = true,
-                availableVoices = listOf("Samantha", "Alex", "Daniel"),
-                selectedVoice = "Samantha",
+    OrpheusTheme {
+        SpeechPanel(
+            isExpanded = true,
+            feature = SpeechViewModel.previewFeature(
+                SpeechUiState(
+                    textInput = "one of these days",
+                    speechText = "One of these days I'm going to cut you a piece of ice cream cake",
+                    isSpeaking = true,
+                    availableVoices = listOf("Samantha", "Alex", "Daniel"),
+                    selectedVoice = "Samantha",
+                )
             )
         )
-    )
+    }
 }
 
 @Preview(widthDp = 400, heightDp = 380)
+@Preview(widthDp = 400, heightDp = 380, name = "140%", fontScale = 1.4f)
 @Composable
 fun SpeechPanelIdlePreview() {
-    SpeechPanel(
-        isExpanded = true,
-        feature = SpeechViewModel.previewFeature(
-            SpeechUiState(
-                textInput = "hello world",
-                availableVoices = listOf("Samantha", "Alex"),
-                selectedVoice = "Samantha",
+    OrpheusTheme {
+        SpeechPanel(
+            isExpanded = true,
+            feature = SpeechViewModel.previewFeature(
+                SpeechUiState(
+                    textInput = "hello world",
+                    availableVoices = listOf("Samantha", "Alex"),
+                    selectedVoice = "Samantha",
+                )
             )
         )
-    )
+    }
 }
 
 @Preview(widthDp = 400, heightDp = 380)
+@Preview(widthDp = 400, heightDp = 380, name = "140%", fontScale = 1.4f)
 @Composable
 fun SpeechPanelGeneratingPreview() {
-    SpeechPanel(
-        isExpanded = true,
-        feature = SpeechViewModel.previewFeature(
-            SpeechUiState(
-                textInput = "synthesize me",
-                isGenerating = true,
-                availableVoices = listOf("Samantha"),
-                selectedVoice = "Samantha",
+    OrpheusTheme {
+        SpeechPanel(
+            isExpanded = true,
+            feature = SpeechViewModel.previewFeature(
+                SpeechUiState(
+                    textInput = "synthesize me",
+                    isGenerating = true,
+                    availableVoices = listOf("Samantha"),
+                    selectedVoice = "Samantha",
+                )
             )
         )
-    )
+    }
 }

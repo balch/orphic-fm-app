@@ -51,6 +51,7 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
 import kotlin.random.Random
 
@@ -554,49 +555,55 @@ fun PulsarStepGrid(
 
 @Suppress("MagicNumber")
 @Preview(widthDp = 500, heightDp = 120)
+@Preview(widthDp = 500, heightDp = 120, name = "140%", fontScale = 1.4f)
 @Composable
 private fun PulsarStepGridPreview() {
-    // Sample "Cosmic Techno" data
-    val gates = Array(NUM_TRACKS) { BooleanArray(MAX_STEPS) }
-    val velocities = Array(NUM_TRACKS) { FloatArray(MAX_STEPS) }
-    val stepCounts = intArrayOf(16, 16, 16, 16, 16, 16, 16, 16)
+    OrpheusTheme {
+        // Sample "Cosmic Techno" data
+        val gates = Array(NUM_TRACKS) { BooleanArray(MAX_STEPS) }
+        val velocities = Array(NUM_TRACKS) { FloatArray(MAX_STEPS) }
+        val stepCounts = intArrayOf(16, 16, 16, 16, 16, 16, 16, 16)
 
-    // Kick: four-on-the-floor
-    for (i in listOf(0, 4, 8, 12)) { gates[0][i] = true; velocities[0][i] = 0.9f }
-    // Perc: offbeat
-    for (i in listOf(2, 6, 10, 14)) { gates[1][i] = true; velocities[1][i] = 0.6f }
-    // HiHat: 8ths
-    for (i in listOf(0, 2, 4, 6, 8, 10, 12, 14)) { gates[2][i] = true; velocities[2][i] = 0.5f }
-    // Bass: syncopated
-    for (i in listOf(0, 3, 6, 10, 13)) { gates[3][i] = true; velocities[3][i] = 0.8f }
-    // Keys: chords
-    for (i in listOf(0, 8)) { gates[4][i] = true; velocities[4][i] = 0.5f }
-    // Pad: sparse
-    for (i in listOf(0, 8)) { gates[5][i] = true; velocities[5][i] = 0.4f }
-    // Texture: scattered
-    for (i in listOf(1, 5, 9, 11, 15)) { gates[6][i] = true; velocities[6][i] = 0.7f }
-    // FX: accents
-    for (i in listOf(3, 7, 11, 15)) { gates[7][i] = true; velocities[7][i] = 0.6f }
+        // Kick: four-on-the-floor
+        for (i in listOf(0, 4, 8, 12)) { gates[0][i] = true; velocities[0][i] = 0.9f }
+        // Perc: offbeat
+        for (i in listOf(2, 6, 10, 14)) { gates[1][i] = true; velocities[1][i] = 0.6f }
+        // HiHat: 8ths
+        for (i in listOf(0, 2, 4, 6, 8, 10, 12, 14)) { gates[2][i] = true; velocities[2][i] = 0.5f }
+        // Bass: syncopated
+        for (i in listOf(0, 3, 6, 10, 13)) { gates[3][i] = true; velocities[3][i] = 0.8f }
+        // Keys: chords
+        for (i in listOf(0, 8)) { gates[4][i] = true; velocities[4][i] = 0.5f }
+        // Pad: sparse
+        for (i in listOf(0, 8)) { gates[5][i] = true; velocities[5][i] = 0.4f }
+        // Texture: scattered
+        for (i in listOf(1, 5, 9, 11, 15)) { gates[6][i] = true; velocities[6][i] = 0.7f }
+        // FX: accents
+        for (i in listOf(3, 7, 11, 15)) { gates[7][i] = true; velocities[7][i] = 0.6f }
 
-    PulsarStepGrid(
-        vizData = PulsarVizData(
-            stepGates = gates,
-            stepVelocities = velocities,
-            playheads = intArrayOf(4, 4, 4, 4, 4, 4, 4, 4),
-            stepCounts = stepCounts,
-        ),
-        energy = 0.7f,
-        space = 0.4f,
-        complexity = 0.5f,
-        mood = 0.6f,
-    )
+        PulsarStepGrid(
+            vizData = PulsarVizData(
+                stepGates = gates,
+                stepVelocities = velocities,
+                playheads = intArrayOf(4, 4, 4, 4, 4, 4, 4, 4),
+                stepCounts = stepCounts,
+            ),
+            energy = 0.7f,
+            space = 0.4f,
+            complexity = 0.5f,
+            mood = 0.6f,
+        )
+    }
 }
 
 @Preview(name = "Idle (startup)", widthDp = 400, heightDp = 120)
+@Preview(name = "Idle (startup) 140%", widthDp = 400, heightDp = 120, fontScale = 1.4f)
 @Composable
 private fun PulsarStepGridIdlePreview() {
-    // Default PulsarVizData — no gates, playheads at -1
-    PulsarStepGrid(
-        vizData = PulsarVizData(),
-    )
+    OrpheusTheme {
+        // Default PulsarVizData — no gates, playheads at -1
+        PulsarStepGrid(
+            vizData = PulsarVizData(),
+        )
+    }
 }

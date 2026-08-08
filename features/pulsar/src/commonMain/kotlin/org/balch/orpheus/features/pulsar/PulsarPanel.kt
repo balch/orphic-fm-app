@@ -50,7 +50,9 @@ import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
+import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.EnumDropdown
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
@@ -158,7 +160,7 @@ fun PulsarPanel(
             ) {
                 Text(
                     text = "ENV",
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.proportional(),
                     color = OrpheusColors.cosmicPurple.lighten(),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Medium,
@@ -388,7 +390,7 @@ fun PulsarPanel(
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelSmall.proportional(),
                     maxLines = 1,
                 )
                 Box(
@@ -485,29 +487,35 @@ fun PulsarPanel(
 
 @Suppress("StateFlowValueCalledInComposition")
 @Preview(widthDp = 500, heightDp = 420)
+@Preview(widthDp = 500, heightDp = 420, name = "140%", fontScale = 1.4f)
 @Composable
 private fun PulsarPanelPreview() {
-    PulsarPanel(
-        pulsar = PulsarViewModel.previewFeature(),
-        isExpanded = true,
-        showCollapsedHeader = false,
-    )
+    OrpheusTheme {
+        PulsarPanel(
+            pulsar = PulsarViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false,
+        )
+    }
 }
 
 @Suppress("StateFlowValueCalledInComposition")
 @Preview(widthDp = 500, heightDp = 420)
+@Preview(widthDp = 500, heightDp = 420, name = "140%", fontScale = 1.4f)
 @Composable
 private fun PulsarPanelWithSelectionPreview() {
-    val preview = PulsarViewModel.previewFeature()
-    PulsarPanel(
-        pulsar = PulsarViewModel.previewFeature(
-            PulsarUiState(
-                selectedTrack = 2,
-                mix = 0.8f,
-                vibe = preview.vibeList.first()
-            )
-        ),
-        isExpanded = true,
-        showCollapsedHeader = false,
-    )
+    OrpheusTheme {
+        val preview = PulsarViewModel.previewFeature()
+        PulsarPanel(
+            pulsar = PulsarViewModel.previewFeature(
+                PulsarUiState(
+                    selectedTrack = 2,
+                    mix = 0.8f,
+                    vibe = preview.vibeList.first()
+                )
+            ),
+            isExpanded = true,
+            showCollapsedHeader = false,
+        )
+    }
 }

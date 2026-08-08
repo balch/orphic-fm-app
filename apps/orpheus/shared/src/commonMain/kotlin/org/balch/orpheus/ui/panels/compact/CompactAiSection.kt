@@ -22,6 +22,7 @@ import org.balch.orpheus.features.ai.chat.ChatViewModel
 import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.widgets.AiMode
 import org.balch.orpheus.features.ai.widgets.AiModeSelector
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 /**
  * Compact AI section for mobile portrait layout.
@@ -150,13 +151,16 @@ fun CompactAiSectionLayout(
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 fun CompactAiSectionPreview() {
-    CompactAiSectionLayout(
-        aiOptionsState = AiOptionsUiState(),
-        aiOptionsActions = AiOptionsPanelActions.EMPTY,
-        chatState = ChatUiState(),
-        chatActions = ChatPanelActions.EMPTY,
-        onShowRepl = {}
-    )
+    OrpheusTheme {
+        CompactAiSectionLayout(
+            aiOptionsState = AiOptionsUiState(),
+            aiOptionsActions = AiOptionsPanelActions.EMPTY,
+            chatState = ChatUiState(),
+            chatActions = ChatPanelActions.EMPTY,
+            onShowRepl = {}
+        )
+    }
 }

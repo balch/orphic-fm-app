@@ -5,6 +5,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.unit.em
 
 // Synth-inspired color palette
 private val NeonCyan = Color(0xFF00F5FF)
@@ -68,6 +71,35 @@ private val LightColorScheme = lightColorScheme(
     onSurface = OrpheusColors.onBackgroundLight,
 )
 
+/**
+ * The app theme, and the wrapper every `@Preview` should use.
+ *
+ * This is a thin `MaterialTheme` wrapper -- no DI, no platform state -- so it is safe to call
+ * from a preview, and a preview that skips it is actively misleading. It does not merely lose
+ * its colors: it renders under different text metrics than the app. `MaterialTheme` ends in
+ * `ProvideTextStyle(typography.bodyLarge)`, which this theme pins to a proportional line box
+ * (see [proportional]); unthemed, `LocalTextStyle` is `TextStyle.Default` and the box falls
+ * back to the font's natural ascent+descent with no trimming.
+ *
+ * **Font scaling belongs on the annotation, not in a wrapper.** `sp` text inside a fixed `dp`
+ * container has a scale ceiling -- a 12.sp label in a `Modifier.height(32.dp)` button clips
+ * above ~1.14, a 9.sp glyph in a `Modifier.size(12.dp)` badge above ~1.09 -- and both of those
+ * shipped, because previews render at 1.0. Pair every `@Preview` with a second one carrying
+ * `fontScale = 1.4f`:
+ *
+ * ```
+ * @Preview(widthDp = 400, heightDp = 400)
+ * @Preview(widthDp = 400, heightDp = 400, name = "140%", fontScale = 1.4f)
+ * ```
+ *
+ * Do not try to render both scales inside one wrapper. These previews declare fixed
+ * `widthDp`/`heightDp`, so a second pane stacked in that frame is clipped away; duplicating the
+ * annotation is what gets each scale its own correctly-sized frame.
+ *
+ * Reach for `LiquidPreviewContainerWithGradient` instead only when a preview needs the liquid
+ * `CompositionLocal`s and a gradient backdrop to mean anything; it costs a forced 400x300 frame
+ * that a full-screen preview should not pay.
+ */
 @Composable
 fun OrpheusTheme(
     // Orpheus renders dark by design, independent of system theme — a light
@@ -80,9 +112,38 @@ fun OrpheusTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        // MaterialTheme ends in ProvideTextStyle(typography.bodyLarge), so bodyLarge is the
+        // ambient line box for every Text that sets no lineHeight of its own. M3's default
+        // is a fixed 24.sp, which is why small text in a short slot fits the preview and
+        // clips on screen.
+        typography = MaterialTheme.typography.copy(
+            bodyLarge = MaterialTheme.typography.bodyLarge.proportional(),
+        ),
         content = content
     )
 }
+
+/**
+ * Re-cuts a [TextStyle]'s line box to track its font size instead of pinning it.
+ *
+ * `1.25.em` keeps the box proportional to whatever `fontSize` finally applies, and
+ * `Trim.Both` drops the leading above the first line and below the last, so a single-line
+ * label collapses to its glyphs while a paragraph keeps its internal rhythm.
+ *
+ * [OrpheusTheme] applies this to `bodyLarge`, which covers every `Text` that inherits
+ * `LocalTextStyle`. **Reach for it by hand when passing an explicit `style =`**, because
+ * `Text(style: TextStyle = LocalTextStyle.current)` *replaces* the ambient style rather
+ * than merging with it — so `style = MaterialTheme.typography.labelSmall` combined with
+ * `fontSize = 9.sp` inherits labelSmall's fixed 16.sp box around 9.sp glyphs, a 1.78x
+ * line box, and clips in any tight container.
+ */
+fun TextStyle.proportional(): TextStyle = copy(
+    lineHeight = 1.25.em,
+    lineHeightStyle = LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.Both,
+    ),
+)
 
 // Convenience extension colors for synth-specific UI
 object OrpheusColors {

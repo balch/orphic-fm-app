@@ -55,6 +55,7 @@ import androidx.compose.ui.window.PopupProperties
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
+import org.balch.orpheus.ui.theme.proportional
 
 // Metrics lifted from Material3's own Menu.kt so the lazy menu is visually indistinguishable
 // from the DropdownMenu it replaces. Only the *layout strategy* changed, not the look.
@@ -200,7 +201,7 @@ fun <T> EnumDropdown(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.proportional(),
             color = labelColor,
             fontSize = 9.sp,
             fontWeight = FontWeight.Medium,

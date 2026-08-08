@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
@@ -267,11 +268,14 @@ fun FluxPanel(
 
 @Suppress("StateFlowValueCalledInComposition")
 @Preview(widthDp = 550, heightDp = 300)
+@Preview(widthDp = 550, heightDp = 300, name = "140%", fontScale = 1.4f)
 @Composable
 private fun FluxPanelPreview() {
-    FluxPanel(
-        flux = FluxViewModel.previewFeature(),
-        isExpanded = true,
-        showCollapsedHeader = false
-    )
+    OrpheusTheme {
+        FluxPanel(
+            flux = FluxViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false
+        )
+    }
 }

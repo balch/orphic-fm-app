@@ -31,6 +31,7 @@ import org.balch.orpheus.core.plugin.symbols.LorenzSymbol
 import org.balch.orpheus.core.plugin.symbols.PolyLfoSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.LearnModeState
@@ -387,9 +388,12 @@ private fun polyLfoShapeName(value: Float): String {
 }
 
 @Preview(widthDp = 400, heightDp = 400)
+@Preview(widthDp = 400, heightDp = 400, name = "140%", fontScale = 1.4f)
 @Composable
 fun HyperLfoPanelPreview() {
-    DuoLfoPanel(
-        feature = LfoViewModel.previewFeature()
-    )
+    OrpheusTheme {
+        DuoLfoPanel(
+            feature = LfoViewModel.previewFeature()
+        )
+    }
 }

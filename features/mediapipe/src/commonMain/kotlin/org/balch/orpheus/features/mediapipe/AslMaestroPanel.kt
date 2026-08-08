@@ -24,6 +24,7 @@ import org.balch.orpheus.core.gestures.GestureMode
 import org.balch.orpheus.features.mediapipe.shader.CameraEffectCanvas
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.Switch3WayState
 
@@ -221,11 +222,14 @@ fun AslMaestroPanel(
 
 @Suppress("StateFlowValueCalledInComposition")
 @Preview(widthDp = 400, heightDp = 400)
+@Preview(widthDp = 400, heightDp = 400, name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslMaestroPanelPreview() {
-    AslMaestroPanel(
-        feature = MediaPipeViewModel.previewFeature(),
-        isExpanded = true,
-        showCollapsedHeader = false,
-    )
+    OrpheusTheme {
+        AslMaestroPanel(
+            feature = MediaPipeViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false,
+        )
+    }
 }

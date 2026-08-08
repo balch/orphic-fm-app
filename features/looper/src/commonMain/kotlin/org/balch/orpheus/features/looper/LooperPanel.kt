@@ -44,7 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.compositeOver
+import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.PI
 import kotlin.math.cos
@@ -105,7 +107,7 @@ fun LooperPanel(
                     color = textColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelSmall
+                    style = MaterialTheme.typography.labelSmall.proportional()
                 )
                 if (state.loopDuration > 0 || state.isRecording) {
                     val seconds =
@@ -318,17 +320,20 @@ private fun LooperActionButton(
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             color = if (active) activeColor else if (enabled) OrpheusColors.looperEmber else OrpheusColors.looperBrown,
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelSmall.proportional()
         )
     }
 }
 
 // Preview support
 @Preview(widthDp = 400, heightDp = 400)
+@Preview(widthDp = 400, heightDp = 400, name = "140%", fontScale = 1.4f)
 @Composable
 fun LooperPanelPreview() {
-    LooperPanel(
-        isExpanded = true,
-        feature = LooperViewModel.previewFeature(),
-    )
+    OrpheusTheme {
+        LooperPanel(
+            isExpanded = true,
+            feature = LooperViewModel.previewFeature(),
+        )
+    }
 }

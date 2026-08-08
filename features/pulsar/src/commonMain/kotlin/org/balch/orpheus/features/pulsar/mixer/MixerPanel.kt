@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.log10
@@ -238,11 +239,12 @@ fun MixerPanel(
  * the strip; per-channel data (fader behavior, value formatting, color logic)
  * arrives via parameters and the [fader] slot.
  *
- * Arrangement.Top + explicit Spacers (instead of SpaceBetween) — the parent Row
- * uses Alignment.Bottom, which makes the Row's height = tallest child. With
- * SpaceBetween any extra slack the Row hands us was distributed as gaps between
- * every child, producing the dead space between label and value visible in the
- * production layout but not in the preview.
+ * The dead space between label and value was inherited line boxes, not layout slack;
+ * OrpheusTheme's proportional bodyLarge now sizes those to the glyphs.
+ *
+ * Spacers stay explicit for two independent reasons: the gaps are asymmetric (6 / 6 / 0),
+ * and the parent Row sets verticalAlignment = Alignment.Bottom, so its height is the
+ * tallest child — Arrangement.SpaceBetween would redistribute that slack into every gap.
  */
 @Composable
 private fun FaderStrip(
@@ -450,33 +452,39 @@ private fun multiplierColor(gain: Float): Color {
 }
 
 @Preview(widthDp = 480, heightDp = 320)
+@Preview(widthDp = 480, heightDp = 320, name = "140%", fontScale = 1.4f)
 @Composable
 fun MixerPanelPreview() {
-    MixerPanel(
-        feature = MixerViewModel.previewFeature(
-            state = MixerUiState(
-                groupGains = listOf(0.7f, 0.55f, 0.6f, 0.35f),
-                drive = 0.62f,
-                peak = 0.42f,
-                groupMuted = listOf(false, false, false, false),
-            )
-        ),
-        trackVizFlows = List(8) { MutableStateFlow(FloatArray(0)) },
-    )
+    OrpheusTheme {
+        MixerPanel(
+            feature = MixerViewModel.previewFeature(
+                state = MixerUiState(
+                    groupGains = listOf(0.7f, 0.55f, 0.6f, 0.35f),
+                    drive = 0.62f,
+                    peak = 0.42f,
+                    groupMuted = listOf(false, false, false, false),
+                )
+            ),
+            trackVizFlows = List(8) { MutableStateFlow(FloatArray(0)) },
+        )
+    }
 }
 
 @Preview(widthDp = 480, heightDp = 320)
+@Preview(widthDp = 480, heightDp = 320, name = "140%", fontScale = 1.4f)
 @Composable
 fun MixerPanelMutedFxPreview() {
-    MixerPanel(
-        feature = MixerViewModel.previewFeature(
-            state = MixerUiState(
-                groupGains = listOf(0.7f, 0.55f, 0.6f, 0.35f),
-                drive = 0.0f,
-                peak = 0.12f,
-                groupMuted = listOf(false, false, false, true),
-            )
-        ),
-        trackVizFlows = List(8) { MutableStateFlow(FloatArray(0)) },
-    )
+    OrpheusTheme {
+        MixerPanel(
+            feature = MixerViewModel.previewFeature(
+                state = MixerUiState(
+                    groupGains = listOf(0.7f, 0.55f, 0.6f, 0.35f),
+                    drive = 0.0f,
+                    peak = 0.12f,
+                    groupMuted = listOf(false, false, false, true),
+                )
+            ),
+            trackVizFlows = List(8) { MutableStateFlow(FloatArray(0)) },
+        )
+    }
 }

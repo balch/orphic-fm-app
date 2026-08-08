@@ -22,6 +22,9 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 /**
  * Preview wrapper with a visualization-style gradient background.
  * Shows the panel with a more colorful background for testing liquid effects.
+ *
+ * Delegates the ambient environment to [OrpheusTheme] -- see its kdoc for why an unthemed
+ * preview misreports text metrics, and for the `fontScale` annotation pattern.
  */
 @Composable
 fun LiquidPreviewContainerWithGradient(

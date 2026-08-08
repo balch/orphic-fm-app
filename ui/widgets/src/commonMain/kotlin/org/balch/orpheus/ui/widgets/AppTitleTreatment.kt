@@ -28,6 +28,7 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 // On a dark theme a "raised" look reads through bevel + gradient, not Material elevation
 // (drop shadows are near-invisible on black): a lit cyan TOP edge + dark BOTTOM edge, a
@@ -49,7 +50,6 @@ private val raisedBevel = BorderStroke(
     )
 )
 
-@Preview
 @Composable
 fun AppTitleTreatment(
     modifier: Modifier = Modifier,
@@ -122,10 +122,22 @@ fun AppTitleTreatment(
                 } else 18.sp,
             fontWeight = FontWeight.Bold,
             color = effects.title.titleColor,
+            // Explicit style= replaces LocalTextStyle rather than merging with it, so this
+            // Text does not inherit OrpheusTheme's bodyLarge line box. Carry the theme's
+            // metrics forward by hand if this ever needs to wrap to a second line.
             style = TextStyle(shadow = textShadow),
             modifier = Modifier
                 .padding(horizontal = horizontalPadding, vertical = verticalPadding)
 
         )
+    }
+}
+
+@Preview
+@Preview(name = "140%", fontScale = 1.4f)
+@Composable
+private fun AppTitleTreatmentPreview() {
+    OrpheusTheme {
+        AppTitleTreatment()
     }
 }

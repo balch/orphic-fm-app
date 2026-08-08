@@ -27,6 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -303,7 +304,7 @@ private fun FlipClockPreviewRunning() {
 @Preview(name = "FlipClock — 45s Final Minute", widthDp = 320, heightDp = 140)
 @Composable
 private fun FlipClockPreviewFinalMinute() {
-    org.balch.orpheus.ui.theme.OrpheusTheme {
+    OrpheusTheme {
         FlipClockDisplay(
             remainingTime = 45.seconds,
             isRunning = true,
@@ -318,7 +319,7 @@ private fun FlipClockPreviewFinalMinute() {
 @Preview(name = "FlipClock — Idle 0:30", widthDp = 320, heightDp = 140)
 @Composable
 private fun FlipClockPreviewIdle() {
-    org.balch.orpheus.ui.theme.OrpheusTheme {
+    OrpheusTheme {
         FlipClockDisplay(
             remainingTime = 30.minutes,
             isRunning = false,
@@ -333,7 +334,7 @@ private fun FlipClockPreviewIdle() {
 @Preview(name = "FlipClock — Idle 0:00", widthDp = 320, heightDp = 140)
 @Composable
 private fun FlipClockPreviewIdleTime0() {
-    org.balch.orpheus.ui.theme.OrpheusTheme {
+    OrpheusTheme {
         FlipClockDisplay(
             remainingTime = Duration.ZERO,
             isRunning = false,
@@ -348,7 +349,7 @@ private fun FlipClockPreviewIdleTime0() {
 @Preview(name = "FlipClock — Running 0:00", widthDp = 320, heightDp = 140)
 @Composable
 private fun FlipClockPreviewRunningTime0() {
-    org.balch.orpheus.ui.theme.OrpheusTheme {
+    OrpheusTheme {
         FlipClockDisplay(
             remainingTime = Duration.ZERO,
             isRunning = true,

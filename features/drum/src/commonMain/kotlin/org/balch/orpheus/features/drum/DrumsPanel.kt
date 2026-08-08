@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.DRUM_V2_PICKER_CONFIG
 import org.balch.orpheus.ui.widgets.EnginePickerButton
@@ -171,7 +172,7 @@ private fun LabelHeader(text: String, modifier: Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.proportional(),
             fontSize = 10.sp,
             color = OrpheusColors.warmGlow,
             maxLines = 1,

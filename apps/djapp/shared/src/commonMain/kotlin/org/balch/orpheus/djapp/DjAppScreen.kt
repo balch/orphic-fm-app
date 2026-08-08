@@ -72,6 +72,7 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.darken
 import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
@@ -497,130 +498,148 @@ private fun DjAppPreviewLayout(
 }
 
 @Preview(widthDp = 360, heightDp = 780, name = "DJ Tab")
+@Preview(widthDp = 360, heightDp = 780, name = "DJ Tab 140%", fontScale = 1.4f)
 @Composable
 private fun DjTabPreview() {
-    DjAppPreviewLayout(selectedTab = DjTab) { mod ->
-        DjPanel(
-            feature = DjViewModel.previewFeature(),
-            vizFlowA = emptyVizFlow,
-            vizFlowB = emptyVizFlow,
-            outVizFlow = emptyVizFlow,
-            modifier = mod,
-            isExpanded = true,
-            onExpandedChange = {},
-            showCollapsedHeader = false,
-            showExpandedTitle = false,
-        )
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = DjTab) { mod ->
+            DjPanel(
+                feature = DjViewModel.previewFeature(),
+                vizFlowA = emptyVizFlow,
+                vizFlowB = emptyVizFlow,
+                outVizFlow = emptyVizFlow,
+                modifier = mod,
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+        }
     }
 }
 
 @Preview(widthDp = 360, heightDp = 780, name = "Mix Tab")
+@Preview(widthDp = 360, heightDp = 780, name = "Mix Tab 140%", fontScale = 1.4f)
 @Composable
 private fun MixTabPreview() {
-    DjAppPreviewLayout(selectedTab = MixTab) { mod ->
-        Column(modifier = mod) {
-            ReverbPanel(
-                feature = ReverbViewModel.previewFeature(),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
-                showExpandedTitle = false,
-            )
-            DistortionPanel(
-                feature = DistortionViewModel.previewFeature(),
-                modifier = Modifier.fillMaxWidth(),
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
-                showExpandedTitle = false,
-            )
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = MixTab) { mod ->
+            Column(modifier = mod) {
+                ReverbPanel(
+                    feature = ReverbViewModel.previewFeature(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    isExpanded = true,
+                    onExpandedChange = {},
+                    showCollapsedHeader = false,
+                    showExpandedTitle = false,
+                )
+                DistortionPanel(
+                    feature = DistortionViewModel.previewFeature(),
+                    modifier = Modifier.fillMaxWidth(),
+                    isExpanded = true,
+                    onExpandedChange = {},
+                    showCollapsedHeader = false,
+                    showExpandedTitle = false,
+                )
+            }
         }
     }
 }
 
 @Preview(widthDp = 360, heightDp = 780, name = "Horn Tab")
+@Preview(widthDp = 360, heightDp = 780, name = "Horn Tab 140%", fontScale = 1.4f)
 @Composable
 private fun HornTabPreview() {
-    DjAppPreviewLayout(selectedTab = HornTab) { mod ->
-        HornPanel(
-            feature = HornViewModel.previewFeature(),
-            modifier = mod,
-            isExpanded = true,
-            onExpandedChange = {},
-            showCollapsedHeader = false,
-            showExpandedTitle = false,
-        )
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = HornTab) { mod ->
+            HornPanel(
+                feature = HornViewModel.previewFeature(),
+                modifier = mod,
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+        }
     }
 }
 
 @Preview(widthDp = 360, heightDp = 780, name = "Timer Tab")
+@Preview(widthDp = 360, heightDp = 780, name = "Timer Tab 140%", fontScale = 1.4f)
 @Composable
 private fun TimerTabPreview() {
-    DjAppPreviewLayout(selectedTab = TimerTab) { mod ->
-        TimerPanel(
-            feature = TimerViewModel.previewFeature(),
-            modifier = mod,
-            showCollapsedHeader = false,
-            showExpandedTitle = false,
-        )
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = TimerTab) { mod ->
+            TimerPanel(
+                feature = TimerViewModel.previewFeature(),
+                modifier = mod,
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+        }
     }
 }
 
 @Preview(widthDp = 360, heightDp = 780, name = "DJ Nav — Timer Running")
+@Preview(widthDp = 360, heightDp = 780, name = "DJ Nav — Timer Running 140%", fontScale = 1.4f)
 @Composable
 private fun DjAppNavTimerRunningPreview() {
-    val runningTimer = TimerViewModel.previewFeature(
-        TimerUiState(
-            initialTime = 45.minutes,
-            remainingTime = 42.minutes.plus(13.seconds),
-            status = TimerStatus.RUNNING,
-        ),
-    )
-    DjAppNavScaffold(
-        currentRoute = DjTab,
-        onRouteSelected = {},
-        isLandscape = false,
-        pulsarFeature = PulsarViewModel.previewFeature(),
-        timerFeature = runningTimer,
-        onTogglePlayback = {},
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center,
+    OrpheusTheme {
+        val runningTimer = TimerViewModel.previewFeature(
+            TimerUiState(
+                initialTime = 45.minutes,
+                remainingTime = 42.minutes.plus(13.seconds),
+                status = TimerStatus.RUNNING,
+            ),
+        )
+        DjAppNavScaffold(
+            currentRoute = DjTab,
+            onRouteSelected = {},
+            isLandscape = false,
+            pulsarFeature = PulsarViewModel.previewFeature(),
+            timerFeature = runningTimer,
+            onTogglePlayback = {},
         ) {
-            Text("(preview)", color = Color.White)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("(preview)", color = Color.White)
+            }
         }
     }
 }
 
 @Preview(widthDp = 360, heightDp = 780, name = "DJ Nav — Timer Paused")
+@Preview(widthDp = 360, heightDp = 780, name = "DJ Nav — Timer Paused 140%", fontScale = 1.4f)
 @Composable
 private fun DjAppNavTimerPausedPreview() {
-    val pausedTimer = TimerViewModel.previewFeature(
-        TimerUiState(
-            initialTime = 45.minutes,
-            remainingTime = 12.minutes,
-            status = TimerStatus.PAUSED,
-        ),
-    )
-    DjAppNavScaffold(
-        currentRoute = DjTab,
-        onRouteSelected = {},
-        isLandscape = false,
-        pulsarFeature = PulsarViewModel.previewFeature(),
-        timerFeature = pausedTimer,
-        onTogglePlayback = {},
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center,
+    OrpheusTheme {
+        val pausedTimer = TimerViewModel.previewFeature(
+            TimerUiState(
+                initialTime = 45.minutes,
+                remainingTime = 12.minutes,
+                status = TimerStatus.PAUSED,
+            ),
+        )
+        DjAppNavScaffold(
+            currentRoute = DjTab,
+            onRouteSelected = {},
+            isLandscape = false,
+            pulsarFeature = PulsarViewModel.previewFeature(),
+            timerFeature = pausedTimer,
+            onTogglePlayback = {},
         ) {
-            Text("(preview)", color = Color.White)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("(preview)", color = Color.White)
+            }
         }
     }
 }
@@ -628,39 +647,17 @@ private fun DjAppNavTimerPausedPreview() {
 // ── Landscape Previews ──
 
 @Preview(widthDp = 780, heightDp = 360, name = "DJ Tab — Landscape")
+@Preview(widthDp = 780, heightDp = 360, name = "DJ Tab — Landscape 140%", fontScale = 1.4f)
 @Composable
 private fun DjTabLandscapePreview() {
-    DjAppPreviewLayout(selectedTab = DjTab, landscape = true) { mod ->
-        DjPanel(
-            feature = DjViewModel.previewFeature(),
-            vizFlowA = emptyVizFlow,
-            vizFlowB = emptyVizFlow,
-            outVizFlow = emptyVizFlow,
-            modifier = mod,
-            isExpanded = true,
-            onExpandedChange = {},
-            showCollapsedHeader = false,
-            showExpandedTitle = false,
-        )
-    }
-}
-
-@Preview(widthDp = 780, heightDp = 360, name = "Mix Tab — Landscape")
-@Composable
-private fun MixTabLandscapePreview() {
-    DjAppPreviewLayout(selectedTab = MixTab, landscape = true) { mod ->
-        Column(modifier = mod) {
-            ReverbPanel(
-                feature = ReverbViewModel.previewFeature(),
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
-                showExpandedTitle = false,
-            )
-            DistortionPanel(
-                feature = DistortionViewModel.previewFeature(),
-                modifier = Modifier.fillMaxWidth(),
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = DjTab, landscape = true) { mod ->
+            DjPanel(
+                feature = DjViewModel.previewFeature(),
+                vizFlowA = emptyVizFlow,
+                vizFlowB = emptyVizFlow,
+                outVizFlow = emptyVizFlow,
+                modifier = mod,
                 isExpanded = true,
                 onExpandedChange = {},
                 showCollapsedHeader = false,
@@ -670,17 +667,48 @@ private fun MixTabLandscapePreview() {
     }
 }
 
+@Preview(widthDp = 780, heightDp = 360, name = "Mix Tab — Landscape")
+@Preview(widthDp = 780, heightDp = 360, name = "Mix Tab — Landscape 140%", fontScale = 1.4f)
+@Composable
+private fun MixTabLandscapePreview() {
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = MixTab, landscape = true) { mod ->
+            Column(modifier = mod) {
+                ReverbPanel(
+                    feature = ReverbViewModel.previewFeature(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    isExpanded = true,
+                    onExpandedChange = {},
+                    showCollapsedHeader = false,
+                    showExpandedTitle = false,
+                )
+                DistortionPanel(
+                    feature = DistortionViewModel.previewFeature(),
+                    modifier = Modifier.fillMaxWidth(),
+                    isExpanded = true,
+                    onExpandedChange = {},
+                    showCollapsedHeader = false,
+                    showExpandedTitle = false,
+                )
+            }
+        }
+    }
+}
+
 @Preview(widthDp = 780, heightDp = 360, name = "Horn Tab — Landscape")
+@Preview(widthDp = 780, heightDp = 360, name = "Horn Tab — Landscape 140%", fontScale = 1.4f)
 @Composable
 private fun HornTabLandscapePreview() {
-    DjAppPreviewLayout(selectedTab = HornTab, landscape = true) { mod ->
-        HornPanel(
-            feature = HornViewModel.previewFeature(),
-            modifier = mod,
-            isExpanded = true,
-            onExpandedChange = {},
-            showCollapsedHeader = false,
-            showExpandedTitle = false,
-        )
+    OrpheusTheme {
+        DjAppPreviewLayout(selectedTab = HornTab, landscape = true) { mod ->
+            HornPanel(
+                feature = HornViewModel.previewFeature(),
+                modifier = mod,
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+        }
     }
 }

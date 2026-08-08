@@ -53,6 +53,7 @@ import org.balch.orpheus.features.draw.SequencerPoint
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 /**
  * Compact inline view for multi-parameter sequencer automation.
@@ -314,65 +315,71 @@ private fun ParameterLegend(
 }
 
 @Preview(heightDp = 240)
+@Preview(heightDp = 240, name = "140%", fontScale = 1.4f)
 @Composable
 private fun CompactTweakSequencerViewPreview() {
-    val samplePath = SequencerPath(
-        points = listOf(
-            SequencerPoint(0f, 0.5f),
-            SequencerPoint(0.3f, 0.8f),
-            SequencerPoint(0.6f, 0.2f),
-            SequencerPoint(1f, 0.6f)
-        ),
-        isComplete = true
-    )
-
-    val state = DrawSequencerUiState(
-        sequencer = DrawSequencerState(
-            config = DrawSequencerConfig(
-                enabled = true,
-                selectedParameters = listOf(
-                    DrawSequencerParameter.LFO_FREQ_A,
-                    DrawSequencerParameter.DELAY_TIME_1,
-                    DrawSequencerParameter.DIST_DRIVE
-                )
+    OrpheusTheme {
+        val samplePath = SequencerPath(
+            points = listOf(
+                SequencerPoint(0f, 0.5f),
+                SequencerPoint(0.3f, 0.8f),
+                SequencerPoint(0.6f, 0.2f),
+                SequencerPoint(1f, 0.6f)
             ),
-            paths = mapOf(
-                DrawSequencerParameter.LFO_FREQ_A to samplePath,
-                DrawSequencerParameter.DELAY_TIME_1 to SequencerPath(
-                    points = listOf(SequencerPoint(0f, 0.2f), SequencerPoint(1f, 0.9f)),
-                    isComplete = true
-                ),
-                DrawSequencerParameter.DIST_DRIVE to SequencerPath()
-            ),
-            currentPosition = 0.4f,
-            isPlaying = true
+            isComplete = true
         )
-    )
 
-    CompactDrawSequencerView(
-        sequencerFeature = DrawSequencerViewModel.previewFeature(state),
-        liquidState = null,
-        effects = VisualizationLiquidEffects(),
-        modifier = Modifier.fillMaxWidth()
-    )
+        val state = DrawSequencerUiState(
+            sequencer = DrawSequencerState(
+                config = DrawSequencerConfig(
+                    enabled = true,
+                    selectedParameters = listOf(
+                        DrawSequencerParameter.LFO_FREQ_A,
+                        DrawSequencerParameter.DELAY_TIME_1,
+                        DrawSequencerParameter.DIST_DRIVE
+                    )
+                ),
+                paths = mapOf(
+                    DrawSequencerParameter.LFO_FREQ_A to samplePath,
+                    DrawSequencerParameter.DELAY_TIME_1 to SequencerPath(
+                        points = listOf(SequencerPoint(0f, 0.2f), SequencerPoint(1f, 0.9f)),
+                        isComplete = true
+                    ),
+                    DrawSequencerParameter.DIST_DRIVE to SequencerPath()
+                ),
+                currentPosition = 0.4f,
+                isPlaying = true
+            )
+        )
+
+        CompactDrawSequencerView(
+            sequencerFeature = DrawSequencerViewModel.previewFeature(state),
+            liquidState = null,
+            effects = VisualizationLiquidEffects(),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
 
 @Preview(heightDp = 240)
+@Preview(heightDp = 240, name = "140%", fontScale = 1.4f)
 @Composable
 private fun CompactTweakSequencerViewDisabledPreview() {
-    val state = DrawSequencerUiState(
-        sequencer = DrawSequencerState(
-            config = DrawSequencerConfig(enabled = false),
-            paths = emptyMap(),
-            currentPosition = 0f,
-            isPlaying = false
+    OrpheusTheme {
+        val state = DrawSequencerUiState(
+            sequencer = DrawSequencerState(
+                config = DrawSequencerConfig(enabled = false),
+                paths = emptyMap(),
+                currentPosition = 0f,
+                isPlaying = false
+            )
         )
-    )
 
-    CompactDrawSequencerView(
-        sequencerFeature = DrawSequencerViewModel.previewFeature(state),
-        liquidState = null,
-        effects = VisualizationLiquidEffects(),
-        modifier = Modifier.fillMaxWidth()
-    )
+        CompactDrawSequencerView(
+            sequencerFeature = DrawSequencerViewModel.previewFeature(state),
+            liquidState = null,
+            effects = VisualizationLiquidEffects(),
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }

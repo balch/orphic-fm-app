@@ -36,6 +36,7 @@ import org.balch.orpheus.core.gestures.paramDisplayLabel
 import org.balch.orpheus.core.gestures.quadDisplayLabel
 import org.balch.orpheus.core.gestures.targetDisplayLabel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 private enum class SlotState { EMPTY, ACTIVE, LOCKED }
 
@@ -216,63 +217,78 @@ private fun ArrowSeparator(locked: Boolean) {
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslSelectionBarIdlePreview() {
-    AslSelectionBar(
-        selectedTarget = null,
-        selectedParam = null,
-        modePrefix = null,
-        interactionPhase = InteractionPhase.IDLE,
-        isTracking = true,
-    )
+    OrpheusTheme {
+        AslSelectionBar(
+            selectedTarget = null,
+            selectedParam = null,
+            modePrefix = null,
+            interactionPhase = InteractionPhase.IDLE,
+            isTracking = true,
+        )
+    }
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslSelectionBarTargetLockedPreview() {
-    AslSelectionBar(
-        selectedTarget = AslSign.NUM_3,
-        selectedParam = null,
-        modePrefix = null,
-        interactionPhase = InteractionPhase.SELECTED,
-        isTracking = true,
-    )
+    OrpheusTheme {
+        AslSelectionBar(
+            selectedTarget = AslSign.NUM_3,
+            selectedParam = null,
+            modePrefix = null,
+            interactionPhase = InteractionPhase.SELECTED,
+            isTracking = true,
+        )
+    }
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslSelectionBarFullyLockedPreview() {
-    AslSelectionBar(
-        selectedTarget = AslSign.NUM_3,
-        selectedParam = AslSign.LETTER_M,
-        modePrefix = null,
-        interactionPhase = InteractionPhase.CONTROLLING,
-        isTracking = true,
-    )
+    OrpheusTheme {
+        AslSelectionBar(
+            selectedTarget = AslSign.NUM_3,
+            selectedParam = AslSign.LETTER_M,
+            modePrefix = null,
+            interactionPhase = InteractionPhase.CONTROLLING,
+            isTracking = true,
+        )
+    }
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslSelectionBarSystemTargetPreview() {
-    AslSelectionBar(
-        selectedTarget = AslSign.LETTER_V,
-        selectedParam = null,
-        modePrefix = null,
-        interactionPhase = InteractionPhase.SELECTED,
-        isTracking = true,
-    )
+    OrpheusTheme {
+        AslSelectionBar(
+            selectedTarget = AslSign.LETTER_V,
+            selectedParam = null,
+            modePrefix = null,
+            interactionPhase = InteractionPhase.SELECTED,
+            isTracking = true,
+        )
+    }
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslSelectionBarModePrefixPreview() {
-    AslSelectionBar(
-        selectedTarget = null,
-        selectedParam = null,
-        modePrefix = AslSign.LETTER_D,
-        interactionPhase = InteractionPhase.IDLE,
-        isTracking = true,
-    )
+    OrpheusTheme {
+        AslSelectionBar(
+            selectedTarget = null,
+            selectedParam = null,
+            modePrefix = AslSign.LETTER_D,
+            interactionPhase = InteractionPhase.IDLE,
+            isTracking = true,
+        )
+    }
 }
 
 @Composable
@@ -356,14 +372,17 @@ private fun ConductorModeBar(modifier: Modifier = Modifier) {
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun AslSelectionBarConductorModePreview() {
-    AslSelectionBar(
-        selectedTarget = null,
-        selectedParam = null,
-        modePrefix = null,
-        interactionPhase = InteractionPhase.IDLE,
-        gestureMode = GestureMode.CONDUCTOR,
-        isTracking = true,
-    )
+    OrpheusTheme {
+        AslSelectionBar(
+            selectedTarget = null,
+            selectedParam = null,
+            modePrefix = null,
+            interactionPhase = InteractionPhase.IDLE,
+            gestureMode = GestureMode.CONDUCTOR,
+            isTracking = true,
+        )
+    }
 }

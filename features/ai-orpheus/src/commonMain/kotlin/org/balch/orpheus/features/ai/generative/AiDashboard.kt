@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.Flow
 import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 
 @Composable
 fun AiDashboard(
@@ -134,7 +135,7 @@ internal fun LogPanel(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.proportional(),
                 color = OrpheusColors.metallicBlue,
                 fontWeight = FontWeight.Black,
                 fontSize = 12.sp,
@@ -156,7 +157,7 @@ internal fun LogPanel(
                 } else {
                     Text(
                         text = msg.text,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.proportional(),
                         color = if (msg.isError) MaterialTheme.colorScheme.error 
                                else OrpheusColors.sterlingSilver.copy(alpha = 0.85f),
                         fontSize = 11.sp,

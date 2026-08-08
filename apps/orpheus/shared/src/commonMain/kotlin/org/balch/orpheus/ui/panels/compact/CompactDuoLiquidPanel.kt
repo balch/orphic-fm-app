@@ -24,6 +24,7 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 /**
  * A glass panel containing a pair of voices (2 voices) with exact styling from reference.
@@ -84,19 +85,22 @@ fun CompactDuoLiquidPanel(
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun CompactDuoLiquidPanelPreview() {
-    Row(
-        modifier = Modifier.background(Color.Black).padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        CompactDuoLiquidPanel(
-            duoIndex = 0,
-            voiceFeature = VoiceViewModel.previewFeature(),
-            borderColor = OrpheusColors.neonMagenta,
-            liquidState = null,
-            effects = VisualizationLiquidEffects.Default,
-            modifier = Modifier.width(140.dp).height(200.dp)
-        )
+    OrpheusTheme {
+        Row(
+            modifier = Modifier.background(Color.Black).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CompactDuoLiquidPanel(
+                duoIndex = 0,
+                voiceFeature = VoiceViewModel.previewFeature(),
+                borderColor = OrpheusColors.neonMagenta,
+                liquidState = null,
+                effects = VisualizationLiquidEffects.Default,
+                modifier = Modifier.width(140.dp).height(200.dp)
+            )
+        }
     }
 }

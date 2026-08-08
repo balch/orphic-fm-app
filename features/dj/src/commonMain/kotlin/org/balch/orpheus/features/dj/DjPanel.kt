@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1032,13 +1033,20 @@ private fun DropZoneCell(
             ) {
                 lockedBy.forEach { (letter, color) ->
                     Box(
+                        // sizeIn, not size: a hard 12.dp box clips sp glyphs once the
+                        // user raises their font scale. The floor keeps the badge round.
                         modifier = Modifier
-                            .size(12.dp)
+                            .sizeIn(minWidth = 12.dp, minHeight = 12.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(Color.Black.copy(alpha = 0.4f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(letter, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            letter,
+                            color = color,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }

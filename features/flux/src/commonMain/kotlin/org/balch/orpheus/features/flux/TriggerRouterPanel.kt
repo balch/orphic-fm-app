@@ -41,6 +41,7 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 
 @Composable
 fun TriggerRouterPanel(
@@ -86,7 +87,7 @@ fun TriggerRouterPanel(
                 // X Headers (Pitch/CV)
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
                     listOf("X1", "X2", "X3").forEach { 
-                        Text(it, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.warmGlow, fontSize = 10.sp) 
+                        Text(it, style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.warmGlow, fontSize = 10.sp) 
                     }
                 }
                 
@@ -96,13 +97,13 @@ fun TriggerRouterPanel(
                 // T Headers (Trigger)
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
                     listOf("T1", "T2", "T3").forEach {
-                        Text(it, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.electricBlue, fontSize = 10.sp)
+                        Text(it, style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.electricBlue, fontSize = 10.sp)
                     }
                 }
 
                 // Y Header (Timbre)
                 Spacer(Modifier.width(8.dp))
-                Text("Y", style = MaterialTheme.typography.labelSmall, color = OrpheusColors.synthGreen, fontSize = 10.sp)
+                Text("Y", style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.synthGreen, fontSize = 10.sp)
             }
 
             // BD

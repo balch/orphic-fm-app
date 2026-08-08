@@ -28,6 +28,7 @@ import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
 /**
@@ -104,12 +105,15 @@ private fun PeakLed(level: Float) {
 // ==================== PREVIEWS ====================
 
 @Preview(widthDp = 360, heightDp = 70)
+@Preview(widthDp = 360, heightDp = 70, name = "140%", fontScale = 1.4f)
 @Composable
 private fun CompactPortraitHeaderPanelPreview() {
-    val previewFeature = DistortionViewModel.previewFeature(DistortionUiState(peak = 0.5f))
-    CompactPortraitHeaderPanel(
-        distortionFeature = previewFeature,
-        liquidState = rememberLiquidState(),
-        effects = VisualizationLiquidEffects()
-    )
+    OrpheusTheme {
+        val previewFeature = DistortionViewModel.previewFeature(DistortionUiState(peak = 0.5f))
+        CompactPortraitHeaderPanel(
+            distortionFeature = previewFeature,
+            liquidState = rememberLiquidState(),
+            effects = VisualizationLiquidEffects()
+        )
+    }
 }

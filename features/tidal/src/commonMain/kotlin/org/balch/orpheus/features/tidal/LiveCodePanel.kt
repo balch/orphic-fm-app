@@ -68,6 +68,7 @@ import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 
 /**
@@ -295,7 +296,7 @@ fun LiveCodePanel(
                     ) {
                         Text(
                             text = "BPM",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = Color.White,
                             fontSize = 9.sp
                         )
@@ -310,7 +311,7 @@ fun LiveCodePanel(
                         )
                         Text(
                             text = "${uiState.bpm.toInt()}",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = OrpheusColors.neonCyan,
                             fontSize = 9.sp,
                             maxLines = 1,
@@ -324,7 +325,7 @@ fun LiveCodePanel(
                     ) {
                         Text(
                             text = "VOL",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = Color.White,
                             fontSize = 9.sp
                         )
@@ -339,7 +340,7 @@ fun LiveCodePanel(
                         )
                         Text(
                             text = "${(uiState.replVolume * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = OrpheusColors.warmGlow,
                             fontSize = 9.sp,
                             maxLines = 1,
@@ -457,7 +458,7 @@ fun LiveCodePanel(
                         )
                         Text(
                             text = "AI generating...",
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodySmall.proportional(),
                             color = OrpheusColors.warmGlow,
                             fontSize = 11.sp
                         )

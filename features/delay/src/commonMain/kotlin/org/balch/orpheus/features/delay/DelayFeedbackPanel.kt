@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
@@ -136,6 +137,7 @@ fun DelayFeedbackPanel(
 }
 
 @Preview(widthDp = 400, heightDp = 400)
+@Preview(widthDp = 400, heightDp = 400, name = "140%", fontScale = 1.4f)
 @Composable
 fun ModDelayPanelPreview() {
     DelayFeedbackPanel(

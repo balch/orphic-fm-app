@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
@@ -97,10 +98,13 @@ fun ReverbPanel(
 }
 
 @Preview(widthDp = 400, heightDp = 200)
+@Preview(widthDp = 400, heightDp = 200, name = "140%", fontScale = 1.4f)
 @Composable
 fun ReverbPanelPreview() {
-    ReverbPanel(
-        feature = ReverbViewModel.previewFeature(),
-        isExpanded = true,
-    )
+    OrpheusTheme {
+        ReverbPanel(
+            feature = ReverbViewModel.previewFeature(),
+            isExpanded = true,
+        )
+    }
 }

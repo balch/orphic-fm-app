@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +46,7 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.abs
 
@@ -777,9 +777,10 @@ internal sealed interface StringInteraction {
 // ==================== PREVIEWS ====================
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun StringsPanelPreview() {
-    MaterialTheme {
+    OrpheusTheme {
         CompactStringPanel(
             voiceState = VoiceUiState(),
             actions = VoicePanelActions.EMPTY

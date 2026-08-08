@@ -45,6 +45,7 @@ import org.balch.orpheus.plugins.drum.DrumBeatsGenerator
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.Learnable
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
@@ -291,7 +292,7 @@ fun DrumBeatsPanel(
                             modifier = Modifier.width(46.dp),
                             textAlign = TextAlign.Center,
                             text = if (state.isRunning) "Stop" else "Play",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = OrpheusColors.seahawksGreen,
                             fontSize = 12.sp,
                             maxLines = 1,
@@ -301,7 +302,7 @@ fun DrumBeatsPanel(
                             modifier = Modifier.width(78.dp),
                             textAlign = TextAlign.Center,
                             text = "${state.bpm.toInt()}bmp",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = OrpheusColors.seahawksGreen,
                             fontSize = 12.sp,
                             maxLines = 1,
@@ -311,7 +312,7 @@ fun DrumBeatsPanel(
                             modifier = Modifier.width(85.dp),
                             textAlign = TextAlign.Center,
                             text = "Mix",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.proportional(),
                             color = OrpheusColors.seahawksGreen,
                             fontSize = 12.sp,
                         )
@@ -412,6 +413,7 @@ private fun KnobControlTopLabel(
 }
 
 @Preview(heightDp = 280, widthDp = 720)
+@Preview(heightDp = 280, widthDp = 720, name = "140%", fontScale = 1.4f)
 @Composable
 fun PatternPanelPreview() {
     OrpheusTheme {

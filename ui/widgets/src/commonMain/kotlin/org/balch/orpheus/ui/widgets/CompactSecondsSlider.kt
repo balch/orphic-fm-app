@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.math.roundToInt
 
 /**
@@ -155,22 +156,25 @@ fun CompactSecondsSlider(
 }
 
 @Preview
+@Preview(name = "140%", fontScale = 1.4f)
 @Composable
 private fun CompactSecondsSliderPreview() {
-    Column(
-        modifier = Modifier.background(OrpheusColors.darkVoid).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        CompactSecondsSlider(
-            valueSeconds = 30f,
-            onValueChange = {},
-            modifier = Modifier.fillMaxWidth()
-        )
-        CompactSecondsSlider(
-            valueSeconds = 90f,
-            onValueChange = {},
-            color = OrpheusColors.neonMagenta,
-            modifier = Modifier.fillMaxWidth()
-        )
+    OrpheusTheme {
+        Column(
+            modifier = Modifier.background(OrpheusColors.darkVoid).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CompactSecondsSlider(
+                valueSeconds = 30f,
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth()
+            )
+            CompactSecondsSlider(
+                valueSeconds = 90f,
+                onValueChange = {},
+                color = OrpheusColors.neonMagenta,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }

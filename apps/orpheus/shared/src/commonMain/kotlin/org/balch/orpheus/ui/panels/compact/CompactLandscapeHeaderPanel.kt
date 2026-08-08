@@ -39,6 +39,7 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -257,17 +258,20 @@ private fun PeakLed(level: Float) {
 }
 
 @Preview(widthDp = 600)
+@Preview(widthDp = 600, name = "140%", fontScale = 1.4f)
 @Composable
 private fun CompactLandscapeHeaderPanelPreview() {
-    CompactLandscapeHeaderPanel(
-        presetFeature = PresetsViewModel.previewFeature(),
-        vizFeature = VizViewModel.previewFeature(),
-        voiceFeature = VoiceViewModel.previewFeature(),
-        presetDropdownExpanded = false,
-        onPresetDropdownExpandedChange = {},
-        vizDropdownExpanded = false,
-        onVizDropdownExpandedChange = {},
-        liquidState = null,
-        effects = VisualizationLiquidEffects()
-    )
+    OrpheusTheme {
+        CompactLandscapeHeaderPanel(
+            presetFeature = PresetsViewModel.previewFeature(),
+            vizFeature = VizViewModel.previewFeature(),
+            voiceFeature = VoiceViewModel.previewFeature(),
+            presetDropdownExpanded = false,
+            onPresetDropdownExpandedChange = {},
+            vizDropdownExpanded = false,
+            onVizDropdownExpandedChange = {},
+            liquidState = null,
+            effects = VisualizationLiquidEffects()
+        )
+    }
 }
