@@ -43,6 +43,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
@@ -50,6 +51,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Guards the per-section override push path in [PulsarViewModel.pushArrangement].
@@ -207,6 +209,131 @@ class PulsarSectionProgressionPushTest {
         assertEquals(0f, floatPort("section_data_${0 * 21 + 16}"))
         assertEquals(1f, floatPort("section_data_${1 * 21 + 16}"))
     }
+
+    /**
+     * A vibe switch must apply the incoming vibe's opening section even though the section index
+     * did not change — the collector is `distinctUntilChanged` on sectionIndex and nothing resets
+     * `_arrangementState` on load, so section 0 -> section 0 is suppressed.
+     *
+     * The two vibes cut DIFFERENT slots, which is what makes this discriminating: without the
+     * synchronous push in [PulsarViewModel.applyVibe] the recipe restores every track to its base
+     * volume and slot 3 stays audible.
+     */
+    @Test
+    fun `switching vibes on the same section index still applies the incoming intro`() =
+        runTest(testDispatcher) {
+            fun vibeCutting(slot: Int) = pushTestVibe(
+                sections = listOf(
+                    Section(
+                        name = "intro", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(slot to TrackSectionOverride(volume = 0f)),
+                    ),
+                    Section(name = "groove", barsMin = 4, barsMax = 4),
+                ),
+            )
+            val cutsLead = vibeCutting(4)
+            val cutsBass = vibeCutting(3)
+            val baseVolume = cutsLead.tracks[4].engineEdm.volume
+            assertTrue(baseVolume > 0f, "precondition: the fixture's base volume must be audible")
+
+            val vm = makeViewModel(cutsLead)
+            vm.actions.setVibe(cutsLead)
+            advanceUntilIdle()
+
+            // Put the engine on section 0 and let the collector apply the first vibe's intro.
+            arrangementFlow.value = PulsarArrangementState(
+                sectionIndex = 0, barsElapsed = 0, barsTotal = 4,
+                soloActive = false, soloTrack = -1, soloMode = 0,
+            )
+            advanceUntilIdle()
+            assertEquals(0f, floatPort("track_4_volume"), "the first vibe's intro must cut slot 4")
+
+            // Switch vibes WITHOUT the engine ever leaving section 0 — the suppressed case.
+            vm.actions.setVibe(cutsBass)
+            advanceUntilIdle()
+
+            assertEquals(
+                0f, floatPort("track_3_volume"),
+                "the incoming vibe's intro must cut slot 3; a non-zero here means its opening " +
+                    "section was never applied",
+            )
+            assertEquals(
+                baseVolume, floatPort("track_4_volume"),
+                "slot 4 must be restored, not left at the previous vibe's 0",
+            )
+        }
+
+    /**
+     * The vibe-load push deliberately skips the pattern-generation inputs. `density` and the hold
+     * parameters reach the engine only through `load_vibe` and the déjà-vu regeneration, so the
+     * opening section's sparseness would outlive that section by up to a déjà-vu interval.
+     */
+    @Test
+    fun `the vibe-load push leaves the pattern-generation inputs at the vibe's base values`() =
+        runTest(testDispatcher) {
+            val vibe = pushTestVibe(
+                sections = listOf(
+                    Section(
+                        name = "intro", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(
+                            5 to TrackSectionOverride(volume = 0f, density = 0f),
+                        ),
+                    ),
+                    Section(name = "groove", barsMin = 4, barsMax = 4),
+                ),
+            )
+            val baseDensity = vibe.tracks[5].density
+            assertTrue(baseDensity > 0f, "precondition: the fixture's base density must be non-zero")
+
+            makeViewModel(vibe).actions.setVibe(vibe)
+            advanceUntilIdle()  // no arrangement emission at all — only the synchronous push ran
+
+            assertEquals(
+                0f, floatPort("track_5_volume"),
+                "slot 5 must be silenced by the vibe-load push",
+            )
+            assertEquals(
+                baseDensity, floatPort("genre_density_5"),
+                "slot 5's density must stay at the vibe's base so load_vibe builds the full " +
+                    "pattern; the intro's 0 would persist into every later section",
+            )
+        }
+
+    /**
+     * C++ resolves volume and sends with PULSAR_PICK, reading the `_space` port whenever the
+     * track's Space engine is the live one. An override written only to the EDM port is
+     * silently ignored on such a track, so both slots must carry it.
+     */
+    @Test
+    fun `section overrides reach the Space slot as well as the EDM slot`() =
+        runTest(testDispatcher) {
+            val vibe = pushTestVibe(
+                sections = listOf(
+                    Section(
+                        name = "intro", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(
+                            6 to TrackSectionOverride(volume = 0f, delaySend = 0f, reverbSend = 0f),
+                        ),
+                    ),
+                    Section(name = "groove", barsMin = 4, barsMax = 4),
+                ),
+            )
+            assertTrue(
+                vibe.tracks[6].engineSpace.volume > 0f,
+                "precondition: the fixture's Space-slot volume must be audible",
+            )
+
+            makeViewModel(vibe).actions.setVibe(vibe)
+            advanceUntilIdle()
+
+            assertEquals(
+                0f, floatPort("track_6_volume_space"),
+                "the Space slot must be silenced too; C++ reads it whenever the Space engine " +
+                    "is live, so an EDM-only write leaves the track audible",
+            )
+            assertEquals(0f, floatPort("track_6_delay_send_space"))
+            assertEquals(0f, floatPort("track_6_reverb_send_space"))
+        }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────

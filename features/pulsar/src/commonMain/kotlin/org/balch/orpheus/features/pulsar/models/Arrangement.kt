@@ -211,6 +211,17 @@ data class Arrangement(
         require(maxVibeSeconds in minVibeSeconds..1800) {
             "Arrangement.maxVibeSeconds must be in $minVibeSeconds..1800, got $maxVibeSeconds"
         }
+        // Both reach C++ as raw section indices. null is the documented "unset" sentinel.
+        introIndex?.let {
+            require(it in sections.indices) {
+                "Arrangement.introIndex must be in 0..${sections.size - 1}, got $it"
+            }
+        }
+        outroIndex?.let {
+            require(it in sections.indices) {
+                "Arrangement.outroIndex must be in 0..${sections.size - 1}, got $it"
+            }
+        }
     }
 
     companion object {

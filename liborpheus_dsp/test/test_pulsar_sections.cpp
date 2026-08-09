@@ -2198,6 +2198,102 @@ static bool test_jam_carry_requires_eligible_lead_into_jam_section() {
     return ok;
 }
 
+// An out-of-range target_index must never be RETURNED, not merely skipped while weighting.
+// A zeroed slot was reachable by both return sites: `roll <= cumulative` succeeds at a
+// zero-weight slot when roll is exactly 0, and the fall-through returned the last transition
+// unconditionally. Either one put an out-of-range index into state.current_section.
+//
+// pattern_rand01 returns exactly 0 only when the draw's low 23 bits are clear (~1 in 8.4M), so
+// search for a seed that lands on it rather than sweeping and hoping.
+static bool test_select_next_section_never_returns_out_of_range_target() {
+    ArrangementParams arr = make_test_arrangement();
+    // Section 0's FIRST edge points outside the arrangement; the second is valid.
+    arr.sections[0].transitions[0].target_index = 99;
+    arr.sections[0].transitions[0].weight = 1.0f;
+    arr.sections[0].transitions[1].target_index = 1;
+    arr.sections[0].transitions[1].weight = 1.0f;
+    arr.sections[0].transition_count = 2;
+
+    // Smallest seed whose first draw is exactly 0. Hardcoded rather than re-derived: the
+    // search is ~8.4M draws and the guard below catches an RNG change immediately.
+    constexpr uint32_t kZeroRollSeed = 8912960u;
+    uint32_t probe = kZeroRollSeed;
+    if (pattern_rand01(probe) != 0.0f) {
+        printf("  FAIL: kZeroRollSeed no longer yields roll 0 — re-derive it\n");
+        return false;
+    }
+
+    SectionState state = {};
+    state.current_section = 0;
+    uint32_t seed = kZeroRollSeed;
+    int next = select_next_section(arr, state, 0, seed);
+
+    bool ok = true;
+    if (next < 0 || next >= arr.section_count) {
+        printf("  FAIL: returned out-of-range section %d (section_count=%d)\n",
+               next, arr.section_count);
+        ok = false;
+    }
+    if (next != 1) {
+        printf("  FAIL: expected the only valid target (1), got %d\n", next);
+        ok = false;
+    }
+
+    // Sweep with the bad edge in LAST position and two valid edges either side, so the roll
+    // actually distributes and both valid targets get selected across the seed range.
+    arr.sections[0].transitions[0].target_index = 1;
+    arr.sections[0].transitions[1].target_index = 2;
+    arr.sections[0].transitions[2].target_index = -7;
+    arr.sections[0].transitions[2].weight = 1.0f;
+    arr.sections[0].transition_count = 3;
+    bool saw_1 = false, saw_2 = false;
+    for (uint32_t s = 1; s < 2000u; s++) {
+        uint32_t sweep_seed = s;
+        int r = select_next_section(arr, state, 0, sweep_seed);
+        if (r < 0 || r >= arr.section_count) {
+            printf("  FAIL: seed %u returned out-of-range section %d\n", s, r);
+            ok = false;
+            break;
+        }
+        if (r == 1) saw_1 = true;
+        if (r == 2) saw_2 = true;
+    }
+    if (!saw_1 || !saw_2) {
+        printf("  FAIL: sweep did not distribute (saw_1=%d saw_2=%d)\n", saw_1, saw_2);
+        ok = false;
+    }
+
+    if (ok) printf("  PASS: select_next_section never returns an out-of-range target\n");
+    return ok;
+}
+
+// The outro path is the other writer of current_section, and outro_index is unpacked
+// unclamped. An out-of-range one used to index arr.sections[] and write past the end of
+// bars_since_visit[kMaxSections].
+static bool test_advance_section_rejects_out_of_range_outro() {
+    bool ok = true;
+    const int bad_indices[] = { kMaxSections, kMaxSections + 5, 99 };
+    for (int bad : bad_indices) {
+        ArrangementParams arr = make_test_arrangement();
+        arr.outro_index = bad;
+
+        SectionState state = {};
+        state.current_section = 0;
+        state.outro_triggered = true;
+        state.bars_remaining = 1;  // decremented to 0 -> boundary flip this call
+        uint32_t seed = 12345u;
+        advance_section(state, arr, seed);
+
+        if (state.current_section < 0 || state.current_section >= arr.section_count) {
+            printf("  FAIL: outro_index %d left current_section at %d (section_count=%d)\n",
+                   bad, state.current_section, arr.section_count);
+            ok = false;
+        }
+    }
+    if (ok) printf("  PASS: advance_section rejects an out-of-range outro_index\n");
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -2220,6 +2316,8 @@ bool run_pulsar_sections_tests() {
     tally(test_section_comping_humanization_override_loads());
     tally(test_section_macro_subbar_lerp());
     tally(test_randomize_section_bars_bounds());
+    tally(test_select_next_section_never_returns_out_of_range_target());
+    tally(test_advance_section_rejects_out_of_range_outro());
     tally(test_select_next_lead_excludes_self_and_drums());
     tally(test_jam_lead_excludes_chordal_only_member());
     tally(test_duck_gate_is_deterministic());

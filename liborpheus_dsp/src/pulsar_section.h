@@ -16,7 +16,8 @@ inline int select_next_section(
     const SectionParam& sec = arr.sections[current];
     if (sec.transition_count == 0) return current;
 
-    float weights[kMaxSectionTransitions];
+    // Zero-initialised: an out-of-range target `continue`s without writing its slot.
+    float weights[kMaxSectionTransitions] = {};
     float total = 0.0f;
     for (int i = 0; i < sec.transition_count; i++) {
         int target = sec.transitions[i].target_index;
@@ -28,20 +29,30 @@ inline int select_next_section(
             recency *= sec.recency_decay;
         }
         weights[i] = base_weight * (0.05f + 0.95f * (1.0f - recency));
+        // A negative authored weight (or recency_decay > 1) would be summed into total but
+        // skipped by the selection loop, leaving the two integrating different distributions.
+        if (weights[i] < 0.0f) weights[i] = 0.0f;
         total += weights[i];
     }
 
     if (total <= 0.0f) return current;
 
+    // Skip zero-weight slots so an out-of-range target can never be returned: roll == 0
+    // satisfies `roll <= cumulative` at a skipped slot, and the old fall-through returned the
+    // last transition unconditionally. total > 0 guarantees last_weighted gets assigned.
     float roll = pattern_rand01(seed) * total;
     float cumulative = 0.0f;
+    int last_weighted = current;
     for (int i = 0; i < sec.transition_count; i++) {
+        if (weights[i] <= 0.0f) continue;
         cumulative += weights[i];
         if (roll <= cumulative) {
             return sec.transitions[i].target_index;
         }
+        last_weighted = sec.transitions[i].target_index;
     }
-    return sec.transitions[sec.transition_count - 1].target_index;
+    // Reached only when float accumulation leaves roll just past the final cumulative.
+    return last_weighted;
 }
 
 inline int randomize_section_bars(const SectionParam& sec, uint32_t& seed) {
@@ -164,7 +175,9 @@ inline bool advance_section(
     // outro_triggered may have been set mid-section, after we already planned
     // toward a different target. Re-route at the boundary; the ramp may have
     // morphed toward the wrong destination, but the outro takes precedence.
-    if (state.outro_triggered && arr.outro_index >= 0) {
+    // Bounds-checked like intro_index: outro_index is authored and unpacked unclamped, and
+    // current_section indexes both arr.sections[] and state.bars_since_visit[kMaxSections].
+    if (state.outro_triggered && arr.outro_index >= 0 && arr.outro_index < arr.section_count) {
         next = arr.outro_index;
     }
 

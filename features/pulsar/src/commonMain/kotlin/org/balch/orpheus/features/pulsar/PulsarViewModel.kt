@@ -654,8 +654,21 @@ class PulsarViewModel(
     // Per-track effective send base values. Section overrides may swap these
     // between vibe load and the next vibe load — pushEffectiveSends reads from
     // here so per-section reverb/delay sends survive DEEP/SPACE knob updates.
-    private val sendBaseDelay = FloatArray(8)
-    private val sendBaseReverb = FloatArray(8)
+    /**
+     * Per-slot send bases. C++ resolves sends with PULSAR_PICK, so the Space slot needs its own
+     * base or neither DEEP nor a section override reaches a track running its Space engine.
+     *
+     * Immutable and swapped as one reference: [applyVibe] runs on the caller's thread while the
+     * arrangement collector runs on `dispatcherProvider.io`, and both rewrite every slot.
+     */
+    private class SendBases(
+        val delayEdm: FloatArray = FloatArray(8),
+        val reverbEdm: FloatArray = FloatArray(8),
+        val delaySpace: FloatArray = FloatArray(8),
+        val reverbSpace: FloatArray = FloatArray(8),
+    )
+
+    @Volatile private var sendBases = SendBases()
 
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
@@ -957,6 +970,11 @@ class PulsarViewModel(
         // section's TrackSectionOverride to each track (or restore the vibe's
         // base value when no override is present). Static atomics flip
         // immediately; sends update via pushEffectiveSends.
+        // Deliberately NOT keyed on a vibe-load generation. arrangementStateFlow is a 5Hz poll
+        // of the engine and nothing resets it on load, so at the moment of a vibe switch it
+        // still holds the OUTGOING vibe's sectionIndex — firing on the load would apply the
+        // wrong section's overrides and stomp applyVibe's synchronous push for ~200ms.
+        // applyVibe covers the load; this collector covers section changes.
         scope.launch(dispatcherProvider.io) {
             arrangementStateFlow
                 .map { it.sectionIndex }
@@ -1042,8 +1060,9 @@ class PulsarViewModel(
         // lastSectionMult to introMult, so the section-0 collector stays idempotent. (In
         // MIX_GATED, presetFlow re-runs this after the graph-ready re-apply, so this push — not
         // applyVibe's — is the last writer; a flat value here is the "intro at default" bug.)
-        val introIdx = provider.vibe.arrangement?.introIndex ?: 0
-        val introMult = provider.vibe.arrangement?.sections?.getOrNull(introIdx)?.bpmMultiplier ?: 1.0f
+        val savedArrangement = provider.vibe.arrangement
+        val introMult = savedArrangement?.introIndex
+            ?.let { savedArrangement.sections.getOrNull(it)?.bpmMultiplier } ?: 1.0f
         bpmId.value = FloatValue(saved.bpm * introMult)
         globalTempo.setBpm((saved.bpm * introMult).toDouble())
         deepId.value = FloatValue(saved.deep)
@@ -1212,16 +1231,17 @@ class PulsarViewModel(
             trackLpgDecaySpaceIds[i].value = FloatValue(spa.lpgDecay)
             trackLpgColourIds[i].value = FloatValue(edm.lpgColour)
             trackLpgColourSpaceIds[i].value = FloatValue(spa.lpgColour)
-            trackDelaySendSpaceIds[i].value = FloatValue(spa.delaySend)
-            trackReverbSendSpaceIds[i].value = FloatValue(spa.reverbSend)
         }
-        // Seed per-track send bases from vibe; section overrides may swap these later.
-        // sendBase[] tracks the EDM-side default; the C++ delay unit reads the
-        // active slot's send (via pulsar_track_active_engine) for feedback blending.
-        for (i in 0 until 8) {
-            val tv = vibe.tracks.getOrNull(i)
-            sendBaseDelay[i] = tv?.engineEdm?.delaySend ?: 0f
-            sendBaseReverb[i] = tv?.engineEdm?.reverbSend ?: 0f
+        // Seed per-slot send bases from the vibe; section overrides may swap these later.
+        // pushEffectiveSends scales both slots by DEEP and publishes the ports.
+        sendBases = SendBases().apply {
+            for (i in 0 until 8) {
+                val tv = vibe.tracks.getOrNull(i)
+                delayEdm[i] = tv?.engineEdm?.delaySend ?: 0f
+                reverbEdm[i] = tv?.engineEdm?.reverbSend ?: 0f
+                delaySpace[i] = tv?.engineSpace?.delaySend ?: 0f
+                reverbSpace[i] = tv?.engineSpace?.reverbSend ?: 0f
+            }
         }
         stepCountId.value = IntValue(vibe.stepCount)
         pushEffectiveSends(deepId.value.asFloat())
@@ -1444,8 +1464,13 @@ class PulsarViewModel(
         // was already on section 0, the new vibe's section-0 re-emission is suppressed and the
         // collector never applies the multiplier. Seeding lastSectionMult keeps the collector
         // idempotent: when section 0 does emit, newMult == oldMult and it early-returns.
-        val introIdx = vibe.arrangement?.introIndex ?: 0
-        val introMult = vibe.arrangement?.sections?.getOrNull(introIdx)?.bpmMultiplier ?: 1.0f
+        //
+        // null = C++ picks a random weighted start (pushArrangement sends -1), so no opening
+        // section is knowable here and everything below falls back to the flat vibe defaults.
+        val arrangement = vibe.arrangement
+        val introIdx = arrangement?.introIndex
+        val introMult = introIdx
+            ?.let { arrangement.sections.getOrNull(it)?.bpmMultiplier } ?: 1.0f
         bpmId.value = FloatValue(vibe.bpm * introMult)
         globalTempo.setBpm((vibe.bpm * introMult).toDouble())
         lastSectionMult = introMult
@@ -1458,6 +1483,13 @@ class PulsarViewModel(
         // Push arrangement data (MUST be before vibe generation increment)
         pushArrangement(vibe)
 
+        // Opening section's per-track overrides, synchronously and BEFORE the generation bump:
+        // load_vibe snapshots pulsar_track_envelope into track_solo_behavior and never refreshes
+        // it, so writing after the bump races that snapshot. The flow collector cannot cover this
+        // — it is a 5Hz poll, and audio is already live in EXPLICIT mode.
+        // applyPatternInputs = false is load-bearing; see its KDoc.
+        introIdx?.let { applyTrackOverridesForSection(it, applyPatternInputs = false) }
+
         // In MIX_GATED mode (Orpheus), auto-start on vibe load — mix knob controls audibility.
         // In EXPLICIT mode (DJ app), playing is controlled by PulsarPlaybackBridge, mix stays at 1.
         if (playbackMode == PulsarPlaybackMode.MIX_GATED) {
@@ -1467,7 +1499,7 @@ class PulsarViewModel(
             mixId.value = FloatValue(1f)
         }
 
-        // Trigger vibe reload (MUST be last)
+        // Trigger vibe reload (MUST be last — load_vibe consumes every port pushed above)
         vibeGenerationId.value = IntValue(vibeGenerationId.value.asInt() + 1)
     }
 
@@ -1496,24 +1528,41 @@ class PulsarViewModel(
      * Apply per-track overrides defined on the given section. For each track,
      * the effective value is `override?.field ?: tv.field`. Restores base
      * values automatically when the section has no override for that track.
+     *
+     * @param applyPatternInputs false at vibe load. `density` and the hold parameters are read
+     *   only by pattern generation (`load_vibe` and the déjà-vu regeneration), so an opening
+     *   section's values would bake into patterns nothing regenerates at a section boundary.
+     *   Volume, envelope profile and sends are re-read per render block, so they always land.
      */
-    private fun applyTrackOverridesForSection(sectionIndex: Int) {
+    private fun applyTrackOverridesForSection(sectionIndex: Int, applyPatternInputs: Boolean = true) {
         val vibe = vibeFlow.value
         val section = vibe.arrangement?.sections?.getOrNull(sectionIndex) ?: return
         val overrides = section.trackOverrides
+        val next = SendBases()
         for (i in 0 until 8) {
             val tv = vibe.tracks.getOrNull(i) ?: continue
             val edm = tv.engineEdm
+            val spa = tv.engineSpace
             val o = overrides?.get(i)
-            trackHoldProbabilityIds[i].value = FloatValue(o?.holdProbability ?: edm.holdProbability)
-            trackHoldLengthMinIds[i].value = IntValue(o?.holdLengthMin ?: edm.holdLengthMin)
-            trackHoldLengthMaxIds[i].value = IntValue(o?.holdLengthMax ?: edm.holdLengthMax)
+            if (applyPatternInputs) {
+                trackHoldProbabilityIds[i].value = FloatValue(o?.holdProbability ?: edm.holdProbability)
+                trackHoldLengthMinIds[i].value = IntValue(o?.holdLengthMin ?: edm.holdLengthMin)
+                trackHoldLengthMaxIds[i].value = IntValue(o?.holdLengthMax ?: edm.holdLengthMax)
+                trackHoldProbabilitySpaceIds[i].value = FloatValue(o?.holdProbability ?: spa.holdProbability)
+                trackHoldLengthMinSpaceIds[i].value = IntValue(o?.holdLengthMin ?: spa.holdLengthMin)
+                trackHoldLengthMaxSpaceIds[i].value = IntValue(o?.holdLengthMax ?: spa.holdLengthMax)
+                genreDensityIds[i].value = FloatValue(o?.density ?: tv.density)
+            }
+            // Both slots: C++ picks per render block by the live engine_index.
             trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
-            genreDensityIds[i].value = FloatValue(o?.density ?: tv.density)
+            trackVolumeSpaceIds[i].value = FloatValue(o?.volume ?: spa.volume)
             trackEnvelopeIds[i].value = IntValue((o?.envelopeProfile ?: tv.envelopeProfile).id)
-            sendBaseDelay[i] = o?.delaySend ?: edm.delaySend
-            sendBaseReverb[i] = o?.reverbSend ?: edm.reverbSend
+            next.delayEdm[i] = o?.delaySend ?: edm.delaySend
+            next.reverbEdm[i] = o?.reverbSend ?: edm.reverbSend
+            next.delaySpace[i] = o?.delaySend ?: spa.delaySend
+            next.reverbSpace[i] = o?.reverbSend ?: spa.reverbSend
         }
+        sendBases = next
         pushEffectiveSends(deepId.value.asFloat())
     }
 
@@ -1523,9 +1572,12 @@ class PulsarViewModel(
         val floor = vibe.effects.deepFloor
         // SPACE boosts DEEP with a per-vibe floor: effectiveDeep = deep * (floor + space * (1 - floor))
         val effectiveDeep = deep * (floor + space * (1.0f - floor))
+        val bases = sendBases
         for (i in 0 until 8) {
-            trackDelaySendIds[i].value = FloatValue(sendBaseDelay[i] * effectiveDeep)
-            trackReverbSendIds[i].value = FloatValue(sendBaseReverb[i] * effectiveDeep)
+            trackDelaySendIds[i].value = FloatValue(bases.delayEdm[i] * effectiveDeep)
+            trackReverbSendIds[i].value = FloatValue(bases.reverbEdm[i] * effectiveDeep)
+            trackDelaySendSpaceIds[i].value = FloatValue(bases.delaySpace[i] * effectiveDeep)
+            trackReverbSendSpaceIds[i].value = FloatValue(bases.reverbSpace[i] * effectiveDeep)
         }
     }
 

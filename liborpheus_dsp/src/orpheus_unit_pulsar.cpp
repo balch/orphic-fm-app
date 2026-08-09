@@ -3714,8 +3714,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (ei < 0) ei = 0;
             if (ei > 23) ei = 23;
             const EngineModRange& mr = kEngineModRanges[ei];
+            // Bias follows lfo_depth, not depth_scale: depth_scale folds in the energy curve,
+            // and a live energy sweep must not drift an authored static tone. The swing is
+            // already depth-scaled in mod_lfo_output[], so apply_mod must not rescale it.
             if (!ts.pin_harmonics) {
-                mod_harmonics = apply_mod(mod_harmonics, ts.mod_lfo_output[2], 1.0f,
+                mod_harmonics = apply_mod(mod_harmonics, ts.mod_lfo_output[2], lfo_depth,
                                           mr.harmonics_min, mr.harmonics_max, mr.harmonics_safe);
             } else if (ts.harmonics_modulation > 0.001f) {
                 // Pinned, but the vibe opts in to a bounded LFO swing around the
@@ -3724,11 +3727,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 mod_harmonics = ts.harmonics + ts.mod_lfo_output[2] * ts.harmonics_modulation;
             }
             if (!ts.pin_timbre) {
-                mod_timbre = apply_mod(mod_timbre, ts.mod_lfo_output[0], 1.0f,
+                mod_timbre = apply_mod(mod_timbre, ts.mod_lfo_output[0], lfo_depth,
                                        mr.timbre_min, mr.timbre_max, true);
             }
             if (!ts.pin_morph) {
-                mod_morph = apply_mod(mod_morph, ts.mod_lfo_output[1], 1.0f,
+                mod_morph = apply_mod(mod_morph, ts.mod_lfo_output[1], lfo_depth,
                                       mr.morph_min, mr.morph_max, mr.morph_safe);
             }
         }

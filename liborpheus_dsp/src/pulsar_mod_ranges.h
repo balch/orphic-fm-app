@@ -81,17 +81,23 @@ static constexpr EngineModRange kEngineModRanges[24] = {
 // Apply bipolar LFO modulation to a base parameter value, clamped to the
 // safe range for the current engine. If !safe, returns base unchanged.
 //
-// lfo_bipolar: [-1, +1] LFO output
-// depth:       [0, 1] modulation depth
+// lfo_bipolar: LFO output, ALREADY scaled by the caller's depth (Pulsar keeps the scaled copy
+//              in ts.mod_lfo_output[]). Scaling it again here would square the depth.
+// bias_depth:  [0, 1], the same depth the caller used. Recentres `base` toward the range centre
+//              so a wide swing is not clipped asymmetrically. Must track the depth: at depth 0
+//              there is no swing, so recentring is a pure detune of an authored value.
 // range_min/max: safe parameter range from kEngineModRanges
 // safe:        harmonics_safe or morph_safe from kEngineModRanges
-inline float apply_mod(float base, float lfo_bipolar, float depth,
+inline float apply_mod(float base, float lfo_bipolar, float bias_depth,
                        float range_min, float range_max, bool safe) {
     if (!safe) return base;
+    // Authored value, unvalidated upstream; past 1.0 the recentring overshoots the centre.
+    if (bias_depth < 0.0f) bias_depth = 0.0f;
+    if (bias_depth > 1.0f) bias_depth = 1.0f;
     float center = (range_min + range_max) * 0.5f;
-    float biased = base + (center - base) * depth * 0.5f;
+    float biased = base + (center - base) * bias_depth * 0.5f;
     float half_range = (range_max - range_min) * 0.5f;
-    float result = biased + lfo_bipolar * depth * half_range;
+    float result = biased + lfo_bipolar * half_range;
     if (result < range_min) result = range_min;
     if (result > range_max) result = range_max;
     return result;

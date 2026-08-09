@@ -9,6 +9,55 @@
 #include <cmath>
 #include <cstring>
 
+// apply_mod's bias recentres `base` toward the engine's range centre so a large swing is not
+// clipped asymmetrically. The three call sites passed a literal 1.0f, so the bias ran at full
+// strength even at modLfoDepth 0, where there is no swing to recentre. The swing term was
+// always correct — mod_lfo_output[] is pre-scaled before apply_mod sees it.
+//
+// Depth 1.0 must keep the original recentring behaviour, and the swing must NOT be scaled
+// twice — the naive `1.0f -> lfo_depth` edit would square it.
+static bool test_mod_lfo_depth_scales_bias_not_swing() {
+    printf("\n  A/B: bias scales with depth, swing does not double-scale\n");
+    bool pass = true;
+    constexpr float kTol = 1e-4f;
+
+    // MOD (engine 20): harmonics range 0.00-1.00, centre 0.50.
+    const float base = 0.90f, lo = 0.0f, hi = 1.0f, centre = 0.5f;
+
+    // No swing: the bias alone, at three depths.
+    struct { float depth; float expect; } cases[] = {
+        { 0.0f, base },                                  // untouched
+        { 0.5f, base + (centre - base) * 0.5f * 0.5f },  // quarter of the way in
+        { 1.0f, base + (centre - base) * 1.0f * 0.5f },  // the historical full bias
+    };
+    for (auto& c : cases) {
+        float got = apply_mod(base, 0.0f, c.depth, lo, hi, true);
+        if (std::fabs(got - c.expect) > kTol) {
+            printf("    FAIL: depth %.2f -> %.4f, expected %.4f\n", c.depth, got, c.expect);
+            pass = false;
+        }
+    }
+
+    // Swing: lfo_bipolar arrives pre-scaled, so a caller at depth 0.5 must move half_range * 0.5,
+    // not * 0.25. Base 0.60 rather than 0.90 keeps the result clear of the [0,1] clamp — at 0.90
+    // both the correct and the double-scaled answer clamp to 1.00 and the test goes blind.
+    {
+        const float swing_base = 0.60f;
+        const float half_range = (hi - lo) * 0.5f;
+        float biased = swing_base + (centre - swing_base) * 0.5f * 0.5f;
+        float expect = biased + 0.5f * half_range;          // 0.575 + 0.25 = 0.825
+        float got = apply_mod(swing_base, 0.5f, 0.5f, lo, hi, true);
+        if (std::fabs(got - expect) > kTol) {
+            printf("    FAIL: pre-scaled swing got scaled again — %.4f, expected %.4f\n",
+                   got, expect);
+            pass = false;
+        }
+    }
+
+    if (pass) printf("    PASS: bias follows depth, swing is applied exactly once\n");
+    return pass;
+}
+
 bool run_pulsar_texture_tests() {
     printf("\n=== Pulsar Texture Tests ===\n\n");
     int pass = 0, fail = 0;
@@ -446,6 +495,10 @@ bool run_pulsar_texture_tests() {
             fail++;
         }
     }
+
+    // Appended last: the numbered blocks above label themselves with `pass + fail + 1`, so
+    // inserting a scoring test ahead of them silently renumbers the suite.
+    if (test_mod_lfo_depth_scales_bias_not_swing()) pass++; else fail++;
 
     // ── Summary ──
     printf("\n  Pulsar Texture: %d passed, %d failed\n", pass, fail);
