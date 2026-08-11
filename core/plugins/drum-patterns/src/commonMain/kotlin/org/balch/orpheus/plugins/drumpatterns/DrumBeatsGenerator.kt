@@ -1,4 +1,4 @@
-package org.balch.orpheus.plugins.drum
+package org.balch.orpheus.plugins.drumpatterns
 
 
 /**

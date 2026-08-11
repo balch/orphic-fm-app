@@ -63,6 +63,7 @@ kotlin {
             implementation(libs.logback.classic)
         }
         commonTest.dependencies {
+            implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
         }
     }
