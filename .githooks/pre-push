@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# Keeps noop/ cruft off remotes that aren't allowlisted.
+#
+# Install:  git config core.hooksPath .githooks   (absolute path if you use worktrees)
+# Override: git push --no-verify
+
+set -uo pipefail
+
+NO_OP_PATHS=(
+    noop
+)
+
+# Allowlisted remotes come from local config, so none are named here:
+#   git config --add noop.remote <url-substring>
+# Nothing configured means nothing allowlisted.
+for allowed in $(git config --get-all noop.remote); do
+    case "${2:-}" in *"$allowed"*) exit 0 ;; esac
+done
+
+blocked=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # All-zero local sha means the ref is being deleted; nothing is published.
+    [[ "$local_sha" =~ ^0+$ ]] && continue
+
+    for path in "${NO_OP_PATHS[@]}"; do
+        # The tree, not the diff: a branch can carry a guarded path from an ancestor
+        # commit that none of the pushed commits touch.
+        if [ -n "$(git ls-tree "$local_sha" -- "$path" 2>/dev/null)" ]; then
+            echo "blocked: ${local_ref#refs/heads/} carries ${path}/" >&2
+            blocked=1
+            break
+        fi
+    done
+done
+
+exit $blocked

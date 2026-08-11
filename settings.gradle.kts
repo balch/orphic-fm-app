@@ -136,3 +136,6 @@ include(":features:tides")
 include(":features:pulsar")
 include(":features:timer")
 include(":tools:vibe-codegen")
+
+// Local scratch modules, when present.
+file("noop/settings.gradle.kts").takeIf { it.isFile }?.let { apply(from = it) }
