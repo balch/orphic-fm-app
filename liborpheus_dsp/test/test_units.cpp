@@ -34,6 +34,7 @@ static bool test_clock() {
     return pass;
 }
 
+#ifdef ORPHEUS_WITH_GRIDS
 static bool test_grids() {
     printf("\n=== Test: Grids drum triggers ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
@@ -90,6 +91,7 @@ static bool test_grids() {
     orpheus_engine_destroy(engine);
     return pass;
 }
+#endif
 
 static bool test_marbles() {
     printf("\n=== Test: Marbles random sequencer ===\n");
@@ -493,7 +495,9 @@ bool run_unit_tests() {
     tally(test_voice_coupling());
     tally(test_fm_modulation());
     tally(test_clock());
+#ifdef ORPHEUS_WITH_GRIDS
     tally(test_grids());
+#endif
     tally(test_marbles());
     tally(test_marbles_y_output());
     tally(test_looper());

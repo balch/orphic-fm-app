@@ -461,8 +461,12 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_reverb(u, engine, num_frames, sr); break;
             case UNIT_CLOCK:
                 unit_process_clock(u, engine, num_frames, sr); break;
+#ifdef ORPHEUS_WITH_GRIDS
+            // Compiled out for commercial builds. The switch ends in `default: break;`, so a
+            // graph carrying this node degrades to a silent no-op rather than crashing.
             case UNIT_GRIDS:
                 unit_process_grids(u, engine, num_frames, sr); break;
+#endif
             case UNIT_MARBLES:
                 unit_process_marbles(u, engine, num_frames, sr); break;
             case UNIT_LOOPER:

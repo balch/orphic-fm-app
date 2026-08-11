@@ -137,9 +137,9 @@ set(ORPHEUS_SRC
     "src/orpheus_monitor.cpp"
     "src/orpheus_unit_basic.cpp"
     "src/orpheus_unit_bender.cpp"
+    "src/orpheus_unit_clock.cpp"
     "src/orpheus_unit_clouds.cpp"
     "src/orpheus_unit_delay.cpp"
-    "src/orpheus_unit_grids.cpp"
     "src/orpheus_unit_lfo.cpp"
     "src/orpheus_unit_looper.cpp"
     "src/orpheus_unit_marbles.cpp"
@@ -178,6 +178,13 @@ set(ORPHEUS_SRC
     "src/chaos/chua.cpp"
 )
 
+# MI licenses AVR projects GPL-3.0 and STM32F projects MIT. Grids is AVR, so this unit and its
+# pattern ROM are the only copyleft code in the library; commercial apps build with it OFF.
+option(ORPHEUS_WITH_GRIDS "Include the MI Grids pattern generator (GPL-3.0)" ON)
+if(ORPHEUS_WITH_GRIDS)
+    list(APPEND ORPHEUS_SRC "src/orpheus_unit_grids.cpp")
+endif()
+
 # ── Library target ────────────────────────────────
 add_library(orpheus_dsp STATIC
     ${ORPHEUS_SRC}
@@ -191,6 +198,12 @@ add_library(orpheus_dsp STATIC
     ${TIDES2_SRC}
     ${BRAIDS_SRC}
 )
+
+if(ORPHEUS_WITH_GRIDS)
+    # PUBLIC: the #ifdef in orpheus_units.h is read by consumers of the library, not just
+    # by its own sources.
+    target_compile_definitions(orpheus_dsp PUBLIC ORPHEUS_WITH_GRIDS)
+endif()
 
 target_include_directories(orpheus_dsp PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"

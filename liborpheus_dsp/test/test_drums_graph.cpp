@@ -667,6 +667,7 @@ static bool test_warps_source_routing() {
 // Clock → Grids → drum UNIT_PLAITS (via IPORT_GATE) → master
 // Verifies the complete Grids pattern → drum trigger → audio pipeline
 // ═══════════════════════════════════════════════════════════════════
+#ifdef ORPHEUS_WITH_GRIDS
 static bool test_grids_drum_integration() {
     printf("\n=== Test: Grids → drum voice integration ===\n");
     bool pass = true;
@@ -823,6 +824,7 @@ static bool test_grids_drum_integration() {
     printf("Grids drum integration test: %s\n", pass ? "PASS" : "FAIL");
     return pass;
 }
+#endif
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 11: Drum slot gain balance and voice isolation
@@ -943,7 +945,9 @@ bool run_drums_graph_tests() {
     tally(test_graph_multi_source_sum());
     tally(test_graph_effects_bypass_parity());
     tally(test_warps_source_routing());
+#ifdef ORPHEUS_WITH_GRIDS
     tally(test_grids_drum_integration());
+#endif
     tally(test_drum_slot_gains());
     tally(test_drum_bypass_toggle());
     TEST_SUITE_RETURN(suite_pass, suite_fail);

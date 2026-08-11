@@ -48,6 +48,8 @@ apps/orpheus/shared/src/wasmJsMain/resources/orpheus_dsp.wasm
 liborpheus_dsp/build_test/
 liborpheus_dsp/build-desktop/
 liborpheus_dsp/build-asan/
+liborpheus_dsp/build-nogrids/
+liborpheus_dsp/desktop/build*/
 liborpheus_dsp/platform/ios/build-*/
 liborpheus_dsp/.cache/
 

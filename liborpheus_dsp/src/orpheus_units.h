@@ -38,7 +38,9 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
 void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_clock(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+#ifdef ORPHEUS_WITH_GRIDS
 void unit_process_grids(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+#endif
 void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_looper(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);

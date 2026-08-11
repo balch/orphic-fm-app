@@ -16,10 +16,22 @@ if(NOT DEFINED EURORACK_DIR)
     set(EURORACK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../../../../eurorack"
         CACHE PATH "Path to eurorack source repo")
 endif()
+# This app ships commercially; MI Grids is GPL-3.0 and must not be linked.
+set(ORPHEUS_WITH_GRIDS OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(
     "${LIBORPHEUS_DIR}"
     "${CMAKE_CURRENT_BINARY_DIR}/liborpheus_dsp"
 )
+
+# Placed AFTER add_subdirectory so it reads the value liborpheus_dsp actually saw -- a stale
+# CMakeCache would otherwise override the set() above without a word.
+if(ORPHEUS_WITH_GRIDS)
+    message(FATAL_ERROR
+        "GPL-3.0 Grids code would be linked into a commercial app. A stale CMakeCache is the "
+        "usual cause -- delete the build directory and reconfigure.")
+endif()
+
 
 # ── Android bridge ────────────────────────────────
 # Reuse the JNI bridge sources from Orpheus's androidApp

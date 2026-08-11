@@ -56,8 +56,11 @@ val buildDesktopNative = tasks.register<Exec>("buildDesktopNative") {
     val targetDir = layout.projectDirectory.dir("src/main/resources/native/$osName-$arch")
     workingDir = desktopDir
     commandLine("bash", "-c",
-        "cmake -B build -DCMAKE_BUILD_TYPE=Release -DEURORACK_DIR=$eurorackDir && cmake --build build --config Release && " +
-        "mkdir -p ${targetDir.asFile.absolutePath} && cp build/$libName ${targetDir.asFile.absolutePath}/$libName"
+        // Own build dir, not just an own flag: all three desktop apps share liborpheus_dsp/desktop,
+        // so a cached ORPHEUS_WITH_GRIDS=OFF here would silently strip Grids from Orpheus.
+        "cmake -B build-nogrids -DCMAKE_BUILD_TYPE=Release -DORPHEUS_WITH_GRIDS=OFF -DEURORACK_DIR=$eurorackDir && " +
+        "cmake --build build-nogrids --config Release && " +
+        "mkdir -p ${targetDir.asFile.absolutePath} && cp build-nogrids/$libName ${targetDir.asFile.absolutePath}/$libName"
     )
 }
 
