@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.UNAUTHORED_TENSION_BOUND
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
@@ -101,14 +102,14 @@ class PulsarPlugin : DspPlugin {
     private var _tensionKeyShift = 0
     private var _tensionHalfLick = 0
     private var _tensionChromaticPassing = 0.0f
-    private var _tensionEvoTimbreLow = 0.25f
-    private var _tensionEvoTimbreHigh = 0.55f
+    private var _tensionEvoTimbreLow = UNAUTHORED_TENSION_BOUND
+    private var _tensionEvoTimbreHigh = UNAUTHORED_TENSION_BOUND
     private var _tensionEvoTimbreProb = 0.7f
-    private var _tensionEvoMorphLow = -1.0f
-    private var _tensionEvoMorphHigh = -1.0f
+    private var _tensionEvoMorphLow = UNAUTHORED_TENSION_BOUND
+    private var _tensionEvoMorphHigh = UNAUTHORED_TENSION_BOUND
     private var _tensionEvoMorphProb = 0.5f
-    private var _tensionEvoHarmLow = -1.0f
-    private var _tensionEvoHarmHigh = -1.0f
+    private var _tensionEvoHarmLow = UNAUTHORED_TENSION_BOUND
+    private var _tensionEvoHarmHigh = UNAUTHORED_TENSION_BOUND
     private var _tensionEvoHarmProb = 0.3f
     private var _tensionEvoAttackPoint = 0.5f
     private var _tensionEvoReleaseSpeed = 0.3f
@@ -426,28 +427,28 @@ class PulsarPlugin : DspPlugin {
             floatType { default = 0.0f; min = 0f; max = 1f; get { _tensionChromaticPassing }; set { _tensionChromaticPassing = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_TIMBRE_LOW) {
-            floatType { default = 0.25f; min = -1f; max = 1f; get { _tensionEvoTimbreLow }; set { _tensionEvoTimbreLow = it } }
+            floatType { default = UNAUTHORED_TENSION_BOUND; min = -1f; max = 1f; get { _tensionEvoTimbreLow }; set { _tensionEvoTimbreLow = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_TIMBRE_HIGH) {
-            floatType { default = 0.55f; min = -1f; max = 1f; get { _tensionEvoTimbreHigh }; set { _tensionEvoTimbreHigh = it } }
+            floatType { default = UNAUTHORED_TENSION_BOUND; min = -1f; max = 1f; get { _tensionEvoTimbreHigh }; set { _tensionEvoTimbreHigh = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_TIMBRE_PROB) {
             floatType { default = 0.7f; min = 0f; max = 1f; get { _tensionEvoTimbreProb }; set { _tensionEvoTimbreProb = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_MORPH_LOW) {
-            floatType { default = -1.0f; min = -1f; max = 1f; get { _tensionEvoMorphLow }; set { _tensionEvoMorphLow = it } }
+            floatType { default = UNAUTHORED_TENSION_BOUND; min = -1f; max = 1f; get { _tensionEvoMorphLow }; set { _tensionEvoMorphLow = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_MORPH_HIGH) {
-            floatType { default = -1.0f; min = -1f; max = 1f; get { _tensionEvoMorphHigh }; set { _tensionEvoMorphHigh = it } }
+            floatType { default = UNAUTHORED_TENSION_BOUND; min = -1f; max = 1f; get { _tensionEvoMorphHigh }; set { _tensionEvoMorphHigh = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_MORPH_PROB) {
             floatType { default = 0.5f; min = 0f; max = 1f; get { _tensionEvoMorphProb }; set { _tensionEvoMorphProb = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_HARM_LOW) {
-            floatType { default = -1.0f; min = -1f; max = 1f; get { _tensionEvoHarmLow }; set { _tensionEvoHarmLow = it } }
+            floatType { default = UNAUTHORED_TENSION_BOUND; min = -1f; max = 1f; get { _tensionEvoHarmLow }; set { _tensionEvoHarmLow = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_HARM_HIGH) {
-            floatType { default = -1.0f; min = -1f; max = 1f; get { _tensionEvoHarmHigh }; set { _tensionEvoHarmHigh = it } }
+            floatType { default = UNAUTHORED_TENSION_BOUND; min = -1f; max = 1f; get { _tensionEvoHarmHigh }; set { _tensionEvoHarmHigh = it } }
         }
         controlPort(PulsarSymbol.TENSION_EVO_HARM_PROB) {
             floatType { default = 0.3f; min = 0f; max = 1f; get { _tensionEvoHarmProb }; set { _tensionEvoHarmProb = it } }

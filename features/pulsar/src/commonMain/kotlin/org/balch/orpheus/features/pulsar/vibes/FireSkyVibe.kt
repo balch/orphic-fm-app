@@ -521,7 +521,6 @@ private class FireSkyVibeBase(
                 OrpheusEngine(
                     engineId = OrpheusEngineId.SD,
                     volume = 0.66f,
-                    timbre = 0.55f,
                     reverbSend = 0.12f,
                 ).let { snare ->
                     TrackVoice(
@@ -552,7 +551,6 @@ private class FireSkyVibeBase(
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
                     volume = 0.80f,
-                    harmonics = 0.58f,        // gritty waveshape
                     noteRangeLow = 31,        // G1
                     noteRangeHigh = 50,       // D3
                     reverbBrightness = 0.26f,
@@ -578,9 +576,6 @@ private class FireSkyVibeBase(
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
                     volume = 0.78f,
-                    harmonics = 0.74f,        // gritty / distorted character
-                    timbre = 0.64f,
-                    morph = 0.45f,
                     noteRangeLow = 50,        // D3
                     noteRangeHigh = 69,       // A4 — low-mid guitar register
                     reverbSend = 0.16f,
@@ -595,8 +590,6 @@ private class FireSkyVibeBase(
                         engineSpace = lead.copy(
                             engineId = OrpheusEngineId.DX3,
                             harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
-                            timbre = 0.55f,           // a touch of drawbar brightness
-                            morph = 0.50f,
                             lpgMode = LpgMode.SUSTAINED
                         ),
                         role = TrackRole.Melodic(
@@ -617,9 +610,6 @@ private class FireSkyVibeBase(
                 OrpheusEngine(
                     engineId = OrpheusEngineId.VA,
                     volume = 0.50f,
-                    harmonics = 0.031f,
-                    timbre = 0.55f,
-                    morph = 0.50f,
                     noteRangeLow = 48,        // C3
                     noteRangeHigh = 72,       // C5
                     reverbSend = 0.22f,
@@ -670,8 +660,6 @@ private class FireSkyVibeBase(
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
                     volume = 0.52f,
-                    harmonics = 0.68f,        // gritty, slightly less than the lead
-                    timbre = 0.58f,
                     modLfoRate = 0.30f,
                     modLfoDepth = 0.15f,
                     modLfoShape = 0.3f,

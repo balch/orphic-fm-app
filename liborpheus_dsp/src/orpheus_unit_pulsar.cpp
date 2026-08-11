@@ -2252,18 +2252,30 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // this track's evolution weight — no per-block stepping.
             float evo = state->tension_evo_smooth * evo_weight;
 
-            // Timbre sweep (only when not pinned)
+            // Timbre sweep (only when not pinned). Unauthored bounds sweep inside the track's
+            // OWN mood_timbre range instead of a fixed one the author never chose; morph and
+            // harmonics read unauthored as "off", timbre keeps its movement.
+            //
+            // The default used to be a hardcoded 0.25-0.55, so a vibe that authored no window
+            // was dragged there on ~70% of steps whatever its mood_timbre said. That also broke
+            // the documented lock idiom: a degenerate MacroTarget(x, x) now survives.
+            //
+            // Both bounds must be authored — with only a low, hi stays at the sentinel and the
+            // sweep runs toward -1, going dull at peak tension.
             if (!ts.pin_timbre && state->tension.evo_timbre_prob > 0.001f) {
                 uint32_t rng = step_hash(ts.playhead, t + 13, state->loop_count);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_timbre_prob) {
-                    float lo = state->tension.evo_timbre_low;
-                    float hi = state->tension.evo_timbre_high;
+                    const bool authored = state->tension.evo_timbre_low >= 0.0f
+                                       && state->tension.evo_timbre_high >= 0.0f;
+                    float lo = authored ? state->tension.evo_timbre_low : mm.mood_timbre.min_value;
+                    float hi = authored ? state->tension.evo_timbre_high : mm.mood_timbre.max_value;
                     mod_timbre = lo + (hi - lo) * evo;
                 }
             }
 
-            // Morph sweep (only when not pinned, only if specified)
-            if (!ts.pin_morph && state->tension.evo_morph_low >= 0.0f && state->tension.evo_morph_prob > 0.001f) {
+            // Morph sweep (only when not pinned, only if BOTH bounds are authored)
+            if (!ts.pin_morph && state->tension.evo_morph_low >= 0.0f
+                && state->tension.evo_morph_high >= 0.0f && state->tension.evo_morph_prob > 0.001f) {
                 uint32_t rng = step_hash(ts.playhead, t + 17, state->loop_count);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_morph_prob) {
                     float lo = state->tension.evo_morph_low;
@@ -2272,8 +2284,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
             }
 
-            // Harmonics nudge (only when not pinned, only if specified)
-            if (!ts.pin_harmonics && state->tension.evo_harm_low >= 0.0f && state->tension.evo_harm_prob > 0.001f) {
+            // Harmonics nudge (only when not pinned, only if BOTH bounds are authored)
+            if (!ts.pin_harmonics && state->tension.evo_harm_low >= 0.0f
+                && state->tension.evo_harm_high >= 0.0f && state->tension.evo_harm_prob > 0.001f) {
                 uint32_t rng = step_hash(ts.playhead, t + 23, state->loop_count);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_harm_prob) {
                     float lo = state->tension.evo_harm_low;

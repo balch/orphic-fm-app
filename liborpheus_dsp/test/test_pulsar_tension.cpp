@@ -98,7 +98,10 @@ static bool test_tension_struct_defaults() {
            && tp.key_shift == 0
            && tp.half_lick == HalfLickMode::OFF
            && std::fabs(tp.chromatic_passing) < 0.001f
-           && std::fabs(tp.evo_timbre_low - 0.25f) < 0.001f
+           // All three evo lows now share the -1 sentinel. For morph and harmonics it means
+           // "off"; for timbre it means "sweep inside the track's own mood_timbre window"
+           // rather than the hardcoded 0.25-0.55 that no vibe ever asked for.
+           && std::fabs(tp.evo_timbre_low - (-1.0f)) < 0.001f
            && std::fabs(tp.evo_morph_low - (-1.0f)) < 0.001f;
     printf("  Defaults check -- %s\n", ok ? "PASS" : "FAIL");
     return ok;

@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.audio.UNAUTHORED_TENSION_BOUND
 
 /**
  * How a FILL lick loops while a tension profile truncates it, and what happens to the
@@ -66,32 +67,50 @@ data class TonalTension(
  * Timbre evolution over the tension cycle. Engine knobs (harmonics, timbre, morph)
  * drift between low/high values as tension rises and falls.
  *
- * @param timbreLow Timbre value at minimum tension.
- * @param timbreHigh Timbre value at peak tension.
+ * Each low/high pair is authored together or not at all. Left unauthored, timbre sweeps inside
+ * the track's own moodTimbre window while morph and harmonics stay off.
+ *
+ * @param timbreLow Timbre at min tension.
+ * @param timbreHigh Timbre at peak tension.
  * @param timbreProbability Chance that timbre evolves each cycle, 0-1.
- * @param morphLow Morph at min tension (-1 = use track default).
- * @param morphHigh Morph at peak tension (-1 = use track default).
+ * @param morphLow Morph at min tension.
+ * @param morphHigh Morph at peak tension.
  * @param morphProbability Chance morph evolves.
- * @param harmonicsLow Harmonics at min tension (-1 = use track default).
- * @param harmonicsHigh Harmonics at peak tension (-1 = use track default).
+ * @param harmonicsLow Harmonics at min tension.
+ * @param harmonicsHigh Harmonics at peak tension.
  * @param harmonicsProbability Chance harmonics evolves.
  * @param attackPoint Where in the tension cycle the peak occurs, 0-1. 0.5 = midpoint.
  * @param releaseSpeed How quickly tension decays after the peak, 0-1. 0.3 = slow, 0.9 = fast snap-back.
  */
 @Serializable
 data class EvolutionTension(
-    val timbreLow: Float = 0.25f,
-    val timbreHigh: Float = 0.55f,
+    val timbreLow: Float = UNAUTHORED_TENSION_BOUND,
+    val timbreHigh: Float = UNAUTHORED_TENSION_BOUND,
     val timbreProbability: Float = 0.7f,
-    val morphLow: Float = -1f,
-    val morphHigh: Float = -1f,
+    val morphLow: Float = UNAUTHORED_TENSION_BOUND,
+    val morphHigh: Float = UNAUTHORED_TENSION_BOUND,
     val morphProbability: Float = 0.5f,
-    val harmonicsLow: Float = -1f,
-    val harmonicsHigh: Float = -1f,
+    val harmonicsLow: Float = UNAUTHORED_TENSION_BOUND,
+    val harmonicsHigh: Float = UNAUTHORED_TENSION_BOUND,
     val harmonicsProbability: Float = 0.3f,
     val attackPoint: Float = 0.5f,
     val releaseSpeed: Float = 0.3f,
-)
+) {
+    init {
+        // A lone bound leaves its partner at the sentinel, and the engine sweeps toward -1.
+        requirePaired("timbre", timbreLow, timbreHigh)
+        requirePaired("morph", morphLow, morphHigh)
+        requirePaired("harmonics", harmonicsLow, harmonicsHigh)
+    }
+}
+
+private fun requirePaired(name: String, low: Float, high: Float) {
+    val authored = low >= 0f
+    require(authored == (high >= 0f)) {
+        "EvolutionTension ${name}Low/${name}High must be authored together, got $low/$high. " +
+            "Set both, or neither to sweep inside the track's own macro window."
+    }
+}
 
 /**
  * Controls musical tension — the build-and-release arc that keeps things interesting.

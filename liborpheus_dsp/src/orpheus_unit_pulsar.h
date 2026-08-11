@@ -554,9 +554,11 @@ struct TensionParams {
     int key_shift = 0;
     HalfLickMode half_lick = HalfLickMode::OFF;
     float chromatic_passing = 0.0f;
-    float evo_timbre_low = 0.25f, evo_timbre_high = 0.55f, evo_timbre_prob = 0.7f;
-    float evo_morph_low = -1.0f, evo_morph_high = -1.0f, evo_morph_prob = 0.5f;
-    float evo_harm_low = -1.0f, evo_harm_high = -1.0f, evo_harm_prob = 0.3f;
+    // Unauthored: timbre sweeps inside the track's own mood_timbre window, morph/harm stay
+    // off. Both bounds must be authored together — a lone low sweeps toward the sentinel.
+    float evo_timbre_low = kUnauthoredTensionBound, evo_timbre_high = kUnauthoredTensionBound, evo_timbre_prob = 0.7f;
+    float evo_morph_low = kUnauthoredTensionBound, evo_morph_high = kUnauthoredTensionBound, evo_morph_prob = 0.5f;
+    float evo_harm_low = kUnauthoredTensionBound, evo_harm_high = kUnauthoredTensionBound, evo_harm_prob = 0.3f;
     float evo_attack_point = 0.5f;
     float evo_release_speed = 0.3f;
     float track_evo_weight[8] = {-1,-1,-1,-1,-1,-1,-1,-1};

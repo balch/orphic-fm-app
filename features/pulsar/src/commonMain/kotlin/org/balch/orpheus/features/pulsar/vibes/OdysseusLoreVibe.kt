@@ -151,13 +151,11 @@ class OdysseusLoreVibe : VibeProvider {
             ),
 
             tracks = listOf(
-                // 0 — kick: the floor of the whole thing. Long vactrol decay so each hit
-                // booms instead of clicking, and harmonics/timbre locked (min == max) so the
-                // Mood knob cannot thin the drum out from under the jam. Locking via the
+                // 0 — kick: the floor of the whole thing. Harmonics/timbre locked (min == max)
+                // so the Mood knob cannot thin the drum out from under the jam. Locking via the
                 // macro map rather than pinHarmonics keeps tension-evolution alive.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.BD, volume = 1f,
-                    lpgDecay = 0.72f, lpgColour = 0.35f,
                 ).let { kick ->
                     TrackVoice(
                         engineEdm = kick, engineSpace = kick,
@@ -175,7 +173,6 @@ class OdysseusLoreVibe : VibeProvider {
                 // the backbeat and spilling into tom rolls between the walkdown anchors.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.SD, volume = 0.95f,
-                    lpgDecay = 0.6f,
                 ).let { snare ->
                     TrackVoice(
                         engineEdm = snare, engineSpace = snare,
@@ -192,7 +189,7 @@ class OdysseusLoreVibe : VibeProvider {
                 // busier than a backbeat hat wants, which is exactly the point.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.HH, volume = 0.7f,
-                    lpgDecay = 0.55f, reverbSend = 0.15f,
+                    reverbSend = 0.15f,
                 ).let { ride ->
                     TrackVoice(
                         engineEdm = ride, engineSpace = ride,

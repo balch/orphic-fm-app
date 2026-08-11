@@ -1,5 +1,6 @@
 #include "test_harness.h"
 #include "test_pulsar_helpers.h"
+#include "stmlib/utils/random.h"
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/orpheus_graph.h"
 #include <cstdio>
@@ -145,6 +146,11 @@ bool run_pulsar_analysis_tests() {
     printf("\n=== Deep Space Vibe — Per-Track Analysis ===\n");
     system("mkdir -p liborpheus_dsp/test/output");
 
+    // This suite pins the process-global stmlib RNG below and renders nine 10-second passes.
+    // Restore it on the way out: later suites inherit whatever state they are handed, and this
+    // one runs before master_fader_pulsar.
+    const uint32_t saved_rng = stmlib::Random::state();
+
     static constexpr int SR = 48000;
     static constexpr int BLOCK = 512;
     static constexpr int DURATION = 10;  // seconds
@@ -174,6 +180,11 @@ bool run_pulsar_analysis_tests() {
             engine->pulsar_track_mute[t].store(t == solo_track ? 0 : 1, std::memory_order_relaxed);
         }
 
+        // Pin BOTH RNGs: setup_deep_space_v2 leaves pulsar_seed at 0, and load_vibe
+        // re-stirs from the wall clock when the seed is 0 — so two identical runs
+        // render different patterns and any A/B off this suite is noise.
+        engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBEA70000u);
         trigger_vibe_load(engine);
 
         std::vector<float> stereo(total_frames * 2, 0.0f);
@@ -232,6 +243,11 @@ bool run_pulsar_analysis_tests() {
         engine->pulsar_complexity.store(0.1f, std::memory_order_relaxed);
         engine->clock_bpm.store(55.0f, std::memory_order_relaxed);
 
+        // Pin BOTH RNGs: setup_deep_space_v2 leaves pulsar_seed at 0, and load_vibe
+        // re-stirs from the wall clock when the seed is 0 — so two identical runs
+        // render different patterns and any A/B off this suite is noise.
+        engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
+        stmlib::Random::Seed(0xBEA70000u);
         trigger_vibe_load(engine);
 
         std::vector<float> stereo(total_frames * 2, 0.0f);
@@ -263,5 +279,6 @@ bool run_pulsar_analysis_tests() {
 
     printf("\n  WAV files: liborpheus_dsp/test/output/deep_space_*.wav\n");
     printf("  Listen to each track solo and the full mix.\n\n");
+    stmlib::Random::Seed(saved_rng);
     return true;
 }

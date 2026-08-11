@@ -8,6 +8,121 @@
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+#include "stmlib/utils/random.h"
+
+static constexpr float kAbSampleRate = 48000.0f;
+static constexpr int   kAbBlockSize  = 64;
+
+static GraphUnit ab_make_pulsar_unit() {
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type    = UNIT_PULSAR;
+    unit.enabled = true;
+    return unit;
+}
+
+static OrpheusEngine* ab_make_playing_engine() {
+    OrpheusEngine* engine = orpheus_engine_create(kAbSampleRate);
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.8f, std::memory_order_relaxed);
+    engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+    return engine;
+}
+
+// The tension timbre sweep must stay inside the track's own mood_timbre window when the vibe
+// authored no window of its own, and must honour an explicit window when it did.
+//
+// Uses track 4: at t < 5 the mod-LFO block does not run, so apply_mod cannot clamp the result to
+// the engine's safe range and confound the reading. MOD (engine 20) has a timbre floor of 0, so
+// the playability floors at :3803 leave it alone too.
+//
+// "Inside the window" alone would also hold if the sweep never fired at all, so the unauthored
+// arm is measured against a prob=0 control rather than a guessed constant: accent boost already
+// moves the no-sweep value around, and any fixed threshold sits a hair from the real reading.
+enum SweepArm { ARM_NONE, ARM_UNAUTHORED, ARM_AUTHORED };
+
+static bool test_evo_timbre_sweep_respects_the_authored_window() {
+    printf("\n  Tension timbre sweep follows the track's mood_timbre window\n");
+    bool pass = true;
+    const int kTrack = 4;
+    // One 16th at 120 BPM is 125 ms; 1024 blocks is ~1.4 s, so step_hash is sampled across
+    // ~11 playhead steps rather than the single step a short render would see.
+    const int kBlocks = 1024;
+
+    auto render_timbre = [&](SweepArm arm, float* out_lo, float* out_hi) {
+        OrpheusEngine* engine = ab_make_playing_engine();
+        setup_fixture_blues(engine);
+        engine->pulsar_track_engine_edm[kTrack].store(20, std::memory_order_relaxed);
+        engine->pulsar_track_engine_space[kTrack].store(20, std::memory_order_relaxed);
+        // A deliberately HIGH window: the old hardcoded 0.25-0.55 sweep sits far below it.
+        engine->pulsar_track_macros[kTrack].mood_timbre_min.store(0.80f, std::memory_order_relaxed);
+        engine->pulsar_track_macros[kTrack].mood_timbre_max.store(0.90f, std::memory_order_relaxed);
+        if (arm == ARM_AUTHORED) {
+            engine->pulsar_tension_evo_timbre_low.store(0.10f, std::memory_order_relaxed);
+            engine->pulsar_tension_evo_timbre_high.store(0.20f, std::memory_order_relaxed);
+        }
+        if (arm == ARM_NONE) {
+            engine->pulsar_tension_evo_timbre_prob.store(0.0f, std::memory_order_relaxed);
+        }
+        engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+        GraphUnit unit = ab_make_pulsar_unit();
+        float lo = 2.0f, hi = -2.0f;
+        for (int b = 0; b < kBlocks; b++) {
+            unit_process_pulsar(&unit, engine, kAbBlockSize, kAbSampleRate);
+            float v = engine->pulsar_track_mod_timbre_debug[kTrack].load(std::memory_order_relaxed);
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+        }
+        orpheus_engine_destroy(engine);
+        *out_lo = lo;
+        *out_hi = hi;
+    };
+
+    // Rendering advances the process-global stmlib RNG that the 808 voices draw from, and later
+    // suites inherit whatever state they are handed — master_fader_pulsar fails downstream
+    // otherwise. Re-seed per arm too, so no arm starts from the previous one's state.
+    const uint32_t saved_rng = stmlib::Random::state();
+    float none_low = 0.0f, none_high = 0.0f;
+    float unauthored_low = 0.0f, unauthored_high = 0.0f;
+    float authored_low = 0.0f, authored_high = 0.0f;
+
+    stmlib::Random::Seed(saved_rng);
+    render_timbre(ARM_NONE, &none_low, &none_high);
+    printf("    control (prob 0)            -> rendered timbre %.3f..%.3f\n", none_low, none_high);
+
+    stmlib::Random::Seed(saved_rng);
+    render_timbre(ARM_UNAUTHORED, &unauthored_low, &unauthored_high);
+    printf("    unauthored window [0.80, 0.90] -> rendered timbre %.3f..%.3f\n",
+           unauthored_low, unauthored_high);
+    if (unauthored_low < 0.70f) {
+        printf("      FAIL: dragged below the track's own window\n");
+        pass = false;
+    }
+    if (unauthored_low >= none_low - 1e-4f) {
+        printf("      FAIL: identical to the prob=0 control, so the sweep never fired and this "
+               "arm is not exercising the unauthored path\n");
+        pass = false;
+    }
+
+    stmlib::Random::Seed(saved_rng);
+    render_timbre(ARM_AUTHORED, &authored_low, &authored_high);
+    printf("    authored window   [0.10, 0.20] -> rendered timbre %.3f..%.3f\n",
+           authored_low, authored_high);
+    if (authored_low > 0.35f) {
+        printf("      FAIL: explicit evo_timbre_low/high was ignored\n");
+        pass = false;
+    }
+
+    stmlib::Random::Seed(saved_rng);
+
+    if (pass) printf("    PASS: unauthored follows mood_timbre, authored overrides it\n");
+    return pass;
+}
 
 // apply_mod's bias recentres `base` toward the engine's range centre so a large swing is not
 // clipped asymmetrically. The three call sites passed a literal 1.0f, so the bias ran at full
@@ -499,6 +614,7 @@ bool run_pulsar_texture_tests() {
     // Appended last: the numbered blocks above label themselves with `pass + fail + 1`, so
     // inserting a scoring test ahead of them silently renumbers the suite.
     if (test_mod_lfo_depth_scales_bias_not_swing()) pass++; else fail++;
+    if (test_evo_timbre_sweep_respects_the_authored_window()) pass++; else fail++;
 
     // ── Summary ──
     printf("\n  Pulsar Texture: %d passed, %d failed\n", pass, fail);

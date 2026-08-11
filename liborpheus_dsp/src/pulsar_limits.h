@@ -40,3 +40,8 @@ static constexpr int kSectionCompingHumanFields = 4;
 // raises kMaxSectionTransitions past the reserved stride.
 static_assert(kMaxSectionTransitions >= 1, "need at least one edge per section");
 static_assert(kMaxSections >= 1, "need at least one section");
+
+// Tension-evolution bound meaning "the vibe authored no window here". Safe as a sentinel
+// because every real bound is a 0-1 macro value. Lives here because orpheus_engine.h and
+// orpheus_unit_pulsar.h both declare defaults from it. Kotlin: UNAUTHORED_TENSION_BOUND.
+static constexpr float kUnauthoredTensionBound = -1.0f;

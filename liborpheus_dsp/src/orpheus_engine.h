@@ -947,14 +947,15 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_tension_key_shift{0};
     std::atomic<int>   pulsar_tension_half_lick{0};
     std::atomic<float> pulsar_tension_chromatic_passing{0.0f};
-    std::atomic<float> pulsar_tension_evo_timbre_low{0.25f};
-    std::atomic<float> pulsar_tension_evo_timbre_high{0.55f};
+    // Unauthored: timbre sweeps inside the track's own mood_timbre window, morph/harm stay off.
+    std::atomic<float> pulsar_tension_evo_timbre_low{kUnauthoredTensionBound};
+    std::atomic<float> pulsar_tension_evo_timbre_high{kUnauthoredTensionBound};
     std::atomic<float> pulsar_tension_evo_timbre_prob{0.7f};
-    std::atomic<float> pulsar_tension_evo_morph_low{-1.0f};
-    std::atomic<float> pulsar_tension_evo_morph_high{-1.0f};
+    std::atomic<float> pulsar_tension_evo_morph_low{kUnauthoredTensionBound};
+    std::atomic<float> pulsar_tension_evo_morph_high{kUnauthoredTensionBound};
     std::atomic<float> pulsar_tension_evo_morph_prob{0.5f};
-    std::atomic<float> pulsar_tension_evo_harm_low{-1.0f};
-    std::atomic<float> pulsar_tension_evo_harm_high{-1.0f};
+    std::atomic<float> pulsar_tension_evo_harm_low{kUnauthoredTensionBound};
+    std::atomic<float> pulsar_tension_evo_harm_high{kUnauthoredTensionBound};
     std::atomic<float> pulsar_tension_evo_harm_prob{0.3f};
     std::atomic<float> pulsar_tension_evo_attack_point{0.5f};
     std::atomic<float> pulsar_tension_evo_release_speed{0.3f};

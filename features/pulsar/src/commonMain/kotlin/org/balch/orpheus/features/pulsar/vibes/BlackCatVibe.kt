@@ -315,7 +315,6 @@ class BlackCatVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.SD,
                     volume = 0.68f,
-                    timbre = 0.52f,
                     reverbSend = 0.14f,
                 ).let { snare ->
                     TrackVoice(
@@ -348,9 +347,6 @@ class BlackCatVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
                     volume = 0.88f,
-                    harmonics = 0.45f,        // round core, mid punch
-                    timbre = 0.52f,
-                    morph = 0.45f,
                     noteRangeLow = 25,        // C#1
                     noteRangeHigh = 49,       // C#3 — auto lick octave centers ~C#2
                     reverbSend = 0.06f,       // nearly dry — forward in the mix
@@ -387,8 +383,6 @@ class BlackCatVibe : VibeProvider {
                     engineId = OrpheusEngineId.DX3,
                     volume = 0.48f,
                     harmonics = 0.888f,       // DX3 idx 28 "Syn orch" (auto-pinned, ear-tuned)
-                    timbre = 0.58f,           // a touch above center = horn-like edge
-                    morph = 0.50f,
                     noteRangeLow = 56,        // G#3
                     noteRangeHigh = 74,       // D5
                     reverbSend = 0.18f,
@@ -438,9 +432,6 @@ class BlackCatVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.FM,
                     volume = 0.50f,
-                    harmonics = 0.48f,
-                    timbre = 0.58f,           // bite
-                    morph = 0.42f,
                     noteRangeLow = 57,        // A3
                     noteRangeHigh = 79,       // G5
                     reverbSend = 0.16f,
@@ -467,8 +458,6 @@ class BlackCatVibe : VibeProvider {
                     engineId = OrpheusEngineId.DX3,
                     volume = 0.34f,
                     harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
-                    timbre = 0.50f,
-                    morph = 0.50f,
                     holdProbability = 0.72f,  // sustained bed
                     holdLengthMin = 2,
                     holdLengthMax = 6,
@@ -506,7 +495,6 @@ class BlackCatVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.NSE,
                     volume = 0.26f,
-                    timbre = 0.62f,
                     noteRangeLow = 60,
                     noteRangeHigh = 76,
                     reverbSend = 0.22f,
