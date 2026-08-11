@@ -49,7 +49,7 @@ See `.claude/skills/dsp-implementation/` for C++ unit creation, engine atomics, 
 
 `liborpheus_dsp/test/data/preset_*.h`, `default_graph.odwg` and `dj_graph.odwg` are generated from Kotlin and checked in for the C++ harness. **`jvmTest` only verifies them — it never writes to the working tree.** A drifted fixture fails the build with a line-level diff naming the source of truth.
 
-Both `.odwg` files must stay tracked. The C++ harness loads them and cannot generate them, so a missing one fails as `Cannot open DJ graph: ...` printed *above* the test banners, where it scrolls out of sight — the visible symptom is the `djapp` suite reporting `1/17`. A new graph topology (e.g. a Baton one) should be committed as soon as it is generated.
+Both `.odwg` files must stay tracked. The C++ harness loads them and cannot generate them, so a missing one fails as `Cannot open DJ graph: ...` printed *above* the test banners, where it scrolls out of sight — the visible symptom is the `djapp` suite reporting `1/17`. Any new graph topology should be committed as soon as it is generated.
 
 Regenerate deliberately, then commit the result:
 - Presets: `./gradlew :features:presets:exportPresets`

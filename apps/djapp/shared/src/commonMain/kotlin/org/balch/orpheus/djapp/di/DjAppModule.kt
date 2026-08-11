@@ -73,7 +73,7 @@ interface DjAppModule {
          * whose monitor would be held across this entire body, and this body is a cross-graph
          * call Metro can neither see nor order.
          *
-         * A monitor held across exactly that kind of hidden edge is what used to hang Baton's
+         * A monitor held across exactly that kind of hidden edge is what used to hang an app's
          * startup four launches out of five: an AB-BA deadlock between a scoped provider's
          * `DoubleCheck` and `FeatureCollection`'s then-extant cache lock, with `jstack` naming
          * both monitors. The collection's cache and lock are gone, so that specific cycle cannot

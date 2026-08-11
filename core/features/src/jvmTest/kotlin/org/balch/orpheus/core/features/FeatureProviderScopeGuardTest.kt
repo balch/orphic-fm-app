@@ -15,7 +15,7 @@ import kotlin.test.fail
  * whole provider body, and that body is a cross-graph call Metro can neither see nor order.
  * A monitor held across that kind of hidden edge is the shape that used to deadlock startup:
  * a scoped provider's `DoubleCheck` and `FeatureCollection`'s then-extant cache lock, taken in
- * opposite orders by the composing UI thread and a background coroutine, hung Baton four
+ * opposite orders by the composing UI thread and a background coroutine, hung an app four
  * launches out of five. The collection's cache and lock are gone, which removed that cycle;
  * this guard keeps anyone from rebuilding half of it.
  *
@@ -26,7 +26,7 @@ import kotlin.test.fail
  *
  * Source-parsing precedent in this repo: `ExportOdwgTest` in `:core:dsp-engine` reaches out of its
  * module with a relative path. `:core:features` is where this lives because it is the module that
- * owns the invariant, and nothing else can see all three app modules at once -- `:apps:*:shared`
+ * owns the invariant, and nothing else can see every app module at once -- `:apps:*:shared`
  * are siblings that never depend on each other.
  */
 class FeatureProviderScopeGuardTest {
@@ -37,10 +37,9 @@ class FeatureProviderScopeGuardTest {
          * cross-checked against a glob below: the list catches a file that moved, the glob catches
          * an app added later that nobody thought to list here.
          *
-         * Baton is deliberately absent: it does not exist on this branch. It stays covered
-         * anyway, because the glob scans every `*Module.kt` under `apps/`, so Baton is picked up
-         * automatically the moment it merges. Add it to this list then, so a *move* of the file
-         * is caught too.
+         * The glob is what covers an app this list has not heard of -- it scans every
+         * `*Module.kt` under `apps/`, so a new one is picked up the moment it lands. Add it
+         * here as well when that happens, so a *move* of the file is caught too.
          */
         val REQUIRED_MODULE_FILES = listOf(
             "apps/orpheus/shared/src/commonMain/kotlin/org/balch/orpheus/di/OrpheusModule.kt",
@@ -55,7 +54,6 @@ class FeatureProviderScopeGuardTest {
         val MIN_FEATURE_PROVIDERS = mapOf(
             "OrpheusModule.kt" to 3, // Pulsar, Timer, AiOptions
             "DjAppModule.kt" to 2,   // Pulsar, Timer
-            // "BatonAppModule.kt" to 1, // Pulsar -- restore when Baton merges
         )
     }
 
