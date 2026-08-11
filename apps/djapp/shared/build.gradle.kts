@@ -89,3 +89,50 @@ listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
             }
         }
     }
+
+// The jvmTest guard sees only the JVM runtime classpath. This sees every target, and names the
+// configuration carrying the GPL module rather than just reporting that a class is present.
+tasks.register("checkGplIsolation") {
+    group = "verification"
+    description = "Fails if :core:plugins:drum-patterns is reachable from this app."
+
+    // Resolution *roots* are captured here as Providers, not the live configuration container:
+    // that container is not serializable, so holding it across into doLast breaks the
+    // configuration cache.
+    val gplModule = ":core:plugins:drum-patterns"
+    val roots = configurations
+        .matching { it.isCanBeResolved && it.name.endsWith("RuntimeClasspath") }
+        .map { it.name to it.incoming.resolutionResult.rootComponent }
+        .toList()
+
+    doLast {
+        val offenders = roots.filter { (_, rootProvider) ->
+            val seen = mutableSetOf<ComponentIdentifier>()
+            val queue = ArrayDeque(listOf(rootProvider.get()))
+            var found = false
+            while (queue.isNotEmpty() && !found) {
+                val component = queue.removeFirst()
+                if (!seen.add(component.id)) continue
+                val id = component.id
+                if (id is ProjectComponentIdentifier && id.projectPath == gplModule) {
+                    found = true
+                } else {
+                    component.dependencies
+                        .filterIsInstance<ResolvedDependencyResult>()
+                        .forEach { queue.add(it.selected) }
+                }
+            }
+            found
+        }.map { it.first }
+
+        if (offenders.isNotEmpty()) {
+            throw GradleException(
+                "$gplModule (GPL-3.0) is reachable from this app via: " +
+                    offenders.joinToString() +
+                    "\nThis app ships commercially and must not link MI Grids."
+            )
+        }
+    }
+}
+
+tasks.named("check") { dependsOn("checkGplIsolation") }
