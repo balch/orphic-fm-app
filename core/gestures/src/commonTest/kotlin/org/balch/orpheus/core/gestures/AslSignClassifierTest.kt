@@ -128,7 +128,7 @@ class AslSignClassifierTest {
     }
 
     @Test
-    fun `LETTER_R - index and middle extended and crossed (right hand)`() {
+    fun `LETTER_R - index and middle extended and crossed - right hand`() {
         // R sign: index + middle extended, crossed (index tipX > middle tipX for right hand)
         // Ring + pinky curled, thumb not extended
         val (sign, conf) = classify(
@@ -304,7 +304,7 @@ class AslSignClassifierTest {
     }
 
     @Test
-    fun `NUM_4 - four fingers extended, thumb curled`() {
+    fun `NUM_4 - four fingers extended and thumb curled`() {
         val (sign, conf) = classify(
             thumbTip = thumbIn to 0.65f,
             indexTip = 0.40f to up,
@@ -343,7 +343,7 @@ class AslSignClassifierTest {
     }
 
     @Test
-    fun `ILY sign — thumb, index, pinky extended, middle and ring curled`() {
+    fun `ILY sign — thumb index pinky extended - middle and ring curled`() {
         val (landmarks, fingers) = hand(
             thumbTip = 0.25f to 0.40f,
             indexTip = 0.40f to 0.20f,
@@ -383,7 +383,7 @@ class AslSignClassifierTest {
     }
 
     @Test
-    fun `LETTER_A - fist (all curled)`() {
+    fun `LETTER_A - fist with all curled`() {
         val (sign, _) = classify(
             thumbTip = thumbIn to 0.65f,
             indexTip = 0.40f to down,

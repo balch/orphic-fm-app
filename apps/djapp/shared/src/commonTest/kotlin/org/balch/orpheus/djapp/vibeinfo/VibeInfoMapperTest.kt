@@ -171,7 +171,7 @@ class VibeInfoMapperTest {
     }
 
     @Test
-    fun `track 4 at low energy uses engineSpace (GRN = Grain)`() {
+    fun `track 4 at low energy uses engineSpace - GRN = Grain`() {
         // energy < 0.5 → pick engineSpace → GRN
         val result = mapVibeInfo(
             vibe = testVibe,
@@ -251,7 +251,7 @@ class VibeInfoMapperTest {
     // ─── Assertion 3: isPlaying from trackLevels vs threshold ──────────────────
 
     @Test
-    fun `track above threshold is playing, track below threshold is not`() {
+    fun `track above threshold is playing and track below threshold is not`() {
         val trackLevels = FloatArray(8) { 0.0f }
         trackLevels[0] = 0.05f  // above default threshold 0.02f
         trackLevels[1] = 0.01f  // below threshold

@@ -90,7 +90,7 @@ class PulsarMetadataProducerTest {
         assertEquals("Second", producer.titleFlow.value)
     }
 
-    @Test fun `no vibe yet publishes the neutral defaults, not a placeholder`() = runTest {
+    @Test fun `no vibe yet publishes the neutral defaults rather than a placeholder`() = runTest {
         val (session, producer) = buildProducer()
         assertEquals("Orpheus", producer.titleFlow.value, "a placeholder vibe must never reach the media session")
         assertEquals("", producer.subtitleFlow.value)

@@ -472,14 +472,14 @@ class ComplexParserTest {
     // ===== MIDI to Frequency Conversion Tests =====
     
     @Test
-    fun `midi note 69 is 440Hz (A4)`() {
+    fun `midi note 69 is 440Hz for A4`() {
         // Standard MIDI: A4 = 69 = 440Hz
         val freq = 440.0 * 2.0.pow((69 - 69) / 12.0)
         assertEquals(440.0, freq, 0.01)
     }
     
     @Test
-    fun `midi note 60 is 261Hz (middle C)`() {
+    fun `midi note 60 is 261Hz for middle C`() {
         // C4 = 60 = ~261.63Hz
         val freq = 440.0 * 2.0.pow((60 - 69) / 12.0)
         assertEquals(261.63, freq, 0.1)
