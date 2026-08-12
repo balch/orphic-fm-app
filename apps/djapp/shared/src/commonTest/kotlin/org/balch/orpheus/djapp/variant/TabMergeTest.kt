@@ -23,7 +23,9 @@ private class FakeContribution(
 }
 
 class TabMergeTest {
-    private val base = listOf(DjTab, MixTab, HornTab, TimerTab)
+    // Annotated, like djTabs itself: the objects' least upper bound is Any on Kotlin/Native,
+    // so an unannotated listOf here compiles on JVM and fails the iOS targets.
+    private val base: List<DjRoute> = listOf(DjTab, MixTab, HornTab, TimerTab)
 
     @Test fun emptyContributionsLeavesBaseUnchanged() {
         assertEquals(base, mergeTabContributions(base, emptyList()))
