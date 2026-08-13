@@ -86,6 +86,7 @@ fun VibeInfoSheet(
 
     OrpheusSlideUpSheet(
         onDismiss = onDismiss,
+        skipPartiallyExpanded = true,
         inactivityTimeoutMs = null,
     ) {
         VibeInfoContent(model = model)
