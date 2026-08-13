@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
-import org.balch.orpheus.core.audio.dsp.DspSynthEngine
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.SynthFeatureRegistry
 import org.balch.orpheus.core.features.feature
@@ -71,14 +70,18 @@ fun DjApp(
                     // Only audible when user dials up a reverb send.
                     // Persistence will override on subsequent launches.
                     val engine = graph.synthEngine
-                    if (engine is DspSynthEngine) {
-                        engine.setPluginPort("org.balch.orpheus.plugins.reverb", "time",
-                            PortValue.FloatValue(0.35f))
-                        engine.setPluginPort("org.balch.orpheus.plugins.reverb", "damping",
-                            PortValue.FloatValue(0.6f))
-                        engine.setPluginPort("org.balch.orpheus.plugins.reverb", "diffusion",
-                            PortValue.FloatValue(0.7f))
-                    }
+                    engine.setPluginPort(
+                        "org.balch.orpheus.plugins.reverb", "time",
+                        PortValue.FloatValue(0.35f)
+                    )
+                    engine.setPluginPort(
+                        "org.balch.orpheus.plugins.reverb", "damping",
+                        PortValue.FloatValue(0.6f)
+                    )
+                    engine.setPluginPort(
+                        "org.balch.orpheus.plugins.reverb", "diffusion",
+                        PortValue.FloatValue(0.7f)
+                    )
                 }
             }
 
