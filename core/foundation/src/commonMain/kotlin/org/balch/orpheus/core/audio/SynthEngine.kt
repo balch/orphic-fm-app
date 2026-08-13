@@ -1,5 +1,7 @@
 package org.balch.orpheus.core.audio
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,6 +17,7 @@ private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(Puls
 private val emptyPulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> = MutableStateFlow(null)
 private val emptyBeatPhaseFlow: StateFlow<Float> = MutableStateFlow(0f)
 private val emptyEngineRecreatedFlow: SharedFlow<Unit> = MutableSharedFlow<Unit>().asSharedFlow()
+private val completedGraphReady: Deferred<Unit> = CompletableDeferred(Unit)
 
 interface SynthEngine {
     fun start()
@@ -22,7 +25,7 @@ interface SynthEngine {
 
     /** Completes when the DSP graph is loaded and all ports are synced.
      *  ViewModels should await this before pushing vibe data. */
-    val graphReady: kotlinx.coroutines.Deferred<Unit> get() = kotlinx.coroutines.CompletableDeferred(Unit)
+    val graphReady: Deferred<Unit> get() = completedGraphReady
 
     /** True when a native C++ DSP engine is available (WASM, Android, desktop-native). */
     val hasNativeEngine: Boolean get() = false
