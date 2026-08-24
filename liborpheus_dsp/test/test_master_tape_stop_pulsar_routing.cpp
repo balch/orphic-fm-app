@@ -23,6 +23,7 @@
 #include "test_harness.h"
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_engine.h"
+#include "stmlib/utils/random.h"
 
 #include <cmath>
 #include <cstdio>
@@ -96,6 +97,10 @@ static OrpheusEngine* make_pulsar_engine() {
     // baseline_peak ~0.895, far above the 0.05 floor (and all three tests in
     // this suite pass with margin under it).
     engine->pulsar_seed.store(0xC0FFEE, std::memory_order_relaxed);
+    // Pin the process-global stmlib RNG too — the 808 voices draw from it, so
+    // pulsar_seed alone leaves baseline_peak suite-order dependent (measured
+    // 0.8126 solo vs 0.7519 in a full run). Restored in the suite entry point.
+    stmlib::Random::Seed(0xC0FFEEu);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
 
@@ -345,10 +350,14 @@ bool test_tape_stop_writes_pulsar_to_ring() {
 
 bool run_master_tape_stop_pulsar_routing_tests() {
     printf("master_tape_stop_pulsar:\n");
+    // make_pulsar_engine() re-seeds the process-global stmlib RNG per engine, so
+    // restore it here: later suites inherit whatever state they are handed.
+    const uint32_t saved_rng = stmlib::Random::state();
     int pass = 0, fail = 0;
     auto tally = [&](bool ok) { if (ok) ++pass; else ++fail; };
     tally(test_tape_stop_affects_pulsar_audio());
     tally(test_tape_stop_then_passthrough_returns_to_pulsar());
     tally(test_tape_stop_writes_pulsar_to_ring());
+    stmlib::Random::Seed(saved_rng);
     TEST_SUITE_RETURN(pass, fail);
 }

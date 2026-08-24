@@ -287,6 +287,7 @@ if(BUILD_TESTS)
         test/test_pulsar_anomaly_arm.cpp
         test/test_pulsar_lick_select.cpp
         test/test_pulsar_timing.cpp
+        test/test_pulsar_start.cpp
         test/test_pulsar_lick_marshalling.cpp
         test/test_pulsar_bass_line.cpp
         test/test_pulsar_lick_offset.cpp

@@ -81,9 +81,16 @@ void minimal_engine_setup(OrpheusEngine* engine, float bpm) {
 
 }  // namespace
 
-// ── Test: last_chord_index starts at -1 after vibe load ─────────────────────
-static bool test_last_chord_index_initial_state() {
-    printf("\n  Test: last_chord_index initialized to -1 across all tracks on vibe load\n");
+// ── Test: a vibe load clears every track's latched chord index ──────────────
+// Guards `ts.last_chord_index = -1` in load_vibe. Asserting -1 on a freshly
+// created engine proves nothing: -1 is the in-class initializer, so a
+// value-initialized PulsarState satisfies it whether or not load_vibe resets
+// anything. Playback has to run first so the field is demonstrably non-(-1),
+// and the reload has to happen while PLAYING — the `!playing || mix <= 0.001f`
+// early return sits above the generation check, so a swap while stopped never
+// reaches load_vibe at all.
+static bool test_last_chord_index_reset_on_vibe_load() {
+    printf("\n  Test: vibe load clears latched chord indices on every track\n");
     bool pass = true;
 
     OrpheusEngine* engine = orpheus_engine_create(48000);
@@ -92,9 +99,12 @@ static bool test_last_chord_index_initial_state() {
     minimal_engine_setup(engine, 120.0f);
     push_lick(engine, -1.0f);
     trigger_vibe_load(engine);
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
 
-    // Single short process tick to materialize state without advancing any step.
-    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+    // Run far enough for the progression to move off chord 0 and for tracks to
+    // latch it. Without this the test cannot distinguish a reset from a default.
+    for (int b = 0; b < 400; b++) unit_process_pulsar(&unit, engine, 512, 48000.0f);
 
     PulsarState* state = engine->pulsar_state;
     if (!state) {
@@ -102,14 +112,57 @@ static bool test_last_chord_index_initial_state() {
         orpheus_engine_destroy(engine);
         return false;
     }
+    int latched = 0;
+    for (int t = 0; t < 8; t++) if (state->tracks[t].last_chord_index >= 0) latched++;
+    if (latched == 0) {
+        printf("    FAIL: playback never latched a chord index on any track — this test's "
+               "premise (that the field goes non-(-1) in normal use) no longer holds\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+
+    // Stamp an impossible chord index on every track. Which tracks naturally hold
+    // a latched value is fixture- and seed-dependent (and the ones that do also
+    // tend to gate step 0, so they re-latch and cannot witness anything). The
+    // sentinel makes every track a candidate witness and makes a surviving stale
+    // value unmistakable rather than coincidentally equal to a legitimate one.
+    constexpr int kStaleSentinel = 99;
+    for (int t = 0; t < 8; t++) state->tracks[t].last_chord_index = kStaleSentinel;
+
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+
+    // The load boundary sounds steps[0], which legitimately re-latches the NEW
+    // progression's current chord on tracks that gate it — so those tracks
+    // cannot witness anything. A witness must have been latched BEFORE the
+    // reload and not gate step 0 after it: it reads -1 if load_vibe reset it,
+    // and its stale pre-reload index if it did not.
+    const int fresh_ci = state->chord_state.chord_index;
+    int witnesses = 0;
     for (int t = 0; t < 8; t++) {
-        if (state->tracks[t].last_chord_index != -1) {
-            printf("    FAIL: track %d last_chord_index = %d (expected -1)\n",
-                   t, state->tracks[t].last_chord_index);
+        const PulsarTrackState& ts = state->tracks[t];
+        const int lci = ts.last_chord_index;
+        if (!ts.steps[0].gate) {
+            witnesses++;
+            if (lci != -1) {
+                printf("    FAIL: track %d does not gate the new step 0, yet still holds "
+                       "last_chord_index = %d — load_vibe did not reset it\n", t, lci);
+                pass = false;
+            }
+        } else if (lci != -1 && lci != fresh_ci) {
+            printf("    FAIL: track %d holds last_chord_index = %d (expected -1 or the "
+                   "new progression's %d)\n", t, lci, fresh_ci);
             pass = false;
         }
     }
-    if (pass) printf("    PASS: all 8 tracks have last_chord_index == -1 immediately after vibe load\n");
+    if (witnesses == 0) {
+        printf("    FAIL: no track was both latched before the reload and silent on the new "
+               "step 0, so nothing could witness the reset\n");
+        pass = false;
+    }
+    if (pass)
+        printf("    PASS: %d track(s) latched before the reload; %d witness(es) cleared to -1\n",
+               latched, witnesses);
 
     orpheus_engine_destroy(engine);
     return pass;
@@ -272,7 +325,7 @@ bool run_pulsar_glide_tests() {
         if (fn()) passed++; else failed++;
     };
 
-    run(test_last_chord_index_initial_state);
+    run(test_last_chord_index_reset_on_vibe_load);
     run(test_first_chord_edge_skips_glide);
     run(test_step_glide_overrides_track);
     run(test_step_sentinel_falls_through_to_track);

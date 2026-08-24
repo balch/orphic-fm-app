@@ -1160,6 +1160,32 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
 
         // Reset state
         ts.playhead = 0;
+        // Resync on the first advance: adopt the NEW window and seat the playhead
+        // at its start without incrementing. Otherwise the opening pass
+        // advance-skips the downbeat and wraps at the PREVIOUS vibe's stale
+        // wrap_len. (Window start is 0 for every mode except JAM_LAST_BAR, whose
+        // window IS bar 2 — a FILL lead under it opens there by design.)
+        ts.resync_pending = true;
+        // Clear the window alongside the playhead that traverses it. Correctness
+        // does not rest on resync_pending being consumed first: any reader that
+        // runs before this track's first advance would otherwise see the previous
+        // vibe's window. wrap_len = 0 alone is NOT enough — the adopt-as-is branch
+        // falls through to playhead++ and reads steps[1].
+        ts.wrap_len = 0;
+        ts.wrap_start = 0;
+        ts.wrap_mode = HalfLickMode::OFF;
+        // A carried-over inversion would spuriously re-lock at the new vibe's
+        // first section flip.
+        ts.phase_inverted = false;
+        // The render path reads the SMOOTHED twins (duck gate, velocity shift), and
+        // their only drain is the per-bar slew inside the wrap handler — a bar away,
+        // then ~6 bars at kSoloModSlew to resolve a deep duck. clear_solo_modifiers
+        // zeroes the targets but not these, so a vibe loaded during a band solo
+        // opened ducked with no solo left to explain it. Snapping is safe here and
+        // only here: a vibe load is already a discontinuity, whereas the mid-song
+        // solo-end paths need the slew to avoid a click.
+        ts.solo_volume_mod_current = 0.0f;
+        ts.solo_density_mod_current = 0.0f;
         ts.gate_timer = 0.0f;
         ts.voice_active = false;
         ts.swing_offset = 0.0;
@@ -1726,6 +1752,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->last_root_note = root;
     state->last_scale_index = scale_idx;
     state->clock_accumulator = 0.0;
+    state->boundary_on_load = true;  // downbeat fires at sample 0, not a step late
     // mutation_seed is reset earlier (before init_section_state consumes it).
     state->loop_count = 0;
     state->loops_since_reset = 0;
@@ -2067,6 +2094,22 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // (it doesn't starve the scratch). Inert when no scratch is ever armed.
     const bool scratch_hold = engine->master_scratch_l.is_active();
 
+    // Vibe-load boundary: fire step 0 at sample 0 of the first playing block
+    // so every track resyncs onto the fresh window immediately. Parity stays
+    // even (playhead is 0), so the next natural threshold is the on-beat one.
+    //
+    // Unlike a natural boundary this one is INJECTED: no musical time elapsed at
+    // it. Everything keyed to elapsed 16ths must skip it — the chord clock and the
+    // wrap detector below both do, via its index. Keying off resync_pending instead
+    // would also catch the JAM_INVERTED section re-lock, where a real step DID pass.
+    int load_boundary_index = -1;
+    if (state->boundary_on_load && !scratch_hold &&
+        num_boundaries < kMaxStepBoundaries) {
+        state->boundary_on_load = false;
+        load_boundary_index = num_boundaries;
+        step_boundary_samples[num_boundaries++] = 0;
+    }
+
     // Swing amount is constant across the block: the complexity macro of
     // track 0 provides the live groove amount, with the vibe's authored
     // genre swing as a floor (pulsar_genre_swing was previously loaded but
@@ -2078,8 +2121,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     const double swing_shift =
         static_cast<double>(swing_amount) * 0.5 * samples_per_step;
 
-    for (int i = 0; i < num_frames; i++) {
-        if (!scratch_hold) state->clock_accumulator += 1.0;
+    // The scratch freeze is hoisted out of the loop rather than gating only the
+    // increment: a held accumulator still SATISFIES a threshold that shrinks
+    // under it (tempo drift or a swing change both move it), so leaving the
+    // comparison live let boundaries fire during the freeze — and keep firing
+    // until the accumulator drained. Freezing means no advance AND no boundary.
+    for (int i = 0; i < num_frames && !scratch_hold; i++) {
+        state->clock_accumulator += 1.0;
 
         // A swung pair must total exactly 2 * samples_per_step: lengthening
         // the even (on-beat) step delays the odd (off-beat) onset, and the
@@ -2338,15 +2386,23 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // so the opening figure repeats/jams (its tone still breathes via evolution).
             // The helper latches the loop length at each wrap so a mid-loop mode change
             // cannot strand the playhead past its old wrap point.
+            // The injected vibe-load boundary consumes no musical time: it exists
+            // only to seat the playhead on the new window and sound steps[0].
+            const bool is_load_boundary = (b == load_boundary_index);
             pulsar_advance_playhead(ts, state->tension.half_lick);
 
-            // Advance chord progression on track 0 step boundaries
-            if (t == 0) {
+            // Advance chord progression on track 0 step boundaries. The load
+            // boundary is not an elapsed 16th, so ticking it here would put the
+            // chord grid permanently one step ahead of the drum grid.
+            if (t == 0 && !is_load_boundary) {
                 advance_chord(state->chord_state, complexity, mood);
             }
 
-            // Detect loop wrap (playhead wrapped to 0) — trigger mutation
-            if (ts.playhead == 0 && prev_playhead > 0 && t == 0) {
+            // Detect loop wrap (playhead wrapped to 0) — trigger mutation.
+            // Same exclusion as the chord clock: this drives loop_count, section
+            // advancement and every master-anomaly roll, so counting the load
+            // boundary as a bar would drift them against the chord clock.
+            if (ts.playhead == 0 && prev_playhead > 0 && t == 0 && !is_load_boundary) {
                 mutate_patterns(state, complexity, engine);
 
                 // ── Section / Solo advancement ──
@@ -3274,7 +3330,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                         uint32_t prob_hash = step_hash(ts.playhead, t, state->loop_count);
                         float prob_roll = static_cast<float>(prob_hash & 0xFFFF) / 65535.0f;
-                        bool fires = prob_roll < fire_prob || energy >= 0.99f;
+                        // The vibe-load downbeat always fires. load_vibe zeroes both
+                        // playhead and loop_count, so step_hash(0, t, 0) collapses to
+                        // t * 104729 — a per-track CONSTANT, independent of seed, vibe
+                        // and pattern. Its rolls (t2=0.988, t3=0.997, t4=0.977) sit above
+                        // the reachable fire_prob ceiling (0.95 percussive, 0.985 at
+                        // energy 0.95), so without this the bass (t3) and t2/t4 lost the
+                        // downbeat on EVERY vibe load below energy 0.99 — deterministically.
+                        bool fires = prob_roll < fire_prob || energy >= 0.99f || is_load_boundary;
 
                         // TEXTURE/FX at low energy: always fire so hold chains work
                         if (t >= 5 && energy < 0.4f) fires = true;

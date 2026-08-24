@@ -489,6 +489,12 @@ bool run_pulsar_texture_tests() {
         // 0.01 floor by ~30x. (174/400 seeds give peak < 0.02 here, which is why
         // the unseeded wall-clock path flaked so often.)
         engine->pulsar_seed.store(364, std::memory_order_relaxed);
+        // Pin the global RNG too: the render path draws from stmlib::Random, so
+        // this render is otherwise suite-order dependent. Saved and restored at the
+        // end of the block per the idiom above — later suites inherit whatever
+        // state they are handed, and master_tape_stop_pulsar shifts without it.
+        const uint32_t saved_rng_t8 = stmlib::Random::state();
+        stmlib::Random::Seed(364u);
         trigger_vibe_load(engine);
         engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
 
@@ -511,18 +517,20 @@ bool run_pulsar_texture_tests() {
         unit.type = UNIT_PULSAR;
         unit.enabled = true;
 
-        // Process ~3 seconds (300 blocks of 512 samples @ 48kHz)
+        // Process ~3 seconds (300 blocks of 512 samples @ 48kHz), keeping the peak
+        // across the WHOLE render. Sampling only the final block made this a
+        // lottery on whether a note happened to sound in one 10.7ms window at
+        // ambient energy — which is what the seed sweep above was really working
+        // around, and what made any change to voice firing tip it over.
+        float peak = 0.0f;
         for (int i = 0; i < 300; i++) {
             unit_process_pulsar(&unit, engine, 512, 48000.0f);
-        }
-
-        // Check peak amplitude
-        float peak = 0.0f;
-        for (int i = 0; i < 512; i++) {
-            float al = std::fabs(engine->pulsar_out_l[i]);
-            float ar = std::fabs(engine->pulsar_out_r[i]);
-            if (al > peak) peak = al;
-            if (ar > peak) peak = ar;
+            for (int s = 0; s < 512; s++) {
+                float al = std::fabs(engine->pulsar_out_l[s]);
+                float ar = std::fabs(engine->pulsar_out_r[s]);
+                if (al > peak) peak = al;
+                if (ar > peak) peak = ar;
+            }
         }
 
         if (peak > 0.01f) {
@@ -533,6 +541,7 @@ bool run_pulsar_texture_tests() {
             fail++;
         }
 
+        stmlib::Random::Seed(saved_rng_t8);
         orpheus_engine_destroy(engine);
     }
 

@@ -277,3 +277,25 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
 
     engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
 }
+
+// ── Shared sequencer-test scaffolding ──────────────────────────────────────
+// Only the pieces that were genuinely duplicated logic. The trivial
+// make_*_unit() constructor is deliberately NOT here: four suites already
+// define their own at file scope, so a shared symbol collides with them for no
+// benefit — a memset of a 4-field struct is not duplication worth centralizing.
+
+#include "stmlib/utils/random.h"
+#include "../src/orpheus_graph.h"
+
+// Pin BOTH RNGs. pulsar_seed alone is not enough: the voices draw from the
+// process-global stmlib::Random, so results stay suite-order dependent without
+// it (see test_pulsar_signal_quality). Callers that care about later suites
+// should save/restore stmlib::Random::state() around the whole suite.
+static void pin_pulsar_rngs(OrpheusEngine* engine) {
+    engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
+    stmlib::Random::Seed(0xBEA70000u);
+}
+
+static double pulsar_samples_per_step(float bpm, float sample_rate = 48000.0f) {
+    return static_cast<double>(sample_rate) / ((static_cast<double>(bpm) / 60.0) * 4.0);
+}

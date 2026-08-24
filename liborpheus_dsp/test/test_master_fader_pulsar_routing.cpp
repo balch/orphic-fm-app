@@ -17,6 +17,7 @@
 #include "test_harness.h"
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_engine.h"
+#include "stmlib/utils/random.h"
 
 #include <cmath>
 #include <cstdio>
@@ -78,6 +79,10 @@ static OrpheusEngine* make_pulsar_engine() {
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
     setup_fixture_baseline(engine);
+    // Pin both RNGs: the fixture leaves seed=0, whose wall-clock stir made the
+    // peak/restore assertions run-to-run flaky (see test_pulsar_signal_quality).
+    engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
+    stmlib::Random::Seed(0xBEA70000u);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
 
@@ -228,10 +233,14 @@ bool test_fade_out_then_in_restores_pulsar() {
 
 bool run_master_fader_pulsar_routing_tests() {
     printf("master_fader_pulsar:\n");
+    // make_pulsar_engine() re-seeds the process-global stmlib RNG per engine, so
+    // restore it here: later suites inherit whatever state they are handed.
+    const uint32_t saved_rng = stmlib::Random::state();
     int pass = 0, fail = 0;
     auto tally = [&](bool ok) { if (ok) ++pass; else ++fail; };
     tally(test_fade_to_zero_silences_pulsar());
     tally(test_fade_ramp_is_monotonic_at_master());
     tally(test_fade_out_then_in_restores_pulsar());
+    stmlib::Random::Seed(saved_rng);
     TEST_SUITE_RETURN(pass, fail);
 }
