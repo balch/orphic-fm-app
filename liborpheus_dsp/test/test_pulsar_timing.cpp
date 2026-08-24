@@ -341,6 +341,59 @@ static bool test_elastic_tempo_bounded() {
     return ok;
 }
 
+// ── Macro smoothing reaches its documented time constant, on any block size ──
+// The coefficient is applied once per BLOCK, so it has to scale with the frames
+// advanced. A per-SAMPLE constant applied per block gave a real time constant of
+// block_period / coeff -- 5.1s at 512/48kHz against a documented 10ms -- and one
+// that changed with the host block size, so desktop, Android and WASM each had a
+// different macro feel. Everything gated on the smoothed macros inherited it.
+static bool test_macro_smoothing_time_constant() {
+    printf("\nTest: macro smoothing hits ~10ms and is block-size independent\n");
+    // 50ms is 5 time constants: a correct 1-pole is at 1 - e^-5 of the step.
+    const double kSettleSeconds = 0.05;
+    const float kStart = 0.5f, kTarget = 1.0f;
+    const float ideal = kStart + (kTarget - kStart) *
+        static_cast<float>(1.0 - std::exp(-kSettleSeconds / 0.01));
+
+    const int block_sizes[] = {64, 240, 480};
+    bool ok = true;
+    float first = 0.0f;
+
+    for (int i = 0; i < 3; i++) {
+        const int nb = block_sizes[i];
+        OrpheusEngine* engine = orpheus_engine_create(kSampleRate);
+        engine->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        setup_fixture_baseline(engine);
+        pin_pulsar_rngs(engine);
+        engine->pulsar_energy.store(kStart, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+        GraphUnit unit = make_unit();
+
+        // load_vibe snaps smooth_energy straight to the atomic, so this block
+        // establishes the starting value rather than smoothing anywhere.
+        unit_process_pulsar(&unit, engine, nb, kSampleRate);
+        engine->pulsar_energy.store(kTarget, std::memory_order_relaxed);
+
+        const int blocks = static_cast<int>(kSettleSeconds * kSampleRate) / nb;
+        for (int b = 0; b < blocks; b++)
+            unit_process_pulsar(&unit, engine, nb, kSampleRate);
+
+        const float got = engine->pulsar_state->smooth_energy;
+        if (i == 0) first = got;
+        // Tolerance covers block quantization of the 50ms window, not a
+        // different time constant: the old code sat at 0.504..0.537 here.
+        const bool near_ideal = std::fabs(got - ideal) < 0.02f;
+        const bool matches_first = std::fabs(got - first) < 0.02f;
+        printf("  block=%3d -> smooth_energy=%.5f (ideal %.5f) -- %s\n",
+               nb, got, ideal, (near_ideal && matches_first) ? "PASS" : "FAIL");
+        if (!near_ideal || !matches_first) ok = false;
+        orpheus_engine_destroy(engine);
+    }
+    return ok;
+}
+
 bool run_pulsar_timing_tests() {
     printf("\n╔══════════════════════════════════════╗\n");
     printf("║  Pulsar Timing Tests                 ║\n");
@@ -351,5 +404,6 @@ bool run_pulsar_timing_tests() {
     all &= test_percussive_probability_floor();
     all &= test_percussive_pattern_stability();
     all &= test_elastic_tempo_bounded();
+    all &= test_macro_smoothing_time_constant();
     return all;
 }

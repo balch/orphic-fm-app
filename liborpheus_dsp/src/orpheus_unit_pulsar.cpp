@@ -1947,8 +1947,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->last_scale_index = live_scale;
     }
 
-    // ── Read and smooth macros (~10ms coefficient) ──
-    float smooth_coeff = 1.0f - std::exp(-1.0f / (0.01f * sample_rate));
+    // ── Read and smooth macros (~10ms time constant) ──
+    // This runs once per BLOCK, so the exponent scales with the frames advanced
+    // this call — same fix, and the same bug, as the tempo_drift slew below. The
+    // old per-SAMPLE constant applied per block gave a real time constant of
+    // block_period / coeff = 5.1s at 512/48kHz, ~512x the documented 10ms, and
+    // one that changed with the host block size (desktop 512 vs Android vs WASM).
+    // Everything downstream inherited that lag: the energy volume curves, the
+    // energy > 0.6f EDM/Space engine swap, swing amount and the fire gate.
+    float smooth_coeff = 1.0f - std::exp(-static_cast<float>(num_frames)
+                                         / (0.01f * sample_rate));
 
     float target_energy     = engine->pulsar_energy.load(std::memory_order_relaxed);
     float target_complexity = engine->pulsar_complexity.load(std::memory_order_relaxed);
