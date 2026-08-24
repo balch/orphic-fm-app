@@ -1806,6 +1806,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->last_scale_index = scale_idx;
     state->clock_accumulator = 0.0;
     state->boundary_on_load = true;  // downbeat fires at sample 0, not a step late
+    state->start_hold_samples = 0;   // fresh audibility-hold budget per load
     // mutation_seed is reset earlier (before init_section_state consumes it).
     state->loop_count = 0;
     state->loops_since_reset = 0;
@@ -2190,6 +2191,40 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // (it doesn't starve the scratch). Inert when no scratch is ever armed.
     const bool scratch_hold = engine->master_scratch_l.is_active();
 
+    // ── Hold the start until the downbeat can actually be heard ────────────
+    // mix is a straight linear gain (output_gain = mix * kPulsarOutputGain), so
+    // the mute point above is about -60dB. In MIX_GATED (Orpheus) the ViewModel
+    // forces mix to 0 on every vibe load and the user dials it back up, and the
+    // `mix <= 0.001f` return sits ABOVE the generation check -- so load_vibe
+    // first ran, and the downbeat was spent, on the block where the knob crossed
+    // 0.001. The whole point of the injected boundary was lost there.
+    //
+    // Holding the TIMELINE (not just the boundary) is what keeps the downbeat on
+    // step 0: gating the boundary alone would let natural boundaries advance the
+    // playhead underneath it, and the vibe would open mid-pattern instead.
+    //
+    // The hold is bounded. A mix parked between 0.001 and the floor is a visible
+    // knob position, and it must not produce permanent silence -- so after
+    // kStartHoldSeconds the downbeat fires anyway, still on step 0, just quietly.
+    //
+    // Inert in EXPLICIT mode (the DJ app), which pins mix at 1.0: the floor is
+    // already cleared on the first block, so transitions keep their exact timing.
+    static constexpr float kStartAudibleMix = 0.05f;   // ~-26dB
+    static constexpr float kStartHoldSeconds = 0.5f;
+    bool start_hold = false;
+    if (state->boundary_on_load) {
+        const int max_hold = static_cast<int>(kStartHoldSeconds * sample_rate);
+        if (mix < kStartAudibleMix && state->start_hold_samples < max_hold) {
+            state->start_hold_samples += num_frames;
+            start_hold = true;
+        }
+    } else {
+        state->start_hold_samples = 0;
+    }
+
+    // Either hold freezes the timeline: no accumulator advance, no boundaries.
+    const bool timeline_hold = scratch_hold || start_hold;
+
     // Vibe-load boundary: fire step 0 at sample 0 of the first playing block
     // so every track resyncs onto the fresh window immediately. Parity stays
     // even (playhead is 0), so the next natural threshold is the on-beat one.
@@ -2199,7 +2234,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // wrap detector below both do, via its index. Keying off resync_pending instead
     // would also catch the JAM_INVERTED section re-lock, where a real step DID pass.
     int load_boundary_index = -1;
-    if (state->boundary_on_load && !scratch_hold &&
+    if (state->boundary_on_load && !timeline_hold &&
         num_boundaries < kMaxStepBoundaries) {
         state->boundary_on_load = false;
         load_boundary_index = num_boundaries;
@@ -2222,7 +2257,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // under it (tempo drift or a swing change both move it), so leaving the
     // comparison live let boundaries fire during the freeze — and keep firing
     // until the accumulator drained. Freezing means no advance AND no boundary.
-    for (int i = 0; i < num_frames && !scratch_hold; i++) {
+    for (int i = 0; i < num_frames && !timeline_hold; i++) {
         state->clock_accumulator += 1.0;
 
         // A swung pair must total exactly 2 * samples_per_step: lengthening

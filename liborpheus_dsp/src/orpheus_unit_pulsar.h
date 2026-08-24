@@ -897,9 +897,13 @@ static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 struct PulsarState {
     PulsarTrackState tracks[kNumPulsarTracks];
     double clock_accumulator;   // fractional sample counter for step grid
-    // Armed by load_vibe: the next playing block fires a step boundary at
-    // sample 0 so the new vibe's downbeat sounds at the load instant.
+    // Armed by load_vibe: the next AUDIBLE playing block fires a step boundary
+    // at sample 0 so the new vibe's downbeat sounds at the load instant.
     bool boundary_on_load = false;
+    // Samples the timeline has been held waiting for the mix to become audible
+    // (see kPulsarStartAudibleMix). Bounded, so a mix parked below the floor
+    // still starts rather than sitting silent forever.
+    int start_hold_samples = 0;
     int current_vibe_generation;
     bool initialized;
     float smooth_energy, smooth_complexity, smooth_space, smooth_mood;

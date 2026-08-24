@@ -35,10 +35,11 @@ GraphUnit make_start_unit() {
 
 OrpheusEngine* make_start_engine(void (*setup)(OrpheusEngine*),
                                  float energy = 1.0f,
-                                 float bpm = kBpm) {
+                                 float bpm = kBpm,
+                                 float mix = 1.0f) {
     OrpheusEngine* engine = orpheus_engine_create(kSampleRate);
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
-    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_mix.store(mix, std::memory_order_relaxed);
     setup(engine);
     engine->pulsar_energy.store(energy, std::memory_order_relaxed);
     pin_pulsar_rngs(engine);
@@ -352,6 +353,79 @@ static bool test_load_clears_inflight_solo_duck() {
     return drained && downbeat_ok;
 }
 
+// ── Test 8: the downbeat waits for a mix it can actually be heard at ───────
+// MIX_GATED (Orpheus) forces mix to 0 on every vibe load and the user dials it
+// back up. The `mix <= 0.001f` return sits above the generation check, so the
+// downbeat used to be spent on the block where the knob crossed 0.001 -- about
+// -60dB. The timeline (not just the boundary) holds until the mix is audible,
+// so the vibe still opens ON step 0 rather than several steps in.
+static bool test_start_waits_for_an_audible_mix() {
+    printf("\n=== Test: the load downbeat waits for an audible mix ===\n");
+    // 0.01 is past the mute point but well under the audibility floor.
+    OrpheusEngine* engine = make_start_engine(setup_fixture_dense_fast, 1.0f, kBpm, 0.01f);
+    GraphUnit unit = make_start_unit();
+
+    // Well inside the hold budget (0.5s): ~0.25s of blocks.
+    const int held_blocks = static_cast<int>(0.25f * kSampleRate) / kBlock;
+    for (int b = 0; b < held_blocks; b++)
+        unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
+    PulsarState* state = engine->pulsar_state;
+
+    // wrap_len is the witness: load_vibe zeroes it and only an advance adopts a
+    // window, so 0 means no boundary has fired and the timeline really is held.
+    bool held = state->tracks[0].wrap_len == 0 && state->tracks[0].playhead == 0;
+    printf("  inaudible mix for %d blocks: wrap_len=%d playhead=%d (want 0, 0) -- %s\n",
+           held_blocks, state->tracks[0].wrap_len, state->tracks[0].playhead,
+           held ? "PASS" : "FAIL");
+
+    engine->pulsar_mix.store(0.6f, std::memory_order_relaxed);
+    unit_process_pulsar(&unit, engine, kObserveBlock, kSampleRate);
+
+    bool opened = state->tracks[0].wrap_len == 16 && state->tracks[0].playhead == 0;
+    printf("  first audible block: wrap_len=%d playhead=%d (want 16, 0) -- %s\n",
+           state->tracks[0].wrap_len, state->tracks[0].playhead, opened ? "PASS" : "FAIL");
+
+    bool any = false, fired = true;
+    for (int t = 0; t < 7; t++) {
+        PulsarTrackState& ts = state->tracks[t];
+        if (!ts.steps[0].gate) continue;
+        any = true;
+        if (!(ts.voice_active || ts.gate_timer > 0.0f)) fired = false;
+    }
+    printf("  step-0 gates sounding on the first audible block: %s\n",
+           (any && fired) ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return held && opened && any && fired;
+}
+
+// ── Test 9: the audibility hold is bounded ────────────────────────────────
+// A mix parked between the mute point and the floor is a visible knob position.
+// It must not buy permanent silence -- the downbeat fires anyway once the hold
+// budget runs out, still on step 0, just quietly.
+static bool test_start_hold_is_bounded() {
+    printf("\n=== Test: a mix parked below the floor still starts ===\n");
+    OrpheusEngine* engine = make_start_engine(setup_fixture_dense_fast, 1.0f, kBpm, 0.01f);
+    GraphUnit unit = make_start_unit();
+
+    // Past the 0.5s budget, with the mix never rising.
+    const int blocks = static_cast<int>(0.55f * kSampleRate) / kBlock;
+    for (int b = 0; b < blocks; b++)
+        unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
+    PulsarState* state = engine->pulsar_state;
+
+    // The accumulator was frozen for the whole hold, so it restarts from 0 and
+    // the next natural boundary is a full step away -- the playhead is still on
+    // the downbeat, which is the point: bounded does not mean mid-pattern.
+    bool started = state->tracks[0].wrap_len == 16 && state->tracks[0].playhead == 0;
+    printf("  after %d blocks at mix=0.01: wrap_len=%d playhead=%d (want 16, 0) -- %s\n",
+           blocks, state->tracks[0].wrap_len, state->tracks[0].playhead,
+           started ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return started;
+}
+
 bool run_pulsar_start_tests() {
     printf("\n════════ PULSAR START-SEQUENCE TESTS ════════\n");
     // Restore the process-global stmlib RNG on exit: pin_pulsar_rngs() reseeds it
@@ -366,6 +440,8 @@ bool run_pulsar_start_tests() {
     tally(test_load_clears_carried_phase_inversion());
     tally(test_stopped_load_fires_downbeat_on_play());
     tally(test_load_clears_inflight_solo_duck());
+    tally(test_start_waits_for_an_audible_mix());
+    tally(test_start_hold_is_bounded());
     printf("\nPulsar start: %d/%d passed\n", pass, pass + fail);
     stmlib::Random::Seed(saved_rng);
     TEST_SUITE_RETURN(pass, fail);
