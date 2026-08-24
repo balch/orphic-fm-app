@@ -360,6 +360,78 @@ static void push_two_section_ab_arrangement(OrpheusEngine* engine,
     engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
 }
 
+// ── The OPENING section's overrides apply at load ──────────────────────────
+// The first section is entered via init_section_state, which fires no
+// advance_section — so the section-change handler never ran for it and a vibe
+// whose intro declared macroOverrides played its whole intro at vibe-base
+// macros. section_total_steps likewise still held the PREVIOUS vibe's value,
+// which is what the void anomaly's end-aligned arc is measured against.
+static bool test_opening_section_overrides_apply_at_load() {
+    printf("\n=== Test: the opening section's overrides apply at load ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    push_two_section_ab_arrangement(engine, 4);
+
+    // Pin section 0 as the intro. The fixture leaves intro_index at -1, and
+    // init_section_state then DRAWS the opening section (pattern_rand01), so
+    // without this the assertion below is a coin flip on which section opens.
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+
+    // Slot 5 of section 0 is the energy macro override (a MULTIPLIER; -1 means
+    // inactive). Written after the fixture, which defaults it to -1.
+    constexpr float kEnergyOverride = 0.5f;
+    engine->pulsar_section_data[5].store(kEnergyOverride, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = true;
+    if (!ps) {
+        printf("  FAIL: pulsar_state was not allocated\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+
+    const float got = ps->section_state.target_energy;
+    if (got != kEnergyOverride) {
+        printf("  FAIL: target_energy = %.3f (expected %.3f) [current_section=%d, "
+               "sec0.energy=%.3f] — the intro is playing at vibe-base macros\n",
+               got, kEnergyOverride, ps->section_state.current_section,
+               ps->arrangement.sections[0].macro_overrides.energy);
+        ok = false;
+    } else {
+        printf("  target_energy = %.3f at load -- PASS\n", got);
+    }
+
+    // section_total_steps is what the void arc is end-aligned against; before
+    // this it held whatever the PREVIOUS vibe's last section left behind.
+    const float want_steps =
+        static_cast<float>(ps->section_state.bars_remaining) *
+        static_cast<float>(ps->tracks[0].step_count);
+    if (ps->section_total_steps != want_steps || want_steps <= 0.0f) {
+        printf("  FAIL: section_total_steps = %.1f (expected %.1f)\n",
+               ps->section_total_steps, want_steps);
+        ok = false;
+    } else {
+        printf("  section_total_steps = %.1f (bars_remaining %d x step_count %d) -- PASS\n",
+               ps->section_total_steps, ps->section_state.bars_remaining,
+               ps->tracks[0].step_count);
+    }
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 static bool test_section_progression_override_applied() {
     printf("\n=== Test: Section progression override activates on section entry ===\n");
 
@@ -2339,6 +2411,7 @@ bool run_pulsar_sections_tests() {
     tally(test_no_jam_carry_resets_solo_at_section_seam());
     tally(test_jam_carry_fallbacks());
     tally(test_jam_carry_requires_eligible_lead_into_jam_section());
+    tally(test_opening_section_overrides_apply_at_load());
     printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

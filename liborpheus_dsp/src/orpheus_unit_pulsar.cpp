@@ -761,6 +761,59 @@ static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, ui
 
 // ── Vibe loading (reads recipe from engine atomics) ─────────────────
 
+// Start a section's band solo, and for LICK_BUILDER seed the live lick from the
+// SOLOIST's channel: a BASS-source lead mutates the bass line, not the lead lick
+// ("owned and mutated by the bass player").
+//
+// Shared by the section-change handler and by load_vibe's opening-section apply.
+// The opening section is entered through init_section_state, which fires no
+// advance_section, so an intro declaring a soloMode used to get none of this.
+static void start_section_solo(PulsarState* state, OrpheusEngine* engine,
+                               const SectionParam& sec) {
+    start_band_solo(state->band_solo_state, state->band_solo_config,
+                    sec, state->tracks, state->mutation_seed);
+    if (sec.solo_mode != SoloModeId::LICK_BUILDER) return;
+
+    int lead = state->band_solo_state.lead_member;
+    bool bass_lead = false;
+    if (lead >= 0) {
+        const BandMemberParam& lm = state->band_solo_config.members[lead];
+        for (int ti = 0; ti < lm.track_count; ti++) {
+            int rt = lm.tracks[ti];
+            if (rt < 0 || rt >= kNumPulsarTracks) continue;
+            LickMode m = static_cast<LickMode>(
+                engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
+            if (m == LickMode::NONE) continue;
+            // First lick track decides (mixed-source members are allowed but
+            // take the first; same rule as track_lick_channel).
+            bass_lead = engine->pulsar_track_lick_source[rt].load(
+                std::memory_order_relaxed) == 1;
+            break;
+        }
+    }
+    const PulsarLickStep* src = nullptr;
+    int src_len = 0;
+    if (bass_lead && state->bass_line_length > 0) {
+        src = state->bass_line; src_len = state->bass_line_length;
+    } else if (state->lick_length > 0) {
+        src = state->lick; src_len = state->lick_length;
+        bass_lead = false;  // fell back to the lead channel
+    }
+    state->live_lick_bass_channel = bass_lead;
+    if (src != nullptr) {
+        int n = src_len < kMaxLickSteps ? src_len : kMaxLickSteps;
+        state->live_lick_length = n;
+        state->live_lick_active = true;
+        for (int i = 0; i < n; i++) {
+            state->live_lick_degrees[i] = src[i].scale_degree;
+            state->live_lick_durations[i] = src[i].duration;
+            state->live_lick_velocities[i] = src[i].velocity;
+            // MUT-4: snapshot section-entry degrees to clamp drift.
+            state->live_lick_base_degrees[i] = src[i].scale_degree;
+        }
+    }
+}
+
 static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
     // ── Clear generative runtime state from the previous vibe ───────────
     // Solo modifiers, live-lick caches, and anchor indices all carry musical
@@ -1762,6 +1815,41 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->tempo_drift_target = 0.0f;
     state->tempo_drift_countdown = 0;
 
+    // ── Apply the OPENING section's overrides ─────────────────────────────
+    // The first section is entered through init_section_state, which fires no
+    // advance_section — so everything the section-change handler does was
+    // skipped for the whole intro. A section declaring macroOverrides played at
+    // vibe-base macros; a declared soloMode produced no solo until some LATER
+    // flip; section_total_steps still held the PREVIOUS vibe's value; and a
+    // declared void anomaly could not fire during the opening section at all.
+    //
+    // Same gap the tension override above closes, and this closes the rest. It
+    // lives down here rather than beside that one because band_solo_config and
+    // void_config are not loaded until well after init_section_state runs.
+    if (state->arrangement.active && state->arrangement.section_count > 0) {
+        int init_sec = state->section_state.current_section;
+        if (init_sec >= 0 && init_sec < state->arrangement.section_count) {
+            const SectionParam& sec = state->arrangement.sections[init_sec];
+
+            state->section_state.target_energy     = sec.macro_overrides.energy;
+            state->section_state.target_complexity = sec.macro_overrides.complexity;
+            state->section_state.target_space      = sec.macro_overrides.space;
+            state->section_state.target_mood       = sec.macro_overrides.mood;
+
+            // No jam_carry check: load_vibe already memset band_solo_state, so
+            // there is never an in-flight jam to walk across this seam.
+            if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
+                start_section_solo(state, engine, sec);
+            }
+
+            state->section_total_steps =
+                static_cast<float>(state->section_state.bars_remaining) *
+                static_cast<float>(state->tracks[0].step_count);
+            arm_void_auto(state->void_state, state->void_config,
+                          state->section_total_steps, state->void_seed);
+        }
+    }
+
     // ── Clear effect buffers so old vibe tails don't bleed through ──
     std::memset(engine->pulsar_delay_buf_1l, 0, sizeof(engine->pulsar_delay_buf_1l));
     std::memset(engine->pulsar_delay_buf_1r, 0, sizeof(engine->pulsar_delay_buf_1r));
@@ -2599,52 +2687,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (jam_carried) {
                             // Intentionally nothing: the jam walks across the seam.
                         } else if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
-                            start_band_solo(state->band_solo_state, state->band_solo_config,
-                                            sec, state->tracks, state->mutation_seed);
-                            // Initialize live lick for LickBuilder mode, seeding from the
-                            // SOLOIST's channel: a BASS-source lead mutates the bass line,
-                            // not the lead lick ("owned and mutated by the bass player").
-                            if (sec.solo_mode == SoloModeId::LICK_BUILDER) {
-                                int lead = state->band_solo_state.lead_member;
-                                bool bass_lead = false;
-                                if (lead >= 0) {
-                                    const BandMemberParam& lm = state->band_solo_config.members[lead];
-                                    for (int ti = 0; ti < lm.track_count; ti++) {
-                                        int rt = lm.tracks[ti];
-                                        if (rt < 0 || rt >= kNumPulsarTracks) continue;
-                                        LickMode m = static_cast<LickMode>(
-                                            engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
-                                        if (m == LickMode::NONE) continue;
-                                        // First lick track decides (mixed-source members
-                                        // are allowed but take the first; same rule as
-                                        // track_lick_channel).
-                                        bass_lead = engine->pulsar_track_lick_source[rt].load(
-                                            std::memory_order_relaxed) == 1;
-                                        break;
-                                    }
-                                }
-                                const PulsarLickStep* src = nullptr;
-                                int src_len = 0;
-                                if (bass_lead && state->bass_line_length > 0) {
-                                    src = state->bass_line; src_len = state->bass_line_length;
-                                } else if (state->lick_length > 0) {
-                                    src = state->lick; src_len = state->lick_length;
-                                    bass_lead = false;  // fell back to the lead channel
-                                }
-                                state->live_lick_bass_channel = bass_lead;
-                                if (src != nullptr) {
-                                    int n = src_len < kMaxLickSteps ? src_len : kMaxLickSteps;
-                                    state->live_lick_length = n;
-                                    state->live_lick_active = true;
-                                    for (int i = 0; i < n; i++) {
-                                        state->live_lick_degrees[i] = src[i].scale_degree;
-                                        state->live_lick_durations[i] = src[i].duration;
-                                        state->live_lick_velocities[i] = src[i].velocity;
-                                        // MUT-4: snapshot section-entry degrees to clamp drift.
-                                        state->live_lick_base_degrees[i] = src[i].scale_degree;
-                                    }
-                                }
-                            }
+                            start_section_solo(state, engine, sec);
                         } else {
                             if (state->band_solo_state.active) {
                                 clear_band_solo(state->band_solo_state, state->tracks);
