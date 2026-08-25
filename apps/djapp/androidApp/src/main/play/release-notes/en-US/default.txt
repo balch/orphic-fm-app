@@ -1,6 +1,6 @@
-Lost in Space and Fire Sky join the lineup, plus Anomalies, a glowing new visualizer, and the Vibe info panel.
+Solos and intros land cleaner, and the knobs finally keep up.
 
-• New vibes: Lost in Space and Fire Sky are live in the picker.
-• Anomalies: rare moments — if you heard it, it was real.
-• The Vibe info panel shows details about the current vibe.
-• The visualizer got a glow-up — bars shift color with pitch, bloom and afterglow.
+• Knobs respond without lag, fast enough to ride in a live set.
+• Cleaner and more articulated intros and solos.
+• Saved settings restore on launch.
+• Coordinated key-module startup using Metro @MapKey multibindings.
