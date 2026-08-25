@@ -9,58 +9,57 @@ import org.balch.orpheus.core.input.KeyBinding
 import kotlin.reflect.KClass
 
 /**
- * Typed index over the [SynthFeature] multibinding, keyed by each feature's public interface
- * via [SynthFeatureKey].
+ * Typed index over the [SynthFeature] multibinding, keyed by each feature's public interface.
  *
- * This class owns **no feature instances and holds no lock across feature construction**.
- * Every feature ViewModel is
- * `@SingleIn(FeatureScope::class)`, so Metro memoizes it in a provider field on the generated
- * `FeatureGraphImpl` and `providers[key]()` returns that one instance. Caching here as well would
- * be a second memoization layer over the same objects, which is exactly what used to deadlock:
- * this class held its lock across `provider()` -- arbitrary ViewModel construction that re-enters
- * DI -- while a Metro `DoubleCheck` was taken in the opposite order on another thread.
+ * Owns **no instances and holds no lock across construction**. Every ViewModel is
+ * `@SingleIn(FeatureScope::class)`, so Metro already memoizes it; caching here would be a second
+ * layer over the same objects, which is what used to deadlock -- this class held its lock across
+ * `provider()` while a Metro `DoubleCheck` was taken in the opposite order on another thread.
  *
- * Metro's own memoization does not have that problem. Its locks are per binding, it never holds
- * one across a call it cannot see, and it proves the binding graph acyclic at compile time. So
- * instance identity has exactly one owner, and it is the DI container.
+ * **Do not add a cache or a lock here.** A feature constructed twice means a missing
+ * `@SingleIn(FeatureScope::class)`, not a missing cache; `FeatureScopeGuardTest` fails the build
+ * for that, because Metro cannot -- an unscoped binding is legal and silently hands out fresh
+ * instances.
  *
- * **Do not add a cache or a lock here.** If a feature is being constructed more than once, the
- * bug is a missing `@SingleIn(FeatureScope::class)` on that ViewModel, not a missing cache.
- * `FeatureScopeGuardTest` fails the build for that, because Metro cannot: an unscoped binding is
- * perfectly legal, it just silently hands out a fresh instance per resolve.
- *
- * There is deliberately no `close()`. These features live for the process; the graph is reached
- * through an `AppScope` holder that outlives the Activity, and process death is the cleanup point.
- *
- * AI tools inject this directly for feature access without needing the ViewModel.
+ * No `close()`: features live for the process, and process death is the cleanup point.
  */
 @SingleIn(FeatureScope::class)
 @Inject
 class FeatureCollection(
-    private val providers: Map<KClass<out SynthFeature<*, *>>, () -> SynthFeature<*, *>>,
+    private val providers: Map<SynthFeatureKey, () -> SynthFeature<*, *>>,
 ) {
     private val log = logging("FeatureCollection")
 
     /**
-     * Get a feature by its interface.
+     * Get a feature by its interface, which is also its [SynthFeatureKey], so the requested type
+     * and the map key cannot drift. The cast is unchecked only because the multibinding erases.
      *
-     * [key] is the feature interface (`LfoFeature::class`), which is also its [SynthFeatureKey],
-     * so the requested type and the map key cannot drift apart: `T` is pinned by [key]'s own type
-     * argument. The cast is unchecked only because the multibinding erases to `SynthFeature<*, *>`.
-     *
-     * What is *not* checked is the registration. `@SynthFeatureKey(DelayFeature::class)` on
-     * `ReverbViewModel` compiles, because both sides satisfy `KClass<out SynthFeature<*, *>>`, and
-     * fails here with a `ClassCastException` on first resolve. Keying by interface moves that
-     * mistake to the single line that declares it instead of every call site; it does not
-     * eliminate it.
+     * The *registration* is unchecked: `@SynthFeatureKey(DelayFeature::class)` on `ReverbViewModel`
+     * compiles and throws `ClassCastException` on first resolve. Keying by interface moves that
+     * mistake to one line instead of every call site; it does not eliminate it.
      */
     @Suppress("UNCHECKED_CAST")
     fun <T : SynthFeature<*, *>> getFeature(key: KClass<T>): T {
-        val provider = providers[key]
+        val provider = byInterface[key]
             ?: error("No SynthFeature provider registered for ${key.simpleName} (${key.qualifiedName})")
         return provider() as T
     }
 
+    /**
+     * Interface -> provider. A necessary evil: the map key is the whole `@SynthFeatureKey` now,
+     * so `providers[SomeFeature::class]` no longer type-checks. Built from keys alone, invokes
+     * nothing.
+     */
+    private val byInterface: Map<KClass<out SynthFeature<*, *>>, () -> SynthFeature<*, *>> by lazy {
+        providers.entries.associate { (key, provider) -> key.value to provider }
+    }
+
+    /**
+     * Features flagged `startup = true`, constructed on the way out. The flag is on the map key, so
+     * the filter runs before any provider does. Not lazy: a second call should re-run, not hide.
+     */
+    val startupFeatures: List<SynthFeature<*, *>>
+        get() = providers.entries.filter { it.key.startup }.map { it.value() }
     /**
      * All features, in multibinding order. Resolves each through Metro, so all are singletons.
      *
@@ -74,9 +73,9 @@ class FeatureCollection(
         log.info { "FeatureCollection: resolving all ${providers.size} features" }
         providers.keys.mapNotNull { key ->
             try {
-                getFeature(key)
+                getFeature(key.value)
             } catch (e: Exception) {
-                log.error(e) { "Failed to create feature for ${key.simpleName}" }
+                log.error(e) { "Failed to create feature for ${key.value.simpleName}" }
                 null
             }
         }

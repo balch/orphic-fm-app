@@ -39,32 +39,8 @@ class DjAppApplication : Application() {
             )
         )
 
-        // Eagerly initialize lifecycle manager to register activity callbacks.
-        // This enables tearing down the foreground service when backgrounded while paused.
-        graph.djAppLifecycleManager
-
-        // Eagerly initialize PlaybackController so its init {} subscribes
-        // to flows at startup. PlaybackController is the single source of
-        // truth for play/pause state across the app.
-        graph.playbackController
-
-        // Eagerly initialize PulsarPlaybackBridge so it observes PlaybackController
-        // state and StopAll events from app launch. Decoupled from PulsarViewModel
-        // to break the DI cycle that would otherwise stack-overflow Metro.
-        graph.pulsarPlaybackBridge
-
-        // Eagerly initialize PulsarSongEnding so its init {} collectors observe
-        // playback state, the arrangement state flow, and the active vibe at
-        // startup. Same decoupling reason as PulsarPlaybackBridge.
-        graph.pulsarSongEnding
-
-        // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
-        // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
-        graph.pulsarSongAdvancer
-
-        // Eagerly initialize InAppReviewManager so its init {} subscribes to the
-        // engagement bus and song-ending events from app launch.
-        graph.inAppReviewManager
+        // Builds every @StartupRoot, then the graph's startup features.
+        graph.startupInitializer.run()
 
         // Keep the home-screen widget in sync with playback / vibe / timer state.
         DjWidgetUpdater(this, graph).start()

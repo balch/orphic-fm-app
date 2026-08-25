@@ -89,11 +89,6 @@ fun DjAppScreen(
 ) {
     val djFeature = DjViewModel.feature()
     val pulsarFeature = PulsarViewModel.feature()
-    // Eagerly create all feature VMs so their port values sync to C++ at startup,
-    // not lazily when the user first navigates to their tab.
-    val reverbFeature = ReverbViewModel.feature()
-    val distortionFeature = DistortionViewModel.feature()
-    val hornFeature = HornViewModel.feature()
     val timerFeature = TimerViewModel.feature()
     val mixerFeature = MixerViewModel.feature()
 

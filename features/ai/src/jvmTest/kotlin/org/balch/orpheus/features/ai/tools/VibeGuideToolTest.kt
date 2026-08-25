@@ -82,7 +82,7 @@ class VibeGuideToolTest {
 
     @Test
     fun `static guide carries the stable semantic markers`() {
-        // Anchor a few load-bearing phrases so the guide can't silently lose its highest-value content.
+        // Anchor the phrases that do the heavy lifting so the guide can't silently lose them.
         assertTrue(STATIC_GUIDE.contains("Translation recipes"), "guide missing the recipes section")
         assertTrue(STATIC_GUIDE.contains("harmonics"), "guide missing the DX patch-bank gotcha")
         assertTrue(STATIC_GUIDE.contains("exactly 8 tracks"), "guide missing the 8-track invariant")

@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -38,8 +37,8 @@ class FeatureCollectionDelegationTest {
     private fun collectionOf(
         provider: () -> SynthFeature<*, *>,
     ) = FeatureCollection(
-        mapOf<KClass<out SynthFeature<*, *>>, () -> SynthFeature<*, *>>(
-            FakeFeature::class to provider,
+        mapOf<SynthFeatureKey, () -> SynthFeature<*, *>>(
+            SynthFeatureKey(FakeFeature::class) to provider,
         ),
     )
 

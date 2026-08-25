@@ -24,21 +24,8 @@ fun main() {
     // Wire up logging to UI
     KmLogging.addLogger(graph.consoleLogger)
 
-    // Eagerly initialize PlaybackController so its init {} subscribes to flows at
-    // startup. The browser has a real media session (navigator.mediaSession), so
-    // this is not Android-only.
-    graph.playbackController
-    // Eagerly initialize PulsarPlaybackBridge. It is the only caller of
-    // setPulsarActive, so without it Pulsar never registers as an audio-activity
-    // source and the OS media controls drop while the beat machine is running.
-    graph.pulsarPlaybackBridge
-    // Eagerly initialize PulsarSongEnding so its init {} collectors observe
-    // playback/arrangement state at startup. Without this touch the singleton
-    // is never created and song-ending stays silently disabled.
-    graph.pulsarSongEnding
-    // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
-    // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
-    graph.pulsarSongAdvancer
+    // Builds every @StartupRoot, then the graph's startup features.
+    graph.startupInitializer.run()
 
     val useWorker = !jsHasNoWorkerFlag()
     var workerProxy: DspWorkerProxy? = null

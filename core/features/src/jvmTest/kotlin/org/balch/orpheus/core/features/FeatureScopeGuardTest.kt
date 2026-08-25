@@ -8,22 +8,15 @@ import kotlin.test.fail
 /**
  * Every feature ViewModel must be `@SingleIn(FeatureScope::class)`.
  *
- * [FeatureCollection] holds no cache. It resolves through the multibinding and hands back whatever
- * Metro gives it, so single-instance comes entirely from the scope annotation. Drop the annotation
- * and the binding is still perfectly legal Metro -- it just constructs a fresh ViewModel on every
- * resolve, and nothing anywhere complains.
+ * [FeatureCollection] holds no cache, so single-instance comes entirely from the scope annotation.
+ * Drop it and the binding is still legal Metro -- it just constructs a fresh ViewModel per resolve,
+ * silently.
  *
- * That failure is silent and expensive. Feature ViewModels register themselves with `AppScope`
- * singletons in their `init` blocks -- `MediaSessionManager`'s `onPlay` / `onPlayFromMediaId`
- * callback slots, for one. A second instance overwrites the first one's handlers, so the lock
- * screen drives a ViewModel the UI never observes: the notification and the screen disagree, and
- * audio follows the hidden one. That is the same bug `FeatureGraphHolder` exists to prevent, one
- * level further down.
+ * That is expensive: ViewModels register with `AppScope` singletons in `init` (MediaSessionManager's
+ * `onPlay` slots, say), so a second instance overwrites the first's handlers and the lock screen
+ * drives a ViewModel the UI never observes. Same bug `FeatureGraphHolder` prevents, one level down.
  *
- * The compiler cannot catch this, which is why it is a source-parsing test rather than a type.
- *
- * Sibling guard: `FeatureProviderScopeGuardTest` enforces the opposite rule one layer up -- an
- * `AppScope` `@Provides` that calls `getFeature` must *not* be scoped.
+ * Sibling guard: `FeatureProviderScopeGuardTest` enforces the opposite rule one layer up.
  */
 class FeatureScopeGuardTest {
 
@@ -36,7 +29,9 @@ class FeatureScopeGuardTest {
          */
         const val MIN_FEATURE_VIEWMODELS = 30
 
-        val KEY = Regex("""@SynthFeatureKey\((\w+)::class\)""")
+        // The key takes a second argument now, and named args may be reordered, so match the
+        // interface anywhere inside the call. Requiring `::class\)` silently dropped all six.
+        val KEY = Regex("""@SynthFeatureKey\([^)]*?(\w+)::class""")
         val SCOPE = Regex("""@SingleIn\(\s*FeatureScope::class\s*\)""")
     }
 

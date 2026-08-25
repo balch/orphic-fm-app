@@ -144,7 +144,7 @@ private sealed interface DjIntent {
  */
 @Inject
 @SingleIn(FeatureScope::class)
-@SynthFeatureKey(DjFeature::class)
+@SynthFeatureKey(DjFeature::class, startup = true)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 @ContributesBinding(FeatureScope::class, binding = binding<DjFeature>())
 class DjViewModel(

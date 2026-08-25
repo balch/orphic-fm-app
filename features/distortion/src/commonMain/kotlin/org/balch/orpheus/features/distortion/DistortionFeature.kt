@@ -105,6 +105,14 @@ interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelAct
  *
  * Uses MVI pattern with SynthController.controlFlow() for port-based engine interactions.
  * Keeps SynthEngine dependency for peakFlow monitoring and StereoMode (non-port state).
+ *
+ * Deliberately left `startup = false`: `onRestore` writes DRIVE and MIX, the same ports
+ * `MixerViewModel`'s DIST fader owns and restores from a different key. Eager on both is
+ * last-writer-wins and these defaults are `0.0f`, so a saved DIST value could be zeroed.
+ *
+ * That kills the race in the DJ app, which has no Distortion panel. In Orpheus it only reorders it
+ * -- Mixer is eager, so this is now reliably the last writer. `onRestore` also writes MASTER_VOL
+ * and MASTER_PAN, so those stop persisting in the DJ app; the defaults match StereoPlugin's.
  */
 @Inject
 @SingleIn(FeatureScope::class)

@@ -11,7 +11,6 @@ import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.update.InAppUpdateManager
 import org.balch.orpheus.djapp.di.DjAppGraph
-import org.balch.orpheus.djapp.lifecycle.DjAppLifecycleManager
 import org.balch.orpheus.djapp.review.InAppReviewManager
 
 /**
@@ -32,9 +31,6 @@ interface DjAppGraphAndroid : DjAppGraph {
     @get:UnstableApi
     val mediaSessionManager: MediaSessionManager
     val mediaSessionStateManager: MediaSessionStateManager
-
-    /** Eagerly initialized to register lifecycle callbacks. */
-    val djAppLifecycleManager: DjAppLifecycleManager
 
     /** Google Play in-app update manager (Android only). */
     val inAppUpdateManager: InAppUpdateManager

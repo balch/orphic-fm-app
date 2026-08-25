@@ -2,8 +2,10 @@ package org.balch.orpheus.core.playback
 
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.audio.AudioHostRepair
 import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
@@ -34,6 +37,7 @@ import org.balch.orpheus.core.media.PlaybackMetadata
  */
 @SingleIn(AppScope::class)
 @Inject
+@ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
 class PlaybackController(
     private val mediaSessionManager: MediaSessionManager,
     private val mediaSessionStateManager: MediaSessionStateManager,

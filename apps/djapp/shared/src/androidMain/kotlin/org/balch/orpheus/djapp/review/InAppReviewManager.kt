@@ -7,14 +7,17 @@ import com.google.android.play.core.ktx.launchReview
 import com.google.android.play.core.ktx.requestReview
 import com.google.android.play.core.review.ReviewManagerFactory
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
+import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.engagement.EngagementAction
 import org.balch.orpheus.core.engagement.EngagementTracker
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
@@ -36,6 +39,7 @@ import org.balch.orpheus.features.pulsar.playback.SongEndingEvent
  */
 @SingleIn(AppScope::class)
 @Inject
+@ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
 class InAppReviewManager(
     application: Application,
     engagementTracker: EngagementTracker,

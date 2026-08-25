@@ -5,8 +5,10 @@ import android.app.Application
 import android.os.Bundle
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.media.MediaSessionStateManager
 
 /**
@@ -27,6 +30,7 @@ import org.balch.orpheus.core.media.MediaSessionStateManager
  */
 @SingleIn(AppScope::class)
 @Inject
+@ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
 class AndroidAppLifecycleManager(
     private val application: Application,
     private val synthEngine: SynthEngine,

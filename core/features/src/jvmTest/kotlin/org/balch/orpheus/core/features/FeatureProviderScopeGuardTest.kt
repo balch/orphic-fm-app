@@ -110,7 +110,7 @@ class FeatureProviderScopeGuardTest {
     }
 
     /**
-     * Path resolution is itself load-bearing. If the working directory ever changes, a guard that
+     * Path resolution supports the whole guard. If the working directory ever changes, one that
      * reads zero files would pass silently, so every path is asserted rather than assumed.
      */
     @Test

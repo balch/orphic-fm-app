@@ -3,12 +3,10 @@ package org.balch.orpheus.djapp.di
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
+import org.balch.orpheus.core.features.StartupInitializer
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.variant.DjTabContribution
-import org.balch.orpheus.features.pulsar.playback.PulsarPlaybackBridge
-import org.balch.orpheus.features.pulsar.playback.PulsarSongAdvancer
-import org.balch.orpheus.features.pulsar.playback.PulsarSongEnding
 
 /**
  * Common surface the [DjApp] composable consumes, independent of platform.
@@ -29,12 +27,6 @@ interface DjAppGraph : ViewModelGraph {
     /** Drives PULSAR_PLAYING via PulsarPlaybackBridge (EXPLICIT playback mode). */
     val playbackController: PlaybackController
 
-    /** Eagerly touched at startup so its init {} collector subscribes. */
-    val pulsarPlaybackBridge: PulsarPlaybackBridge
-
-    /** Eagerly touched at startup so its init {} collectors observe playback/arrangement. */
-    val pulsarSongEnding: PulsarSongEnding
-
-    /** Eagerly touched at startup so its init {} collector subscribes to songEndingEvents. */
-    val pulsarSongAdvancer: PulsarSongAdvancer
+    /** Constructing it builds every `@StartupRoot`; `run()` then the graph's startup features. */
+    val startupInitializer: StartupInitializer
 }

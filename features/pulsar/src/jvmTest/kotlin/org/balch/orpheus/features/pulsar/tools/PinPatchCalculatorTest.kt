@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
  *
  *     center(N) = (N + 0.5) / (32 * 1.02)
  *
- * The `+ 0.5` is load-bearing. `N / (32 * 1.02)` is the bucket's *lower edge*,
+ * The `+ 0.5` does the heavy lifting. `N / (32 * 1.02)` is the bucket's *lower edge*,
  * where `value` lands exactly on `N - 0.5`; the hysteresis then decides the
  * result, and it resolves to `N - 1` for every prior patch below `N`. That
  * uncentred form round-trips 1 of 32 indices; the centred form round-trips
@@ -97,7 +97,7 @@ class PinPatchCalculatorTest {
     }
 
     /**
-     * The load-bearing case. A fresh quantizer starts at 0, but the engine's is
+     * The case that bites. A fresh quantizer starts at 0, but the engine's is
      * long-lived: whatever patch the track played last biases the hysteresis. A
      * correct authoring value must land on its patch from *every* prior state.
      */

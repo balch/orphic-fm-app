@@ -30,8 +30,9 @@ import orpheus.features.pulsar.generated.resources.Res
  * NSImage won't decode WebP).
  *
  * Art is cached per vibe name and the *same* ByteArray instance must be returned on a hit.
- * This is load-bearing: PlaybackController de-dupes on StateFlow equal-emission dropping and
- * compares artwork by reference, so a fresh-but-identical array would re-emit on every tick.
+ * That instance rule does the heavy lifting: PlaybackController de-dupes on StateFlow
+ * equal-emission dropping and compares artwork by reference, so a fresh-but-identical array
+ * would re-emit on every tick.
  */
 @SingleIn(AppScope::class)
 @Inject

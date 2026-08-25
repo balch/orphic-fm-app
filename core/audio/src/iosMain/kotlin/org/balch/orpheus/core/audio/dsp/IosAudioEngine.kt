@@ -807,8 +807,8 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         // a throw below would leave watchdogChainActive true with no tick in
         // flight, and start()'s kick would then see the flag set and decline
         // to re-arm. Constraint 2 violated through a new door. Nothing on
-        // this path throws today. The finally is what stops that from being
-        // load-bearing, so do not fold it back into a trailing call.
+        // this path throws today. The finally is a necessary evil that keeps
+        // it that way, so do not fold it back into a trailing call.
         try {
             if (CACurrentMediaTime() < suspendWatchdogUntil) {
                 // Interrupted. The counter is legitimately frozen, so take a

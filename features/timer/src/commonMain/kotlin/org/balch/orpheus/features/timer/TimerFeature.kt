@@ -65,6 +65,7 @@ data class TimerActions(
 }
 
 interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
+
     override val synthControl: SynthFeature.SynthControl
         get() = SynthControlDescriptor
 
@@ -91,7 +92,7 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
 
 @Inject
 @SingleIn(FeatureScope::class)
-@SynthFeatureKey(TimerFeature::class)
+@SynthFeatureKey(TimerFeature::class, startup = true)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 @ContributesBinding(FeatureScope::class, binding = binding<TimerFeature>())
 class TimerViewModel(

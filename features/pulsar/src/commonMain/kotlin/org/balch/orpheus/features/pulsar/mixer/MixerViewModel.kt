@@ -62,7 +62,7 @@ private sealed interface MixerIntent {
  */
 @Inject
 @SingleIn(FeatureScope::class)
-@SynthFeatureKey(MixerFeature::class)
+@SynthFeatureKey(MixerFeature::class, startup = true)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 @ContributesBinding(FeatureScope::class, binding = binding<MixerFeature>())
 class MixerViewModel(

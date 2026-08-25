@@ -212,31 +212,212 @@ Same feature modules, same DSP engine, different bindings:
 | `HeaderPanelScope` | has a graph | no graph |
 | `Set<DjTabContribution>` | not present | `ai` edition only, `@Multibinds(allowEmpty = true)` |
 
-## Eager roots
+## Startup construction
 
 Metro builds a binding the first time something asks for it. A singleton whose `init {}` installs
-flow collectors is never constructed if nothing touches it, and it fails silently. These roots exist
-only for those side effects and must be touched at startup:
+flow collectors or registers platform callbacks is never constructed if nothing injects it, and
+nothing reports the omission. Two things force construction anyway, and they are declared
+differently because they have different material to work with.
 
-| Root | Orpheus | Orphic DJ |
+| | Feature ViewModels | App-scope roots |
 |---|---|---|
-| `playbackController` | all platforms | all platforms |
-| `pulsarPlaybackBridge` | all platforms | all platforms |
-| `pulsarSongEnding` | all platforms | all platforms |
-| `pulsarSongAdvancer` | all platforms | all platforms |
-| `androidAppLifecycleManager` | Android | via `djAppLifecycleManager` |
-| `inAppReviewManager` | not present | Android |
+| Declared by | `startup = true` on `@SynthFeatureKey` | `binding<@StartupRoot Any>()` |
+| Lives in | `FeatureScope` (child graph) | `AppScope` |
+| Read by | `FeatureCollection.startupFeatures` | `StartupInitializer`'s constructor |
+| Why that way | the class already carries a registration annotation | nothing to widen, so it gets a qualifier |
 
-`pulsarPlaybackBridge` is easy to mistake for an Android concern. Every platform has a real media
+Both are **one declaration site**. Neither has a state where you can declare half of it.
+
+### The flag rides the registration, not the feature
+
+```kotlin
+@MapKey(unwrapValue = false)
+annotation class SynthFeatureKey(
+    val value: KClass<out SynthFeature<*, *>>,
+    val startup: Boolean = false,
+)
+```
+
+```kotlin
+@SynthFeatureKey(TimerFeature::class, startup = true)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+class TimerViewModel(...) : TimerFeature
+```
+
+`unwrapValue = false` makes the whole annotation instance the map key, so the multibinding is
+`Map<SynthFeatureKey, () -> SynthFeature<*, *>>` and the flag is readable straight off the key:
+
+```kotlin
+val startupFeatures: List<SynthFeature<*, *>>
+    get() = providers.entries.filter { it.key.startup }.map { it.value() }
+```
+
+Filtering happens **before any provider is invoked**, so only the marked features are built.
+
+**Why not a marker interface, or a boolean on `SynthFeature`?** Both were tried. Both put the answer
+inside the thing being decided about: a marker on the type is readable only through an instance or
+through reflection, and a property on the instance is readable only through an instance. Either way
+you must construct a feature to learn whether to construct it. KMP common `KClass` cannot break the
+loop — it exposes `simpleName`, `qualifiedName`, and `isInstance(value)`, but no subtype check
+(`isSubclassOf` is `kotlin.reflect.full`, JVM-only, so iOS and wasm are out). The registration is
+the one place the answer exists before construction, and Metro materializes it at graph-build time.
+
+A marker interface also leaked: `DistortionViewModel.previewFeature()` returns
+`object : DistortionFeature { ... }`, so a preview stub silently became a startup feature. A flag on
+the key cannot do that.
+
+### App-scope roots
+
+Roots carry no registration annotation to widen, so they get a qualifier and a set of their own:
+
+```kotlin
+@ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
+class PlaybackController(...) : MediaSessionActionHandler
+```
+
+The bound type is `Any` deliberately. Nothing ever calls a method on a member of that set —
+construction is the whole contract — so a named marker interface would only be a second place to
+declare the same fact. `StartupRoot` needs `AnnotationTarget.TYPE` in its `@Target` list so the
+qualifier can ride the `binding<...>` type argument; Kotlin's default target set omits `TYPE`.
+
+### The inventory
+
+| `@StartupRoot` (`AppScope`) | `startup = true` (`FeatureScope`) |
+|---|---|
+| `PlaybackController` | `ReverbViewModel` |
+| `PulsarPlaybackBridge` | `HornViewModel` |
+| `PulsarSongEnding` | `TimerViewModel` |
+| `PulsarSongAdvancer` | `DjViewModel` |
+| `AndroidAppLifecycleManager` (Orpheus, Android only) | `MixerViewModel` |
+| `DjAppLifecycleManager` (Orphic DJ, Android only) | `PulsarViewModel` |
+| `InAppReviewManager` (Orphic DJ, Android only) | |
+
+`DistortionViewModel` restores engine ports in `onRestore` too, but is deliberately left
+`startup = false`: it writes `DistortionSymbol.DRIVE` and `MIX`, the same two ports
+`MixerViewModel`'s DIST fader owns and restores from a different persisted key. Building both at
+startup makes the result last-writer-wins, and `DistortionUiState` defaults those ports to `0.0f`,
+so a saved DIST value could be silently zeroed. `FeatureStartupGuardTest` carries the file name in
+`DELIBERATELY_LAZY_RESTORERS` so its `onRestore` nag stays quiet.
+
+That removes the race in the DJ app, which has no Distortion panel and never builds the ViewModel at
+all. In Orpheus it only *reorders* it: both still construct, `MixerViewModel` now runs first, and
+`DistortionViewModel` arrives later via its panel or via `keyActions` draining `allFeatures` — so it
+is reliably the last writer where it used to be whatever registration order produced. A saved
+Orpheus DIST value coming back as `0.0f` is the symptom to watch for; the fix would be for one of
+the two to stop owning the port.
+
+That same `onRestore` also writes `StereoSymbol.MASTER_VOL` and `MASTER_PAN`, so those two ports go
+neither restored nor persisted in the DJ app now that the ViewModel never constructs there — a
+behavior change. It is harmless and arguably a bugfix: `DistortionUiState`'s defaults
+(`volume = 0.7f`, `masterPan = 0f`) match `StereoPlugin`'s port defaults exactly, and it removes a
+latent bug where a DJ app killed mid-timer-fade persisted `volume` near `0` and silently restored a
+muted app.
+
+`PulsarViewModel` is `startup = true` for a reason no rule can infer: it registers
+`MediaSessionManager` callbacks in `init {}` and has no `onRestore` at all. Dropping its flag breaks
+lock-screen transport, and no test catches that.
+
+`PulsarPlaybackBridge` is easy to mistake for an Android concern. Every platform has a real media
 session behind `MediaSessionManager`: media3 on Android, `MacOsNowPlaying` on desktop,
 `MPNowPlayingInfoCenter` on iOS, `navigator.mediaSession` on web. The bridge is the only caller of
 `MediaSessionStateManager.setPulsarActive`, one of the seven inputs to `isMediaSessionNeeded`. If it
 is absent, Pulsar never registers as an audio-activity source, so the session deactivates when the
 timer or Evo stops even though the beat machine is still running.
 
-New roots go on the common interface, not a platform graph, and get touched in every entry point:
+### `StartupInitializer.run()`
+
+One class, one call, injected on the app-level graph interface (`OrpheusGraph.startupInitializer`,
+`DjAppGraph.startupInitializer`) and invoked once from every entry point —
 `OrpheusApplication.onCreate`, `desktopApp/main.kt`, `main.ios.kt`, `main.wasmJs.kt`, and the DJ
-equivalents.
+equivalents:
+
+```kotlin
+graph.startupInitializer.run()
+```
+
+Ordering falls out of construction order rather than a priority field: the constructor takes
+`@StartupRoot roots: Set<Any>`, so every root is already built by the time `run()` is entered.
+`run()` then reads `holder.featureGraph.featureCollection.startupFeatures`.
+
+Root construction does **not** stay inside `AppScope`, despite happening in an `AppScope`
+constructor. `PulsarSongAdvancer` injects `PulsarFeature` eagerly, and the `AppScope` provider for
+it is `holder.featureGraph.featureCollection.getFeature(...)` — so building the root set already
+enters `FeatureGraphHolder`'s lazy and constructs `PulsarViewModel`, before `run()` is reached. A
+new root must not assume otherwise.
+
+What the split *does* buy is narrow, and the drain's placement does the heavy lifting: it lives
+inside `run()` and
+deliberately **not** inside `FeatureGraphHolder`'s
+`val featureGraph: FeatureGraph by lazy { factory.create() }`. Kotlin's `SynchronizedLazyImpl` is
+not re-entrant — it checks `_value !== UNINITIALIZED` inside its own lock, and `synchronized`
+re-enters freely on the same thread, so a same-thread re-entry during initialization finds the value
+still unset and recurses without bound. Root construction is safe today only because
+`factory.create()` builds no members of its own. Draining after `create()` has already published its
+result cannot hit that at all.
+
+The startup log line records what actually got built:
+
+```
+startup init: N app roots, M features
+```
+
+On DJ desktop, `N` is 4 (`PlaybackController`, `PulsarPlaybackBridge`, `PulsarSongEnding`,
+`PulsarSongAdvancer`; the three Android-only roots are absent from that classpath) and `M` is 6.
+
+### `getFeature` goes through a derived index
+
+`SynthFeatureKey` is the map key now, so `providers[SomeFeature::class]` no longer type-checks.
+`FeatureCollection` builds a `KClass -> provider` index lazily from the keys alone — no provider is
+invoked, so it constructs nothing — and `getFeature` reads that. Callers are unchanged.
+
+### The two guards, and what neither one catches
+
+`StartupRootGuardTest` and `FeatureStartupGuardTest` (both `core/features/src/jvmTest`):
+
+- **`FeatureStartupGuardTest` nags.** With one declaration site there is no half-done state to
+  catch, so the only job left is the one a compiler cannot do: notice a feature that *should* be
+  `startup = true`. It infers that from `onRestore =`, the signature of a port-restoring
+  `persistence.bind(...)` call, and fails if a matching file lacks the flag.
+  `DELIBERATELY_LAZY_RESTORERS` holds the one deliberate exception. **KNOWN LIMIT:** the inference
+  catches port-restorers, not callback-registrars, so `PulsarViewModel`'s flag is unguarded.
+- **`StartupRootGuardTest` pins, it does not infer.** Two heuristics for "is this `AppScope`
+  singleton a startup root" were measured against this repo before the test was written. The best —
+  `@SingleIn(AppScope::class)` whose `init` contains `.launch` — produced 9 false positives and 2
+  false negatives out of 14 matches. The false positives (`SynthOrchestrator`,
+  `MediaSessionStateManager`, `PulsarSession`, `PulsarMetadataProducer`, `PulsarSkipHandler`,
+  `TidalScheduler`, `SongEndingPreferences`, `TransitionPreferences`, `AiModelProvider`) all have
+  real injectors and are constructed anyway. The false negatives were `AndroidAppLifecycleManager`
+  and `DjAppLifecycleManager`, whose `init` registers activity-lifecycle callbacks instead of
+  launching a coroutine — the two most easily forgotten. The distinguishing question, "does anything
+  else already inject this?", is a property of the whole binding graph and is invisible in the file
+  being scanned. So the test hardcodes the seven-class inventory and fails if source and list
+  diverge in either direction.
+
+A third check, `noEntryPointTouchesRootsByHand`, pins the seven entry points and fails if any still
+references a removed per-root accessor, or has stopped calling `graph.startupInitializer.run()` —
+the one thing no source-level wiring check can see.
+
+**These guards scan the repo tree at runtime through `java.io.File`, which Gradle cannot see.**
+`core/features/build.gradle.kts` declares `core/**`, `features/**`, and `apps/**` as an explicit
+task input. Without it, `:core:features:jvmTest` is `UP-TO-DATE` whenever only *other* modules
+changed — meaning dropping a feature's `startup` flag would not re-run the guards locally or in an
+incremental CI. If you add another repo-scanning guard in this module it inherits the declaration;
+one in a different module does not.
+
+Watch the regexes when the key shape changes. `FeatureScopeGuardTest`'s `KEY` pattern used to end in
+`::class\)`, which silently stopped matching every startup feature the moment a second argument was
+added — caught only because that test carries a `MIN_FEATURE_VIEWMODELS` floor.
+
+### Why Orpheus used to get this by accident, and Orphic DJ did not
+
+Before this mechanism existed, most Orpheus features got constructed without anyone declaring
+intent: `FeatureCollection.keyActions` (keyboard dispatch) is `by lazy`, and building it iterates
+`allFeatures`, which drains every provider in the multibinding. So reading a keyboard shortcut on
+the Orpheus desktop/JVM UI happened to construct every feature ViewModel as a side effect. The DJ
+app has no keyboard handling and never reads `keyActions` or `allFeatures`, so nothing forced
+construction there — a saved Reverb setting silently failed to apply until the user visited the
+Reverb tab. The `startup` flag replaces that accident with a declared contract that holds identically
+on both apps and every platform.
 
 ## Constraints
 

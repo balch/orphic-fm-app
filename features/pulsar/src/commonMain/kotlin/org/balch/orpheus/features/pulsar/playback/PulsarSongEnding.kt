@@ -3,8 +3,10 @@ package org.balch.orpheus.features.pulsar.playback
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.controller.SynthController
@@ -85,6 +88,7 @@ interface SongEndingEventSource {
 @SingleIn(AppScope::class)
 @Inject
 @ContributesBinding(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
 class PulsarSongEnding(
     // Eager, not a () -> PulsarFeature provider: PulsarSession depends on nothing that
     // depends back on a feature, so there is no cycle left to defer around.

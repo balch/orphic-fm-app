@@ -105,7 +105,7 @@ interface HornFeature : SynthFeature<HornUiState, HornPanelActions> {
 
 @Inject
 @SingleIn(FeatureScope::class)
-@SynthFeatureKey(HornFeature::class)
+@SynthFeatureKey(HornFeature::class, startup = true)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 @ContributesBinding(FeatureScope::class, binding = binding<HornFeature>())
 class HornViewModel(

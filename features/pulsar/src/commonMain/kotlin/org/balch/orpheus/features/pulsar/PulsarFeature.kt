@@ -296,10 +296,12 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
  * Bridges PulsarSymbol controls to the C++ engine via SynthController,
  * exposing a reactive PulsarUiState and stable PulsarPanelActions.
  */
+// startup = true is not inferable: this registers MediaSessionManager callbacks rather than
+// restoring ports, so the guard cannot see the need. Dropping it breaks lock-screen transport.
 @OptIn(FlowPreview::class)
 @Inject
 @SingleIn(FeatureScope::class)
-@SynthFeatureKey(PulsarFeature::class)
+@SynthFeatureKey(PulsarFeature::class, startup = true)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 @ContributesBinding(FeatureScope::class, binding = binding<PulsarFeature>())
 class PulsarViewModel(
@@ -1487,7 +1489,7 @@ class PulsarViewModel(
         // load_vibe snapshots pulsar_track_envelope into track_solo_behavior and never refreshes
         // it, so writing after the bump races that snapshot. The flow collector cannot cover this
         // — it is a 5Hz poll, and audio is already live in EXPLICIT mode.
-        // applyPatternInputs = false is load-bearing; see its KDoc.
+        // applyPatternInputs = false is required; see its KDoc.
         introIdx?.let { applyTrackOverridesForSection(it, applyPatternInputs = false) }
 
         // In MIX_GATED mode (Orpheus), auto-start on vibe load — mix knob controls audibility.

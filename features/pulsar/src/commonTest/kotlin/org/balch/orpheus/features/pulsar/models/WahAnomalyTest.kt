@@ -128,7 +128,7 @@ class WahAnomalyTest {
                 "OrpheusEngine::kLickWahFields, the PulsarViewModel marshal and the " +
                 "load_vibe unpack together, or the bank silently scrambles.",
         )
-        // Order is as load-bearing as the count: the bank is positional on both sides.
+        // Order matters as much as the count: the bank is positional on both sides.
         assertEquals(
             listOf("rateDivision", "depth", "resonanceQ", "centerHz", "sweepOctaves", "wet"),
             (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },

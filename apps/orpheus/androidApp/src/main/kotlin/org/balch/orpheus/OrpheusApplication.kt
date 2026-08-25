@@ -43,28 +43,8 @@ class OrpheusApplication : Application() {
         // Wire up logging to UI
         KmLogging.addLogger(graph.consoleLogger)
         
-        // Eagerly initialize AndroidAppLifecycleManager to register lifecycle callbacks
-        // This enables muting audio when the app is backgrounded without MediaSession
-        graph.androidAppLifecycleManager
-
-        // Eagerly initialize PlaybackController so its init {} subscribes
-        // to flows at startup. PlaybackController is the single source of
-        // truth for play/pause state across the app.
-        graph.playbackController
-
-        // Eagerly initialize PulsarPlaybackBridge so it observes PlaybackController
-        // state and StopAll events from app launch. Decoupled from PulsarViewModel
-        // to break the DI cycle that would otherwise stack-overflow Metro.
-        graph.pulsarPlaybackBridge
-
-        // Eagerly initialize PulsarSongEnding so its init {} collectors observe
-        // playback/arrangement state at startup. Same decoupling reason as
-        // PulsarPlaybackBridge.
-        graph.pulsarSongEnding
-
-        // Eagerly initialize PulsarSongAdvancer so its init {} collector subscribes
-        // to PulsarSongEnding.songEndingEvents and auto-advances the vibe list.
-        graph.pulsarSongAdvancer
+        // Builds every @StartupRoot, then the graph's startup features.
+        graph.startupInitializer.run()
 
         // Pause UI-feeding polls (60Hz Pulsar viz, turntable viz, 5Hz meters)
         // while the app is backgrounded so Android doesn't kill us for

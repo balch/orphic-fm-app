@@ -2,9 +2,12 @@ package org.balch.orpheus.features.pulsar.playback
 
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
@@ -30,6 +33,7 @@ import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
  */
 @SingleIn(AppScope::class)
 @Inject
+@ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
 class PulsarPlaybackBridge(
     private val playbackController: PlaybackController,
     private val mediaSessionStateManager: MediaSessionStateManager,
