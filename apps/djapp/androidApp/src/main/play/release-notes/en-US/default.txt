@@ -1,4 +1,4 @@
-Solos and intros land cleaner, and the knobs finally keep up.
+Solos and intros land cleaner, knobs are smoother and more responsive.
 
 • Knobs respond without lag, fast enough to ride in a live set.
 • Cleaner and more articulated intros and solos.
