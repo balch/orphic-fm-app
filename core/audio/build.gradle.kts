@@ -22,7 +22,7 @@ kotlin {
         target.compilations.getByName("main") {
             cinterops {
                 create("orpheus_dsp") {
-                    defFile = file("src/nativeInterop/cinterop/orpheus_dsp.def")
+                    definitionFile.set(file("src/nativeInterop/cinterop/orpheus_dsp.def"))
                     includeDirs("${rootProject.projectDir}/liborpheus_dsp/include")
                     extraOpts("-libraryPath", "$iosBuildDir/$libSubdir/orpheus_dsp")
                 }
@@ -94,12 +94,24 @@ tasks.register<Exec>("buildIosDeviceNative") {
     )
 }
 
-// Wire cinterop tasks to depend on the correct iOS native build
+// Wire cinterop tasks to depend on the correct iOS native build.
+//
+// The .def sets `staticLibraries = liborpheus_dsp.a`, so cinterop COPIES the
+// archive into the klib and the framework links that copy, not the file cmake
+// just produced. Cinterop's own up-to-date check only looks at the .def and the
+// headers, so a C++-only change (no header touched) left the klib holding a
+// stale archive and never reached the app — iOS silently shipped older DSP than
+// the tag it was built from. Declaring the archive as an input is what makes
+// cinterop re-run when the library actually changes.
 tasks.matching { it.name == "cinteropOrpheus_dspIosArm64" }.configureEach {
     dependsOn("buildIosDeviceNative")
+    inputs.file(rootProject.file("liborpheus_dsp/platform/ios/build-device/orpheus_dsp/liborpheus_dsp.a"))
+        .withPropertyName("orpheusDspDeviceArchive")
 }
 tasks.matching {
     it.name == "cinteropOrpheus_dspIosSimulatorArm64" || it.name == "cinteropOrpheus_dspIosX64"
 }.configureEach {
     dependsOn("buildIosSimNative")
+    inputs.file(rootProject.file("liborpheus_dsp/platform/ios/build-sim/orpheus_dsp/liborpheus_dsp.a"))
+        .withPropertyName("orpheusDspSimArchive")
 }
