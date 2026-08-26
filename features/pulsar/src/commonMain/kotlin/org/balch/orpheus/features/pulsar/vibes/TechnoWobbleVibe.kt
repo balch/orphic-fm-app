@@ -114,10 +114,22 @@ class TechnoWobbleVibe : VibeProvider {
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),   // G# — pulse
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.90f),   // G# — pulse
                     LickStep(scaleDegree = -2, duration = 0.5f, velocity = 0.70f),  // F — dip below
-                    LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.95f),   // G# — back, hit
+                    LickStep(
+                        scaleDegree = 0,
+                        duration = 0.5f,
+                        velocity = 0.95f
+                    ),   // G# — back, hit
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.85f),
-                    LickStep(scaleDegree = 3, duration = 0.5f, velocity = 0.80f),   // C# — reach to 4th
-                    LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.90f),   // G# — resolve, hang
+                    LickStep(
+                        scaleDegree = 3,
+                        duration = 0.5f,
+                        velocity = 0.80f
+                    ),   // C# — reach to 4th
+                    LickStep(
+                        scaleDegree = 0,
+                        duration = 1.0f,
+                        velocity = 0.90f
+                    ),   // G# — resolve, hang
                 ),
                 loopLength = 8,
             ),
@@ -148,15 +160,15 @@ class TechnoWobbleVibe : VibeProvider {
                     //             DRUM  BASS  LEAD  PADS
                     "Drummer" to row(0.00f, 0.35f, 0.30f, 0.15f),
                     "Bassist" to row(0.15f, 0.00f, 0.45f, 0.20f),
-                    "Lead"    to row(0.15f, 0.45f, 0.00f, 0.20f),
-                    "Pads"    to row(0.10f, 0.30f, 0.35f, 0.00f),
+                    "Lead" to row(0.15f, 0.45f, 0.00f, 0.20f),
+                    "Pads" to row(0.10f, 0.30f, 0.35f, 0.00f),
                 ),
                 pullInMatrix = bandMatrix(
                     //             DRUM  BASS  LEAD  PADS
                     "Drummer" to row(0.00f, 0.30f, 0.15f, 0.10f),
                     "Bassist" to row(0.25f, 0.00f, 0.30f, 0.15f),
-                    "Lead"    to row(0.20f, 0.40f, 0.00f, 0.25f),
-                    "Pads"    to row(0.15f, 0.25f, 0.30f, 0.00f),
+                    "Lead" to row(0.20f, 0.40f, 0.00f, 0.25f),
+                    "Pads" to row(0.15f, 0.25f, 0.30f, 0.00f),
                 ),
                 pullInBarsMin = 4, pullInBarsMax = 8,   // slow, deliberate
                 barsPerLeadMin = 6, barsPerLeadMax = 12, // leads hang forever — hypnotic
@@ -250,7 +262,10 @@ class TechnoWobbleVibe : VibeProvider {
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
-                        engineSpace = bass.copy(engineId = OrpheusEngineId.STR, lpgMode = LpgMode.BYPASS),
+                        engineSpace = bass.copy(
+                            engineId = OrpheusEngineId.STR,
+                            lpgMode = LpgMode.BYPASS
+                        ),
                         role = TrackRole.Melodic(
                             chordFollow = ChordFollow.ROOT_ONLY,
                             lickMode = LickMode.Fill,
@@ -418,7 +433,9 @@ class TechnoWobbleVibe : VibeProvider {
             ),
             stepCount = 32,  // 32-step patterns support the 8-bar hypnotic loop
             tension = TensionProfile(
-                innerBars = 8, outerBars = 32, outerDepth = 0.8f,  // long arcs — deeper outer swing (TW-4)
+                innerBars = 8,
+                outerBars = 32,
+                outerDepth = 0.8f,  // long arcs — deeper outer swing (TW-4)
                 volume = 0.30f,        // subtle volume tension — keep it relentless
                 tonal = TonalTension(
                     octaveShift = false,   // bass stays in the deep
@@ -426,9 +443,15 @@ class TechnoWobbleVibe : VibeProvider {
                 ),
                 timing = 0.10f,        // very tight — this is machine music
                 evolution = EvolutionTension(
-                    timbreLow = 0.25f, timbreHigh = 0.70f, timbreProbability = 0.85f,  // breathing distortion
-                    morphLow = 0.30f,  morphHigh = 0.65f, morphProbability = 0.6f,
-                    harmonicsLow = 0.40f, harmonicsHigh = 0.75f, harmonicsProbability = 0.5f,
+                    timbreLow = 0.25f,
+                    timbreHigh = 0.70f,
+                    timbreProbability = 0.85f,  // breathing distortion
+                    morphLow = 0.30f,
+                    morphHigh = 0.65f,
+                    morphProbability = 0.6f,
+                    harmonicsLow = 0.40f,
+                    harmonicsHigh = 0.75f,
+                    harmonicsProbability = 0.5f,
                     attackPoint = 0.4f,    // build earlier so the evolution arc opens sooner (TW-4)
                     releaseSpeed = 0.25f,  // slow decay — hang in the tension
                 ),
@@ -453,10 +476,14 @@ class TechnoWobbleVibe : VibeProvider {
                     // pulse -> grind: chorusLift (smooth climb into the verse).
                     Section(
                         name = "pulse",
-                        barsMin = 6, barsMax = 6,
+                        barsMin = 2, barsMax = 2,
                         transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = chorusLiftBars),
+                            SectionTransition(
+                                targetIndex = 1,
+                                weight = 1f,
+                            ),
                         ),
+                        tensionOverride = TensionProfile(innerBars = 2, volume = .9f),
                         macroOverrides = MacroOverrides(
                             energy = 0.45f, complexity = 0.3f, space = 1.3f, mood = 0.7f,
                         ),
@@ -467,11 +494,22 @@ class TechnoWobbleVibe : VibeProvider {
                     // grind -> drift: hard cut (sudden end of the song).
                     Section(
                         name = "grind",
-                        barsMin = 8, barsMax = 16,
+                        barsMin = 6, barsMax = 10,
                         transitions = listOf(
-                            SectionTransition(targetIndex = 2, weight = 0.5f, transitionBars = chorusLiftBars),
-                            SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = chorusDropBars),
-                            SectionTransition(targetIndex = 4, weight = 0.05f),  // 0-bar = hard outro entry; rare (SEC-5) — don't drop straight into the outro
+                            SectionTransition(
+                                targetIndex = 2,
+                                weight = 0.5f,
+                                transitionBars = chorusLiftBars
+                            ),
+                            SectionTransition(
+                                targetIndex = 3,
+                                weight = 0.3f,
+                                transitionBars = chorusDropBars
+                            ),
+                            SectionTransition(
+                                targetIndex = 4,
+                                weight = 0.05f
+                            ),  // 0-bar = hard outro entry; rare (SEC-5) — don't drop straight into the outro
                         ),
                         recencyDecay = 0.6f,
                         macroOverrides = null,  // grind IS the baseline
@@ -485,10 +523,18 @@ class TechnoWobbleVibe : VibeProvider {
                     // stab -> drift: hard cut (sudden ending after the chorus).
                     Section(
                         name = "stab",
-                        barsMin = 6, barsMax = 10,
+                        barsMin = 4, barsMax = 8,
                         transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.5f, transitionBars = chorusLiftBars),
-                            SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = chorusDropBars),
+                            SectionTransition(
+                                targetIndex = 1,
+                                weight = 0.5f,
+                                transitionBars = chorusLiftBars
+                            ),
+                            SectionTransition(
+                                targetIndex = 3,
+                                weight = 0.3f,
+                                transitionBars = chorusDropBars
+                            ),
                             SectionTransition(targetIndex = 4, weight = 0.2f),
                         ),
                         recencyDecay = 0.5f,
@@ -524,10 +570,18 @@ class TechnoWobbleVibe : VibeProvider {
                     // fall -> drift: hard cut.
                     Section(
                         name = "fall",
-                        barsMin = 6, barsMax = 10,
+                        barsMin = 4, barsMax = 6,
                         transitions = listOf(
-                            SectionTransition(targetIndex = 1, weight = 0.6f, transitionBars = chorusLiftBars),
-                            SectionTransition(targetIndex = 2, weight = 0.3f, transitionBars = chorusLiftBars),
+                            SectionTransition(
+                                targetIndex = 1,
+                                weight = 0.6f,
+                                transitionBars = chorusLiftBars
+                            ),
+                            SectionTransition(
+                                targetIndex = 2,
+                                weight = 0.3f,
+                                transitionBars = chorusLiftBars
+                            ),
                             SectionTransition(targetIndex = 4, weight = 0.1f),
                         ),
                         recencyDecay = 0.5f,
@@ -611,7 +665,6 @@ class TechnoWobbleVibe : VibeProvider {
                     ),
                 ),
             ),
-    )
-
+        )
     }
 }
