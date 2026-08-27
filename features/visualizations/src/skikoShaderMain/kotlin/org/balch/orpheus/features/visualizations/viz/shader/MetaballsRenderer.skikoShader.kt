@@ -20,8 +20,8 @@ import org.jetbrains.skia.RuntimeShaderBuilder
  * SkSL metaballs, shared by every target that runs the shader path.
  *
  * `RuntimeEffect` and `RuntimeShaderBuilder` come from skiko, so this compiles for JVM, WASM and
- * iOS alike. iOS opts out and keeps its own stub: it has never rendered this viz, and switching it
- * on is a visual change rather than the deduplication this file is doing.
+ * iOS alike. iOS renders through skiko too (see ui/widgets' `skikoMain` for another example), so
+ * it takes this implementation directly rather than keeping its own stub.
  */
 actual class MetaballsRenderer {
     private var runtimeEffect: RuntimeEffect? = null

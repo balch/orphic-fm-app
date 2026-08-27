@@ -20,12 +20,14 @@ kotlin {
     applyDefaultHierarchyTemplate()
 
     sourceSets {
-        // Not `skikoMain`: iOS is a skiko target too, but it stubs MetaballsRenderer out rather
-        // than running the SkSL path, so it is deliberately not a member. Named for the capability
-        // the members share, not for the renderer they happen to have in common.
+        // JVM, WASM and iOS all render through skiko, so the SkSL-based MetaballsRenderer has
+        // exactly one implementation shared by the three. Named for the capability the members
+        // share (RuntimeEffect-backed shaders), not for the renderer they happen to have in
+        // common — mirrors the `skikoMain` split in ui/widgets/build.gradle.kts.
         val skikoShaderMain = create("skikoShaderMain") { dependsOn(commonMain.get()) }
         jvmMain.get().dependsOn(skikoShaderMain)
         wasmJsMain.get().dependsOn(skikoShaderMain)
+        iosMain.get().dependsOn(skikoShaderMain)
 
         commonMain.dependencies {
              // Core deps provided by convention
