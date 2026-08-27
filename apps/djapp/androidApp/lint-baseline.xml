@@ -1,16 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="6" by="lint 9.1.0" type="baseline" client="gradle" dependencies="false" name="AGP (9.1.0)" variant="all" version="9.1.0">
-
-    <issue
-        id="MissingOnPlayFromSearch"
-        message="This class does not override `onPlayFromSearch` from `MediaSession.Callback` The method should be overridden and implemented to support Voice search on Android Auto."
-        errorLine1="            setCallback(object : MediaSessionCompat.Callback() {"
-        errorLine2="                        ~~~~~~">
-        <location
-            file="src/main/kotlin/org/balch/djapp/DjAudioForegroundService.kt"
-            line="162"
-            column="25"/>
-    </issue>
+<issues format="6" by="lint 9.3.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.3.1)" variant="all" version="9.3.1">
 
     <issue
         id="NewApi"
@@ -35,25 +24,47 @@
     </issue>
 
     <issue
+        id="UnusedAttribute"
+        message="Attribute `maxResizeHeight` is only used in API level 31 and higher (current min is 26)"
+        errorLine1="    android:maxResizeHeight=&quot;220dp&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/dj_widget_info.xml"
+            line="7"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellWidth` is only used in API level 31 and higher (current min is 26)"
+        errorLine1="    android:targetCellWidth=&quot;4&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/dj_widget_info.xml"
+            line="8"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `targetCellHeight` is only used in API level 31 and higher (current min is 26)"
+        errorLine1="    android:targetCellHeight=&quot;1&quot;"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/xml/dj_widget_info.xml"
+            line="9"
+            column="5"/>
+    </issue>
+
+    <issue
         id="ExportedService"
         message="Exported service does not require permission"
         errorLine1="        &lt;service"
         errorLine2="         ~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="32"
+            line="28"
             column="10"/>
-    </issue>
-
-    <issue
-        id="ObsoleteSdkInt"
-        message="Unnecessary; `SDK_INT` is always >= 26"
-        errorLine1="        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/org/balch/djapp/DjAudioForegroundService.kt"
-            line="143"
-            column="13"/>
     </issue>
 
     <issue
@@ -61,24 +72,6 @@
         message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 26. Merge all the resources in this folder into `mipmap-anydpi`.">
         <location
             file="src/main/res/mipmap-anydpi-v26"/>
-    </issue>
-
-    <issue
-        id="MonochromeLauncherIcon"
-        message="The application adaptive icon is missing a monochrome tag"
-        errorLine1="&lt;adaptive-icon xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;>"
-        errorLine2="^">
-        <location
-            file="src/main/res/mipmap-anydpi-v26/ic_launcher.xml"
-            line="2"
-            column="1"/>
-    </issue>
-
-    <issue
-        id="IconLocation"
-        message="Found bitmap drawable `res/drawable/album_art.webp` in densityless folder">
-        <location
-            file="src/main/res/drawable/album_art.webp"/>
     </issue>
 
     <issue
@@ -124,17 +117,6 @@
             file="src/main/res/mipmap-xxxhdpi/ic_launcher_round.png"/>
         <location
             file="src/main/res/mipmap-xxxhdpi/ic_launcher.png"/>
-    </issue>
-
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `String.toColorInt` instead?"
-        errorLine1="        private val NOTIFICATION_COLOR = Color.parseColor(&quot;#7B68EE&quot;)"
-        errorLine2="                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/kotlin/org/balch/djapp/DjAudioForegroundService.kt"
-            line="57"
-            column="42"/>
     </issue>
 
 </issues>
