@@ -10,9 +10,8 @@ androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.11.0"
 androidx-lifecycle-viewmodel = "2.11.0"
 androidx-testExt = "1.3.0"
-composeGradlePlugin = "1.11.1"
 composeHotReload = "1.2.0"
-composeMultiplatform = "1.11.1"
+composeMultiplatform = "1.12.0"
 glance = "1.1.1"
 gradle = "9.3.1"
 junit = "4.13.2"
@@ -26,7 +25,7 @@ kotlinx-datetime = "0.8.0"
 kotlinx-collections-immutable = "0.5.1"
 liquid = "1.1.1"
 kmlogging = "2.1.1"
-material3Version = "1.9.0"
+material3Version = "1.12.0-alpha03"
 media3 = "1.10.1"
 slf4jApi = "2.0.18"
 logback = "1.6.0"
@@ -53,19 +52,19 @@ javacv = "1.5.13"
 
 [libraries]
 media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
-compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeGradlePlugin" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "composeIcons" }
 compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
-compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "composeGradlePlugin" }
+compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "composeMultiplatform" }
 dev-zacsweers-metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
-compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeGradlePlugin" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
 gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3Version" }
 metro-gradle-plugin = { module = "dev.zacsweers.metro:metro-gradle-plugin", version.ref = "metro" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
-compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeGradlePlugin" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "kotlinx-atomicfu" }
@@ -151,7 +150,7 @@ androidx-glance-appwidget-preview = { module = "androidx.glance:glance-appwidget
 # Compose UI Tooling (for previews)
 compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
 compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeGradlePlugin" }
+ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

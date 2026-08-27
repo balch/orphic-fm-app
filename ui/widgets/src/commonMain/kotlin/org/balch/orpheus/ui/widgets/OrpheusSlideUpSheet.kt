@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,7 +50,16 @@ fun OrpheusSlideUpSheet(
     dragHandle: @Composable () -> Unit = { CosmicDragHandle() },
     content: @Composable ColumnScope.(kick: () -> Unit) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = skipPartiallyExpanded)
+    // M3 replaced the skipPartiallyExpanded boolean with an explicit detent set; keep the
+    // boolean as this widget's contract and map it here so call sites stay M3-agnostic.
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = if (skipPartiallyExpanded) {
+            setOf(SheetValue.Hidden, SheetValue.Expanded)
+        } else {
+            setOf(SheetValue.Hidden, SheetValue.PartiallyExpanded, SheetValue.Expanded)
+        },
+    )
     var interactionTick by remember { mutableIntStateOf(0) }
     if (inactivityTimeoutMs != null) {
         LaunchedEffect(interactionTick, inactivityTimeoutMs) {
