@@ -395,6 +395,18 @@ struct PulsarTrackState {
     int chordal_base_count = 0;
     bool chordal_base_valid = false;
 
+    // Density this track's current pattern was GENERATED at. Section entry compares the
+    // section-effective density against this and regenerates only on a change, so a
+    // section that does not touch density leaves the groove exactly as it was.
+    float generated_density = -1.0f;
+    // Set while the ACTIVE section overrides this track's density to 0 ("track out").
+    // Enforced as a render-time mute rather than an empty pattern: the level generators
+    // lay down unconditional primary hits (the backbeat on 2 and 4, driving 8ths, the
+    // beat-1 bass root) that no density value can gate, and a mute also covers the
+    // CHORDAL and lick tracks whose generators ignore density entirely. Muting also
+    // means leaving the section restores the original groove with no regeneration.
+    bool section_density_out = false;
+
     // Evolution state (persists across bars)
     bool evo_rhythmic = false;
     float evo_tension_resp = 1.0f;
@@ -655,6 +667,11 @@ struct SectionParam {
     int track_inversion_override[kNumPulsarTracks]     = {-1, -1, -1, -1, -1, -1, -1, -1};
     int track_arp_mode_override[kNumPulsarTracks]      = {-1, -1, -1, -1, -1, -1, -1, -1};
     int track_chord_follow_override[kNumPulsarTracks]  = {-1, -1, -1, -1, -1, -1, -1, -1};
+    // Per-track density for this section. Negative = no override (use the vibe's base
+    // density); 0 means the track is OUT. Resolved through resolve_section_densities() so
+    // load, section entry and the déjà-vu reset can never disagree on a track's density.
+    float track_density_override[kNumPulsarTracks] =
+        {-1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f};
     // Per-section chord progression override (0 = no override; see pulsar_chord_progression.h for kMaxProgressionLength = 8)
     int custom_progression_length = 0;
     int8_t custom_progression[kMaxProgressionLength] = {};

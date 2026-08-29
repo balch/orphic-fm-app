@@ -1026,6 +1026,11 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_section_track_inversion[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<int>   pulsar_section_track_arp_mode[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<int>   pulsar_section_track_chord_follow[kMaxSections * kNumPulsarTracks] = {};
+    // Per-section per-track density. Unlike the four above this is a float and 0 is a
+    // MEANINGFUL value ("track out"), so the no-override sentinel is any negative number.
+    // Density is a pattern-GENERATION input, so a change here regenerates the affected
+    // track's pattern at the section boundary; see regenerate_track_density().
+    std::atomic<float> pulsar_section_track_density[kMaxSections * kNumPulsarTracks] = {};
     // Per-section outgoing edges. Stride: 8 sections × 8 edges × 3 floats per edge.
     // Field layout per edge: 0=target_index, 1=weight, 2=transition_bars (pre-roll
     // ramp into the destination, in bars; 0 = hard cut at the boundary).

@@ -138,10 +138,12 @@ struct WahCase {
     // yields a silent measurement range, and "is the wah audible" cannot be measured on
     // silence. Any test that asserts an RMS delta raises the solo'd track's density.
     // Per-track density OVERRIDE (pulsar_track_density_override, the value threaded into
-    // generate_track_pattern), 0 = no override, i.e. fall back to the genre density. The
-    // genre densities for the melodic tracks are sparse, so a test that has to measure a
+    // generate_track_pattern). NEGATIVE = no override, i.e. fall back to the genre density
+    // — matching the port's own default (-1f) and generate_track_pattern's parameter
+    // default. 0 is a real value meaning "track out" and empties the pattern. The genre
+    // densities for the melodic tracks are sparse, so a test that has to measure a
     // filtered lead raises its track here.
-    float density[8]      = {0, 0, 0, 0, 0, 0, 0, 0};
+    float density[8]      = {-1, -1, -1, -1, -1, -1, -1, -1};
     // Engine + envelope per track, defaulted to setup_fixture_baseline's own values so an
     // untouched case renders exactly as before. Overridable because giving a track the
     // MELODIC role does not give it a melodic VOICE: track 6 ships as NSE with envelope

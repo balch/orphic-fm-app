@@ -1174,6 +1174,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
                 engine->pulsar_section_track_chord_follow[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
+        else if (std::strncmp(symbol, "section_track_density_", 22) == 0) {
+            int idx = std::atoi(symbol + 22);
+            if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
+                engine->pulsar_section_track_density[idx].store(value, std::memory_order_relaxed);
+        }
         else if (std::strncmp(symbol, "section_transitions_", 20) == 0) {
             int idx = std::atoi(symbol + 20);
             if (idx >= 0 && idx < kMaxSections * kMaxSectionTransitions * 3)

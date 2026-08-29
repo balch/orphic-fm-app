@@ -137,10 +137,18 @@ LickBuilder(probability, mutationRate) for melodic construction, LongFill for ex
 To peg a lead voice on the tonic while other tracks follow the progression — and as the standard
 fix when a lick lurches on leaping progressions — use trackOverrides keyed by the track index as a
 string: "trackOverrides": ${VibeGuideExamples.TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE}. All
-TrackSectionOverride fields are optional; only set what you need to change (density, volume,
+TrackSectionOverride fields are optional; only set what you need to change (density, volume, morph,
 reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode, chordFollow,
 holdProbability, holdLengthMin, holdLengthMax). Settings restore automatically when the section
 ends.
+
+Two of those have rules worth knowing. "density": 0 takes a track OUT for the section (a clean
+mute that works on any track); a POSITIVE density rebuilds the track's pattern at that density,
+thinning fills and ghosts — but only on tracks whose pattern is GENERATED, so on a Chordal track
+or one playing a lick figure a positive density does nothing while 0 still mutes it. To simply
+duck a track rather than drop it, set "volume". "morph": pins the voice's morph for the section
+so the Space macro cannot overwrite it — on the drum engines (BD/SD/HH) morph is DECAY, so this
+is how one section gets a long-ringing kick against a tight snare.
 
 A simple 5-section shape: intro (sparse, low energy) → groove (full band, macro baseline) → peak
 (energy × 1.3, complexity × 1.3) → breakdown (energy × 0.4, space × 1.5) → outro (sparse, fade).

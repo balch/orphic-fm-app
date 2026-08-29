@@ -85,12 +85,14 @@ object VibeCatalog {
 
     private val log = logging("VibeCatalog")
 
-    /** Ordered master map: catalog position = picker order; first LIVE entry = default vibe. */
-    val entries: Map<String, CatalogEntry> = linkedMapOf(
+    /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
+    private val entryList: List<Pair<String, CatalogEntry>> = listOf(
         "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
+        // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
+        "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
         "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
-        "Rust Belt" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "swamp")),
+        "Rust Belt" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
@@ -140,11 +142,21 @@ object VibeCatalog {
         "Vanished Skyline" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Kaleidoscope Drift" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "opus 4.8", "drone", "void")),
         "Ouroboros Bloom" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "sonnet 5", "drone", "void")),
-        "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Natalis Shimmer" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Bricklayer's Lament" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Mellow Haze" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
     )
+
+    /** Ordered master map: catalog position = picker order; first LIVE entry = default vibe. */
+    val entries: Map<String, CatalogEntry> = entryList.toMap(LinkedHashMap())
+
+    init {
+        // A repeated name is silent and asymmetric: the map keeps the LAST entry's status but
+        // the FIRST entry's position, so the vibe reads as curated where you look and is
+        // governed where you don't. "Aether Natalis" shipped hidden that way. Fail instead.
+        val dupes = entryList.groupingBy { it.first }.eachCount().filterValues { it > 1 }.keys
+        require(dupes.isEmpty()) { "VibeCatalog lists these vibes more than once: $dupes" }
+    }
 
     /**
      * Filter + order the injected provider set through the catalog.

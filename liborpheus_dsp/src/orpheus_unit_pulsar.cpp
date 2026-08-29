@@ -814,6 +814,120 @@ static void start_section_solo(PulsarState* state, OrpheusEngine* engine,
     }
 }
 
+// ── Per-section density ─────────────────────────────────────────────────────
+//
+// density is a pattern-GENERATION input, not a per-block mixer control: the generators
+// consume it while BUILDING a track's step array, and nothing re-reads it while that
+// array plays. So a section that changes a track's density has to regenerate that
+// track's pattern at the boundary, which is what these two functions do.
+
+// Resolve every track's density for `sec`: the section's per-track override when set
+// (>= 0 — and 0 legitimately means "track out"), else the vibe's base density. One
+// resolver so vibe load, section entry and the déjà-vu reset cannot disagree.
+static void resolve_section_densities(const OrpheusEngine* engine, const SectionParam* sec,
+                                      float out[kNumPulsarTracks]) {
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        const float base = engine->pulsar_genre_density[t].load(std::memory_order_relaxed);
+        const float ovr  = sec ? sec->track_density_override[t] : -1.0f;
+        out[t] = (ovr >= 0.0f) ? ovr : base;
+    }
+}
+
+// Regenerate every track whose section-effective density differs from the density its
+// current pattern was built at, recording the new value. Returns the count regenerated.
+//
+// Only GENERATIVE tracks are rebuilt. A CHORDAL track walks a comping template and a
+// FILL/SQUASH lick owns its own steps — neither generator takes a density parameter, so
+// there a density override means nothing and the pattern is left alone. Tracks whose
+// density did not change are skipped entirely, so entering a section that says nothing
+// about density can never perturb the groove.
+static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
+                                   const SectionParam* sec) {
+    float density[kNumPulsarTracks];
+    resolve_section_densities(engine, sec, density);
+
+    // Genre profile for regeneration, with the section-effective densities substituted.
+    PulsarGenreProfile genre;
+    for (int t = 0; t < kNumPulsarTracks; t++) genre.base_density[t] = density[t];
+    genre.swing_amount      = engine->pulsar_genre_swing.load(std::memory_order_relaxed);
+    genre.ghost_probability = engine->pulsar_genre_ghost_prob.load(std::memory_order_relaxed);
+    genre.note_range_low    = static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed));
+    genre.note_range_high   = static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed));
+    genre.rhythm_density    = engine->pulsar_genre_rhythm_density.load(std::memory_order_relaxed);
+
+    int scale_idx = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+    if (scale_idx < 0) scale_idx = 0;
+    if (scale_idx >= kNumPulsarScales) scale_idx = kNumPulsarScales - 1;
+    const PulsarScale& scale = kPulsarScales[scale_idx];
+    const int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
+
+    int step_count_cfg = engine->pulsar_step_count.load(std::memory_order_relaxed);
+    if (step_count_cfg <= 0) step_count_cfg = 16;
+    const int bar1_len = (step_count_cfg > 16) ? 16 : step_count_cfg;
+
+    // Same seed basis as the déjà-vu reset, so a track returning to a density it played
+    // before gets that pattern back instead of drifting one step further every section.
+    const uint32_t section_seed = state->seed_counter * 2654435761u;
+    const float energy     = engine->pulsar_energy.load(std::memory_order_relaxed);
+    const float complexity = engine->pulsar_complexity.load(std::memory_order_relaxed);
+
+    int regenerated = 0;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        PulsarTrackState& ts = state->tracks[t];
+
+        // density 0 = "track out" for this section, enforced as a render mute so it works
+        // for every role and reverses on exit without touching the pattern. Deliberately
+        // does NOT update generated_density: the steps are untouched, so leaving the
+        // section brings the original groove back exactly, with no regeneration at all.
+        ts.section_density_out = (density[t] == 0.0f);
+        if (ts.section_density_out) continue;
+
+        if (ts.generated_density == density[t]) continue;
+        ts.generated_density = density[t];
+
+        if (ts.role == TrackRole::CHORDAL) continue;
+        const LickMode lick_mode = static_cast<LickMode>(
+            engine->pulsar_track_lick_mode[t].load(std::memory_order_relaxed));
+        LickChannel ch = track_lick_channel(state, engine, t);
+        if (ch.length > 0 && lick_mode != LickMode::NONE && ts.role == TrackRole::MELODIC) continue;
+
+        const bool percussive = (ts.role == TrackRole::PERCUSSIVE);
+        const float hold_prob = engine->pulsar_track_hold_probability[t].load(std::memory_order_relaxed);
+        int hold_min = engine->pulsar_track_hold_length_min[t].load(std::memory_order_relaxed);
+        int hold_max = engine->pulsar_track_hold_length_max[t].load(std::memory_order_relaxed);
+        if (hold_min < 1) hold_min = 2;
+        if (hold_max < hold_min) hold_max = hold_min;
+        const float density_ovr = engine->pulsar_track_density_override[t].load(std::memory_order_relaxed);
+        const int nr_low  = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
+        const int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
+        const int eng_note_min = (ts.engine_index >= 0 && ts.engine_index < 24)
+            ? kEngineModRanges[ts.engine_index].note_min : 0;
+
+        generate_track_pattern(ts, t, percussive, genre,
+                               static_cast<uint8_t>(root), scale, bar1_len, section_seed,
+                               0, hold_prob, hold_min, hold_max,
+                               density_ovr, nr_low, nr_high, eng_note_min);
+
+        // generate_track_pattern only fills bar 1; without this the regenerated track
+        // would sit at step_count 16 while every other track runs 32 and drift out of
+        // phase within a bar. Same contract as the load and déjà-vu paths.
+        if (step_count_cfg > 16) {
+            const float ch_mut = state->in_spurt
+                ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+            apply_bar_strategy(ts, t, ts.bar_strategy, percussive, genre,
+                               static_cast<uint8_t>(root), scale,
+                               energy, complexity,
+                               ch.lick, ch.length, ch_mut,
+                               section_seed ^ (t * 13331u),
+                               ch.octave,
+                               ch.loop_length);
+        }
+        if (ts.playhead >= ts.step_count) ts.playhead = 0;
+        regenerated++;
+    }
+    return regenerated;
+}
+
 static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
     // ── Clear generative runtime state from the previous vibe ───────────
     // Solo modifiers, live-lick caches, and anchor indices all carry musical
@@ -1091,6 +1205,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         LickChannel ch = track_lick_channel(state, engine, t);
         float ch_mut = state->in_spurt
             ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+
+        // Density this pattern is about to be built at, so a section entry can tell whether
+        // its per-track override actually changes anything. See apply_section_densities().
+        ts.generated_density = genre.base_density[t];
 
         if (role == TrackRole::CHORDAL) {
             // CHORDAL: walk rhythm template, stab chord root (CHD renders voicing)
@@ -1370,6 +1488,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     sec.track_inversion_override[t]     = engine->pulsar_section_track_inversion[tbase + t].load(std::memory_order_relaxed);
                     sec.track_arp_mode_override[t]      = engine->pulsar_section_track_arp_mode[tbase + t].load(std::memory_order_relaxed);
                     sec.track_chord_follow_override[t]  = engine->pulsar_section_track_chord_follow[tbase + t].load(std::memory_order_relaxed);
+                    sec.track_density_override[t]       = engine->pulsar_section_track_density[tbase + t].load(std::memory_order_relaxed);
                 }
             }
 
@@ -1531,6 +1650,12 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 if (sec.has_tension_override) {
                     state->tension = sec.tension_override;
                 }
+
+                // Apply the opening section's per-track DENSITY overrides. The patterns
+                // above were generated at the vibe's base densities; this rebuilds only
+                // the tracks this section actually changes. Same reason as the tension
+                // block: no advance_section fires for the section we start in.
+                apply_section_densities(state, engine, &sec);
 
                 // Apply per-track section overrides for the initial section so
                 // chordal patterns generated above match the active section's
@@ -2500,8 +2625,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         else if (t == 4)       track_volume *= pulsar_fader_to_gain(keys_gain);
         else /* t == 5,6,7 */  track_volume *= pulsar_fader_to_gain(fx_gain);
 
-        // Track mute: zero volume but keep sequencer running
-        bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0;
+        // Track mute: zero volume but keep sequencer running. section_density_out is the
+        // active section's `density = 0` override — same treatment, cleared on exit.
+        bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0
+                           || ts.section_density_out;
         if (track_muted) track_volume = 0.0f;
 
         // ── Pan gains ──
@@ -2674,6 +2801,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // leak forward into a section with no override of its own.
                             reload_vibe_tension(engine, state);
                         }
+
+                        // --- Per-track DENSITY overrides: rebuild only what changed ---
+                        // Density is consumed at pattern-generation time, so unlike volume
+                        // it cannot simply be re-read per block — the section boundary is
+                        // where it has to take effect. Tracks the section leaves alone
+                        // (and every chordal/lick track) keep their existing pattern.
+                        apply_section_densities(state, engine, &sec);
 
                         // --- Re-lock any track a JAM_INVERTED release left out of phase ---
                         // The inversion is scoped to the section that follows the jam, so
@@ -3255,8 +3389,18 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     state->loops_since_reset = 0;
                     // Re-read genre profile for regeneration
                     PulsarGenreProfile rg;
-                    for (int gi = 0; gi < 8; gi++)
-                        rg.base_density[gi] = engine->pulsar_genre_density[gi].load(std::memory_order_relaxed);
+                    {
+                        // Resolve through the ACTIVE section: a déjà-vu reset that read the
+                        // raw base densities would silently undo the section's arrangement
+                        // partway through it.
+                        const int cs = state->section_state.current_section;
+                        const SectionParam* cur_sec =
+                            (state->arrangement.active && cs >= 0 && cs < state->arrangement.section_count)
+                                ? &state->arrangement.sections[cs] : nullptr;
+                        float rd[kNumPulsarTracks];
+                        resolve_section_densities(engine, cur_sec, rd);
+                        for (int gi = 0; gi < kNumPulsarTracks; gi++) rg.base_density[gi] = rd[gi];
+                    }
                     rg.swing_amount = engine->pulsar_genre_swing.load(std::memory_order_relaxed);
                     rg.ghost_probability = engine->pulsar_genre_ghost_prob.load(std::memory_order_relaxed);
                     rg.note_range_low = static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed));

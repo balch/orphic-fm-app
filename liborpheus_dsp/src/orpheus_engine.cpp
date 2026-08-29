@@ -21,6 +21,12 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->sample_rate = sample_rate;
     engine->spectrum_analyzer.Init(sample_rate);
 
+    // Per-section per-track density: 0 is a MEANINGFUL value ("track out"), so this table
+    // cannot use the zero-init every other section-override array relies on — an unpushed
+    // slot would read as "silence this track". Seed the negative no-override sentinel.
+    for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
+        engine->pulsar_section_track_density[i].store(-1.0f, std::memory_order_relaxed);
+
     // Initialize all Plaits voices (OrpheusVoice: direct engine render)
     for (int i = 0; i < kNumVoices; i++) {
         stmlib::BufferAllocator allocator(

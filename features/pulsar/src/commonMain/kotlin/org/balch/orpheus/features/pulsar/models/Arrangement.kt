@@ -40,8 +40,19 @@ data class SectionTransition(
  *   Only meaningful for tracks 5..7 (effect/pad slots) — tracks 0..4 ignore holds.
  * @param holdLengthMin Override min hold-chain length in steps.
  * @param holdLengthMax Override max hold-chain length in steps.
- * @param density Override per-step density (0..1). Negative = no override.
+ * @param density Override per-step density (0..1). Null = no override.
+ *   **`0` takes the track OUT for the section** — a clean mute, restored on exit, and it
+ *   works for every role. A POSITIVE value regenerates the track's pattern at that density
+ *   at the section boundary, which thins fills and ghosts; that regeneration only reaches
+ *   tracks whose pattern is generated from density, so on a `Chordal` track or one playing
+ *   a `LickMode.Fill`/`Squash` figure a positive density is a no-op (their generators take
+ *   no density parameter) while `0` still mutes. Density is a pattern-GENERATION input, so
+ *   unlike [volume] it cannot change mid-section — the boundary is where it lands.
  * @param volume Override mix volume (0..1).
+ * @param morph Override the voice's morph (0..1), pinning it for the section's duration so
+ *   the macro map's `spaceDecay` cannot overwrite it. On the drum engines (BD/SD/HH) morph
+ *   is decay, so this is how one section gets a long-ringing kick against a tight snare.
+ *   The track's base morph and pin state are restored on exit.
  * @param reverbSend Override per-track reverb send (0..1).
  * @param delaySend Override per-track delay send (0..1).
  * @param envelopeProfile Override envelope profile for this section. Switch e.g.
@@ -65,6 +76,7 @@ data class TrackSectionOverride(
     val holdLengthMax: Int? = null,
     val density: Float? = null,
     val volume: Float? = null,
+    val morph: Float? = null,
     val reverbSend: Float? = null,
     val delaySend: Float? = null,
     val envelopeProfile: EnvelopeProfile? = null,

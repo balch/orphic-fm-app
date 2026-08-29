@@ -1553,11 +1553,22 @@ class PulsarViewModel(
                 trackHoldProbabilitySpaceIds[i].value = FloatValue(o?.holdProbability ?: spa.holdProbability)
                 trackHoldLengthMinSpaceIds[i].value = IntValue(o?.holdLengthMin ?: spa.holdLengthMin)
                 trackHoldLengthMaxSpaceIds[i].value = IntValue(o?.holdLengthMax ?: spa.holdLengthMax)
-                genreDensityIds[i].value = FloatValue(o?.density ?: tv.density)
             }
+            // NOTE: density is deliberately absent here. It reaches the engine through the
+            // per-section table pushed by pushArrangement(), which the C++ resolves
+            // synchronously at the section boundary and regenerates from. Writing the
+            // effective value into the genre atomic from this 5Hz collector would race that
+            // and leave the base density wrong for the next section.
             // Both slots: C++ picks per render block by the live engine_index.
             trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(o?.volume ?: spa.volume)
+            // A section morph only survives if it is pinned: unpinned, the render loop
+            // recomputes morph as lerp_macro(space, spaceDecay) every block and the
+            // override is never heard. Pin for the override's duration, restore on exit.
+            trackMorphIds[i].value = FloatValue(o?.morph ?: edm.morph)
+            trackMorphSpaceIds[i].value = FloatValue(o?.morph ?: spa.morph)
+            trackPinMorphIds[i].value = IntValue(if (o?.morph != null || edm.pinMorph) 1 else 0)
+            trackPinMorphSpaceIds[i].value = IntValue(if (o?.morph != null || spa.pinMorph) 1 else 0)
             trackEnvelopeIds[i].value = IntValue((o?.envelopeProfile ?: tv.envelopeProfile).id)
             next.delayEdm[i] = o?.delaySend ?: edm.delaySend
             next.reverbEdm[i] = o?.reverbSend ?: edm.reverbSend
@@ -1729,6 +1740,13 @@ class PulsarViewModel(
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_track_chord_follow_$baseIdx"),
                     IntValue(o?.chordFollow?.ordinal ?: -1)
+                )
+                // Density is a float and 0 is meaningful ("track out"), so the no-override
+                // sentinel is -1, not 0. The engine resolves this against the vibe's base
+                // density at the boundary and regenerates the tracks that changed.
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_density_$baseIdx"),
+                    FloatValue(o?.density ?: -1f)
                 )
             }
 

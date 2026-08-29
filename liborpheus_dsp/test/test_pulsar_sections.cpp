@@ -2366,6 +2366,139 @@ static bool test_advance_section_rejects_out_of_range_outro() {
     return ok;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Per-section track density.
+//
+// density is a pattern-GENERATION input: the generators consume it while BUILDING a
+// track's step array and nothing re-reads it while that array plays. So unlike volume
+// it cannot ride a per-block atomic — the section boundary is the only place it can
+// land. For years these overrides were authored across the vibe catalog and reached
+// nothing at all. These two pin the contract that replaced that silence.
+// ═══════════════════════════════════════════════════════════════════════
+
+// Two 1-bar sections, A -> B, opening on A, at a tempo where one bar is a round
+// number of render blocks.
+static void setup_density_rig(OrpheusEngine* engine, GraphUnit* unit) {
+    std::memset(unit, 0, sizeof(*unit));
+    unit->type = UNIT_PULSAR;
+    unit->enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    pin_pulsar_rngs(engine);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);  // freeze mutation
+    push_two_section_ab_arrangement(engine, 1);
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+}
+
+static int count_gates(const PulsarTrackState& ts) {
+    int n = 0;
+    const int limit = ts.step_count < kMaxPulsarSteps ? ts.step_count : kMaxPulsarSteps;
+    for (int i = 0; i < limit; i++) if (ts.steps[i].gate) n++;
+    return n;
+}
+
+// density = 0 is what vibe authors write to drop a track for one section. It has to
+// silence the track OUTRIGHT: the level generators lay down unconditional primary hits
+// (the backbeat on 2 and 4, driving 8ths) that no density value can gate, so thinning
+// the pattern is not enough. Leaving the section has to bring the track back.
+static bool test_section_density_zero_mutes_track_and_restores_on_exit() {
+    printf("\n=== Test: section density 0 takes a track out, exit restores it ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    setup_density_rig(engine, &unit);
+    solo_track(engine, 2);   // hat: fixture density 0.80, the busiest track
+    // Section 0 drops track 2. Section 1 stays at the -1 no-override sentinel.
+    engine->pulsar_section_track_density[0 * kNumPulsarTracks + 2]
+        .store(0.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);   // first render runs load_vibe
+
+    PulsarState* ps = engine->pulsar_state;
+    if (!ps) {
+        printf("  FAIL: pulsar_state was not allocated\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+
+    // Measure per section rather than on block arithmetic: the A/B arrangement loops,
+    // so a fixed block count can straddle a boundary and average the two states.
+    float rms_muted = 0.0f, rms_restored = 0.0f;
+    bool flag_in_a = ps->tracks[2].section_density_out;
+    bool flag_in_b = true;
+    bool reached_b = false;
+    int b_blocks = 0;
+    for (int i = 0; i < 3000 && b_blocks < 200; i++) {   // 200 blocks ≈ one bar
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        const float rms = compute_rms(engine->pulsar_out_l, 512);
+        if (!reached_b && ps->section_state.current_section == 0) {
+            rms_muted = std::fmax(rms_muted, rms);
+            flag_in_a = flag_in_a || ps->tracks[2].section_density_out;
+        } else if (ps->section_state.current_section == 1) {
+            reached_b = true;
+            b_blocks++;
+            rms_restored = std::fmax(rms_restored, rms);
+            flag_in_b = ps->tracks[2].section_density_out;
+        }
+    }
+    if (!reached_b) {
+        printf("  FAIL: never advanced into section 1, so the restore is untested\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+
+    // Threshold is calibrated for ONE solo'd hat, not a full mix: the muted section
+    // reads exactly 0, so anything clearly above the noise floor proves the restore.
+    const bool ok = flag_in_a && !flag_in_b && rms_muted < 1e-6f && rms_restored > 1e-3f;
+    printf("  section A: rms=%.6f out_flag=%d (expect 0, 1)\n", rms_muted, flag_in_a);
+    printf("  section B: rms=%.6f out_flag=%d (expect >0.001, 0) -- %s\n",
+           rms_restored, flag_in_b, ok ? "PASS" : "FAIL");
+    if (rms_muted >= 1e-6f)
+        printf("  FAIL: track still sounds under a density = 0 override\n");
+    if (rms_restored <= 1e-3f)
+        printf("  FAIL: track did not come back on section exit\n");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+// A POSITIVE density override has to regenerate the pattern, not just scale it: the
+// override is only meaningful if the generator re-runs at the new value. Compares two
+// identically-seeded engines that differ only in the override.
+static bool test_section_density_regenerates_generative_pattern() {
+    printf("\n=== Test: positive section density rebuilds the pattern ===\n");
+    int gates[2] = {0, 0};
+    for (int run = 0; run < 2; run++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit;
+        setup_density_rig(engine, &unit);
+        if (run == 1) {
+            // Track 2's fixture density is 0.80; thin it hard for section 0 only.
+            engine->pulsar_section_track_density[0 * kNumPulsarTracks + 2]
+                .store(0.06f, std::memory_order_relaxed);
+        }
+        trigger_vibe_load(engine);
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) {
+            printf("  FAIL: pulsar_state was not allocated\n");
+            orpheus_engine_destroy(engine);
+            return false;
+        }
+        gates[run] = count_gates(ps->tracks[2]);
+        orpheus_engine_destroy(engine);
+    }
+    // The opening section is entered without an advance_section, so this also proves
+    // load_vibe applies the override rather than baking the vibe's base density.
+    const bool ok = gates[1] < gates[0] && gates[1] >= 0;
+    printf("  gates: base density=%d, section override 0.06=%d (expect fewer) -- %s\n",
+           gates[0], gates[1], ok ? "PASS" : "FAIL");
+    if (!ok)
+        printf("  FAIL: the section's density never reached pattern generation\n");
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -2412,6 +2545,8 @@ bool run_pulsar_sections_tests() {
     tally(test_jam_carry_fallbacks());
     tally(test_jam_carry_requires_eligible_lead_into_jam_section());
     tally(test_opening_section_overrides_apply_at_load());
+    tally(test_section_density_zero_mutes_track_and_restores_on_exit());
+    tally(test_section_density_regenerates_generative_pattern());
     printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

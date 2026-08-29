@@ -92,34 +92,80 @@ class RustBeltVibe : VibeProvider {
     private val liftBars = 2
     private val dropBars = 2
     private val bigLiftBars = 4
+    private val introBuildBars = 3
 
     val sectionList by lazy {
         listOf(
-            // 0: intro — SLOWED cold open so you can PICK OUT the hook. Bass + a soft kick at
-            //    ~61.2 BPM (bpmMultiplier 0.85; 72×0.85=61.2, just above the engine's 60 floor,
-            //    so the drop restores to 72 cleanly with no overshoot). Snare/hats out to unmask
-            //    the syncopation; comp/lead/organ out. Over the last bar the tempo winds UP
-            //    (bpmRampBars) into the full-tempo verse — an accelerando drop.
+            // 0: intro — the KIT up front, building. A big ringing kick and a moderate
+            //    shaker carry an eight-bar crescendo over the hook while the jangle and the
+            //    twang stay out, so the verse downbeat is where the band actually walks on.
+            //    Three things stack to make the build obvious: energy opens at 0.45x and the
+            //    3-bar pre-roll ramps it to the verse's 1.0x; the tension override runs a
+            //    per-bar staircase (0 -> 0.75) of velocity and timbre; and the muted tracks
+            //    all arrive at once on the transition.
+            //
+            //    Drum morph is DECAY on BD/SD/HH, pinned here for three distinct voices: a
+            //    long-ringing kick against a tight snare crack and a washy open hat.
+            //
+            //    Morph pinning also decides WHAT MOVES. The tension evolution below sweeps
+            //    morph only on tracks that are NOT pinned, so pinning the kit and the bass
+            //    leaves the shaker as the single voice drifting across the build — the
+            //    texture reads as the thing developing while the hook and the pocket hold.
             Section(
                 name = "intro",
-                barsMin = 2, barsMax = 2,   // the 2-bar hook stated twice, slow
-                bpmMultiplier = 0.85f,      // ~61.2 BPM — slowed so the hook reads, then winds up
-                bpmRampBars = 1,            // accelerando over the last bar, lands on the drop
+                barsMin = 4, barsMax = 4,   // 4 loop-cycles = 8 real bars at stepCount 32
                 transitions = listOf(
-                    SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = liftBars),
+                    SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = introBuildBars),
                 ),
                 macroOverrides = MacroOverrides(
-                    energy = 0.7f, complexity = 0.5f, space = 0.9f, mood = 0.95f,
+                    energy = 0.65f, complexity = 0.4f, space = 1.15f, mood = 0.9f,
+                ),
+                // Replaces the vibe tension for this section only. The tension counter is
+                // free-running and starts at 0 on load, so the intro is the one section that
+                // gets a clean 0 -> peak sweep. The sawtooth caps at (inner-1)/inner = 0.75,
+                // hence attackPoint 0 — anything higher wastes most of the range.
+                tensionOverride = TensionProfile(
+                    innerBars = 4,     // one staircase per visit: 0, .25, .5, .75
+                    outerBars = 0,     // single-visit section — an outer arc means nothing
+                    outerDepth = 0f,
+                    volume = 0.9f,     // the crescendo
+                    tonal = TonalTension(chromaticPassing = 0.16f),
+                    timing = 0.10f,
+                    // The morph range is wide on purpose: with the kit and the bass pinned it
+                    // now reaches the shaker alone, so it buys texture movement instead of
+                    // smearing the pocket. Widen only while that pinning holds.
+                    evolution = EvolutionTension(
+                        timbreLow = 0.18f, timbreHigh = 0.78f, timbreProbability = 0.95f,
+                        morphLow = 0.20f, morphHigh = 0.82f, morphProbability = 0.92f,
+                        attackPoint = 0.0f,
+                        releaseSpeed = 0.25f,
+                    ),
+                    spurtChance = 0f,
                 ),
                 customProgression = verseProgression,
                 chordsPerBar = 1,
                 trackOverrides = mapOf(
-                    1 to TrackSectionOverride(density = 0.0f),   // snare out — unmask the hook
-                    2 to TrackSectionOverride(density = 0.0f),   // hats out — unmask the hook
-                    4 to TrackSectionOverride(density = 0.0f),   // jangle comp out
-                    5 to TrackSectionOverride(density = 0.0f),   // twang lead out
-                    6 to TrackSectionOverride(density = 0.0f),   // organ out
-                    7 to TrackSectionOverride(density = 0.05f),  // shaker barely there
+                    0 to TrackSectionOverride(volume = 0.9f, morph = 0.90f, reverbSend = 0.36f, density = .32f),  // kick: loud, ringing
+                    1 to TrackSectionOverride(volume = 0.62f, morph = 0.26f, density = .15f),  // snare: tight crack
+                    2 to TrackSectionOverride(volume = 0.44f, morph = 0.54f, density = .85f),  // hat: open and washy
+                    // Track 3 — THE HOOK, and the one thing in the intro that must not move.
+                    // No volume override: it plays at its authored 0.88 while everything
+                    // around it is pulled down, which is what puts it out front. The morph
+                    // pin is the point of this entry — unpinned, the tension evolution above
+                    // walks the bass's morph 0.22 -> 0.72 across the build and the fingered
+                    // PLUCK character wanders with it. 0.30 is what the verse's own Space
+                    // setting resolves to through MELODIC's spaceDecay, so the un-pin at the
+                    // section boundary lands on the same value and is inaudible.
+                    3 to TrackSectionOverride(volume = 0.1f, morph = 0.30f, density = .15f),
+                    4 to TrackSectionOverride(volume = 0.4f, density = .15f),   // jangle
+                    5 to TrackSectionOverride(volume = 0.4f, density = .15f),   // twang
+                    6 to TrackSectionOverride(volume = 0.4f, density = .15f),  // organ
+                    // Track 7 — the texture, and the one voice left free to drift. Deliberately
+                    // NOT morph-pinned so the evolution sweep is audible on it alone. Loud for
+                    // an EFFECT track because that macro map caps energyVolume at 0.5x and
+                    // texture_energy_curve ducks tracks 5-7 again; the sends give it a tail so
+                    // it reads as its own layer rather than dust on the kit.
+                    7 to TrackSectionOverride(volume = 0.88f, reverbSend = 0.42f, delaySend = 0.24f, density = .5f),
                 ),
             ),
             // 1: verse — the full pocket, baseline. One-chord vamp; the hook rules.
@@ -221,7 +267,7 @@ class RustBeltVibe : VibeProvider {
         Vibe(
             name = name,
             album = Album.RIF,
-            bpm = 72f,
+            bpm = 87f,
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
