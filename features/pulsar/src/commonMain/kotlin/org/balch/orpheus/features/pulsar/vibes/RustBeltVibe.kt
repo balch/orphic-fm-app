@@ -122,12 +122,18 @@ class RustBeltVibe : VibeProvider {
                 ),
                 // Replaces the vibe tension for this section only. The tension counter is
                 // free-running and starts at 0 on load, so the intro is the one section that
-                // gets a clean 0 -> peak sweep. The sawtooth caps at (inner-1)/inner = 0.75,
-                // hence attackPoint 0 — anything higher wastes most of the range.
+                // gets a clean 0 -> peak sweep.
+                //
+                // outerBars == innerBars is a CURVE control here, not a long arc. Both phases
+                // are then the same p every bar, so intensity collapses to
+                // (1 - depth) * p + depth * p^2 and outerDepth becomes a linear-to-quadratic
+                // knob. At 0.65 the walk-up hangs back and rushes the last bar into the drop
+                // (steps of .13, .21, .29) instead of a rigid .25 each. It buys that shape by
+                // giving up peak height: the top lands at 0.63 rather than 0.75.
                 tensionOverride = TensionProfile(
-                    innerBars = 4,     // one staircase per visit: 0, .25, .5, .75
-                    outerBars = 0,     // single-visit section — an outer arc means nothing
-                    outerDepth = 0f,
+                    innerBars = 4,       // one staircase per visit
+                    outerBars = 4,       // == innerBars: curves the walk-up, see above
+                    outerDepth = 0.65f,  // 0 = linear, 1 = pure quadratic
                     volume = 0.9f,     // the crescendo
                     tonal = TonalTension(chromaticPassing = 0.16f),
                     timing = 0.10f,
@@ -137,7 +143,11 @@ class RustBeltVibe : VibeProvider {
                     evolution = EvolutionTension(
                         timbreLow = 0.18f, timbreHigh = 0.78f, timbreProbability = 0.95f,
                         morphLow = 0.20f, morphHigh = 0.82f, morphProbability = 0.92f,
-                        attackPoint = 0.0f,
+                        // A second knee, on the tone rather than the velocity: evolution is
+                        // (intensity - attackPoint) / (1 - attackPoint), so at 0.12 the timbre
+                        // barely stirs through the first half and then opens late. Keep this
+                        // well under the 0.63 peak above or the sweep loses most of its range.
+                        attackPoint = 0.12f,
                         releaseSpeed = 0.25f,
                     ),
                     spurtChance = 0f,

@@ -560,6 +560,81 @@ static bool test_tension_evo_release_speed_decays_over_bars() {
     return pass;
 }
 
+// Setting outerBars EQUAL to innerBars repurposes the outer cycle as a CURVE control
+// rather than a long arc. Both phases are then the same p every bar, so the product
+// collapses to (1 - depth) * p + depth * p^2 and outerDepth becomes a linear-to-quadratic
+// knob. That is the only non-linear tension walk-up the Vibe schema can express, and Rust
+// Belt's intro depends on it. Without this test, "tidying" outerBars back to 0 on a
+// single-visit section (which is the right advice for a long arc) would silently flatten
+// the build to a rigid 25%-per-bar staircase and nothing would fail.
+//
+// Drives the real engine rather than re-deriving the formula: a mirror test would still
+// pass if the engine stopped applying outer_scale at all.
+static bool test_equal_inner_outer_bars_curve_the_walkup() {
+    printf("\n=== Test: outerBars == innerBars curves the tension walk-up ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_tension_inner_bars.store(4, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(4, std::memory_order_relaxed);   // == inner: the curve
+    engine->pulsar_tension_outer_depth.store(0.65f, std::memory_order_relaxed);
+    engine->pulsar_seed.store(99, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    std::vector<float> bars;
+    int last_loop = -1;
+    for (int i = 0; i < 4000 && bars.size() < 12; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            last_loop = ps->loop_count;
+            bars.push_back(ps->tension_intensity);
+        }
+    }
+
+    // Find a cycle start (intensity wraps to ~0) and read the three rising bars after it.
+    // p = .25/.5/.75 -> p * (0.35 + 0.65p) = 0.128, 0.338, 0.628.
+    bool found = false, ok = false;
+    float a = 0, b = 0, c = 0;
+    for (size_t i = 0; i + 3 < bars.size(); i++) {
+        if (bars[i] < 0.01f) {
+            a = bars[i + 1]; b = bars[i + 2]; c = bars[i + 3];
+            found = true;
+            break;
+        }
+    }
+    if (found) {
+        const bool matches = std::fabs(a - 0.128f) < 0.01f
+                          && std::fabs(b - 0.338f) < 0.01f
+                          && std::fabs(c - 0.628f) < 0.01f;
+        // The shape claim, independent of the exact numbers: each step is BIGGER than the
+        // last. A linear staircase would give three equal 0.25 steps.
+        const bool accelerating = (b - a) > (a - 0.0f) + 0.02f && (c - b) > (b - a) + 0.02f;
+        // And it must NOT be the linear staircase, whose third bar sits at 0.75.
+        const bool not_linear = c < 0.70f;
+        ok = matches && accelerating && not_linear;
+        printf("  bars: %.3f, %.3f, %.3f (expect .128/.338/.628)\n", a, b, c);
+        printf("  steps: %.3f, %.3f, %.3f (must strictly grow; linear would be .25/.25/.25) -- %s\n",
+               a, b - a, c - b, ok ? "PASS" : "FAIL");
+        if (!accelerating) printf("  FAIL: steps are not accelerating, the walk-up is linear\n");
+        if (!not_linear) printf("  FAIL: peak reached %.3f, outer_scale is not being applied\n", c);
+    } else {
+        printf("  FAIL: never observed a cycle start in %zu captured bars\n", bars.size());
+    }
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_tension_tests() {
     printf("\n========== PULSAR TENSION TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -585,6 +660,7 @@ bool run_pulsar_tension_tests() {
     tally(test_original_lick_immutable());
     tally(test_random_spurt_fires());
     tally(test_tension_evo_release_speed_decays_over_bars());
+    tally(test_equal_inner_outer_bars_curve_the_walkup());
     printf("\nPulsar tension tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
