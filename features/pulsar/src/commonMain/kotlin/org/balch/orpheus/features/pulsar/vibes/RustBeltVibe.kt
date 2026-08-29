@@ -5,6 +5,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
@@ -69,8 +72,9 @@ import org.balch.orpheus.features.pulsar.models.chords
  * intro (THE HOOK ALONE over drums) -> verse (full pocket, one-chord vamp so the
  * hook never transposes) -> chorus (the lift: IV -> bVII -> i, hook transposes
  * with the roots — the payoff) -> jam (band stretches out) -> breakdown (drums +
- * bass only, one long build) -> outro (full-band lift, terminal). A/B against
- * DogHouseVibe.
+ * bass only, one long build) -> outro (full-band lift, terminal). The breakdown
+ * and jam can instead open into cloudbreak: kit and hook step out, the textures
+ * hold a wide wet weather, then the band walks back in. A/B against DogHouseVibe.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
@@ -93,6 +97,22 @@ class RustBeltVibe : VibeProvider {
     private val dropBars = 2
     private val bigLiftBars = 4
     private val introBuildBars = 3
+    private val walkBackBars = 2  // cloudbreak exit: the band walks back in
+
+    // The record remembers: a 2-bar gliding chant condensed from the original
+    // Aether Natalis lead — root pedal, a step up, a rise to the 4th, settling
+    // on the b3. Rarely swapped over the hook by the LickAnomaly below.
+    private val aetherChant = Lick(
+        steps = listOf(
+            LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.62f, glideRate = 0.45f),  // D  root pedal
+            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.58f, glideRate = 0.45f),  // D  re-touch
+            LickStep(scaleDegree = 1, duration = 1.0f, velocity = 0.66f, glideRate = 0.45f),  // E  step up
+            LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.60f, glideRate = 0.45f),  // D  back home
+            LickStep(scaleDegree = 3, duration = 1.5f, velocity = 0.70f, glideRate = 0.45f),  // G  the rise
+            LickStep(scaleDegree = 2, duration = 2.5f, velocity = 0.60f, glideRate = 0.55f),  // F  b3 — long settle
+        ),
+        loopLength = 8,  // 2 bars; matches the hook's footprint so the swap statement aligns
+    )
 
     val sectionList by lazy {
         listOf(
@@ -220,6 +240,7 @@ class RustBeltVibe : VibeProvider {
                     SectionTransition(targetIndex = 2, weight = 0.45f, transitionBars = liftBars),  // -> chorus
                     SectionTransition(targetIndex = 1, weight = 0.35f, transitionBars = liftBars),  // -> verse
                     SectionTransition(targetIndex = 4, weight = 0.20f, transitionBars = dropBars),  // -> breakdown
+                    SectionTransition(targetIndex = 5, weight = 0.15f, transitionBars = dropBars),  // -> cloudbreak (thin out into weather)
                 ),
                 recencyDecay = 0.4f,
                 macroOverrides = MacroOverrides(
@@ -239,13 +260,15 @@ class RustBeltVibe : VibeProvider {
                 soloMode = SoloMode.Jam(probability = 0.8f, lickInfluence = 0.8f),
             ),
             // 4: breakdown — drums + bass only; the hook naked again, one long
-            //    anticipation build back into the chorus.
+            //    anticipation build back into the chorus. Sometimes the build never
+            //    comes and the sky opens instead (-> cloudbreak).
             Section(
                 name = "breakdown",
                 barsMin = 4, barsMax = 4,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.70f, transitionBars = bigLiftBars), // -> chorus (THE build)
-                    SectionTransition(targetIndex = 1, weight = 0.30f, transitionBars = liftBars),    // -> verse
+                    SectionTransition(targetIndex = 2, weight = 0.55f, transitionBars = bigLiftBars), // -> chorus (THE build)
+                    SectionTransition(targetIndex = 1, weight = 0.20f, transitionBars = liftBars),    // -> verse
+                    SectionTransition(targetIndex = 5, weight = 0.25f, transitionBars = dropBars),    // -> cloudbreak (the sky opens instead)
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
@@ -260,7 +283,68 @@ class RustBeltVibe : VibeProvider {
                     7 to TrackSectionOverride(density = 0.08f),
                 ),
             ),
-            // 5: outro — full-band lift, ride it home. Terminal.
+            // 5: cloudbreak — the breakdown (or a thinning jam) opens into weather
+            //    instead of building. Kit and hook step OUT (density 0 = clean section
+            //    mute, restored on exit), and the low-energy voices carry it: the chank
+            //    smeared into a wash, a lone slide line, long ensemble holds on the bed,
+            //    and particles up top in a wide wet room. Textures lifted from the
+            //    original Aether Natalis drone; the exit ramps are the band walking back in.
+            Section(
+                name = "cloudbreak",
+                barsMin = 2, barsMax = 3,  // hold the weather ~15s before the walk-back
+                transitions = listOf(
+                    SectionTransition(targetIndex = 1, weight = 0.55f, transitionBars = walkBackBars), // -> verse (the pocket resumes)
+                    SectionTransition(targetIndex = 2, weight = 0.45f, transitionBars = bigLiftBars),  // -> chorus (weather-to-payoff swell)
+                ),
+                recencyDecay = 0.5f,
+                macroOverrides = MacroOverrides(
+                    energy = 0.35f, complexity = 0.55f, space = 1.9f, mood = 1.05f,
+                ),
+                // Aether's glacial arc, near verbatim: no groove tension, just a slow
+                // probabilistic drift of timbre/morph/harmonics so the weather billows.
+                // The free-running counter arrives mid-phase here — fine, this profile
+                // has no build to protect, only motion.
+                tensionOverride = TensionProfile(
+                    innerBars = 8,
+                    outerBars = 0,
+                    outerDepth = 0f,
+                    volume = 0.35f,  // slow breathing, not a crescendo
+                    tonal = TonalTension(),
+                    timing = 0.02f,
+                    evolution = EvolutionTension(
+                        timbreLow = 0.15f, timbreHigh = 0.45f, timbreProbability = 0.5f,
+                        morphLow = 0.10f, morphHigh = 0.50f, morphProbability = 0.4f,
+                        harmonicsLow = 0.15f, harmonicsHigh = 0.45f, harmonicsProbability = 0.3f,
+                        attackPoint = 0.25f, releaseSpeed = 0.8f,
+                    ),
+                    spurtChance = 0f,
+                ),
+                customProgression = verseProgression,  // hang on the i — the weather is harmonically still
+                chordsPerBar = 1,
+                trackOverrides = mapOf(
+                    0 to TrackSectionOverride(density = 0.0f),  // kit out
+                    1 to TrackSectionOverride(density = 0.0f),
+                    2 to TrackSectionOverride(density = 0.0f),
+                    // The hook steps out — not retuned, just absent, so its return on
+                    // the exit downbeat is the payoff the whole section aims at.
+                    3 to TrackSectionOverride(density = 0.0f),
+                    4 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.55f, delaySend = 0.28f),  // chank -> wash
+                    5 to TrackSectionOverride(volume = 0.50f, reverbSend = 0.50f, delaySend = 0.42f),  // the lone slide voice
+                    // The bed goes long-form: sustained holds in the old drone register.
+                    6 to TrackSectionOverride(
+                        volume = 0.62f, density = 0.30f, reverbSend = 0.50f,
+                        holdProbability = 0.90f, holdLengthMin = 8, holdLengthMax = 16,
+                    ),
+                    // Particles dense, morph pinned high (scatter character held still)
+                    // so the evolution's morph drift animates the wash and bed, not this.
+                    // Loud for an EFFECT track — see the intro's track 7 note.
+                    7 to TrackSectionOverride(
+                        volume = 0.88f, density = 0.42f, morph = 0.85f,
+                        reverbSend = 0.50f, delaySend = 0.35f,
+                    ),
+                ),
+            ),
+            // 6: outro — full-band lift, ride it home. Terminal.
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 8, barStep = 4,
@@ -497,9 +581,19 @@ class RustBeltVibe : VibeProvider {
                 ).let { organ ->
                     TrackVoice(
                         engineEdm = organ,
-                        // 0.092f is a bucket edge: idx 2 "E organ 3" or 3 "60s organ" by prior
-                        // load. Ear-tuned, left as-is — see fm_patches.md on legacy edge values.
-                        engineSpace = organ.copy(harmonics = 0.092f, reverbSend = 0.34f),  // wetter
+                        // At low energy the drawbar bed dissolves into a string ensemble —
+                        // the original Aether Natalis pad role, glacial chorus LFO and all.
+                        // Tone rides the MELODIC macro map like the rest of the track (no
+                        // statics: unpinned harmonics/timbre/morph never reach the voice).
+                        // Replaces the wetter-DX3 slot (harmonics 0.092); mostly heard in
+                        // breakdown/cloudbreak, bleeds into the jam's mid-energy blend.
+                        engineSpace = organ.copy(
+                            engineId = OrpheusEngineId.ENS,
+                            harmonics = 0.5f,  // clear the inherited DX3 patch index — meaningless on ENS
+                            modLfoRate = 0.02f, modLfoDepth = 0.4f, modLfoShape = 0.1f,
+                            modLfoCoupling = 0.3f,
+                            reverbSend = 0.34f,
+                        ),
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
                             comping = ChordComping(
@@ -569,6 +663,14 @@ class RustBeltVibe : VibeProvider {
                 reverbDamping = 0.50f,
                 reverbBrightness = 0.50f,
                 deepFloor = 0.24f,
+            ),
+            // Two rare surprises from the original Aether Natalis, retuned for a rock
+            // record: a stop-time void (the band cuts fast, the room rings, one ghost
+            // bar of the full band flashes through) and the chant flash above, where
+            // the hook dissolves into the slow glide figure for one statement.
+            anomalies = listOf(
+                CrossfadeAnomaly(probability = 0.03f),
+                LickAnomaly(lick = aetherChant, chance = 0.02f),
             ),
         )
     }
