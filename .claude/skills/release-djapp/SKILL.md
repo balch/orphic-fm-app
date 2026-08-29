@@ -454,7 +454,7 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 ## When something looks off
 
 - **Filename has a `-N-gSHA` suffix** (e.g. `djapp-v1.1.0-3-gabc1234-release.aab`): HEAD isn't on a tag. Either tag HEAD first, or check out the right tag.
-- **Filename says `-dirty`**: working tree has uncommitted changes. Stash or commit first.
+- **Filename says `-dirty`**: working tree has uncommitted changes. Commit them first — the current flow is to tweak on a feature branch, then land it on `main` as logical, separately revertable commits. Reach for `git stash` only if the change genuinely should not ship, and check first that the dirty files are yours: the tree often carries the user's WIP or a sibling agent's edits.
 - **`gh release create` fails with "release already exists"**: the release exists but maybe without binaries — use `gh release upload <tag> <file>` to add assets, or `gh release edit` to update notes.
 - **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease`.
 - **Built artifact isn't where you expected**: the flavor segment moves between the bundle and APK trees (`bundle/ogRelease/` vs `apk/og/release/`). `find apps/djapp/androidApp/build/outputs -name "*-v1.X.Y-*"` beats guessing.
