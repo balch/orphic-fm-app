@@ -143,6 +143,7 @@ object VibeCatalog {
         "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Natalis Shimmer" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Bricklayer's Lament" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        "Mellow Haze" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
     )
 
     /**
