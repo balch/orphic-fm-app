@@ -222,12 +222,15 @@ class DjLibraryCallback(
         return Futures.immediateFuture(mediaItems)
     }
 
+    // The controller argument is what the deprecated single-arg builder lacked: without it
+    // the defaults cannot distinguish a trusted controller from an untrusted one. Passing it
+    // lets media3 pick the right pair itself — SESSION_AND_LIBRARY + PLAYER commands when
+    // trusted, the UNTRUSTED_* variants otherwise — so the explicit setters that used to sit
+    // here are deliberately gone. Re-adding either would hand untrusted controllers the full
+    // trusted command set again, which is the whole thing the new API exists to prevent.
     override fun onConnect(
         session: MediaSession,
         controller: MediaSession.ControllerInfo
     ): MediaSession.ConnectionResult =
-        MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-            .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS)
-            .setAvailablePlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS)
-            .build()
+        MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller).build()
 }
