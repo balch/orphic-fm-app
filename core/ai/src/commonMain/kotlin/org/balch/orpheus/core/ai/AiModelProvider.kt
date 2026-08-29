@@ -27,15 +27,28 @@ enum class AiModel(
 ) {
     HAIKU("Haiku", "Haiku 4.5", AiProvider.Anthropic, AnthropicModels.Haiku_4_5),
     SONNET("Sonnet", "Sonnet 5", AiProvider.Anthropic, Sonnet5),
-    OPUS("opus", "Opus 4.8", AiProvider.Anthropic, Opus4_8),
-    FABLE("fable", "Fable 5", AiProvider.Anthropic, Fable5),
-    PRO_31("pro_31", "Pro 3.1", AiProvider.Google, Gemini3_1ProPreview),
-    FLASH_35("flash_35", "Flash 3.5", AiProvider.Google, Gemini3_5FlashPreview);
+    OPUS("opus", "Opus 5", AiProvider.Anthropic, Opus5),
+    FABLE("fable", "Fable 5", AiProvider.Anthropic, AnthropicModels.Fable_5),
+    // Google slots ride floating aliases, so the display name carries no version number —
+    // it would go stale the first time Google hot-swaps. See GeminiProLatest.
+    PRO_LATEST("pro_latest", "Pro (latest)", AiProvider.Google, GeminiProLatest),
+    FLASH_LATEST("flash_latest", "Flash (latest)", AiProvider.Google, GeminiFlashLatest);
 
     companion object {
-        val DEFAULT = FLASH_35
+        val DEFAULT = FLASH_LATEST
 
-        fun fromId(id: String): AiModel = entries.find { it.id == id } ?: DEFAULT
+        /**
+         * Ids of retired entries, remapped to their successor tier so an upgrade keeps the
+         * user's choice instead of silently dropping them onto [DEFAULT]. Ids of tiers that
+         * no longer exist at all are deliberately absent — those should fall through.
+         */
+        private val supersededIds: Map<String, AiModel> = mapOf(
+            "pro_31" to PRO_LATEST,
+            "flash_35" to FLASH_LATEST,
+        )
+
+        fun fromId(id: String): AiModel =
+            entries.find { it.id == id } ?: supersededIds[id] ?: DEFAULT
     }
 }
 

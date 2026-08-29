@@ -53,6 +53,7 @@ import kotlinx.serialization.json.put
 import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
+import org.balch.orpheus.core.ai.anthropicEffort
 import org.balch.orpheus.core.ai.anthropicModelVersionsMap
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
 import org.balch.orpheus.core.ai.usesAdaptiveThinking
@@ -81,11 +82,15 @@ private const val ANTHROPIC_MAX_TOKENS = 16_000
  * Anthropic thinking config, shaped per model generation.
  *
  * Models flagged [usesAdaptiveThinking] reject `thinking: {type: "enabled",
- * budget_tokens}` with a 400 (Opus 4.7+ / Sonnet 5 / Fable 5). Koog 1.0.0 has no
- * adaptive variant of [AnthropicThinking], so the raw object rides
+ * budget_tokens}` with a 400 (Opus 4.7+ / Opus 5 / Sonnet 5 / Fable 5). Koog 1.2.0 has
+ * no adaptive variant of [AnthropicThinking], so the raw object rides
  * additionalProperties, which Koog's AnthropicMessageRequestSerializer flattens into
  * the request body. `display: "summarized"` matters: these models default to omitted
  * thinking text, which would leave the apps' thinking feeds permanently empty.
+ *
+ * The same map carries `output_config.effort` for the models [anthropicEffort] names,
+ * which is how Opus and Fable are tuned for latency. It stays on this branch only —
+ * Haiku 4.5 rejects the field.
  *
  * `cacheControl` requests Anthropic's request-level "automatic caching" (the API
  * places the cache breakpoint on the last cacheable block), which suits this
@@ -97,12 +102,19 @@ internal fun anthropicThinkingParams(model: LLModel): AnthropicParams =
     if (model.usesAdaptiveThinking) {
         AnthropicParams(
             maxTokens = ANTHROPIC_MAX_TOKENS,
-            additionalProperties = mapOf(
-                "thinking" to buildJsonObject {
-                    put("type", "adaptive")
-                    put("display", "summarized")
-                },
-            ),
+            additionalProperties = buildMap {
+                put(
+                    "thinking",
+                    buildJsonObject {
+                        put("type", "adaptive")
+                        put("display", "summarized")
+                    },
+                )
+                // Only ever set on this branch: pre-4.6 models (Haiku 4.5) reject the field.
+                model.anthropicEffort?.let { effort ->
+                    put("output_config", buildJsonObject { put("effort", effort) })
+                }
+            },
             cacheControl = AnthropicCacheControl.Default,
         )
     } else {

@@ -4,19 +4,20 @@ import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AiModelCatalogTest {
 
     @Test
-    fun defaultIsFlash35() {
-        assertEquals(AiModel.FLASH_35, AiModel.DEFAULT)
+    fun defaultIsFlashLatest() {
+        assertEquals(AiModel.FLASH_LATEST, AiModel.DEFAULT)
     }
 
     @Test
     fun catalogIsExactlyTheApprovedLineupInPickerOrder() {
         assertEquals(
-            listOf("HAIKU", "SONNET", "OPUS", "FABLE", "PRO_31", "FLASH_35"),
+            listOf("HAIKU", "SONNET", "OPUS", "FABLE", "PRO_LATEST", "FLASH_LATEST"),
             AiModel.entries.map { it.name },
         )
     }
@@ -36,12 +37,20 @@ class AiModelCatalogTest {
     }
 
     @Test
+    fun supersededGoogleIdsLandOnTheirSuccessorTier() {
+        // The Google slots were renamed when they moved onto floating aliases; a user who
+        // had picked Pro must not be silently dropped onto the Flash default.
+        assertEquals(AiModel.PRO_LATEST, AiModel.fromId("pro_31"))
+        assertEquals(AiModel.FLASH_LATEST, AiModel.fromId("flash_35"))
+    }
+
+    @Test
     fun anthropicEntriesWireTheLatestModelIds() {
         assertEquals("claude-sonnet-5", AiModel.SONNET.llmModel.id)
-        assertEquals("claude-opus-4-8", AiModel.OPUS.llmModel.id)
+        assertEquals("claude-opus-5", AiModel.OPUS.llmModel.id)
         assertEquals("claude-fable-5", AiModel.FABLE.llmModel.id)
         assertEquals("Sonnet 5", AiModel.SONNET.displayName)
-        assertEquals("Opus 4.8", AiModel.OPUS.displayName)
+        assertEquals("Opus 5", AiModel.OPUS.displayName)
         assertEquals("Fable 5", AiModel.FABLE.displayName)
         assertEquals(AiProvider.Anthropic, AiModel.SONNET.aiProvider)
         assertEquals(AiProvider.Anthropic, AiModel.OPUS.aiProvider)
@@ -49,14 +58,48 @@ class AiModelCatalogTest {
     }
 
     @Test
+    fun googleEntriesRideFloatingAliases() {
+        // Deliberate: these upgrade without a store release. If Google hot-swaps a bad
+        // build, this is the line to pin. See GeminiProLatest.
+        assertEquals("gemini-pro-latest", AiModel.PRO_LATEST.llmModel.id)
+        assertEquals("gemini-flash-latest", AiModel.FLASH_LATEST.llmModel.id)
+        assertEquals(AiProvider.Google, AiModel.PRO_LATEST.aiProvider)
+        assertEquals(AiProvider.Google, AiModel.FLASH_LATEST.aiProvider)
+    }
+
+    @Test
     fun adaptiveThinkingPredicateCoversOpus47PlusGeneration() {
+        assertTrue(Opus5.usesAdaptiveThinking)
         assertTrue(Opus4_8.usesAdaptiveThinking)
         assertTrue(Sonnet5.usesAdaptiveThinking)
-        assertTrue(Fable5.usesAdaptiveThinking)
+        assertTrue(AnthropicModels.Fable_5.usesAdaptiveThinking)
         assertTrue(AnthropicModels.Opus_4_7.usesAdaptiveThinking)
         assertFalse(AnthropicModels.Haiku_4_5.usesAdaptiveThinking)
-        assertFalse(Gemini3_1ProPreview.usesAdaptiveThinking)
-        assertFalse(Gemini3_5FlashPreview.usesAdaptiveThinking)
+        assertFalse(GeminiProLatest.usesAdaptiveThinking)
+        assertFalse(GeminiFlashLatest.usesAdaptiveThinking)
+    }
+
+    @Test
+    fun onlyTheHeavyTiersDialEffortDown() {
+        assertEquals("medium", Opus5.anthropicEffort)
+        assertEquals("medium", AnthropicModels.Fable_5.anthropicEffort)
+        assertNull(Sonnet5.anthropicEffort)
+        // Haiku 4.5 rejects output_config outright — it must never carry a value.
+        assertNull(AnthropicModels.Haiku_4_5.anthropicEffort)
+    }
+
+    @Test
+    fun everyEffortModelAlsoUsesAdaptiveThinking() {
+        // anthropicThinkingParams only emits output_config on the adaptive branch, so an
+        // effort value on a budgeted model would be silently dropped.
+        AiModel.entries
+            .filter { it.aiProvider == AiProvider.Anthropic && it.llmModel.anthropicEffort != null }
+            .forEach { entry ->
+                assertTrue(
+                    entry.llmModel.usesAdaptiveThinking,
+                    "${entry.name} sets effort but is not on the adaptive-thinking branch",
+                )
+            }
     }
 
     @Test

@@ -36,7 +36,7 @@ coremidi4j = "1.6"
 navigation3 = "1.1.4"
 adaptiveNavigation3 = "1.2.0"
 material3 = "1.5.0-alpha24"
-koog = "1.1.1"
+koog = "1.2.0"
 ktor = "3.5.1"
 buildkonfig = "0.22.0"
 markdown = "0.43.0"
@@ -110,7 +110,8 @@ material3-adaptive-navigation-suite = { module = "androidx.compose.material3:mat
 
 # AI/koog
 koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
-koog-google-client = { module = "ai.koog:prompt-executor-google-client", version = "1.0.0-beta" }
+# Google client ships on koog's version line with a -beta suffix; keep the two in lockstep.
+koog-google-client = { module = "ai.koog:prompt-executor-google-client", version = "1.2.0-beta" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
