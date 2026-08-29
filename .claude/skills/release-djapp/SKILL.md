@@ -225,8 +225,9 @@ API_PRIVATE_KEYS_DIR=<ABSOLUTE>/apps/djapp/play-store/.secrets \
 
 Success looks like `UPLOAD SUCCEEDED with no errors` plus a `Delivery UUID`. Apple then
 processes the build server-side (usually a few minutes) before it appears under TestFlight in
-App Store Connect — no separate "publish" step is needed for internal testers, unlike Play's
-track assignment.
+App Store Connect. **Internal** testers need nothing further — internal groups pick up every
+processed build automatically. **External** testers need step 9; the upload alone does not
+reach them.
 
 **iOS mirrors Android versioning, with one deliberate deviation.** `CURRENT_PROJECT_VERSION`
 uses the exact same `git rev-list --count HEAD` as Android's `versionCode` (monotonic forever,
@@ -246,6 +247,58 @@ its own version group instead of stacking under one release.
   depending on that session at all. See `reference_apple_dev_team` memory.
 - `DjAppAi` is Android/desktop-only right now — there's no iOS AI-edition graph, so only the
   `DjApp` (OG) scheme ships to TestFlight/App Store.
+
+### 9. Assign TestFlight groups + submit for Beta App Review
+
+`altool` only delivers the binary. Beta groups are a **separate App Store Connect API step**, and
+the two group types behave differently in ways that are easy to misread as success:
+
+- **Internal group** (`DjAppTesters`): receives every processed build automatically. Explicitly
+  assigning one returns HTTP **422** `"Cannot add internal group to a build."` That is not an
+  error to fix — verify with `GET /v1/betaGroups/{gid}/builds` and the build is already there.
+- **External group** (`DjAppExt`): membership alone does **not** distribute. The POST returns 204
+  and the build appears in the group, but external testers receive nothing until a **Beta App
+  Review** submission exists and Apple approves it.
+
+**Do not treat the 204 as done.** Check `GET /v1/builds/{id}/betaAppReviewSubmission`; `data: null`
+means not submitted. Cross-check against prior builds — historically every externally-distributed
+build shows `betaReviewState=APPROVED`, so a `None` on the new one is the tell.
+
+The system `python3` has neither PyJWT nor `cryptography`. Build a throwaway env:
+
+```bash
+uv venv asc-env
+uv pip install --python asc-env/bin/python "pyjwt[crypto]" requests
+```
+
+Auth is a JWT: ES256, `aud=appstoreconnect-v1`, `kid` = Key ID, `iss` = Issuer ID, short `exp`.
+Same `.p8` as the upload. Key ID / Issuer ID / app ID / group IDs are in the
+`project_ios_appstore_publishing` and `reference_apple_dev_team` memories — **never write them
+into this repo.**
+
+```
+GET  /v1/betaGroups?filter[app]=<APP_ID>              # group ids + isInternalGroup
+GET  /v1/builds?filter[app]=<APP_ID>&filter[version]=<BUILD_NUMBER>
+                                                      # poll until processingState=VALID
+POST /v1/builds/<BUILD_ID>/relationships/betaGroups   # {"data":[{"type":"betaGroups","id":"<GID>"}]}
+                                                      # 204 external OK / 422 internal (expected)
+GET  /v1/builds/<BUILD_ID>/betaAppReviewSubmission    # data:null = NOT submitted
+POST /v1/betaAppReviewSubmissions                     # relationships.build -> build id
+                                                      # 201 + betaReviewState=WAITING_FOR_REVIEW
+GET  /v1/betaGroups/<GID>/builds                      # verify membership
+```
+
+Order matters: the build must reach `processingState=VALID` before any of the group or review
+calls will find it. Processing typically takes a couple of minutes after `UPLOAD SUCCEEDED`; poll
+rather than guessing a delay.
+
+**Gotcha:** `GET /v1/builds/{id}/betaGroups` returns **403** with this API key. Query the inverse,
+`GET /v1/betaGroups/{gid}/builds`, to confirm membership.
+
+**Submitting for Beta App Review is an outward-facing action** — it puts the build in front of
+Apple and, on approval, in front of external testers. Confirm with the user before submitting,
+especially when the release carries pre-release dependencies or changes only verified on
+simulator.
 
 ## Release-notes structure
 
@@ -392,6 +445,11 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | Regenerate iOS Xcode project | `xcodegen generate --spec apps/djapp/iosApp/project.yml --project apps/djapp/iosApp` |
 | Build iOS release framework | `./gradlew :apps:djapp:shared:linkReleaseFrameworkIosArm64` |
 | Upload IPA to App Store Connect | `xcrun altool --upload-app -f <ipa> --type ios --apiKey <KEYID> --apiIssuer <ISSUER_ID>` |
+| List TestFlight beta groups | `GET /v1/betaGroups?filter[app]=<APP_ID>` (see step 9) |
+| Wait for a build to process | `GET /v1/builds?filter[app]=<APP_ID>&filter[version]=<N>` until `processingState=VALID` |
+| Attach build to external group | `POST /v1/builds/<BUILD_ID>/relationships/betaGroups` (internal groups 422 by design) |
+| Check if beta review submitted | `GET /v1/builds/<BUILD_ID>/betaAppReviewSubmission` (`data:null` = not submitted) |
+| Submit for Beta App Review | `POST /v1/betaAppReviewSubmissions` relating `build` |
 
 ## When something looks off
 
