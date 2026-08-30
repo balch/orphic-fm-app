@@ -48,9 +48,14 @@ class PulsarPlaybackBridge(
         //   - setPulsarActive (keeps MediaSession alive while playing/paused)
         //   - PULSAR_PLAYING port (gates beat generation in C++ — saves CPU when off)
         scope.launch {
+            // `state` conflates and this collector runs off the main thread, so a Playing
+            // superseded before it is scheduled is never observed. Logging the previous
+            // OBSERVED state separates "play never ran" from "play ran and was undone".
+            var observed: PlaybackState? = null
             playbackController.state.collect { state ->
                 val playing = if (state == PlaybackState.Playing) 1 else 0
-                log.info { "state=$state → PULSAR_PLAYING=$playing" }
+                log.info { "state=$state (prev observed=$observed) → PULSAR_PLAYING=$playing" }
+                observed = state
                 mediaSessionStateManager.setPulsarActive(state != PlaybackState.Stopped)
                 synthController.setPluginControl(
                     id = PulsarSymbol.PLAYING.controlId,

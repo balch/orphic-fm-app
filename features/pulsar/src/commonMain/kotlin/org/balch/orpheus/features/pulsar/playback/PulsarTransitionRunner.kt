@@ -92,10 +92,18 @@ class PulsarTransitionRunnerImpl(
     private suspend fun runGap(gapMs: Int, applyNext: suspend () -> Unit) {
         engine.fadeMasterVolume(0f, DECLICK_MS, FadeCurve.LINEAR)
         delay(DECLICK_MS.toLong().milliseconds)
-        setPulsarPlaying(false)
-        applyNext()
-        delay(gapMs.toLong().milliseconds)
-        setPulsarPlaying(true)
+        // Hand the gate back as we found it, from a finally: PulsarSkipHandler cancels the
+        // in-flight transition on every rapid tap, and nothing re-asserts this port until
+        // PlaybackController.state changes, so a gate left at 0 is permanent silence. A hard
+        // 1 is equally wrong, since a skip can arrive while EXPLICIT playback is not running.
+        val wasPlaying = isPulsarPlaying()
+        try {
+            setPulsarPlaying(false)
+            applyNext()
+            delay(gapMs.toLong().milliseconds)
+        } finally {
+            setPulsarPlaying(wasPlaying)
+        }
         engine.fadeMasterVolume(1f, DECLICK_MS, FadeCurve.LINEAR)
         delay(DECLICK_MS.toLong().milliseconds)
     }
@@ -197,6 +205,12 @@ class PulsarTransitionRunnerImpl(
             PortValue.IntValue(if (playing) 1 else 0),
         )
     }
+
+    // An unreadable port falls back to true, keeping the pre-fix behaviour rather
+    // than silencing the transport on a plugin the engine has not registered yet.
+    private fun isPulsarPlaying(): Boolean =
+        engine.getPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol)
+            ?.let { it.asInt() != 0 } ?: true
 
     private companion object {
         const val DECLICK_MS = 80

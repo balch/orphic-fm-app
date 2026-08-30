@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.seconds
 
 // ─── Fake SynthEngine ─────────────────────────────────────────────────────────
 
-private class FakeSynthEngine : SynthEngine {
+internal class FakeSynthEngine : SynthEngine {
     private var _masterVolume: Float = 0.8f
 
     // Expose the backing field for assertions in tests

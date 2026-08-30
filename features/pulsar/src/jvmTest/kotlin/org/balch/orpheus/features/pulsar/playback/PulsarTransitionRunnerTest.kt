@@ -9,6 +9,9 @@ import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
+import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,9 +36,20 @@ class PulsarTransitionRunnerTest {
         val filters = mutableListOf<Pair<Long, Int>>()
         var now: () -> Long = { 0L }
 
+        /** Plugin port map: GAP reads and restores PULSAR_PLAYING through it. */
+        val ports = mutableMapOf<Pair<String, String>, PortValue>()
+
         init {
             setMasterVolume(initialVolume)
         }
+
+        override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean {
+            ports[pluginUri to symbol] = value
+            return true
+        }
+
+        override fun getPluginPort(pluginUri: String, symbol: String): PortValue? =
+            ports[pluginUri to symbol]
 
         override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) {
             fades += FadeCall(now(), target, durationMs, curve)
@@ -363,5 +377,63 @@ class PulsarTransitionRunnerTest {
         // CUT, not RANDOM — surfacing "RANDOM" briefly would be a meaningless
         // flash since the user wants to see what was actually picked.
         assertEquals(TransitionStyle.CUT, observed)
+    }
+
+    // ── PULSAR_PLAYING gate (GAP is the only style that touches it) ────────
+
+    private fun RecordingEngine.pulsarPlaying(): Int? =
+        getPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol)?.asInt()
+
+    // PulsarSkipHandler cancels the in-flight transition on every rapid tap. Before the
+    // fix the gate stayed at 0 forever: PulsarPlaybackBridge only writes it on a
+    // PlaybackController.state CHANGE, so nothing re-asserted it and Pulsar went silent
+    // until the user toggled play/pause.
+    @Test
+    fun `GAP cancelled inside the gap restores the transport gate`() = runTest {
+        val engine = RecordingEngine()
+        engine.now = { testScheduler.currentTime }
+        engine.setPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol, PortValue.IntValue(1))
+        val runner = makeRunner(engine)
+
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.GAP)) {} }
+        advanceTimeBy(DECLICK_MS + 1L) // past the declick, inside the silent gap
+        assertEquals(0, engine.pulsarPlaying(), "gap must gate the transport off while it runs")
+        job.cancelAndJoin()
+
+        assertEquals(1, engine.pulsarPlaying(), "cancellation must hand the transport back")
+    }
+
+    // A skip arriving while the DJ app is paused or stopped must not start the beat clock
+    // behind PlaybackController's back. The old code restored a hard 1.
+    @Test
+    fun `GAP leaves the transport gate off when it started off`() = runTest {
+        val engine = RecordingEngine()
+        engine.now = { testScheduler.currentTime }
+        engine.setPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol, PortValue.IntValue(0))
+        val runner = makeRunner(engine)
+
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.GAP)) {} }
+        advanceUntilIdle()
+        job.join()
+
+        assertEquals(0, engine.pulsarPlaying())
+    }
+
+    @Test
+    fun `GAP restores the transport gate on a clean run`() = runTest {
+        val engine = RecordingEngine()
+        engine.now = { testScheduler.currentTime }
+        engine.setPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol, PortValue.IntValue(1))
+        val runner = makeRunner(engine)
+
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.GAP)) {} }
+        advanceUntilIdle()
+        job.join()
+
+        assertEquals(1, engine.pulsarPlaying())
+    }
+
+    private companion object {
+        const val DECLICK_MS = 80L
     }
 }
