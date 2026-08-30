@@ -45,6 +45,10 @@ fun HorizontalRotaryKnob(
     valueFormatter: KnobValueFormatter? = { v ->
         ((v * 100).roundToInt() / 100.0).toString()
     },
+    // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
+    // Every production call site leaves this null and gets live focus behavior.
+    previewFocused: Boolean? = null,
+    previewAdjusting: Boolean = false,
 ) {
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
@@ -105,6 +109,8 @@ fun HorizontalRotaryKnob(
                 indicatorColor = indicatorColor,
                 isLearning = isLearning,
                 enabled = enabled,
+                previewFocused = previewFocused,
+                previewAdjusting = previewAdjusting,
             )
         }
 

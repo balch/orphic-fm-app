@@ -1,5 +1,10 @@
 package org.balch.orpheus.ui.widgets
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -12,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,12 +32,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
@@ -41,12 +56,31 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Shared state holder for knob drag interaction. */
+/** One D-pad press moves 2.5% of the range; 40 presses cross the whole knob. */
+private const val StepFraction = 0.025f
+private const val FineStepFraction = 0.005f
+
 internal class KnobDragState(
     initialValue: Float,
     private val range: ClosedFloatingPointRange<Float>,
     private val sensitivity: Float,
 ) {
     var internalValue by mutableStateOf(initialValue)
+
+    /**
+     * Nudge by whole steps, for D-pad and arrow keys. Expressed as a fraction of the range
+     * rather than pixels: a key press has no drag distance, and a value step also sidesteps
+     * the density scaling that makes pixel deltas differ per screen.
+     */
+    fun applyStep(steps: Int, fine: Boolean = false): Float? {
+        val fraction = if (fine) FineStepFraction else StepFraction
+        val delta = steps * (range.endInclusive - range.start) * fraction
+        val newValue = (internalValue + delta).coerceIn(range)
+        return if (newValue != internalValue) {
+            internalValue = newValue
+            newValue
+        } else null
+    }
 
     fun applyDrag(dragAmount: Float, ctrlPressed: Boolean, fineTune: Boolean = false): Float? {
         val ctrlMultiplier = if (ctrlPressed) 20f else 1f
@@ -74,6 +108,22 @@ internal fun rememberKnobDragState(
  * The knob circle + arc drawing with drag interaction.
  * Shared between [RotaryKnob] and [HorizontalRotaryKnob].
  */
+/**
+ * Applies one step only while the knob is in adjust mode, and reports whether the key was
+ * consumed. Outside adjust mode the arrow key is left alone so focus traversal still works.
+ */
+private fun stepIf(
+    adjusting: Boolean,
+    dragState: KnobDragState,
+    steps: Int,
+    fine: Boolean,
+    onValueChange: (Float) -> Unit,
+): Boolean {
+    if (!adjusting) return false
+    dragState.applyStep(steps, fine)?.let(onValueChange)
+    return true
+}
+
 @Composable
 internal fun RotaryKnobDial(
     dragState: KnobDragState,
@@ -87,14 +137,73 @@ internal fun RotaryKnobDial(
     indicatorColor: Color = OrpheusColors.neonCyan,
     isLearning: Boolean = false,
     enabled: Boolean = true,
+    // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
+    // null (the default, used by every real call site) means "use live focus state" below.
+    previewFocused: Boolean? = null,
+    previewAdjusting: Boolean = false,
 ) {
     val sensitivity = 200f
     val currentOnValueChange by rememberUpdatedState(onValueChange)
+    var liveFocused by remember { mutableStateOf(false) }
+    // D-pad left/right is also how focus moves, so a knob may only consume those keys once
+    // the user has explicitly entered adjust mode with select. Otherwise focus is trapped:
+    // you can reach a knob with the remote and never leave it.
+    var liveAdjusting by remember { mutableStateOf(false) }
+    val isFocused = previewFocused ?: liveFocused
+    val isAdjusting = if (previewFocused != null) previewAdjusting else liveAdjusting
+
+    // TV: a thin ring is too subtle from couch distance and against a busy viz background, so
+    // focus gets an opaque raised plate instead (see raisedAccentSurface's language). Gated so
+    // every other platform's keyboard-focus ring (drawn below) is unchanged.
+    val isTvFocusChrome = LocalTvFocusChrome.current
+    val adjustPulseAlpha = if (isTvFocusChrome && isAdjusting) {
+        val transition = rememberInfiniteTransition(label = "knobAdjustPulse")
+        val alpha by transition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 0.95f,
+            animationSpec = infiniteRepeatable(tween(550), repeatMode = RepeatMode.Reverse),
+            label = "knobAdjustPulseAlpha",
+        )
+        alpha
+    } else {
+        0f
+    }
 
     Box(modifier = modifier.size(size)) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
+                // D-pad and arrow keys drive the knob by value steps. Focusable comes after
+                // onKeyEvent so the handler is in the chain for the node that takes focus.
+                .onFocusChanged {
+                    liveFocused = it.isFocused
+                    if (!it.isFocused) liveAdjusting = false
+                }
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown || isLearning || !enabled) {
+                        return@onKeyEvent false
+                    }
+                    when (event.key) {
+                        // Select toggles adjust mode; back leaves it without exiting the app.
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            liveAdjusting = !liveAdjusting
+                            true
+                        }
+                        Key.Back, Key.Escape -> {
+                            val wasAdjusting = liveAdjusting
+                            liveAdjusting = false
+                            wasAdjusting
+                        }
+                        Key.DirectionRight, Key.DirectionUp -> stepIf(
+                            liveAdjusting, dragState, 1, event.isCtrlPressed, currentOnValueChange,
+                        )
+                        Key.DirectionLeft, Key.DirectionDown -> stepIf(
+                            liveAdjusting, dragState, -1, event.isCtrlPressed, currentOnValueChange,
+                        )
+                        else -> false
+                    }
+                }
+                .focusable(enabled = enabled && !isLearning)
                 .pointerInput(sensitivity, range, isLearning, enabled) {
                     if (isLearning || !enabled) return@pointerInput
                     awaitEachGesture {
@@ -123,6 +232,62 @@ internal fun RotaryKnobDial(
 
             val startAngle = 135f
             val sweepAngle = 270f
+
+            // Focus treatment: a full circle outside the dial, so a D-pad selection is legible
+            // from across a room rather than a hairline outline.
+            if (isFocused && isTvFocusChrome) {
+                // TV: raised opaque plate — lit-top/dark-bottom bevel fill plus a drop shadow —
+                // rather than a thin ring, so it reads as "lifted" even over a bright/busy viz.
+                // Adjusting uses progressColor and adds a pulsing outer glow so the two states
+                // are unmistakably different: a static plate means the D-pad moves focus, a
+                // pulsing glow means left/right now changes the value.
+                val plateAccent = if (isAdjusting) progressColor else indicatorColor
+                val plateRadius = radius + strokeWidth * 1.8f
+
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.6f),
+                    radius = plateRadius,
+                    center = center.copy(y = center.y + strokeWidth * 0.35f),
+                )
+                drawCircle(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            plateAccent.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.85f),
+                        ),
+                        startY = center.y - plateRadius,
+                        endY = center.y + plateRadius,
+                    ),
+                    radius = plateRadius,
+                    center = center,
+                )
+                drawCircle(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(plateAccent, Color.Black.copy(alpha = 0.6f)),
+                        startY = center.y - plateRadius,
+                        endY = center.y + plateRadius,
+                    ),
+                    radius = plateRadius,
+                    center = center,
+                    style = Stroke(width = strokeWidth * 0.35f),
+                )
+                if (isAdjusting) {
+                    drawCircle(
+                        color = progressColor.copy(alpha = adjustPulseAlpha),
+                        radius = plateRadius + strokeWidth * 0.7f,
+                        center = center,
+                        style = Stroke(width = strokeWidth * 0.5f),
+                    )
+                }
+            } else if (isFocused) {
+                // Non-TV keyboard focus: unchanged from before this TV pass.
+                drawCircle(
+                    color = if (isAdjusting) progressColor else indicatorColor,
+                    radius = radius + strokeWidth * 0.55f,
+                    center = center,
+                    style = Stroke(width = strokeWidth * (if (isAdjusting) 0.9f else 0.45f)),
+                )
+            }
 
             // Track Groove (Shadow)
             drawArc(
@@ -323,7 +488,11 @@ fun RotaryKnob(
     enabled: Boolean = true,
     valueFormatter: KnobValueFormatter? = { value ->
         ((value * 100).roundToInt() / 100.0).toString()
-    }
+    },
+    // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
+    // Every production call site leaves this null and gets live focus behavior.
+    previewFocused: Boolean? = null,
+    previewAdjusting: Boolean = false,
 ) {
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
@@ -353,6 +522,8 @@ fun RotaryKnob(
             indicatorColor = indicatorColor,
             isLearning = isLearning,
             enabled = enabled,
+            previewFocused = previewFocused,
+            previewAdjusting = previewAdjusting,
         )
 
         if (label != null) {
@@ -375,5 +546,56 @@ fun RotaryKnob(
                 valueFormatter = valueFormatter,
             )
         }
+    }
+}
+
+// ==================== TV FOCUS PREVIEWS ====================
+// previewFocused/previewAdjusting force the visuals for inspection; every real call site
+// leaves them null and gets genuine D-pad/keyboard focus behavior.
+
+@Preview(name = "TV — Focused (not adjusting)")
+@Composable
+private fun RotaryKnobTvFocusedPreview() {
+    OrpheusTheme {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            RotaryKnob(
+                label = "ENERGY",
+                value = 0.6f,
+                onValueChange = {},
+                progressColor = OrpheusColors.cosmicPurple,
+                previewFocused = true,
+            )
+        }
+    }
+}
+
+@Preview(name = "TV — Adjusting (pulsing glow)")
+@Composable
+private fun RotaryKnobTvAdjustingPreview() {
+    OrpheusTheme {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            RotaryKnob(
+                label = "ENERGY",
+                value = 0.6f,
+                onValueChange = {},
+                progressColor = OrpheusColors.cosmicPurple,
+                previewFocused = true,
+                previewAdjusting = true,
+            )
+        }
+    }
+}
+
+@Preview(name = "Non-TV — Focused (unchanged ring)")
+@Composable
+private fun RotaryKnobNonTvFocusedPreview() {
+    OrpheusTheme {
+        RotaryKnob(
+            label = "ENERGY",
+            value = 0.6f,
+            onValueChange = {},
+            progressColor = OrpheusColors.cosmicPurple,
+            previewFocused = true,
+        )
     }
 }

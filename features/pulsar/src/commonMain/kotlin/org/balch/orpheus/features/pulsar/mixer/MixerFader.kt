@@ -1,7 +1,13 @@
 package org.balch.orpheus.features.pulsar.mixer
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,8 +36,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -41,9 +54,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
+import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.roundToInt
@@ -52,6 +67,11 @@ import kotlin.math.roundToInt
  *  of throw, narrow enough to leave fine control near unity, wide enough to
  *  feel like a deliberate detent rather than an accidental snap. */
 private const val UNITY_SNAP_TOLERANCE = 0.025f
+
+/** One D-pad/keyboard press moves 2.5% of the fader's 0..1 travel — same fraction
+ *  as the knobs' StepFraction, so every adjustable control in the app steps at the
+ *  same felt rate regardless of control shape. */
+private const val FADER_KEY_STEP = 0.025f
 
 /**
  * Vertical fader with an integrated LED meter ladder rendered inside the track,
@@ -101,6 +121,10 @@ internal fun MixerFader(
     glassTint: Color = accentColor,
     glassTintAlpha: Float = 0.15f,
     unityTravel: Float? = null,
+    // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
+    // null (the default, used by every real call site) means "use live focus state" below.
+    previewFocused: Boolean? = null,
+    previewAdjusting: Boolean = false,
 ) {
     val density = LocalDensity.current
     val trackHeightPx = with(density) { trackHeight.dp.toPx() }
@@ -110,6 +134,14 @@ internal fun MixerFader(
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
+
+    var liveFocused by remember { mutableStateOf(false) }
+    // Same contract as the knobs/BenderFaderWidget: arrows also move focus, so this control
+    // only consumes them once select has entered adjust mode — otherwise a D-pad reaching
+    // this fader could never leave it. See RotaryKnobDial.
+    var liveAdjusting by remember { mutableStateOf(false) }
+    val isFocused = previewFocused ?: liveFocused
+    val isAdjusting = if (previewFocused != null) previewAdjusting else liveAdjusting
 
     // Bottom of thumb: 0 == fully bottom, usableRange == fully top.
     val thumbBottomPx = if (dragging) dragOffset
@@ -133,10 +165,77 @@ internal fun MixerFader(
         (unityCenter - notchHeightPx / 2f).roundToInt()
     }
 
+    // Focus treatment, mirroring RotaryKnobDial's canonical pattern (see its doc for the "why"
+    // of each state): TV gets an opaque raised plate — legible from across a room over a busy
+    // viz background — that gains a pulsing glow once adjusting; off TV a thin ring thickens
+    // for the same signal. There's only one accent color here (unlike the knob's indicator/
+    // progress pair), so idle-vs-adjusting is read from ring weight/alpha instead of hue.
+    val isTvFocusChrome = LocalTvFocusChrome.current
+    val faderFocusShape = RoundedCornerShape(8.dp)
+    val adjustPulseAlpha = if (isTvFocusChrome && isAdjusting) {
+        val transition = rememberInfiniteTransition(label = "mixerFaderAdjustPulse")
+        val alpha by transition.animateFloat(
+            initialValue = 0.45f,
+            targetValue = 0.95f,
+            animationSpec = infiniteRepeatable(tween(550), repeatMode = RepeatMode.Reverse),
+            label = "mixerFaderAdjustPulseAlpha",
+        )
+        alpha
+    } else {
+        0f
+    }
+    val focusRingModifier = when {
+        !isFocused -> Modifier
+        isTvFocusChrome -> Modifier
+            .raisedAccentSurface(accent = accentColor, shape = faderFocusShape)
+            .then(
+                if (isAdjusting) {
+                    Modifier.border(2.5.dp, accentColor.copy(alpha = adjustPulseAlpha), faderFocusShape)
+                } else {
+                    Modifier
+                }
+            )
+        else -> Modifier.border(
+            width = if (isAdjusting) 3.dp else 1.5.dp,
+            color = if (isAdjusting) accentColor else accentColor.copy(alpha = 0.6f),
+            shape = faderFocusShape,
+        )
+    }
+
     Box(
         modifier = modifier
             .width((thumbWidth + 16).dp)
             .height(trackHeight.dp)
+            .onFocusChanged {
+                liveFocused = it.isFocused
+                if (!it.isFocused) liveAdjusting = false
+            }
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (event.key) {
+                    // Select toggles adjust mode; back leaves it without exiting the app.
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        liveAdjusting = !liveAdjusting
+                        return@onKeyEvent true
+                    }
+                    Key.Back, Key.Escape -> {
+                        val wasAdjusting = liveAdjusting
+                        liveAdjusting = false
+                        return@onKeyEvent wasAdjusting
+                    }
+                }
+                if (!liveAdjusting) return@onKeyEvent false
+                val step = when (event.key) {
+                    Key.DirectionUp, Key.DirectionRight -> FADER_KEY_STEP
+                    Key.DirectionDown, Key.DirectionLeft -> -FADER_KEY_STEP
+                    else -> return@onKeyEvent false
+                }
+                val next = (value + step).coerceIn(0f, 1f)
+                if (next != value) currentOnValueChange(next)
+                true
+            }
+            .focusable()
+            .then(focusRingModifier)
             .pointerInput(Unit) {
                 // detectDragGestures waits for ~16dp of touch slop before firing
                 // onDragStart, so a pure tap never moves the thumb. Use
@@ -395,5 +494,65 @@ private fun FaderColumn(
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp,
         )
+    }
+}
+
+// ==================== TV FOCUS PREVIEWS ====================
+// previewFocused/previewAdjusting force the visuals for inspection; every real call site
+// leaves them null and gets genuine D-pad/keyboard focus behavior.
+
+@Preview(name = "TV — Focused (not adjusting)", widthDp = 200, heightDp = 260)
+@Composable
+private fun MixerFaderTvFocusedPreview() {
+    LiquidPreviewContainerWithGradient(modifier = Modifier.size(200.dp, 260.dp)) {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            FaderColumn("BASS\nfocused", OrpheusColors.neonCyan) {
+                MixerFader(
+                    value = 0.6f,
+                    onValueChange = {},
+                    accentColor = OrpheusColors.neonCyan,
+                    meterLevel = 0.3f,
+                    glowIntensity = 0.3f,
+                    previewFocused = true,
+                )
+            }
+        }
+    }
+}
+
+@Preview(name = "TV — Adjusting (pulsing glow)", widthDp = 200, heightDp = 260)
+@Composable
+private fun MixerFaderTvAdjustingPreview() {
+    LiquidPreviewContainerWithGradient(modifier = Modifier.size(200.dp, 260.dp)) {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            FaderColumn("BASS\nadjusting", OrpheusColors.neonCyan) {
+                MixerFader(
+                    value = 0.6f,
+                    onValueChange = {},
+                    accentColor = OrpheusColors.neonCyan,
+                    meterLevel = 0.3f,
+                    glowIntensity = 0.3f,
+                    previewFocused = true,
+                    previewAdjusting = true,
+                )
+            }
+        }
+    }
+}
+
+@Preview(name = "Non-TV — Focused (keyboard ring)", widthDp = 200, heightDp = 260)
+@Composable
+private fun MixerFaderNonTvFocusedPreview() {
+    LiquidPreviewContainerWithGradient(modifier = Modifier.size(200.dp, 260.dp)) {
+        FaderColumn("BASS\nfocused", OrpheusColors.neonCyan) {
+            MixerFader(
+                value = 0.6f,
+                onValueChange = {},
+                accentColor = OrpheusColors.neonCyan,
+                meterLevel = 0.3f,
+                glowIntensity = 0.3f,
+                previewFocused = true,
+            )
+        }
     }
 }

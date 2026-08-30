@@ -17,9 +17,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -34,6 +36,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +51,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
+import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.math.absoluteValue
@@ -60,6 +71,12 @@ import kotlin.math.roundToInt
  * - Wide rectangular thumb handle with center groove
  * - Tension indicator (color/glow intensity based on displacement)
  */
+/** One key press moves 5% of the fader's -1..1 travel. */
+private const val FaderKeyStep = 0.1f
+
+/** Shape for the focus/adjust-mode backing plate drawn behind the touch target. */
+private val FaderFocusShape = RoundedCornerShape(8.dp)
+
 @Composable
 fun BenderFaderWidget(
     value: Float, // Current bend value from state (-1 to +1)
@@ -73,13 +90,24 @@ fun BenderFaderWidget(
     accentColor: Color = OrpheusColors.neonCyan,
     enabled: Boolean = true,
     springBack: Boolean = true, // When false, fader stays where released (e.g. crossfader)
+    // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
+    // null (every real call site) means "use live focus state" below. See RotaryKnobDial.
+    previewFocused: Boolean? = null,
+    previewAdjusting: Boolean = false,
 ) {
     val density = LocalDensity.current
     val trackHeightPx = with(density) { trackHeight.dp.toPx() }
     val thumbHeightPx = with(density) { thumbHeight.dp.toPx() }
     val usableRange = (trackHeightPx - thumbHeightPx) / 2f // Half range from center
-    
+
     val coroutineScope = rememberCoroutineScope()
+    var liveFocused by remember { mutableStateOf(false) }
+    // Same contract as the knobs: up/down also move focus, so the fader only consumes them
+    // once select has entered adjust mode. See RotaryKnobDial.
+    var liveAdjusting by remember { mutableStateOf(false) }
+    val isFocused = previewFocused ?: liveFocused
+    val isAdjusting = if (previewFocused != null) previewAdjusting else liveAdjusting
+    val isTvFocusChrome = LocalTvFocusChrome.current
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     val currentOnRelease by rememberUpdatedState(onRelease)
 
@@ -130,6 +158,52 @@ fun BenderFaderWidget(
             modifier = Modifier
                 .width(thumbWidth.dp + 16.dp) // Touch area wide enough for thumb
                 .height(trackHeight.dp)
+                // Focus/adjust-mode backing plate — same contract as RotaryKnobDial: a static
+                // border on desktop, an opaque raised plate on TV (legible from couch distance),
+                // heavier in both cases while adjusting since that mode is otherwise invisible.
+                .then(
+                    when {
+                        isFocused && isTvFocusChrome -> Modifier.raisedAccentSurface(
+                            accent = accentColor,
+                            shape = FaderFocusShape,
+                            elevation = if (isAdjusting) 11.dp else 6.dp,
+                        )
+                        isFocused -> Modifier.border(
+                            width = if (isAdjusting) 3.dp else 1.5.dp,
+                            color = accentColor.copy(alpha = if (isAdjusting) 0.95f else 0.5f),
+                            shape = FaderFocusShape,
+                        )
+                        else -> Modifier
+                    }
+                )
+                .onFocusChanged {
+                    liveFocused = it.isFocused
+                    if (!it.isFocused) liveAdjusting = false
+                }
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown || !enabled) return@onKeyEvent false
+                    when (event.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            liveAdjusting = !liveAdjusting
+                            return@onKeyEvent true
+                        }
+                        Key.Back, Key.Escape -> {
+                            val was = liveAdjusting
+                            liveAdjusting = false
+                            return@onKeyEvent was
+                        }
+                    }
+                    if (!liveAdjusting) return@onKeyEvent false
+                    val step = when (event.key) {
+                        Key.DirectionUp, Key.DirectionRight -> FaderKeyStep
+                        Key.DirectionDown, Key.DirectionLeft -> -FaderKeyStep
+                        else -> return@onKeyEvent false
+                    }
+                    val next = (value + step).coerceIn(-1f, 1f)
+                    if (next != value) currentOnValueChange(next)
+                    true
+                }
+                .focusable(enabled = enabled)
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
                     var startY = 0f
@@ -404,5 +478,53 @@ private fun BenderSliderPulledPreview() {
                 accentColor = OrpheusColors.warmGlow
             )
         }
+    }
+}
+
+// ==================== TV FOCUS PREVIEWS ====================
+// previewFocused/previewAdjusting force the visuals for inspection; every real call site
+// leaves them null and gets genuine D-pad/keyboard focus behavior.
+
+@Preview(name = "TV — Focused (not adjusting)")
+@Composable
+private fun BenderFaderTvFocusedPreview() {
+    OrpheusTheme {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            BenderFaderWidget(
+                value = 0f,
+                onValueChange = {},
+                springBack = false,
+                previewFocused = true,
+            )
+        }
+    }
+}
+
+@Preview(name = "TV — Adjusting (raised + brighter)")
+@Composable
+private fun BenderFaderTvAdjustingPreview() {
+    OrpheusTheme {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            BenderFaderWidget(
+                value = 0.3f,
+                onValueChange = {},
+                springBack = false,
+                previewFocused = true,
+                previewAdjusting = true,
+            )
+        }
+    }
+}
+
+@Preview(name = "Non-TV — Focused (border ring)")
+@Composable
+private fun BenderFaderNonTvFocusedPreview() {
+    OrpheusTheme {
+        BenderFaderWidget(
+            value = 0f,
+            onValueChange = {},
+            springBack = false,
+            previewFocused = true,
+        )
     }
 }

@@ -86,6 +86,7 @@ fun MixerPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
+    fillHeight: Boolean = true,
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
@@ -191,6 +192,7 @@ fun MixerPanel(
         initialExpanded = true,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
+        fillHeight = fillHeight,
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
             Row(

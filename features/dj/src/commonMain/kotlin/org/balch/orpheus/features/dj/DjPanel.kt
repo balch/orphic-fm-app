@@ -153,6 +153,7 @@ fun DjPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
+    fillHeight: Boolean = true,
     previewFaderOverride: FaderPreviewOverride? = null,
 ) {
     val djColors = remember { DjColors() }
@@ -161,6 +162,27 @@ fun DjPanel(
     val vizA by vizFlowA.collectAsState()
     val vizB by vizFlowB.collectAsState()
     val beatPhase by beatPhaseFlow.collectAsState()
+
+    // Beat length measured from phase wraps. There is no BPM on this panel, and the
+    // auto-scratch needs a subdivision to land on; a wrap-to-wrap interval gives one without
+    // plumbing tempo through. Falls back to 500ms (120 BPM) until two wraps have been seen.
+    var beatMillis by remember { mutableStateOf(500L) }
+    var focusedDeck by remember { mutableStateOf(-1) }
+    LaunchedEffect(beatPhaseFlow) {
+        var previousPhase = 0f
+        var lastWrap: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
+        beatPhaseFlow.collect { phase ->
+            if (phase < previousPhase) {
+                val mark = kotlin.time.TimeSource.Monotonic.markNow()
+                lastWrap?.let { previous ->
+                    val elapsed = previous.elapsedNow().inWholeMilliseconds
+                    if (elapsed in 200L..2_000L) beatMillis = elapsed
+                }
+                lastWrap = mark
+            }
+            previousPhase = phase
+        }
+    }
 
     // Hit-test rects are stored in window-space pixels (boundsInWindow /
     // positionInWindow). Those pixel values are density-dependent, so when the
@@ -406,8 +428,10 @@ fun DjPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        modifier = Modifier.fillMaxSize(),
+        // Width always, height only when filling: a docked panel sizes to its content.
+        modifier = if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
         showCollapsedHeader = showCollapsedHeader,
+        fillHeight = fillHeight,
         backgroundContent = {
             SignalTrace(data = outVizFlow, color = djColors.deckAColor, alpha = 0.25f)
         },
@@ -439,9 +463,18 @@ fun DjPanel(
                     deckColor = djColors.deckAColor,
                     frozenColor = djColors.frozenColor,
                     deckLabel = "A",
+                    focused = focusedDeck == 0,
                     onBounds = { platterABounds = it },
                     onToggleLock = { actions.toggleLock(0) },
-                    modifier = Modifier.size(100.dp),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .deckDpad(
+                            deck = 0,
+                            actions = actions,
+                            zoneOrder = state.zoneOrder,
+                            beatMillis = { beatMillis },
+                            onFocusChanged = { focused -> if (focused) focusedDeck = 0 else if (focusedDeck == 0) focusedDeck = -1 },
+                        ),
                 )
             }
 
@@ -532,9 +565,18 @@ fun DjPanel(
                     deckColor = djColors.deckBColor,
                     frozenColor = djColors.frozenColor,
                     deckLabel = "B",
+                    focused = focusedDeck == 1,
                     onBounds = { platterBBounds = it },
                     onToggleLock = { actions.toggleLock(1) },
-                    modifier = Modifier.size(100.dp),
+                    modifier = Modifier
+                        .size(100.dp)
+                        .deckDpad(
+                            deck = 1,
+                            actions = actions,
+                            zoneOrder = state.zoneOrder,
+                            beatMillis = { beatMillis },
+                            onFocusChanged = { focused -> if (focused) focusedDeck = 1 else if (focusedDeck == 1) focusedDeck = -1 },
+                        ),
                 )
             }
         }
@@ -603,6 +645,7 @@ private fun TurntablePlatter(
     deckLabel: String,
     onBounds: (Rect) -> Unit,
     onToggleLock: () -> Unit,
+    focused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val currentOnToggleLock by rememberUpdatedState(onToggleLock)
@@ -669,6 +712,16 @@ private fun TurntablePlatter(
             val outerRadius = (size.minDimension / 2f) - 4f
             val innerRadius = outerRadius * 0.3f
             val waveRadius = outerRadius * 0.7f
+
+            // D-pad focus ring, drawn under everything so the platter art stays readable.
+            if (focused) {
+                drawCircle(
+                    color = deckColor,
+                    radius = outerRadius + 2f,
+                    center = Offset(cx, cy),
+                    style = Stroke(width = 4f),
+                )
+            }
 
             // Frozen: filled ice overlay that pulses
             if (isFrozen) {

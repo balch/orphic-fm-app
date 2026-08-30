@@ -29,6 +29,13 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,6 +63,8 @@ fun SegmentedAlgoKnob(
 ) {
     val sensitivity = 150f
     var internalValue by remember(value) { mutableStateOf(value) }
+    var isFocused by remember { mutableStateOf(false) }
+    var isAdjusting by remember { mutableStateOf(false) }
     val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     val algoColors = listOf(
@@ -109,6 +118,43 @@ fun SegmentedAlgoKnob(
             Canvas(
                 modifier = Modifier
                     .size(size)
+                    // D-pad steps one algorithm at a time rather than by a value fraction,
+                    // since the segments are discrete.
+                    .onFocusChanged {
+                        isFocused = it.isFocused
+                        if (!it.isFocused) isAdjusting = false
+                    }
+                    .onKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown || isLearning) {
+                            return@onKeyEvent false
+                        }
+                        when (event.key) {
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                isAdjusting = !isAdjusting
+                                return@onKeyEvent true
+                            }
+                            Key.Back, Key.Escape -> {
+                                val was = isAdjusting
+                                isAdjusting = false
+                                return@onKeyEvent was
+                            }
+                        }
+                        // Arrows only steer the dial in adjust mode; otherwise focus moves on.
+                        if (!isAdjusting) return@onKeyEvent false
+                        val step = when (event.key) {
+                            Key.DirectionRight, Key.DirectionUp -> 1
+                            Key.DirectionLeft, Key.DirectionDown -> -1
+                            else -> return@onKeyEvent false
+                        }
+                        val next = (activeIdx + step).coerceIn(0, algoNames.lastIndex)
+                        if (next != activeIdx) {
+                            val newValue = next.toFloat() / algoNames.lastIndex.coerceAtLeast(1)
+                            internalValue = newValue
+                            currentOnValueChange(newValue)
+                        }
+                        true
+                    }
+                    .focusable(enabled = !isLearning)
                     .pointerInput(Unit) {
                         if (isLearning) return@pointerInput
                         detectVerticalDragGestures { change, dragAmount ->
@@ -161,6 +207,17 @@ fun SegmentedAlgoKnob(
                 val radius = size.toPx() / 2
                 val innerRadius = radius * 0.65f
                 val strokeWidth = 10.dp.toPx()
+
+                // Focus ring for D-pad selection, outside the dial so it stays legible at
+                // television viewing distance.
+                if (isFocused) {
+                    drawCircle(
+                        color = algoColors[activeIdx],
+                        radius = radius + strokeWidth * 0.5f,
+                        center = center,
+                        style = Stroke(width = strokeWidth * (if (isAdjusting) 0.9f else 0.45f)),
+                    )
+                }
 
                 // Draw segments background
                 val segmentCount = 9
