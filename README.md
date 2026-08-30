@@ -42,6 +42,7 @@ Orphic-DJ is an interactive album that lets the user control each Vibe. Four kno
 - **Mix faders**: grouped faders for perc, bass, keys, and FX with live level meters, plus master gain
 - **Sleep timer** that fades the set out
 - **Home-screen widget** for now-playing and transport
+- **Android TV and big screens**: panels dock around the stage, playable from a remote
 - **AI edition**: describe a vibe in words, an in-app agent builds it live
 
 > **Built from Orphic-FM.** Orphic-DJ is assembled from the synth's own parts. The same C++ engine renders every voice, and the same plugin modules supply the delays, reverb, and drums. Pulsar is an original generative engine composed on top of them.
@@ -64,6 +65,14 @@ The Pulsar deck owns the top of the portrait screen and never leaves. Whatever t
 <p align="center">
   <img src="docs/screenshots/djapp/mixer-og.webp" alt="Mix tab with grouped track faders and master gain" width="38%">
 </p>
+
+### Big Screen
+
+On an Android TV or a fullscreen desktop window the panels leave the sheet and dock around the stage. Global actions move to a top bar, every panel becomes a toggle along the bottom, and the whole thing is playable from a remote.
+
+|                       Full dock                       |                     Sleep timer                      |
+|:-----------------------------------------------------:|:----------------------------------------------------:|
+| <img src="docs/screenshots/djapp/tv-dock-og.webp" alt="Orphic DJ docked on a big screen with vibe info, DJ, Pulsar, and mix panels" width="100%"> | <img src="docs/screenshots/djapp/tv-timer-og.webp" alt="Orphic DJ big screen with the sleep timer running over the Aquarium visualization" width="100%"> |
 
 ### Two Editions
 
