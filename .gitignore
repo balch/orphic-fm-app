@@ -84,3 +84,6 @@ export-appstore-*/
 
 # Brainstorming visual-companion scratch
 .superpowers/
+
+# AI-authored design specs — superseded by the code, stale within days
+docs/superpowers/

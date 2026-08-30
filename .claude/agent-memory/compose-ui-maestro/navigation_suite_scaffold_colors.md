@@ -1,0 +1,16 @@
+---
+name: navigation-suite-scaffold-colors
+description: NavigationSuiteScaffold per-item color plumbing (material3-adaptive-navigation-suite) — no scaffold-level default, must build colors and pass to every item(); how to read CMP library sources from the Gradle cache.
+metadata:
+  type: reference
+---
+
+## NavigationSuiteScaffold Item Colors (material3-adaptive-navigation-suite 1.9.0)
+- Version catalog's `material3 = "1.5.0-alpha23"` version.ref does NOT describe what's actually resolved for KMP commonMain — JB's Compose Multiplatform plugin substitutes `org.jetbrains.compose.material3:*` with its own versioning (resolved to 1.9.0 as of 2026-07; check `~/.gradle/caches/modules-2/files-2.1/org.jetbrains.compose.material3/` for the real cached version before trusting the catalog string).
+- `NavigationSuiteScaffold(navigationSuiteItems: NavigationSuiteScope.() -> Unit, ...)` has **no scaffold-level default-item-colors parameter**. `navigationSuiteColors` only sets container/content colors, not per-item indicator/icon/text colors.
+- The only per-item color hook is `NavigationSuiteScope.item(..., colors: NavigationSuiteItemColors? = null)`. Build with `NavigationSuiteDefaults.itemColors(navigationBarItemColors = NavigationBarItemDefaults.colors(indicatorColor = X), navigationRailItemColors = NavigationRailItemDefaults.colors(indicatorColor = X))` and pass `colors = ...` to **every** `item()` call (there's no way to set it once for all items).
+- `item()` itself is NOT `@Composable` (it's a plain builder fn that records items into a list for later rendering) — so the `NavigationSuiteItemColors` must be computed as a `val` in the enclosing `@Composable` body *before* the `navigationSuiteItems = { }` lambda, then captured by closure. Calling `NavigationSuiteDefaults.itemColors()` (which IS `@Composable`) directly inside the lambda is a compile error.
+- `NavigationBarItemDefaults.colors(indicatorColor = X)` alone (all other params omitted) safely overrides ONLY the indicator — other params default to `Color.Unspecified` and `.copy()` uses `takeOrElse` to fall back to theme-derived colors. `NavigationRailItemDefaults.colors(indicatorColor = X)` takes a different internal path (concrete token defaults, not Unspecified) but resolves to the same observable behavior.
+- Icon/label content color IS independent of `colors.iconColor()`/`textColor()` **as long as** the `icon`/`label` composable lambdas pass an explicit `tint`/`color` themselves (`Icon.tint` defaults to `LocalContentColor.current`, which is what `colors` would otherwise drive via `CompositionLocalProvider` — an explicit tint always wins). Verified via `NavigationBar.kt`/`NavigationRail.kt`/`Icon.kt` source, not assumed.
+- To read this library's actual source when docs/autocomplete aren't enough: `find ~/.gradle/caches/modules-2/files-2.1/org.jetbrains.compose.material3 -iname "*sources.jar"`, `unzip -q <jar> -d <scratchpad-dir>`, then `Read`/`grep` the extracted `commonMain/androidx/compose/material3/**/*.kt`. Works the same for any Compose Multiplatform artifact.
+- Applied in `apps/djapp/shared/.../DjAppBottomNav.kt`: `NavIndicatorColor = OrpheusColors.neonCyan.copy(alpha = NavIndicatorAlpha)`, `NavIndicatorAlpha = 0.16f` (top-level private const, tunable).

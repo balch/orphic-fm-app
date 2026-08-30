@@ -1,0 +1,11 @@
+---
+name: ios-skiko-shader-support
+description: iOS Compose Multiplatform renders through skiko same as JVM/WASM (RuntimeEffect/SkSL shaders work) — how to verify via klib metadata strings, and the skikoShaderMain source-set fan-out pattern used to un-stub MetaballsRenderer.ios.kt.
+metadata:
+  type: reference
+---
+
+## iOS Skiko Shader Support (Metaballs, 2026-08-26)
+- iOS Compose Multiplatform DOES render through skiko, same as JVM/WASM — `org.jetbrains.skia.RuntimeEffect`/`RuntimeShaderBuilder` (SkSL shaders) and `ShaderBrush`/`asComposeShader` all exist in the resolved iOS klibs. Verified by unzipping `skiko-iosSimulatorArm64Main-<ver>.klib` and `ui-graphics-iosSimulatorArm64Main-<ver>.klib`, then `strings default/linkdata/package_<pkg>/*.knm | grep <Symbol>` — klib metadata is protobuf but symbol/class names still show up as plain strings. Don't assume a skiko API is JVM/WASM-only without checking this first; the old `MetaballsRenderer.ios.kt` stub comment claiming otherwise was simply wrong/stale.
+- `ui/widgets/build.gradle.kts` already had the exact fan-out pattern needed: a synthetic source set (there, `skikoMain`; `dependsOn(commonMain.get())`) shared by `jvmMain`/`wasmJsMain`/`iosMain`, with `applyDefaultHierarchyTemplate()` re-asserted explicitly right before it — manually adding `dependsOn` edges otherwise switches the default hierarchy template off and `iosMain` stops existing. Reused this pattern verbatim (as `skikoShaderMain`) in `features/visualizations/build.gradle.kts` to un-stub `MetaballsRenderer.ios.kt`: deleted the stub file, added `iosMain.get().dependsOn(skikoShaderMain)`. The real impl (`MetaballsRenderer.skikoShader.kt`) needed zero logic changes — every import (Compose foundation/ui/graphics + `org.jetbrains.skia.*`) is already common across JVM/WASM/iOS klibs.
+- Compiled clean: `:features:visualizations:compileKotlinIosSimulatorArm64`, `:features:visualizations:compileKotlinJvm`, `:apps:djapp:shared:compileKotlinIosSimulatorArm64`. Runtime behavior of `RuntimeEffect.makeForShader` on-device was NOT verified (compile-only) — this is a genuinely new visual on iOS (was a blank `Box`), worth an eye test on simulator/device before considering it done.
