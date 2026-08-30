@@ -1,8 +1,10 @@
 package org.balch.orpheus.core.media
 
+import android.app.ActivityOptions
 import android.app.Application
 import android.app.PendingIntent
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
@@ -107,8 +109,32 @@ actual class MediaSessionManager(
                 setPackage(service.packageName)
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
-        return PendingIntent.getActivity(service, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        // Whoever fires this — a TV now-playing tile, the notification, Assistant — is itself in
+        // the background, so the start is a background activity launch and the CREATOR of the
+        // PendingIntent has to opt in. Without this the system logs
+        // "Background activity launch blocked ... balAllowedByPiCreator: BSP.NONE" and the
+        // launcher's Open button silently does nothing. Sender-side permission is not enough:
+        // from Android 14 the creator's opt-in is required too.
+        return PendingIntent.getActivity(
+            service,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE,
+            backgroundLaunchOptions(),
+        )
     }
+
+    /** Creator-side background-activity-start opt-in; null before the API existed (< 34). */
+    private fun backgroundLaunchOptions(): android.os.Bundle? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ActivityOptions.makeBasic()
+                .setPendingIntentCreatorBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                )
+                .toBundle()
+        } else {
+            null
+        }
 
     actual fun activate() {
         mainHandler.post { doActivate() }
