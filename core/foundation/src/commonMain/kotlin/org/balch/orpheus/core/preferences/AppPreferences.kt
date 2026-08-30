@@ -27,6 +27,12 @@ data class AppPreferences(
     val lastPulsarJson: String? = null,
     /** Serialized panel expansion overrides: Map of panelId -> expanded. */
     val lastExpandedPanelsJson: String? = null,
+    /**
+     * DJ TV-mode docked panels, by route label, in the order the user switched them on.
+     * Null means never configured (fall back to the default pair); an empty list means the
+     * user deliberately docked nothing, which is the valid visualizer-only state.
+     */
+    val largeScreenPanels: List<String>? = null,
     /** Serialized effect UI states for DJ app cross-session persistence. */
     val lastTimerJson: String? = null,
     val lastReverbJson: String? = null,

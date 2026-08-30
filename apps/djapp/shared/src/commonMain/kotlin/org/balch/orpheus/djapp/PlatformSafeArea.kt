@@ -11,9 +11,11 @@ import androidx.compose.runtime.Composable
  * - **iOS** returns the real safe area. The status bar is hidden (see project.yml), but the
  *   Dynamic Island / notch and the home indicator still reserve space, so top content must be
  *   inset or it renders under the Island.
- * - **Android / desktop** return zero. Android hides the system bars and intentionally draws the
- *   chrome into the cutout (side notches are handled separately via [WindowInsets.displayCutout]);
- *   desktop has no notch. Returning zero here keeps the shipped Android layout unchanged.
+ * - **Android** returns zero on a phone or tablet: it hides the system bars and intentionally
+ *   draws the chrome into the cutout (side notches are handled separately via
+ *   [WindowInsets.displayCutout]). On a physical television it instead returns the overscan
+ *   margin, since there the edge is destructively cropped rather than merely occluded.
+ * - **Desktop** always returns zero; there is no notch.
  */
 @Composable
 expect fun platformSafeAreaInsets(): WindowInsets
