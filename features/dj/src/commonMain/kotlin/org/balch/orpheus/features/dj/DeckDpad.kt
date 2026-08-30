@@ -112,16 +112,71 @@ internal suspend fun performFling(deck: Int, actions: DjPanelActions, direction:
     }
 }
 
+/** The D-pad keys a platter reacts to, kept off Compose's `Key` so routing stays testable. */
+internal enum class DeckKey { Up, Down, Select, Back, Other }
+
+/** What a press means to the platter. */
+internal sealed interface DeckAction {
+    /** Not ours. Left unconsumed so Compose can move focus out of the deck. */
+    data object Pass : DeckAction
+
+    /** Take the platter, so the vertical axis starts driving it. */
+    data object EnterAdjust : DeckAction
+
+    /** Hand the platter back, so the vertical axis returns to moving focus. */
+    data object ExitAdjust : DeckAction
+
+    /** Spin the platter, [velocity] telling a nudge from a fling. */
+    data class Spin(val direction: Float, val velocity: Float) : DeckAction
+
+    data object RandomDrop : DeckAction
+}
+
+/**
+ * Routes one D-pad press for a platter.
+ *
+ * The deck only owns its vertical axis *while grabbed*, which is the same select-activated
+ * gate the knobs and faders use. Owning it unconditionally is what made the panel below a
+ * deck unreachable: a consumed key ends Compose's focus search, so a remote could enter a
+ * platter and never get back out downwards.
+ *
+ * Grabbing first also keeps the double press detectable — the pair of presses that flings is
+ * read after the platter is already held, so neither of them has to double as focus movement.
+ */
+internal fun decideDeckKey(
+    key: DeckKey,
+    adjusting: Boolean,
+    doubleVertical: Boolean,
+    doubleSelect: Boolean,
+): DeckAction = when (key) {
+    DeckKey.Up, DeckKey.Down -> when {
+        !adjusting -> DeckAction.Pass
+        else -> DeckAction.Spin(
+            direction = if (key == DeckKey.Up) 1f else -1f,
+            velocity = if (doubleVertical) FlingVelocity else NudgeVelocity,
+        )
+    }
+
+    DeckKey.Select -> when {
+        adjusting && doubleSelect -> DeckAction.RandomDrop
+        adjusting -> DeckAction.ExitAdjust
+        else -> DeckAction.EnterAdjust
+    }
+
+    // Only swallowed while grabbed, so back still leaves the screen the rest of the time.
+    DeckKey.Back -> if (adjusting) DeckAction.ExitAdjust else DeckAction.Pass
+
+    DeckKey.Other -> DeckAction.Pass
+}
+
 /**
  * Makes a turntable reachable and playable from a D-pad.
  *
- * - up / down: one press nudges, two in quick succession fling that direction.
- * - select: two in quick succession run [performRandomDrop].
+ * - select: grabs the platter, and a quick second press runs [performRandomDrop].
+ * - up / down (once grabbed): one press nudges, two in quick succession fling that direction.
+ * - back: hands the platter back.
  *
- * Up and down are consumed here rather than passed on, so the deck owns its vertical axis;
- * focus still leaves the platter with left and right. Letting the first press through would
- * move focus away and make the second press unreachable, so a double press could never be
- * detected at all.
+ * See [decideDeckKey] for why the vertical axis is gated behind the grab.
  */
 @Composable
 internal fun Modifier.deckDpad(
@@ -131,45 +186,84 @@ internal fun Modifier.deckDpad(
     beatMillis: () -> Long,
     enabled: Boolean = true,
     onFocusChanged: (Boolean) -> Unit = {},
+    onAdjustingChanged: (Boolean) -> Unit = {},
 ): Modifier {
     val scope = rememberCoroutineScope()
     val clock = remember { TimeSource.Monotonic }
     var lastVertical by remember { mutableStateOf<Pair<Key, TimeSource.Monotonic.ValueTimeMark>?>(null) }
     var lastSelect by remember { mutableStateOf<TimeSource.Monotonic.ValueTimeMark?>(null) }
     var running by remember { mutableStateOf<Job?>(null) }
+    var adjusting by remember { mutableStateOf(false) }
 
     fun recentlyPressed(mark: TimeSource.Monotonic.ValueTimeMark?): Boolean =
         mark != null && mark.elapsedNow().inWholeMilliseconds < DoublePressWindowMs
 
+    fun setAdjusting(value: Boolean) {
+        if (adjusting == value) return
+        adjusting = value
+        onAdjustingChanged(value)
+    }
+
     return this
-        .onFocusChanged { onFocusChanged(it.isFocused) }
+        .onFocusChanged {
+            onFocusChanged(it.isFocused)
+            // Losing focus must also drop the grab, or the platter would still be swallowing
+            // the vertical axis the next time this deck is reached.
+            if (!it.isFocused) setAdjusting(false)
+        }
         .onKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown || !enabled) return@onKeyEvent false
-            when (event.key) {
-                Key.DirectionUp, Key.DirectionDown -> {
-                    val direction = if (event.key == Key.DirectionUp) 1f else -1f
-                    val previous = lastVertical
-                    val isDouble = previous?.first == event.key && recentlyPressed(previous.second)
-                    lastVertical = event.key to clock.markNow()
 
-                    if (running?.isActive == true) return@onKeyEvent true
-                    running = scope.launch {
-                        if (isDouble) performFling(deck, actions, direction)
-                        else performFling(deck, actions, direction * (NudgeVelocity / FlingVelocity))
+            val key = when (event.key) {
+                Key.DirectionUp -> DeckKey.Up
+                Key.DirectionDown -> DeckKey.Down
+                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> DeckKey.Select
+                Key.Back, Key.Escape -> DeckKey.Back
+                else -> DeckKey.Other
+            }
+            val isDoubleVertical = lastVertical
+                ?.let { (k, mark) -> k == event.key && recentlyPressed(mark) } == true
+            val decision = decideDeckKey(
+                key = key,
+                adjusting = adjusting,
+                doubleVertical = isDoubleVertical,
+                doubleSelect = recentlyPressed(lastSelect),
+            )
+
+            when (key) {
+                DeckKey.Up, DeckKey.Down -> lastVertical = event.key to clock.markNow()
+                DeckKey.Select -> lastSelect = clock.markNow()
+                else -> Unit
+            }
+
+            when (decision) {
+                DeckAction.Pass -> false
+
+                DeckAction.EnterAdjust -> { setAdjusting(true); true }
+
+                DeckAction.ExitAdjust -> { setAdjusting(false); true }
+
+                is DeckAction.Spin -> {
+                    if (running?.isActive != true) {
+                        running = scope.launch {
+                            performFling(
+                                deck,
+                                actions,
+                                decision.direction * (decision.velocity / FlingVelocity),
+                            )
+                        }
                     }
                     true
                 }
-                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                    val isDouble = recentlyPressed(lastSelect)
-                    lastSelect = clock.markNow()
-                    if (isDouble && running?.isActive != true) {
+
+                DeckAction.RandomDrop -> {
+                    if (running?.isActive != true) {
                         running = scope.launch {
                             performRandomDrop(deck, actions, zoneOrder, beatMillis())
                         }
                     }
                     true
                 }
-                else -> false
             }
         }
         .focusable(enabled = enabled)

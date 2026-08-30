@@ -168,6 +168,9 @@ fun DjPanel(
     // plumbing tempo through. Falls back to 500ms (120 BPM) until two wraps have been seen.
     var beatMillis by remember { mutableStateOf(500L) }
     var focusedDeck by remember { mutableStateOf(-1) }
+    // Which deck currently owns the vertical axis, or -1. Separate from focus: a focused
+    // deck still lets up/down move focus until it is grabbed.
+    var grabbedDeck by remember { mutableStateOf(-1) }
     LaunchedEffect(beatPhaseFlow) {
         var previousPhase = 0f
         var lastWrap: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
@@ -464,6 +467,7 @@ fun DjPanel(
                     frozenColor = djColors.frozenColor,
                     deckLabel = "A",
                     focused = focusedDeck == 0,
+                    adjusting = grabbedDeck == 0,
                     onBounds = { platterABounds = it },
                     onToggleLock = { actions.toggleLock(0) },
                     modifier = Modifier
@@ -474,6 +478,7 @@ fun DjPanel(
                             zoneOrder = state.zoneOrder,
                             beatMillis = { beatMillis },
                             onFocusChanged = { focused -> if (focused) focusedDeck = 0 else if (focusedDeck == 0) focusedDeck = -1 },
+                            onAdjustingChanged = { grabbed -> if (grabbed) grabbedDeck = 0 else if (grabbedDeck == 0) grabbedDeck = -1 },
                         ),
                 )
             }
@@ -566,6 +571,7 @@ fun DjPanel(
                     frozenColor = djColors.frozenColor,
                     deckLabel = "B",
                     focused = focusedDeck == 1,
+                    adjusting = grabbedDeck == 1,
                     onBounds = { platterBBounds = it },
                     onToggleLock = { actions.toggleLock(1) },
                     modifier = Modifier
@@ -576,6 +582,7 @@ fun DjPanel(
                             zoneOrder = state.zoneOrder,
                             beatMillis = { beatMillis },
                             onFocusChanged = { focused -> if (focused) focusedDeck = 1 else if (focusedDeck == 1) focusedDeck = -1 },
+                            onAdjustingChanged = { grabbed -> if (grabbed) grabbedDeck = 1 else if (grabbedDeck == 1) grabbedDeck = -1 },
                         ),
                 )
             }
@@ -646,6 +653,7 @@ private fun TurntablePlatter(
     onBounds: (Rect) -> Unit,
     onToggleLock: () -> Unit,
     focused: Boolean = false,
+    adjusting: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val currentOnToggleLock by rememberUpdatedState(onToggleLock)
@@ -714,12 +722,15 @@ private fun TurntablePlatter(
             val waveRadius = outerRadius * 0.7f
 
             // D-pad focus ring, drawn under everything so the platter art stays readable.
-            if (focused) {
+            // Grabbed draws heavier than merely focused: while grabbed the platter owns
+            // up/down, so the ring is the only thing telling a remote why focus stopped
+            // moving.
+            if (focused || adjusting) {
                 drawCircle(
                     color = deckColor,
                     radius = outerRadius + 2f,
                     center = Offset(cx, cy),
-                    style = Stroke(width = 4f),
+                    style = Stroke(width = if (adjusting) 9f else 4f),
                 )
             }
 

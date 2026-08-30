@@ -125,4 +125,76 @@ class DeckDpadTest {
         assertEquals(DjDrop.NONE, weightedDrop(emptyList(), Random(0)))
         assertEquals(DjDrop.NONE, weightedDrop(listOf(DjDrop.NONE), Random(0)))
     }
+
+    // --- Key routing -------------------------------------------------------------------
+    // The deck used to consume up/down whenever it held focus, which left a remote unable to
+    // leave the platter vertically: the panel below it was simply unreachable. Every other
+    // D-pad control gates value changes behind select, so the deck does now too.
+
+    @Test
+    fun verticalPassesThroughUntilTheDeckIsGrabbed() {
+        // The regression: unconsumed is what lets Compose move focus on to the next control.
+        assertEquals(
+            DeckAction.Pass,
+            decideDeckKey(DeckKey.Down, adjusting = false, doubleVertical = false, doubleSelect = false),
+            "down must fall through so focus can leave the platter",
+        )
+        assertEquals(
+            DeckAction.Pass,
+            decideDeckKey(DeckKey.Up, adjusting = false, doubleVertical = true, doubleSelect = false),
+            "a double press outside adjust mode is still just focus movement",
+        )
+    }
+
+    @Test
+    fun verticalDrivesThePlatterOnceGrabbed() {
+        val nudge = decideDeckKey(DeckKey.Up, adjusting = true, doubleVertical = false, doubleSelect = false)
+        assertEquals(DeckAction.Spin(1f, NudgeVelocity), nudge, "one press nudges forward")
+
+        val fling = decideDeckKey(DeckKey.Down, adjusting = true, doubleVertical = true, doubleSelect = false)
+        assertEquals(DeckAction.Spin(-1f, FlingVelocity), fling, "two quick presses fling back")
+    }
+
+    @Test
+    fun selectGrabsAndReleasesThePlatter() {
+        assertEquals(
+            DeckAction.EnterAdjust,
+            decideDeckKey(DeckKey.Select, adjusting = false, doubleVertical = false, doubleSelect = false),
+        )
+        assertEquals(
+            DeckAction.ExitAdjust,
+            decideDeckKey(DeckKey.Select, adjusting = true, doubleVertical = false, doubleSelect = false),
+            "a later press hands the platter back",
+        )
+    }
+
+    @Test
+    fun doubleSelectStillRunsTheDrop() {
+        assertEquals(
+            DeckAction.RandomDrop,
+            decideDeckKey(DeckKey.Select, adjusting = true, doubleVertical = false, doubleSelect = true),
+            "grab then a quick second press is the auto-scratch",
+        )
+    }
+
+    @Test
+    fun backLeavesAdjustModeButNeverTrapsTheRemote() {
+        assertEquals(
+            DeckAction.ExitAdjust,
+            decideDeckKey(DeckKey.Back, adjusting = true, doubleVertical = false, doubleSelect = false),
+        )
+        assertEquals(
+            DeckAction.Pass,
+            decideDeckKey(DeckKey.Back, adjusting = false, doubleVertical = false, doubleSelect = false),
+            "back must still exit the screen when the deck is not grabbed",
+        )
+    }
+
+    @Test
+    fun unrelatedKeysAreNeverConsumed() {
+        assertEquals(
+            DeckAction.Pass,
+            decideDeckKey(DeckKey.Other, adjusting = true, doubleVertical = false, doubleSelect = false),
+        )
+    }
 }
