@@ -48,8 +48,10 @@ import org.balch.orpheus.ui.infrastructure.LocalTvFocusRegion
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.orpheusRaisedPlate
 import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
+import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.infrastructure.tvFocusRegionBorder
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.readableOnDark
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import org.balch.orpheus.ui.widgets.TvInlinePicker
@@ -64,6 +66,9 @@ private val TvTopBarControlHeight = 52.dp
 
 /** Icon size for the top bar's own buttons — bigger than the 24dp default for couch viewing. */
 private val TvTopBarIconSize = 32.dp
+
+/** Focus ring width on a top bar control — the one visual channel the idle plate never uses. */
+private val TvTopBarFocusBorderWidth = 3.dp
 
 /** Label size for the top bar's own buttons — closer to the title's own visual weight. */
 private val TvTopBarLabelSize = 16.sp
@@ -135,7 +140,7 @@ fun DjTvTopBar(
             .tvFocusRegionBorder(
                 holder = focusRegion,
                 token = focusToken,
-                color = effects.title.titleColor,
+                color = effects.title.titleColor.readableOnDark(),
                 shape = barShape,
             )
             .then(
@@ -155,7 +160,7 @@ fun DjTvTopBar(
         TvTopBarButton(
             icon = if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
             label = if (paused) "Play" else "Pause",
-            tint = effects.title.titleColor,
+            tint = effects.title.titleColor.readableOnDark(),
             onClick = onTogglePlayback,
             previewFocused = previewFocusedButton == TvTopBarButtonId.PLAY_PAUSE,
             modifier = Modifier
@@ -215,7 +220,7 @@ private fun TvVibePicker(pulsarFeature: PulsarFeature, previewFocused: Boolean) 
         entries = vibeList,
         displayName = { it.name },
         onSelected = { pulsarFeature.actions.setVibe(it) },
-        color = effects.title.titleColor,
+        color = effects.title.titleColor.readableOnDark(),
         previewFocused = previewFocused,
     )
 }
@@ -253,7 +258,7 @@ private fun TvVizPicker(vizFeature: VizFeature, previewFocused: Boolean) {
                 is VizPickerEntry.Item -> vizFeature.actions.onSelectViz(entry.viz)
             }
         },
-        color = effects.title.titleColor,
+        color = effects.title.titleColor.readableOnDark(),
         previewFocused = previewFocused,
     )
 }
@@ -286,7 +291,13 @@ private fun TvTopBarButton(
             .defaultMinSize(minHeight = TvTopBarControlHeight)
             .then(
                 if (isFocused) {
-                    Modifier.raisedAccentSurface(accent = tint, shape = shape)
+                    // Plate AND ring. Idle is already a raised plate, so lifting onto a second
+                    // plate was too close a relative to read as "the cursor is here" from a
+                    // couch — every control in the bar looked alike. The ring is a channel idle
+                    // does not use at all, which is what makes it unmistakable.
+                    Modifier
+                        .raisedAccentSurface(accent = tint, shape = shape)
+                        .border(TvTopBarFocusBorderWidth, tint.lighten(0.45f), shape)
                 } else {
                     // Idle plate follows the selected visualization, same as the title.
                     Modifier.orpheusRaisedPlate(
