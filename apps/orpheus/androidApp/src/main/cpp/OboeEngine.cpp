@@ -1,5 +1,7 @@
 #include "OboeEngine.h"
+#include <oboe/OboeExtensions.h>
 #include <android/log.h>
+#include <sys/system_properties.h>
 #include <sys/resource.h>
 #include <cstring>
 #include <chrono>
@@ -14,10 +16,23 @@ OboeEngine::~OboeEngine() {
     stop();
 }
 
+// Android TV boxes (verified on Amlogic / Chromecast with Google TV) hand out an MMAP
+// stream that opens cleanly, reports healthy and consumes frames, yet emits silence.
+// LowLatency is what selects the MMAP endpoint - sharing mode does not, as those devices
+// route even a Shared stream through AAudioServiceEndpointMMAP - so PerformanceMode::None
+// is the only reliable way off it. Costs latency (~384 -> ~2050 frame bursts), so it is
+// gated to TV and never affects phones or tablets.
+static bool isTelevisionDevice() {
+    char value[PROP_VALUE_MAX] = {0};
+    __system_property_get("ro.build.characteristics", value);
+    return std::strstr(value, "tv") != nullptr;
+}
+
 oboe::Result OboeEngine::openStream() {
+    const bool isTv = isTelevisionDevice();
     oboe::AudioStreamBuilder builder;
-    builder.setSharingMode(oboe::SharingMode::Exclusive)
-        ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
+    builder.setSharingMode(isTv ? oboe::SharingMode::Shared : oboe::SharingMode::Exclusive)
+        ->setPerformanceMode(isTv ? oboe::PerformanceMode::None : oboe::PerformanceMode::LowLatency)
         ->setFormat(oboe::AudioFormat::Float)
         ->setFormatConversionAllowed(true)
         ->setChannelCount(2)
@@ -40,8 +55,13 @@ oboe::Result OboeEngine::open() {
     mCreatedSampleRate = mStream->getSampleRate();
     dsp_engine_.store(orpheus_engine_create(sr), std::memory_order_release);
 
-    LOGI("Stream opened: sampleRate=%d, framesPerBurst=%d, dsp_engine=%p",
+    // Log what we actually got, not what we asked for: sharing/performance mode and the
+    // MMAP verdict are negotiated by the HAL and are the first thing to check on silence.
+    LOGI("Stream opened: sampleRate=%d, framesPerBurst=%d, sharing=%s, perf=%s, mmap=%d, dsp_engine=%p",
          mStream->getSampleRate(), mStream->getFramesPerBurst(),
+         oboe::convertToText(mStream->getSharingMode()),
+         oboe::convertToText(mStream->getPerformanceMode()),
+         static_cast<int>(oboe::OboeExtensions::isMMapUsed(mStream.get())),
          dsp_engine_.load(std::memory_order_relaxed));
     return oboe::Result::OK;
 }
