@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,6 +50,7 @@ import org.balch.orpheus.ui.infrastructure.orpheusChromeWash
 import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.infrastructure.tvFocusRegionBorder
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -81,6 +85,21 @@ private val TvBottomBarMinHeight = 148.dp
  * alpha was tuned for a completely different recipe.
  */
 private const val TvDockedWashAlpha = 0.5f
+
+/**
+ * How far the docked/focused icon and label are lightened off the visualization accent.
+ *
+ * High because it fights that item's own accent wash: at the bare accent the selected items were
+ * the least readable things in the bar. Drop it and they mud out again; take it to 1f and the bar
+ * stops following the visualization at all.
+ */
+private const val TvBottomBarContentLighten = 0.7f
+
+/** Idle icon/label opacity. Undocked items still have to be readable from a couch, not just present. */
+private const val TvBottomBarIdleAlpha = 0.75f
+
+/** Size of the shown/hidden toggle badge in an item's corner. */
+private val TvBottomBarToggleSize = 26.dp
 
 /**
  * Fixed bottom bar display order: DJ, Mix, Horn, Pulsar, Timer, then Vibe Info and Ends last.
@@ -242,7 +261,17 @@ private fun TvBottomBarItem(
     // Focus also brightens the icon/label — otherwise an undocked-but-focused item sits inside
     // a bright raised plate with a muddy dim icon, undercutting the very thing the plate exists
     // to highlight.
-    val tint = if (docked || isFocused) accent else Color.White.copy(alpha = 0.55f)
+    //
+    // Lightened, not the bare accent: a docked item's own plate IS an accent wash, so drawing
+    // accent content on it put accent on accent and left the selected items reading worse across
+    // a room than the plain-white unselected ones — backwards. The plate already carries the
+    // visualization's colour, so the content on top only has to stay legible while keeping the
+    // hue.
+    val tint = if (docked || isFocused) {
+        accent.lighten(TvBottomBarContentLighten)
+    } else {
+        Color.White.copy(alpha = TvBottomBarIdleAlpha)
+    }
     val shape = RoundedCornerShape(14.dp)
 
     // The armed ring is its own outer layer, offset from the plate/wash by a gap (mirrors the
@@ -302,6 +331,26 @@ private fun TvBottomBarItem(
                 fontSize = TvBottomBarLabelSize,
                 maxLines = 1,
                 softWrap = false,
+            )
+        }
+
+        // Whether this panel is on screen, said outright — but only under the cursor. On every
+        // item at once it was a row of badges competing with the icons for attention, when the
+        // plate already says which panels are docked; what was actually missing is what pressing
+        // select right now would do. So it answers that, for the one item that can be pressed.
+        //
+        // An overlay rather than a Column child, so appearing and disappearing costs no layout,
+        // and a plain Icon takes no pointer input, so a press in this corner still reaches the
+        // clickable underneath.
+        if (isFocused) {
+            Icon(
+                imageVector = if (docked) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                contentDescription = if (docked) "$label shown" else "$label hidden",
+                tint = tint,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(TvBottomBarToggleSize),
             )
         }
     }
