@@ -1,5 +1,6 @@
-Better on the big screen.
+Easier to read, easier to steer.
 
-• The remote can now move off a turntable: press select to grab it, then up and down scratch.
-• Panels let the visualization through instead of sitting on a solid slab.
-• A new television banner and app art.
+• Titles and labels stay readable whatever the visualization is doing behind them.
+• The remote's cursor is unmistakable now, and a mouse click no longer leaves a button lit.
+• Every deck control is reachable from a remote, including the source selectors.
+• A hotter look for the Black Hole Sun visualization.
