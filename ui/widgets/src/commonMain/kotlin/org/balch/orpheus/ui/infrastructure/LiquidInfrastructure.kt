@@ -159,6 +159,17 @@ fun Modifier.liquefiableVizEffects(
  * is skipped entirely and a flat OPAQUE fill takes its place at the same clip/shape, so toggling
  * it changes only the fill's cost, never the panel's layout metrics.
  */
+/**
+ * Opacity of a docked panel's flat fill on television hardware, where glass is off.
+ *
+ * A television reads from across a room, so this is deliberately near the opaque end: the plate
+ * exists because glass washed out over a bright visualization and cost legibility. This lets the
+ * visualization register behind a panel as motion and colour without the text ever competing with
+ * it. Lower it and bright visualizations start to fight the labels; raise it to 1f and the panel
+ * goes back to the flat slab it was.
+ */
+const val TvPanelFillAlpha = 0.86f
+
 fun Modifier.panelGlassChrome(
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
@@ -180,9 +191,13 @@ fun Modifier.panelGlassChrome(
                 shape = shape,
             )
         } else {
-            // Flat opaque fill: no LiquidState sampling, no blur — just a solid clipped
-            // rectangle, so the A/B measures only the glass effect's own frame cost.
-            Modifier.clip(shape).background(OrpheusColors.panelSurface)
+            // Flat translucent fill: no LiquidState sampling, no blur — just a solid clipped
+            // rectangle at [TvPanelFillAlpha], so the visualization still moves behind a docked
+            // panel without paying for glass. What cost ~6ms/frame on a television was the blur
+            // and the state sampling, not the transparency: compositing one alpha'd rectangle is
+            // effectively free next to either.
+            Modifier.clip(shape)
+                .background(OrpheusColors.panelSurface.copy(alpha = TvPanelFillAlpha))
         }
     )
     // No clip(shape) here — both branches above already clip to `shape` themselves
