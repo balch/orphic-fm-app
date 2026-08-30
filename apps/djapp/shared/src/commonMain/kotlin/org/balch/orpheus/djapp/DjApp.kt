@@ -145,6 +145,7 @@ fun DjApp(
                             DjAppScreen(
                                 synthEngine = graph.synthEngine,
                                 vizFeature = vizFeature,
+                                appPreferencesRepository = graph.appPreferencesRepository,
                                 onTogglePlayback = onTogglePlayback,
                                 modifier = Modifier.fillMaxSize(),
                                 tabContributions = tabContributions,

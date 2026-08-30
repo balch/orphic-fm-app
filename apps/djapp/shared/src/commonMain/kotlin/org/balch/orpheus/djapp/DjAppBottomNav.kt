@@ -44,33 +44,36 @@ private const val NavIndicatorAlpha = 0.16f
  * transparent nav background in dark posture, and baseline lavender under a light
  * system theme — a deliberate neon-cyan wash replaces it instead.
  */
-private val NavIndicatorColor = OrpheusColors.neonCyan.copy(alpha = NavIndicatorAlpha)
+internal val NavIndicatorColor = OrpheusColors.neonCyan.copy(alpha = NavIndicatorAlpha)
 
 /**
- * Adaptive navigation scaffold: bottom bar in portrait, side rail in landscape.
+ * Adaptive navigation scaffold: bottom bar in portrait, side rail otherwise.
  * Includes a centered Play/Pause button that toggles global audio mute.
+ *
+ * Selection is expressed as [isSelected] rather than a current route so the same scaffold
+ * serves both models: portrait and landscape pass a single-route equality check, while TV
+ * mode passes a membership test over the docked panels.
  */
 @Composable
 fun DjAppNavScaffold(
-    currentRoute: DjRoute,
-    onRouteSelected: (DjRoute) -> Unit,
-    isLandscape: Boolean,
+    isSelected: (DjRoute) -> Boolean,
+    onItemClick: (DjRoute) -> Unit,
+    layoutMode: DjLayoutMode,
     pulsarFeature: PulsarFeature,
     timerFeature: TimerFeature,
     onTogglePlayback: () -> Unit,
     tabs: List<DjRoute> = djTabs,
-    onOpenSheet: (DjRoute) -> Unit = {},
-    openSheetRoute: DjRoute? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val layoutType = if (isLandscape) NavigationSuiteType.NavigationRail
+    val usesRail = layoutMode != DjLayoutMode.Portrait
+    val layoutType = if (usesRail) NavigationSuiteType.NavigationRail
                      else NavigationSuiteType.NavigationBar
 
     val pulsarState by pulsarFeature.stateFlow.collectAsState()
     val timerState by timerFeature.stateFlow.collectAsState()
-    // Insert play/pause in the center for portrait, at the end for landscape
-    val playPauseIndex = if (isLandscape) tabs.size else tabs.size / 2
+    // Insert play/pause in the center for the bottom bar, at the end for the rail
+    val playPauseIndex = if (usesRail) tabs.size else tabs.size / 2
 
     // NavigationSuiteScaffold has no scaffold-level default-item-colors hook in this
     // M3 version — NavigationSuiteScope.item() takes its own `colors`, so this is
@@ -104,13 +107,10 @@ fun DjAppNavScaffold(
             tabs.forEachIndexed { index, route ->
                 if (index == playPauseIndex) addPlayPause()
 
-                val selected = if (route.opensAsSheet) route == openSheetRoute
-                               else currentRoute == route
+                val selected = isSelected(route)
                 item(
                     selected = selected,
-                    onClick = {
-                        if (route.opensAsSheet) onOpenSheet(route) else onRouteSelected(route)
-                    },
+                    onClick = { onItemClick(route) },
                     icon = {
                         val showCountdown = route is TimerTab
                             && (timerState.status == TimerStatus.RUNNING
@@ -170,7 +170,7 @@ fun DjAppNavScaffold(
  *   - >= 1m: "Nm"    (e.g. "42m")
  *   - <  1m: "Ns"    (e.g. "42s")
  */
-private fun formatNavCountdown(remaining: Duration): String {
+internal fun formatNavCountdown(remaining: Duration): String {
     val totalSeconds = remaining.inWholeSeconds.coerceAtLeast(0L)
     if (totalSeconds < 60L) return "${totalSeconds}s"
     val totalMinutes = totalSeconds / 60L
@@ -186,7 +186,7 @@ private fun formatNavCountdown(remaining: Duration): String {
  * reversing tween between 0.7 and 1.0).
  */
 @Composable
-private fun runningAlphaPulse(): Float {
+internal fun runningAlphaPulse(): Float {
     val transition = rememberInfiniteTransition(label = "navCountdownPulse")
     val alpha by transition.animateFloat(
         initialValue = 0.7f,

@@ -5,6 +5,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.features.StartupInitializer
 import org.balch.orpheus.core.playback.PlaybackController
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.variant.DjTabContribution
 
@@ -29,4 +30,7 @@ interface DjAppGraph : ViewModelGraph {
 
     /** Constructing it builds every `@StartupRoot`; `run()` then the graph's startup features. */
     val startupInitializer: StartupInitializer
+
+    /** Persists the TV-mode docked-panel set, which has no ViewModel of its own. */
+    val appPreferencesRepository: AppPreferencesRepository
 }

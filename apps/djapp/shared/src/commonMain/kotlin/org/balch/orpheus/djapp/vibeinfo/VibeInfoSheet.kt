@@ -40,6 +40,7 @@ import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.widgets.OrpheusSlideUpSheet
 
 /**
@@ -61,6 +62,26 @@ fun VibeInfoSheet(
     vizFlow: StateFlow<PulsarVizData>,
     onDismiss: () -> Unit,
 ) {
+    val model = rememberVibeInfoModel(pulsar, vizFlow)
+
+    OrpheusSlideUpSheet(
+        onDismiss = onDismiss,
+        skipPartiallyExpanded = true,
+        inactivityTimeoutMs = null,
+    ) {
+        VibeInfoContent(model = model)
+    }
+}
+
+/**
+ * Builds the vibe readout model. Shared by the sheet and the docked panel so the hysteresis
+ * and memoization below apply identically however the readout is presented.
+ */
+@Composable
+private fun rememberVibeInfoModel(
+    pulsar: PulsarFeature,
+    vizFlow: StateFlow<PulsarVizData>,
+): VibeInfoUiModel {
     val uiState by pulsar.stateFlow.collectAsState()
     val arrangement by pulsar.arrangementStateFlow.collectAsState()
     val viz by vizFlow.collectAsState()
@@ -75,7 +96,7 @@ fun VibeInfoSheet(
     // stable reference between polls, so recompositions from unrelated state
     // (e.g. dragging the energy knob) reuse the cached model — zero per-frame
     // allocation when nothing relevant changed.
-    val model = remember(uiState.vibe, arrangement, stableViz, uiState.energy) {
+    return remember(uiState.vibe, arrangement, stableViz, uiState.energy) {
         mapVibeInfo(
             vibe = uiState.vibe,
             arrangement = arrangement,
@@ -83,11 +104,33 @@ fun VibeInfoSheet(
             energy = uiState.energy,
         )
     }
+}
 
-    OrpheusSlideUpSheet(
-        onDismiss = onDismiss,
-        skipPartiallyExpanded = true,
-        inactivityTimeoutMs = null,
+/**
+ * The same content as [VibeInfoSheet], docked as a panel instead of slid up over the stage.
+ * TV mode has room to keep the vibe readout on screen alongside everything else, where a
+ * modal sheet would cover the layout it is describing.
+ */
+@Composable
+fun VibeInfoPanel(
+    pulsar: PulsarFeature,
+    vizFlow: StateFlow<PulsarVizData>,
+    modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
+) {
+    val model = rememberVibeInfoModel(pulsar, vizFlow)
+
+    CollapsibleColumnPanel(
+        title = "INFO",
+        // No heading: docked panels in TV mode are headerless, and the content already
+        // opens with the vibe's own name.
+        expandedTitle = null,
+        color = OrpheusColors.cosmicPurple,
+        isExpanded = true,
+        onExpandedChange = {},
+        showCollapsedHeader = false,
+        fillHeight = fillHeight,
+        modifier = modifier,
     ) {
         VibeInfoContent(model = model)
     }
