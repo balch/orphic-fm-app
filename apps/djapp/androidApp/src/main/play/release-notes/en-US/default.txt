@@ -1,6 +1,7 @@
-Solos and intros land cleaner, knobs are smoother and more responsive.
+Orphic DJ comes to the big screen.
 
-• Knobs respond without lag, fast enough to ride in a live set.
-• Cleaner and more articulated intros and solos.
-• Saved settings restore on launch.
-• Coordinated key-module startup using Metro @MapKey multibindings.
+• Android TV support: panels dock around the stage, playable entirely from the remote.
+• Fixed: no audio at all on Android TV.
+• Fixed: playback restarts after the sleep timer.
+• Smoother visualizations, lighter on the CPU.
+• Rust Belt opens into a new weather section.
