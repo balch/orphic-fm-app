@@ -29,6 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -282,7 +284,12 @@ private fun TvTopBarButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val liveFocused by interactionSource.collectIsFocusedAsState()
-    val isFocused = previewFocused || liveFocused
+    // Pointer clicks take focus too, so on desktop a mouse click left the item sitting in the
+    // focused state with nothing to clear it — it read as "selected" long after the click. The
+    // focus treatment exists for a cursor that has nowhere else to show itself, so it is gated on
+    // the input mode actually being a cursor: D-pad and keyboard show it, mouse and touch do not.
+    val inputMode = LocalInputModeManager.current
+    val isFocused = previewFocused || (liveFocused && inputMode.inputMode == InputMode.Keyboard)
     val shape = RoundedCornerShape(8.dp)
     val effects = LocalLiquidEffects.current
 
