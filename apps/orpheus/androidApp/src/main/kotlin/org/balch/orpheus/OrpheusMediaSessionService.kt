@@ -10,22 +10,24 @@ import androidx.media3.session.MediaSessionService
 
 class OrpheusMediaSessionService : MediaSessionService() {
 
-    private var session: MediaSession? = null
+    private val mediaSessionManager
+        get() = (application as OrpheusApplication).graph.mediaSessionManager
 
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannel()
-        session = (application as OrpheusApplication).graph.mediaSessionManager.buildMediaSession(this)
-        addSession(session!!)
+        addSession(mediaSessionManager.buildMediaSession(this))
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return session
-    }
+    // Reads the manager's live handle rather than a cached field. Media3 calls
+    // this from onStartCommand for MEDIA_BUTTON intents and feeds the result
+    // straight to addSession, which throws on a released session.
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
+        mediaSessionManager.session
 
     override fun onDestroy() {
-        session?.release()
-        session = null
+        // The service built the session, so the service releases it.
+        runCatching { mediaSessionManager.releaseSession() }
         super.onDestroy()
     }
 

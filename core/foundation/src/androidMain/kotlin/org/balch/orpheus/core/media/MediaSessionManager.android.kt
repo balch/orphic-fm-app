@@ -42,7 +42,17 @@ actual class MediaSessionManager(
     }
     private val transientWatchdogMs = 10L * 60L * 1000L
 
+    /**
+     * The live session, or null once it has been released. Media services must
+     * read this from onGetSession rather than caching their own field: media3
+     * feeds that return value straight into addSession, which throws
+     * "session is already released" on a stale one.
+     */
     val session: MediaSession? get() = mediaSession
+
+    /** [session] narrowed for MediaLibraryService.onGetSession. */
+    val librarySession: MediaLibraryService.MediaLibrarySession?
+        get() = mediaSession as? MediaLibraryService.MediaLibrarySession
 
     fun setLibraryCallback(callback: MediaLibraryService.MediaLibrarySession.Callback?) {
         this.libraryCallback = callback
@@ -53,6 +63,7 @@ actual class MediaSessionManager(
     }
 
     fun buildLibrarySession(service: MediaLibraryService): MediaLibraryService.MediaLibrarySession {
+        releaseStaleSession()
         ensurePlayer()
         val callback = libraryCallback ?: DefaultLibraryCallback()
         val session = MediaLibraryService.MediaLibrarySession.Builder(service, synthPlayer!!, callback)
@@ -63,12 +74,31 @@ actual class MediaSessionManager(
     }
 
     fun buildMediaSession(service: MediaSessionService): MediaSession {
+        releaseStaleSession()
         ensurePlayer()
         val session = MediaSession.Builder(service, synthPlayer!!)
             .setSessionActivity(launchIntent(service))
             .build()
         mediaSession = session
         return session
+    }
+
+    /**
+     * Releases the session and the player it drives. Called ONLY from the owning
+     * media service's onDestroy: MediaSession.Builder binds the session to that
+     * service, so the service is its real owner. The audio-focus and deactivate
+     * paths deliberately pause instead of releasing (see [doLossPermanentLocked]).
+     */
+    fun releaseSession() {
+        // The service is going away, so the FGS is definitively down. Without
+        // this, doStartService's isServiceStarted short-circuit would skip the
+        // restart and the next play() would find no service and no session.
+        isServiceStarted = false
+        // isActive deliberately survives: it still gates doDeactivate's focus
+        // abandon. doActivate rebuilds the player it drops here (see there).
+        if (mediaSession == null && synthPlayer == null) return
+        log.info { "Releasing media session" }
+        releaseSessionAndPlayer()
     }
 
     private fun launchIntent(service: android.app.Service): PendingIntent {
@@ -213,12 +243,9 @@ actual class MediaSessionManager(
         doStopService()
         audioFocusController.abandon()
         audioFocusController.setListener(null)
-        // Release the player + receiver — leaving them registered after a
-        // permanent loss would keep the volume BroadcastReceiver firing
-        // invalidateState() on a session that no longer drives audio, and the
-        // attached Player.Listener could still bounce stale onPlay/onPause
-        // through handler when reused.
-        releaseSynthPlayer()
+        // Pause, never release: the session is the media service's. Releasing it
+        // here left onGetSession handing media3 a dead session, which threw
+        // "session is already released" on the next MEDIA_BUTTON start.
         isActive = false
     }
 
@@ -234,6 +261,10 @@ actual class MediaSessionManager(
         // fire for our own updatePlaybackState()/updateMetadata() pushes (both
         // call invalidateState()), echoing every self-push back as a fake user
         // play/pause — a ~250 Hz feedback loop that stutters the beat clock.
+        //
+        // These stay wired across a focus teardown on purpose: a controller press
+        // arriving while inactive is the resume path, and it lands on
+        // PlaybackController.play(), which re-takes focus and re-activates.
         player.onSetPlayWhenReady = { playWhenReady ->
             if (playWhenReady) handler?.onPlay() else handler?.onPause()
         }
@@ -244,9 +275,13 @@ actual class MediaSessionManager(
     }
 
     private fun doActivate() {
+        // Ahead of the early-return on purpose, and idempotent: the owning
+        // service can release the player out from under an already-active
+        // manager (its onDestroy calls releaseSession), and every later
+        // updatePlaybackState would then land on a null player.
+        ensurePlayer()
         if (isActive) return
         log.info { "Activating media session" }
-        ensurePlayer()
         audioFocusController.setListener(this)
         // We're (re)activating — cancel any pending transient watchdog.
         mainHandler.removeCallbacks(transientWatchdog)
@@ -260,26 +295,33 @@ actual class MediaSessionManager(
         // promise a startForeground() we'd never deliver while merely browsing.
     }
 
-    // Invariant: by the time this returns, both synthPlayer == null AND
-    // isActive == false. The early-return on synthPlayer == null is safe
-    // because every teardown path (doDeactivate, doLossPermanentLocked, and
-    // updatePlaybackState's FGS-failed rollback) releases the player.
+    // Invariant: by the time this returns, isActive == false and nothing we own
+    // is driving audio. The session and player deliberately survive — they are
+    // the media service's, and doStopService() below destroys that service when
+    // nothing is bound, which releases them through the owner (onDestroy →
+    // releaseSession()). When something IS still bound (Android Auto, a system
+    // MediaBrowser, a TV media-button router) the service lives on and so must
+    // its session, or the next start intent crashes in addSession.
     private fun doDeactivate() {
-        if (synthPlayer == null) return
+        if (!isActive) return
         log.info { "Deactivating media session" }
         mainHandler.removeCallbacks(transientWatchdog)
-        if (isActive) {
-            doStopService()
-            audioFocusController.abandon()
-        }
+        synthPlayer?.updatePlayState(false)
+        doStopService()
+        audioFocusController.abandon()
         audioFocusController.setListener(null)
-        releaseSynthPlayer()
         isActive = false
     }
 
-    private fun releaseSynthPlayer() {
+    // Drops a session left behind by a previous service instance. A service owns
+    // exactly one session, so media3 must never see two live ones for us.
+    private fun releaseStaleSession() {
         mediaSession?.release()
         mediaSession = null
+    }
+
+    private fun releaseSessionAndPlayer() {
+        releaseStaleSession()
         synthPlayer?.onSkipNext = null
         synthPlayer?.onSkipPrevious = null
         synthPlayer?.onSetPlayWhenReady = null
@@ -289,16 +331,15 @@ actual class MediaSessionManager(
         synthPlayer = null
     }
 
-    // Called from updatePlaybackState(true) when the FGS start is refused. Tears
-    // down the half-started session and resets the single source of truth so a
-    // subsequent play() can retry instead of short-circuiting on a stale Playing
-    // state. Mirrors the teardown the old doActivate FGS-failed branch performed,
-    // plus the handler?.onStop() reset. (Finding 1C.)
+    // Called from updatePlaybackState(true) when the FGS start is refused. Drops
+    // focus and resets the single source of truth so a subsequent play() can
+    // retry instead of short-circuiting on a stale Playing state. Leaves the
+    // session intact for the same reason doLossPermanentLocked does. (Finding 1C.)
     private fun rollbackFailedActivation() {
         mainHandler.removeCallbacks(transientWatchdog)
         audioFocusController.abandon()
         audioFocusController.setListener(null)
-        releaseSynthPlayer()
+        synthPlayer?.updatePlayState(false)
         isActive = false
         handler?.onStop()
     }

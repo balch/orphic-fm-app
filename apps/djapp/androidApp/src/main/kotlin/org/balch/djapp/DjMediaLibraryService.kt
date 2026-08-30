@@ -22,7 +22,6 @@ import java.util.Locale
 class DjMediaLibraryService : MediaLibraryService() {
 
     private val log = logging("DjMediaLibrary")
-    private var session: MediaLibrarySession? = null
 
     private val pulsarFeature: PulsarFeature? by lazy {
         try {
@@ -39,8 +38,7 @@ class DjMediaLibraryService : MediaLibraryService() {
         super.onCreate()
         ensureNotificationChannel()
         val graph = DjAppApplication.getGraph(this)
-        session = graph.mediaSessionManager.buildLibrarySession(this)
-        addSession(session!!)
+        addSession(graph.mediaSessionManager.buildLibrarySession(this))
         // Neither call below can throw: setAutoBrowserActive is a StateFlow
         // write, and pulsarFeature is a `by lazy` whose body catches internally
         // and returns null. (Previously this guarded synthOrchestrator.start(),
@@ -66,17 +64,19 @@ class DjMediaLibraryService : MediaLibraryService() {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
-        return session
-    }
+    // Reads the manager's live handle rather than a cached field. Media3 calls
+    // this from onStartCommand for MEDIA_BUTTON intents and feeds the result
+    // straight to addSession, which throws on a released session. One owner, one
+    // nullable field, so the two can never disagree.
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =
+        runCatching { DjAppApplication.getGraph(this).mediaSessionManager.librarySession }.getOrNull()
 
     override fun onDestroy() {
         log.info { "DjMediaLibraryService destroyed" }
-        try {
-            DjAppApplication.getGraph(this).mediaSessionStateManager.setAutoBrowserActive(false)
-        } catch (_: Exception) { }
-        session?.release()
-        session = null
+        val graph = runCatching { DjAppApplication.getGraph(this) }.getOrNull()
+        graph?.mediaSessionStateManager?.setAutoBrowserActive(false)
+        // The service built the session, so the service releases it.
+        graph?.mediaSessionManager?.releaseSession()
         super.onDestroy()
     }
 

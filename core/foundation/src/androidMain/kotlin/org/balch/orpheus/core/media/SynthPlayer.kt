@@ -56,6 +56,9 @@ class SynthPlayer(
             .setMaxVolume(audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC))
             .build()
 
+    // Stays registered for the session's whole life, including after an audio-focus
+    // teardown. invalidateState() only refreshes the notification's volume slider;
+    // media3 turns device-volume events into neither a notification post nor an FGS start.
     private val volumeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != VOLUME_CHANGED_ACTION) return

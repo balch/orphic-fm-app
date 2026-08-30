@@ -28,6 +28,10 @@ import kotlin.test.assertTrue
  * Robolectric's paused main looper past the 10-minute deadline to assert whether
  * the escalation (a second onPauseFromFocusLoss + abandon) fires.
  *
+ * Scope note: these two cover WHETHER the escalation fires. What the escalation
+ * is allowed to tear down is [MediaSessionLifecycleTest]'s half — it must pause,
+ * never release the service's session.
+ *
  * Pinned to SDK 34 — see [AudioFocusControllerTest] for the rationale.
  */
 @RunWith(RobolectricTestRunner::class)

@@ -4,8 +4,11 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -13,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjApp
+import org.balch.orpheus.djapp.tvDensityScale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,18 +59,27 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            DjApp(
-                graph = graph,
-                onTogglePlayback = {
-                    val controller = graph.playbackController
-                    if (controller.state.value == PlaybackState.Playing) controller.pause()
-                    else controller.play()
-                },
+            // TV widens the dp canvas so the fixed-width dock panels fit (see tvDensityScale).
+            // tvScale is 1f off television hardware, so this is inert on phones and tablets.
+            // fontScale passes through untouched, keeping the user's own text-size setting.
+            val tvScale = tvDensityScale()
+            val baseDensity = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(baseDensity.density * tvScale, baseDensity.fontScale),
             ) {
-                InAppUpdateHost(
-                    manager = graph.inAppUpdateManager,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
+                DjApp(
+                    graph = graph,
+                    onTogglePlayback = {
+                        val controller = graph.playbackController
+                        if (controller.state.value == PlaybackState.Playing) controller.pause()
+                        else controller.play()
+                    },
+                ) {
+                    InAppUpdateHost(
+                        manager = graph.inAppUpdateManager,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
             }
         }
     }
