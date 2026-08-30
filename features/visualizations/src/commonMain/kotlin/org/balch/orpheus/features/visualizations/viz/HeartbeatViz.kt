@@ -9,9 +9,14 @@ import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Canvas as SkiaCanvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -29,6 +34,8 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -168,6 +175,9 @@ class HeartbeatViz(
             // the draw pass, not recompose this @Composable.
             val state = _uiState.value
             drawRect(OrpheusColors.vizBackground)
+            // Keep the whole-heart sprite cache matched to this frame's glow
+            // knob + canvas size before any heart reads it below.
+            ensureSpriteCacheCurrent()
 
             // Soft red bloom on big bass beats — barely visible at low energy
             if (state.flashIntensity > 0.01f) {
@@ -373,6 +383,21 @@ class HeartbeatViz(
     // Drawing
     // ----------------------------------------------------------------------------
 
+    // Cached "whole heart" sprite (glow halo + filled body + white rim) baked
+    // per duo color. With ~30 hearts on screen, drawing all three as live
+    // Paths (the stroked rim worst of all — Skia CPU-triangulates every one)
+    // was the dominant per-frame cost. Baking the composite once per color
+    // and blitting it as an image turns that into a cheap textured quad; see
+    // renderHeartSprite() for how the color/alpha math stays exact.
+    private val spriteCache = HashMap<Color, ImageBitmap>()
+    private val offscreenDrawScope = CanvasDrawScope()
+    private var spriteGlow = Float.NaN
+    private var spriteMinDimension = 0f
+    private var spriteRefRadius = 0f
+    private var spriteOriginPx = Offset.Zero
+    private var spriteWidthPx = 0f
+    private var spriteHeightPx = 0f
+
     private fun DrawScope.drawHeart(h: Heart, masterEnergy: Float) {
         // Pulsing — size scales with master energy + the heart's own oscillator
         val pulse = 1f + 0.18f * masterEnergy + 0.12f * sin(h.pulsePhase)
@@ -391,11 +416,11 @@ class HeartbeatViz(
         translate(cx, cy) {
             when {
                 // Pre-break or non-breaking: render the whole heart as before.
-                h.breakAge < 0f -> drawWholeHeart(pixelSize, tinted, finalAlpha, h.color)
+                h.breakAge < 0f -> drawWholeHeart(pixelSize, finalAlpha, h.color)
 
                 // Tension phase — whole heart with a growing red flush overlay.
                 h.breakAge < BREAK_TENSION_END -> {
-                    drawWholeHeart(pixelSize, tinted, finalAlpha, h.color)
+                    drawWholeHeart(pixelSize, finalAlpha, h.color)
                     val t = h.breakAge / BREAK_TENSION_END
                     drawHeartPath(
                         pixelSize,
@@ -406,7 +431,7 @@ class HeartbeatViz(
 
                 // Tear phase — whole heart with a widening jagged crack down the centre.
                 h.breakAge < BREAK_TEAR_END -> {
-                    drawWholeHeart(pixelSize, tinted, finalAlpha, h.color)
+                    drawWholeHeart(pixelSize, finalAlpha, h.color)
                     val tearT = (h.breakAge - BREAK_TENSION_END) /
                         (BREAK_TEAR_END - BREAK_TENSION_END)
                     drawCrack(pixelSize, tearT, finalAlpha)
@@ -421,22 +446,114 @@ class HeartbeatViz(
         }
     }
 
+    /**
+     * Draws the non-breaking heart appearance (glow halo + filled body +
+     * white rim) as a single cached sprite instead of three live Path
+     * draws. [ensureSpriteCacheCurrent] and [renderHeartSprite] below cover
+     * how the bake stays mathematically equivalent to the original
+     * per-path additive render.
+     */
     private fun DrawScope.drawWholeHeart(
-        pixelSize: Float, tinted: Color, finalAlpha: Float, baseColor: Color,
+        pixelSize: Float, finalAlpha: Float, baseColor: Color,
     ) {
-        if (_glow > 0.05f) {
-            drawHeartPath(
-                pixelSize * 1.45f,
-                baseColor.copy(alpha = finalAlpha * 0.18f * _glow),
-                filled = true,
+        val sprite = spriteCache.getOrPut(baseColor) { renderHeartSprite(baseColor) }
+        val spriteScale = pixelSize / spriteRefRadius
+        scale(spriteScale, spriteScale, pivot = Offset.Zero) {
+            drawImage(
+                image = sprite,
+                topLeft = Offset(-spriteOriginPx.x, -spriteOriginPx.y),
+                alpha = finalAlpha,
+                blendMode = BlendMode.Plus,
             )
         }
-        drawHeartPath(pixelSize, tinted, filled = true)
-        drawHeartPath(
-            pixelSize,
-            Color.White.copy(alpha = finalAlpha * 0.35f * _glow),
-            filled = false,
+    }
+
+    /**
+     * (Re)computes the sprite reference size and clears the per-color cache
+     * whenever GLOW or the canvas size has drifted enough to invalidate the
+     * baked bitmaps. Must run once per frame before any [drawWholeHeart]
+     * call reads [spriteRefRadius] / [spriteOriginPx].
+     *
+     * A rebake is needed on GLOW change because the halo/rim-to-body alpha
+     * *ratio* is baked into the sprite's pixels (see [renderHeartSprite]) —
+     * there's no per-draw colorFilter left to adjust it afterwards. GLOW is
+     * a single knob shared by every heart, so this only fires while it's
+     * being dragged, never per heart or per frame otherwise.
+     */
+    private fun DrawScope.ensureSpriteCacheCurrent() {
+        val minDim = size.minDimension
+        val glowStale = spriteGlow.isNaN() || abs(_glow - spriteGlow) > GLOW_REBAKE_EPSILON
+        val sizeStale = spriteRefRadius <= 0f ||
+            abs(minDim - spriteMinDimension) > spriteMinDimension * SIZE_REBAKE_FRACTION
+        if (!glowStale && !sizeStale) return
+
+        spriteCache.clear()
+        spriteGlow = _glow
+        spriteMinDimension = minDim
+        // Sized for the largest heart can ever get (max spawn size + max
+        // pulse headroom) so a sprite is only ever downscaled, never
+        // upscaled — upscaling a raster sprite would look soft.
+        spriteRefRadius = HEART_MAX_SIZE * HEART_PULSE_HEADROOM * minDim
+
+        val haloScale = HEART_GLOW_SCALE * spriteRefRadius
+        spriteOriginPx = Offset(-unitHeartBounds.left * haloScale, -unitHeartBounds.top * haloScale)
+        spriteWidthPx = unitHeartBounds.width * haloScale
+        spriteHeightPx = unitHeartBounds.height * haloScale
+    }
+
+    /**
+     * Bakes the glow halo + filled body + white rim for one duo color into
+     * an offscreen bitmap at [spriteRefRadius], using the current
+     * [spriteGlow] ratio between the three layers.
+     *
+     * All three layers are additive (BlendMode.Plus) against a transparent
+     * background here, exactly like the original per-path render was
+     * additive against the live canvas. Clamped addition is associative, so
+     * pre-summing them into one bitmap and drawing *that* with Plus (see
+     * [drawWholeHeart]) reproduces the same accumulated color as drawing
+     * the three paths directly — there's no occlusion between layers to
+     * worry about the way there would be with normal (SrcOver) blending.
+     *
+     * One known, deliberate approximation: the white rim's stroke width is
+     * calibrated for [spriteRefRadius] (the largest heart) instead of
+     * staying a constant physical width at every heart size the way the
+     * original live-Stroke draw did. It thins out proportionally on the
+     * smallest hearts rather than staying a constant 1.5px. Given the rim
+     * is already a faint (GLOW-scaled) highlight in a busy additive scene,
+     * that's judged an acceptable trade for turning 3 triangulated Path
+     * draws into 1 image blit — flagged here in case it reads otherwise on
+     * a real screen.
+     */
+    private fun DrawScope.renderHeartSprite(color: Color): ImageBitmap {
+        val widthPx = spriteWidthPx.roundToInt().coerceAtLeast(1)
+        val heightPx = spriteHeightPx.roundToInt().coerceAtLeast(1)
+        val bitmap = ImageBitmap(widthPx, heightPx)
+        val skiaCanvas = SkiaCanvas(bitmap)
+        // Belt-and-suspenders: fresh bitmaps are expected to be zero-filled
+        // on every backend, but clear explicitly so the margin around the
+        // heart shape can never pick up undefined pixels.
+        skiaCanvas.drawRect(
+            0f, 0f, widthPx.toFloat(), heightPx.toFloat(),
+            Paint().apply { blendMode = BlendMode.Clear },
         )
+        offscreenDrawScope.draw(this, layoutDirection, skiaCanvas, Size(widthPx.toFloat(), heightPx.toFloat())) {
+            translate(spriteOriginPx.x, spriteOriginPx.y) {
+                if (spriteGlow > 0.05f) {
+                    drawHeartPath(
+                        spriteRefRadius * HEART_GLOW_SCALE,
+                        color.copy(alpha = 0.18f * spriteGlow),
+                        filled = true,
+                    )
+                }
+                drawHeartPath(spriteRefRadius, color.copy(alpha = 1f), filled = true)
+                drawHeartPath(
+                    spriteRefRadius,
+                    Color.White.copy(alpha = 0.35f * spriteGlow),
+                    filled = false,
+                )
+            }
+        }
+        return bitmap
     }
 
     private fun DrawScope.drawCrack(pixelSize: Float, progress: Float, finalAlpha: Float) {
@@ -542,6 +659,11 @@ class HeartbeatViz(
         close()
     }
 
+    // Tight bounds of the shape above, used to size the whole-heart sprite
+    // bitmap (see ensureSpriteCacheCurrent) without hand-duplicating its
+    // control-point geometry as separate magic numbers.
+    private val unitHeartBounds = unitHeartPath.getBounds()
+
     // Left half: lobe + jagged inner edge from cusp back down to the base.
     // The inner edge mirrors the points of [crackPath] so the two halves tile
     // perfectly at hingeDegrees=0 and reveal the zigzag silhouette as they
@@ -628,6 +750,20 @@ class HeartbeatViz(
 
         // Population cap (perf safety) — generous fixed ceiling.
         private const val MAX_HEARTS = 240
+
+        // ── Whole-heart sprite cache tuning ────────────────────────────────
+        // Glow halo draw scale relative to the heart's own body size.
+        private const val HEART_GLOW_SCALE = 1.45f
+        // Sprite reference radius headroom over HEART_MAX_SIZE, matching the
+        // max of drawHeart's `1f + 0.18f * masterEnergy + 0.12f * sin(...)`
+        // pulse (both terms cap at 1) so a pulsing max-size heart is never
+        // upscaled from its cached sprite.
+        private const val HEART_PULSE_HEADROOM = 1.30f
+        // Rebake thresholds — small enough to stay visually exact, large
+        // enough that a GLOW knob drag or a window resize doesn't rebake
+        // every single frame.
+        private const val GLOW_REBAKE_EPSILON = 0.01f
+        private const val SIZE_REBAKE_FRACTION = 0.08f
 
         // ── Break animation tuning ─────────────────────────────────────────
         // Probability range a heart will break, lerped against smoothedMaster.
