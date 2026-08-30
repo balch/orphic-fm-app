@@ -7,7 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -68,6 +71,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.DjDrop
 import org.balch.orpheus.core.plugin.symbols.DjSource
+import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -868,12 +872,27 @@ private fun SourceDropdown(
     color: Color,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(6.dp)
 
     Box(
         modifier = modifier
-            .clickable { expanded = true }
-            .clip(RoundedCornerShape(6.dp))
-            .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+            ) { expanded = true }
+            // A bare clickable was already reachable and already opened on select, but wore no
+            // focus treatment at all, so on a remote there was nothing to say the cursor had
+            // arrived — it read as decoration rather than a control. Same accent plate every
+            // other focusable control in this app lifts onto.
+            .then(
+                if (isFocused) {
+                    Modifier.raisedAccentSurface(accent = color, shape = shape)
+                } else {
+                    Modifier.clip(shape).background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
+                }
+            )
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .padding(start = 16.dp),
         contentAlignment = Alignment.Center,
