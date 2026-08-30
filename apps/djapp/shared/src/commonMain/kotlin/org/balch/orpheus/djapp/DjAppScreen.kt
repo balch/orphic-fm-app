@@ -94,6 +94,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.darken
 import org.balch.orpheus.ui.theme.lighten
+import org.balch.orpheus.ui.theme.readableOnDark
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -613,13 +614,13 @@ internal fun VizDropdown(
                         else -> vizName
                     },
                     style = textStyle,
-                    color = effects.title.titleColor.lighten(),
+                    color = effects.title.titleColor.readableOnDark(),
                     maxLines = 1
                 )
                 Text(
                     text = if (expanded) " ▲" else " ▼",
                     style = textStyle,
-                    color = effects.title.titleColor.lighten(),
+                    color = effects.title.titleColor.readableOnDark(),
                 )
             }
         }

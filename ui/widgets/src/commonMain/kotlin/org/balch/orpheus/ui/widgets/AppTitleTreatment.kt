@@ -27,6 +27,7 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.infrastructure.orpheusRaisedPlate
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.readableOnDark
 import org.balch.orpheus.ui.theme.OrpheusTheme
 
 @Composable
@@ -105,7 +106,9 @@ fun AppTitleTreatment(
                     effects.title.titleSize
                 } else 18.sp,
             fontWeight = FontWeight.Bold,
-            color = effects.title.titleColor,
+            // Floored for legibility: a visualization's title colour is picked to sit in its
+            // own scene, which is a different job from being readable type over it.
+            color = effects.title.titleColor.readableOnDark(),
             // Explicit style= replaces LocalTextStyle rather than merging with it, so this
             // Text does not inherit OrpheusTheme's bodyLarge line box. Carry the theme's
             // metrics forward by hand if this ever needs to wrap to a second line.
