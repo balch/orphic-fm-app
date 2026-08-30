@@ -42,8 +42,14 @@ android {
         versionCode = 1
         versionName = "dev"
 
+        // Opt-in extra ABIs for local installs, e.g. -PextraAbis=armeabi-v7a for a
+        // Chromecast with Google TV (32-bit only). Distribution builds stay 64-bit.
+        val extraAbis = (findProperty("extraAbis") as String?)
+            ?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            .orEmpty()
+
         ndk {
-            abiFilters += setOf("arm64-v8a", "x86_64")
+            abiFilters += setOf("arm64-v8a", "x86_64") + extraAbis
         }
     }
 

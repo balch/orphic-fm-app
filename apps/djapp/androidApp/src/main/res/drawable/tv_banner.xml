@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android TV launcher banner. Nominal 320x180 @ xhdpi -> 160dp x 90dp as a vector,
+  so one resource covers every TV density with no binary asset.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp"
+    android:height="90dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- ===== Panel ground ===== -->
+    <path android:fillColor="#14141F"
+          android:pathData="M0,0 L320,0 L320,180 L0,180 Z" />
+
+    <!-- ===== Cosmic purple glow behind the deck (stepped, no gradient needed) ===== -->
+    <path android:fillColor="#7C4DFF" android:fillAlpha="0.04"
+          android:pathData="M60,90 m-68,0 a68,68 0 1 1 136,0 a68,68 0 1 1 -136,0" />
+    <path android:fillColor="#7C4DFF" android:fillAlpha="0.05"
+          android:pathData="M60,90 m-58,0 a58,58 0 1 1 116,0 a58,58 0 1 1 -116,0" />
+    <path android:fillColor="#7C4DFF" android:fillAlpha="0.06"
+          android:pathData="M60,90 m-48,0 a48,48 0 1 1 96,0 a48,48 0 1 1 -96,0" />
+
+    <!-- ===== Deck: platter, vinyl, grooves ===== -->
+    <path android:fillColor="#1E1E2E"
+          android:pathData="M60,90 m-40,0 a40,40 0 1 1 80,0 a40,40 0 1 1 -80,0" />
+    <path android:strokeColor="#00E5FF" android:strokeWidth="2.5" android:strokeAlpha="0.85"
+          android:pathData="M60,90 m-40,0 a40,40 0 1 1 80,0 a40,40 0 1 1 -80,0" />
+    <path android:fillColor="#0B0B14"
+          android:pathData="M60,90 m-34,0 a34,34 0 1 1 68,0 a34,34 0 1 1 -68,0" />
+    <path android:strokeColor="#7C4DFF" android:strokeWidth="1.2" android:strokeAlpha="0.55"
+          android:pathData="M60,90 m-29,0 a29,29 0 1 1 58,0 a29,29 0 1 1 -58,0" />
+    <path android:strokeColor="#7C4DFF" android:strokeWidth="1.2" android:strokeAlpha="0.55"
+          android:pathData="M60,90 m-24,0 a24,24 0 1 1 48,0 a24,24 0 1 1 -48,0" />
+    <path android:strokeColor="#7C4DFF" android:strokeWidth="1.2" android:strokeAlpha="0.55"
+          android:pathData="M60,90 m-19,0 a19,19 0 1 1 38,0 a19,19 0 1 1 -38,0" />
+
+    <!-- ===== Tonearm (pivot + arm) ===== -->
+    <path android:strokeColor="#7C4DFF" android:strokeWidth="5" android:strokeLineCap="round"
+          android:pathData="M96,44 L70,74" />
+    <path android:fillColor="#7C4DFF"
+          android:pathData="M96,44 m-6,0 a6,6 0 1 1 12,0 a6,6 0 1 1 -12,0" />
+
+    <!-- ===== Label well + spindle ===== -->
+    <path android:fillColor="#00E5FF"
+          android:pathData="M60,90 m-10,0 a10,10 0 1 1 20,0 a10,10 0 1 1 -20,0" />
+    <path android:fillColor="#14141F"
+          android:pathData="M60,90 m-2.5,0 a2.5,2.5 0 1 1 5,0 a2.5,2.5 0 1 1 -5,0" />
+
+    <!-- ===== Wordmark line 1: ORPHIC (geometric strokes, cap height 30) ===== -->
+    <path android:strokeColor="#E8E8F0" android:strokeWidth="7"
+          android:strokeLineCap="round" android:strokeLineJoin="round"
+          android:pathData="M123,48 a11,15 0 1 1 0,30 a11,15 0 1 1 0,-30
+                            M143,78 L143,48 L156,48 a9,9 0 0 1 0,18 L143,66 M154,66 L165,78
+                            M174,78 L174,48 L185,48 a9,9 0 0 1 0,18 L174,66
+                            M203,48 L203,78 M225,48 L225,78 M203,63 L225,63
+                            M234,48 L234,78
+                            M259.5,50 a11,15 0 1 0 0,26" />
+
+    <!-- ===== Wordmark line 2: DJ ===== -->
+    <path android:strokeColor="#00E5FF" android:strokeWidth="7"
+          android:strokeLineCap="round" android:strokeLineJoin="round"
+          android:pathData="M112,130 L112,100 L124,100 a9,15 0 0 1 0,30 L112,130
+                            M160,100 L160,122 a9,8 0 0 1 -18,0" />
+
+    <!-- ===== Waveform strip trailing the wordmark ===== -->
+    <path android:strokeColor="#00E5FF" android:strokeWidth="6" android:strokeLineCap="round"
+          android:pathData="M182,107 L182,123 M210,105 L210,125 M238,101 L238,129
+                            M266,103 L266,127 M294,108 L294,122" />
+    <path android:strokeColor="#7C4DFF" android:strokeWidth="6" android:strokeLineCap="round"
+          android:pathData="M196,99 L196,131 M224,93 L224,137 M252,91 L252,139 M280,97 L280,133" />
+</vector>
