@@ -29,6 +29,7 @@ fun ReverbPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
+    fillHeight: Boolean = true,
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
@@ -37,6 +38,7 @@ fun ReverbPanel(
         title = "VERB",
         expandedTitle = if (showExpandedTitle) "Echo" else null,
         showCollapsedHeader = showCollapsedHeader,
+        fillHeight = fillHeight,
         color = OrpheusColors.echoLavender,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,

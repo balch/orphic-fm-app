@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
+import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.CosmicDragHandle
@@ -220,6 +221,71 @@ private fun TransitionSheetContent(
                 onHandoffMsChange = onHandoffMsChange,
             )
         }
+    }
+}
+
+/**
+ * TV-dockable panel form of the same transition-ending picker as [TransitionSettingsSheet] —
+ * DJ/Mix/Horn/Timer's sibling, not a bottom sheet. Reuses [StyleChips]/[HandoffSection] directly
+ * (same file, same privates) so there is still exactly one implementation of each control; only
+ * the host changes from a slide-up sheet to a [CollapsibleColumnPanel].
+ */
+@Composable
+fun EndsPanel(
+    spec: TransitionSpec,
+    enabled: Boolean,
+    onSetEnabled: (Boolean) -> Unit,
+    onStyleChange: (TransitionStyle) -> Unit,
+    onHandoffMsChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
+    showExpandedTitle: Boolean = true,
+    fillHeight: Boolean = true,
+) {
+    val visibleStyles = remember { TransitionStyle.entries.filter { it.isVisible } }
+    val handoffMs = remember(spec) { spec.effectiveHandoffMs }
+    val description = if (!enabled) PLAYS_DESCRIPTION else spec.style.meta.description
+
+    CollapsibleColumnPanel(
+        modifier = modifier,
+        title = "ENDS",
+        color = OrpheusColors.cosmicPurple,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
+        initialExpanded = true,
+        expandedTitle = if (showExpandedTitle) "Vibe Ending" else null,
+        showCollapsedHeader = showCollapsedHeader,
+        fillHeight = fillHeight,
+    ) {
+        Text(
+            text = description,
+            color = OrpheusColors.onSurfaceDark.copy(alpha = 0.6f),
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            lineHeight = 13.sp,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        StyleChips(
+            visibleStyles = visibleStyles,
+            selectedStyle = spec.style,
+            enabled = enabled,
+            onSelectPlays = { onSetEnabled(false) },
+            onSelectStyle = { style ->
+                if (!enabled) onSetEnabled(true)
+                onStyleChange(style)
+            },
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        HandoffSection(
+            handoffMs = handoffMs,
+            handoffRange = spec.style.handoffRange,
+            enabled = enabled && spec.style.canHandoff,
+            onHandoffMsChange = onHandoffMsChange,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
     }
 }
 

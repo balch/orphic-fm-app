@@ -1,10 +1,15 @@
 package org.balch.orpheus.features.timer
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -13,10 +18,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -25,6 +35,8 @@ import org.balch.orpheus.features.timer.TimerLimits.MAX_HOURS
 import org.balch.orpheus.features.timer.TimerLimits.MAX_MINUTES_AT_CAP_HOUR
 import org.balch.orpheus.features.timer.TimerLimits.MAX_MINUTES_NORMAL
 import org.balch.orpheus.features.timer.TimerLimits.MIN_HOURS
+import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
+import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -34,6 +46,9 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+/** Identifies one of [TimerPanel]'s transport buttons for its preview-only focus override. */
+enum class TimerTransportButtonId { START_STOP, RESET }
+
 @Composable
 fun TimerPanel(
     feature: TimerFeature = TimerViewModel.feature(),
@@ -42,6 +57,10 @@ fun TimerPanel(
     onExpandedChange: (Boolean) -> Unit = {},
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
+    fillHeight: Boolean = true,
+    // Preview/render-harness seam only: forces one transport button's focus visual without a
+    // real D-pad. Every production call site leaves this null.
+    previewFocusedButton: TimerTransportButtonId? = null,
 ) {
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
@@ -66,6 +85,7 @@ fun TimerPanel(
         title = "Timer",
         expandedTitle = if (showExpandedTitle) "Sleep" else null,
         showCollapsedHeader = showCollapsedHeader,
+        fillHeight = fillHeight,
         color = OrpheusColors.sleepMoonlight,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -124,39 +144,36 @@ fun TimerPanel(
             }
         }
 
-        // Transport controls
+        // Transport controls. Start/Stop carries its own RUNNING/PAUSED persistent wash — a
+        // separate channel from D-pad focus, same docked-vs-focused split as DjTvBottomBar's
+        // items, so a focused running timer never reads as a focused idle one. Reset is
+        // momentary: focus is the only signal it ever needs.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
+            val isTransportActive = state.status == TimerStatus.RUNNING || state.status == TimerStatus.PAUSED
+            TimerTransportButton(
+                icon = if (isIdle) Icons.Default.PlayArrow else Icons.Default.Stop,
+                contentDescription = if (isIdle) "Start" else "Stop",
+                tint = OrpheusColors.sleepMoonlight,
+                active = isTransportActive,
+                previewFocused = previewFocusedButton == TimerTransportButtonId.START_STOP,
                 onClick = {
                     when (state.status) {
                         TimerStatus.IDLE, TimerStatus.FINISHED -> actions.onStart()
                         TimerStatus.PAUSED -> actions.onStart()
                         else -> actions.onStop()
                     }
-                }
-            ) {
-                val icon = when (state.status) {
-                    TimerStatus.IDLE, TimerStatus.FINISHED -> Icons.Default.PlayArrow
-                    else -> Icons.Default.Stop
-                }
-                Icon(
-                    imageVector = icon,
-                    contentDescription = if (isIdle) "Start" else "Stop",
-                    tint = OrpheusColors.sleepMoonlight,
-                )
-            }
+                },
+            )
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
+            TimerTransportButton(
+                icon = Icons.Default.Refresh,
+                contentDescription = "Reset",
+                tint = OrpheusColors.sleepMoonlight,
+                previewFocused = previewFocusedButton == TimerTransportButtonId.RESET,
                 onClick = { actions.onReset() },
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Reset",
-                    tint = OrpheusColors.sleepMoonlight,
-                )
-            }
+            )
         }
 
         Text(
@@ -165,6 +182,44 @@ fun TimerPanel(
             fontSize = 9.sp,
             color = OrpheusColors.sleepMoonlight.copy(alpha = 0.4f),
         )
+    }
+}
+
+/**
+ * Timer transport button (start/stop or reset). TV-gated raised-plate focus treatment, the same
+ * language as [raisedAccentSurface]'s other call sites (DjTvBottomBar/DjTvTopBar, RotaryKnobDial).
+ * [active] is a persistent state independent of focus (RUNNING/PAUSED for start/stop; always
+ * false for the momentary Reset button) — the two read as separate signals, exactly like
+ * DjTvBottomBar's docked-vs-focused split, so a focused running timer never looks confusably like
+ * a focused idle one. Off TV ([LocalTvFocusChrome] false), the wrapping [Box] carries no modifier
+ * at all, so this is pixel-identical to a plain [IconButton].
+ */
+@Composable
+private fun TimerTransportButton(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+    active: Boolean = false,
+    previewFocused: Boolean = false,
+) {
+    val tvChrome = LocalTvFocusChrome.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val liveFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused = tvChrome && (previewFocused || liveFocused)
+    val shape = CircleShape
+
+    Box(
+        modifier = when {
+            !tvChrome -> Modifier
+            isFocused -> Modifier.raisedAccentSurface(accent = tint, shape = shape)
+            active -> Modifier.clip(shape).background(tint.copy(alpha = 0.18f))
+            else -> Modifier
+        },
+    ) {
+        IconButton(onClick = onClick, interactionSource = interactionSource) {
+            Icon(imageVector = icon, contentDescription = contentDescription, tint = tint)
+        }
     }
 }
 
@@ -269,5 +324,43 @@ private fun TimerPanelFinalSecondsRunningPreview() {
                 )
             ),
         )
+    }
+}
+
+@Preview(name = "Timer Panel — TV, Running, Stop focused", heightDp = 280)
+@Composable
+private fun TimerPanelTvStopFocusedPreview() {
+    OrpheusTheme {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            TimerPanel(
+                feature = TimerViewModel.previewFeature(
+                    TimerUiState(
+                        initialTime = 45.minutes,
+                        remainingTime = 42.minutes.plus(13.seconds),
+                        status = TimerStatus.RUNNING,
+                    )
+                ),
+                previewFocusedButton = TimerTransportButtonId.START_STOP,
+            )
+        }
+    }
+}
+
+@Preview(name = "Timer Panel — TV, Idle, Reset focused", heightDp = 280)
+@Composable
+private fun TimerPanelTvResetFocusedPreview() {
+    OrpheusTheme {
+        CompositionLocalProvider(LocalTvFocusChrome provides true) {
+            TimerPanel(
+                feature = TimerViewModel.previewFeature(
+                    TimerUiState(
+                        initialTime = 90.minutes,
+                        remainingTime = 90.minutes,
+                        status = TimerStatus.IDLE,
+                    )
+                ),
+                previewFocusedButton = TimerTransportButtonId.RESET,
+            )
+        }
     }
 }
