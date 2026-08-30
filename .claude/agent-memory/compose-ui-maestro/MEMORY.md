@@ -27,3 +27,6 @@
 - [DJ Panel D-pad audit](djapp_dj_panel_dpad_audit.md) — full control enumeration, BenderFaderWidget's missing focus visual
 - [DJ App nav icons](djapp_nav_icons.md) — DjNavRoutes.kt icon map, how to verify a Material icon exists in this project's classpath
 - [Large-screen toggle fixes](djapp_large_screen_toggle_fixes.md) — opensAsSheet ≠ dockable, conditional-padding footprint bug, double vertical overscan, LaunchedEffect-vs-toggle race
+
+## Rendering Performance
+- [Sprite-baking for path-heavy visualizations](sprite_baking_path_heavy_viz.md) — Skia CPU `TriangulatingPathOp` is the cost; bake per-colour `ImageBitmap` once and blit, why `BlendMode.Plus` makes it safe, `ImageComposeScene` A/B technique
