@@ -1,7 +1,5 @@
-Orphic DJ comes to the big screen.
+Better on the big screen.
 
-• Android TV support: panels dock around the stage, playable entirely from the remote.
-• Fixed: no audio at all on Android TV.
-• Fixed: playback restarts after the sleep timer.
-• Smoother visualizations, lighter on the CPU.
-• Rust Belt opens into a new weather section.
+• The remote can now move off a turntable: press select to grab it, then up and down scratch.
+• Panels let the visualization through instead of sitting on a solid slab.
+• A new television banner and app art.
