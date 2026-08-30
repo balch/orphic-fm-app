@@ -39,6 +39,13 @@ import kotlin.time.Duration
 private const val NavIndicatorAlpha = 0.16f
 
 /**
+ * Unselected icon/label opacity. Raised from 0.6 alongside the TV bar's own readability pass:
+ * an unselected destination still has to be readable, not merely present, and 0.6 sat close to
+ * "disabled" against this app's dark chrome.
+ */
+private const val NavUnselectedAlpha = 0.75f
+
+/**
  * Selected-tab indicator color for both the bottom bar and the rail. M3's default
  * indicator (`colorScheme.secondaryContainer`) renders invisible against our
  * transparent nav background in dark posture, and baseline lavender under a light
@@ -137,7 +144,7 @@ fun DjAppNavScaffold(
                                 imageVector = route.icon,
                                 contentDescription = route.label,
                                 tint = if (selected) OrpheusColors.neonCyan
-                                       else Color.White.copy(alpha = 0.6f),
+                                       else Color.White.copy(alpha = NavUnselectedAlpha),
                             )
                         }
                     },
@@ -146,7 +153,7 @@ fun DjAppNavScaffold(
                             text = route.label,
                             style = MaterialTheme.typography.labelSmall,
                             color = if (selected) OrpheusColors.neonCyan
-                                    else Color.White.copy(alpha = 0.6f),
+                                    else Color.White.copy(alpha = NavUnselectedAlpha),
                         )
                     },
                     colors = navItemColors,
