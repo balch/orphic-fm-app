@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -156,17 +157,22 @@ internal fun RotaryKnobDial(
     // focus gets an opaque raised plate instead (see raisedAccentSurface's language). Gated so
     // every other platform's keyboard-focus ring (drawn below) is unchanged.
     val isTvFocusChrome = LocalTvFocusChrome.current
-    val adjustPulseAlpha = if (isTvFocusChrome && isAdjusting) {
+    // Read as a State, NOT via `by` here — destructuring with `by` reads .value right in this
+    // composable body, so every pulse tick recomposed RotaryKnobDial (rebuilding the whole
+    // modifier chain below) just to feed a value the draw lambda alone consumes. Deferring the
+    // .value read into the Canvas draw lambda (see adjustPulseAlpha below) keeps the invariant
+    // this file otherwise holds throughout: dragState.internalValue is read inside the draw
+    // lambda for the same reason.
+    val adjustPulseAlphaState: State<Float>? = if (isTvFocusChrome && isAdjusting) {
         val transition = rememberInfiniteTransition(label = "knobAdjustPulse")
-        val alpha by transition.animateFloat(
+        transition.animateFloat(
             initialValue = 0.45f,
             targetValue = 0.95f,
             animationSpec = infiniteRepeatable(tween(550), repeatMode = RepeatMode.Reverse),
             label = "knobAdjustPulseAlpha",
         )
-        alpha
     } else {
-        0f
+        null
     }
 
     Box(modifier = modifier.size(size)) {
@@ -272,8 +278,10 @@ internal fun RotaryKnobDial(
                     style = Stroke(width = strokeWidth * 0.35f),
                 )
                 if (isAdjusting) {
+                    // .value read here, inside the draw lambda, so the 60Hz pulse invalidates
+                    // only this draw pass — see adjustPulseAlphaState above.
                     drawCircle(
-                        color = progressColor.copy(alpha = adjustPulseAlpha),
+                        color = progressColor.copy(alpha = adjustPulseAlphaState?.value ?: 0f),
                         radius = plateRadius + strokeWidth * 0.7f,
                         center = center,
                         style = Stroke(width = strokeWidth * 0.5f),

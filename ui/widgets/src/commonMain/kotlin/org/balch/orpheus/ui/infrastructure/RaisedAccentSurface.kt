@@ -141,13 +141,7 @@ fun Modifier.orpheusRaisedPlate(
         spotColor = accent,
     )
     .orpheusChromeWash(shape = shape, accent = accent)
-    .border(
-        width = 1.5.dp,
-        brush = Brush.verticalGradient(
-            listOf(accent.copy(alpha = 0.95f), Color.Black.copy(alpha = 0.55f)),
-        ),
-        shape = shape,
-    )
+    .border(width = 1.5.dp, brush = raisedBevelBrush(accent), shape = shape)
 
 /**
  * "Raised on filled" chrome for a TV-focused control: an opaque bevel-gradient plate plus a
@@ -173,13 +167,18 @@ fun Modifier.raisedAccentSurface(
         ),
         shape,
     )
-    .border(
-        width = 1.5.dp,
-        brush = Brush.verticalGradient(
-            listOf(accent.copy(alpha = 0.95f), Color.Black.copy(alpha = 0.55f)),
-        ),
-        shape = shape,
-    )
+    .border(width = 1.5.dp, brush = raisedBevelBrush(accent), shape = shape)
+
+/**
+ * Lit-[accent]-to-dark bevel border shared by [orpheusRaisedPlate] and [raisedAccentSurface].
+ * Unlike [raisedPlateBase] (the fixed chrome fill, hoisted to a file-level val above), this
+ * can't be hoisted the same way: [accent] follows whichever visualization is currently active,
+ * so it's a genuine per-call input, not a compile-time constant. Factored into one function
+ * instead of being duplicated inline in both callers, so there's only one place building it.
+ */
+private fun raisedBevelBrush(accent: Color): Brush = Brush.verticalGradient(
+    listOf(accent.copy(alpha = 0.95f), Color.Black.copy(alpha = 0.55f)),
+)
 
 /** How long the TV region-focus borders stay fully shown after the last D-pad key event, before
  * starting to fade. Named and hoisted here specifically so it is easy to find and retune once
@@ -249,14 +248,18 @@ val LocalTvFocusRegion = compositionLocalOf<TvFocusRegionHolder?> { null }
 
 /**
  * Cheap, exclusive region-focus border. [holder]'s current token AND its idle-fade [TvFocusRegionHolder.alpha]
- * are both read inside the DRAW phase ([drawWithContent]), not composition or layout: a focus
- * change, or a fade animation frame, repaints only the previously- and newly-focused containers'
- * own draw scope. It never recomposes or re-lays-out a container or its content — the container's
- * content lambda is never re-invoked because of this — and on every frame where neither focus nor
- * the fade has moved, the draw phase isn't re-triggered by this modifier at all (no per-frame
- * allocation, no continuous work). [token] should be a stable per-container identity —
- * `remember { Any() }` at that container's call site is enough, since equality here is by
- * reference, not structural.
+ * are both read inside the DRAW phase ([drawWithContent]), not composition or layout, so neither
+ * ever recomposes or re-lays-out a container or its content — the container's content lambda is
+ * never re-invoked because of this. The two reads are NOT scoped equally, though: [holder.current]
+ * is read unconditionally by every container wearing this modifier (the `===` check below is
+ * itself a read), so a focus change repaints every one of them, not just the previously- and
+ * newly-focused pair. [holder.alpha] is read only once `holder.current === token` is already
+ * known true, so the short-circuit DOES keep a pure fade-animation frame (focus unchanged, only
+ * the idle fade ticking) scoped to the one container currently focused. In practice the fan-out on
+ * focus change costs nothing extra here — the visualization already forces a full frame every
+ * frame — but it is real, not the narrow two-containers-touched read this might otherwise suggest.
+ * [token] should be a stable per-container identity — `remember { Any() }` at that container's
+ * call site is enough, since equality here is by reference, not structural.
  */
 fun Modifier.tvFocusRegionBorder(
     holder: TvFocusRegionHolder?,

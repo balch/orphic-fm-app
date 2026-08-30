@@ -185,7 +185,10 @@ fun Modifier.panelGlassChrome(
             Modifier.clip(shape).background(OrpheusColors.panelSurface)
         }
     )
-    .clip(shape)
+    // No clip(shape) here — both branches above already clip to `shape` themselves
+    // (liquidVizEffects internally, the flat-fill branch explicitly), so a second one here
+    // was a redundant graphicsLayer per docked panel. That's a real cost specifically on the
+    // TV kill-switch path this modifier gates, which exists to buy back frame time.
     .border(
         width = if (focusedDescendant) 1.5.dp else 1.dp,
         color = when {

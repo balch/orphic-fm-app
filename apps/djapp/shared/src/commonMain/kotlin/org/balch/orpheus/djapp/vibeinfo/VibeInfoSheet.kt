@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
+import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.PulsarFeature
@@ -92,11 +93,21 @@ private fun rememberVibeInfoModel(
     val stableViz = rememberStableViz(viz)
 
     // Memoize the mapping so it (and its per-track FmPatchNames lookups + fresh
-    // list/model allocation) only runs when a real input changes. stableViz is a
-    // stable reference between polls, so recompositions from unrelated state
-    // (e.g. dragging the energy knob) reuse the cached model — zero per-frame
-    // allocation when nothing relevant changed.
-    return remember(uiState.vibe, arrangement, stableViz, uiState.energy) {
+    // list/model allocation) only runs when something mapVibeInfo actually reads
+    // has changed. mapVibeInfo only reads two things off viz: activeEngines (per
+    // track, already hysteresis-stabilized above) and trackLevels (collapsed here
+    // into a per-track playing/not-playing bit). Keying on those two — instead of
+    // stableViz itself — matters because PulsarVizData.equals() deep-compares
+    // EVERY field, including stepGates/stepVelocities/playheads that this panel
+    // never displays and that change on essentially every ~16ms poll while
+    // playing; that made the old key "different" almost every frame. Both new
+    // keys are cheap to compare: activeEngines keeps array-reference equality
+    // (Kotlin's synthesized data-class equals does not deep-compare arrays), and
+    // VizStabilizer only swaps in a new array when a commit actually happens;
+    // playingMask is a single Int that only changes when a track crosses the
+    // threshold.
+    val playingMask = playingTrackMask(viz)
+    return remember(uiState.vibe, arrangement, uiState.energy, stableViz.activeEngines, playingMask) {
         mapVibeInfo(
             vibe = uiState.vibe,
             arrangement = arrangement,
@@ -104,6 +115,22 @@ private fun rememberVibeInfoModel(
             energy = uiState.energy,
         )
     }
+}
+
+/**
+ * Packs which tracks are audibly playing (trackLevels[i] > threshold) into a bitmask,
+ * matching the exact comparison [mapVibeInfo] performs for [VibeInfoTrack.isPlaying].
+ * Used only as a cheap remember() key — see [rememberVibeInfoModel].
+ */
+private fun playingTrackMask(
+    viz: PulsarVizData,
+    threshold: Float = DEFAULT_TRACK_LEVEL_THRESHOLD,
+): Int {
+    var mask = 0
+    for (i in 0 until PULSAR_NUM_TRACKS) {
+        if (viz.trackLevels.getOrElse(i) { 0f } > threshold) mask = mask or (1 shl i)
+    }
+    return mask
 }
 
 /**

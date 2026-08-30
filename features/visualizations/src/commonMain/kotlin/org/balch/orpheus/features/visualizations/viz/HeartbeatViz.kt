@@ -149,6 +149,13 @@ class HeartbeatViz(
         active = false
         hearts.clear()
         _uiState.value = HeartbeatUiState()
+        // Sprite bitmaps (~0.83MB each, up to 6 duo colors) are baked lazily
+        // per color and only invalidated by ensureSpriteCacheCurrent() on
+        // GLOW/size drift — nothing clears them when the viz simply switches
+        // away, so they'd otherwise live for the graph's lifetime. Dropping
+        // them here is safe: spriteRefRadius/spriteOriginPx stay valid, so
+        // getOrPut re-bakes lazily the next time this viz activates.
+        spriteCache.clear()
     }
 
     @Composable

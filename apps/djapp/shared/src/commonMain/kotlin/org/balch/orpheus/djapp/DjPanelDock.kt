@@ -11,9 +11,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -35,17 +36,31 @@ fun DjPanelDock(
     gap: Dp = 12.dp,
     panelContent: @Composable (DjRoute, Modifier) -> Unit,
 ) {
-    val dock = assignDock(panels)
+    // panels is a plain List (structurally equal each recomposition when unchanged), but
+    // assignDock() still allocates three fresh lists every call — memoizing avoids doing that
+    // on every recomposition this dock isn't itself the cause of (e.g. an unrelated knob drag
+    // in a docked panel).
+    val dock = remember(panels) { assignDock(panels) }
 
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    // A plain Box, NOT BoxWithConstraints: BoxWithConstraints is backed by SubcomposeLayout,
+    // which defers/redoes composition of its content on every measure — on a desktop window
+    // drag-resize that meant every docked panel recomposed on every single resize frame, just
+    // to recompute one padding value. Expressing the overscan margin as a width FRACTION
+    // instead of `maxWidth * OverscanFraction` removes the only reason this needed `maxWidth`
+    // at all, so an ordinary (single measure pass, no subcomposition) Box works. contentAlignment
+    // = Center reproduces the old symmetric-padding look: Box still reports the full available
+    // size to its parent (it's the one bounded by `modifier`), and centers the now-narrower Row
+    // inside it, landing the same margin on both edges that `padding(maxWidth * OverscanFraction)`
+    // produced.
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
     Row(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxHeight()
             // Horizontal only: DjAppScreen sandwiches this dock between DjTvTopBar and
             // DjTvBottomBar, which already reserve the vertical overscan margin on their own
-            // Top/Bottom edges (see platformSafeAreaInsets) — padding vertical here too only
-            // shrank docked panels for a crop that can't happen twice.
-            .padding(horizontal = maxWidth * OverscanFraction),
+            // Top/Bottom edges (see platformSafeAreaInsets) — insetting vertically here too
+            // only shrank docked panels for a crop that can't happen twice.
+            .fillMaxWidth(1f - 2f * OverscanFraction),
         horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
         DockColumn(
@@ -97,10 +112,18 @@ private fun DockColumn(
             verticalArrangement = Arrangement.spacedBy(gap),
         ) {
             panels.forEach { route ->
-                panelContent(
-                    route,
-                    Modifier.fillMaxWidth().heightIn(max = columnHeight).wrapContentHeight(),
-                )
+                // assignDock() identifies each column's members by list position, and that
+                // position shifts for every panel after the one toggled (parity flips).
+                // forEach identifies children the same way by default, so without an explicit
+                // key a toggle tore down and rebuilt every untouched panel below it — losing
+                // remembered state, scroll position, and D-pad focus. Keying on the route ties
+                // identity to the panel itself instead of its slot.
+                key(route) {
+                    panelContent(
+                        route,
+                        Modifier.fillMaxWidth().heightIn(max = columnHeight).wrapContentHeight(),
+                    )
+                }
             }
         }
     }

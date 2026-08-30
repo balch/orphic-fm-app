@@ -286,15 +286,7 @@ private fun TvBottomBarItem(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (countdownText != null) {
-                val alpha = if (countdownDimmed) 0.45f else runningAlphaPulse()
-                Text(
-                    text = countdownText,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = TvBottomBarLabelSize,
-                    maxLines = 1,
-                    softWrap = false,
-                    color = OrpheusColors.sleepMoonlight.copy(alpha = alpha),
-                )
+                TvBottomBarCountdownText(text = countdownText, dimmed = countdownDimmed)
             } else {
                 Icon(
                     imageVector = icon,
@@ -313,6 +305,27 @@ private fun TvBottomBarItem(
             )
         }
     }
+}
+
+/**
+ * The countdown digits, pulsing via [runningAlphaPulse] while running. Split out as its own
+ * (non-inline) composable so the pulse's 60Hz state read is scoped here — Column, which
+ * [TvBottomBarItem] otherwise wraps this in, is inline and would otherwise let the read bubble
+ * up and force a recompose (and full modifier-chain rebuild) of the whole item every frame. The
+ * phone/tablet nav gets this for free because its icon slot is a `@Composable` lambda parameter
+ * to `item()`, which is its own restart scope by construction (see DjAppBottomNav.kt).
+ */
+@Composable
+private fun TvBottomBarCountdownText(text: String, dimmed: Boolean) {
+    val alpha = if (dimmed) 0.45f else runningAlphaPulse()
+    Text(
+        text = text,
+        fontFamily = FontFamily.Monospace,
+        fontSize = TvBottomBarLabelSize,
+        maxLines = 1,
+        softWrap = false,
+        color = OrpheusColors.sleepMoonlight.copy(alpha = alpha),
+    )
 }
 
 // ==================== PREVIEWS ====================

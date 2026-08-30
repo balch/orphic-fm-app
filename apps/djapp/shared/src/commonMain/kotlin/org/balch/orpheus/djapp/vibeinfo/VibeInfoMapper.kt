@@ -9,6 +9,13 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 /**
+ * Minimum peak audio level for a track to be considered "playing". Shared with
+ * VibeInfoSheet's remember-key derivation so the two stay in lockstep — see
+ * playingTrackMask() there.
+ */
+const val DEFAULT_TRACK_LEVEL_THRESHOLD = 0.02f
+
+/**
  * Maps a [Vibe] and live playback state into a [VibeInfoUiModel] suitable for display.
  *
  * This is a pure function — no side effects, no coroutines, easily unit-testable.
@@ -21,14 +28,13 @@ import org.balch.orpheus.features.pulsar.models.Vibe
  *                          The live [PulsarVizData.activeEngines] id (what the DSP is actually
  *                          playing) is preferred when it matches one of the track's two slots.
  * @param trackLevelThreshold  Minimum peak audio level for a track to be considered "playing".
- *                          Default 0.02f.
  */
 fun mapVibeInfo(
     vibe: Vibe,
     arrangement: PulsarArrangementState,
     viz: PulsarVizData,
     energy: Float,
-    trackLevelThreshold: Float = 0.02f,
+    trackLevelThreshold: Float = DEFAULT_TRACK_LEVEL_THRESHOLD,
 ): VibeInfoUiModel {
     val sections = vibe.arrangement?.sections?.mapIndexed { index, section ->
         VibeInfoSection(
