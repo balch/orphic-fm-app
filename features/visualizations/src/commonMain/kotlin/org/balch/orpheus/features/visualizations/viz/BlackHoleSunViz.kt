@@ -503,7 +503,7 @@ class BlackHoleSunViz(
                         0.5f to Color.Transparent,
                         0.7f to OrpheusColors.blackHoleDiskPurple.copy(alpha = diskIntensity * 0.3f),
                         0.85f to OrpheusColors.blackHoleDiskOrange.copy(alpha = diskIntensity * 0.4f),
-                        0.95f to OrpheusColors.blackHoleDiskGold.copy(alpha = diskIntensity * 0.2f),
+                        0.95f to OrpheusColors.blackHoleDiskHot.copy(alpha = diskIntensity * 0.2f),
                         1f to Color.Transparent
                     ),
                     center = Offset(cx, cy),
@@ -523,7 +523,7 @@ class BlackHoleSunViz(
                     colorStops = arrayOf(
                         0f to Color.Transparent,
                         0.6f to Color.Transparent,
-                        0.8f to OrpheusColors.blackHoleHorizonGold.copy(alpha = horizonGlow * 0.4f),
+                        0.8f to OrpheusColors.blackHoleHorizonHot.copy(alpha = horizonGlow * 0.4f),
                         0.95f to OrpheusColors.blackHoleHorizonOrange.copy(alpha = horizonGlow * 0.25f),
                         1f to Color.Transparent
                     ),

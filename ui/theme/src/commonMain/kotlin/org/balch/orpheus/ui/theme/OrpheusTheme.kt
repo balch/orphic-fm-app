@@ -258,8 +258,8 @@ object OrpheusColors {
     val blackHoleEdge = Color(0xFF020108)
     val blackHoleDiskPurple = Color(0xFFaa4488)
     val blackHoleDiskOrange = Color(0xFFff6633)
-    val blackHoleDiskGold = Color(0xFFffaa55)
-    val blackHoleHorizonGold = Color(0xFFffcc88)
+    val blackHoleDiskHot = Color(0xFFff9ed8)
+    val blackHoleHorizonHot = Color(0xFFffdcf2)
     val blackHoleHorizonOrange = Color(0xFFff8844)
     val blackHoleParticleOrange = Color(0xFFff8855)
 
