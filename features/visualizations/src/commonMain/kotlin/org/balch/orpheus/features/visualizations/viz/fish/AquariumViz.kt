@@ -10,10 +10,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -213,6 +211,9 @@ class AquariumViz(
         val id = nextFishId++
         val voiceIdx = id % 8
         val baseSize = 0.04f + Random.nextFloat() * 0.03f
+        // One heading for both fields so a new fish doesn't swing around on its first frames.
+        val heading = Random.nextFloat() * 2f * PI.toFloat()
+        val roll = rollTargetFor(heading, 1f)
         fish.add(
             Fish(
                 id = id,
@@ -222,10 +223,12 @@ class AquariumViz(
                 y = Random.nextFloat() * 0.8f + 0.1f,
                 vx = (Random.nextFloat() - 0.5f) * 0.1f,
                 vy = (Random.nextFloat() - 0.5f) * 0.05f,
-                heading = Random.nextFloat() * 2f * PI.toFloat(),
-                smoothHeading = Random.nextFloat() * 2f * PI.toFloat(),
+                heading = heading,
+                smoothHeading = heading,
                 voiceIndex = voiceIdx,
                 alpha = 0.01f,
+                roll = roll,
+                rollTarget = roll,
             )
         )
     }
@@ -359,6 +362,10 @@ class AquariumViz(
             val headingDiff = angleDiff(f.smoothHeading, f.heading)
             f.smoothHeading += headingDiff * 0.25f
 
+            // Turning past vertical flips the body over instead of rotating it upside down.
+            f.rollTarget = rollTargetFor(f.smoothHeading, f.rollTarget)
+            f.roll += (f.rollTarget - f.roll) * ROLL_EASE
+
             // Tail animation — faster when moving/energized
             f.tailPhase += dt * (4f + speed * 30f + f.energy * 8f)
         }
@@ -420,7 +427,7 @@ class AquariumViz(
             }
 
             for (f in state.fish) {
-                drawFish(f, w, h)
+                drawFish(f, w, h, bodyPath, tailPath)
             }
         }
     }
@@ -440,59 +447,6 @@ class AquariumViz(
             path.lineTo(startX - w * 0.1f, h)
             path.close()
             drawPath(path, shaftColor)
-        }
-    }
-
-    private fun DrawScope.drawFish(f: Fish, w: Float, h: Float) {
-        if (f.alpha <= 0.01f) return
-
-        val cx = f.x * w
-        val cy = f.y * h
-        val fishLen = f.baseSize * w * f.pulseScale
-        val fishHeight = fishLen * 0.4f
-
-        val brightness = 1f + f.energy * 0.8f  // much brighter flash on active voice
-        val fishColor = f.baseColor.copy(
-            red = (f.baseColor.red * brightness).coerceAtMost(1f),
-            green = (f.baseColor.green * brightness).coerceAtMost(1f),
-            blue = (f.baseColor.blue * brightness).coerceAtMost(1f),
-            alpha = f.alpha
-        )
-
-        val tailSwing = sin(f.tailPhase) * fishHeight * 0.5f
-
-        rotate(
-            degrees = f.smoothHeading * 180f / PI.toFloat(),
-            pivot = Offset(cx, cy)
-        ) {
-            bodyPath.reset()
-            bodyPath.moveTo(cx + fishLen * 0.5f, cy)
-            bodyPath.cubicTo(
-                cx + fishLen * 0.3f, cy - fishHeight * 0.5f,
-                cx - fishLen * 0.1f, cy - fishHeight * 0.5f,
-                cx - fishLen * 0.3f, cy
-            )
-            bodyPath.cubicTo(
-                cx - fishLen * 0.1f, cy + fishHeight * 0.5f,
-                cx + fishLen * 0.3f, cy + fishHeight * 0.5f,
-                cx + fishLen * 0.5f, cy
-            )
-            bodyPath.close()
-            drawPath(bodyPath, fishColor)
-
-            // Forked tail fin
-            tailPath.reset()
-            tailPath.moveTo(cx - fishLen * 0.3f, cy)
-            tailPath.lineTo(cx - fishLen * 0.55f, cy - fishHeight * 0.5f + tailSwing)
-            tailPath.lineTo(cx - fishLen * 0.4f, cy + tailSwing * 0.3f)
-            tailPath.lineTo(cx - fishLen * 0.55f, cy + fishHeight * 0.5f + tailSwing)
-            tailPath.close()
-            drawPath(tailPath, fishColor.copy(alpha = fishColor.alpha * 0.8f))
-
-            val eyeX = cx + fishLen * 0.25f
-            val eyeR = fishLen * 0.05f
-            drawCircle(Color.White.copy(alpha = f.alpha), eyeR, Offset(eyeX, cy - fishHeight * 0.1f))
-            drawCircle(Color.Black.copy(alpha = f.alpha), eyeR * 0.5f, Offset(eyeX, cy - fishHeight * 0.1f))
         }
     }
 

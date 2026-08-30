@@ -35,6 +35,8 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            // Skia natives for ImageComposeScene, so draw code can be rendered and inspected.
+            implementation(compose.desktop.currentOs)
         }
     }
 }
