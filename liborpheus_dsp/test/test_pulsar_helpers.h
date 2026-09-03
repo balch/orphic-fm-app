@@ -279,6 +279,107 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
     engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
 }
 
+// Band-solo arrangement fixture: a 1-bar NONE intro that transitions into a
+// 32-bar self-looping LICK_BUILDER section, with a two-member band --
+//   member 0 = drums (always_active, tracks 0,1,2)
+//   member 1 = melodic lead (track `lead_track`)
+// Section 0 = 1-bar NONE intro that transitions to section 1.
+// Section 1 = long (32-bar) LickBuilder section that self-loops; the solo
+// starts on ENTRY to section 1 and then advance_band_solo + mutate_live_lick
+// run once per bar for the section's duration, evolving the live lick.
+static void push_lickbuilder_band_arrangement(OrpheusEngine* engine, int lead_track) {
+    engine->pulsar_arrangement_active.store(1, std::memory_order_relaxed);
+    engine->pulsar_arrangement_section_count.store(2, std::memory_order_relaxed);
+    engine->pulsar_arrangement_intro_index.store(-1, std::memory_order_relaxed);
+    engine->pulsar_arrangement_outro_index.store(-1, std::memory_order_relaxed);
+
+    constexpr int kSectionStride = kSectionDataFields;
+    float section_data[8 * kSectionStride] = {};
+    for (int s = 0; s < 8; s++) {
+        section_data[s * kSectionStride + 18] = -1;
+        section_data[s * kSectionStride + 19] = -1;
+        section_data[s * kSectionStride + 20] = -1;
+        section_data[s * kSectionStride + 5]  = -1;
+        section_data[s * kSectionStride + 6]  = -1;
+        section_data[s * kSectionStride + 7]  = -1;
+        section_data[s * kSectionStride + 8]  = -1;
+    }
+    // Section 0: 1-bar NONE intro, transitions to section 1.
+    section_data[0] = 1;     // bars_min
+    section_data[1] = 1;     // bars_max
+    section_data[2] = 1;     // bar_step
+    section_data[3] = 0.8f;  // recency_decay
+    section_data[4] = 1;     // transition_count
+    section_data[9] = 0;     // solo_mode = NONE
+
+    // Section 1: 32-bar LickBuilder, self-loops.
+    int s1 = kSectionStride;
+    section_data[s1 + 0] = 32;     // bars_min
+    section_data[s1 + 1] = 32;     // bars_max
+    section_data[s1 + 2] = 1;      // bar_step
+    section_data[s1 + 3] = 0.8f;   // recency_decay
+    section_data[s1 + 4] = 1;      // transition_count
+    section_data[s1 + 9]  = static_cast<float>(static_cast<int>(SoloModeId::LICK_BUILDER));
+    section_data[s1 + 10] = 1.0f;  // solo_probability
+    section_data[s1 + 11] = 1.0f;  // solo_mutation_rate (max so the live lick clearly evolves)
+    section_data[s1 + 12] = 0.5f;  // solo_lick_influence
+    section_data[s1 + 13] = 2;     // solo_bars_min
+    section_data[s1 + 14] = 4;     // solo_bars_max
+    for (int i = 0; i < 8 * kSectionStride; i++)
+        engine->pulsar_section_data[i].store(section_data[i], std::memory_order_relaxed);
+
+    // Transitions: s0 -> {1:1.0}, s1 -> {1:1.0} (self-loop).
+    float trans[8 * 8 * 3] = {};
+    trans[0]  = 1; trans[1]  = 1.0f; trans[2]  = 0;  // s0 edge 0 -> section 1
+    trans[24] = 1; trans[25] = 1.0f; trans[26] = 0;  // s1 edge 0 -> section 1 (s1 base = 8*3 = 24)
+    for (int i = 0; i < 8 * 8 * 3; i++)
+        engine->pulsar_section_transitions[i].store(trans[i], std::memory_order_relaxed);
+
+    // Band config: member 0 = drums (always_active), member 1 = melodic lead.
+    engine->pulsar_band_active.store(1, std::memory_order_relaxed);
+    engine->pulsar_band_member_count.store(2, std::memory_order_relaxed);
+    // band_member_data layout per member: base = m*12
+    //   [0]=track_count, [1..8]=tracks, [9]=always_active, [10]=loudness, [11]=creativity
+    for (int i = 0; i < 96; i++)
+        engine->pulsar_band_member_data[i].store(0.0f, std::memory_order_relaxed);
+    // member 0: drums tracks 0,1,2 always_active
+    engine->pulsar_band_member_data[0 + 0].store(3.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[0 + 1].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[0 + 2].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[0 + 3].store(2.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[0 + 9].store(1.0f, std::memory_order_relaxed);  // always_active
+    engine->pulsar_band_member_data[0 + 10].store(0.7f, std::memory_order_relaxed); // loudness
+    engine->pulsar_band_member_data[0 + 11].store(0.2f, std::memory_order_relaxed); // creativity
+    // member 1: melodic lead on lead_track
+    engine->pulsar_band_member_data[12 + 0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 1].store(static_cast<float>(lead_track), std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 9].store(0.0f, std::memory_order_relaxed);  // not always_active
+    engine->pulsar_band_member_data[12 + 10].store(0.8f, std::memory_order_relaxed); // loudness
+    engine->pulsar_band_member_data[12 + 11].store(0.9f, std::memory_order_relaxed); // creativity (high)
+    // Handoff/pull-in: keep the lead leading (member 1 -> member 1). Stride-N=2.
+    for (int i = 0; i < 64; i++) {
+        engine->pulsar_band_handoff_matrix[i].store(0.0f, std::memory_order_relaxed);
+        engine->pulsar_band_pull_in_matrix[i].store(0.0f, std::memory_order_relaxed);
+    }
+    // row 1 (lead) -> col 1 (itself) = 1.0 (stride-N row-major, N=2 → idx 1*2+1=3)
+    engine->pulsar_band_handoff_matrix[1 * 2 + 1].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_band_bars_per_lead_min.store(64, std::memory_order_relaxed);  // keep leading
+    engine->pulsar_band_bars_per_lead_max.store(64, std::memory_order_relaxed);
+    engine->pulsar_band_pull_in_bars_min.store(2, std::memory_order_relaxed);
+    engine->pulsar_band_pull_in_bars_max.store(4, std::memory_order_relaxed);
+    engine->pulsar_band_probability.store(1.0f, std::memory_order_relaxed);
+
+    // Clear solo/ducking/markov to defaults
+    for (int i = 0; i < 8 * 15; i++)
+        engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
+    for (int i = 0; i < kNumPulsarTracks * kTrackDuckingFields; i++)
+        engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
+    for (int i = 0; i < 8 * 15; i++)
+        engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);
+
+    engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
+}
+
 // ── Shared sequencer-test scaffolding ──────────────────────────────────────
 // Only the pieces that were genuinely duplicated logic. The trivial
 // make_*_unit() constructor is deliberately NOT here: four suites already

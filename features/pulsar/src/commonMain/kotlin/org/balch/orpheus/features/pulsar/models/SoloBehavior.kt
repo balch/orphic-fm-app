@@ -103,10 +103,11 @@ data class MelodicOverride(
  *
  * @param volumeBoost Extra volume during solo, added to track volume. 0.2 = subtle lift.
  * @param densityBoost Extra density during solo. 0.3 = moderately busier.
- * @param timbreMin/timbreMax Timbre range during solo (wider = more expressive).
- * @param morphMin/morphMax Morph range during solo.
- * @param harmonicsMin/harmonicsMax Harmonics range during solo.
- * @param evolutionIntensity How much the tension system affects this track during solos, 0-1.
+ * @param timbreMin/timbreMax DEAD: marshalled and loaded by the engine, read by nothing.
+ *   Authoring them changes nothing today. See the 2.0.x dead-parameter audit.
+ * @param morphMin/morphMax DEAD, as [timbreMin].
+ * @param harmonicsMin/harmonicsMax DEAD, as [timbreMin].
+ * @param evolutionIntensity DEAD, as [timbreMin].
  * @param fillProbability Chance of playing fills at phrase boundaries during solos, 0-1.
  * @param melodicOverride Optional engine/range overrides during solos.
  * @param markovConfig Custom Markov config for this track's solo note generation.
@@ -138,10 +139,8 @@ data class SoloBehavior(
  * Does NOT apply to tracks belonging to an always-active band member: "the kit never fully
  * steps back" is a band-level rule, and a per-track profile must not undo it.
  *
- * Only three of the six fields currently reach the audio. The other three are carried all
- * the way to the render as modifiers that nothing reads, so authoring them changes nothing
- * today — they are marked below rather than hidden, so no one tunes a dial that is not
- * connected.
+ * Four of the six fields reach the audio; ghostReduction and reverbBoost do not, and are
+ * marked below so no one tunes a dial that is not connected.
  *
  * @param densityReduction Density drop — how many of the track's steps are dropped while
  *   ducking. 0.2 = the baseline; 0.5 is noticeably sparser. APPLIED.
@@ -150,10 +149,8 @@ data class SoloBehavior(
  * @param fillSuppression How much to suppress fills, 0-1. 0.35 = the baseline, 0.9 = almost
  *   none. APPLIED, but only on a solo handoff bar and only for percussive tracks — that is
  *   the one seam where a ducked kit is allowed to answer with a fill.
- * @param volumeReduction Volume drop while ducking, 0-1. NOT YET APPLIED: the render folds
- *   the modifier into a local velocity that it then discards, so the voice still sounds at
- *   the step's authored velocity. Wiring it would make every band vibe's ducked tracks
- *   quieter, so it needs its own change and an ear test.
+ * @param volumeReduction Velocity drop while ducking, 0-1. APPLIED: subtracted from the
+ *   step velocity the voice hears (live since the modified velocity reached the voice).
  * @param ghostReduction Ghost note reduction. NOT YET APPLIED — the modifier is computed
  *   and no consumer reads it.
  * @param reverbBoost Extra reverb send while ducking. NOT YET APPLIED — same as [ghostReduction].

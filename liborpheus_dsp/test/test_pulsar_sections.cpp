@@ -1396,18 +1396,177 @@ static bool test_render_drum_lead_mirrors_lick() {
     }
     bool melody_kept = tracks[3].steps[0].gate;  // LOCK_IN leaves melody alone
 
-    // BREAK: melody should be cleared (all gates off)
+    // BREAK: the render itself no longer touches melody -- the duck does that work now.
     // Re-fill melody before the BREAK render
     for (int i = 0; i < 16; i++) tracks[3].steps[i] = make_step(60, 0.8f, true, 0.5f);
     render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::BREAK, lick, 4, 0.5f, seed);
-    bool melody_dropped = true;
-    for (int i = 0; i < 16; i++) {
-        if (tracks[3].steps[i].gate) { melody_dropped = false; break; }
+    bool melody_kept_under_break = tracks[3].steps[0].gate;
+
+    bool ok = (drum_hits > 0) && melody_kept && melody_kept_under_break;
+    printf("  drum render: hits=%d lockin_keeps_melody=%d break_leaves_melody=%d -- %s\n",
+           drum_hits, melody_kept, melody_kept_under_break, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// ── Task 6: the drum arc ─────────────────────────────────────────────────────
+
+// Shared scaffold for the arc tests: a 3-track drum member with a snapshot groove.
+// PulsarTrackState is not copy-assignable (it embeds an OrpheusVoice), so the fixture
+// clears the three kit tracks' steps by hand instead of reassigning the array.
+static void arc_fixture(BandSoloConfigParam& cfg, PulsarTrackState* tracks, BandSoloState& st) {
+    cfg = BandSoloConfigParam{}; cfg.member_count = 1;
+    cfg.members[0].track_count = 3; cfg.members[0].tracks[0] = 0; cfg.members[0].tracks[1] = 1; cfg.members[0].tracks[2] = 2;
+    cfg.members[0].always_active = true;
+    for (int t = 0; t < 3; t++) {
+        tracks[t].role = TrackRole::PERCUSSIVE; tracks[t].step_count = 16;
+        for (int i = 0; i < kMaxPulsarSteps; i++) tracks[t].steps[i] = make_step(0, 0.0f, false, 0.0f);
+    }
+    for (int i = 0; i < 16; i += 4) tracks[0].steps[i] = make_step(36, 0.9f, true, 0.5f);
+    for (int i = 4; i < 16; i += 8) tracks[1].steps[i] = make_step(40, 0.8f, true, 0.4f);
+    st = BandSoloState{}; st.active = true; st.lead_member = 0; st.drum_lead_style = 1;
+    st.member_role[0] = MemberSoloRole::LEADING; st.member_bars_remaining[0] = 4;
+    begin_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+}
+
+static int count_gates(const PulsarTrackState& t, int from, int to) {
+    int n = 0; for (int i = from; i < to; i++) if (t.steps[i].gate) n++; return n;
+}
+
+static bool test_drum_arc_hats_climb_and_climax_fills_the_last_beat() {
+    printf("\n=== Test: drum arc: hats climb with progress, the last bar ends in a fill ===\n");
+    BandSoloConfigParam cfg; PulsarTrackState tracks[kNumPulsarTracks]; BandSoloState st;
+    PulsarLickStep lick[4] = {{0, 1.0f, 0.9f, -1.0f}, {2, 1.0f, 0.5f, -1.0f}, {4, 1.0f, 0.3f, -1.0f}, {5, 1.0f, 0.8f, -1.0f}};
+    int hats_early = 0, hats_late = 0, climax_q = 0, other_q = 0;
+    for (uint32_t s = 1; s <= 8; s++) {
+        arc_fixture(cfg, tracks, st); uint32_t seed = s;
+        DrumArc a0 = drum_arc(0.0f, false, s, 0);
+        render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st, &a0);
+        hats_early += count_gates(tracks[2], 0, 16);
+        DrumArc a1 = drum_arc(1.0f, false, s, 3);
+        render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st, &a1);
+        hats_late += count_gates(tracks[2], 0, 16);
+        DrumArc last = drum_arc(1.0f, true, s, 3);
+        render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st, &last);
+        climax_q += count_gates(tracks[1], 12, 16);
+        other_q  += count_gates(tracks[1], 0, 4) + count_gates(tracks[1], 4, 8) + count_gates(tracks[1], 8, 12);
+    }
+    bool climb = hats_late * 2 > hats_early * 3;   // the observed margin is roughly 2x
+    bool climax = climax_q >= 8 * 4 && climax_q * 3 > other_q;   // every climax quarter full
+    bool pass = climb && climax;
+    printf("  hats early=%d late=%d  snare climax-quarter=%d other-quarters=%d -- %s\n",
+           hats_early, hats_late, climax_q, other_q, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_drum_arc_runs_without_a_lick() {
+    printf("\n=== Test: a drum lead with no live lick still restores and arcs ===\n");
+    BandSoloConfigParam cfg; PulsarTrackState tracks[kNumPulsarTracks]; BandSoloState st;
+    arc_fixture(cfg, tracks, st); uint32_t seed = 3;
+    // Render once with a loud lick note so the kick row is actually overlaid (0.9 in the
+    // groove, 1.0 in the lick beats it), then again with no lick, so "restored" below is
+    // proving something rather than checking gates the render never touched.
+    PulsarLickStep lick[4] = {{0, 1.0f, 1.0f, -1.0f}, {2, 1.0f, 0.5f, -1.0f}, {4, 1.0f, 0.3f, -1.0f}, {5, 1.0f, 0.8f, -1.0f}};
+    DrumArc mid = drum_arc(1.0f, false, 3, 3);
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st, &mid);
+    DrumArc a = drum_arc(1.0f, true, 3, 3);
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, nullptr, 0, 0.5f, seed, &st, &a);
+    // Kick should be back to exactly the snapshot (gated at 0/4/8/12, nowhere else) --
+    // except the last step, which the climax's own unconditional downbeat kick owns
+    // regardless of any lick; that override is covered by the climax test above.
+    bool groove_kept = true;
+    for (int i = 0; i < 16 && groove_kept; i++) {
+        if (i == 15) continue;
+        const PulsarStep& k = tracks[0].steps[i];
+        const PulsarStep& g = st.drum_groove[0][i];
+        if (k.gate != g.gate || k.note != g.note || k.velocity != g.velocity || k.duration != g.duration)
+            groove_kept = false;
+    }
+    bool hats = count_gates(tracks[2], 0, 16) > 0;
+    bool fill = count_gates(tracks[1], 12, 16) == 4;
+    bool pass = groove_kept && hats && fill;
+    printf("  groove=%d hats=%d fill=%d -- %s\n", groove_kept, hats, fill, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// The hats and ghosts draw from the seed the caller HANDS the render, which is how the
+// engine keeps them off the shared mutation stream: it passes a hashed local seed. Pin
+// both halves -- the draws land on the caller's variable, and the same seed renders the
+// same bar.
+static bool test_drum_lead_render_leaves_the_caller_seed_alone() {
+    printf("\n=== Test: a drum lead render draws only from the seed it was handed ===\n");
+    BandSoloConfigParam cfg; PulsarTrackState tracks[kNumPulsarTracks]; BandSoloState st;
+    arc_fixture(cfg, tracks, st);
+    PulsarLickStep lick[4] = {{0, 1.0f, 0.9f, -1.0f}, {2, 1.0f, 0.5f, -1.0f},
+                              {4, 1.0f, 0.3f, -1.0f}, {5, 1.0f, 0.8f, -1.0f}};
+    DrumArc arc = drum_arc(0.5f, false, 9u, 1);
+
+    const uint32_t start = 0xC0FFEEu;
+    uint32_t seed = start;
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st, &arc);
+    bool advanced = seed != start;
+    PulsarStep hat[kMaxPulsarSteps], snare[kMaxPulsarSteps];
+    std::memcpy(hat, tracks[2].steps, sizeof(hat));
+    std::memcpy(snare, tracks[1].steps, sizeof(snare));
+
+    // The snapshot is the base every bar, so an identical seed must reproduce the rows.
+    uint32_t again = start;
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, again, &st, &arc);
+    bool deterministic = (again == seed);
+    for (int i = 0; i < 16 && deterministic; i++) {
+        const PulsarStep& h = tracks[2].steps[i];
+        const PulsarStep& s = tracks[1].steps[i];
+        deterministic = h.gate == hat[i].gate && h.note == hat[i].note && h.velocity == hat[i].velocity &&
+                        s.gate == snare[i].gate && s.note == snare[i].note && s.velocity == snare[i].velocity;
+    }
+    bool pass = advanced && deterministic;
+    printf("  seed 0x%X -> 0x%X advanced=%d identical_rows=%d -- %s\n",
+           start, seed, advanced, deterministic, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool approx6(float a, float b) { return std::fabs(a - b) < 1e-6f; }
+
+static bool test_drum_span_progress_lands_the_climax_on_the_last_bar() {
+    printf("\n=== Test: drum_span_progress lands the climax on exactly the last bar ===\n");
+    bool ok = true;
+
+    // span=4: remaining 4,3,2,1 -> dp 0, 1/3, 2/3, 1; climax true only on remaining=1.
+    const float expect4[4] = {0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f};
+    for (int i = 0; i < 4; i++) {
+        int remaining = 4 - i;
+        float dp = drum_span_progress(4, remaining);
+        BandSoloState st{};
+        st.drum_span_bars = 4; st.member_bars_remaining[0] = remaining;
+        st.solo_seed = 7; st.bars_elapsed = 2;
+        DrumArc arc = drum_arc_for_bar(st, 0);
+        bool dp_ok = approx6(dp, expect4[i]);
+        bool climax_ok = arc.climax == (remaining <= 1);
+        printf("  span=4 remaining=%d dp=%.6f (expect %.6f) climax=%d -- %s\n",
+               remaining, dp, expect4[i], arc.climax, (dp_ok && climax_ok) ? "OK" : "FAIL");
+        ok = ok && dp_ok && climax_ok;
     }
 
-    bool ok = (drum_hits > 0) && melody_kept && melody_dropped;
-    printf("  drum render: hits=%d lockin_keeps_melody=%d break_drops_melody=%d -- %s\n",
-           drum_hits, melody_kept, melody_dropped, ok ? "PASS" : "FAIL");
+    // A one-bar span is entirely climax.
+    BandSoloState st1{}; st1.drum_span_bars = 1; st1.member_bars_remaining[0] = 1;
+    float dp1 = drum_span_progress(1, 1);
+    bool span1_ok = approx6(dp1, 1.0f) && drum_arc_for_bar(st1, 0).climax;
+    printf("  span=1 remaining=1 dp=%.6f (expect 1.0) climax=%d -- %s\n",
+           dp1, drum_arc_for_bar(st1, 0).climax, span1_ok ? "OK" : "FAIL");
+    ok = ok && span1_ok;
+
+    // span=2: first bar dp=0 (no climax), second (last) bar dp=1 (climax).
+    BandSoloState st2a{}; st2a.drum_span_bars = 2; st2a.member_bars_remaining[0] = 2;
+    BandSoloState st2b{}; st2b.drum_span_bars = 2; st2b.member_bars_remaining[0] = 1;
+    float dp2a = drum_span_progress(2, 2);
+    float dp2b = drum_span_progress(2, 1);
+    bool arc2a_climax = drum_arc_for_bar(st2a, 0).climax;
+    bool arc2b_climax = drum_arc_for_bar(st2b, 0).climax;
+    bool span2_ok = approx6(dp2a, 0.0f) && approx6(dp2b, 1.0f) && !arc2a_climax && arc2b_climax;
+    printf("  span=2 dp=%.6f,%.6f (expect 0,1) climax=%d,%d (expect 0,1) -- %s\n",
+           dp2a, dp2b, arc2a_climax, arc2b_climax, span2_ok ? "OK" : "FAIL");
+    ok = ok && span2_ok;
+
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -1561,6 +1720,21 @@ static bool test_articulate_bass_solo_preserves_authored_velocity() {
     printf("  authored bass solo: velocities_kept=%d floored_would_raise=%d slaps=%d -- %s\n",
            velocities_kept, raised, slaps, ok ? "PASS" : "FAIL");
     return ok;
+}
+
+static bool test_articulate_bass_solo_reports_and_strips_slaps() {
+    printf("\n=== Test: articulate_bass_solo reports slap count and strips at density 0 ===\n");
+    PulsarStep steps[16] = {};
+    for (int i = 0; i < 16; i += 4) steps[i] = make_step(40, 0.8f, true, 0.5f);
+    uint32_t seed = 31;
+    int with = articulate_bass_solo(steps, 16, 1.0f, seed, true);
+    int after = articulate_bass_solo(steps, 16, 0.0f, seed, true);
+    int leftover = 0;
+    for (int i = 1; i < 16; i += 2)
+        if (steps[i].gate && steps[i].velocity == kBassSlapVelocity && steps[i].duration == kBassSlapDuration) leftover++;
+    bool pass = with > 0 && after == 0 && leftover == 0;
+    printf("  slaps with=%d after=%d leftover=%d -- %s\n", with, after, leftover, pass ? "PASS" : "FAIL");
+    return pass;
 }
 
 static bool test_solo_fire_boost_never_saturates() {
@@ -2614,6 +2788,25 @@ static bool test_progression_anchor_drift_survive_section_flip() {
     return ok;
 }
 
+// ── Task 7: octave idiom in scale units ─────────────────────────────────────
+
+static bool test_live_lick_octave_jump_is_one_scale() {
+    printf("\n=== Test: the octave-jump idiom moves one scale's worth of degrees ===\n");
+    int max_abs = 0, big = 0;
+    for (uint32_t s = 1; s <= 400; s++) {
+        int8_t deg[1] = {0}; float dur[1] = {1.0f}; float vel[1] = {0.8f}; int8_t base[1] = {0};
+        uint32_t seed = s;
+        mutate_live_lick(deg, dur, vel, 1, 1.0f, seed, base, /*max_degree_drift=*/10, true, /*octave_degrees=*/5);
+        int d = std::abs(static_cast<int>(deg[0]));
+        if (d > max_abs) max_abs = d;
+        if (d >= 3) big++;
+    }
+    // substitution is +/-2, an octave is +/-5: the sum never exceeds 7, and never 9 (old +/-7 idiom).
+    bool pass = max_abs <= 7 && big > 0;
+    printf("  max |delta|=%d (want <= 7) jumps seen=%d -- %s\n", max_abs, big, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -2647,6 +2840,11 @@ bool run_pulsar_sections_tests() {
     tally(test_overlap_baton_pass());
     tally(test_drum_lead_gate_and_style());
     tally(test_render_drum_lead_mirrors_lick());
+    tally(test_drum_arc_hats_climb_and_climax_fills_the_last_beat());
+    tally(test_drum_arc_runs_without_a_lick());
+    tally(test_drum_lead_render_leaves_the_caller_seed_alone());
+    tally(test_drum_span_progress_lands_the_climax_on_the_last_bar());
+    tally(test_live_lick_octave_jump_is_one_scale());
     tally(test_choose_lick_octave_minimizes_leap());
     tally(test_choose_lick_octave_no_prior_soloist());
     tally(test_choose_lick_octave_clamps_to_range());
@@ -2654,6 +2852,7 @@ bool run_pulsar_sections_tests() {
     tally(test_articulate_bass_solo());
     tally(test_articulate_bass_solo_idempotent_under_repeats());
     tally(test_articulate_bass_solo_preserves_authored_velocity());
+    tally(test_articulate_bass_solo_reports_and_strips_slaps());
     tally(test_midi_lick_degree_roundtrip_and_synth());
     tally(test_synthesize_lick_below_root_renders_notes_not_rests());
     tally(test_generate_jam_solo_line());

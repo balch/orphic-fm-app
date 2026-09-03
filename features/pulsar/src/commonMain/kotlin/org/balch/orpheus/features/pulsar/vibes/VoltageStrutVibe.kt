@@ -354,18 +354,19 @@ class VoltageStrutVibe : VibeProvider {
             ),
             arrangement = Arrangement(
                 introIndex = 0,
+                lengthSeconds = 90..180,
                 sections = listOf(
                     // 0: intro — percussion + sub bass only, build anticipation.
                     Section(
                         name = "intro",
-                        barsMin = 8, barsMax = 16,
+                        barsMin = 4, barsMax = 6,
                         transitions = listOf(SectionTransition(targetIndex = 1, weight = 1.0f)),
                         macroOverrides = MacroOverrides(energy = 0.55f, complexity = 0.5f),
                     ),
                     // 1: groove — full kit, both basses, lead stabs.
                     Section(
                         name = "groove",
-                        barsMin = 8, barsMax = 16,
+                        barsMin = 6, barsMax = 6,
                         transitions = listOf(
                             SectionTransition(targetIndex = 2, weight = 0.5f),
                             SectionTransition(targetIndex = 3, weight = 0.3f),
@@ -389,7 +390,7 @@ class VoltageStrutVibe : VibeProvider {
                     // 3: drop — peak energy, band jams, solos cycle.
                     Section(
                         name = "drop",
-                        barsMin = 8, barsMax = 16,
+                        barsMin = 8, barsMax = 12,
                         transitions = listOf(
                             SectionTransition(targetIndex = 4, weight = 0.5f),
                             SectionTransition(targetIndex = 1, weight = 0.3f),
@@ -404,7 +405,7 @@ class VoltageStrutVibe : VibeProvider {
                     // 4: break — drums + sub bass hold it down, lead rests, FX rises.
                     Section(
                         name = "break",
-                        barsMin = 4, barsMax = 8,
+                        barsMin = 4, barsMax = 6,
                         transitions = listOf(
                             SectionTransition(targetIndex = 2, weight = 0.6f),
                             SectionTransition(targetIndex = 1, weight = 0.4f),

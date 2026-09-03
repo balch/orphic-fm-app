@@ -821,8 +821,11 @@ inline void generate_track_pattern(
 static constexpr float kBassSlapVelocity = 0.9f;
 static constexpr float kBassSlapDuration = 0.15f;
 
-// Articulate the bass when it leads a solo: accent beat positions and insert sparse
-// syncopated percussive slap ghost-notes on empty off-beats. Operates in place.
+// Articulate the bass under a solo: accent beat positions and insert sparse syncopated
+// percussive slap ghost-notes on empty off-beats. Operates in place. No longer lead-only:
+// also runs on a ducked bass at a lower slap_density, and at slap_density 0 it only
+// strips slaps left by a prior pass. Returns the slap-signature step count left in the
+// buffer after the pass.
 // slap_density (~0.35 sparse) scales the off-beat slap probability. The slap note is
 // the most recent preceding gated bass pitch, with a short duration + high velocity so
 // it re-attacks as a percussive ghost (it lands on a rest, so no glide slurs into it).
@@ -833,6 +836,9 @@ static constexpr float kBassSlapDuration = 0.15f;
 // (a sparse bass solo turning into a loud constant 16th-slap line), it (1) strips any
 // slap inserted by a prior pass before re-inserting, and (2) uses max-toward-floor
 // accents instead of additive boosts so accented beats settle at a fixed level.
+// The strip goes by signature, not by bookkeeping: it removes any odd-index step whose
+// velocity and duration exactly match the slap signature, so an authored off-beat step
+// at exactly 0.9 velocity and 0.15 duration would be treated as a slap and dropped.
 //
 // preserve_authored_velocity SKIPS the accent floors, for a hook-driven jam lead whose
 // dynamics an author wrote. The floors give shape to a line that has none, and a generated
@@ -840,10 +846,10 @@ static constexpr float kBassSlapDuration = 0.15f;
 // they only flatten — quiet notes lift to the floor, loud ones stay, so a diminuendo
 // inverts and the jam's deliberately-under ornaments come up level with the hook. Slaps
 // still go in: they land on rests, so they articulate without rewriting a velocity.
-inline void articulate_bass_solo(PulsarStep* steps, int step_count,
-                                 float slap_density, uint32_t& seed,
-                                 bool preserve_authored_velocity = false) {
-    if (step_count <= 0) return;
+inline int articulate_bass_solo(PulsarStep* steps, int step_count,
+                                float slap_density, uint32_t& seed,
+                                bool preserve_authored_velocity = false) {
+    if (step_count <= 0) return 0;
     // (1) Strip slaps inserted by a previous pass (gated off-beat steps carrying the
     // slap signature) so re-articulating a non-regenerated buffer can't accumulate.
     for (int i = 1; i < step_count; i += 2) {
@@ -871,4 +877,8 @@ inline void articulate_bass_solo(PulsarStep* steps, int step_count,
             }
         }
     }
+    int slaps = 0;
+    for (int i = 1; i < step_count; i += 2)
+        if (steps[i].gate && steps[i].duration == kBassSlapDuration && steps[i].velocity == kBassSlapVelocity) slaps++;
+    return slaps;
 }

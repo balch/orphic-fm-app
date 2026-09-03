@@ -3,11 +3,13 @@
 #include "../src/pulsar_pattern_gen.h"
 #include "../src/pulsar_mod_ranges.h"
 #include "../src/orpheus_graph.h"
+#include "../src/pulsar_band_solo.h"
 #include "tides2/poly_slope_generator.h"
 #include "frames/poly_lfo.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
+#include <vector>
 #include "stmlib/utils/random.h"
 
 static constexpr float kAbSampleRate = 48000.0f;
@@ -170,6 +172,79 @@ static bool test_mod_lfo_depth_scales_bias_not_swing() {
     }
 
     if (pass) printf("    PASS: bias follows depth, swing is applied exactly once\n");
+    return pass;
+}
+
+// Render one lead track alone under a LickBuilder band (or with the band off as the
+// control). Returns RMS over the measured window and the retrigger count.
+struct LeadRender { double rms = 0.0; int fired = 0; bool solo_ran = false; };
+
+static LeadRender render_lead(int lead_track, bool band_on, float energy, float complexity) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(energy, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(complexity, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_seed.store(0x5EED, std::memory_order_relaxed);
+    stmlib::Random::Seed(0x5EED);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    solo_track(engine, lead_track);
+    push_lickbuilder_band_arrangement(engine, lead_track);
+    if (!band_on) engine->pulsar_band_active.store(0, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    constexpr int kBlock = 256, kWarm = 600, kTotal = 1800;
+    LeadRender out; double sum = 0.0; long n = 0; float prev_timer = 0.0f;
+    for (int b = 0; b < kTotal; b++) {
+        unit_process_pulsar(&unit, engine, kBlock, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (ps && ps->band_solo_state.active) out.solo_ran = true;
+        if (b < kWarm) continue;
+        for (int i = 0; i < kBlock; i++) {
+            sum += (double)engine->pulsar_out_l[i] * engine->pulsar_out_l[i]; n++;
+        }
+        if (ps) {
+            float t = ps->tracks[lead_track].gate_timer;
+            if (t > prev_timer + 1.0f) out.fired++;
+            prev_timer = t;
+        }
+    }
+    out.rms = n ? std::sqrt(sum / n) : 0.0;
+    orpheus_engine_destroy(engine);
+    return out;
+}
+
+// Track 5 sits in the texture notch at energy 0.5 (gain 0.05). Leading must lift it out,
+// so the notch render lands near the same render at energy 0.65, outside the notch.
+static bool test_soloist_on_texture_slot_escapes_the_notch() {
+    printf("\n  Soloist on a texture slot escapes the energy notch\n");
+    LeadRender notch = render_lead(5, true, 0.5f, 0.0f);
+    LeadRender clear = render_lead(5, true, 0.65f, 0.0f);
+    bool ran = notch.solo_ran && clear.solo_ran;
+    bool audible = clear.rms > 1e-4;
+    bool lifted = notch.rms >= clear.rms * 0.5;
+    bool pass = ran && audible && lifted;
+    printf("    rms notch=%.6f clear=%.6f (want notch >= 0.5x clear) solo_ran=%d/%d -- %s\n",
+           notch.rms, clear.rms, notch.solo_ran, clear.solo_ran, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// Track 7 never fires at energy 0.5 / complexity 0.5 (FX probability is 0). Leading must.
+static bool test_soloist_on_fx_slot_fires() {
+    printf("\n  Soloist on the FX slot fires through the FX gate\n");
+    LeadRender off = render_lead(7, false, 0.5f, 0.5f);
+    LeadRender on  = render_lead(7, true,  0.5f, 0.5f);
+    bool pass = on.solo_ran && off.fired == 0 && on.fired > 0;
+    printf("    fired off=%d on=%d -- %s\n", off.fired, on.fired, pass ? "PASS" : "FAIL");
     return pass;
 }
 
@@ -624,6 +699,8 @@ bool run_pulsar_texture_tests() {
     // inserting a scoring test ahead of them silently renumbers the suite.
     if (test_mod_lfo_depth_scales_bias_not_swing()) pass++; else fail++;
     if (test_evo_timbre_sweep_respects_the_authored_window()) pass++; else fail++;
+    if (test_soloist_on_texture_slot_escapes_the_notch()) pass++; else fail++;
+    if (test_soloist_on_fx_slot_fires()) pass++; else fail++;
 
     // ── Summary ──
     printf("\n  Pulsar Texture: %d passed, %d failed\n", pass, fail);

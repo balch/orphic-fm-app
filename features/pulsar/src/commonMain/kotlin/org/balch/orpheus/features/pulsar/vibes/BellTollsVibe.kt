@@ -15,6 +15,7 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
@@ -371,8 +372,10 @@ class BellTollsVibe : VibeProvider {
                     engineId = OrpheusEngineId.PD,
                     volume = 0.95f,
                     harmonics = 0.18f, timbre = 0.22f, morph = 0.12f,  // darker, rounder dub tone
-                    noteRangeLow = 28, noteRangeHigh = 45,  // E1-A2 — deep sub bass territory
-                    glideRate = 0.55f,  // slidey dub bass — notes smear into each other
+                    noteRangeLow = 28, noteRangeHigh = 45,  // E1-A2, the solo folds into this now
+                    // EAR-TUNE(user owns after ear test): the slide. 0.55 was a half-second
+                    // sweep on every leap; 0.35 is a finger slide between neighbours.
+                    glideRate = 0.35f,
                     reverbBrightness = 0.25f,
                 ).let { bass ->
                     TrackVoice(
@@ -383,6 +386,10 @@ class BellTollsVibe : VibeProvider {
                         envelopeProfile = EnvelopeProfile.MELODIC,
                         macroMap = TrackMacroMap.MELODIC,
                         barStrategy = BarStrategy.REPEAT,
+                        // Under a keys or melodica lead the bass plays less and slaps more:
+                        // the engine adds the slaps, this sets how much thinner it gets.
+                        // EAR-TUNE(user owns after ear test)
+                        duckingProfile = DuckingProfile(densityReduction = 0.40f),
                     )
                 },
                 // 4 LEAD: Roots horn-stand-in — lick-driven, dual DX with mood-driven

@@ -1,8 +1,11 @@
 #pragma once
 #include <cmath>
+#include <cstring>
+#include <algorithm>
 #include "orpheus_unit_pulsar.h"
 #include "pulsar_lick_techniques.h"
 #include "pulsar_pattern_gen.h"
+#include "pulsar_solo_curves.h"
 
 // ── Drum-lead gate and style selection ──────────────────────────────────────
 //
@@ -71,60 +74,136 @@ inline int choose_lick_octave(int first_degree, int outgoing_note,
     return best_oct;   // -1 if nothing fit the range (renderer falls back to auto)
 }
 
+// Kick/snare/hat of a drum member: tracks[0..2], missing slots fall back to tracks[0].
+inline bool drum_member_kit(const BandSoloConfigParam& config, int member, int num_tracks,
+                            int& kick, int& snare, int& hat) {
+    if (member < 0 || member >= config.member_count) return false;
+    const BandMemberParam& dm = config.members[member];
+    if (dm.track_count < 1) return false;
+    kick  = dm.tracks[0];
+    snare = dm.track_count > 1 ? dm.tracks[1] : dm.tracks[0];
+    hat   = dm.track_count > 2 ? dm.tracks[2] : dm.tracks[0];
+    return kick >= 0 && kick < num_tracks && snare >= 0 && snare < num_tracks && hat >= 0 && hat < num_tracks;
+}
+
+// Snapshot the kit's groove at the handoff into a drum lead.
+inline void begin_drum_lead(BandSoloState& state, const BandSoloConfigParam& config,
+                            PulsarTrackState* tracks, int num_tracks) {
+    int k, s, h;
+    if (!drum_member_kit(config, state.lead_member, num_tracks, k, s, h)) return;
+    const int idx[3] = {k, s, h};
+    for (int r = 0; r < 3; r++)
+        std::memcpy(state.drum_groove[r], tracks[idx[r]].steps, sizeof(state.drum_groove[r]));
+    state.drum_groove_valid = true;
+    state.drum_span_bars = state.member_bars_remaining[state.lead_member];
+}
+
+// Hand the groove back on the way out. Safe to call when nothing was armed.
+inline void end_drum_lead(BandSoloState& state, const BandSoloConfigParam& config,
+                          PulsarTrackState* tracks, int num_tracks) {
+    if (!state.drum_groove_valid) return;
+    int k, s, h;
+    if (drum_member_kit(config, state.lead_member, num_tracks, k, s, h)) {
+        const int idx[3] = {k, s, h};
+        for (int r = 0; r < 3; r++)
+            std::memcpy(tracks[idx[r]].steps, state.drum_groove[r], sizeof(state.drum_groove[r]));
+    }
+    state.drum_groove_valid = false;
+    state.drum_span_bars = 0;
+}
+
+// 0 on the drummer's first bar, 1 on the last; a one-bar span is its own climax.
+inline float drum_span_progress(int span, int remaining) {
+    if (span <= 1) return 1.0f;
+    float p = static_cast<float>(span - remaining) / static_cast<float>(span - 1);
+    return p < 0.0f ? 0.0f : (p > 1.0f ? 1.0f : p);
+}
+
+// The arc for the bar about to render: advance_band_solo has already decremented
+// member_bars_remaining, so remaining == 1 is the drummer's final bar.
+inline DrumArc drum_arc_for_bar(const BandSoloState& state, int lead) {
+    int remaining = state.member_bars_remaining[lead];
+    return drum_arc(drum_span_progress(state.drum_span_bars, remaining), remaining <= 1,
+                    state.solo_seed, state.bars_elapsed);
+}
+
 // Render the shared lick's rhythm onto the drum member's tracks.
 //
 // Signature is intentionally flat (no PulsarState*) so unit tests can pass a
 // stack-allocated BandSoloConfigParam + PulsarTrackState[] without a full state.
 //
-// Mapping: member's tracks[0]→kick, [1]→snare, [2]→hat.
+// Mapping: member's tracks[0] to kick, [1] to snare, [2] to hat.
 // Missing slots (1- or 2-track member) fall back to tracks[0].
 //
 // Style semantics:
-//   CONTOUR  — passes role=LEADING (busier, velocity-routed kit); melodic untouched.
-//   LOCK_IN  — passes role=ACTIVE; melodic untouched.
-//   BREAK    — passes role=ACTIVE; clears every MELODIC track's steps (melody drops).
+//   CONTOUR: passes role=LEADING (busier, velocity-routed kit); melodic untouched.
+//   LOCK_IN: passes role=ACTIVE; melodic untouched.
+//   BREAK: passes role=ACTIVE; melodic ducking is handled by apply_band_solo_modifiers.
+//
+// solo_state, when given and holding a valid snapshot, is the base: the lick's accents
+// lay OVER the restored groove instead of clearing it. arc, when given, rides the
+// drummer's build (overlay gain, hat/ghost climb, the last-bar climax fill).
+//
+// seed is expected to be a LOCAL hashed seed, not the shared mutation stream: the hat
+// and ghost draws below run every drum-lead bar and would reorder every later mutation.
 inline void render_drum_lead(const BandSoloConfigParam& config,
                              PulsarTrackState* tracks, int num_tracks,
                              int lead_member, DrumLeadStyle style,
                              const PulsarLickStep* lick, int lick_len,
-                             float complexity, uint32_t& seed) {
-    if (lead_member < 0 || lead_member >= config.member_count) return;
-    const BandMemberParam& dm = config.members[lead_member];
-    if (dm.track_count < 1 || lick_len <= 0) return;
+                             float complexity, uint32_t& seed,
+                             const BandSoloState* solo_state = nullptr,
+                             const DrumArc* arc = nullptr) {
+    int kick_idx, snare_idx, hat_idx;
+    if (!drum_member_kit(config, lead_member, num_tracks, kick_idx, snare_idx, hat_idx)) return;
+    PulsarStep* kick  = tracks[kick_idx].steps;
+    PulsarStep* snare = tracks[snare_idx].steps;
+    PulsarStep* hat   = tracks[hat_idx].steps;
+    const int sc = tracks[kick_idx].step_count;
+    if (sc <= 0) return;
+    const MemberSoloRole role = (style == DrumLeadStyle::CONTOUR)
+                                ? MemberSoloRole::LEADING : MemberSoloRole::ACTIVE;
+    const bool has_groove = solo_state && solo_state->drum_groove_valid;
 
-    // Map first three member tracks to kick/snare/hat (fall back to tracks[0]).
-    int kick_idx  = dm.tracks[0];
-    int snare_idx = dm.track_count > 1 ? dm.tracks[1] : dm.tracks[0];
-    int hat_idx   = dm.track_count > 2 ? dm.tracks[2] : dm.tracks[0];
+    if (has_groove) {
+        // Base = the snapshot, so bars never compound and the groove is always underneath.
+        std::memcpy(kick,  solo_state->drum_groove[0], sizeof(PulsarStep) * sc);
+        std::memcpy(snare, solo_state->drum_groove[1], sizeof(PulsarStep) * sc);
+        std::memcpy(hat,   solo_state->drum_groove[2], sizeof(PulsarStep) * sc);
+        float gain = arc ? arc->overlay_gain : 1.0f;
+        overlay_lick_rhythm_pattern(kick, snare, hat, sc, lick, lick_len, gain, role);
+    } else {
+        // No snapshot (unit tests, or a lead that started before one was armed): the
+        // historic mirror, which clears and rebuilds the three tracks.
+        if (lick_len <= 0) return;
+        generate_lick_rhythm_pattern(kick, snare, hat, sc, lick, lick_len, complexity, role, seed);
+    }
 
-    if (kick_idx  < 0 || kick_idx  >= num_tracks) return;
-    if (snare_idx < 0 || snare_idx >= num_tracks) return;
-    if (hat_idx   < 0 || hat_idx   >= num_tracks) return;
-
-    int sc = tracks[kick_idx].step_count;
-
-    MemberSoloRole role = (style == DrumLeadStyle::CONTOUR)
-                          ? MemberSoloRole::LEADING : MemberSoloRole::ACTIVE;
-
-    generate_lick_rhythm_pattern(
-        tracks[kick_idx].steps, tracks[snare_idx].steps, tracks[hat_idx].steps,
-        sc, lick, lick_len, complexity, role, seed);
-
-    if (style == DrumLeadStyle::BREAK) {
-        // Duck the OTHER melodic voices — clear every MELODIC track's steps,
-        // but exempt the lead member's own tracks. Without this, an all-Melodic
-        // vibe (no PERCUSSIVE tracks) wipes the drum member's just-rendered
-        // rhythm too, collapsing the whole sequencer to silence.
-        for (int t = 0; t < num_tracks; t++) {
-            if (tracks[t].role != TrackRole::MELODIC) continue;
-            bool is_lead_track = false;
-            for (int k = 0; k < dm.track_count; k++) {
-                if (dm.tracks[k] == t) { is_lead_track = true; break; }
-            }
-            if (is_lead_track) continue;
-            for (int i = 0; i < tracks[t].step_count; i++)
-                tracks[t].steps[i] = make_step(0, 0.0f, false, 0.0f);
+    // Hat gaps and snare ghosts: by the arc when there is one, else the historic rates.
+    // Only for the has-groove path -- the no-groove path already did both inside
+    // generate_lick_rhythm_pattern, so an arc with no snapshot skips just these two
+    // rates. Its climax block below still runs.
+    if (has_groove) {
+        const bool is_leading = (role == MemberSoloRole::LEADING);
+        float hat_prob = arc ? arc->hat_prob
+                             : std::min(1.0f, 0.3f + complexity * 0.4f + (is_leading ? 0.2f : 0.0f));
+        float ghost_prob = arc ? arc->ghost_prob : (is_leading ? complexity * 0.3f : 0.0f);
+        for (int i = 0; i < sc; i++) {
+            if (!hat[i].gate && pattern_rand01(seed) < hat_prob)
+                hat[i] = make_step(42, 0.25f + pattern_rand01(seed) * 0.2f, true, 0.1f);
+            if (!snare[i].gate && pattern_rand01(seed) < ghost_prob)
+                snare[i] = make_step(40, 0.2f + pattern_rand01(seed) * 0.15f, true, 0.15f);
         }
+    }
+
+    // The last quarter of the final bar is a snare ramp capped by a kick on the last
+    // step, the pickup into the band's downbeat.
+    if (arc && arc->climax) {
+        int q = sc / 4; if (q < 1) q = 1;
+        for (int i = sc - q; i < sc; i++) {
+            float f = (q > 1) ? static_cast<float>(i - (sc - q)) / static_cast<float>(q - 1) : 1.0f;
+            snare[i] = make_step(40, kClimaxVelStart + (1.0f - kClimaxVelStart) * f, true, 0.15f);
+        }
+        kick[sc - 1] = make_step(36, 1.0f, true, 0.4f);
     }
 }
 

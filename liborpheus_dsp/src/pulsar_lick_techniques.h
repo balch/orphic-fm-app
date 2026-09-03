@@ -45,7 +45,7 @@ inline void mutate_live_lick(
     int8_t* degrees, float* durations, float* velocities, int length,
     float creativity, uint32_t& seed,
     const int8_t* base_degrees = nullptr, int max_degree_drift = 14,
-    bool allow_octave_jump = true
+    bool allow_octave_jump = true, int octave_degrees = 7
 ) {
     if (length <= 0) return;
 
@@ -75,7 +75,7 @@ inline void mutate_live_lick(
         // Octave jump (high creativity only) — suppressed on the first post-handoff bar
         roll = pattern_rand01(seed);
         if (allow_octave_jump && roll < creativity * 0.1f) {
-            int octave = (pattern_rand01(seed) > 0.5f) ? 7 : -7;
+            int octave = (pattern_rand01(seed) > 0.5f) ? octave_degrees : -octave_degrees;
             degrees[i] = static_cast<int8_t>(degrees[i] + octave);
         }
 
@@ -195,6 +195,40 @@ inline void generate_lick_rhythm_pattern(
                 snare_steps[i] = make_step(40, vel, true, 0.15f);
             }
         }
+    }
+}
+
+// Lay the lick's accents OVER an existing kit pattern: loud lick notes -> kick, medium ->
+// snare, quiet -> hat, scaled by overlay_gain. Never removes or quietens a groove hit.
+inline void overlay_lick_rhythm_pattern(
+    PulsarStep* kick_steps, PulsarStep* snare_steps, PulsarStep* hat_steps,
+    int step_count, const PulsarLickStep* lick, int lick_length,
+    float overlay_gain, MemberSoloRole role
+) {
+    if (lick_length <= 0 || step_count <= 0) return;
+    float total_dur = 0.0f;
+    for (int i = 0; i < lick_length; i++) total_dur += lick[i].duration;
+    if (total_dur <= 0.0f) total_dur = 1.0f;
+    const bool is_leading = (role == MemberSoloRole::LEADING);
+    auto place = [](PulsarStep* row, int pos, uint8_t note, float vel, float dur) {
+        if (!row[pos].gate || row[pos].velocity < vel) row[pos] = make_step(note, vel, true, dur);
+    };
+    float cumulative = 0.0f;
+    for (int li = 0; li < lick_length; li++) {
+        int pos = static_cast<int>((cumulative / total_dur) * step_count);
+        if (pos >= step_count) pos = step_count - 1;
+        if (pos < 0) pos = 0;
+        float vel = lick[li].velocity * overlay_gain;
+        float dur = 0.3f + vel * 0.4f;
+        if (lick[li].velocity >= 0.7f) {
+            place(kick_steps, pos, 36, vel, dur);
+            if (is_leading && lick[li].velocity >= 0.85f) place(snare_steps, pos, 40, vel * 0.7f, dur * 0.8f);
+        } else if (lick[li].velocity >= 0.4f) {
+            place(snare_steps, pos, 40, vel, dur);
+        } else {
+            place(hat_steps, pos, 42, (lick[li].velocity + 0.2f) * overlay_gain, 0.15f);
+        }
+        cumulative += lick[li].duration;
     }
 }
 

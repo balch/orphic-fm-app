@@ -2,7 +2,8 @@
 
 #include "orpheus_unit_pulsar.h"
 #include "pulsar_pattern_gen.h"  // for pattern_rand01
-#include "pulsar_solo.h"         // for clear_solo_modifiers
+#include "pulsar_solo.h"         // for clear_solo_modifiers, jam_solo_progress
+#include "pulsar_solo_curves.h"  // for kit_ride, shaped_progress, solo_shape
 #include "pulsar_handoff.h"      // for should_drum_lead, pick_drum_lead_style, DrumLeadStyle
 #include <cstring>
 #include <algorithm>
@@ -22,6 +23,24 @@ inline constexpr float kHandoffFillChance = 0.6f;
 // EAR TUNE: how far the kit sheds its duck for that bar, in solo_fill_mod units.
 // 0.45 fully clears the -0.15/-0.2 support ducks, so the fill plays at full density.
 inline constexpr float kHandoffFillDepth = 0.45f;
+
+// EAR TUNE: the smoothed solo volume mod at which a track is treated as fully "leading"
+// for the texture notch and FX gate. 0.1 is the ACTIVE mod, so pulled-in members lift too.
+inline constexpr float kSoloLiftFull = 0.1f;
+
+// EAR TUNE: fraction of its target boost a soloist starts with on its first bar; the
+// rest slews. 0 = the old fade-in, 1 = a hard entrance.
+inline constexpr float kSoloEntranceFraction = 0.5f;
+
+// EAR TUNE: off-beat slap density for the bass when it leads, and when it is ducked
+// under someone else's solo (fewer notes, but the pocket keeps popping).
+inline constexpr float kLeadBassSlapDensity    = 0.35f;
+inline constexpr float kSupportBassSlapDensity = 0.20f;
+
+// EAR TUNE: BREAK depths. The melody all but drops (-1.0 is silence; -0.9 leaks about a
+// note a bar), the bass thins but stays, slapping (see kSupportBassSlapDensity).
+inline constexpr float kBreakMelodicDuck     = -0.9f;
+inline constexpr float kBreakBassDensityDuck = -0.5f;
 
 // ── Select initial lead member (weighted random, prefer non-always-active) ──
 
@@ -185,8 +204,13 @@ inline void apply_band_solo_modifiers(
     const BandSoloConfigParam& config,
     const BandSoloState& state,
     int num_tracks = kNumPulsarTracks,
-    const DuckingParam* track_ducking = nullptr   // kNumPulsarTracks entries, or nullptr
+    const DuckingParam* track_ducking = nullptr,  // kNumPulsarTracks entries, or nullptr
+    float progress = 0.0f                          // 0..1 through the solo's section span
 ) {
+    // How far support ducks have eased toward half depth at this point in the solo.
+    static_assert(kSupportEase <= 1.0f, "kSupportEase above 1 would flip a duck into a boost");
+    const float ease = 1.0f - kSupportEase * shaped_progress(progress, solo_shape(state.solo_seed, kKitSalt));
+
     // Build track-to-member lookup (-1 = not in any member)
     int track_member[kNumPulsarTracks];
     for (int t = 0; t < num_tracks; t++) track_member[t] = -1;
@@ -207,6 +231,7 @@ inline void apply_band_solo_modifiers(
         if (m < 0) {
             // Track not in any member: standard ducking
             apply_duck_modifiers(tracks[t], dp);
+            tracks[t].solo_density_mod *= ease;
             continue;
         }
 
@@ -238,21 +263,39 @@ inline void apply_band_solo_modifiers(
 
             case MemberSoloRole::SUPPORT:
                 if (always_active) {
-                    // Always-active support: simplify but no volume duck. Deliberately
-                    // NOT profile-driven — "the kit never fully steps back" is a band
-                    // rule, and an authored per-track duck must not undo it.
+                    // Always-active support rides the build: thin and plain early, louder
+                    // and busier late. Deliberately NOT profile-driven, the kit never fully
+                    // steps back and an authored duck must not undo that.
+                    KitRide r = kit_ride(progress, state.solo_seed, state.bars_elapsed);
                     tracks[t].is_soloist = false;
-                    tracks[t].solo_volume_mod = 0.0f;
-                    tracks[t].solo_density_mod = -0.15f;
+                    tracks[t].solo_volume_mod = r.volume_mod;
+                    tracks[t].solo_density_mod = r.density_mod;
                     tracks[t].solo_ghost_mod = 0.0f;
-                    tracks[t].solo_fill_mod = 0.0f;
-                    tracks[t].solo_simplify = true;
+                    tracks[t].solo_fill_mod = r.fill_mod;
+                    tracks[t].solo_simplify = r.simplify;
                     tracks[t].solo_reverb_mod = 0.0f;
                 } else {
                     // Standard ducking for non-always-active support
                     apply_duck_modifiers(tracks[t], dp);
+                    tracks[t].solo_density_mod *= ease;
                 }
                 break;
+        }
+    }
+
+    // BREAK pass, after the role switch so it overrides the member duck. A break is a
+    // cut: entering writes the smoothed value too; the release bar lands on the new depth.
+    const bool in_break = state.lead_member >= 0 &&
+                          state.drum_lead_style == static_cast<int>(DrumLeadStyle::BREAK);
+    if (in_break || state.break_released) {
+        for (int t = 0; t < num_tracks; t++) {
+            if (tracks[t].role != TrackRole::MELODIC) continue;
+            if (track_member[t] == state.lead_member) continue;
+            if (in_break) {
+                tracks[t].solo_density_mod = (t == kBassTrack) ? kBreakBassDensityDuck : kBreakMelodicDuck;
+            }
+            tracks[t].solo_density_mod_current = tracks[t].solo_density_mod;
+            if (!in_break) tracks[t].solo_volume_mod_current = tracks[t].solo_volume_mod;
         }
     }
 }
@@ -268,6 +311,10 @@ inline void start_band_solo(
     int num_tracks = kNumPulsarTracks,
     const DuckingParam* track_ducking = nullptr   // per-track authored duck, or nullptr
 ) {
+    // A new solo starting means any drum lead from before is over; hand its groove back
+    // before anything else runs, even if this call ends up not starting a solo at all.
+    end_drum_lead(state, config, tracks, num_tracks);
+
     if (section.solo_mode == SoloModeId::NONE) {
         state.active = false;
         clear_solo_modifiers(tracks, num_tracks);
@@ -292,6 +339,7 @@ inline void start_band_solo(
     state.outgoing_last_note = -1;
     state.just_handed_off = false;
     state.bars_elapsed = 0;
+    state.break_released = false;
 
     // JAM solos render an improvised melodic LINE, so the lead must own a melodic
     // track; a chordal-only member would no-op into a dead solo. Filter it out.
@@ -330,7 +378,23 @@ inline void start_band_solo(
         }
     }
 
-    apply_band_solo_modifiers(tracks, config, state, num_tracks, track_ducking);
+    apply_band_solo_modifiers(tracks, config, state, num_tracks, track_ducking, 0.0f);
+
+    // A fresh solo's own leader skips the cpp's per-bar slew entirely for bar one. That
+    // loop only runs on advance_band_solo, one bar later. Floor the entrance here so the
+    // pass reads as an event on its very first bar too, mirroring the cpp's slew-loop
+    // latch: a floor, not an assignment, so a track already carried in above the
+    // fraction (a previous section's lead, a pulled-in ACTIVE member) is never stepped
+    // down.
+    for (int t = 0; t < num_tracks; t++) {
+        if (!tracks[t].is_soloist) continue;
+        const float dmin = tracks[t].solo_density_mod * kSoloEntranceFraction;
+        if (tracks[t].solo_density_mod > 0.0f && tracks[t].solo_density_mod_current < dmin)
+            tracks[t].solo_density_mod_current = dmin;
+        const float vmin = tracks[t].solo_volume_mod * kSoloEntranceFraction;
+        if (tracks[t].solo_volume_mod > 0.0f && tracks[t].solo_volume_mod_current < vmin)
+            tracks[t].solo_volume_mod_current = vmin;
+    }
 }
 
 // ── Advance band solo with SoloMode-aware dispatch ──────────────────
@@ -342,13 +406,17 @@ inline void advance_band_solo(
     PulsarTrackState* tracks,
     uint32_t& seed,
     int num_tracks = kNumPulsarTracks,
-    const DuckingParam* track_ducking = nullptr   // per-track authored duck, or nullptr
+    const DuckingParam* track_ducking = nullptr,  // per-track authored duck, or nullptr
+    int section_bars_total = 0
 ) {
     if (!state.active) return;
 
     // Clear the per-bar handoff flag; the expiry block below sets it if a
     // handoff happens THIS bar. The cpp render reads it AFTER this call.
     state.just_handed_off = false;
+    // Clear the one-bar release flag too; the expiry block below re-arms it when
+    // a BREAK lead hands off THIS bar.
+    state.break_released = false;
 
     // Bars this solo has run, section-wide. Feeds jam_solo_progress() so a jam
     // builds across its section instead of re-arcing at every handoff.
@@ -371,6 +439,11 @@ inline void advance_band_solo(
     if (section.solo_mode == SoloModeId::LONG_FILL) {
         if (state.lead_member >= 0 &&
             state.member_bars_remaining[state.lead_member] <= 0) {
+            // A carried drum lead (jamCarry from a LICK_BUILDER section) that expires
+            // here still owes the kit its groove back; nothing else on this path calls
+            // end_drum_lead.
+            end_drum_lead(state, config, tracks, num_tracks);
+            state.drum_lead_style = -1;
             state.active = false;
             clear_solo_modifiers(tracks, num_tracks);
         }
@@ -430,6 +503,13 @@ inline void advance_band_solo(
     if (state.lead_member >= 0 &&
         state.member_bars_remaining[state.lead_member] <= 0) {
         int outgoing = state.lead_member;
+
+        // Leaving a drum lead: hand the groove back; a BREAK release lands, not fades.
+        if (state.drum_lead_style >= 0) {
+            state.break_released = (state.drum_lead_style == static_cast<int>(DrumLeadStyle::BREAK));
+            end_drum_lead(state, config, tracks, num_tracks);
+        }
+
         int next = (state.pending_lead >= 0) ? state.pending_lead
                                              : select_next_lead(config, state, seed, elig);
 
@@ -463,6 +543,8 @@ inline void advance_band_solo(
         state.member_bars_remaining[next] = config.bars_per_lead_min +
             static_cast<int>(pattern_rand01(seed) * range) % range;
 
+        if (state.drum_lead_style >= 0) begin_drum_lead(state, config, tracks, num_tracks);
+
         // NOTE: phrase_cursor + last_phrase intentionally NOT reset here.
         // The outgoing phrase survives to the render block so improvisers_handoff()
         // can bias the incoming soloist's interval weights toward the outgoing phrase.
@@ -473,7 +555,8 @@ inline void advance_band_solo(
         state.just_handed_off = true;
     }
 
-    apply_band_solo_modifiers(tracks, config, state, num_tracks, track_ducking);
+    const float progress = jam_solo_progress(state.bars_elapsed, section_bars_total);
+    apply_band_solo_modifiers(tracks, config, state, num_tracks, track_ducking, progress);
 
     // Handoff punctuation: on the bar the solo passes, the kit answers with a fill.
     // Rolled ONCE per handoff and written into solo_fill_mod, which the call above
@@ -493,9 +576,12 @@ inline void advance_band_solo(
 
 inline void clear_band_solo(
     BandSoloState& state,
+    const BandSoloConfigParam& config,
     PulsarTrackState* tracks,
     int num_tracks = kNumPulsarTracks
 ) {
+    end_drum_lead(state, config, tracks, num_tracks);
+
     state.active = false;
     state.lead_member = -1;
     state.phrase_cursor = 0;
@@ -512,6 +598,8 @@ inline void clear_band_solo(
     state.outgoing_last_note = -1;
     state.just_handed_off = false;
     state.bars_elapsed = 0;
+    state.break_released = false;
+    state.drum_span_bars = 0;
 
     clear_solo_modifiers(tracks, num_tracks);
 }

@@ -196,6 +196,7 @@ class VelvetLeashVibe : VibeProvider {
             album = Album.RIF,
             bpm = 96f,
             arrangement = Arrangement(
+                lengthSeconds = 100..180,
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
                 sections = sectionList,

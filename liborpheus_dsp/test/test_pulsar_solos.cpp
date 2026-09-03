@@ -354,107 +354,8 @@ static bool test_drone_interval_preset() {
     return ok;
 }
 
-// ── SOLO-1 integration helper ───────────────────────────────────────
-//
-// Pushes a 2-section arrangement with a 2-member band:
-//   member 0 = drums (always_active, tracks 0,1,2)
-//   member 1 = melodic lead (track `lead_track`)
-// Section 0 = 1-bar NONE intro that transitions to section 1.
-// Section 1 = long (32-bar) LickBuilder section that self-loops; the solo
-// starts on ENTRY to section 1 and then advance_band_solo + mutate_live_lick
-// run once per bar for the section's duration, evolving the live lick.
-static void push_lickbuilder_band_arrangement(OrpheusEngine* engine, int lead_track) {
-    engine->pulsar_arrangement_active.store(1, std::memory_order_relaxed);
-    engine->pulsar_arrangement_section_count.store(2, std::memory_order_relaxed);
-    engine->pulsar_arrangement_intro_index.store(-1, std::memory_order_relaxed);
-    engine->pulsar_arrangement_outro_index.store(-1, std::memory_order_relaxed);
-
-    constexpr int kSectionStride = kSectionDataFields;
-    float section_data[8 * kSectionStride] = {};
-    for (int s = 0; s < 8; s++) {
-        section_data[s * kSectionStride + 18] = -1;
-        section_data[s * kSectionStride + 19] = -1;
-        section_data[s * kSectionStride + 20] = -1;
-        section_data[s * kSectionStride + 5]  = -1;
-        section_data[s * kSectionStride + 6]  = -1;
-        section_data[s * kSectionStride + 7]  = -1;
-        section_data[s * kSectionStride + 8]  = -1;
-    }
-    // Section 0: 1-bar NONE intro, transitions to section 1.
-    section_data[0] = 1;     // bars_min
-    section_data[1] = 1;     // bars_max
-    section_data[2] = 1;     // bar_step
-    section_data[3] = 0.8f;  // recency_decay
-    section_data[4] = 1;     // transition_count
-    section_data[9] = 0;     // solo_mode = NONE
-
-    // Section 1: 32-bar LickBuilder, self-loops.
-    int s1 = kSectionStride;
-    section_data[s1 + 0] = 32;     // bars_min
-    section_data[s1 + 1] = 32;     // bars_max
-    section_data[s1 + 2] = 1;      // bar_step
-    section_data[s1 + 3] = 0.8f;   // recency_decay
-    section_data[s1 + 4] = 1;      // transition_count
-    section_data[s1 + 9]  = static_cast<float>(static_cast<int>(SoloModeId::LICK_BUILDER));
-    section_data[s1 + 10] = 1.0f;  // solo_probability
-    section_data[s1 + 11] = 1.0f;  // solo_mutation_rate (max so the live lick clearly evolves)
-    section_data[s1 + 12] = 0.5f;  // solo_lick_influence
-    section_data[s1 + 13] = 2;     // solo_bars_min
-    section_data[s1 + 14] = 4;     // solo_bars_max
-    for (int i = 0; i < 8 * kSectionStride; i++)
-        engine->pulsar_section_data[i].store(section_data[i], std::memory_order_relaxed);
-
-    // Transitions: s0 -> {1:1.0}, s1 -> {1:1.0} (self-loop).
-    float trans[8 * 8 * 3] = {};
-    trans[0]  = 1; trans[1]  = 1.0f; trans[2]  = 0;  // s0 edge 0 -> section 1
-    trans[24] = 1; trans[25] = 1.0f; trans[26] = 0;  // s1 edge 0 -> section 1 (s1 base = 8*3 = 24)
-    for (int i = 0; i < 8 * 8 * 3; i++)
-        engine->pulsar_section_transitions[i].store(trans[i], std::memory_order_relaxed);
-
-    // Band config: member 0 = drums (always_active), member 1 = melodic lead.
-    engine->pulsar_band_active.store(1, std::memory_order_relaxed);
-    engine->pulsar_band_member_count.store(2, std::memory_order_relaxed);
-    // band_member_data layout per member: base = m*12
-    //   [0]=track_count, [1..8]=tracks, [9]=always_active, [10]=loudness, [11]=creativity
-    for (int i = 0; i < 96; i++)
-        engine->pulsar_band_member_data[i].store(0.0f, std::memory_order_relaxed);
-    // member 0: drums tracks 0,1,2 always_active
-    engine->pulsar_band_member_data[0 + 0].store(3.0f, std::memory_order_relaxed);
-    engine->pulsar_band_member_data[0 + 1].store(0.0f, std::memory_order_relaxed);
-    engine->pulsar_band_member_data[0 + 2].store(1.0f, std::memory_order_relaxed);
-    engine->pulsar_band_member_data[0 + 3].store(2.0f, std::memory_order_relaxed);
-    engine->pulsar_band_member_data[0 + 9].store(1.0f, std::memory_order_relaxed);  // always_active
-    engine->pulsar_band_member_data[0 + 10].store(0.7f, std::memory_order_relaxed); // loudness
-    engine->pulsar_band_member_data[0 + 11].store(0.2f, std::memory_order_relaxed); // creativity
-    // member 1: melodic lead on lead_track
-    engine->pulsar_band_member_data[12 + 0].store(1.0f, std::memory_order_relaxed);
-    engine->pulsar_band_member_data[12 + 1].store(static_cast<float>(lead_track), std::memory_order_relaxed);
-    engine->pulsar_band_member_data[12 + 9].store(0.0f, std::memory_order_relaxed);  // not always_active
-    engine->pulsar_band_member_data[12 + 10].store(0.8f, std::memory_order_relaxed); // loudness
-    engine->pulsar_band_member_data[12 + 11].store(0.9f, std::memory_order_relaxed); // creativity (high)
-    // Handoff/pull-in: keep the lead leading (member 1 -> member 1). Stride-N=2.
-    for (int i = 0; i < 64; i++) {
-        engine->pulsar_band_handoff_matrix[i].store(0.0f, std::memory_order_relaxed);
-        engine->pulsar_band_pull_in_matrix[i].store(0.0f, std::memory_order_relaxed);
-    }
-    // row 1 (lead) -> col 1 (itself) = 1.0 (stride-N row-major, N=2 → idx 1*2+1=3)
-    engine->pulsar_band_handoff_matrix[1 * 2 + 1].store(1.0f, std::memory_order_relaxed);
-    engine->pulsar_band_bars_per_lead_min.store(64, std::memory_order_relaxed);  // keep leading
-    engine->pulsar_band_bars_per_lead_max.store(64, std::memory_order_relaxed);
-    engine->pulsar_band_pull_in_bars_min.store(2, std::memory_order_relaxed);
-    engine->pulsar_band_pull_in_bars_max.store(4, std::memory_order_relaxed);
-    engine->pulsar_band_probability.store(1.0f, std::memory_order_relaxed);
-
-    // Clear solo/ducking/markov to defaults
-    for (int i = 0; i < 8 * 15; i++)
-        engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
-    for (int i = 0; i < kNumPulsarTracks * kTrackDuckingFields; i++)
-        engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
-    for (int i = 0; i < 8 * 15; i++)
-        engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);
-
-    engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
-}
+// push_lickbuilder_band_arrangement lives in test_pulsar_helpers.h (shared
+// with test_pulsar_texture.cpp).
 
 // ── JAM-1 integration helper ─────────────────────────────────────────
 //
@@ -818,6 +719,50 @@ static bool test_lickbuilder_lead_evolving_in_scale() {
     return pass;
 }
 
+// Task 7: a LickBuilder lead with an authored per-track range must render
+// entirely inside it, not the (wider) genre range.
+static bool test_lickbuilder_bass_lead_stays_in_its_register() {
+    printf("\n=== Test: a LickBuilder bass lead keeps every note inside its authored range ===\n");
+    const int kLead = 3, kLow = 28, kHigh = 45;
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_seed.store(2024, std::memory_order_relaxed);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->pulsar_track_note_range_low[kLead].store(kLow, std::memory_order_relaxed);
+    engine->pulsar_track_note_range_high[kLead].store(kHigh, std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    push_lickbuilder_band_arrangement(engine, kLead);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    int checked = 0, outside = 0, bars = 0, last_loop = -1;
+    for (int i = 0; i < 6000 && bars < 24; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        PulsarState* ps = engine->pulsar_state; if (!ps) continue;
+        if (ps->loop_count != last_loop && ps->band_solo_state.active) {
+            last_loop = ps->loop_count; bars++;
+            const PulsarTrackState& lt = ps->tracks[kLead];
+            for (int s = 0; s < lt.step_count; s++) if (lt.steps[s].gate) {
+                checked++;
+                if (lt.steps[s].note < kLow || lt.steps[s].note > kHigh) outside++;
+            }
+        }
+    }
+    orpheus_engine_destroy(engine);
+    bool pass = bars >= 24 && checked > 0 && outside == 0;
+    printf("  bars=%d notes=%d outside[%d..%d]=%d -- %s\n", bars, checked, kLow, kHigh, outside, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // ── SOLO-3: positive density modifier makes the leading track busier ──
 //
 // Counts fired step-triggers on a fully-gated melodic track at a fixed seed,
@@ -1017,10 +962,11 @@ static bool test_jam_improv_generated_and_carryover() {
     return ok;
 }
 
-// BREAK must silence the OTHER melodic voices but NOT annihilate the drummer's
-// own tracks. Regression test for the all-Melodic self-wipe (Lost in Space).
-static bool test_break_exempts_lead_member_tracks() {
-    printf("\n=== Test: BREAK exempts the lead member's own tracks ===\n");
+// BREAK no longer clears melodic steps itself -- the duck (apply_band_solo_modifiers)
+// does that work now, so render_drum_lead must leave every melodic track's steps alone,
+// lead member's own tracks included.
+static bool test_break_render_leaves_melodic_steps_alone() {
+    printf("\n=== Test: BREAK render leaves melodic steps alone ===\n");
 
     // One band member owning tracks {0,1,2,3}. Tracks 0-2 map to kick/snare/hat
     // (overwritten by the rhythm render); track 3 is a member track the render
@@ -1046,19 +992,19 @@ static bool test_break_exempts_lead_member_tracks() {
     render_drum_lead(config, tracks, kNumPulsarTracks, /*lead_member=*/0,
                      DrumLeadStyle::BREAK, lick, /*lick_len=*/4, /*complexity=*/0.5f, seed);
 
-    // Track 3 (member, not kick/snare/hat) must be exempted: its gates survive.
+    // Track 3 (member, not kick/snare/hat): its gates survive.
     int member_gates = 0;
     for (int i = 0; i < tracks[3].step_count; i++) if (tracks[3].steps[i].gate) member_gates++;
 
-    // Track 5 (non-member melodic) must be fully cleared: BREAK still works.
+    // Track 5 (non-member melodic): also survives -- the render no longer touches it.
     int nonmember_gates = 0;
     for (int i = 0; i < tracks[5].step_count; i++) if (tracks[5].steps[i].gate) nonmember_gates++;
 
-    bool exempt_ok = member_gates > 0;
-    bool wipe_ok = nonmember_gates == 0;
-    printf("  member track 3 gates=%d (expected >0) -- %s\n", member_gates, exempt_ok ? "OK" : "FAIL");
-    printf("  non-member track 5 gates=%d (expected 0) -- %s\n", nonmember_gates, wipe_ok ? "OK" : "FAIL");
-    bool ok = exempt_ok && wipe_ok;
+    bool member_ok = member_gates > 0;
+    bool nonmember_ok = nonmember_gates > 0;
+    printf("  member track 3 gates=%d (expected >0) -- %s\n", member_gates, member_ok ? "OK" : "FAIL");
+    printf("  non-member track 5 gates=%d (expected >0) -- %s\n", nonmember_gates, nonmember_ok ? "OK" : "FAIL");
+    bool ok = member_ok && nonmember_ok;
     printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
@@ -1543,11 +1489,12 @@ bool run_pulsar_solos_tests() {
     tally(test_density_curve_shape());
     tally(test_drone_interval_preset());
     tally(test_lickbuilder_lead_evolving_in_scale());
+    tally(test_lickbuilder_bass_lead_stays_in_its_register());
     tally(test_positive_density_makes_soloist_busier());
     tally(test_render_lick_into_track_honors_call_response());
     tally(test_jam_solo_shared_line());
     tally(test_jam_improv_generated_and_carryover());
-    tally(test_break_exempts_lead_member_tracks());
+    tally(test_break_render_leaves_melodic_steps_alone());
     tally(test_solo_mod_slew_produces_intermediate_values());
     tally(test_jam_lick_influence_drives_carryover());
     tally(test_handoff_bar_fires_a_kit_fill());

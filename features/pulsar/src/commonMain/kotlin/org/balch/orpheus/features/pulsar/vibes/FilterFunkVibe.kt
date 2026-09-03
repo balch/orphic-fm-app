@@ -152,7 +152,7 @@ class FilterFunkVibe : VibeProvider {
                 introIndex = 0,
                 sections = sectionList,
                 outroIndex = sectionList.lastIndex,
-                lengthSeconds = 130 .. 150,
+                lengthSeconds = 110 .. 150,
             ),
             bpm = 110f,
             envelopeType = EnvelopeType.BLEND,
@@ -195,10 +195,13 @@ class FilterFunkVibe : VibeProvider {
                 ),
                 handoffMatrix = bandMatrix(
                     //            DRUM  BASS  KEYS  FX
-                    "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
-                    "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
-                    "Keys" to row(0.20f, 0.35f, 0.00f, 0.20f),
-                    "FX" to row(0.15f, 0.30f, 0.30f, 0.00f),
+                    // FX leads on its GRN voice (track 7), audible now that a soloist
+                    // escapes the FX gate; kept rare so it is a colour, not a fifth of the
+                    // handoffs. EAR-TUNE(user owns after ear test)
+                    "Drummer" to row(0.00f, 0.35f, 0.40f, 0.05f),
+                    "Bassist" to row(0.25f, 0.00f, 0.40f, 0.05f),
+                    "Keys"    to row(0.20f, 0.40f, 0.00f, 0.05f),
+                    "FX"      to row(0.15f, 0.30f, 0.30f, 0.00f),
                 ),
                 pullInMatrix = bandMatrix(
                     //            DRUM  BASS  KEYS  FX

@@ -2,6 +2,7 @@
 #include "test_pulsar_helpers.h"
 #include "../src/pulsar_band_solo.h"
 #include "../src/pulsar_handoff.h"
+#include "../src/pulsar_pattern_gen.h"
 #include "../src/pulsar_rng.h"
 #include <cstdio>
 #include <cmath>
@@ -913,6 +914,538 @@ static bool test_simplify_false_keeps_ornament_hits() {
     return pass;
 }
 
+static bool test_solo_curves_are_seeded_and_deterministic() {
+    printf("\n=== Test: solo curves are deterministic per seed and differ across seeds ===\n");
+    KitRide a1 = kit_ride(0.5f, 1234u, 3), a2 = kit_ride(0.5f, 1234u, 3);
+    bool same = a1.density_mod == a2.density_mod && a1.volume_mod == a2.volume_mod;
+    bool differs = false;
+    for (int bar = 0; bar < 8 && !differs; bar++)
+        differs = kit_ride(0.5f, 1234u, bar).density_mod != kit_ride(0.5f, 99u, bar).density_mod;
+    float sh = solo_shape(1234u, kKitSalt);
+    bool in_range = sh >= kShapeMin && sh <= kShapeMax;
+    bool pass = same && differs && in_range;
+    printf("  same=%d differs=%d shape=%.3f -- %s\n", same, differs, sh, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_kit_ride_climbs_from_duck_to_boost() {
+    printf("\n=== Test: kit ride climbs from a density cut to a boost ===\n");
+    bool pass = true;
+    const uint32_t seeds[4] = {1u, 77u, 4242u, 0xBEEFu};
+    for (uint32_t s : seeds) {
+        KitRide lo = kit_ride(0.0f, s, 0), mid = kit_ride(0.6f, s, 19), hi = kit_ride(1.0f, s, 31);
+        bool climbs = (hi.density_mod - lo.density_mod) > 0.15f;
+        bool ordered = mid.density_mod > lo.density_mod - 2.0f * kKitJitter &&
+                       mid.density_mod < hi.density_mod + 2.0f * kKitJitter;
+        bool louder = hi.volume_mod > lo.volume_mod && lo.volume_mod >= 0.0f;
+        bool simp = lo.simplify && !hi.simplify;
+        bool ok = climbs && ordered && louder && simp;
+        printf("  seed %u: density %.3f -> %.3f -> %.3f volume %.3f -> %.3f simplify %d->%d -- %s\n",
+               s, lo.density_mod, mid.density_mod, hi.density_mod, lo.volume_mod, hi.volume_mod,
+               lo.simplify, hi.simplify, ok ? "OK" : "FAIL");
+        pass = pass && ok;
+    }
+    return pass;
+}
+
+static bool test_drum_arc_builds_and_climaxes_on_the_last_bar() {
+    printf("\n=== Test: drum arc builds hats and ghosts, climax only on the last bar ===\n");
+    DrumArc a0 = drum_arc(0.0f, false, 55u, 0), a1 = drum_arc(1.0f, false, 55u, 3);
+    DrumArc last = drum_arc(1.0f, true, 55u, 3);
+    bool hats = a1.hat_prob > a0.hat_prob + 0.3f;
+    bool ghosts = a0.ghost_prob <= kDrumGhostEnd * kDrumJitter + 1e-6f && a1.ghost_prob > 0.2f;
+    bool gain = a0.overlay_gain < a1.overlay_gain && a1.overlay_gain <= 1.0f;
+    bool climax = !a1.climax && last.climax;
+    bool pass = hats && ghosts && gain && climax;
+    printf("  hat %.2f->%.2f ghost %.2f->%.2f gain %.2f->%.2f climax %d/%d -- %s\n",
+           a0.hat_prob, a1.hat_prob, a0.ghost_prob, a1.ghost_prob, a0.overlay_gain, a1.overlay_gain,
+           a1.climax, last.climax, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ── The band builds behind the soloist (engine-level) ────────────────
+
+// Per-bar stats of a LickBuilder solo: the kit (0-2), the bass (3, SUPPORT) and the lead (4).
+struct SoloBar {
+    int kit_hits = 0; float kit_vel = 0.0f;
+    float bass_density_target = 0.0f;
+    float lead_density_current = 0.0f, lead_density_target = 0.0f;
+    bool active = false;
+    int bass_slaps = 0;
+};
+
+// Runs the engine and samples a SoloBar per bar. Shared by run_lickbuilder_capture
+// and any test that needs its own arrangement tweak before capture starts.
+// include_inactive also records bars where the solo has ended (default: solo-only,
+// matching the original capture behavior every existing caller relies on).
+static std::vector<SoloBar> capture_solo_bars(OrpheusEngine* engine, GraphUnit& unit, int want_bars,
+                                               int lead_track, bool include_inactive) {
+    std::vector<SoloBar> out;
+    int last_loop = -1; SoloBar cur; float prev_timer[kNumPulsarTracks] = {};
+    for (int b = 0; b < 40000 && (int)out.size() < want_bars; b++) {
+        unit_process_pulsar(&unit, engine, 128, 48000.0f);
+        PulsarState* ps = engine->pulsar_state; if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            if (last_loop >= 0 && (cur.active || include_inactive)) out.push_back(cur);
+            last_loop = ps->loop_count; cur = SoloBar{};
+            cur.active = ps->band_solo_state.active;
+            cur.lead_density_current = ps->tracks[lead_track].solo_density_mod_current;
+            cur.lead_density_target  = ps->tracks[lead_track].solo_density_mod;
+            cur.bass_density_target  = ps->tracks[3].solo_density_mod;
+            for (int s = 1; s < ps->tracks[3].step_count; s += 2) {
+                const PulsarStep& st = ps->tracks[3].steps[s];
+                if (st.gate && st.velocity == kBassSlapVelocity && st.duration == kBassSlapDuration) cur.bass_slaps++;
+            }
+        }
+        for (int t = 0; t < 4; t++) {
+            float g = ps->tracks[t].gate_timer;
+            if (g > prev_timer[t] + 1.0f && t < 3) {
+                cur.kit_hits++; cur.kit_vel += ps->tracks[t].current_velocity;
+            }
+            prev_timer[t] = g;
+        }
+    }
+    return out;
+}
+
+static std::vector<SoloBar> run_lickbuilder_capture(uint32_t seed, int want_bars, int lead_track = 4,
+                                                      bool include_inactive = false) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_seed.store(seed, std::memory_order_relaxed);
+    stmlib::Random::Seed(seed);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    push_lickbuilder_band_arrangement(engine, lead_track);
+    trigger_vibe_load(engine);
+
+    std::vector<SoloBar> out = capture_solo_bars(engine, unit, want_bars, lead_track, include_inactive);
+    orpheus_engine_destroy(engine);
+    return out;
+}
+
+// Louder is measured as summed kit velocity over the window (total kit energy), not the
+// mean per hit: past the simplify midpoint the quiet ghosts return, which raises the
+// total while lowering the mean, so a per-hit average would fight the busier assertion.
+// The margin has to clear the pre-feature baseline (kit_ride not wired, old fixed
+// -0.15/simplify branch): that baseline still drifts busier/louder by ~1.2x hits /
+// ~1.15x vel just from the duck easing off near the section's downbeat, so a bare
+// late > early would pass without the feature. With the feature wired the ride reaches
+// ~2.1x hits / ~1.9x vel, so 1.5x sits clear of the baseline and under the feature.
+static bool test_kit_builds_behind_the_soloist() {
+    printf("\n=== Test: the kit builds behind a melodic soloist ===\n");
+    std::vector<SoloBar> bars = run_lickbuilder_capture(0x51DE, 30);
+    if (bars.size() < 30) { printf("  only %zu solo bars captured -- FAIL\n", bars.size()); return false; }
+    int early_hits = 0, late_hits = 0; float early_vel = 0, late_vel = 0;
+    for (int i = 1; i <= 4; i++)   { early_hits += bars[i].kit_hits; early_vel += bars[i].kit_vel; }
+    for (int i = 25; i <= 28; i++) { late_hits  += bars[i].kit_hits; late_vel  += bars[i].kit_vel; }
+    bool busier = late_hits * 2 >= early_hits * 3;
+    bool louder = late_vel >= 1.5f * early_vel;
+    printf("  kit hits early=%d late=%d  total vel early=%.3f late=%.3f -- %s\n",
+           early_hits, late_hits, early_vel, late_vel, (busier && louder) ? "PASS" : "FAIL");
+    return busier && louder;
+}
+
+// The bass in this fixture is too sparse to prove an ease of up to half depth by
+// counting fires, so this pins the mechanism deterministically instead: the target
+// apply_band_solo_modifiers wrote that bar, not how many of its gated steps happened
+// to pass.
+static bool test_support_duck_eases_late_in_the_solo() {
+    printf("\n=== Test: a support track's density duck eases as the solo builds ===\n");
+    std::vector<SoloBar> bars = run_lickbuilder_capture(0x51DE, 30);
+    if (bars.size() < 30) return false;
+    float early_sum = 0, late_sum = 0;
+    for (int i = 1; i <= 6; i++)   early_sum += bars[i].bass_density_target;
+    for (int i = 23; i <= 28; i++) late_sum  += bars[i].bass_density_target;
+    float early_mean = early_sum / 6.0f, late_mean = late_sum / 6.0f;
+    bool both_ducked = early_mean < 0.0f && late_mean < 0.0f;
+    bool eased = (late_mean - early_mean) >= 0.05f;
+    bool pass = both_ducked && eased;
+    printf("  bass duck target mean early=%.4f late=%.4f (late-early=%.4f) -- %s\n",
+           early_mean, late_mean, late_mean - early_mean, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_soloist_entrance_lands_at_half_boost() {
+    printf("\n=== Test: the soloist's first bar starts at least half its boost ===\n");
+    std::vector<SoloBar> bars = run_lickbuilder_capture(0x51DE, 4);
+    if (bars.empty()) return false;
+    const SoloBar& first = bars[0];
+    bool pass = first.lead_density_target > 0.0f &&
+                first.lead_density_current >= kSoloEntranceFraction * first.lead_density_target - 1e-4f;
+    printf("  bar 1 density current=%.3f target=%.3f -- %s\n",
+           first.lead_density_current, first.lead_density_target, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_ducked_bass_gets_slaps() {
+    printf("\n=== Test: a ducked bass keeps slapping under the solo ===\n");
+    std::vector<SoloBar> bars = run_lickbuilder_capture(0x51DE, 12);
+    int slaps = 0; bool all_ducked = true;
+    for (const SoloBar& b : bars) {
+        slaps += b.bass_slaps;
+        if (b.bass_density_target >= 0.0f) all_ducked = false;
+    }
+    bool pass = bars.size() == 12 && slaps > 0 && all_ducked;
+    printf("  slap steps over %zu bars=%d all_ducked=%d -- %s\n",
+           bars.size(), slaps, all_ducked, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// Engine-level: solo_slaps_present must survive clear_solo_modifiers for the strip
+// pass to get a bar to run once the solo ends. Repoints the LickBuilder section's
+// self-loop at the NONE intro so it actually ends, and shrinks it from 32 bars to
+// 3 -- at 32 it lands exactly on the déjà-vu periodic reset (also 32 bars at
+// complexity 0), which regenerates the bass pattern on its own and would mask
+// whether this pass is what stripped it.
+static bool test_slaps_are_stripped_when_the_solo_ends() {
+    printf("\n=== Test: slaps are stripped once the solo ends ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    uint32_t seed = 0x51DE;
+    engine->pulsar_seed.store(seed, std::memory_order_relaxed);
+    stmlib::Random::Seed(seed);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    push_lickbuilder_band_arrangement(engine, 4);
+    // Section 1 (LICK_BUILDER, base = 1 * kSectionDataFields): shrink bars_min/max
+    // from 32 to 3, well clear of the 32-bar déjà-vu reset (see comment above).
+    engine->pulsar_section_data[kSectionDataFields + 0].store(3.0f, std::memory_order_relaxed);
+    engine->pulsar_section_data[kSectionDataFields + 1].store(3.0f, std::memory_order_relaxed);
+    // s1 edge 0 (base 8*3=24) normally self-loops (target=1); point it at
+    // section 0 (the 1-bar NONE intro) so the solo actually ends.
+    engine->pulsar_section_transitions[24].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_arrangement_generation.store(2, std::memory_order_release);
+    trigger_vibe_load(engine);
+
+    // 5 cycles of (1-bar NONE + 3-bar LickBuilder), all inside loop_count < 20 --
+    // comfortably short of bar 32, where the déjà-vu reset could otherwise fire.
+    std::vector<SoloBar> bars = capture_solo_bars(engine, unit, 20, 4, /*include_inactive=*/true);
+    orpheus_engine_destroy(engine);
+
+    bool any_slapped = false;
+    for (const SoloBar& b : bars) if (b.active && b.bass_slaps > 0) any_slapped = true;
+    bool found_end = false, stripped = false;
+    for (size_t i = 1; i < bars.size() && !found_end; i++) {
+        if (bars[i - 1].active && !bars[i].active) {
+            found_end = true;
+            stripped = bars[i].bass_slaps == 0;
+        }
+    }
+    bool pass = any_slapped && found_end && stripped;
+    printf("  bars=%zu any_slapped=%d found_end=%d stripped_on_end_bar=%d -- %s\n",
+           bars.size(), any_slapped, found_end, stripped, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool same_step(const PulsarStep& a, const PulsarStep& b) {
+    return a.note == b.note && a.gate == b.gate && a.velocity == b.velocity && a.duration == b.duration;
+}
+
+static bool test_drum_lead_hands_the_groove_back() {
+    printf("\n=== Test: a drum lead snapshots the groove and restores it on exit ===\n");
+    BandSoloConfigParam cfg{}; cfg.member_count = 2;
+    cfg.members[0].track_count = 3; cfg.members[0].tracks[0] = 0; cfg.members[0].tracks[1] = 1; cfg.members[0].tracks[2] = 2;
+    cfg.members[0].always_active = true;
+    cfg.members[1].track_count = 1; cfg.members[1].tracks[0] = 4;
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    for (int t = 0; t < 3; t++) { tracks[t].role = TrackRole::PERCUSSIVE; tracks[t].step_count = 16; }
+    tracks[4].role = TrackRole::MELODIC; tracks[4].step_count = 16;
+    for (int i = 0; i < 16; i += 4) tracks[0].steps[i] = make_step(36, 0.9f, true, 0.5f);
+    for (int i = 4; i < 16; i += 8) tracks[1].steps[i] = make_step(40, 0.8f, true, 0.4f);
+    for (int i = 0; i < 16; i += 2) tracks[2].steps[i] = make_step(42, 0.4f, true, 0.2f);
+    // PulsarTrackState embeds an OrpheusVoice (non-copyable, MI DISALLOW_COPY_AND_ASSIGN),
+    // so snapshot just the steps this test actually inspects rather than whole tracks.
+    PulsarStep before[3][kMaxPulsarSteps];
+    for (int t = 0; t < 3; t++) std::memcpy(before[t], tracks[t].steps, sizeof(before[t]));
+
+    BandSoloState st{}; st.active = true; st.lead_member = 0; st.drum_lead_style = 1;
+    st.member_role[0] = MemberSoloRole::LEADING; st.member_bars_remaining[0] = 3;
+    begin_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+    bool armed = st.drum_groove_valid && st.drum_span_bars == 3;
+
+    PulsarLickStep lick[4] = {{0, 1.0f, 0.9f, -1.0f}, {2, 1.0f, 0.5f, -1.0f}, {4, 1.0f, 0.3f, -1.0f}, {5, 1.0f, 0.8f, -1.0f}};
+    uint32_t seed = 7;
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st);
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st);
+    bool changed = false;
+    for (int i = 0; i < 16 && !changed; i++) changed = !same_step(tracks[0].steps[i], before[0][i]) || !same_step(tracks[2].steps[i], before[2][i]);
+
+    end_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+    bool restored = !st.drum_groove_valid;
+    for (int t = 0; t < 3 && restored; t++)
+        for (int i = 0; i < 16; i++) if (!same_step(tracks[t].steps[i], before[t][i])) { restored = false; break; }
+    bool pass = armed && changed && restored;
+    printf("  armed=%d changed_during=%d restored=%d -- %s\n", armed, changed, restored, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// A section seam with a carried lead ends the lead, lets the section re-author the kit,
+// then re-arms it. The re-arm has to snapshot the kit as it is NOW, or the new section's
+// density is buried under the old groove at the next restore.
+static bool test_drum_lead_resnapshots_after_a_section_seam() {
+    printf("\n=== Test: re-arming a drum lead snapshots the current kit, not the old groove ===\n");
+    BandSoloConfigParam cfg{}; cfg.member_count = 1;
+    cfg.members[0].track_count = 3; cfg.members[0].tracks[0] = 0; cfg.members[0].tracks[1] = 1; cfg.members[0].tracks[2] = 2;
+    cfg.members[0].always_active = true;
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    for (int t = 0; t < 3; t++) { tracks[t].role = TrackRole::PERCUSSIVE; tracks[t].step_count = 16; }
+    for (int i = 0; i < 16; i += 4) tracks[0].steps[i] = make_step(36, 0.9f, true, 0.5f);
+
+    BandSoloState st{}; st.active = true; st.lead_member = 0;
+    st.drum_lead_style = static_cast<int>(DrumLeadStyle::LOCK_IN);
+    st.member_role[0] = MemberSoloRole::LEADING; st.member_bars_remaining[0] = 4;
+    begin_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+    const int carried_span = st.drum_span_bars;
+
+    // The seam: hand the groove back, let the section re-author the kick, re-arm.
+    end_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+    for (int i = 0; i < 16; i++) tracks[0].steps[i] = make_step(36, 0.6f, (i % 2) == 0, 0.3f);
+    st.member_bars_remaining[0] = 1;
+    begin_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+
+    bool resnapped = st.drum_groove_valid;
+    for (int i = 0; i < 16 && resnapped; i++) resnapped = same_step(st.drum_groove[0][i], tracks[0].steps[i]);
+    // begin_drum_lead rewrites the span from member_bars_remaining, which is exactly why
+    // the engine puts the carried span back after re-arming a lead mid-span.
+    bool span_overwritten = carried_span == 4 && st.drum_span_bars == 1;
+    bool pass = resnapped && span_overwritten;
+    printf("  resnapped=%d span %d -> %d -- %s\n", resnapped, carried_span, st.drum_span_bars, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// A carried drum lead (jamCarry into a LONG_FILL section) that expires via the LongFill
+// bar-count path must still hand its groove back -- that path returns early and does not
+// go through the normal handoff expiry block.
+static bool test_long_fill_expiry_hands_the_groove_back() {
+    printf("\n=== Test: a LongFill expiry hands a carried drum lead's groove back ===\n");
+    BandSoloConfigParam cfg{}; cfg.member_count = 1;
+    cfg.members[0].track_count = 3; cfg.members[0].tracks[0] = 0; cfg.members[0].tracks[1] = 1; cfg.members[0].tracks[2] = 2;
+    cfg.members[0].always_active = true;
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    for (int t = 0; t < 3; t++) { tracks[t].role = TrackRole::PERCUSSIVE; tracks[t].step_count = 16; }
+    for (int i = 0; i < 16; i += 4) tracks[0].steps[i] = make_step(36, 0.9f, true, 0.5f);
+    for (int i = 4; i < 16; i += 8) tracks[1].steps[i] = make_step(40, 0.8f, true, 0.4f);
+    for (int i = 0; i < 16; i += 2) tracks[2].steps[i] = make_step(42, 0.4f, true, 0.2f);
+
+    BandSoloState st{}; st.active = true; st.lead_member = 0;
+    st.drum_lead_style = static_cast<int>(DrumLeadStyle::LOCK_IN);
+    st.member_role[0] = MemberSoloRole::LEADING; st.member_bars_remaining[0] = 1;
+    begin_drum_lead(st, cfg, tracks, kNumPulsarTracks);
+
+    // Snapshot what begin_drum_lead captured, then mutate the kit as a lick render
+    // would, so "restored" below is checking a real change, not a no-op.
+    PulsarStep before[3][kMaxPulsarSteps];
+    for (int t = 0; t < 3; t++) std::memcpy(before[t], tracks[t].steps, sizeof(before[t]));
+    PulsarLickStep lick[4] = {{0, 1.0f, 0.9f, -1.0f}, {2, 1.0f, 0.5f, -1.0f}, {4, 1.0f, 0.3f, -1.0f}, {5, 1.0f, 0.8f, -1.0f}};
+    uint32_t seed = 7;
+    render_drum_lead(cfg, tracks, kNumPulsarTracks, 0, DrumLeadStyle::LOCK_IN, lick, 4, 0.5f, seed, &st);
+    bool changed = false;
+    for (int i = 0; i < 16 && !changed; i++)
+        for (int t = 0; t < 3 && !changed; t++) changed = !same_step(tracks[t].steps[i], before[t][i]);
+
+    SectionParam section{}; section.solo_mode = SoloModeId::LONG_FILL;
+    section.solo_probability = 1.0f; section.solo_bars_min = 3; section.solo_bars_max = 3;
+    advance_band_solo(st, cfg, section, tracks, seed);
+
+    bool ended = !st.active;
+    bool cleared = !st.drum_groove_valid;
+    bool style_reset = st.drum_lead_style == -1;
+    bool restored = true;
+    for (int t = 0; t < 3 && restored; t++)
+        for (int i = 0; i < 16; i++) if (!same_step(tracks[t].steps[i], before[t][i])) { restored = false; break; }
+    bool pass = changed && ended && cleared && style_reset && restored;
+    printf("  changed_during=%d ended=%d groove_cleared=%d style_reset=%d restored=%d -- %s\n",
+           changed, ended, cleared, style_reset, restored, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// Engine-level drum lead. The 12% handoff gate is far too rare to hunt, so the drummer is
+// handed a BREAK span by hand at a loop wrap and the whole shape is watched go by: the deep
+// melodic duck from the very first bar, the bass still slapping under it, the climax on the
+// last bar, and the kit's own groove back on the release.
+struct LeadBar {
+    int style = -1, lead_fires = 0, lead_gated = 0, bass_fires = 0, bass_slaps = 0;
+    int hat_steps = 0, snare_q[4] = {0, 0, 0, 0};
+    float lead_dmod = 0.0f, lead_dcur = 0.0f;
+    bool kit_restored = false;
+};
+
+static bool test_drum_lead_end_to_end() {
+    printf("\n=== Test: a forced BREAK drum lead ducks, slaps, climaxes and restores ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_seed.store(0x51DE, std::memory_order_relaxed);
+    stmlib::Random::Seed(0x51DE);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    push_lickbuilder_band_arrangement(engine, 4);
+    trigger_vibe_load(engine);
+
+    std::vector<LeadBar> bars;
+    PulsarStep snap[3][kMaxPulsarSteps];
+    bool forced = false, recording = false;
+    int last_loop = -1, solo_bars = 0; LeadBar cur; float prev_timer[kNumPulsarTracks] = {};
+    for (int b = 0; b < 40000 && bars.size() < 5; b++) {
+        unit_process_pulsar(&unit, engine, 128, 48000.0f);
+        PulsarState* ps = engine->pulsar_state; if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            last_loop = ps->loop_count;
+            if (!forced) {
+                // Let the LickBuilder render the lead a few times first, so the track
+                // carries real gated steps into the break instead of an empty row.
+                if (ps->band_solo_state.active) solo_bars++;
+                if (solo_bars < 4) continue;
+                BandSoloState& bss = ps->band_solo_state;
+                bss.lead_member = 0;                                  // the drummer
+                bss.member_role[0] = MemberSoloRole::LEADING;
+                bss.member_role[1] = MemberSoloRole::ACTIVE;
+                bss.member_bars_remaining[0] = 3;
+                bss.member_bars_remaining[1] = 1;
+                bss.drum_lead_style = static_cast<int>(DrumLeadStyle::BREAK);
+                bss.last_handoff_was_drum = true;                     // no second drum span
+                begin_drum_lead(bss, ps->band_solo_config, ps->tracks, kNumPulsarTracks);
+                apply_band_solo_modifiers(ps->tracks, ps->band_solo_config, bss,
+                                          kNumPulsarTracks, ps->track_ducking);
+                for (int t = 0; t < 3; t++) std::memcpy(snap[t], ps->tracks[t].steps, sizeof(snap[t]));
+                forced = true;
+                continue;   // the poke lands mid-bar; record from the next one
+            }
+            if (recording) bars.push_back(cur);
+            recording = true; cur = LeadBar{};
+            cur.style = ps->band_solo_state.drum_lead_style;
+            cur.lead_dmod = ps->tracks[4].solo_density_mod;
+            cur.lead_dcur = ps->tracks[4].solo_density_mod_current;
+            const int sc = ps->tracks[0].step_count;
+            for (int i = 0; i < sc; i++) {
+                if (ps->tracks[4].steps[i].gate) cur.lead_gated++;
+                if (ps->tracks[2].steps[i].gate) cur.hat_steps++;
+                if (ps->tracks[1].steps[i].gate) cur.snare_q[(i * 4) / sc]++;
+            }
+            for (int i = 1; i < ps->tracks[3].step_count; i += 2) {
+                const PulsarStep& st = ps->tracks[3].steps[i];
+                if (st.gate && st.velocity == kBassSlapVelocity && st.duration == kBassSlapDuration) cur.bass_slaps++;
+            }
+            cur.kit_restored = true;
+            for (int t = 0; t < 3 && cur.kit_restored; t++)
+                for (int i = 0; i < sc; i++)
+                    if (!same_step(ps->tracks[t].steps[i], snap[t][i])) { cur.kit_restored = false; break; }
+        }
+        if (recording) {
+            for (int t = 3; t <= 4; t++) {
+                float g = ps->tracks[t].gate_timer;
+                if (g > prev_timer[t] + 1.0f) { if (t == 3) cur.bass_fires++; else cur.lead_fires++; }
+                prev_timer[t] = g;
+            }
+        }
+    }
+    orpheus_engine_destroy(engine);
+
+    for (size_t i = 0; i < bars.size(); i++)
+        printf("  bar %zu style=%2d lead %d/%d fires dmod=%.2f cur=%.2f  bass %d fires %d slaps  hats=%d snare_q=%d/%d/%d/%d restored=%d\n",
+               i, bars[i].style, bars[i].lead_fires, bars[i].lead_gated, bars[i].lead_dmod, bars[i].lead_dcur,
+               bars[i].bass_fires, bars[i].bass_slaps, bars[i].hat_steps,
+               bars[i].snare_q[0], bars[i].snare_q[1], bars[i].snare_q[2], bars[i].snare_q[3], bars[i].kit_restored);
+
+    int first_lead = -1, last_lead = -1;
+    for (size_t i = 0; i < bars.size(); i++)
+        if (bars[i].style >= 0) { if (first_lead < 0) first_lead = (int)i; last_lead = (int)i; }
+    // The span must open on the very first recorded bar and close inside the window.
+    bool shape = first_lead == 0 && last_lead + 1 < (int)bars.size() && bars[last_lead + 1].style < 0;
+    const int release = shape ? last_lead + 1 : 0;
+
+    // (a) The BREAK-ducked melodic non-lead is all but silent, at full depth from bar one.
+    bool ducked = shape;
+    int bass_fires = 0, bass_slaps = 0;
+    for (int i = first_lead; shape && i <= last_lead; i++) {
+        int cap = static_cast<int>((1.0f + kBreakMelodicDuck) * bars[i].lead_gated) + 1;
+        if (bars[i].lead_gated <= 0 || bars[i].lead_fires > cap) ducked = false;
+        if (bars[i].lead_dcur != kBreakMelodicDuck) ducked = false;   // a cut, not a fade-in
+        bass_fires += bars[i].bass_fires; bass_slaps += bars[i].bass_slaps;
+    }
+    // (b) The bass thins but keeps popping under the break.
+    bool bass_ok = bass_fires > 0 && bass_slaps > 0;
+    // (c) The kit gets its own groove back on the release, and the lead sings again.
+    bool restored = shape && bars[release].kit_restored &&
+                    bars[release].lead_dmod > kBreakMelodicDuck &&
+                    (bars[release].lead_fires > 0 ||
+                     (release + 1 < (int)bars.size() && bars[release + 1].lead_fires > 0));
+    // (d) The climax: the last drum-lead bar ends on a full snare ramp the span's first
+    // bar does not have.
+    bool climax = shape && bars[last_lead].snare_q[3] == 4 &&
+                  bars[last_lead].snare_q[3] > bars[first_lead].snare_q[3];
+
+    bool pass = shape && ducked && bass_ok && restored && climax;
+    printf("  span=[%d..%d] release=%d ducked=%d bass(fires=%d slaps=%d)=%d restored=%d climax=%d -- %s\n",
+           first_lead, last_lead, release, ducked, bass_fires, bass_slaps, bass_ok,
+           restored, climax, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_break_is_a_deep_duck_that_lands() {
+    printf("\n=== Test: BREAK deep-ducks the melody and bass through the duck, snapping both ways ===\n");
+    BandSoloConfigParam cfg{}; cfg.member_count = 3;
+    cfg.members[0].track_count = 3; cfg.members[0].tracks[0] = 0; cfg.members[0].tracks[1] = 1; cfg.members[0].tracks[2] = 2; cfg.members[0].always_active = true;
+    cfg.members[1].track_count = 1; cfg.members[1].tracks[0] = 3;   // bass
+    cfg.members[2].track_count = 1; cfg.members[2].tracks[0] = 4;   // lead
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    for (int t = 0; t < 3; t++) tracks[t].role = TrackRole::PERCUSSIVE;
+    tracks[3].role = tracks[4].role = tracks[5].role = TrackRole::MELODIC;   // 5 = in no member
+    BandSoloState st{}; st.active = true; st.lead_member = 0;
+    st.drum_lead_style = static_cast<int>(DrumLeadStyle::BREAK);
+    st.member_role[0] = MemberSoloRole::LEADING; st.member_role[1] = st.member_role[2] = MemberSoloRole::SUPPORT;
+    apply_band_solo_modifiers(tracks, cfg, st);
+    bool melody = tracks[4].solo_density_mod == kBreakMelodicDuck && tracks[4].solo_density_mod_current == kBreakMelodicDuck
+               && tracks[5].solo_density_mod == kBreakMelodicDuck && tracks[5].solo_density_mod_current == kBreakMelodicDuck;
+    bool bass = tracks[3].solo_density_mod == kBreakBassDensityDuck && tracks[3].solo_density_mod_current == kBreakBassDensityDuck;
+    bool kit = tracks[0].solo_density_mod > 0.0f;
+
+    // Release: the lead passes to member 2; the ex-ducked tracks land on their new depth.
+    st.drum_lead_style = -1; st.break_released = true; st.lead_member = 2;
+    st.member_role[0] = MemberSoloRole::SUPPORT; st.member_role[2] = MemberSoloRole::LEADING;
+    apply_band_solo_modifiers(tracks, cfg, st);
+    bool landed = tracks[3].solo_density_mod_current == tracks[3].solo_density_mod
+               && tracks[5].solo_density_mod_current == tracks[5].solo_density_mod
+               && tracks[3].solo_density_mod > kBreakBassDensityDuck;
+    bool new_lead = tracks[4].is_soloist && tracks[4].solo_density_mod > 0.0f;
+    bool pass = melody && bass && kit && landed && new_lead;
+    printf("  melody=%d bass=%d kit=%d landed=%d new_lead=%d -- %s\n", melody, bass, kit, landed, new_lead, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_pulsar_band_solo_tests() {
     printf("\n========== PULSAR BAND SOLO TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -934,6 +1467,19 @@ bool run_pulsar_band_solo_tests() {
     tally(test_unauthored_render_is_bit_identical());
     tally(test_duck_depth_reaches_the_audio());
     tally(test_simplify_false_keeps_ornament_hits());
+    tally(test_solo_curves_are_seeded_and_deterministic());
+    tally(test_kit_ride_climbs_from_duck_to_boost());
+    tally(test_drum_arc_builds_and_climaxes_on_the_last_bar());
+    tally(test_kit_builds_behind_the_soloist());
+    tally(test_support_duck_eases_late_in_the_solo());
+    tally(test_soloist_entrance_lands_at_half_boost());
+    tally(test_ducked_bass_gets_slaps());
+    tally(test_slaps_are_stripped_when_the_solo_ends());
+    tally(test_drum_lead_hands_the_groove_back());
+    tally(test_drum_lead_resnapshots_after_a_section_seam());
+    tally(test_long_fill_expiry_hands_the_groove_back());
+    tally(test_drum_lead_end_to_end());
+    tally(test_break_is_a_deep_duck_that_lands());
     printf("\nPulsar band solo tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

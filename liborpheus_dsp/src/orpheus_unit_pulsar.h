@@ -318,6 +318,10 @@ struct PulsarTrackState {
     bool  solo_simplify = false;
     float solo_reverb_mod = 0.0f;
     bool  is_soloist = false;
+    // Bass only: true once the solo pass has inserted slaps. Deliberately survives
+    // clear_solo_modifiers (which zeroes every other solo_* field) so the strip
+    // pass gets one more bar to run after the solo actually ends.
+    bool  solo_slaps_present = false;
 
     // Mod LFO: per-track modulation for TEXTURE/FX (tracks 5-7)
     frames::PolyLfo mod_poly_lfo;
@@ -815,6 +819,14 @@ struct BandSoloState {
     // Bars this solo has run (advance_band_solo increments, start/clear zero).
     // Numerator of jam_solo_progress() — the jam's build, not a per-soloist arc.
     int bars_elapsed = 0;
+    // Drum lead: the kit's groove at the handoff in, restored on the handoff out, and
+    // the span so the render can place its climax. Rows are kick/snare/hat.
+    PulsarStep drum_groove[3][kMaxPulsarSteps] = {};
+    bool drum_groove_valid = false;
+    int  drum_span_bars = 0;
+    // True for the one bar after a BREAK lead hands off: ducked tracks land on their new
+    // depth instead of slewing to it.
+    bool break_released = false;
 };
 
 // Wah Anomaly config (unpacked from pulsar_wah_data). Mirrors the Kotlin
