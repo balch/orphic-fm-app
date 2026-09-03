@@ -343,6 +343,12 @@ struct PulsarTrackState {
     bool gate_pre_boundary = false;
     bool pending_retrig = false;
 
+    // Velocity of the step that last FIRED, after complexity variation, the solo
+    // volume duck and volume tension. The render reads this rather than the raw
+    // step so those three reach the voice; a gated step that lost its density
+    // roll leaves it alone, since the voice is still on the note that did fire.
+    float current_velocity = 0.8f;
+
     // Reverb send brightness filter (one-pole LP per channel)
     float reverb_send_filter_state_l = 0.0f;
     float reverb_send_filter_state_r = 0.0f;

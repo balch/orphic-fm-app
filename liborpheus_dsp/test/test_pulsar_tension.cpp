@@ -1,6 +1,7 @@
 #include "test_harness.h"
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
+#include "stmlib/utils/random.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -46,8 +47,64 @@ static bool test_tension_outer_modulation() {
     return ok;
 }
 
+// The arithmetic test below proves the FORMULA. It passed for as long as the
+// engine computed that scale into a local and then threw it away, so this one
+// renders instead: with volume tension armed, a bar at low tension intensity
+// must come out quieter than one at high intensity.
+static bool test_tension_volume_reaches_the_render() {
+    printf("\n=== Test: Volume tension is audible in the render ===\n");
+    auto bar_rms = [](float vol_tension) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+        unit.type = UNIT_PULSAR; unit.enabled = true;
+        engine->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
+        setup_fixture_baseline(engine);
+        pin_pulsar_rngs(engine);
+        // One 8-bar inner ramp, no outer cycle: intensity climbs 0 -> 7/8.
+        engine->pulsar_tension_inner_bars.store(8, std::memory_order_relaxed);
+        engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+        engine->pulsar_tension_volume.store(vol_tension, std::memory_order_relaxed);
+        engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+
+        std::vector<double> sum(8, 0.0); std::vector<int> n(8, 0);
+        for (int i = 0; i < 3000; i++) {
+            unit_process_pulsar(&unit, engine, 256, 48000.0f);
+            PulsarState* ps = engine->pulsar_state;
+            if (!ps) continue;
+            int bar = ps->loop_count;
+            if (bar < 0 || bar >= 8) continue;
+            for (int s = 0; s < 256; s++) {
+                sum[bar] += (double)engine->pulsar_out_l[s] * engine->pulsar_out_l[s];
+                n[bar]++;
+            }
+        }
+        std::vector<float> rms(8, 0.0f);
+        for (int b = 0; b < 8; b++) rms[b] = n[b] ? (float)std::sqrt(sum[b] / n[b]) : 0.0f;
+        orpheus_engine_destroy(engine);
+        return rms;
+    };
+
+    // pin_pulsar_rngs re-seeds the process-global stmlib::Random, so hand it back
+    // exactly as found or every suite ordered after this one shifts.
+    const auto saved_random = stmlib::Random::state();
+    auto off = bar_rms(0.0f);
+    auto on  = bar_rms(0.9f);
+    stmlib::Random::Seed(saved_random);
+    // Armed, the early (low-intensity) bars must be pulled down relative to the
+    // late ones; disarmed, that ratio is whatever the pattern happens to do.
+    float on_ratio  = (on[6]  > 1e-6f) ? on[0]  / on[6]  : 1.0f;
+    float off_ratio = (off[6] > 1e-6f) ? off[0] / off[6] : 1.0f;
+    printf("  early/late RMS: tension off = %.3f, tension on = %.3f\n", off_ratio, on_ratio);
+    bool ok = on_ratio < off_ratio * 0.95f;
+    printf("  volume tension reaches the voice: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_tension_volume_scaling() {
-    printf("\n=== Test: Volume tension scales velocity ===\n");
+    printf("\n=== Test: Volume tension scales velocity (formula only) ===\n");
     float vol = 0.5f;
     // At intensity=0: scale = 1 - 0.5*0.3*1.0 = 0.85
     float scale_low = 1.0f - vol * 0.3f * (1.0f - 0.0f);
@@ -641,6 +698,7 @@ bool run_pulsar_tension_tests() {
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_tension_inner_phase());
     tally(test_tension_outer_modulation());
+    tally(test_tension_volume_reaches_the_render());
     tally(test_tension_volume_scaling());
     tally(test_tension_timing_scaling());
     tally(test_tension_evolution_attack_point());

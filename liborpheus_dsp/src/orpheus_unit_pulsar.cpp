@@ -1534,6 +1534,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.tides_env_level = 0.0f;
         ts.current_pitch = 60.0f;
         ts.target_pitch = 60.0f;
+        ts.current_velocity = 0.8f;
         ts.glide_rate = 0.0f;
         ts.prev_step_gated = false;
         ts.last_chord_index = -1;
@@ -4047,6 +4048,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 float vel_scale = 1.0f - vol_tension * 0.3f * (1.0f - state->tension_intensity);
                                 vel = clamp01(vel * vel_scale);
                             }
+                            // Carry it to the render. Without this the three modifiers
+                            // above are computed and discarded, and the voice hears the
+                            // raw authored velocity.
+                            ts.current_velocity = vel;
 
                             // Sample-accurate trigger: remember where in this
                             // block the step boundary landed. The render is
@@ -4337,7 +4342,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
             const PulsarStep& step = ts.steps[ts.playhead];
             if (step.gate) {
-                accent_for_render = step.velocity;
+                accent_for_render = ts.current_velocity;
             }
         }
 
