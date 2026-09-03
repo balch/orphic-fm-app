@@ -109,33 +109,32 @@
   <script>
     // Each entry produces one landscape large-screen frame. Render with e.g.
     //   --window-size=2560,1600 (tablet) or --window-size=2752,2064 (iPad 13").
+    // Headlines and subheads are the phone frames' verbatim, from frame.html — the listing says
+    // the same things about the same screens whatever the device, so a large-screen shot is not
+    // pitching the app differently from the phone one beside it.
     const FRAMES = [
+      // 0-1: Android tablet (2560x1600).
       {
         img: "../screenshots/large-01-dock.png",
-        headline: "The whole rig,\non one screen",
-        subhead: "Deck, mixer, macros and timer — no tabbing, no hunting",
+        headline: "Four knobs.\nYou conduct.",
+        subhead: "Energy · Complexity · Mood · Space",
       },
       {
         img: "../screenshots/large-02-catalog.png",
-        headline: "Eleven vibes,\nendless variations",
-        subhead: "From swampy heartland rock to deep ambient drift",
+        headline: "Pick your vibe,\nendless variations",
+        subhead: "From upbeat grooves to deep ambient drones",
       },
-      {
-        img: "../screenshots/large-03-storm.png",
-        headline: "Songs with weather",
-        subhead: "Rain, thunder that rolls past, lightning that cracks",
-      },
-      // 3-4: iPad 13" landscape (2752x2064). Deliberately a different vibe and visualization
+      // 2-3: iPad 13" landscape (2752x2064). Deliberately a different vibe and visualization
       // from each other, so the pair does not read as one screen shot twice.
       {
         img: "../screenshots/ipad-01-dock.png",
-        headline: "The whole rig,\non one screen",
-        subhead: "Deck, macros and timer side by side — nothing buried in a tab",
+        headline: "Four knobs.\nYou conduct.",
+        subhead: "Energy · Complexity · Mood · Space",
       },
       {
         img: "../screenshots/ipad-02-mix.png",
-        headline: "See every part,\nride every level",
-        subhead: "Eight generative tracks, mixed live while the song rearranges itself",
+        headline: "Ride the mix, live",
+        subhead: "Balance every track in real time",
       },
     ];
 
