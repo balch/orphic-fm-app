@@ -2,26 +2,22 @@ package org.balch.orpheus.ui.widgets
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -67,7 +62,6 @@ import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
-import org.balch.orpheus.ui.theme.proportional
 
 // Metrics lifted from Material3's own Menu.kt so the lazy menu is visually indistinguishable
 // from the DropdownMenu it replaces. Only the *layout strategy* changed, not the look.
@@ -88,17 +82,6 @@ private val MenuContainerVerticalPadding: Dp = 8.dp
 
 /** Corner radius of the menu surface. Matches M3's `MenuDefaults.shape`. */
 private val MenuCornerRadius: Dp = 4.dp
-
-/**
- * Insets of the anchor chip's content, and so the chip's height: the label row has no explicit
- * height and sizes to its text plus these.
- *
- * Public because panels hand-roll chips that sit directly beside a dropdown (Pulsar's ENV
- * cycle button is one), and a chip that keeps its own numbers falls out of step the moment
- * these change. Use them for anything that has to line up with a dropdown.
- */
-val ChipHorizontalPadding: Dp = 12.dp
-val ChipVerticalPadding: Dp = 8.dp
 
 /** Drop shadow under the menu surface. Matches M3's `MenuDefaults.ShadowElevation`. */
 private val MenuShadowElevation: Dp = 3.dp
@@ -183,8 +166,12 @@ private class AnchoredMenuPositionProvider(private val gapPx: Int) : PopupPositi
  *   for the manual anomaly trigger.
  * @param highlight 0f..1f "armed"/active tint on the anchor chip, lerped toward
  *   [OrpheusColors.cosmicPurple].
+ * @param minWidth optional width floor. Unset by default: the anchor grows to fit its value rather
+ *   than being padded to a width it doesn't need.
+ * @param valueMaxWidth optional ceiling on the value text, which ellipsizes past it. Caps how much
+ *   of a row one long value can take, so the row stays predictable at any name length. The arrow
+ *   sits outside it and is never pushed off.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> EnumDropdown(
     label: String,
@@ -197,6 +184,8 @@ fun <T> EnumDropdown(
     onLongPress: (() -> Unit)? = null,
     highlight: Float = 0f,
     labelColor: Color = color.lighten(),
+    minWidth: Dp = Dp.Unspecified,
+    valueMaxWidth: Dp = Dp.Unspecified,
     menuWidth: Dp = 180.dp,
     // ~8 rows at 48dp. M3's menu grew to nearly the full window on a 47-item list; capping it
     // keeps the popup on screen without making browsing feel cramped.
@@ -218,69 +207,46 @@ fun <T> EnumDropdown(
         entries.indexOfFirst { displayName(it) == selectedDisplay }
     }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    LabeledDropdown(
+        label = label,
+        onClick = { expanded = true },
         modifier = modifier,
+        labelColor = labelColor,
+        background = backgroundColor,
+        minWidth = minWidth,
+        onLongClick = onLongPress,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.proportional(),
-            color = labelColor,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-        )
-
-        Spacer(Modifier.height(2.dp))
-
-        Box(
-            // Order matters: clip first so the press ripple is bounded by the rounded corners,
-            // then background, then the click handler, then padding so the padded area stays
-            // part of the touch target.
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(backgroundColor)
-                .combinedClickable(
-                    onClick = { expanded = true },
-                    onLongClick = onLongPress,
-                )
-                .padding(horizontal = ChipHorizontalPadding, vertical = ChipVerticalPadding),
-            contentAlignment = Alignment.Center,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = selectedDisplay,
-                    color = color,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Select $label",
-                    tint = color,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
+            DropdownValueText(
+                text = selectedDisplay,
+                color = color,
+                modifier = Modifier.widthIn(max = valueMaxWidth),
+            )
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = "Select $label",
+                tint = color,
+                modifier = Modifier.size(DropdownIconSize),
+            )
+        }
 
-            if (expanded) {
-                EnumDropdownMenu(
-                    entries = entries,
-                    displayName = displayName,
-                    selectedIndex = selectedIndex,
-                    color = color,
-                    menuWidth = menuWidth,
-                    menuMaxHeight = menuMaxHeight,
-                    onSelected = {
-                        onSelected(it)
-                        expanded = false
-                    },
-                    onDismiss = { expanded = false },
-                )
-            }
+        if (expanded) {
+            EnumDropdownMenu(
+                entries = entries,
+                displayName = displayName,
+                selectedIndex = selectedIndex,
+                color = color,
+                menuWidth = menuWidth,
+                menuMaxHeight = menuMaxHeight,
+                onSelected = {
+                    onSelected(it)
+                    expanded = false
+                },
+                onDismiss = { expanded = false },
+            )
         }
     }
 }

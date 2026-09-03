@@ -8,21 +8,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,12 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
@@ -55,37 +45,40 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
-import org.balch.orpheus.ui.theme.proportional
-import org.balch.orpheus.ui.widgets.ChipHorizontalPadding
-import org.balch.orpheus.ui.widgets.ChipVerticalPadding
+import org.balch.orpheus.ui.widgets.DropdownCycleMinWidth
+import org.balch.orpheus.ui.widgets.DropdownValueText
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.EnumDropdown
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
+import org.balch.orpheus.ui.widgets.LabeledDropdown
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Index lists for the ROOT and SCALE dropdowns.
  *
- * Hoisted to top level on purpose: building these inline with `.indices.toList()` allocated a
- * fresh `List` on every recomposition, and because `List` is an unstable type that also defeated
- * skipping for both dropdowns. PulsarPanel's body recomposes at visualization frame rate (it
- * reads `vizData`), so that was a per-frame allocation plus a per-frame recompose.
+ * Top level because this body recomposes at viz frame rate. Built inline, `.indices.toList()`
+ * allocated a fresh unstable `List` every frame, which also defeated skipping for both dropdowns.
  */
 private val PULSAR_NOTE_INDICES: List<Int> = PULSAR_NOTE_NAMES.indices.toList()
 private val PULSAR_SCALE_INDICES: List<Int> = PULSAR_SCALE_NAMES.indices.toList()
 
 /**
+ * Ceiling on the VIBE value, past which the name ellipsizes.
+ *
+ * The selector row is a single non-wrapping line, so its width has to be predictable. ROOT, SCALE
+ * and ENV are all short and bounded; VIBE is the only one whose length is open-ended, so capping it
+ * caps the row. Sized to hold a two-word name and keep the four inside a phone's width.
+ */
+private val VibeValueMaxWidth: Dp = 72.dp
+
+/**
  * Pulsar Beat Machine panel.
  *
- * Layout:
- * 1. Header row: Kit cycle button + Root dropdown + Scale dropdown + Mix knob + BPM knob
- * 2. Step grid (tappable for track selection)
- * 3. Voice detail strip (only when track selected)
- * 4. Macro knobs: ENERGY, COMPLEXITY, SPACE, MOOD, DELAY, REVERB
+ * Top to bottom: VIBE/ROOT/SCALE/ENV selectors, the step grid, a voice detail strip that appears
+ * only with a track selected, the PERC/BPM/DEEP/ENDING row, then the macro knobs.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PulsarPanel(
     pulsar: PulsarFeature,
@@ -97,9 +90,8 @@ fun PulsarPanel(
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
     fillHeight: Boolean = true,
-    // TV docks the vibe-ending picker as its own bottom-bar button (see DjTvBottomBar's "Ends"
-    // item) so it stays reachable without expanding this panel; PERC/BPM/DEEP stay put here on
-    // every layout. Phone/tablet/desktop keep ENDING in the panel exactly as before.
+    // TV docks ENDING as its own bottom-bar button (DjTvBottomBar's "Ends") so it stays reachable
+    // without expanding this panel. Everywhere else it stays here.
     showEndingControl: Boolean = true,
 ) {
     val vizData by vizFlow.collectAsState()
@@ -118,24 +110,25 @@ fun PulsarPanel(
         val arrangementState by pulsar.arrangementStateFlow.collectAsState()
         val actions = pulsar.actions
 
-        // Row 1: Selectors only — skipped on real TV hardware, not the LargeScreen layout signal
-        // (a tablet/fullscreen desktop also enters LargeScreen but must keep this row): VIBE is
-        // duplicated in the TV top bar, but ROOT/SCALE/ENV have no other entry point anywhere.
-        // Skipping composition (not just hiding) matters on TV — this panel is its heaviest.
+        // Gated on TV hardware, not LargeScreen: a tablet or fullscreen desktop is LargeScreen
+        // too and must keep this row. VIBE is duplicated in the TV top bar, ROOT/SCALE/ENV are
+        // not, so TV loses them. Skipping composition rather than hiding matters on TV, where
+        // this is the heaviest panel.
         if (!LocalTelevisionHardware.current) {
+            // Deliberately one line that never wraps. A Row measures each child against what the
+            // earlier ones left over, so the only thing that can squeeze the rest is VIBE, whose
+            // value length is unbounded. VibeValueMaxWidth caps it, which keeps the row's total
+            // inside a phone's width without anything having to reflow.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Top,
             ) {
                 val vibeList = remember { pulsar.vibeList }
-                // The manual anomaly trigger arms the Void Anomaly (equivalent to the
-                // ENDING pill's outro arm); the dropdown tints cosmicPurple while armed
-                // so the user knows the trigger took effect. Once the duck actually
-                // starts, voidGain (live from the C++ audio thread) dips below 1 and
-                // deepens the tint further — it breathes back as the mix returns.
+                // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
+                // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
+                // dips below 1 and deepens the tint, breathing back as the mix returns.
                 val anomalyArmed by actions.anomalyArmed.collectAsState()
                 EnumDropdown(
-                    modifier = Modifier.widthIn(max = 120.dp),
                     label = "VIBE",
                     selectedDisplay = state.vibe.name,
                     entries = vibeList,
@@ -144,6 +137,7 @@ fun PulsarPanel(
                     color = OrpheusColors.cosmicPurple,
                     onLongPress = actions.onTriggerAnomaly,
                     highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - vizData.voidGain),
+                    valueMaxWidth = VibeValueMaxWidth,
                     // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
                     menuWidth = 200.dp,
                 )
@@ -169,57 +163,30 @@ fun PulsarPanel(
                     menuWidth = 140.dp,
                 )
 
-                // Envelope mode toggle
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                // Cycles in place instead of opening a menu, but wears the same LabeledDropdown
+                // as its neighbours so it can't drift out of step. Needs the floor: without it,
+                // tapping AD to WAVES to BLEND resizes on every tap.
+                LabeledDropdown(
+                    label = "ENV",
+                    onClick = { actions.setEnvelopeMode((state.envelopeMode + 1) % 3) },
+                    minWidth = DropdownCycleMinWidth,
                 ) {
-                    Text(
-                        text = "ENV",
-                        style = MaterialTheme.typography.labelSmall.proportional(),
-                        color = OrpheusColors.cosmicPurple.lighten(),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
+                    DropdownValueText(
+                        text = when (state.envelopeMode) {
+                            1 -> "WAVES"
+                            2 -> "BLEND"
+                            else -> "AD"
+                        },
+                        color = OrpheusColors.cosmicPurple,
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Box(
-                        modifier = Modifier
-                            .clickable { actions.setEnvelopeMode((state.envelopeMode + 1) % 3) }
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
-                            // Shares the dropdowns' insets: ENV sits in the same row as
-                            // VIBE/ROOT/SCALE, so its own numbers would read as a misalignment.
-                            .padding(
-                                horizontal = ChipHorizontalPadding,
-                                vertical = ChipVerticalPadding,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            modifier = Modifier.widthIn(min = 40.dp),
-                            text = when (state.envelopeMode) {
-                                1 -> "WAVES"
-                                2 -> "BLEND"
-                                else -> "AD"
-                            },
-                            color = OrpheusColors.cosmicPurple,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
                 }
-
             }
         }
 
-        // Row 2: Knobs flanking the step grid
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-
-            // Center: Step grid — weight(1f) fills remaining Row space, max capped inside
             val activeTransition by actions.activeTransition.collectAsState()
             val finalSectionIdx by actions.finalSectionIndex.collectAsState()
             val songEndingOn by actions.songEndingEnabled.collectAsState()
@@ -237,8 +204,8 @@ fun PulsarPanel(
                 arrangement = state.vibe.arrangement,
                 activeTransition = activeTransition,
                 finalSectionIndex = finalSectionIdx,
-                // resolvedStyle has RANDOM already pre-rolled to a concrete
-                // substyle, so the suffix never reads "verse 3/8 — RANDOM".
+                // RANDOM is already pre-rolled to a concrete substyle here, so the suffix
+                // never reads "verse 3/8, RANDOM".
                 pendingTransition = if (songEndingOn) resolvedStyle else null,
                 modifier = Modifier
                     .width(360.dp)
@@ -248,8 +215,7 @@ fun PulsarPanel(
             )
         }
 
-        // Row 3: Voice detail strip with animated show/hide
-        // Auto-dismiss after 10s of inactivity, suppressed while picker is open
+        // Voice detail strip. Auto-dismisses after 10s idle, suppressed while a picker is open.
         AnimatedVisibility(
             visible = state.selectedTrack != null,
             enter = fadeIn(tween(300)) + expandVertically(tween(300)),
@@ -382,23 +348,17 @@ fun PulsarPanel(
                 valueFormatter = null,
             )
 
-            // Auto-end + transition style pill: shows active style when enabled,
-            // PLAYS when not. Tap opens the transition settings sheet. Long-press
-            // arms the outro immediately — equivalent to the auto-trigger firing
-            // now, regardless of playing-time or random roll. When armed, the
-            // pill background tints to cosmicPurple so the user knows their
-            // long-press took effect; resets when the next vibe loads.
+            // Shows the active transition style when auto-end is on, PLAYS when off. Tap opens
+            // the settings sheet. Long press arms the outro now, skipping the playing-time and
+            // random-roll checks, and tints the background until the next vibe loads.
             //
-            // TV moves this control to the bottom bar's "Ends" button (see
-            // showEndingControl) — gated here rather than removed so PERC/BPM/DEEP still just
-            // reflow across a Row with one fewer child, no leftover gap.
+            // Gated rather than removed so the row reflows with one fewer child on TV.
             if (showEndingControl) {
                 val songEndingEnabled by actions.songEndingEnabled.collectAsState()
                 val transitionSpec by actions.transitionSpec.collectAsState()
                 val outroArmed by actions.outroArmed.collectAsState()
-                // Pill reflects the user's PICKED mode (RANDOM stays RANDOM) — the
-                // resolved substyle shows up in the step-grid final-section suffix
-                // and is what actually fires.
+                // Shows the picked mode, so RANDOM stays RANDOM. The resolved substyle is what
+                // actually fires, and it shows up in the step grid's final-section suffix.
                 val pillLabel = if (songEndingEnabled) transitionSpec.style.name else "PLAYS"
                 var showTransitionSheet by remember { mutableStateOf(false) }
                 val pillBg = if (outroArmed) {
@@ -407,39 +367,16 @@ fun PulsarPanel(
                     OrpheusColors.darkVoid.copy(alpha = 0.6f)
                 }
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Same floor as ENV, same reason: the label swings between PLAYS and whichever
+                // style is picked.
+                LabeledDropdown(
+                    label = "ENDING",
+                    onClick = { showTransitionSheet = true },
+                    onLongClick = { actions.onArmOutro() },
+                    background = pillBg,
+                    minWidth = DropdownCycleMinWidth,
                 ) {
-                    Text(
-                        text = "ENDING",
-                        color = OrpheusColors.cosmicPurple.lighten(),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelSmall.proportional(),
-                        maxLines = 1,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .combinedClickable(
-                                onClick = { showTransitionSheet = true },
-                                onLongClick = { actions.onArmOutro() },
-                            )
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(pillBg)
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            modifier = Modifier.widthIn(min = 60.dp),
-                            text = pillLabel,
-                            color = OrpheusColors.cosmicPurple,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                        )
-                    }
+                    DropdownValueText(text = pillLabel, color = OrpheusColors.cosmicPurple)
                 }
 
                 if (showTransitionSheet) {
@@ -455,7 +392,6 @@ fun PulsarPanel(
             }
         }
 
-        // Row 4: Big macro knobs
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Bottom,
@@ -508,7 +444,6 @@ fun PulsarPanel(
             )
         }
 
-        // (small knobs now flank the grid above)
     }
 }
 
@@ -531,9 +466,8 @@ private fun PulsarPanelPreview() {
 @Composable
 private fun PulsarPanelNoEndingPreview() {
     OrpheusTheme {
-        // LocalTelevisionHardware=true drops Row 1 (VIBE/ROOT/SCALE/ENV); LocalTvFocusChrome=true
-        // gives the knobs their TV focus treatment; showEndingControl=false drops the ENDING pill
-        // — matches exactly what DjAppScreen provides when this panel is docked on real TV hardware.
+        // Matches what DjAppScreen provides on real TV hardware: no selector row, TV focus
+        // treatment on the knobs, and ENDING moved out to the bottom bar.
         CompositionLocalProvider(
             LocalTvFocusChrome provides true,
             LocalTelevisionHardware provides true,
