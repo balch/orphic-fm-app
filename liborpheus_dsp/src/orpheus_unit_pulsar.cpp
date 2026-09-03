@@ -4002,7 +4002,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // TEXTURE/FX tracks (5-7) at low energy bypass gating so hold
                         // chains reliably start — the pattern generator already controls
                         // density, and the energy volume curve handles presence.
-                        float base_prob = energy * 0.6f + 0.4f;  // 40% at energy=0, 100% at energy=1
+                        // Per-track energy->density macro. This was a hardcoded
+                        // 0.4->1.0 ramp, which left energy_density the only macro
+                        // target in the map with no consumer at all: every vibe
+                        // authored it and nothing ever read it. Defaults (0.3->0.8)
+                        // are sparser than the old ramp at the top of the range.
+                        float base_prob = lerp_macro(energy, ts.macro_map.energy_density);
                         // Percussive tracks keep their backbone at any energy:
                         // randomly dropping one-drop kicks and backbeats reads
                         // as a drummer flubbing hits, not as dynamics — and

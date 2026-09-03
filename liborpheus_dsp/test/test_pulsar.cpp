@@ -1615,6 +1615,78 @@ bool run_pulsar_tests() {
         }
     }
 
+    // ── energy_density macro reaches the render's fire gate ──
+    // It used to be the one macro target with no consumer: every vibe authored it,
+    // load_vibe copied it into ts.macro_map, and nothing ever read it back. Two runs
+    // differing ONLY in that map must not sound the same.
+    {
+        printf("  Test: energy_density macro reaches the fire gate\n");
+        const uint32_t saved_random = stmlib::Random::state();
+
+        auto run_density = [](float lo, float hi) {
+            OrpheusEngine* e = orpheus_engine_create(48000.0f);
+            GraphUnit u; std::memset(&u, 0, sizeof(u));
+            u.type = UNIT_PULSAR; u.enabled = true;
+            e->pulsar_playing.store(1, std::memory_order_relaxed);
+            e->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+            setup_fixture_baseline(e);
+            pin_pulsar_rngs(e);
+            // 0.7 keeps texture tracks above the low-energy gating bypass, so the
+            // map is what decides whether their steps fire.
+            e->pulsar_energy.store(0.7f, std::memory_order_relaxed);
+            for (int t = 0; t < 8; t++) {
+                e->pulsar_track_macros[t].energy_density_min.store(lo, std::memory_order_relaxed);
+                e->pulsar_track_macros[t].energy_density_max.store(hi, std::memory_order_relaxed);
+            }
+            e->clock_bpm.store(128.0f, std::memory_order_relaxed);
+            trigger_vibe_load(e);
+
+            // Count blocks where track 4's voice is gated on. Reading the gate rather
+            // than the audio keeps mixing, routing and per-track volume out of it.
+            // Track 4 is MELODIC in this fixture, so neither the percussive 0.9 floor
+            // nor the low-energy texture bypass applies — the map alone decides.
+            // Count rising edges, not gated blocks: voice_active measures how long a
+            // note is held, so a sparser pattern of longer notes looks identical.
+            int fires = 0;
+            int per_track[8] = {0};
+            bool prev[8] = {false};
+            for (int i = 0; i < 300; i++) {
+                unit_process_pulsar(&u, e, 512, 48000.0f);
+                if (!e->pulsar_state) continue;
+                for (int t = 0; t < 8; t++) {
+                    const bool now = e->pulsar_state->tracks[t].voice_active;
+                    if (now && !prev[t]) { per_track[t]++; fires++; }
+                    prev[t] = now;
+                }
+            }
+            printf("      map %.1f: per-track fires %d %d %d %d %d %d %d %d\n", lo,
+                   per_track[0], per_track[1], per_track[2], per_track[3],
+                   per_track[4], per_track[5], per_track[6], per_track[7]);
+            orpheus_engine_destroy(e);
+            return fires;
+        };
+
+        int sparse = run_density(0.0f, 0.0f);
+        int dense  = run_density(1.0f, 1.0f);
+        stmlib::Random::Seed(saved_random);
+
+        // The margin is small on purpose, and the assertion is only ">" rather than a
+        // ratio: every track that fires under this fixture is PERCUSSIVE, and those
+        // floor base_prob at 0.9, so the widest swing the map can produce here is
+        // 0.9 -> 1.0. Its melodic tracks cannot fill the gap — the fixture sets
+        // lick_length = 0 and the lick is what drives keys. What this pins is that the
+        // map is READ AT ALL: ignore it again and both runs return exactly equal
+        // counts, since the RNGs are pinned and nothing else differs between them.
+        printf("    total fires: map@0.0=%d map@1.0=%d\n", sparse, dense);
+        if (dense > sparse) {
+            printf("    PASS: energy_density reaches the fire gate\n");
+            pass++;
+        } else {
+            printf("    FAIL: energy_density map made no difference (%d vs %d)\n", sparse, dense);
+            fail++;
+        }
+    }
+
     printf("\nPulsar: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);
 }
