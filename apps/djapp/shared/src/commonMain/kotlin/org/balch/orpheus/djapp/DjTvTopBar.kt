@@ -7,13 +7,14 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
@@ -76,6 +77,23 @@ private val TvTopBarFocusBorderWidth = 3.dp
 private val TvTopBarLabelSize = 16.sp
 
 /**
+ * Width the centred title plate reserves for itself, and the clearance kept either side of it.
+ *
+ * The three slots are aligned independently against the full bar (see the [DjTvTopBar] KDoc), so
+ * they share coordinate space and nothing stops a wide side group from painting over the title —
+ * the right-hand group is drawn last, so it wins. That is invisible at 1280dp but not at 1032dp,
+ * which is what an iPad 13" gives in portrait: a 12-character vibe name covered "Orphic DJ" there.
+ * Budgeting each side against this reserve bounds the group instead of moving the title, so the
+ * fixed centre the layout is built around survives. [TvInlinePicker] already truncates to one line,
+ * so a bounded group ellipsises rather than overflowing.
+ */
+private val TvTopBarTitleReserve = 180.dp
+private val TvTopBarTitleClearance = 12.dp
+
+/** Floor for the side budget, so a very narrow bar still leaves the pickers tappable. */
+private val TvTopBarMinSideWidth = 120.dp
+
+/**
  * Synthetic entry for [TvVizPicker]'s "Random" mode, which is a flag on [VizFeature]'s state
  * rather than a real [Visualization] in its list — wrapping both in one sealed type lets the
  * random option and the real catalog share [org.balch.orpheus.ui.widgets.TvInlinePicker]'s
@@ -134,7 +152,7 @@ fun DjTvTopBar(
     val focusToken = remember { Any() }
     val barShape = RoundedCornerShape(8.dp)
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .focusGroup()
@@ -187,8 +205,14 @@ fun DjTvTopBar(
             onClick = null,
         )
 
+        // Bounded so it cannot reach the centred title — see [TvTopBarTitleReserve]. maxWidth here
+        // is the bar's inner width, the padding above already removed.
+        val sideBudget = ((maxWidth - TvTopBarTitleReserve) / 2 - TvTopBarTitleClearance)
+            .coerceAtLeast(TvTopBarMinSideWidth)
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .widthIn(max = sideBudget),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -361,6 +385,30 @@ private fun DjTvTopBarPlayingPreview() {
             vizFeature = VizViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(
                 PulsarUiState(globalPaused = false, vibe = basePulsar.vibeList.first()),
+            ),
+            onTogglePlayback = {},
+        )
+    }
+}
+
+/**
+ * iPad 13" portrait is 1032dp — the narrowest bar the large-screen dock is ever laid out at, and
+ * the only one where the side groups can reach the centred title. Every other preview here is
+ * 1280dp, where there is room to spare, so this width is the one that can regress. Pinned to the
+ * longest name in the catalog rather than a literal, so a longer vibe lands here automatically.
+ */
+@Preview(widthDp = 1032, heightDp = 120, name = "TV Top Bar — iPad portrait, longest vibe name")
+@Composable
+private fun DjTvTopBarNarrowLongVibePreview() {
+    OrpheusTheme {
+        val basePulsar = PulsarViewModel.previewFeature()
+        DjTvTopBar(
+            vizFeature = VizViewModel.previewFeature(),
+            pulsarFeature = PulsarViewModel.previewFeature(
+                PulsarUiState(
+                    globalPaused = false,
+                    vibe = basePulsar.vibeList.maxBy { it.name.length },
+                ),
             ),
             onTogglePlayback = {},
         )
