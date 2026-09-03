@@ -50,7 +50,11 @@ targets:
           - "-framework"
           - "DjAppShared"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
-        TARGETED_DEVICE_FAMILY: "1"
+        # iPhone and iPad. iPad matters beyond the extra screen size: the large-screen
+        # dock needs a canvas of at least 900x500dp, and an iPhone-only build runs
+        # letterboxed at phone dimensions on an iPad, so it could never reach it. This
+        # also activates the UISupportedInterfaceOrientations~ipad block above.
+        TARGETED_DEVICE_FAMILY: "1,2"
         # Fallback for ad-hoc Xcode builds; the archive script overrides both
         # from git (nearest tag / total commit count) — see build-logic's
         # orpheus.android.app.gradle.kts for the Android-side equivalent.
@@ -142,7 +146,11 @@ targets:
           - "-framework"
           - "DjAppAi"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
-        TARGETED_DEVICE_FAMILY: "1"
+        # iPhone and iPad. iPad matters beyond the extra screen size: the large-screen
+        # dock needs a canvas of at least 900x500dp, and an iPhone-only build runs
+        # letterboxed at phone dimensions on an iPad, so it could never reach it. This
+        # also activates the UISupportedInterfaceOrientations~ipad block above.
+        TARGETED_DEVICE_FAMILY: "1,2"
         # Fallback for ad-hoc Xcode builds; the archive script overrides both
         # from git (nearest tag / total commit count) — see build-logic's
         # orpheus.android.app.gradle.kts for the Android-side equivalent.
