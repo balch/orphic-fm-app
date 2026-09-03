@@ -92,9 +92,51 @@ static bool test_pulsar_chaos_renders_lorenz() {
     return ok;
 }
 
+// Regression: the Pulsar render path must hand the track gate to the chaos
+// kernel. prev_gate is written ONLY by the kernel's rising-edge detector, so
+// observing it go high proves the gate plumbing exists; without it, note-ons
+// never re-seed the attractor and every note continues mid-trajectory.
+static bool test_pulsar_chaos_gate_reaches_kernel() {
+    printf("\n=== Test: Pulsar chaos track passes gate to kernel (note-on re-seed plumbing) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+
+    constexpr int kChaosLorenz = 200;
+    engine->pulsar_track_engine_edm[0].store(kChaosLorenz, std::memory_order_relaxed);
+    engine->pulsar_track_engine_space[0].store(kChaosLorenz, std::memory_order_relaxed);
+    solo_track(engine, 0);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
+
+    // ~2s of audio — the baseline kick track fires many notes in that window.
+    bool saw_gate = false;
+    for (int i = 0; i < 200 && !saw_gate; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        saw_gate |= engine->pulsar_state->tracks[0].chaos_state.prev_gate != 0;
+    }
+
+    if (saw_gate) {
+        printf("  PASS: kernel observed a gate edge from the Pulsar sequencer\n");
+    } else {
+        printf("  FAIL: chaos_state.prev_gate never went high — Pulsar path is not passing the gate\n");
+    }
+    orpheus_engine_destroy(engine);
+    return saw_gate;
+}
+
 bool run_pulsar_chaos_tests() {
     printf("\n=== Pulsar Chaos Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
     if (test_pulsar_chaos_renders_lorenz()) suite_pass++; else suite_fail++;
+    if (test_pulsar_chaos_gate_reaches_kernel()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

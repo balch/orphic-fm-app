@@ -13,13 +13,24 @@ constexpr float kTwoPi = 6.28318530717958647692f;
 
 namespace chaos {
 
-// Per-sample chaos render loop, factored out so it can be reused by both the
-// main voice path (unit_process_chaos) and the Pulsar render path. Caller is
-// responsible for trigger-time state re-seeding before invoking.
+// Per-sample chaos render loop, shared by the main voice path
+// (unit_process_chaos) and the Pulsar render path. Owns the rising-edge
+// re-seed so every caller gets note-on behavior by construction.
 void process_chaos_block(ChaosVoiceState& s, int engine_index,
                          float harmonics, float timbre, float morph,
-                         float note, float sample_rate,
+                         float note, int gate, float sample_rate,
                          float* out, int num_frames) {
+    // Rising-edge gate detection: re-seed the attractor on note trigger so a
+    // new note doesn't start mid-trajectory (potentially near a blow-up
+    // region for Henon). carrier_phase and blow_up_count stay untouched.
+    if (gate && !s.prev_gate) {
+        s.x = 0.1f;
+        s.y = 0.0f;
+        s.z = 0.0f;
+        s.drive_phase = 0.0f;
+    }
+    s.prev_gate = gate;
+
     const float note_freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
     const float phase_inc = note_freq / sample_rate;
 
@@ -76,22 +87,11 @@ void unit_process_chaos(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     auto& vp = engine->voice_params[voice_idx];
     ChaosVoiceState& s = engine->chaos_state[voice_idx];
 
-    // Rising-edge gate detection: re-seed attractor on note trigger so a new
-    // note doesn't start mid-trajectory (potentially near a blow-up region for
-    // Henon). carrier_phase and blow_up_count are intentionally left alone.
     const int gate = vp.gate.load(std::memory_order_relaxed);
-    if (gate && !s.prev_gate) {
-        s.x = 0.1f;
-        s.y = 0.0f;
-        s.z = 0.0f;
-        s.drive_phase = 0.0f;
-    }
-    s.prev_gate = gate;
-
     const int engine_index = vp.engine_index.load(std::memory_order_relaxed);
     const float timbre = vp.timbre.load(std::memory_order_relaxed);
     const float note = vp.tune.load(std::memory_order_relaxed);
 
     chaos::process_chaos_block(s, engine_index, harmonics, timbre, morph,
-                               note, sr, u->output_buffers[OPORT_OUT], num_frames);
+                               note, gate, sr, u->output_buffers[OPORT_OUT], num_frames);
 }

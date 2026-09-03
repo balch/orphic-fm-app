@@ -28,9 +28,11 @@ namespace chaos {
 
 // Render N samples of a chaos voice into `out`. Iterates the appropriate
 // attractor kernel for `engine_index`, blends against a pitched sine carrier
-// via `morph`, and resets state on numerical blow-up. Caller is responsible
-// for trigger-time state re-seeding (this function only handles the
-// per-sample work).
+// via `morph`, and resets state on numerical blow-up. A rising edge on `gate`
+// re-seeds the trajectory (x/y/z/drive_phase; carrier_phase and blow_up_count
+// are left alone) so a new note never starts mid-trajectory. The re-seed
+// lives HERE, not in callers — the Pulsar path shipped without it for months
+// because the old contract left it to the call site.
 //
 // Parameters:
 //   state         per-voice chaos trajectory state, mutated in place
@@ -39,6 +41,7 @@ namespace chaos {
 //   timbre        modulated, clamped [0,1] — chaos integration rate (or update count for Henon)
 //   morph         modulated, clamped [0,1] — carrier<->chaos blend (0=pure carrier, 1=raw chaos)
 //   note          MIDI note number; carrier and Duffing drive run at this frequency
+//   gate          note gate; a 0->1 edge vs the previous call re-seeds the trajectory
 //   sample_rate   Hz
 //   out           output buffer of length num_frames
 //   num_frames    samples to render
@@ -49,6 +52,7 @@ void process_chaos_block(
     float timbre,
     float morph,
     float note,
+    int gate,
     float sample_rate,
     float* out,
     int num_frames);

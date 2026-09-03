@@ -4619,7 +4619,25 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Chaos engines (200..204): per-track ChaosVoiceState driven by the
             // shared chaos kernel. Without this branch the engine_index would
             // fall through to plaits::Voice::Render which clamps unknown ids to
-            // its last engine (HiHat).
+            // its last engine (HiHat). Split at the intra-block step boundary
+            // like the OrpheusVoice path below, so the kernel sees the gate
+            // edge (note-on re-seed) on the true boundary sample.
+            const int trig_off =
+                (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
+                    ? ts.trigger_offset : 0;
+            if (trig_off > 0) {
+                chaos::process_chaos_block(
+                    ts.chaos_state,
+                    ts.engine_index,
+                    clamp01(mod_harmonics),
+                    clamp01(mod_timbre),
+                    clamp01(mod_morph),
+                    note_for_render,
+                    ts.gate_pre_boundary ? 1 : 0,
+                    sample_rate,
+                    track_buffer,
+                    trig_off);
+            }
             chaos::process_chaos_block(
                 ts.chaos_state,
                 ts.engine_index,
@@ -4627,9 +4645,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 clamp01(mod_timbre),
                 clamp01(mod_morph),
                 note_for_render,
+                gate_for_render,
                 sample_rate,
-                track_buffer,
-                num_frames);
+                track_buffer + trig_off,
+                num_frames - trig_off);
         } else {
             // Sub-block trigger accuracy: split the render at the intra-block
             // step-boundary offset so the voice's gate edge — and with it the

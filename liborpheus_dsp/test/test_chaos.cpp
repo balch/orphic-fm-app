@@ -1,6 +1,7 @@
 // Chaos engines: per-voice trajectory, pitched carrier, MORPH blend
 #include "test_harness.h"
 #include "orpheus_unit_chaos.h"
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <vector>
@@ -264,9 +265,51 @@ static bool test_chaos_blow_up_safety_henon() {
     return all_pass;
 }
 
+// The kernel owns note-on re-seeding: a rising gate edge must restart the
+// trajectory from the seed (compared at MORPH=1, where the carrier is
+// excluded), while a held gate must continue it. Equality is toleranced, not
+// bitwise: optimized builds contract FMAs differently per inlined call site
+// (~1 ULP at sample 0), and the Lorenz Lyapunov growth (~e^0.03/sample at
+// these settings) amplifies that — over a 64-sample window seed noise stays
+// far below 1e-3 while a genuine continuation differs at trajectory scale.
+static bool test_chaos_kernel_reseeds_on_rising_edge() {
+    printf("\n=== Test: Kernel re-seeds on rising gate edge (and only then) ===\n");
+    constexpr int N = 2048;
+    std::vector<float> first(N), held(N), off(N), retrig(N);
+
+    ChaosVoiceState s;
+    // Rising edge (prev_gate 0 -> gate 1): fresh from-seed statement.
+    chaos::process_chaos_block(s, kChaosEngineLorenz, 0.5f, 0.5f, 1.0f, 60.0f,
+                               1, 48000.0f, first.data(), N);
+    // Gate held: must CONTINUE the trajectory, not restart it.
+    chaos::process_chaos_block(s, kChaosEngineLorenz, 0.5f, 0.5f, 1.0f, 60.0f,
+                               1, 48000.0f, held.data(), N);
+    // Gate released: state wanders further from the seed.
+    chaos::process_chaos_block(s, kChaosEngineLorenz, 0.5f, 0.5f, 1.0f, 60.0f,
+                               0, 48000.0f, off.data(), N);
+    // New rising edge: must reproduce the from-seed statement exactly.
+    chaos::process_chaos_block(s, kChaosEngineLorenz, 0.5f, 0.5f, 1.0f, 60.0f,
+                               1, 48000.0f, retrig.data(), N);
+
+    float max_restart_err = 0.0f, max_cont_diff = 0.0f;
+    for (int i = 0; i < 64; i++) {
+        max_restart_err = std::max(max_restart_err, std::fabs(first[i] - retrig[i]));
+        max_cont_diff   = std::max(max_cont_diff,   std::fabs(first[i] - held[i]));
+    }
+    bool retrig_restarts = max_restart_err < 1e-3f;
+    bool held_continues  = max_cont_diff  > 1e-2f;
+    printf("  restart err (64-sample window): %.3g, continuation diff: %.3g\n",
+           max_restart_err, max_cont_diff);
+
+    printf("  held gate continues trajectory: %s\n", held_continues ? "OK" : "FAIL (restarted)");
+    printf("  rising edge restarts from seed: %s\n", retrig_restarts ? "OK" : "FAIL (continued)");
+    return held_continues && retrig_restarts;
+}
+
 bool run_chaos_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_chaos_kernel_reseeds_on_rising_edge());
     tally(test_chaos_engine_produces_output());
     tally(test_chaos_pitch_tracks_at_morph_zero());
     tally(test_chaos_blow_up_recovers());
