@@ -27,6 +27,10 @@ data class MacroTarget(
 data class TrackMacroMap(
     val energyVolume: MacroTarget,
     val energyDensity: MacroTarget,
+    /**
+     * Only track 0's value is read. Swing shifts the one shared step clock, so it
+     * cannot vary per track — the other seven copies are inert. Set it on track 0.
+     */
     val complexitySwing: MacroTarget,
     val complexityVariation: MacroTarget,
     val spaceDecay: MacroTarget,

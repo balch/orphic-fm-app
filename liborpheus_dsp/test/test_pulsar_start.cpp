@@ -58,7 +58,7 @@ int blocks_for_steps(double steps, float bpm = kBpm) {
 // One block after a vibe load the window must already be adopted and every
 // track whose pattern gates step 0 must be sounding.
 //
-// The energy sweep is load-bearing. The fire gate rolls step_hash(playhead,
+// The energy sweep does the heavy lifting. The fire gate rolls step_hash(playhead,
 // track, loop_count), and load_vibe zeroes both playhead and loop_count — so at
 // the downbeat the hash collapses to t * 104729, a per-track CONSTANT
 // independent of seed, vibe and pattern. Its rolls (t2=0.988, t3=0.997,

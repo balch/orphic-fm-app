@@ -168,7 +168,7 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
         // evo_release_speed is EXPECTED in [0,1] (0 = instant follow, 1 = near
         // frozen), but it is loaded raw from the param atomic / section override
         // with no upstream clamp — so the [0,1] clamp on evo_speed below is
-        // load-bearing, NOT redundant: an out-of-range value would otherwise make
+        // necessary, NOT redundant: an out-of-range value would otherwise make
         // evo_speed negative (step the wrong way) or >1 (overshoot). The per-bar
         // coefficient is (1 - releaseSpeed); high releaseSpeed = slow multi-bar approach.
         float evo_speed = 1.0f - state->tension.evo_release_speed;
@@ -4256,7 +4256,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         // ── Wah-anomaly envelope: per-block bookkeeping (t == 0 only) ──
         // The arm above runs inside this per-track loop at t == 0, so the trajectory is
-        // built here rather than above the loop. Two things are load-bearing:
+        // built here rather than above the loop. Two things this placement depends on:
         //  1. The countdown is committed exactly ONCE per block. The loop body runs 8
         //     times, so a per-track decrement would end the window 8x early and leave the
         //     eight tracks reading eight different envelopes.

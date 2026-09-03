@@ -112,7 +112,9 @@ moodTimbre. Each dimension maps one macro to one parameter at render time. Inter
 value = min + macro × (max − min). A min > max gives an inverted response. Use min == max to lock a
 parameter while still letting tension-evolution drift it. Setting moodTimbre to (0, 0) opts the track
 entirely out of tension-evolution. For DX/DX2/DX3 tracks, harmonics is auto-pinned, so moodHarmonics
-is effectively locked by the engine regardless of the macroMap range.
+is effectively locked by the engine regardless of the macroMap range. complexitySwing is the one
+exception to "per track": swing shifts the single shared step clock, so only track 0's value is read
+and the other seven are ignored — set the groove you want on track 0.
 
 ## 6. Tension arc (TensionProfile)
 innerBars sets the primary build-and-release cycle length (4 = tight phrase, 8 = longer, 16 = epic).

@@ -1109,7 +1109,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strncmp(symbol, "lick_wah_data_", 14) == 0) {
             // Per-track lick-wah insert bank. Longer prefix than "wah_data_" and "lick_data_",
             // so it needs its own branch — neither shorter prefix matches "lick_wah_data_N"
-            // (differ at index 0 / index 5 respectively), so ordering here is not load-bearing.
+            // (differ at index 0 / index 5 respectively), so branch order does not matter.
             int idx = std::atoi(symbol + 14);
             constexpr int kLickWahBankSize =
                 static_cast<int>(sizeof(OrpheusEngine::pulsar_lick_wah_data) /

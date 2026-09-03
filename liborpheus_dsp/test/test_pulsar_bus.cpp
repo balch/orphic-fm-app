@@ -34,9 +34,12 @@ static bool test_melodic_engines_classified_as_keys() {
 }
 
 static bool test_all_engines_have_valid_bus() {
-    printf("\n=== Test: All 24 engines have valid bus type ===\n");
+    // Length comes from the table, not a literal: a 25th engine would otherwise
+    // be added without this ever covering it, and the suite would stay green.
+    constexpr int kEngineCount = sizeof(kEngineBusType) / sizeof(kEngineBusType[0]);
+    printf("\n=== Test: All %d engines have valid bus type ===\n", kEngineCount);
     bool pass = true;
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < kEngineCount; i++) {
         PulsarBusType bus = kEngineBusType[i];
         bool valid = (bus == PULSAR_BUS_KEYS || bus == PULSAR_BUS_DRUMS || bus == PULSAR_BUS_BASS);
         if (!valid) {

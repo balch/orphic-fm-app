@@ -4,7 +4,7 @@
 //
 // These govern PREALLOCATED wire buffers — the arrangement crosses into the audio
 // thread through fixed-size atomic arrays so the render path never allocates. That
-// makes the numbers load-bearing in four places that must agree exactly:
+// pins the same numbers in four places that must agree exactly:
 //
 //   1. the wire arrays in orpheus_engine.h        (pulsar_section_*)
 //   2. the runtime structs in orpheus_unit_pulsar.h (ArrangementParams, SectionParam)

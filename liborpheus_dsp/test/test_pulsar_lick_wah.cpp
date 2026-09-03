@@ -1,4 +1,4 @@
-// Per-track lick-wah insert (Task 13) — guards the two load-bearing invariants the
+// Per-track lick-wah insert (Task 13) — guards the two invariants the
 // feature relies on:
 //   (a) the per-track opt-in bitmask decodes to exactly the flagged tracks, and
 //   (b) a WahVoice whose WahParams.wet == 0 leaves a track buffer BYTE-identical,

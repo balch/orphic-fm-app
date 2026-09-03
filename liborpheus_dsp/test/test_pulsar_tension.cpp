@@ -7,43 +7,134 @@
 #include <cstring>
 #include <vector>
 
-// ── Unit tests for tension system math (no engine needed) ──
+// ── Tension intensity, driven through the real unit ──
+//
+// Both tests below used to recompute (loop_count % inner) / inner in their own
+// body and check that against hand-written constants, so they held no matter
+// what mutate_patterns did. Same fix as the volume test further down: drive
+// unit_process_pulsar and read state->tension_intensity, which production
+// computes once per bar.
+//
+// What one bar of a driven run looked like. intensity < 0 marks a bar the run
+// never reached, which every test below checks before reading the rest.
+struct BarSample {
+    float intensity  = -1.0f;
+    float evo_smooth = 0.0f;
+    float drunk_mag  = 0.0f;  // mean |drunk_target| over every track and step
+    // Loudest current_velocity track 0 showed during the bar. Track 0 only, on
+    // purpose: current_velocity persists between fires, so a sparse track can carry
+    // a loud value out of a high-intensity bar and dominate a max taken across all
+    // tracks, which flattens exactly the ratio the volume test is measuring.
+    float vel_max    = 0.0f;
+};
+
+// energy/complexity default to the sentinel, meaning "leave the fixture's own value".
+struct TensionRun {
+    int   inner  = 4;
+    int   outer  = 0;
+    float depth  = 0.0f;
+    float timing = 0.0f;
+    float volume = 0.0f;
+    float evo_attack_point  = 0.5f;
+    float evo_release_speed = 0.0f;  // 0 = smoother follows evo_intensity instantly
+    float energy     = -1.0f;
+    float complexity = -1.0f;
+};
+
+static std::vector<BarSample> capture_bars(const TensionRun& cfg, int max_loop) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    pin_pulsar_rngs(engine);
+    engine->pulsar_tension_inner_bars.store(cfg.inner, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(cfg.outer, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_depth.store(cfg.depth, std::memory_order_relaxed);
+    engine->pulsar_tension_timing.store(cfg.timing, std::memory_order_relaxed);
+    engine->pulsar_tension_volume.store(cfg.volume, std::memory_order_relaxed);
+    engine->pulsar_tension_evo_attack_point.store(cfg.evo_attack_point, std::memory_order_relaxed);
+    engine->pulsar_tension_evo_release_speed.store(cfg.evo_release_speed, std::memory_order_relaxed);
+    if (cfg.energy     >= 0.0f) engine->pulsar_energy.store(cfg.energy, std::memory_order_relaxed);
+    if (cfg.complexity >= 0.0f) engine->pulsar_complexity.store(cfg.complexity, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    std::vector<BarSample> seen(max_loop + 1);
+    // ~190 blocks per bar at 240 BPM; leave headroom so the last bar is reached.
+    const int blocks = std::max(6000, (max_loop + 3) * 220);
+    for (int i = 0; i < blocks; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        const int lc = ps->loop_count;
+        if (lc < 0 || lc > max_loop) continue;
+        BarSample& b = seen[lc];
+        if (b.intensity < 0.0f) {
+            // Written once per bar in mutate_patterns, so the boundary block has them.
+            b.intensity  = ps->tension_intensity;
+            b.evo_smooth = ps->tension_evo_smooth;
+            double sum = 0.0; int n = 0;
+            for (int t = 0; t < kNumPulsarTracks; t++) {
+                const int sc = std::min(ps->tracks[t].step_count, kMaxPulsarSteps);
+                for (int s = 0; s < sc; s++) { sum += std::fabs(ps->drunk_targets[t][s]); n++; }
+            }
+            b.drunk_mag = n ? static_cast<float>(sum / n) : 0.0f;
+            // current_velocity persists between fires, so on the boundary block it
+            // still holds the PREVIOUS bar's value. Start accumulating next block.
+            continue;
+        }
+        b.vel_max = std::max(b.vel_max, ps->tracks[0].current_velocity);
+    }
+    orpheus_engine_destroy(engine);
+    return seen;
+}
+
+// Intensity-only view, for the two tests that care about nothing else.
+static std::vector<float> capture_tension_by_loop(int inner, int outer, float depth, int max_loop) {
+    TensionRun cfg; cfg.inner = inner; cfg.outer = outer; cfg.depth = depth;
+    auto bars = capture_bars(cfg, max_loop);
+    std::vector<float> out(bars.size());
+    for (size_t i = 0; i < bars.size(); i++) out[i] = bars[i].intensity;
+    return out;
+}
 
 static bool test_tension_inner_phase() {
-    printf("\n=== Test: Tension inner phase ramps 0->1 over innerBars ===\n");
-    int inner = 4;
-    float phases[5];
-    for (int loop = 0; loop < 5; loop++) {
-        phases[loop] = static_cast<float>(loop % inner) / static_cast<float>(inner);
-    }
-    bool ok = std::fabs(phases[0] - 0.0f) < 0.001f
-           && std::fabs(phases[1] - 0.25f) < 0.001f
-           && std::fabs(phases[3] - 0.75f) < 0.001f
-           && std::fabs(phases[4] - 0.0f) < 0.001f;  // wraps
-    printf("  Phases: %.2f, %.2f, %.2f, %.2f, %.2f -- %s\n",
-           phases[0], phases[1], phases[2], phases[3], phases[4],
-           ok ? "PASS" : "FAIL");
+    printf("\n=== Test: Tension inner phase ramps 0->1 over innerBars (via the unit) ===\n");
+    auto t = capture_tension_by_loop(/*inner*/4, /*outer*/0, /*depth*/0.0f, /*max_loop*/8);
+    bool observed = t[1] >= 0.0f && t[3] >= 0.0f && t[4] >= 0.0f && t[5] >= 0.0f;
+    bool ok = observed
+           && std::fabs(t[1] - 0.25f) < 0.001f
+           && std::fabs(t[3] - 0.75f) < 0.001f
+           && std::fabs(t[4] - 0.0f)  < 0.001f   // wraps
+           && std::fabs(t[5] - 0.25f) < 0.001f;  // and climbs again
+    if (!observed) printf("  FAIL: run never reached the sampled bars\n");
+    printf("  loop1=%.2f loop3=%.2f loop4=%.2f loop5=%.2f -- %s\n",
+           t[1], t[3], t[4], t[5], ok ? "PASS" : "FAIL");
     return ok;
 }
 
 static bool test_tension_outer_modulation() {
-    printf("\n=== Test: Outer cycle modulates inner ceiling ===\n");
-    int inner = 4, outer = 8;
-    float depth = 0.5f;
-    auto intensity = [&](int loop) {
-        float ip = static_cast<float>(loop % inner) / static_cast<float>(inner);
-        float op = static_cast<float>(loop % outer) / static_cast<float>(outer);
-        float os = (1.0f - depth) + depth * op;
-        return ip * os;
-    };
-    float i0 = intensity(0);
-    float i3 = intensity(3);
-    float i7 = intensity(7);
-    // loop0: inner_phase=0 -> 0
-    // loop3: inner_phase=3/4=0.75, outer_phase=3/8=0.375, outer_scale=0.5+0.5*0.375=0.6875 -> 0.515
-    // loop7: inner_phase=3/4=0.75, outer_phase=7/8=0.875, outer_scale=0.5+0.5*0.875=0.9375 -> 0.703
-    bool ok = i0 < 0.001f && i3 > 0.4f && i3 < 0.6f && i7 > 0.65f && i7 < 0.75f;
-    printf("  loop0=%.3f, loop3=%.3f, loop7=%.3f -- %s\n", i0, i3, i7, ok ? "PASS" : "FAIL");
+    printf("\n=== Test: Outer cycle modulates inner ceiling (via the unit) ===\n");
+    // inner 4 / outer 8 / depth 0.5:
+    //   loop3 -> 0.75 * (0.5 + 0.5*3/8) = 0.516
+    //   loop7 -> 0.75 * (0.5 + 0.5*7/8) = 0.703
+    auto mod = capture_tension_by_loop(/*inner*/4, /*outer*/8, /*depth*/0.5f, /*max_loop*/8);
+    // The same bars with the outer cycle off. Comparing against these proves the
+    // outer scale is actually consumed, rather than the values merely landing in range.
+    auto flat = capture_tension_by_loop(/*inner*/4, /*outer*/0, /*depth*/0.5f, /*max_loop*/8);
+
+    bool observed = mod[3] >= 0.0f && mod[4] >= 0.0f && mod[7] >= 0.0f && flat[3] >= 0.0f;
+    bool ok = observed
+           && mod[4] < 0.001f                 // inner wrap still zeroes it
+           && mod[3] > 0.4f  && mod[3] < 0.6f
+           && mod[7] > 0.65f && mod[7] < 0.75f
+           && mod[3] < flat[3] - 0.1f         // outer scale pulls loop3 down
+           && mod[7] > mod[3];                // and opens up across the outer cycle
+    if (!observed) printf("  FAIL: run never reached the sampled bars\n");
+    printf("  outer on: loop3=%.3f loop4=%.3f loop7=%.3f | outer off: loop3=%.3f -- %s\n",
+           mod[3], mod[4], mod[7], flat[3], ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -103,44 +194,90 @@ static bool test_tension_volume_reaches_the_render() {
     return ok;
 }
 
+// The render test above proves volume tension reaches the voice at all. This one
+// pins the 0.3 DEPTH: the render check still passes if that constant is changed,
+// since a bigger duck is still a duck.
 static bool test_tension_volume_scaling() {
-    printf("\n=== Test: Volume tension scales velocity (formula only) ===\n");
-    float vol = 0.5f;
-    // At intensity=0: scale = 1 - 0.5*0.3*1.0 = 0.85
-    float scale_low = 1.0f - vol * 0.3f * (1.0f - 0.0f);
-    // At intensity=1: scale = 1 - 0.5*0.3*0.0 = 1.0
-    float scale_high = 1.0f - vol * 0.3f * (1.0f - 1.0f);
-    bool ok = std::fabs(scale_low - 0.85f) < 0.01f && std::fabs(scale_high - 1.0f) < 0.01f;
-    printf("  At intensity=0: %.3f, intensity=1: %.3f -- %s\n", scale_low, scale_high, ok ? "PASS" : "FAIL");
+    printf("\n=== Test: Volume tension ducks velocity by the 0.3 depth (via the unit) ===\n");
+    // vol = 1.0, inner 8: vel_scale = 1 - 0.3*(1 - intensity).
+    //   loop1 -> intensity .125 -> 0.7375
+    //   loop7 -> intensity .875 -> 0.9625, so late/early = 1.305
+    // Both bars follow a QUIETER bar, so any velocity carried over the boundary
+    // can only pull a max down, never inflate it.
+    // WHICH steps fire is itself a function of loop_count (the fire gate hashes it),
+    // so one bar's loudest step is a different step from the next bar's. Averaging
+    // the same phase across many cycles cancels that; a single pair of bars does not.
+    constexpr int kLoops = 48;
+    auto phase_mean = [](const std::vector<BarSample>& v, int inner, int phase) {
+        double sum = 0.0; int n = 0;
+        for (size_t i = static_cast<size_t>(inner); i < v.size(); i++) {
+            if (static_cast<int>(i) % inner == phase && v[i].vel_max > 1e-6f) { sum += v[i].vel_max; n++; }
+        }
+        return n ? static_cast<float>(sum / n) : 0.0f;
+    };
+
+    TensionRun on;  on.inner = 8; on.volume = 1.0f; on.energy = 0.9f; on.complexity = 0.1f;
+    TensionRun off; off.inner = 8; off.volume = 0.0f; off.energy = 0.9f; off.complexity = 0.1f;
+    auto a = capture_bars(on,  kLoops);
+    auto b = capture_bars(off, kLoops);
+
+    float a_early = phase_mean(a, 8, 1), a_late = phase_mean(a, 8, 7);
+    float b_early = phase_mean(b, 8, 1), b_late = phase_mean(b, 8, 7);
+    bool observed = a_early > 1e-6f && a_late > 1e-6f && b_early > 1e-6f && b_late > 1e-6f;
+    float on_ratio  = observed ? a_late / a_early : 0.0f;
+    float off_ratio = observed ? b_late / b_early : 0.0f;
+    bool ok = observed
+           && std::fabs(on_ratio - 1.305f) < 0.06f   // the depth itself
+           && std::fabs(off_ratio - 1.0f)  < 0.06f;  // disarmed, velocity is flat
+    if (!observed) printf("  FAIL: no velocity observed in the sampled bars\n");
+    printf("  late/early velocity: tension on = %.3f (expect 1.305), off = %.3f -- %s\n",
+           on_ratio, off_ratio, ok ? "PASS" : "FAIL");
     return ok;
 }
 
 static bool test_tension_timing_scaling() {
-    printf("\n=== Test: Timing tension scales drunk offsets ===\n");
-    float timing = 0.5f;
-    // At intensity=0: scale = (1-0.5) + 0.5*0.0 = 0.5
-    float scale_low = (1.0f - timing) + timing * 0.0f;
-    // At intensity=1: scale = (1-0.5) + 0.5*1.0 = 1.0
-    float scale_high = (1.0f - timing) + timing * 1.0f;
-    bool ok = std::fabs(scale_low - 0.5f) < 0.01f && std::fabs(scale_high - 1.0f) < 0.01f;
-    printf("  At intensity=0: %.3f, intensity=1: %.3f -- %s\n", scale_low, scale_high, ok ? "PASS" : "FAIL");
+    printf("\n=== Test: Timing tension scales drunk offsets (via the unit) ===\n");
+    // timing = 1.0 makes timing_scale collapse to the intensity itself, so the
+    // drunk targets an early bar writes are far smaller than a late bar's.
+    // energy/complexity are pinned only to keep max_drunk off zero.
+    TensionRun on;  on.inner = 8; on.timing = 1.0f; on.energy = 0.3f; on.complexity = 0.8f;
+    TensionRun off; off.inner = 8; off.timing = 0.0f; off.energy = 0.3f; off.complexity = 0.8f;
+    auto a = capture_bars(on,  8);
+    auto b = capture_bars(off, 8);
+
+    bool observed = a[1].intensity >= 0.0f && a[7].intensity >= 0.0f
+                 && b[1].intensity >= 0.0f && b[7].intensity >= 0.0f
+                 && a[1].drunk_mag > 1e-9f && b[1].drunk_mag > 1e-9f;
+    float on_ratio  = observed ? a[7].drunk_mag / a[1].drunk_mag : 0.0f;
+    float off_ratio = observed ? b[7].drunk_mag / b[1].drunk_mag : 0.0f;
+    // Armed, late/early is roughly 0.875/0.125 = 7x. Disarmed the scale is a flat
+    // 1.0, so the same ratio is whatever the drunk RNG happens to do.
+    bool ok = observed && on_ratio > 3.0f && off_ratio < 2.0f && on_ratio > off_ratio * 2.0f;
+    if (!observed) printf("  FAIL: run never reached the sampled bars, or drunk offsets were zero\n");
+    printf("  late/early drunk magnitude: timing on = %.2f, timing off = %.2f -- %s\n",
+           on_ratio, off_ratio, ok ? "PASS" : "FAIL");
     return ok;
 }
 
 static bool test_tension_evolution_attack_point() {
-    printf("\n=== Test: Evolution attack point gates evo_intensity ===\n");
-    float ap = 0.5f;
-    // intensity below attack_point -> 0
-    float evo_at_0_3 = (ap < 0.999f) ? std::max(0.0f, (0.3f - ap) / (1.0f - ap)) : 0.0f;
-    // intensity above attack_point -> ramps up
-    float evo_at_0_75 = (ap < 0.999f) ? std::max(0.0f, (0.75f - ap) / (1.0f - ap)) : 0.0f;
-    // intensity at 1.0 -> 1.0
-    float evo_at_1_0 = (ap < 0.999f) ? std::max(0.0f, (1.0f - ap) / (1.0f - ap)) : 0.0f;
-    bool ok = std::fabs(evo_at_0_3 - 0.0f) < 0.01f
-           && std::fabs(evo_at_0_75 - 0.5f) < 0.01f
-           && std::fabs(evo_at_1_0 - 1.0f) < 0.01f;
-    printf("  evo@0.3=%.3f, evo@0.75=%.3f, evo@1.0=%.3f -- %s\n",
-           evo_at_0_3, evo_at_0_75, evo_at_1_0, ok ? "PASS" : "FAIL");
+    printf("\n=== Test: Evolution attack point gates evo_intensity (via the unit) ===\n");
+    // releaseSpeed 0 makes the smoother follow instantly, so tension_evo_smooth
+    // reads back the gate itself rather than a lagged approach to it.
+    // inner 8 / attack point 0.5 walks intensity past the gate mid-cycle:
+    //   loop3 -> intensity .375, under the gate      -> 0
+    //   loop5 -> intensity .625 -> (.625-.5)/.5      -> 0.25
+    //   loop7 -> intensity .875 -> (.875-.5)/.5      -> 0.75
+    TensionRun cfg; cfg.inner = 8; cfg.evo_attack_point = 0.5f; cfg.evo_release_speed = 0.0f;
+    auto t = capture_bars(cfg, 8);
+
+    bool observed = t[3].intensity >= 0.0f && t[5].intensity >= 0.0f && t[7].intensity >= 0.0f;
+    bool ok = observed
+           && t[3].evo_smooth < 0.001f                       // gated off below the attack point
+           && std::fabs(t[5].evo_smooth - 0.25f) < 0.01f
+           && std::fabs(t[7].evo_smooth - 0.75f) < 0.01f;
+    if (!observed) printf("  FAIL: run never reached the sampled bars\n");
+    printf("  evo@loop3=%.3f evo@loop5=%.3f evo@loop7=%.3f -- %s\n",
+           t[3].evo_smooth, t[5].evo_smooth, t[7].evo_smooth, ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -694,6 +831,10 @@ static bool test_equal_inner_outer_bars_curve_the_walkup() {
 
 bool run_pulsar_tension_tests() {
     printf("\n========== PULSAR TENSION TESTS ==========\n");
+    // Several tests here call pin_pulsar_rngs, which re-seeds the process-global
+    // stmlib::Random. Hand it back exactly as found or every suite ordered after
+    // this one draws a different sequence.
+    const uint32_t saved_random = stmlib::Random::state();
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_tension_inner_phase());
@@ -719,6 +860,7 @@ bool run_pulsar_tension_tests() {
     tally(test_random_spurt_fires());
     tally(test_tension_evo_release_speed_decays_over_bars());
     tally(test_equal_inner_outer_bars_curve_the_walkup());
+    stmlib::Random::Seed(saved_random);
     printf("\nPulsar tension tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
