@@ -299,7 +299,7 @@ static void push_two_section_ab_arrangement(OrpheusEngine* engine,
     engine->pulsar_arrangement_intro_index.store(-1, std::memory_order_relaxed);
     engine->pulsar_arrangement_outro_index.store(-1, std::memory_order_relaxed);
 
-    constexpr int kSectionStride = 21;
+    constexpr int kSectionStride = kSectionDataFields;
     float section_data[8 * kSectionStride] = {};
     for (int s = 0; s < 8; s++) {
         // Default comping overrides to -1
@@ -715,6 +715,7 @@ static bool test_tension_override_then_inherit() {
     //   8=chromatic_passing, 9..11=evo_timbre_low/high/prob, 12..14=evo_morph_*,
     //   15..17=evo_harm_*, 18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
     engine->pulsar_section_tension_active[1].store(1, std::memory_order_relaxed);
+    // Tension's own fixed stride, NOT pulsar_section_data's (25) -- see pulsar_limits.h.
     constexpr int kSectionStride = 21;
     const int tb = 1 * kSectionStride;
     // Valid, non-silly defaults so the override struct isn't garbage.
@@ -821,6 +822,7 @@ static bool test_initial_section_tension_override_applied_on_load() {
     // Override on the INITIAL section (0) with distinctive volume = 0.9. Before the
     // fix, load_vibe left the intro on the vibe base (0.3) until the first transition.
     engine->pulsar_section_tension_active[0].store(1, std::memory_order_relaxed);
+    // Tension's own fixed stride, NOT pulsar_section_data's (25) -- see pulsar_limits.h.
     constexpr int kSectionStride = 21;
     const int tb = 0 * kSectionStride;
     engine->pulsar_section_tension_data[tb + 0].store(4.0f, std::memory_order_relaxed);  // inner_bars
@@ -1035,7 +1037,7 @@ static bool test_section_macro_subbar_lerp() {
     push_two_section_ab_arrangement(engine, 4);
 
     // Edge 0->1 has transition_bars = 4 so the entire section 0 IS the ramp.
-    constexpr int kSectionStride = 21;
+    constexpr int kSectionStride = kSectionDataFields;
     engine->pulsar_section_data[1 * kSectionStride + 5].store(2.0f, std::memory_order_relaxed);  // section 1 energy = 2.0
     engine->pulsar_section_transitions[0 * 3 + 2].store(4.0f, std::memory_order_relaxed);        // edge 0 -> 1 trans_bars
     // Force section 0 as the initial section so the ramp is deterministic
@@ -1836,7 +1838,7 @@ static void push_jam_carry_band_arrangement(OrpheusEngine* engine,
                                             float sec1_jam_carry) {
     push_two_section_ab_arrangement(engine, 2);
 
-    constexpr int kSectionStride = 21;
+    constexpr int kSectionStride = kSectionDataFields;
     // Section 0: LICK_BUILDER solo, fast mutation, never carries in.
     engine->pulsar_section_data[0 * kSectionStride + 9].store(
         static_cast<float>(static_cast<int>(SoloModeId::LICK_BUILDER)), std::memory_order_relaxed);

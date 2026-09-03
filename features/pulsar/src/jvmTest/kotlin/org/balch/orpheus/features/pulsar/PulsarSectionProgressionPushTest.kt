@@ -32,6 +32,8 @@ import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
+import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.ChordStep
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
@@ -40,8 +42,12 @@ import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionTransition
+import org.balch.orpheus.features.pulsar.models.SectionWeather
+import org.balch.orpheus.features.pulsar.models.StrikeEffect
+import org.balch.orpheus.features.pulsar.models.TapeStopEffect
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
@@ -206,8 +212,264 @@ class PulsarSectionProgressionPushTest {
         makeViewModel(vibe).actions.setVibe(vibe)
         advanceUntilIdle()
 
-        assertEquals(0f, floatPort("section_data_${0 * 21 + 16}"))
-        assertEquals(1f, floatPort("section_data_${1 * 21 + 16}"))
+        assertEquals(0f, floatPort("section_data_${0 * Arrangement.SECTION_DATA_FIELDS + 16}"))
+        assertEquals(1f, floatPort("section_data_${1 * Arrangement.SECTION_DATA_FIELDS + 16}"))
+    }
+
+    /**
+     * One push exercising all four storm-weather banks together: a section weather bed,
+     * a strike effect on a transition edge, a declared StormAnomaly, and a breathe
+     * override on one track. Pins exact floats at exact wire indices, plus zero-fill of
+     * every unauthored slot (stale-bank hygiene, matching the existing anomaly banks).
+     */
+    @Test
+    fun `storm weather trans-fx and breathe banks reach the controller`() = runTest(testDispatcher) {
+        val weather = SectionWeather(
+            rain = 0.6f, rumble = 0.4f, strikeChance = 0.25f, distance = 0.3f, rainLevel = 0.7f,
+        )
+        val strike = StrikeEffect(intensity = 0.9f, distance = 0.1f, offsetBars = -2f, delayMs = 250)
+        val storm = StormAnomaly(
+            probability = 0.15f, durationBarsMin = 1, durationBarsMax = 3,
+            intensity = 0.8f, distance = 0.35f,
+        )
+        val breathe = TrackSectionOverride(breatheBars = 4, breatheFloor = 0.2f, breatheTimbreSpan = 0.5f)
+
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "storm-verse", barsMin = 4, barsMax = 4,
+                    weather = weather,
+                    trackOverrides = mapOf(2 to breathe),
+                    transitions = listOf(SectionTransition(targetIndex = 1, weight = 1f, effects = listOf(strike))),
+                ),
+                Section(name = "calm", barsMin = 4, barsMax = 4),
+            ),
+            anomalies = listOf(storm),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        // --- Section weather: section 0 slots 21-25, section 1 all-zero (no weather). ---
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        assertEquals(weather.rain, floatPort("section_data_${0 * stride + 21}"))
+        assertEquals(weather.rumble, floatPort("section_data_${0 * stride + 22}"))
+        assertEquals(weather.strikeChance, floatPort("section_data_${0 * stride + 23}"))
+        assertEquals(weather.distance, floatPort("section_data_${0 * stride + 24}"))
+        assertEquals(weather.rainLevel, floatPort("section_data_${0 * stride + 25}"))
+        assertEquals(0f, floatPort("section_data_${1 * stride + 21}"), "section 1 declares no weather")
+        assertEquals(0f, floatPort("section_data_${1 * stride + 24}"), "section 1 declares no weather")
+        // rainLevel's authoring default is 1f, but an absent bed marshals the whole row
+        // as zero — the encoding C++ reads as "no weather", not "silent rain at rate 0".
+        assertEquals(0f, floatPort("section_data_${1 * stride + 25}"), "section 1 declares no weather")
+
+        // --- Trans-fx: row 0 = [section=0, edge=0, type=STRIKE, offset=-2, intensity, distance,
+        // delayMs]. p2 is the strike's sub-bar delay in MILLISECONDS, not samples or beats:
+        // C++ converts at the sample rate this side has no view of. ---
+        assertEquals(0f, floatPort("trans_fx_data_0"), "row 0 section")
+        assertEquals(0f, floatPort("trans_fx_data_1"), "row 0 edge")
+        assertEquals(TransitionFxWire.TYPE_STRIKE.toFloat(), floatPort("trans_fx_data_2"))
+        assertEquals(strike.offsetBars, floatPort("trans_fx_data_3"))
+        assertEquals(strike.intensity, floatPort("trans_fx_data_4"))
+        assertEquals(strike.distance, floatPort("trans_fx_data_5"))
+        assertEquals(strike.delayMs.toFloat(), floatPort("trans_fx_data_6"), "strike delay ms -> p2")
+        // Every remaining row must be zero-filled padding (stale-bank hygiene).
+        for (i in TransitionFxWire.ROW_FIELDS until TransitionFxWire.BANK_SIZE) {
+            assertEquals(0f, floatPort("trans_fx_data_$i"), "trans_fx_data_$i should be zeroed padding")
+        }
+
+        // --- Storm anomaly bank: [probability, durMin, durMax, intensity, distance, declared=1]. ---
+        assertEquals(storm.probability, floatPort("storm_data_0"))
+        assertEquals(storm.durationBarsMin.toFloat(), floatPort("storm_data_1"))
+        assertEquals(storm.durationBarsMax.toFloat(), floatPort("storm_data_2"))
+        assertEquals(storm.intensity, floatPort("storm_data_3"))
+        assertEquals(storm.distance, floatPort("storm_data_4"))
+        assertEquals(1f, floatPort("storm_data_5"), "declared flag")
+
+        // --- Breathe: track 2/section 0 carries the override; track 3/section 0 stays zero. ---
+        val overriddenIdx = 0 * 8 + 2
+        assertEquals(breathe.breatheBars.toFloat(), floatPort("section_track_breathe_bars_$overriddenIdx"))
+        assertEquals(breathe.breatheFloor, floatPort("section_track_breathe_floor_$overriddenIdx"))
+        assertEquals(breathe.breatheTimbreSpan, floatPort("section_track_breathe_timbre_span_$overriddenIdx"))
+        val plainIdx = 0 * 8 + 3
+        assertEquals(0f, floatPort("section_track_breathe_bars_$plainIdx"))
+        assertEquals(0f, floatPort("section_track_breathe_floor_$plainIdx"))
+        assertEquals(0f, floatPort("section_track_breathe_timbre_span_$plainIdx"))
+    }
+
+    /**
+     * `Section.exitEffects` fires on EVERY outgoing edge, so it costs exactly one wildcard
+     * row (edge = -1) no matter how many transitions the section declares — pre-expanding
+     * one row per edge would burn the 24-row bank on a section with a fan-out.
+     */
+    @Test
+    fun `section exitEffects emit one wildcard row ahead of the per-edge rows`() = runTest(testDispatcher) {
+        val exit = TapeStopEffect(ms = 650)
+        val edgeStrike = StrikeEffect(intensity = 0.7f, distance = 0.3f, offsetBars = -1f)
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "exit", barsMin = 4, barsMax = 4,
+                    exitEffects = listOf(exit),
+                    transitions = listOf(
+                        SectionTransition(targetIndex = 1, weight = 1f, effects = listOf(edgeStrike)),
+                        SectionTransition(targetIndex = 2, weight = 1f),
+                    ),
+                ),
+                Section(name = "a", barsMin = 4, barsMax = 4),
+                Section(name = "b", barsMin = 4, barsMax = 4),
+            ),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        // Row 0 is the section row: emitted before the per-edge rows so it wins a pending
+        // slot first if the 24-row cap ever truncates.
+        assertEquals(0f, floatPort("trans_fx_data_0"), "row 0 section")
+        assertEquals(-1f, floatPort("trans_fx_data_1"), "row 0 edge must be the -1 wildcard")
+        assertEquals(TransitionFxWire.TYPE_TAPE_STOP.toFloat(), floatPort("trans_fx_data_2"))
+        assertEquals(0f, floatPort("trans_fx_data_3"), "tape stop fires at the flip")
+        assertEquals(exit.ms.toFloat(), floatPort("trans_fx_data_4"))
+        assertEquals(0f, floatPort("trans_fx_data_5"))
+        assertEquals(0f, floatPort("trans_fx_data_6"))
+
+        // Row 1 is the edge row on edge 0 — two transitions, but the wildcard did not expand.
+        val r1 = TransitionFxWire.ROW_FIELDS
+        assertEquals(0f, floatPort("trans_fx_data_$r1"), "row 1 section")
+        assertEquals(0f, floatPort("trans_fx_data_${r1 + 1}"), "row 1 edge 0")
+        assertEquals(TransitionFxWire.TYPE_STRIKE.toFloat(), floatPort("trans_fx_data_${r1 + 2}"))
+        assertEquals(edgeStrike.offsetBars, floatPort("trans_fx_data_${r1 + 3}"))
+        assertEquals(edgeStrike.intensity, floatPort("trans_fx_data_${r1 + 4}"))
+        assertEquals(edgeStrike.distance, floatPort("trans_fx_data_${r1 + 5}"))
+
+        // Exactly two rows: everything past row 1 is zeroed padding.
+        for (i in 2 * TransitionFxWire.ROW_FIELDS until TransitionFxWire.BANK_SIZE) {
+            assertEquals(0f, floatPort("trans_fx_data_$i"), "trans_fx_data_$i should be zeroed padding")
+        }
+    }
+
+    /**
+     * `Section.entryEffects` fires on every ARRIVAL, so like `exitEffects` it costs exactly
+     * one row (edge = -2) no matter how many edges lead into the section — pre-expanding one
+     * row per inbound edge would burn the 24-row bank on a section everything routes to.
+     */
+    @Test
+    fun `section entryEffects emit one entry-sentinel row regardless of inbound edges`() = runTest(testDispatcher) {
+        val entry = ScratchEffect(ms = 320)
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "a", barsMin = 4, barsMax = 4,
+                    transitions = listOf(
+                        SectionTransition(targetIndex = 1, weight = 1f),
+                        SectionTransition(targetIndex = 2, weight = 1f),
+                    ),
+                ),
+                Section(
+                    name = "b", barsMin = 4, barsMax = 4,
+                    transitions = listOf(SectionTransition(targetIndex = 2, weight = 1f)),
+                ),
+                // Two inbound edges (from a and from b), one entry row.
+                Section(name = "arrival", barsMin = 4, barsMax = 4, entryEffects = listOf(entry)),
+            ),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(2f, floatPort("trans_fx_data_0"), "row 0 names the ARRIVING section")
+        assertEquals(-2f, floatPort("trans_fx_data_1"), "row 0 edge must be the -2 entry sentinel")
+        assertEquals(TransitionFxWire.TYPE_SCRATCH.toFloat(), floatPort("trans_fx_data_2"))
+        assertEquals(0f, floatPort("trans_fx_data_3"), "scratch fires on the section's downbeat")
+        assertEquals(entry.ms.toFloat(), floatPort("trans_fx_data_4"))
+
+        // Exactly one row: the three inbound-edge writes did not each add their own.
+        for (i in TransitionFxWire.ROW_FIELDS until TransitionFxWire.BANK_SIZE) {
+            assertEquals(0f, floatPort("trans_fx_data_$i"), "trans_fx_data_$i should be zeroed padding")
+        }
+    }
+
+    /**
+     * A vibe with NO storm anomaly, weather, or breathe overrides must still zero every
+     * slot of all four banks — guards the "declared => probability 0" / "null => all-zero"
+     * hygiene against a future refactor that only writes on presence.
+     */
+    @Test
+    fun `absent storm weather and breathe banks are all zero`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(name = "plain", barsMin = 4, barsMax = 4),
+            ),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        for (i in 0 until TransitionFxWire.BANK_SIZE) {
+            assertEquals(0f, floatPort("trans_fx_data_$i"), "trans_fx_data_$i")
+        }
+        // Only probability[0] and declared[5] go to 0 when absent — indices 1-4 fall back
+        // to StormAnomaly's OWN ship defaults, same convention as every sibling anomaly
+        // bank (e.g. WahAnomaly absent still writes its default rateDivision, not zero).
+        assertEquals(0f, floatPort("storm_data_0"), "probability")
+        assertEquals(1f, floatPort("storm_data_1"), "durationBarsMin default")
+        assertEquals(2f, floatPort("storm_data_2"), "durationBarsMax default")
+        assertEquals(0.7f, floatPort("storm_data_3"), "intensity default")
+        assertEquals(0.4f, floatPort("storm_data_4"), "distance default")
+        assertEquals(0f, floatPort("storm_data_5"), "declared flag")
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        for (field in 21..25) {
+            assertEquals(0f, floatPort("section_data_${0 * stride + field}"), "weather field $field")
+        }
+        for (field in listOf("bars", "floor", "timbre_span")) {
+            assertEquals(0f, floatPort("section_track_breathe_${field}_0"), "breathe $field")
+        }
+    }
+
+    /**
+     * Regression: `pushArrangement`'s no-arrangement early return used to skip the
+     * trans-fx flush entirely, so a PREVIOUS vibe's staged strike/scratch rows stayed
+     * resident in `pulsar_trans_fx_data` after switching to an arrangement-less vibe —
+     * contradicting the bank's own writer contract (no count field of its own; every
+     * apply must zero every unauthored row, see the comment on `pushTransFxBank`).
+     */
+    @Test
+    fun `switching to an arrangement-less vibe zeroes the trans-fx bank`() = runTest(testDispatcher) {
+        val stormy = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "storm-verse", barsMin = 4, barsMax = 4,
+                    transitions = listOf(
+                        SectionTransition(
+                            targetIndex = 1, weight = 1f,
+                            effects = listOf(StrikeEffect(intensity = 0.9f, distance = 0.1f, offsetBars = -2f)),
+                        ),
+                    ),
+                ),
+                Section(name = "calm", barsMin = 4, barsMax = 4),
+            ),
+        )
+        val vm = makeViewModel(stormy)
+        vm.actions.setVibe(stormy)
+        advanceUntilIdle()
+        // Precondition: the strike row actually landed before the no-arrangement switch,
+        // otherwise the assertions below would trivially pass on a bank that was never
+        // dirtied in the first place.
+        assertEquals(
+            TransitionFxWire.TYPE_STRIKE.toFloat(), floatPort("trans_fx_data_2"),
+            "precondition: the stormy vibe must actually stage a trans-fx row",
+        )
+
+        vm.actions.setVibe(noArrangementTestVibe())
+        advanceUntilIdle()
+
+        for (i in 0 until TransitionFxWire.BANK_SIZE) {
+            assertEquals(
+                0f, floatPort("trans_fx_data_$i"),
+                "trans_fx_data_$i must be zeroed after switching to an arrangement-less vibe",
+            )
+        }
     }
 
     /**
@@ -338,7 +600,7 @@ class PulsarSectionProgressionPushTest {
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
-private fun pushTestVibe(sections: List<Section>): Vibe = Vibe(
+private fun pushTestVibe(sections: List<Section>, anomalies: List<Anomaly> = emptyList()): Vibe = Vibe(
     name = "Section Push Test",
     bpm = 120f,
     rootNote = RootNote.C,
@@ -356,6 +618,27 @@ private fun pushTestVibe(sections: List<Section>): Vibe = Vibe(
         )
     },
     arrangement = Arrangement(sections = sections),
+    anomalies = anomalies,
+)
+
+/** A vibe with `arrangement = null` (its default) — exercises pushArrangement's early return. */
+private fun noArrangementTestVibe(): Vibe = Vibe(
+    name = "No Arrangement Push Test",
+    bpm = 120f,
+    rootNote = RootNote.C,
+    scaleType = ScaleType.MINOR,
+    genre = GenreProfile(
+        swingAmount = 0f, ghostProbability = 0f,
+        noteRangeLow = 36, noteRangeHigh = 72,
+        rhythmDensity = RhythmPattern.SPARSE.density,
+    ),
+    tracks = List(8) {
+        TrackVoice(
+            engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VA),
+            engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VA),
+            role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
+        )
+    },
 )
 
 private class PushTestVibeProvider(override val vibe: Vibe) : VibeProvider {

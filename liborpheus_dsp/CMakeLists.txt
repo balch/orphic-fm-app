@@ -310,6 +310,9 @@ if(BUILD_TESTS)
         test/chaos_tests/test_henon.cpp
         test/chaos_tests/test_chua.cpp
         test/test_pulsar_chaos.cpp
+        test/test_pulsar_storm.cpp
+        test/test_pulsar_transition_fx.cpp
+        test/test_pulsar_breathe.cpp
         test/test_master_fader.cpp
         test/test_master_tape_stop.cpp
         test/test_master_scratch.cpp

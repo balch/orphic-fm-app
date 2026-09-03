@@ -62,6 +62,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
@@ -80,13 +81,17 @@ import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SoloBehavior
 import org.balch.orpheus.features.pulsar.models.SoloMarkovConfig
 import org.balch.orpheus.features.pulsar.models.SoloMode
+import org.balch.orpheus.features.pulsar.models.StrikeEffect
+import org.balch.orpheus.features.pulsar.models.TapeStopEffect
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.TransitionEffect
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.WahParams
@@ -287,6 +292,46 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
                 PulsarSymbol.MIX.controlId.key to "Output mix level (0..1)",
             )
         }
+    }
+}
+
+/**
+ * Wire-format constants for the `trans_fx_data_$i` bank (168 = [MAX_ROWS] * [ROW_FIELDS]).
+ * Mirrors `TransFxType`/`kTransFxRowFields`/`kMaxTransFxRows` in
+ * `liborpheus_dsp/src/pulsar_transition_fx.h` verbatim — pinned by
+ * `PulsarSectionLimitsTest` so the two sides can't drift.
+ */
+internal object TransitionFxWire {
+    const val TYPE_NONE = 0
+    const val TYPE_SCRATCH = 1
+    const val TYPE_TAPE_STOP = 2
+    const val TYPE_STRIKE = 3
+    const val ROW_FIELDS = 7
+    const val MAX_ROWS = 24
+    const val BANK_SIZE = ROW_FIELDS * MAX_ROWS
+
+    /** `edge_idx` for a `Section.exitEffects` row: C++ matches it against ANY outgoing edge. */
+    const val EDGE_ANY = -1f
+
+    /** `edge_idx` for a `Section.entryEffects` row: C++ fires it on ANY arrival into the section. */
+    const val EDGE_ENTRY = -2f
+
+    /**
+     * The trailing 5 of a row's 7 fields: [type_id, offset_bars, p0, p1, p2]. Scratch and
+     * tape-stop always fire AT the flip (offset 0) — only StrikeEffect exposes its own offset.
+     *
+     * Per-type payloads, mirroring the `TransFxType` comments in `pulsar_transition_fx.h`:
+     * scratch/tape-stop carry milliseconds in p0 and leave p1/p2 unused; a strike carries
+     * intensity in p0, distance in p1, and its sub-bar `delayMs` — milliseconds, converted to
+     * samples by `StormVoice::trigger_strike` — in p2.
+     */
+    fun fieldsFor(effect: TransitionEffect): FloatArray = when (effect) {
+        is ScratchEffect -> floatArrayOf(TYPE_SCRATCH.toFloat(), 0f, effect.ms.toFloat(), 0f, 0f)
+        is TapeStopEffect -> floatArrayOf(TYPE_TAPE_STOP.toFloat(), 0f, effect.ms.toFloat(), 0f, 0f)
+        is StrikeEffect -> floatArrayOf(
+            TYPE_STRIKE.toFloat(), effect.offsetBars,
+            effect.intensity, effect.distance, effect.delayMs.toFloat(),
+        )
     }
 }
 
@@ -986,7 +1031,7 @@ class PulsarViewModel(
                     applyTrackOverridesForSection(sectionIndex)
                 }
         }
-        // NOTE: the per-section EXIT scratch (Section.exitScratchMs) is triggered in C++,
+        // NOTE: a per-edge ScratchEffect (SectionTransition.effects) is triggered in C++,
         // not here. The arrangement flow is a 5Hz poll (up to 200ms latency), far too
         // coarse to fire a scratch AT the boundary and hold the drop's first steps. The
         // pulsar unit arms the master scratch synchronously at the section flip and freezes
@@ -1599,14 +1644,16 @@ class PulsarViewModel(
      *
      * Layout for C++ engine arrays (must match orpheus_engine_routing.cpp and load_vibe()):
      *
-     * section_data[s * 21 + field]:
+     * section_data[s * Arrangement.SECTION_DATA_FIELDS + field]:
      *   0=bars_min, 1=bars_max, 2=bar_step (1 = any; 2 = odd/even only; etc.),
-     *   3=recency_decay,
-     *   4=macro_energy, 5=macro_complexity, 6=macro_space, 7=macro_mood,
-     *   8=has_solo/solo_mode_id, 9..17=solo params (format depends on new vs legacy),
-     *   12=bars_per_soloist_max, 13=solo_transition_bars, 14=improv_carryover,
-     *   15=transition_count, 16=reserved, 17=reserved,
-     *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override
+     *   3=recency_decay, 4=transition_count,
+     *   5=macro_energy, 6=macro_complexity, 7=macro_space, 8=macro_mood,
+     *   9=solo_mode_id (0=no solo), 10=solo_probability, 11=solo_mutation_rate (LickBuilder),
+     *   12=solo_lick_influence (Jam), 13=solo_bars_min (LongFill), 14=solo_bars_max (LongFill),
+     *   15=reserved (retired: was exitScratchMs, see the zeroing comment below), 16=jamCarry, 17=reserved,
+     *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override,
+     *   21=weather_rain, 22=weather_rumble, 23=weather_strike_chance, 24=weather_distance,
+     *   25=weather_rain_level (SectionWeather; all-zero when [Section.weather] is null)
      *
      * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
      *   0=targetIndex, 1=weight, 2=transitionBars
@@ -1627,12 +1674,33 @@ class PulsarViewModel(
      *
      * arrangement_generation written last as acquire fence.
      */
+    // Trans-fx has no count/active field of its own (see the writer-contract comment on
+    // pulsar_trans_fx_data in orpheus_engine.h) — every apply must zero every unauthored
+    // row, on EVERY path through pushArrangement, including the no-arrangement early
+    // return below. Unlike section_data, a future reader isn't guaranteed to also check
+    // arrangement_active first, so this bank can't lean on that guard the way section
+    // fields (including weather) do.
+    private fun pushTransFxBank(rows: List<FloatArray>) {
+        val transFxData = FloatArray(TransitionFxWire.BANK_SIZE)
+        rows.forEachIndexed { rowIdx, row ->
+            row.copyInto(transFxData, rowIdx * TransitionFxWire.ROW_FIELDS)
+        }
+        transFxData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "trans_fx_data_$i"), FloatValue(v)
+            )
+        }
+    }
+
     private fun pushArrangement(vibe: Vibe) {
         val arr = vibe.arrangement
         if (arr == null) {
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "arrangement_active"), IntValue(0)
             )
+            // No sections means no edges to stage — zero the bank so a PREVIOUS vibe's
+            // rows can't linger (see pushTransFxBank's doc comment above).
+            pushTransFxBank(emptyList())
             log.debug { "Arrangement: inactive (vibe=${vibe.name})" }
             return
         }
@@ -1652,9 +1720,13 @@ class PulsarViewModel(
             PluginControlId(PULSAR_URI, "arrangement_outro_index"), IntValue(arr.outroIndex ?: -1)
         )
 
-        // Section data (21 floats per section)
+        // Trans-fx bank accumulator: flattened across every section/edge below, written
+        // once after the loop (see kMaxTransFxRows in pulsar_transition_fx.h).
+        val transFxRows = ArrayList<FloatArray>(TransitionFxWire.MAX_ROWS)
+
+        // Section data (Arrangement.SECTION_DATA_FIELDS floats per section)
         arr.sections.forEachIndexed { s, section ->
-            val base = s * 21
+            val base = s * Arrangement.SECTION_DATA_FIELDS
             val mo = section.macroOverrides
             fun setSection(field: Int, v: Float) =
                 synthController.setPluginControl(
@@ -1693,7 +1765,7 @@ class PulsarViewModel(
                 setSection(12, (sectionSolo as? SoloMode.Jam)?.lickInfluence ?: 0.5f)
                 setSection(13, (sectionSolo as? SoloMode.LongFill)?.barsMin?.toFloat() ?: 2f)
                 setSection(14, (sectionSolo as? SoloMode.LongFill)?.barsMax?.toFloat() ?: 4f)
-                setSection(15, 0f) // set below (exit scratch)
+                setSection(15, 0f) // slot 15 retired, never repurpose
                 setSection(16, 0f) // slot 16 written below (jamCarry)
                 setSection(17, 0f) // reserved
             } else {
@@ -1702,11 +1774,8 @@ class PulsarViewModel(
                 for (slot in 10..17) setSection(slot, 0f)
             }
 
-            // Slot 15: per-section EXIT scratch (ms), independent of solo. C++ arms a
-            // master record-scratch at this section's exit and freezes the incoming
-            // section's clock while the scratch runs (0 = none). Written after the
-            // solo block so it wins over the reserved-0 set in both branches.
-            setSection(15, section.exitScratchMs.toFloat())
+            // Slot 15 retired (was Section.exitScratchMs) — left zeroed by both branches
+            // above; never repurpose.
 
             // Slot 16: jamCarry — carry an in-flight band solo across this
             // section's entry (see Section.jamCarry). Written after the solo
@@ -1717,6 +1786,16 @@ class PulsarViewModel(
             setSection(18, compingStyleOrSentinel(section.compingStyle))
             setSection(19, compingInversionOrSentinel(section.compingInversion))
             setSection(20, chordFollowOrSentinel(section.chordFollow))
+
+            // Weather bed (slots 21-25); null = all-zero, no storm ambience this section.
+            // rainLevel's absent value is 0, not its 1f default: an all-zero row IS the
+            // "no weather" encoding, and rate 0 renders nothing at any level anyway.
+            val weather = section.weather
+            setSection(21, weather?.rain ?: 0f)
+            setSection(22, weather?.rumble ?: 0f)
+            setSection(23, weather?.strikeChance ?: 0f)
+            setSection(24, weather?.distance ?: 0f)
+            setSection(25, weather?.rainLevel ?: 0f)
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.
@@ -1748,6 +1827,38 @@ class PulsarViewModel(
                     PluginControlId(PULSAR_URI, "section_track_density_$baseIdx"),
                     FloatValue(o?.density ?: -1f)
                 )
+                // Breathe (volume/timbre swell), trailing 3 slots on this per-track family.
+                // 0 is the natural "off" value for all three, so absent overrides don't need
+                // a separate sentinel the way density does.
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_breathe_bars_$baseIdx"),
+                    FloatValue((o?.breatheBars ?: 0).toFloat())
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_breathe_floor_$baseIdx"),
+                    FloatValue(o?.breatheFloor ?: 0f)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_breathe_timbre_span_$baseIdx"),
+                    FloatValue(o?.breatheTimbreSpan ?: 0f)
+                )
+            }
+
+            // Section-level exit and entry effects: ONE sentinel row each — EDGE_ANY covers
+            // every outgoing edge, EDGE_ENTRY every arrival — not one row per edge. Emitted
+            // ahead of the per-edge rows below so they win pending slots first if the
+            // MAX_ROWS cap truncates.
+            section.exitEffects.forEach { effect ->
+                if (transFxRows.size >= TransitionFxWire.MAX_ROWS) return@forEach
+                transFxRows.add(
+                    floatArrayOf(s.toFloat(), TransitionFxWire.EDGE_ANY) + TransitionFxWire.fieldsFor(effect)
+                )
+            }
+            section.entryEffects.forEach { effect ->
+                if (transFxRows.size >= TransitionFxWire.MAX_ROWS) return@forEach
+                transFxRows.add(
+                    floatArrayOf(s.toFloat(), TransitionFxWire.EDGE_ENTRY) + TransitionFxWire.fieldsFor(effect)
+                )
             }
 
             // Transitions for this section (up to 8 edges × 3 floats per edge:
@@ -1766,6 +1877,16 @@ class PulsarViewModel(
                     PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 3 + 2}"),
                     FloatValue(tr.transitionBars.toFloat())
                 )
+                // Dramatic effects armed on this edge (scratch/tape-stop/strike), collected
+                // for the flattened trans_fx_data_$i write after the section loop. Extra
+                // rows past MAX_ROWS are dropped, matching every other section-bank's
+                // silent-truncation-past-the-wire-cap behavior.
+                tr.effects.forEach { effect ->
+                    if (transFxRows.size >= TransitionFxWire.MAX_ROWS) return@forEach
+                    transFxRows.add(
+                        floatArrayOf(s.toFloat(), t.toFloat()) + TransitionFxWire.fieldsFor(effect)
+                    )
+                }
             }
 
             // --- Per-section progression override ---
@@ -1800,6 +1921,8 @@ class PulsarViewModel(
                 IntValue(if (to != null) 1 else 0)
             )
             if (to != null) {
+                // Tension's OWN fixed stride — independent of Arrangement.SECTION_DATA_FIELDS.
+                // It never grew the 4 weather slots, so this literal must stay 21.
                 val tBase = s * 21
                 fun setTension(field: Int, v: Float) =
                     synthController.setPluginControl(
@@ -1848,6 +1971,10 @@ class PulsarViewModel(
                 setCh(3, ch.extensionProbability)
             }
         }
+
+        // Trans-fx bank: flatten the accumulated rows and zero-fill the rest so a vibe
+        // reload doesn't carry stale rows from a previous vibe.
+        pushTransFxBank(transFxRows)
 
         // Band solo config
         val bandConfig = vibe.band
@@ -2089,6 +2216,23 @@ class PulsarViewModel(
         filterData.forEachIndexed { i, v ->
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "filter_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Storm Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val sto = vibe.anomalies.filterIsInstance<StormAnomaly>().firstOrNull()
+        val stormData = floatArrayOf(
+            sto?.probability ?: 0f,
+            sto?.durationBarsMin?.toFloat() ?: 1f,
+            sto?.durationBarsMax?.toFloat() ?: 2f,
+            sto?.intensity ?: 0.7f,
+            sto?.distance ?: 0.4f,
+            if (sto != null) 1f else 0f, // [5] declared flag — manual trigger fires only on declaring vibes
+        )
+        stormData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "storm_data_$i"), FloatValue(v)
             )
         }
 

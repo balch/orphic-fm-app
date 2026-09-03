@@ -3,6 +3,7 @@
 #include "orpheus_dsp.h"
 #include "orpheus_compat.h"
 #include "pulsar_limits.h"
+#include "pulsar_transition_fx.h"
 #include "orpheus_graph.h"
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
@@ -1005,6 +1006,22 @@ struct OrpheusEngine {
     // (1.0 when the vibe declares a FilterAnomaly; gates the manual trigger). Arms the EXISTING
     // master_filter_l/r members (already in the master chain) — no new engine effect member here.
     std::atomic<float> pulsar_filter_data[4] = {};
+    // Storm Anomaly: 6-float config bank [0]=prob, [1]=durMin, [2]=durMax, [3]=intensity,
+    // [4]=distance, [5]=declared flag (1.0 when the vibe declares a StormAnomaly; gates the
+    // manual trigger). The one anomaly that arms no master effect: it strikes the pulsar's
+    // OWN storm voice, so an undeclared vibe leaves the mix bit-identical.
+    static constexpr int kStormDataFields = 6;
+    static_assert(kStormDataFields == 6,
+                  "storm_data layout: probability, durMin, durMax, intensity, distance, declared");
+    std::atomic<float> pulsar_storm_data[kStormDataFields] = {};
+    // Generic per-edge section transition effects: kMaxTransFxRows rows of
+    // kTransFxRowFields floats — [section_idx, edge_idx, type_id, offset_bars, p0, p1, p2].
+    // type_id 0=none, 1=scratch(p0=ms), 2=tape stop(p0=ms), 3=strike(p0=intensity, p1=distance).
+    // Unlike the anomaly banks above there is no declared flag: a row with type 0 is
+    // simply unauthored padding. See pulsar_transition_fx.h for the staging rules.
+    // Writers must zero unused rows on every apply: the loader scans all kMaxTransFxRows
+    // rows with no count field.
+    std::atomic<float> pulsar_trans_fx_data[kTransFxBankSize] = {};
     // Per-track lick-wah insert config bank. [0] = track opt-in bitmask (bit t set => track t
     // filters its rendered audio through its OWN WahVoice, voiced by its OWN params). Then
     // kLickWahFields floats per track at 1 + t * kLickWahFields, in orpheus::WahParams
@@ -1031,6 +1048,17 @@ struct OrpheusEngine {
     // Density is a pattern-GENERATION input, so a change here regenerates the affected
     // track's pattern at the section boundary; see regenerate_track_density().
     std::atomic<float> pulsar_section_track_density[kMaxSections * kNumPulsarTracks] = {};
+    // Per-section per-track breathe cycle: three trailing families on the same
+    // per-track index. 0 is the natural "off" for all three, so unlike density they
+    // need no sentinel — bars 0 means the track does not breathe this section.
+    // See pulsar_breathe.h; bars are loop-units (16 steps), floor and span are 0-1.
+    std::atomic<float> pulsar_section_track_breathe_bars[kMaxSections * kNumPulsarTracks] = {};
+    std::atomic<float> pulsar_section_track_breathe_floor[kMaxSections * kNumPulsarTracks] = {};
+    std::atomic<float> pulsar_section_track_breathe_timbre_span[kMaxSections * kNumPulsarTracks] = {};
+    // Every family above is indexed s * kNumPulsarTracks + t; PulsarFeature.kt builds
+    // that index with a hardcoded stride of 8 (baseIdx = s * 8 + t).
+    static_assert(kNumPulsarTracks == 8,
+                  "section_track_* bank stride must match PulsarFeature.kt's baseIdx = s * 8 + t");
     // Per-section outgoing edges. Stride: 8 sections × 8 edges × 3 floats per edge.
     // Field layout per edge: 0=target_index, 1=weight, 2=transition_bars (pre-roll
     // ramp into the destination, in bars; 0 = hard cut at the boundary).

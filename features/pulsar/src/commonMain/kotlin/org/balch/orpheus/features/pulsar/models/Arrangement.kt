@@ -5,6 +5,19 @@ import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.serialization.IntRangeSerializer
 
 /**
+ * The -8..1 offset bound every effects list shares, independent of any edge's own
+ * `transitionBars`: C++ clamps a longer offset to its owning section's start, so a wider
+ * range would only collapse silently.
+ */
+private fun requireStrikeOffsetsInRange(effects: List<TransitionEffect>) {
+    effects.filterIsInstance<StrikeEffect>().forEach { strike ->
+        require(strike.offsetBars in -8f..1f) {
+            "StrikeEffect.offsetBars must be -8f..1f, got ${strike.offsetBars}"
+        }
+    }
+}
+
+/**
  * A weighted edge in the section graph.
  * @param targetIndex Index into [Arrangement.sections] for the destination section.
  * @param weight Relative probability of this transition (weights are normalized per section).
@@ -17,13 +30,27 @@ import org.balch.orpheus.core.serialization.IntRangeSerializer
  *   - chorus lift:    `SectionTransition(STAB, 0.5f, transitionBars = 2)`
  *   - hard verse cut: `SectionTransition(VERSE, 0.5f)` (no ramp)
  *   - long fade-out:  `SectionTransition(DRIFT, 0.2f, transitionBars = 4)`
+ * @param effects Dramatic events armed at the flip, fired in list order. Up to
+ *   [TransitionEffect.MAX_PER_FLIP]. Replaces the retired single-purpose `Section.exitScratchMs`
+ *   field — a [ScratchEffect] here reproduces that behavior. Always (re)arms, even over an
+ *   anomaly already in flight on the same target. Unioned with the source section's
+ *   [Section.exitEffects] (which fire on every edge including this one) and the destination
+ *   section's [Section.entryEffects].
  */
 @Serializable
 data class SectionTransition(
     val targetIndex: Int,
     val weight: Float,
     val transitionBars: Int = 0,
-)
+    val effects: List<TransitionEffect> = emptyList(),
+) {
+    init {
+        require(effects.size <= TransitionEffect.MAX_PER_FLIP) {
+            "SectionTransition.effects size ${effects.size} exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
+        }
+        requireStrikeOffsetsInRange(effects)
+    }
+}
 
 /**
  * Per-track parameter overrides scoped to a single [Section].
@@ -68,6 +95,12 @@ data class SectionTransition(
  *   force arpeggiation, `NEVER` for block stabs, `AUTO` for engine-default.
  * @param chordFollow Override chord-follow mode for melodic and chordal tracks.
  *   e.g. flip a bass from `ROOT_ONLY` (verse pedal) to `FOLLOW` (chorus walks).
+ * @param breatheBars Cycle period for the volume/timbre "breathe" modulation, in loop-units.
+ *   0 = off. Starts at the top on section entry and descends first, then repeats; snaps back
+ *   to unity on section exit.
+ * @param breatheFloor Gain at the bottom of the breathe cycle, 0-1.
+ * @param breatheTimbreSpan How much timbre (morph) closes as the breath sinks, 0-1. 0 = gain
+ *   only, no timbre movement.
  */
 @Serializable
 data class TrackSectionOverride(
@@ -84,7 +117,20 @@ data class TrackSectionOverride(
     val sectionInversion: SectionInversion? = null,
     val arpMode: ArpMode? = null,
     val chordFollow: ChordFollow? = null,
-)
+    val breatheBars: Int = 0,
+    val breatheFloor: Float = 0f,
+    val breatheTimbreSpan: Float = 0f,
+) {
+    init {
+        require(breatheBars >= 0) { "TrackSectionOverride.breatheBars must be >= 0, got $breatheBars" }
+        require(breatheFloor in 0f..1f) {
+            "TrackSectionOverride.breatheFloor must be 0..1, got $breatheFloor"
+        }
+        require(breatheTimbreSpan in 0f..1f) {
+            "TrackSectionOverride.breatheTimbreSpan must be 0..1, got $breatheTimbreSpan"
+        }
+    }
+}
 
 /**
  * One section in an [Arrangement] — a distinct musical phase like verse, chorus, or solo.
@@ -144,11 +190,6 @@ data class Section(
      *  user makes during a section carry through into subsequent sections at
      *  their relative multiplier. */
     val bpmMultiplier: Float = 1.0f,
-    /** When leaving this section, fire a master record-scratch of this many ms
-     *  (0 = none). The scratch grabs the outgoing audio and drops back to live on
-     *  the next section's beat — put it on a build section to scratch into the drop.
-     *  Fires once per exit of this section. Useful range ~400..1000 ms. */
-    val exitScratchMs: Int = 0,
     /** Accelerando: over the last [bpmRampBars] arrangement-bars of this section, ramp
      *  the live BPM from this section's [bpmMultiplier] tempo UP to the vibe's full base
      *  tempo, landing on the next section's downbeat (0 = no ramp; instant flip as before).
@@ -165,6 +206,33 @@ data class Section(
      *  roll) happens instead. Default false = today's full reset. Use on chained
      *  jam stages so the jam develops across them instead of restarting. */
     val jamCarry: Boolean = false,
+    /** Storm/rain ambience layered under this section while active. Crossfades in over the
+     *  entry pre-roll and drains on the walk-back, same lerp as the macro overrides.
+     *  Null = no weather (all-zero bed, no strikes). */
+    val weather: SectionWeather? = null,
+    /** Dramatic events fired whenever this section ENDS, on every outgoing edge — the
+     *  section-wide counterpart to per-edge [SectionTransition.effects]. The two are a
+     *  UNION at a flip: both this list and the taken edge's own list stage and fire, which
+     *  is why the combined total is capped at [TransitionEffect.MAX_PER_FLIP] below.
+     *
+     *  A TERMINAL section (no [transitions]) never flips, so its exitEffects never fire;
+     *  ending the song is separate machinery ([Arrangement.transitionOut]). */
+    val exitEffects: List<TransitionEffect> = emptyList(),
+    /** Dramatic events fired whenever this section BEGINS, whichever section it came from —
+     *  the mirror of [exitEffects]. Authoring an arrival here costs one row no matter how many
+     *  edges lead in, instead of the same effect copied onto every inbound edge.
+     *
+     *  At a flip all THREE lists are a union: the departing section's [exitEffects], the taken
+     *  edge's [SectionTransition.effects], and this list. [Arrangement] caps that combined total
+     *  at [TransitionEffect.MAX_PER_FLIP] — only it can see all three.
+     *
+     *  Does NOT fire for the arrangement's OPENING section at song start: there is no transition
+     *  into it, and these fire on flips only. A section re-entered by a self-edge does fire.
+     *
+     *  Offsets are measured from this section's own first downbeat: a [StrikeEffect] at 0 or
+     *  below lands on it, +1 fires one bar in. Negatives cannot reach back into the departing
+     *  section — the edge that arrives is not known until the flip — so they collapse to 0. */
+    val entryEffects: List<TransitionEffect> = emptyList(),
 ) {
     init {
         customProgression?.let { validateProgression(it, "Section.customProgression") }
@@ -173,8 +241,22 @@ data class Section(
         }
         require(barStep in 1..16) { "Section.barStep must be 1..16, got $barStep" }
         require(bpmMultiplier > 0f) { "Section.bpmMultiplier must be > 0, got $bpmMultiplier" }
-        require(exitScratchMs >= 0) { "Section.exitScratchMs must be >= 0, got $exitScratchMs" }
         require(bpmRampBars >= 0) { "Section.bpmRampBars must be >= 0, got $bpmRampBars" }
+        require(exitEffects.size <= TransitionEffect.MAX_PER_FLIP) {
+            "Section.exitEffects size ${exitEffects.size} exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
+        }
+        require(entryEffects.size <= TransitionEffect.MAX_PER_FLIP) {
+            "Section.entryEffects size ${entryEffects.size} exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
+        }
+        requireStrikeOffsetsInRange(exitEffects)
+        requireStrikeOffsetsInRange(entryEffects)
+        // exitEffects union the edge's own list at every flip, and C++ stages only
+        // MAX_PER_FLIP pending slots — the worst edge has to fit, not just each list.
+        val worstEdge = transitions.maxOfOrNull { it.effects.size } ?: 0
+        require(exitEffects.size + worstEdge <= TransitionEffect.MAX_PER_FLIP) {
+            "Section.exitEffects (${exitEffects.size}) + its busiest edge's effects ($worstEdge) " +
+                "exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
+        }
     }
 }
 
@@ -234,6 +316,22 @@ data class Arrangement(
                 "Arrangement.outroIndex must be in 0..${sections.size - 1}, got $it"
             }
         }
+        // Three lists stage at one flip — the source's exitEffects, the taken edge's own
+        // effects, and the DESTINATION's entryEffects. Section.init enforces the first two;
+        // only the arrangement can see the third. C++ holds kMaxPendingFx and silently drops
+        // the rest, so this is what keeps that unreachable from authored data.
+        sections.forEachIndexed { s, source ->
+            source.transitions.forEach { edge ->
+                val target = sections.getOrNull(edge.targetIndex) ?: return@forEach
+                val total = source.exitEffects.size + edge.effects.size + target.entryEffects.size
+                require(total <= TransitionEffect.MAX_PER_FLIP) {
+                    "Section $s '${source.name}' -> ${edge.targetIndex} '${target.name}' stages " +
+                        "$total effects at one flip: exitEffects=${source.exitEffects.size} + " +
+                        "edge effects=${edge.effects.size} + entryEffects=${target.entryEffects.size} " +
+                        "exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
+                }
+            }
+        }
     }
 
     companion object {
@@ -252,5 +350,18 @@ data class Arrangement(
          * for a long time, which hid a stride mismatch in the C++ transition unpack.
          */
         const val MAX_SECTION_TRANSITIONS = 8
+
+        /**
+         * Floats per section in the `section_data_$i` bank (slots 0-20 existing fields,
+         * 21-25 [SectionWeather]). MUST equal `kSectionDataFields` in `pulsar_limits.h`.
+         * `PulsarSectionLimitsTest` parses the header and fails if these drift apart.
+         *
+         * NOT shared with the co-located `pulsar_section_tension_data` bank: that array
+         * reuses this constant only for its C++-side allocation size, but its own
+         * per-section stride is independently fixed at 21 (see the `tBase`/`tb` literals
+         * in `PulsarFeature.pushArrangement` and `orpheus_unit_pulsar.cpp`) — tension never
+         * grew the 5 weather slots, so bumping this constant again must NOT touch those.
+         */
+        const val SECTION_DATA_FIELDS = 26
     }
 }

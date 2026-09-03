@@ -7,6 +7,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
@@ -187,6 +188,9 @@ data class Vibe(
         }
         require(anomalies.filterIsInstance<FilterAnomaly>().size <= 1) {
             "Vibe.anomalies may contain at most one FilterAnomaly"
+        }
+        require(anomalies.filterIsInstance<StormAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one StormAnomaly"
         }
         val lickAnomalies = anomalies.filterIsInstance<LickAnomaly>()
         require(lickAnomalies.size <= 1) {

@@ -214,8 +214,9 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
 
     // Section 0: groove (bars 4-8, transitions to 0 and 1)
     // Section 1: improv (bars 4-8, IMPROVISERS solo)
-    // 21 floats per section (slots 18-20 = comping overrides, -1 = no override)
-    constexpr int kSectionStride = 21;
+    // kSectionDataFields floats per section (slots 18-20 = comping overrides, -1 = no
+    // override; 21-25 = weather, left zeroed here — no fixture exercises it yet).
+    constexpr int kSectionStride = kSectionDataFields;
     float section_data[8 * kSectionStride] = {};
     // Default all comping-override slots to -1 across every section
     for (int s = 0; s < 8; s++) {

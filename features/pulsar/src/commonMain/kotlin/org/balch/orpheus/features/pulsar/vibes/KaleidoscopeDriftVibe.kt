@@ -1161,7 +1161,6 @@ public class KaleidoscopeDriftVibe : VibeProvider {
               customProgression = null,
               chordsPerBar = null,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1201,7 +1200,6 @@ public class KaleidoscopeDriftVibe : VibeProvider {
               customProgression = null,
               chordsPerBar = null,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1233,7 +1231,6 @@ public class KaleidoscopeDriftVibe : VibeProvider {
               customProgression = null,
               chordsPerBar = null,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
           ),

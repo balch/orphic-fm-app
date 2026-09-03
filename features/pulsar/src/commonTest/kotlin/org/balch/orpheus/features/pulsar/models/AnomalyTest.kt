@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.models
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import kotlin.test.Test
@@ -110,6 +111,41 @@ class AnomalyTest {
     fun rejects_duplicate_wah_anomaly() {
         assertFailsWith<IllegalArgumentException> {
             base.copy(anomalies = listOf(WahAnomaly(), WahAnomaly()))
+        }
+    }
+
+    @Test
+    fun rejects_duplicate_storm_anomaly() {
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(anomalies = listOf(StormAnomaly(probability = 0.04f), StormAnomaly(probability = 0.05f)))
+        }
+    }
+
+    @Test
+    fun storm_anomaly_round_trips_with_its_discriminator() {
+        val vibe = base.copy(
+            anomalies = listOf(StormAnomaly(probability = 0.04f, intensity = 0.7f, distance = 0.4f)),
+        )
+        val encoded = json.encodeToString(Vibe.serializer(), vibe)
+        assertTrue(encoded.contains("\"type\":\"storm\""), "missing storm discriminator: $encoded")
+        val decoded = json.decodeFromString(Vibe.serializer(), encoded)
+        assertEquals(vibe.anomalies, decoded.anomalies)
+    }
+
+    @Test
+    fun rejects_storm_anomaly_probability_out_of_range() {
+        assertFailsWith<IllegalArgumentException> { StormAnomaly(probability = 1.1f) }
+    }
+
+    @Test
+    fun rejects_storm_anomaly_duration_bars_min_below_one() {
+        assertFailsWith<IllegalArgumentException> { StormAnomaly(probability = 0.1f, durationBarsMin = 0) }
+    }
+
+    @Test
+    fun rejects_storm_anomaly_duration_bars_min_above_max() {
+        assertFailsWith<IllegalArgumentException> {
+            StormAnomaly(probability = 0.1f, durationBarsMin = 3, durationBarsMax = 2)
         }
     }
 

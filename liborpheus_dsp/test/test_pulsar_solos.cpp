@@ -369,7 +369,7 @@ static void push_lickbuilder_band_arrangement(OrpheusEngine* engine, int lead_tr
     engine->pulsar_arrangement_intro_index.store(-1, std::memory_order_relaxed);
     engine->pulsar_arrangement_outro_index.store(-1, std::memory_order_relaxed);
 
-    constexpr int kSectionStride = 21;
+    constexpr int kSectionStride = kSectionDataFields;
     float section_data[8 * kSectionStride] = {};
     for (int s = 0; s < 8; s++) {
         section_data[s * kSectionStride + 18] = -1;
@@ -469,7 +469,7 @@ static void push_jam_band_arrangement(OrpheusEngine* engine, int lead_track) {
     engine->pulsar_arrangement_intro_index.store(-1, std::memory_order_relaxed);
     engine->pulsar_arrangement_outro_index.store(-1, std::memory_order_relaxed);
 
-    constexpr int kSectionStride = 21;
+    constexpr int kSectionStride = kSectionDataFields;
     float section_data[8 * kSectionStride] = {};
     for (int s = 0; s < 8; s++) {
         section_data[s * kSectionStride + 18] = -1;

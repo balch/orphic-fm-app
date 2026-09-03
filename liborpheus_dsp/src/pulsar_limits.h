@@ -30,8 +30,12 @@ static constexpr int kMaxSections = 12;
 // kMaxSections while Kotlin wrote by this value. Keep them independent.
 static constexpr int kMaxSectionTransitions = 8;
 
-// Per-section wire strides (floats/ints per section in each array).
-static constexpr int kSectionDataFields = 21;   // pulsar_section_data, pulsar_section_tension_data
+// Per-section wire strides (floats/ints per section in each array). Governs allocation
+// size for BOTH arrays below, but only pulsar_section_data's own indexing uses the full
+// width (slots 21-25 are SectionWeather) — pulsar_section_tension_data's indexing stays
+// independently fixed at 21 (see the tb/tBase literals in orpheus_unit_pulsar.cpp and
+// PulsarFeature.pushArrangement); it never grew those 5 slots.
+static constexpr int kSectionDataFields = 26;   // pulsar_section_data, pulsar_section_tension_data
 static constexpr int kSectionProgressionSlots = 12;  // degrees + glides
 static constexpr int kSectionCompingHumanFields = 4;
 

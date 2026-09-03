@@ -1221,7 +1221,6 @@ public class VanishedSkylineVibe : VibeProvider {
               ),
               chordsPerBar = 2,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1258,7 +1257,6 @@ public class VanishedSkylineVibe : VibeProvider {
               customProgression = null,
               chordsPerBar = null,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1335,7 +1333,6 @@ public class VanishedSkylineVibe : VibeProvider {
               ),
               chordsPerBar = 2,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1380,7 +1377,6 @@ public class VanishedSkylineVibe : VibeProvider {
               customProgression = null,
               chordsPerBar = null,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1434,7 +1430,6 @@ public class VanishedSkylineVibe : VibeProvider {
               ),
               chordsPerBar = 2,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
             Section(
@@ -1481,7 +1476,6 @@ public class VanishedSkylineVibe : VibeProvider {
               ),
               chordsPerBar = 2,
               bpmMultiplier = 1.0f,
-              exitScratchMs = 0,
               bpmRampBars = 0,
             ),
           ),

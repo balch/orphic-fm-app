@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.models.ProgressionStyle
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SectionTransition
@@ -183,7 +184,7 @@ class FireSky05Vibe : VibeProvider {
     override val name: String = "Fire Sky .5f"
 
     override val vibe: Vibe by lazy {
-        FireSkyVibeBase(baseBpm = 60f, halfTimeMult = 1.0f, buildExitScratchMs = 0).vibe.copy(
+        FireSkyVibeBase(baseBpm = 60f, halfTimeMult = 1.0f, buildScratchMs = 0).vibe.copy(
             name = name,
             lick = tweakLick,  // fallback seed; the pool overrides it at load
             lickRotation = LickRotation(pool = listOf(tweakLick, aiLick)),
@@ -247,7 +248,7 @@ class FireSky05Vibe : VibeProvider {
 private class FireSkyVibeBase(
     private val baseBpm: Float = 84f,
     private val halfTimeMult: Float = 0.72f,
-    private val buildExitScratchMs: Int = 500,
+    private val buildScratchMs: Int = 500,
 ) {
 
     // The riff hangs on the i (G), then makes the iconic hard-rock move: down to
@@ -346,9 +347,13 @@ private class FireSkyVibeBase(
                 name = "build",
                 barsMin = 2, barsMax = 2,   // two more slow statements as the organ swells
                 bpmMultiplier = halfTimeMult,      // same ~60 BPM half-time as the cold open
-                exitScratchMs = buildExitScratchMs, // record-scratch out of the build's tail, into the drop
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = liftBars),  // -> verse = THE DROP (tempo snaps to 84)
+                    // -> verse = THE DROP (tempo snaps to 84); scratch out of the build's tail,
+                    // into the drop (buildScratchMs = 0 in FireSky05Vibe drops the effect).
+                    SectionTransition(
+                        targetIndex = 2, weight = 1.0f, transitionBars = liftBars,
+                        effects = if (buildScratchMs > 0) listOf(ScratchEffect(ms = buildScratchMs)) else emptyList(),
+                    ),
                 ),
                 macroOverrides = MacroOverrides(
                     energy = 0.65f, complexity = 0.42f, space = 0.45f, mood = 0.6f,

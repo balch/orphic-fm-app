@@ -14,6 +14,7 @@
 #include "pulsar_comping.h"
 #include "pulsar_rng.h"
 #include "pulsar_anomaly_arm.h"
+#include "pulsar_breathe.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -41,6 +42,24 @@ static_assert(sizeof(OrpheusEngine::pulsar_lick_wah_data) /
               "lick-wah bank must hold the mask plus one WahParams per pulsar track");
 
 static constexpr float kTidesNorm = 0.125f;
+
+// Storm send taps. Fixed rather than authored: the weather voice has no per-engine
+// send atomics behind it, and a wide reverb wash is what turns a dry rain bed into
+// weather — the pulsar reverb is the only diffusion the storm gets. The reverb tap is
+// darkened first (storm::kStormSendBrightness); undarkened, this much wide-band bed in
+// a reverb reads as static.
+static constexpr float kStormReverbSend = 0.45f;
+static constexpr float kStormDelaySend  = 0.15f;
+
+// StormAnomaly rumble floor, as a fraction of the authored strike intensity. Half was
+// picked to sit under a default 0.7 intensity as a clearly-present roll without
+// swamping a section that authored its own bed.
+// EAR-TUNE(storm-anomaly-floor)
+static constexpr float kStormAnomalyFloorScale = 0.5f;
+// Fixed intensity for the per-bar weather strikes. Weather authors a CHANCE, not a
+// level: distant grumbling that never competes with an anomaly's headline strike.
+// EAR-TUNE(weather-strike-intensity)
+static constexpr float kWeatherStrikeIntensity = 0.55f;
 
 // ═══════════════════════════════════════════════════════════════════════
 // Pulsar Beat Machine — Clock, Sequencer, Voice Rendering
@@ -710,6 +729,155 @@ static void arm_anomaly_wah(PulsarState* state, uint8_t mask, int samples) {
         if (state->lick_wah_declared && (state->lick_wah_mask & (1 << i))) continue;  // takeover
         state->anomaly_wah_voice[i].Init();
     }
+}
+
+// ── Generic per-edge section transition effects ─────────────────────────────
+// Staging rules and the row layout live in pulsar_transition_fx.h; only the parts
+// that need the engine (arming master effects) and the arrangement are here.
+
+// Which outgoing edge the section is currently planning to leave by. First match on
+// target index — the same rule find_edge_transition_bars() uses, so the staged
+// effects and the pre-roll ramp can never disagree about which edge is in play.
+static int find_planned_edge_index(const ArrangementParams& arr, const SectionState& sec_state) {
+    int cur = sec_state.current_section;
+    if (cur < 0 || cur >= arr.section_count) return -1;
+    const SectionParam& sec = arr.sections[cur];
+    for (int e = 0; e < sec.transition_count; e++) {
+        if (sec.transitions[e].target_index == sec_state.next_section_planned) return e;
+    }
+    return -1;
+}
+
+// Arm the master effect a staged row asks for. Deliberately unguarded: a transition
+// effect always (re)arms, even over a running anomaly. The anomaly dispatch keeps its
+// own is_active() guards; transitions win.
+static void fire_transition_fx(OrpheusEngine* engine, PulsarState* state,
+                               int type, float p0, float p1, float p2,
+                               float sample_rate) {
+    switch (type) {
+        case TRANS_FX_SCRATCH: {
+            int samples = static_cast<int>(p0 * sample_rate / 1000.0f);
+            engine->master_scratch_l.arm(samples, sample_rate, 0);
+            engine->master_scratch_r.arm(samples, sample_rate, 0x55555555u);
+            break;
+        }
+        case TRANS_FX_TAPE_STOP: {
+            int samples = static_cast<int>(p0 * sample_rate / 1000.0f);
+            engine->master_tape_stop_l.arm(samples);
+            engine->master_tape_stop_r.arm(samples);
+            break;
+        }
+        case TRANS_FX_STRIKE:
+            // Unguarded like its siblings: a strike landing inside the 30-120 ms window
+            // an earlier one is still waiting on truncates that burst and its tail. The
+            // anomaly and weather paths guard on strike_active(); transitions do not.
+            // p2 is the authored sub-bar delay in milliseconds — the way a pair of strikes
+            // is spaced far enough apart to sound as two cracks rather than one.
+            state->storm_voice.trigger_strike(p0, p1, p2);
+            break;
+        default:
+            break;
+    }
+}
+
+// Re-stage the pending list for the section that is now current and the edge it plans
+// to leave by. Called at vibe load and at every flip, so a stale edge's rows can never
+// survive into the next section.
+static void stage_transition_fx_for_planned_edge(PulsarState* state) {
+    state->pending_fx_count = 0;
+    if (!state->arrangement.active || state->trans_fx_count == 0) return;
+    int edge = find_planned_edge_index(state->arrangement, state->section_state);
+    if (edge < 0) return;
+    state->pending_fx_count = stage_transition_fx(
+        state->trans_fx, state->trans_fx_count,
+        state->section_state.current_section, edge,
+        state->section_state.bars_remaining,
+        state->pending_fx, kMaxPendingFx);
+}
+
+// Fire and disarm every pending whose bar countdown has run out. after_flip rows are
+// skipped: they belong to the section the flip enters, however many bars the outgoing
+// one actually runs.
+static void fire_due_transition_fx(OrpheusEngine* engine, PulsarState* state, float sample_rate) {
+    for (int i = 0; i < state->pending_fx_count; i++) {
+        PendingTransFx& p = state->pending_fx[i];
+        if (!p.armed || p.after_flip || p.bars_until_fire > 0.0f) continue;
+        p.armed = false;
+        fire_transition_fx(engine, state, p.type, p.p0, p.p1, p.p2, sample_rate);
+    }
+}
+
+// The flip fires everything the taken edge still has armed EXCEPT the positive
+// offsets, which move to post_flip_fx to count down inside the section just entered.
+// Normalized to one bar rather than carried at their staged value: the cap is +1, so
+// "the next boundary" is the whole of what a positive offset can mean. Returns the
+// carry count, which the entry pass below appends to.
+static int fire_and_carry_transition_fx_at_flip(OrpheusEngine* engine, PulsarState* state,
+                                                float sample_rate, int carried) {
+    for (int i = 0; i < state->pending_fx_count; i++) {
+        PendingTransFx& p = state->pending_fx[i];
+        if (!p.armed) continue;
+        p.armed = false;
+        if (p.after_flip && carried < kMaxPendingFx) {
+            state->post_flip_fx[carried] = p;
+            state->post_flip_fx[carried].armed = true;
+            state->post_flip_fx[carried].bars_until_fire = 1.0f;
+            carried++;
+            continue;
+        }
+        fire_transition_fx(engine, state, p.type, p.p0, p.p1, p.p2, sample_rate);
+    }
+    return carried;
+}
+
+// The arriving section's own entry rows, sharing the departure's carry list. Runs on
+// EVERY arrival, a re-routed one included — an entry row is keyed to its section, not
+// to the edge that reached it. Song start is not an arrival, so an opening section's
+// entry rows never fire: only a flip reaches here.
+static int fire_and_carry_entry_transition_fx(OrpheusEngine* engine, PulsarState* state,
+                                              int section, float sample_rate, int carried) {
+    PendingTransFx entry[kMaxPendingFx];
+    int n = stage_entry_transition_fx(state->trans_fx, state->trans_fx_count, section,
+                                      entry, kMaxPendingFx);
+    for (int i = 0; i < n; i++) {
+        if (entry[i].after_flip) {
+            if (carried < kMaxPendingFx) state->post_flip_fx[carried++] = entry[i];
+            continue;
+        }
+        fire_transition_fx(engine, state, entry[i].type, entry[i].p0, entry[i].p1,
+                           entry[i].p2, sample_rate);
+    }
+    return carried;
+}
+
+// One elapsed bar for the carried rows, firing whichever have arrived. Runs on EVERY
+// bar boundary, flips included — a carry whose new section is one bar long still has
+// to land on that section's own flip rather than be dropped by it.
+static void tick_post_flip_transition_fx(OrpheusEngine* engine, PulsarState* state,
+                                         float sample_rate) {
+    for (int i = 0; i < state->post_flip_fx_count; i++) {
+        PendingTransFx& p = state->post_flip_fx[i];
+        if (!p.armed) continue;
+        p.bars_until_fire -= 1.0f;
+        if (p.bars_until_fire > 0.0f) continue;
+        p.armed = false;
+        fire_transition_fx(engine, state, p.type, p.p0, p.p1, p.p2, sample_rate);
+    }
+}
+
+// StormAnomaly: a strike now, a raised rumble bed under it for the drawn window, and
+// a second strike a bar in when the window is long enough to carry one. The window is
+// counted in bars and ticked at bar boundaries, like the pending-fx list; the caller
+// owns the declared/strike_active guards.
+static void arm_storm_anomaly(PulsarState* state) {
+    const float bars = anomaly_draw_bars(state->storm_config.dur_min,
+                                         state->storm_config.dur_max,
+                                         state->master_anomaly_seed);
+    const float intensity = clamp01(state->storm_config.intensity);
+    state->storm_floor_bars_left = bars;
+    state->storm_floor_rumble = clamp01(kStormAnomalyFloorScale * intensity);
+    state->storm_second_strike_pending = bars >= 2.0f;
+    state->storm_voice.trigger_strike(intensity, state->storm_config.distance);
 }
 
 // Copy lick-pool slot `idx` into the active lick buffers (state->lick / original_lick).
@@ -1441,7 +1609,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
 
         for (int s = 0; s < arr.section_count; s++) {
             SectionParam& sec = arr.sections[s];
-            int base = s * 21;
+            int base = s * kSectionDataFields;
             sec.bars_min              = static_cast<int>(engine->pulsar_section_data[base + 0].load(std::memory_order_relaxed));
             sec.bars_max              = static_cast<int>(engine->pulsar_section_data[base + 1].load(std::memory_order_relaxed));
             int loaded_bar_step       = static_cast<int>(engine->pulsar_section_data[base + 2].load(std::memory_order_relaxed));
@@ -1471,14 +1639,30 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.chord_follow_override = (cf < 0.0f) ? -1 : static_cast<int>(cf);
             }
 
-            // Slot 15: per-section exit-scratch length in ms (0 = none).
-            sec.exit_scratch_ms = static_cast<int>(
-                engine->pulsar_section_data[base + 15].load(std::memory_order_relaxed));
+            // Slot 15 retired (was the legacy per-section exit-scratch length); the
+            // generic transition-fx bank (trans_fx_data_$i, see below) is the only
+            // scratch-at-flip mechanism now. Left unread so it stays inert.
 
             // Slot 16: jamCarry — continue an in-flight band solo across this
             // section's entry seam (see SectionParam::jam_carry).
             sec.jam_carry =
                 engine->pulsar_section_data[base + 16].load(std::memory_order_relaxed) > 0.5f;
+
+            // Slots 21-25: SectionWeather. All five are zero when the section declares
+            // no weather, so nothing here distinguishes "dry" from "absent" — an
+            // all-zero bed renders nothing either way. Clamped because StormVoice
+            // treats every one of these as a 0-1 control.
+            {
+                auto W = [&](int f) {
+                    return clamp01(engine->pulsar_section_data[base + f].load(
+                        std::memory_order_relaxed));
+                };
+                sec.weather.rain          = W(21);
+                sec.weather.rumble        = W(22);
+                sec.weather.strike_chance = W(23);
+                sec.weather.distance      = W(24);
+                sec.weather.rain_level    = W(25);
+            }
 
             // Per-track section overrides; -1 = no override (per-track wins over section-level)
             {
@@ -1489,6 +1673,15 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     sec.track_arp_mode_override[t]      = engine->pulsar_section_track_arp_mode[tbase + t].load(std::memory_order_relaxed);
                     sec.track_chord_follow_override[t]  = engine->pulsar_section_track_chord_follow[tbase + t].load(std::memory_order_relaxed);
                     sec.track_density_override[t]       = engine->pulsar_section_track_density[tbase + t].load(std::memory_order_relaxed);
+                    // Breathe: 0 bars = off. Negative bars would invert the modulo in
+                    // breathe_phase, and floor/span are 0-1 controls, so both are pinned
+                    // here rather than trusted from the wire.
+                    const float bb = engine->pulsar_section_track_breathe_bars[tbase + t].load(std::memory_order_relaxed);
+                    sec.track_breathe_bars[t] = (bb > 0.0f) ? static_cast<int>(bb) : 0;
+                    sec.track_breathe_floor[t] = clamp01(
+                        engine->pulsar_section_track_breathe_floor[tbase + t].load(std::memory_order_relaxed));
+                    sec.track_breathe_timbre_span[t] = clamp01(
+                        engine->pulsar_section_track_breathe_timbre_span[tbase + t].load(std::memory_order_relaxed));
                 }
             }
 
@@ -1517,6 +1710,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     std::memory_order_relaxed);
                 sec.has_tension_override = (tension_active == 1);
                 if (sec.has_tension_override) {
+                    // Tension's OWN fixed stride -- NOT kSectionDataFields (25). It never
+                    // grew the 4 weather slots pulsar_section_data added.
                     int tb = s * 21;
                     auto L = [&](int f) {
                         return engine->pulsar_section_tension_data[tb + f].load(
@@ -1786,6 +1981,14 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // this back to full too rather than gliding it (nothing to click against).
     state->void_state.gain_smoothed = 1.0f;
 
+    // Storm weather voice. Seeded off base_seed like the pattern RNG, so a pinned
+    // pulsar_seed renders the same rain twice. Init is also the full reset: it drops
+    // any bed, pending tail or ringing clap the previous vibe left in flight, which a
+    // vibe switch hard-cuts anyway. PulsarState is built once per engine, so without
+    // this the storm would be the one voice that survives a vibe change.
+    state->storm_voice.Init(base_seed,
+                            engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f);
+
     // Wah Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
     // [0]=prob [1]=durMin [2]=durMax [3]=rateDivision [4]=depth [5]=resonanceQ
     // [6]=centerHz [7]=sweepOctaves [8]=wet [9]=declared flag. Loaded unconditionally,
@@ -1891,6 +2094,47 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // filter when this is set — no default-shape fallback for undeclared vibes.
     state->filter_declared = engine->pulsar_filter_data[3].load(std::memory_order_relaxed) > 0.5f;
 
+    // Storm Anomaly config bank. Order mirrors the Kotlin marshal in PulsarFeature:
+    // [0]=prob [1]=durMin [2]=durMax [3]=intensity [4]=distance [5]=declared flag.
+    // The only anomaly with no master effect behind it — it strikes storm_voice, which
+    // the block above just re-Init'd, so the armed window has to be cleared with it.
+    state->storm_config.probability = engine->pulsar_storm_data[0].load(std::memory_order_relaxed);
+    state->storm_config.dur_min     = engine->pulsar_storm_data[1].load(std::memory_order_relaxed);
+    state->storm_config.dur_max     = engine->pulsar_storm_data[2].load(std::memory_order_relaxed);
+    state->storm_config.intensity   = engine->pulsar_storm_data[3].load(std::memory_order_relaxed);
+    state->storm_config.distance    = engine->pulsar_storm_data[4].load(std::memory_order_relaxed);
+    // [5] is the explicit "this vibe declares the storm anomaly" flag (Kotlin pushes 1.0
+    // when Vibe.anomalies contains a StormAnomaly). The manual trigger only strikes when
+    // this is set — no default-shape fallback for undeclared vibes.
+    state->storm_declared = engine->pulsar_storm_data[5].load(std::memory_order_relaxed) > 0.5f;
+    state->storm_floor_bars_left = 0.0f;
+    state->storm_floor_rumble = 0.0f;
+    state->storm_second_strike_pending = false;
+    // Per-bar strikeChance stream. Derived from base_seed rather than the wall clock so a
+    // pinned pulsar_seed replays the same weather, and kept apart from master_anomaly_seed
+    // so authoring weather cannot shift the anomaly rolls.
+    state->storm_weather_seed = base_seed ^ 0x57EA7E12u;
+    if (state->storm_weather_seed == 0) state->storm_weather_seed = 0x57EA7E12u;  // xorshift needs nonzero
+
+    // Generic per-edge transition effects. The wire sends no row count, so every slot
+    // is scanned and type 0 (unauthored) rows are dropped — stopping at the first empty
+    // row would silently discard everything past a gap. Staged here rather than in the
+    // arrangement block above because init_section_state must already have picked the
+    // opening section's outgoing edge.
+    state->trans_fx_count = 0;
+    for (int r = 0; r < kMaxTransFxRows; r++) {
+        float fields[kTransFxRowFields];
+        const int base = r * kTransFxRowFields;
+        for (int f = 0; f < kTransFxRowFields; f++) {
+            fields[f] = engine->pulsar_trans_fx_data[base + f].load(std::memory_order_relaxed);
+        }
+        TransFxRow row = trans_fx_row_from_wire(fields);
+        if (row.type == TRANS_FX_NONE) continue;
+        state->trans_fx[state->trans_fx_count++] = row;
+    }
+    state->post_flip_fx_count = 0;
+    stage_transition_fx_for_planned_edge(state);
+
     // Per-track lick-wah insert bank. Order mirrors the Kotlin marshal in PulsarViewModel:
     // [0]=track opt-in bitmask [1]=rateDivision [2]=depth [3]=resonanceQ [4]=centerHz
     // [5]=sweepOctaves [6]=wet [7]=declared flag. NOT an anomaly — a standing per-track filter
@@ -1935,6 +2179,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // mutation_seed is reset earlier (before init_section_state consumes it).
     state->loop_count = 0;
     state->loops_since_reset = 0;
+    // The opening section is entered without a flip, so its breathe has to be seated
+    // here: bar 0 of the cycle, every envelope at the top.
+    state->breathe_bar = 0;
+    state->breathe_mask = 0;
+    for (int t = 0; t < kNumPulsarTracks; t++) state->breathe_env[t] = 1.0f;
     std::memset(state->drunk_offsets, 0, sizeof(state->drunk_offsets));
     std::memset(state->drunk_targets, 0, sizeof(state->drunk_targets));
     state->tempo_drift = 0.0f;
@@ -2006,6 +2255,38 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->tracks[t].reverb_send_filter_state_l = 0.0f;
         state->tracks[t].reverb_send_filter_state_r = 0.0f;
     }
+}
+
+// Resolve this block's breathe targets for all 8 tracks (see pulsar_breathe.h).
+// Committed ONCE per block: the eight tracks must agree on one envelope, and running
+// it per track would resolve eight different phases.
+static void resolve_breathe_block(PulsarState* state, float sample_rate) {
+    state->breathe_coeff = orpheus::breathe_smoothing_coeff(sample_rate);
+    const ArrangementParams& arr = state->arrangement;
+    const int cur = state->section_state.current_section;
+    // Same guard as the rest of the track-override family: the bank keeps a previous
+    // vibe's values on the null-arrangement path, so it must not be read there.
+    const bool have_section = arr.active && cur >= 0 && cur < arr.section_count;
+    uint8_t mask = 0;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        const int bars = have_section ? arr.sections[cur].track_breathe_bars[t] : 0;
+        if (bars <= 0) {
+            // Pinned to the top so the render path can skip this track outright —
+            // "off" must be exactly unity, not a computed 1.0.
+            state->breathe_env[t] = 1.0f;
+            state->breathe_env_target[t] = 1.0f;
+            state->breathe_floor[t] = 0.0f;
+            state->breathe_span[t] = 0.0f;
+            continue;
+        }
+        const SectionParam& sec = arr.sections[cur];
+        mask |= static_cast<uint8_t>(1u << t);
+        state->breathe_env_target[t] =
+            orpheus::breathe_envelope(orpheus::breathe_phase(state->breathe_bar, bars));
+        state->breathe_floor[t] = sec.track_breathe_floor[t];
+        state->breathe_span[t]  = sec.track_breathe_timbre_span[t];
+    }
+    state->breathe_mask = mask;
 }
 
 // ── Main process function ────────────────────────────────────────────
@@ -2199,10 +2480,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // and sounds abrupt. Compute a continuous progress here using track 0's
     // playhead within the current bar — gives one update per step (typically
     // 1/16 of a bar) which is effectively continuous.
+    //
+    // `progress` is hoisted out of the block because the storm's weather bed
+    // crossfades on this same ramp, and it renders after the track loop.
+    float progress = 0.0f;
     if (state->arrangement.active) {
         const SectionState& ss = state->section_state;
         bool in_transition = ss.transition_target >= 0;
-        float progress = ss.transition_progress;
+        progress = ss.transition_progress;
         if (in_transition && ss.next_section_trans_bars > 0) {
             int N = ss.next_section_trans_bars;
             const PulsarTrackState& t0 = state->tracks[0];
@@ -2663,6 +2948,27 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (ts.playhead == 0 && prev_playhead > 0 && t == 0 && !is_load_boundary) {
                 mutate_patterns(state, complexity, engine);
 
+                // ── StormAnomaly window: one bar of the drawn length has elapsed ──
+                // Outside the arrangement guard below so a window can never outlive an
+                // arrangement that goes inactive mid-flight, leaving the floor stuck up.
+                if (state->storm_floor_bars_left > 0.0f) {
+                    state->storm_floor_bars_left -= 1.0f;
+                    if (state->storm_second_strike_pending) {
+                        state->storm_second_strike_pending = false;
+                        // Deliberately unguarded: a bar is orders of magnitude longer than
+                        // the 30-120 ms window a re-trigger truncates, and the first strike's
+                        // seconds-long tail still holds strike_active() true here — guarding
+                        // would simply delete the second strike.
+                        state->storm_voice.trigger_strike(clamp01(state->storm_config.intensity),
+                                                          state->storm_config.distance);
+                    }
+                }
+
+                // ── Breathe: one loop-unit of the cycle has elapsed ──
+                // Before the section advance below, which zeroes it again on a flip so
+                // the incoming section always starts at the top of its own cycle.
+                state->breathe_bar++;
+
                 // ── Section / Solo advancement ──
                 if (state->arrangement.active) {
                     // Pull any pending outro request before advancing so the
@@ -2754,33 +3060,82 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             engine->master_filter_l.arm(samples, sample_rate, 0);
                             engine->master_filter_r.arm(samples, sample_rate, 7);
                         }
+                        // Storm Anomaly: strikes the pulsar's OWN storm voice, not a master
+                        // effect. Guarded on the voice so a gesture inside a ringing strike
+                        // cannot truncate the burst that is already sounding.
+                        if (state->storm_declared && !state->storm_voice.strike_active()) {
+                            arm_storm_anomaly(state);
+                        }
                         if (state->lick_pool_count > 0 && state->lick_anomaly_index >= 0) {
                             state->force_lick_anomaly = true;   // one-shot; consumed at the next lick resolve
                         }
                     }
 
-                    int prev_sec = state->section_state.current_section;  // outgoing section
+                    // Per-bar weather strikes: the ACTIVE section's strikeChance, rolled once
+                    // a bar on its own stream so authoring weather never shifts the anomaly
+                    // rolls. The roll is consumed before the guard is consulted, keeping the
+                    // stream's position independent of whatever is still ringing.
+                    {
+                        const int wsec = state->section_state.current_section;
+                        if (wsec >= 0 && wsec < state->arrangement.section_count) {
+                            const SectionWeatherParam& w = state->arrangement.sections[wsec].weather;
+                            if (w.strike_chance > 0.0f &&
+                                pattern_rand01(state->storm_weather_seed) < w.strike_chance &&
+                                !state->storm_voice.strike_active()) {
+                                state->storm_voice.trigger_strike(kWeatherStrikeIntensity, w.distance);
+                            }
+                        }
+                    }
+
+                    // The edge the transition effects were staged for. advance_section
+                    // re-plans, so it has to be read before the flip.
+                    int staged_target = state->section_state.next_section_planned;
                     bool section_changed = advance_section(
                         state->section_state, state->arrangement, state->mutation_seed);
+
+                    // Rows a previous flip carried forward (positive offsets) count down
+                    // here, before the block below can hand this flip's own carries over.
+                    if (state->post_flip_fx_count > 0) {
+                        tick_post_flip_transition_fx(engine, state, sample_rate);
+                    }
+
+                    // Transition effects on a bar that is NOT the flip: count the staged
+                    // rows down, and fire the ones whose negative offset_bars puts them
+                    // ahead of their edge. Offset 0 lands on the flip and is fired inside
+                    // the section-changed block below.
+                    if (!section_changed && state->pending_fx_count > 0) {
+                        tick_transition_fx_bar(state->pending_fx, state->pending_fx_count);
+                        fire_due_transition_fx(engine, state, sample_rate);
+                    }
 
                     if (section_changed) {
                         int cur_sec = state->section_state.current_section;
                         const SectionParam& sec = state->arrangement.sections[cur_sec];
 
-                        // Task B: if the section we just LEFT declared an exit scratch, arm
-                        // the master record-scratch NOW — synchronous with the flip, so no
-                        // Kotlin/flow latency (the arrangement poll is 5Hz). The clock-freeze
-                        // gate below (`scratch_hold`) then holds the incoming section's
-                        // sequencer while the scratch is active, so the drop is not eaten.
-                        if (prev_sec >= 0 && prev_sec < state->arrangement.section_count) {
-                            int scratch_ms = state->arrangement.sections[prev_sec].exit_scratch_ms;
-                            if (scratch_ms > 0) {
-                                int scratch_samples =
-                                    static_cast<int>(scratch_ms * engine->sample_rate / 1000.0f);
-                                engine->master_scratch_l.arm(scratch_samples, engine->sample_rate, 0);
-                                engine->master_scratch_r.arm(scratch_samples, engine->sample_rate, 0x55555555u);
-                            }
+                        // Generic transition effects: fire whatever the taken edge still has
+                        // armed (offset 0 lands here; negative offsets already fired at an
+                        // earlier bar), then the section just entered fires its own entry
+                        // rows, and both hand their positive offsets to post_flip_fx, which
+                        // the re-stage below cannot reach. This is the ONLY scratch/tape-stop/
+                        // strike-at-flip mechanism now (the legacy per-section exit-scratch arm
+                        // is retired — see the slot-15 comment in the unpack above). A boundary
+                        // re-route (outro_triggered) means the staged edge was NOT the one
+                        // taken, so its rows are dropped rather than fired on the wrong seam,
+                        // carries included — the carry list is rebuilt from zero either way.
+                        // Entry rows survive a re-route: the arrival is real whichever edge
+                        // made it.
+                        int carried_fx = 0;
+                        if (cur_sec == staged_target) {
+                            carried_fx = fire_and_carry_transition_fx_at_flip(
+                                engine, state, sample_rate, carried_fx);
                         }
+                        carried_fx = fire_and_carry_entry_transition_fx(
+                            engine, state, cur_sec, sample_rate, carried_fx);
+                        for (int i = carried_fx; i < kMaxPendingFx; i++) {
+                            state->post_flip_fx[i] = PendingTransFx{};
+                        }
+                        state->post_flip_fx_count = carried_fx;
+                        stage_transition_fx_for_planned_edge(state);
 
                         // Apply section macro overrides
                         state->section_state.target_energy = sec.macro_overrides.energy;
@@ -2829,6 +3184,18 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // so zeroing it here DOES reset the timbre-evolution arc.
                         state->tension_intensity  = 0.0f;
                         state->tension_evo_smooth = 0.0f;
+
+                        // --- Breathe: restart the cycle at the top on section entry ---
+                        // The envelope is reset, not just the bar, and that matters on the
+                        // HANDOFF: when the incoming section breathes too the render path
+                        // keeps running, so without this the new cycle would glide up from
+                        // the outgoing section's sunk value instead of snapping to its own
+                        // top. (A section that drops its breathe clears the mask and skips
+                        // the path entirely, so it is clean either way.) The one-pole
+                        // smooths bar steps INSIDE a cycle; it must never cross the seam.
+                        state->breathe_bar = 0;
+                        for (int bt = 0; bt < kNumPulsarTracks; bt++)
+                            state->breathe_env[bt] = 1.0f;
 
                         // Start solo: new SoloMode system > band system > legacy.
                         // Section.jamCarry: when a band solo is already in flight
@@ -3038,6 +3405,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 int samples = anomaly_arm_samples(bars, samples_per_step);
                                 engine->master_filter_l.arm(samples, sample_rate, 0);
                                 engine->master_filter_r.arm(samples, sample_rate, 7);
+                            }
+                        }
+
+                        // Storm Anomaly: roll the auto trigger at the section boundary.
+                        // Guarded on the storm voice rather than a master effect — it is
+                        // the pulsar's own voice, and a strike is still ringing for seconds.
+                        if (state->storm_declared && state->storm_config.probability > 0.0f &&
+                            !state->storm_voice.strike_active()) {
+                            if (pattern_rand01(state->master_anomaly_seed) < state->storm_config.probability) {
+                                arm_storm_anomaly(state);
                             }
                         }
                     }
@@ -3810,6 +4187,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
+        // ── Breathe cycle: per-block resolve (t == 0 only) ──
+        // Same two constraints as the wah bookkeeping above: committed once per block,
+        // and OUTSIDE the step-boundary loop so it still runs on the common 512-frame
+        // block that contains no boundary at all. It sits after that loop so a bar
+        // boundary (and any section flip it carried) lands in THIS block's envelope,
+        // which is what makes the flip a snap rather than a block-late glide.
+        if (t == 0) {
+            resolve_breathe_block(state, sample_rate);
+        }
+
         // Decrement gate timer by num_frames (block-rate approximation).
         if (ts.gate_timer > 0.0f) {
             ts.gate_timer -= static_cast<float>(num_frames);
@@ -4092,6 +4479,18 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         int gate_for_render = ts.voice_active ? 1 : 0;
         if (is_self_env && ts.in_hold) gate_for_render = 1;
 
+        // ── Breathe: close the tone as the swell sinks ──
+        // ADDED to whatever this block's writers left in mod_timbre, so the macro walk,
+        // the LFO and the evolution sweep all still shape it. Deliberately above the
+        // playability floor below: a deep breathe must not sink an engine into its
+        // artifact zone. Deliberately NOT gated on pin_timbre either — this is an
+        // authored per-section gesture, not the automatic macro modulation the pin
+        // suppresses, and span defaults to 0 so it is opt-in per section.
+        if ((state->breathe_mask & (1u << t)) && state->breathe_span[t] > 0.0f) {
+            mod_timbre += orpheus::breathe_timbre_bias(state->breathe_env[t],
+                                                       state->breathe_span[t]);
+        }
+
         // ── Apply per-engine playability floors ──
         // Prevents artifacts (aliasing, crackling) from bad parameter combos.
         if (ts.engine_index >= 0 && ts.engine_index < 24) {
@@ -4372,6 +4771,25 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
+        // ── Breathe swell ──
+        // Scales the rendered buffer rather than the mix gain below, so the dry mix,
+        // the bus stem, the fx sends and the level meter cannot disagree about how far
+        // the track has sunk. One-poled per SAMPLE: the phase only moves at bar
+        // boundaries, and a per-block step of the full swing would click. Skipped
+        // outright when this track has no breathe override — that skip, not a computed
+        // 1.0, is what keeps a no-breathe vibe bit-identical.
+        if (state->breathe_mask & (1u << t)) {
+            float env = state->breathe_env[t];
+            const float target = state->breathe_env_target[t];
+            const float coeff  = state->breathe_coeff;
+            const float floor_gain = state->breathe_floor[t];
+            for (int i = 0; i < num_frames; i++) {
+                env += coeff * (target - env);
+                track_buffer[i] *= orpheus::breathe_gain(env, floor_gain);
+            }
+            state->breathe_env[t] = env;
+        }
+
         // ── Mix to stereo with constant-power pan ──
         float vol = track_volume;
         float track_peak = 0.0f;
@@ -4443,6 +4861,80 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     engine->pulsar_reverb_send_l[i] += ts.reverb_send_filter_state_l;
                     engine->pulsar_reverb_send_r[i] += ts.reverb_send_filter_state_r;
                 }
+            }
+        }
+    }
+
+    // ── Storm weather bed (the 9th voice) ────────────────────────────────
+    // Not sequenced and not a bus stem: the storm renders once per block, straight
+    // into the stereo mix ahead of the output HPF, so the master chain (tape stop,
+    // fader, filter) warps the weather along with the band. Its bed is the active
+    // section's weather crossfaded toward the staged destination's on the same
+    // pre-roll ramp the macros use, so weather swells in over an entry and drains
+    // over a walk-back with no extra machinery.
+    //
+    // set_bed runs every block even when the values did not change: it is also what
+    // re-asserts the bed's distance after a strike temporarily darkened it.
+    {
+        storm::StormVoice& storm = state->storm_voice;
+        float bed_rain = 0.0f, bed_rain_level = 0.0f, bed_rumble = 0.0f, bed_distance = 0.0f;
+        if (state->arrangement.active) {
+            const ArrangementParams& arr = state->arrangement;
+            const SectionState& ss = state->section_state;
+            const int cur = ss.current_section;
+            if (cur >= 0 && cur < arr.section_count) {
+                const SectionWeatherParam& w = arr.sections[cur].weather;
+                bed_rain = w.rain; bed_rumble = w.rumble; bed_distance = w.distance;
+                bed_rain_level = w.rain_level;
+                // transition_target is cleared at the flip, so a mid-block flip lands
+                // here as "no blend" and the bed snaps to the section that just began.
+                const int dst = ss.transition_target;
+                if (dst >= 0 && dst < arr.section_count) {
+                    const SectionWeatherParam& n = arr.sections[dst].weather;
+                    bed_rain       += (n.rain       - bed_rain)       * progress;
+                    bed_rain_level += (n.rain_level - bed_rain_level) * progress;
+                    bed_rumble     += (n.rumble     - bed_rumble)     * progress;
+                    bed_distance   += (n.distance   - bed_distance)   * progress;
+                }
+            }
+        }
+        // StormAnomaly window: hold a rumble floor under whatever the section authored.
+        // max(), so a heavier authored bed is never ducked by the anomaly; the anomaly's
+        // own distance comes along only when its floor is the one that wins.
+        if (state->storm_floor_bars_left > 0.0f && state->storm_floor_rumble > bed_rumble) {
+            bed_rumble = state->storm_floor_rumble;
+            bed_distance = state->storm_config.distance;
+        }
+        storm.set_bed(bed_rain, bed_rain_level, bed_rumble, bed_distance);
+
+        // Exactly the condition Process() early-outs on. Checking it here skips the
+        // scratch clear and the mix loop too, so a vibe with no weather pays three
+        // compares per block rather than 2 KB of stores it would only add zeros from.
+        // audible_rain() is rate * level: either at zero is a silent rain layer.
+        const bool storm_idle = storm.settled() && storm.audible_rain() <= 0.0f
+                                && bed_rumble <= 0.0f && !storm.strike_active();
+        if (!storm_idle) {
+            float storm_l[kMaxFrames];
+            float storm_r[kMaxFrames];
+            std::memset(storm_l, 0, num_frames * sizeof(float));
+            std::memset(storm_r, 0, num_frames * sizeof(float));
+            storm.Process(storm_l, storm_r, num_frames);
+            for (int i = 0; i < num_frames; i++) {
+                // The same per-sample void gain the tracks got: the storm sinks into
+                // a Void with everything else. Unconditional — a branch on "no void
+                // armed" costs more than the multiply it would save.
+                const float sl = storm_l[i] * void_gain_buf[i];
+                const float sr = storm_r[i] * void_gain_buf[i];
+                out_l[i] += sl;
+                out_r[i] += sr;
+                engine->pulsar_delay_send_l[i]  += sl * kStormDelaySend;
+                engine->pulsar_delay_send_r[i]  += sr * kStormDelaySend;
+                // The same one-pole darkening every per-track send gets, set lower for a
+                // wide-band bed: the dry storm above stays bright, the wash does not sizzle.
+                float dark_l, dark_r;
+                storm.DarkenSend(sl, sr, &dark_l, &dark_r);
+                engine->pulsar_reverb_send_l[i] += dark_l * kStormReverbSend;
+                engine->pulsar_reverb_send_r[i] += dark_r * kStormReverbSend;
             }
         }
     }

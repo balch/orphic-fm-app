@@ -1,9 +1,11 @@
 #pragma once
 
 #include "pulsar_limits.h"
+#include "pulsar_transition_fx.h"
 #include "orpheus_voice.h"
 #include "orpheus_unit_chaos.h"
 #include "pulsar_void.h"
+#include "pulsar_storm.h"
 #include "orpheus_wah_core.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
@@ -637,6 +639,19 @@ enum class SoloModeId : uint8_t {
     JAM          = 3,
 };
 
+// Per-section storm weather (pulsar_section_data slots 21-25). A section that
+// declares none marshals all five slots as zero — distance and rain_level included —
+// so an all-zero bed IS the "no weather" encoding and needs no separate flag.
+struct SectionWeatherParam {
+    float rain = 0.0f;
+    float rumble = 0.0f;
+    float strike_chance = 0.0f;   // per-bar roll while the section is active
+    float distance = 0.0f;
+    // Loudness of the whole rain layer, independent of `rain`'s drop RATE. Appended
+    // after distance because the wire grows at the end; slot 25, not beside `rain`.
+    float rain_level = 0.0f;
+};
+
 struct SectionParam {
     int bars_min = 4, bars_max = 8;
     // Step within [bars_min, bars_max] when picking a random length. 1 = any
@@ -672,6 +687,12 @@ struct SectionParam {
     // load, section entry and the déjà-vu reset can never disagree on a track's density.
     float track_density_override[kNumPulsarTracks] =
         {-1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f};
+    // Per-track breathe cycle for this section (see pulsar_breathe.h). bars 0 = the
+    // track does not breathe here, which has to render EXACTLY unity — 0 is the
+    // natural off for all three, so there is no sentinel to distinguish.
+    int   track_breathe_bars[kNumPulsarTracks] = {};
+    float track_breathe_floor[kNumPulsarTracks] = {};
+    float track_breathe_timbre_span[kNumPulsarTracks] = {};
     // Per-section chord progression override (0 = no override; see pulsar_chord_progression.h for kMaxProgressionLength = 8)
     int custom_progression_length = 0;
     int8_t custom_progression[kMaxProgressionLength] = {};
@@ -683,14 +704,13 @@ struct SectionParam {
     float comping_humanization_ghost = 0.0f;
     float comping_humanization_octave = 0.0f;
     float comping_humanization_extension = 0.0f;
-    // Master record-scratch fired when this section is LEFT (0 = none). The pulsar
-    // unit arms the scratch at the section flip and freezes its own clock while the
-    // scratch is active, so the incoming section holds until the scratch drops.
-    int exit_scratch_ms = 0;
     // Carry an in-flight band solo across this section's ENTRY (slot 16).
     // Gates only the section-entry solo reset block; see the section_changed
     // handler in orpheus_unit_pulsar.cpp.
     bool jam_carry = false;
+    // Weather bed for this section (slots 21-24). Blended toward the staged
+    // destination's during a transition pre-roll, exactly like the macros.
+    SectionWeatherParam weather;
 };
 
 struct ArrangementParams {
@@ -908,6 +928,18 @@ struct FilterConfig {
     float dur_max = 4.0f;
 };
 
+// Storm Anomaly config (unpacked from pulsar_storm_data). Mirrors the Kotlin
+// StormAnomaly: a probability + duration range plus the strike's intensity and
+// distance. Alone among the anomalies it arms no master effect — it strikes the
+// pulsar's own storm voice, so an undeclared vibe cannot colour the mix at all.
+struct StormConfig {
+    float probability = 0.0f;
+    float dur_min = 1.0f;
+    float dur_max = 2.0f;
+    float intensity = 0.7f;
+    float distance = 0.4f;
+};
+
 // ── Persistent state (heap-allocated on first process call) ──────────────
 static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 
@@ -998,6 +1030,12 @@ struct PulsarState {
     BandSoloConfigParam band_solo_config;
     bool has_band_solo = false;
 
+    // Storm weather voice — the pulsar's 9th voice. Not sequenced and not a bus stem:
+    // it renders once per block after the track loop, straight into the stereo mix and
+    // the send buses, scaled by the same void gain the tracks get. Re-Init'd per vibe
+    // load, which is also what clears any bed or strike still in flight.
+    storm::StormVoice storm_voice;
+
     // Void Anomaly (dispatched by the Anomaly Engine)
     VoidConfig void_config;
     VoidAnomaly void_state;
@@ -1052,6 +1090,29 @@ struct PulsarState {
     FilterConfig filter_config;
     bool filter_declared = false;       // true when this vibe opts into the filter (filter_data[3])
 
+    // Storm Anomaly (dispatched by the Anomaly Engine, strikes storm_voice above).
+    // The armed window is counted in BARS, not samples: both the follow-up strike and
+    // the raised rumble floor are bar-quantized, so they tick with the pending_fx list.
+    StormConfig storm_config;
+    bool storm_declared = false;        // true when this vibe opts into the storm (storm_data[5])
+    float storm_floor_bars_left = 0.0f; // > 0 while the anomaly holds its rumble floor
+    float storm_floor_rumble = 0.0f;    // the floor level itself, drawn from the intensity
+    bool storm_second_strike_pending = false;  // windows >= 2 bars strike again one bar in
+    uint32_t storm_weather_seed = 0;    // per-bar strikeChance stream, apart from the anomaly rolls
+
+    // Generic per-edge section transition effects (bank: pulsar_trans_fx_data).
+    // trans_fx is the whole authored table; pending_fx is only the subset staged for
+    // the CURRENT section's planned outgoing edge, counting bars down to its fire
+    // point. Both are rebuilt on every vibe load and at every section flip.
+    // post_flip_fx holds the positive-offset rows carried THROUGH a flip: they fire a
+    // bar into the section the flip entered, which the re-stage would otherwise erase.
+    TransFxRow trans_fx[kMaxTransFxRows];
+    int trans_fx_count = 0;
+    PendingTransFx pending_fx[kMaxPendingFx];
+    int pending_fx_count = 0;
+    PendingTransFx post_flip_fx[kMaxPendingFx];
+    int post_flip_fx_count = 0;
+
     // Per-track lick-wah insert (NOT an anomaly): a standing bandpass wah applied to each
     // opted-in track's rendered buffer, in place, before it accumulates into the mix. One
     // WahVoice per track so each keeps its own filter + LFO phase. Inert unless lick_wah_declared.
@@ -1065,6 +1126,20 @@ struct PulsarState {
     orpheus::WahVoice lick_wah_voice[kNumPulsarTracks];
     uint8_t lick_wah_mask = 0;          // bit t set => track t filters through lick_wah_voice[t]
     bool lick_wah_declared = false;     // true when at least one track resolved wah params
+
+    // Per-track breathe cycle (see pulsar_breathe.h). breathe_bar counts loop-units
+    // since SECTION ENTRY, not since load: it is what puts the phase back at the top
+    // on every flip. breathe_env is the smoothed envelope actually applied (1 = top);
+    // it is reset to 1 at every flip, so the gain SNAPS back to unity there while the
+    // one-pole still smooths the bar steps inside a cycle. Tracks outside breathe_mask
+    // are pinned at env 1 and skip the audio path entirely.
+    int      breathe_bar = 0;
+    uint8_t  breathe_mask = 0;          // bit t set => track t breathes this block
+    float    breathe_coeff = 0.0f;      // per-sample one-pole coefficient for this block
+    float    breathe_env[kNumPulsarTracks] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
+    float    breathe_env_target[kNumPulsarTracks] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
+    float    breathe_floor[kNumPulsarTracks] = {};
+    float    breathe_span[kNumPulsarTracks] = {};
 
     uint32_t master_anomaly_seed = 0;   // play-scoped RNG for Master* anomaly rolls/durations
     bool force_lick_anomaly = false;    // one-shot: force the OG lick anomaly at the next resolve
