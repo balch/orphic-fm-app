@@ -9,6 +9,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.ClassDiscriminatorMode
 import kotlinx.serialization.json.Json
@@ -25,6 +26,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
  * LickMode). Keeping the schema's discriminator equal to the decoder's keeps the two in lockstep.
  * (Asserted by VibeSchemaToolTest against `vibeApplyJson.configuration.classDiscriminator`.)
  */
+@OptIn(ExperimentalSerializationApi::class)
 private val schemaGenJson = Json {
     prettyPrint = true
     explicitNulls = false

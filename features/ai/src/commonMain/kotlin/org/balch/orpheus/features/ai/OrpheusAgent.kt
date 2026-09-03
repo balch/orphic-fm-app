@@ -8,8 +8,8 @@ import ai.koog.agents.features.eventHandler.feature.handleEvents
 import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
-import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicCacheControl
+import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicParams
 import ai.koog.prompt.executor.clients.anthropic.models.AnthropicThinking
@@ -251,6 +251,7 @@ class OrpheusAgent(
         startAgentIfNeeded()
     }
     
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun startAgentIfNeeded() {
         // "IfNeeded" enforced here: live run loops are never doubled. restart() manages its
         // own cancel + relaunch and does not route through this guard.
@@ -300,6 +301,7 @@ class OrpheusAgent(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun restart() {
         // Cancel the current run before re-arming, regardless of greeting mode.
         currentAgentJob?.cancel()
@@ -472,7 +474,6 @@ class OrpheusAgent(
                     AiProvider.Anthropic -> anthropicThinkingParams(config.model)
                     AiProvider.Google -> GoogleParams(thinkingConfig = GoogleThinkingConfig(includeThoughts = true, thinkingLevel = GoogleThinkingLevel.HIGH))
                     AiProvider.OpenAI -> OpenAIResponsesParams(reasoning = ReasoningConfig(effort = ReasoningEffort.MEDIUM, summary = ReasoningSummary.AUTO))
-                    else -> LLMParams()
                 }
             } else {
                 LLMParams()
