@@ -5,13 +5,13 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
-import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
-import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.Band
+import org.balch.orpheus.features.pulsar.models.BandMember
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -37,7 +37,9 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SectionTransition
+import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.SoloMode
+import org.balch.orpheus.features.pulsar.models.StrikeEffect
 import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
@@ -47,46 +49,45 @@ import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
+import org.balch.orpheus.features.pulsar.models.row
 
 /**
  * Rust Belt — a swampy heartland-rock pocket built on a bass hook, dry and lazy-tough.
  *
  * ## The feel
- * Mid-tempo, laid back but insistent. THE BASS IS THE SONG: a round, fingered
- * two-bar hook that anchors the root, leans on the b7 and 5th, breathes through
- * pocket rests, and resolves home with a walking pickup. Everything else sits
- * behind it — a fat dry backbeat, a jangly chord chank on the off-hand, a twangy
- * slide lead answering between phrases, and a low-mixed drawbar organ bed.
- * Production is dry and forward: garage floor, not arena.
+ * Mid-tempo, laid back but insistent. THE BASS IS THE SONG: a round, fingered two-bar
+ * hook. Everything else sits behind it — a fat dry backbeat, a jangly chank on the
+ * off-hand, a twangy slide answering between phrases, a low-mixed organ bed. Production
+ * is dry and forward: garage floor, not arena.
  *
- * ## The hook (why the bass reads as a hook)
- * Two-bar phrase in DORIAN degrees (0=root, 2=b3, 3=4th, 4=5th, 5=6th, 6=b7):
- * bar 1 states the anchor with a ghost pickup and a syncopated push, bounces
- * b7 -> 5th, and lands home ringing over the barline; bar 2 exhales (rest on the
- * downbeat, kick alone), answers with a b7/6th sixteenth turn, then walks
- * b3 -> 4 -> 5 -> b7 straight back into the downbeat. Rests are real rests
- * (negative degrees) — the swamp is in the space between notes.
+ * ## The hook
+ * Two bars in DORIAN degrees (0=root, 2=b3, 3=4th, 4=5th, 5=6th, 6=b7). Bar 1 anchors the
+ * root and leans DOWN through b7 -> 5 -> root; bar 2 lifts to the 6th, pops the octave,
+ * then falls 4 -> b3 -> 2 back into the loop. Rests are real rests (negative degrees) —
+ * the swamp is in the space between notes.
  *
  * ## Arrangement
- * intro (THE HOOK ALONE over drums) -> verse (full pocket, one-chord vamp so the
- * hook never transposes) -> chorus (the lift: IV -> bVII -> i, hook transposes
- * with the roots — the payoff) -> jam (band stretches out) -> breakdown (drums +
- * bass only, one long build) -> outro (full-band lift, terminal). The breakdown
- * and jam can instead open into cloudbreak: kit and hook step out, the textures
- * hold a wide wet weather, then the band walks back in. A/B against DogHouseVibe.
+ * Eight sections. intro (kit and texture build; the band walks on at the verse) -> verse
+ * (one-chord vamp, so the hook never transposes) -> chorus (IV -> bVII -> i, the hook rides
+ * the roots — the payoff) -> jam -> breakdown (drums + bass, one long build) -> outro
+ * (terminal lift). Jam and breakdown can open instead into the storm pair: "cloud burst"
+ * (rumble swallows the room, the band plays on buried and comes apart), then "storm"
+ * (rain at full, everyone re-aligns, the kit walks back in), exiting to verse or chorus.
+ * A/B against DogHouseVibe.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RustBeltVibe : VibeProvider {
     override val name: String = "Rust Belt"
 
-    // Verse hangs on the i — the hook carries all the motion, so the chord bed
-    // stays planted and the bass never transposes until the chorus asks it to.
+    // Verse hangs on the i: the hook carries all the motion, so the bed stays planted
+    // and the bass never transposes until the chorus asks it to.
     private val verseProgression = chords(0)
 
-    // The chorus lift: IV -> bVII -> i -> i (in dorian: the major IV is the
-    // money chord). ROOT_ONLY tracks transpose the hook up the lift and back.
+    // The chorus lift, IV -> bVII -> i -> i; in dorian the major IV is the money chord.
+    // ROOT_ONLY tracks transpose the hook up the lift and back.
     private val chorusProgression = chords(3, 6, 0, 0)
 
     // Jam seesaw — mostly home with a bVII lean every 4th bar to give soloists a shape.
@@ -97,46 +98,35 @@ class RustBeltVibe : VibeProvider {
     private val dropBars = 2
     private val bigLiftBars = 4
     private val introBuildBars = 3
-    private val walkBackBars = 2  // cloudbreak exit: the band walks back in
 
-    // The record remembers: a 2-bar gliding chant condensed from the original
-    // Aether Natalis lead — root pedal, a step up, a rise to the 4th, settling
-    // on the b3. Rarely swapped over the hook by the LickAnomaly below.
-    private val aetherChant = Lick(
-        steps = listOf(
-            LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.62f, glideRate = 0.45f),  // D  root pedal
-            LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.58f, glideRate = 0.45f),  // D  re-touch
-            LickStep(scaleDegree = 1, duration = 1.0f, velocity = 0.66f, glideRate = 0.45f),  // E  step up
-            LickStep(scaleDegree = 0, duration = 1.0f, velocity = 0.60f, glideRate = 0.45f),  // D  back home
-            LickStep(scaleDegree = 3, duration = 1.5f, velocity = 0.70f, glideRate = 0.45f),  // G  the rise
-            LickStep(scaleDegree = 2, duration = 2.5f, velocity = 0.60f, glideRate = 0.55f),  // F  b3 — long settle
-        ),
-        loopLength = 8,  // 2 bars; matches the hook's footprint so the swap statement aligns
-    )
+    // Deliberately ONE bar: the pre-roll drags the destination's macros AND weather back
+    // into the outgoing section, so a longer lead-in guts the band and raises the rumble
+    // well before the storm lands. One bar leaves a rise under the last bar, clap as arrival.
+    private val stormLeadInBars = 1
 
     val sectionList by lazy {
         listOf(
-            // 0: intro — the KIT up front, building. A big ringing kick and a moderate
-            //    shaker carry an eight-bar crescendo over the hook while the jangle and the
-            //    twang stay out, so the verse downbeat is where the band actually walks on.
-            //    Three things stack to make the build obvious: energy opens at 0.45x and the
-            //    3-bar pre-roll ramps it to the verse's 1.0x; the tension override runs a
-            //    per-bar staircase (0 -> 0.75) of velocity and timbre; and the muted tracks
-            //    all arrive at once on the transition.
+            // 0: intro — kit and texture build; the band walks on at the verse downbeat.
+            //    A ringing kick and a washy hat carry an eight-bar crescendo while the hook,
+            //    the jangle and the twang sit far back and all come up together on the flip.
+            //    Energy opens under the verse's and the 3-bar pre-roll ramps it home; the
+            //    tension override stacks a per-bar staircase on top.
             //
-            //    Drum morph is DECAY on BD/SD/HH, pinned here for three distinct voices: a
-            //    long-ringing kick against a tight snare crack and a washy open hat.
-            //
-            //    Morph pinning also decides WHAT MOVES. The tension evolution below sweeps
-            //    morph only on tracks that are NOT pinned, so pinning the kit and the bass
-            //    leaves the shaker as the single voice drifting across the build — the
-            //    texture reads as the thing developing while the hook and the pocket hold.
+            //    Morph pinning decides WHAT MOVES: the tension evolution below sweeps morph
+            //    only on UNPINNED tracks, so pinning the kit (DECAY, for three distinct voices)
+            //    and the bass leaves the shaker as the one drifting voice — the texture reads
+            //    as the thing developing while the pocket holds.
             Section(
                 name = "intro",
                 barsMin = 4, barsMax = 4,   // 4 loop-cycles = 8 real bars at stepCount 32
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = introBuildBars),
                 ),
+                // The build pays off in a crack on the downbeat the band walks on. On the
+                // section, not the edge, so it survives the intro gaining a destination.
+                // EAR-TUNE(user owns after ear test)
+                exitEffects = listOf(StrikeEffect(intensity = 0.85f, distance = 0.25f)),
+
                 macroOverrides = MacroOverrides(
                     energy = 0.65f, complexity = 0.4f, space = 1.15f, mood = 0.9f,
                 ),
@@ -144,12 +134,10 @@ class RustBeltVibe : VibeProvider {
                 // free-running and starts at 0 on load, so the intro is the one section that
                 // gets a clean 0 -> peak sweep.
                 //
-                // outerBars == innerBars is a CURVE control here, not a long arc. Both phases
-                // are then the same p every bar, so intensity collapses to
-                // (1 - depth) * p + depth * p^2 and outerDepth becomes a linear-to-quadratic
-                // knob. At 0.65 the walk-up hangs back and rushes the last bar into the drop
-                // (steps of .13, .21, .29) instead of a rigid .25 each. It buys that shape by
-                // giving up peak height: the top lands at 0.63 rather than 0.75.
+                // outerBars == innerBars is a CURVE control, not a long arc: both phases share
+                // one p, so intensity collapses to (1 - depth) * p + depth * p^2 and outerDepth
+                // becomes a linear-to-quadratic knob. 0.65 hangs the walk-up back and rushes
+                // the last bar, paid for in peak height — the top lands at 0.63, not 0.75.
                 tensionOverride = TensionProfile(
                     innerBars = 4,       // one staircase per visit
                     outerBars = 4,       // == innerBars: curves the walk-up, see above
@@ -157,16 +145,16 @@ class RustBeltVibe : VibeProvider {
                     volume = 0.9f,     // the crescendo
                     tonal = TonalTension(chromaticPassing = 0.16f),
                     timing = 0.10f,
-                    // The morph range is wide on purpose: with the kit and the bass pinned it
-                    // now reaches the shaker alone, so it buys texture movement instead of
-                    // smearing the pocket. Widen only while that pinning holds.
+                    // Wide on purpose: with the kit and the bass pinned this reaches the shaker
+                    // alone, so it buys texture movement instead of smearing the pocket.
+                    // Widen only while that pinning holds.
                     evolution = EvolutionTension(
                         timbreLow = 0.18f, timbreHigh = 0.78f, timbreProbability = 0.95f,
                         morphLow = 0.20f, morphHigh = 0.82f, morphProbability = 0.92f,
-                        // A second knee, on the tone rather than the velocity: evolution is
-                        // (intensity - attackPoint) / (1 - attackPoint), so at 0.12 the timbre
-                        // barely stirs through the first half and then opens late. Keep this
-                        // well under the 0.63 peak above or the sweep loses most of its range.
+                        // A knee on the tone rather than the velocity: evolution is
+                        // (intensity - attackPoint) / (1 - attackPoint), so the timbre barely
+                        // stirs through the first half and opens late. Keep it well under the
+                        // 0.63 peak above or the sweep loses most of its range.
                         attackPoint = 0.12f,
                         releaseSpeed = 0.25f,
                     ),
@@ -178,34 +166,29 @@ class RustBeltVibe : VibeProvider {
                     0 to TrackSectionOverride(volume = 0.9f, morph = 0.90f, reverbSend = 0.36f, density = .32f),  // kick: loud, ringing
                     1 to TrackSectionOverride(volume = 0.62f, morph = 0.26f, density = .15f),  // snare: tight crack
                     2 to TrackSectionOverride(volume = 0.44f, morph = 0.54f, density = .85f),  // hat: open and washy
-                    // Track 3 — THE HOOK, and the one thing in the intro that must not move.
-                    // No volume override: it plays at its authored 0.88 while everything
-                    // around it is pulled down, which is what puts it out front. The morph
-                    // pin is the point of this entry — unpinned, the tension evolution above
-                    // walks the bass's morph 0.22 -> 0.72 across the build and the fingered
-                    // PLUCK character wanders with it. 0.30 is what the verse's own Space
-                    // setting resolves to through MELODIC's spaceDecay, so the un-pin at the
-                    // section boundary lands on the same value and is inaudible.
+                    // Track 3 — THE HOOK, held right back so the kit carries the build. The
+                    // morph pin is the point of this entry: unpinned, the tension evolution
+                    // above walks the bass morph 0.22 -> 0.72 and the fingered PLUCK character
+                    // wanders with it. 0.30 is what the verse's own Space resolves to through
+                    // MELODIC's spaceDecay, so the un-pin at the boundary is inaudible.
                     3 to TrackSectionOverride(volume = 0.1f, morph = 0.30f, density = .15f),
                     4 to TrackSectionOverride(volume = 0.4f, density = .15f),   // jangle
                     5 to TrackSectionOverride(volume = 0.4f, density = .15f),   // twang
                     6 to TrackSectionOverride(volume = 0.4f, density = .15f),  // organ
-                    // Track 7 — the texture, and the one voice left free to drift. Deliberately
-                    // NOT morph-pinned so the evolution sweep is audible on it alone. Loud for
-                    // an EFFECT track because that macro map caps energyVolume at 0.5x and
-                    // texture_energy_curve ducks tracks 5-7 again; the sends give it a tail so
-                    // it reads as its own layer rather than dust on the kit.
+                    // Track 7 — the texture, deliberately NOT morph-pinned so the evolution
+                    // sweep is audible on it alone. Loud for an EFFECT track because that macro
+                    // map caps energyVolume at 0.5x and texture_energy_curve ducks tracks 5-7
+                    // again; the sends give it a tail so it reads as a layer, not dust on the kit.
                     7 to TrackSectionOverride(volume = 0.88f, reverbSend = 0.42f, delaySend = 0.24f, density = .5f),
                 ),
             ),
             // 1: verse — the full pocket, baseline. One-chord vamp; the hook rules.
             Section(
                 name = "verse",
-                barsMin = 8, barsMax = 12,
+                barsMin = 3, barsMax = 6,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.60f, transitionBars = liftBars),  // -> chorus
-                    SectionTransition(targetIndex = 3, weight = 0.25f, transitionBars = liftBars),  // -> jam
-                    SectionTransition(targetIndex = 4, weight = 0.15f, transitionBars = dropBars),  // -> breakdown
+                    SectionTransition(targetIndex = 2, weight = 0.99f, transitionBars = liftBars),  // -> chorus
+                    SectionTransition(targetIndex = 5, weight = 0.01f, transitionBars = stormLeadInBars)  // -> cloud bursts
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = null,
@@ -214,11 +197,9 @@ class RustBeltVibe : VibeProvider {
             //    lead come forward; brighter and bigger but still dry.
             Section(
                 name = "chorus",
-                barsMin = 4, barsMax = 8, barStep = 4,
+                barsMin = 3, barsMax = 4,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 1, weight = 0.45f, transitionBars = dropBars),  // -> verse
-                    SectionTransition(targetIndex = 3, weight = 0.30f, transitionBars = liftBars),  // -> jam
-                    SectionTransition(targetIndex = 4, weight = 0.25f, transitionBars = dropBars),  // -> breakdown
+                    SectionTransition(targetIndex = 3, weight = 1.0f, transitionBars = liftBars),  // -> jam
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
@@ -232,15 +213,12 @@ class RustBeltVibe : VibeProvider {
                     6 to TrackSectionOverride(density = 0.30f),                  // organ swells in
                 ),
             ),
-            // 3: jam — the band stretches out over the seesaw; hook develops.
+            // 3: jam — the band stretches out over the seesaw; bass and twang trade leads.
             Section(
                 name = "jam",
-                barsMin = 8, barsMax = 16,
+                barsMin = 8, barsMax = 12,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.45f, transitionBars = liftBars),  // -> chorus
-                    SectionTransition(targetIndex = 1, weight = 0.35f, transitionBars = liftBars),  // -> verse
-                    SectionTransition(targetIndex = 4, weight = 0.20f, transitionBars = dropBars),  // -> breakdown
-                    SectionTransition(targetIndex = 5, weight = 0.15f, transitionBars = dropBars),  // -> cloudbreak (thin out into weather)
+                    SectionTransition(targetIndex = 4, weight = 1.0f, transitionBars = dropBars),  // -> breakdown
                 ),
                 recencyDecay = 0.4f,
                 macroOverrides = MacroOverrides(
@@ -251,24 +229,25 @@ class RustBeltVibe : VibeProvider {
                     1 to TrackSectionOverride(delaySend = 0.2f),
                     3 to TrackSectionOverride(delaySend = 0.4f),
                     4 to TrackSectionOverride(delaySend = 0.4f),
-                    5 to TrackSectionOverride(density = 0.0f),
+                    // The twang is HALF THE JAM — lead eligibility is role-only, so muted it
+                    // still took the lead and played nothing. Chorus level to start.
+                    // EAR-TUNE(user owns after ear test)
+                    5 to TrackSectionOverride(density = 0.26f),
                     6 to TrackSectionOverride(volume = .8f, delaySend = .8f, reverbSend = .6f),
                     7 to TrackSectionOverride(volume = .8f, delaySend = .8f, reverbSend = .6f),
                 ),
                 customProgression = jamProgression,
                 chordsPerBar = 1,
-                soloMode = SoloMode.Jam(probability = 0.8f, lickInfluence = 0.8f),
+                soloMode = SoloMode.Jam(probability = 0.8f, lickInfluence = 0.3f),
             ),
-            // 4: breakdown — drums + bass only; the hook naked again, one long
-            //    anticipation build back into the chorus. Sometimes the build never
-            //    comes and the sky opens instead (-> cloudbreak).
+            // 4: breakdown — drums + bass only, the hook naked again, one long anticipation
+            //    build back into the chorus. Sometimes the build never comes and the sky
+            //    opens instead.
             Section(
                 name = "breakdown",
                 barsMin = 4, barsMax = 4,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 2, weight = 0.55f, transitionBars = bigLiftBars), // -> chorus (THE build)
-                    SectionTransition(targetIndex = 1, weight = 0.20f, transitionBars = liftBars),    // -> verse
-                    SectionTransition(targetIndex = 5, weight = 0.25f, transitionBars = dropBars),    // -> cloudbreak (the sky opens instead)
+                    SectionTransition(targetIndex = 5, weight = 1.0f, transitionBars = stormLeadInBars)  // -> cloud bursts
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
@@ -283,27 +262,46 @@ class RustBeltVibe : VibeProvider {
                     7 to TrackSectionOverride(density = 0.08f),
                 ),
             ),
-            // 5: cloudbreak — the breakdown (or a thinning jam) opens into weather
-            //    instead of building. Kit and hook step OUT (density 0 = clean section
-            //    mute, restored on exit), and the low-energy voices carry it: the chank
-            //    smeared into a wash, a lone slide line, long ensemble holds on the bed,
-            //    and particles up top in a wide wet room. Textures lifted from the
-            //    original Aether Natalis drone; the exit ramps are the band walking back in.
+            // 5: cloud bursts — THE ROAR. The breakdown (or a thinning jam) opens into a real
+            //    storm instead of building: the entry strike lands and its roll swallows the
+            //    room. Rumble fills this section; the rain arrives in 6. The kit is OUT, but
+            //    the rest of the band plays on UNDER the roar — buried, not absent.
+            //
+            //    THE BAND COMES APART: three voices breathe on co-prime periods (2, 3, 5), so
+            //    their swells only re-converge every 30 bars, far longer than this section
+            //    lives. The ensemble audibly decoheres instead of just getting quieter.
             Section(
-                name = "cloudbreak",
-                barsMin = 2, barsMax = 3,  // hold the weather ~15s before the walk-back
+                name = "downpour",
+                // Matched to the exit's 4-bar pre-roll, so the crossfade toward downpour
+                // runs the whole section from zero rather than starting part-way in.
+                barsMin = 4, barsMax = 4,
                 transitions = listOf(
-                    SectionTransition(targetIndex = 1, weight = 0.55f, transitionBars = walkBackBars), // -> verse (the pocket resumes)
-                    SectionTransition(targetIndex = 2, weight = 0.45f, transitionBars = bigLiftBars),  // -> chorus (weather-to-payoff swell)
+                    // One way out, and the blend IS the transition: no effect fires here.
+                    // Macros and weather crossfade toward downpour across all 4 bars.
+                    SectionTransition(targetIndex = 6, weight = 1.0f, transitionBars = 4),
+                ),
+                // Clap, clap, roll — however the storm is reached. The first lands overhead on
+                // the flip, the second answers from further off; the later strike re-arms the
+                // one rumble tail, so the pair hands over to a single roll rather than two.
+                entryEffects = listOf(
+                    StrikeEffect(intensity = 0.9f, distance = 0.1f),
+                    // EAR-TUNE(user owns after ear test)
+                    StrikeEffect(intensity = 0.75f, distance = 0.40f, delayMs = 420),
+                ),
+                // Far and quiet: the storm already moving off as the rain takes over.
+                exitEffects = listOf(
+                    StrikeEffect(intensity = 0.50f, distance = 0.80f),
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = MacroOverrides(
-                    energy = 0.35f, complexity = 0.55f, space = 1.9f, mood = 1.05f,
+                    // The floor of the whole song and the START of the ramp, not a level the
+                    // section sits at: energy and mood collapse while complexity goes UP —
+                    // the band is scattered and disoriented rather than merely quiet.
+                    energy = 0.12f, complexity = 1.6f, space = 1.9f, mood = 0.45f,
                 ),
-                // Aether's glacial arc, near verbatim: no groove tension, just a slow
-                // probabilistic drift of timbre/morph/harmonics so the weather billows.
-                // The free-running counter arrives mid-phase here — fine, this profile
-                // has no build to protect, only motion.
+                // Aether's glacial arc, near verbatim: no groove tension, just a slow drift of
+                // timbre/morph/harmonics so the weather billows. The free-running counter lands
+                // mid-phase here — fine, this profile has no build to protect, only motion.
                 tensionOverride = TensionProfile(
                     innerBars = 8,
                     outerBars = 0,
@@ -319,40 +317,111 @@ class RustBeltVibe : VibeProvider {
                     ),
                     spurtChance = 0f,
                 ),
+                // Rumble-dominant and close: the roar, not the rainfall. Rain is nearly off so
+                // section 6 has somewhere to swell up from, and the rumble decays across the
+                // section as rain climbs — the roll hands over instead of sitting on top of it.
+                weather = SectionWeather(rain = 0.08f, rumble = 0.40f, strikeChance = 0.20f, distance = 0.25f),
                 customProgression = verseProgression,  // hang on the i — the weather is harmonically still
                 chordsPerBar = 1,
                 trackOverrides = mapOf(
                     0 to TrackSectionOverride(density = 0.0f),  // kit out
                     1 to TrackSectionOverride(density = 0.0f),
                     2 to TrackSectionOverride(density = 0.0f),
-                    // The hook steps out — not retuned, just absent, so its return on
-                    // the exit downbeat is the payoff the whole section aims at.
-                    3 to TrackSectionOverride(density = 0.0f),
-                    4 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.55f, delaySend = 0.28f),  // chank -> wash
-                    5 to TrackSectionOverride(volume = 0.50f, reverbSend = 0.50f, delaySend = 0.42f),  // the lone slide voice
-                    // The bed goes long-form: sustained holds in the old drone register.
-                    6 to TrackSectionOverride(
-                        volume = 0.62f, density = 0.30f, reverbSend = 0.50f,
-                        holdProbability = 0.90f, holdLengthMin = 8, holdLengthMax = 16,
+                    // The hook is buried but never gone — a low ceiling and a deep floor,
+                    // so it surfaces between rolls instead of holding a line through them.
+                    3 to TrackSectionOverride(
+                        volume = 0.45f, density = 0.9f,
+                        breatheBars = 2, breatheFloor = 0.04f, breatheTimbreSpan = 0.40f,
                     ),
-                    // Particles dense, morph pinned high (scatter character held still)
-                    // so the evolution's morph drift animates the wash and bed, not this.
-                    // Loud for an EFFECT track — see the intro's track 7 note.
+                    4 to TrackSectionOverride(volume = 0.24f, reverbSend = 0.55f, delaySend = 0.28f),  // chank -> wash, under
+                    5 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.50f, delaySend = 0.42f),  // the lone slide voice
+                    // The bed goes long-form: sustained holds, breathing on 3 against the hook's 2.
+                    6 to TrackSectionOverride(
+                        volume = 0.44f, density = 0.30f, reverbSend = 0.50f,
+                        holdProbability = 0.90f, holdLengthMin = 8, holdLengthMax = 16,
+                        breatheBars = 3, breatheFloor = 0.10f, breatheTimbreSpan = 0.25f,
+                    ),
+                    // Particles sit back now that the weather carries the top end. The 5-bar
+                    // breathe is the slowest of the three, so it's the voice that most
+                    // obviously stops agreeing with the others.
                     7 to TrackSectionOverride(
-                        volume = 0.88f, density = 0.42f, morph = 0.85f,
+                        volume = 0.22f, density = 0.20f, morph = 0.85f,
                         reverbSend = 0.50f, delaySend = 0.35f,
+                        breatheBars = 5, breatheFloor = 0.15f,
                     ),
                 ),
             ),
-            // 6: outro — full-band lift, ride it home. Terminal.
+            // 6: cloudbreak — RAIN AT FULL, THE BAND REASSEMBLES. Really two ramp ENDPOINTS
+            //    wearing one name: its macros and weather are what cloud bursts crossfades
+            //    TOWARD, and its own exits carry the same values on toward verse/chorus, where
+            //    weather is absent. Nothing here is a level the section merely sits at.
+            //
+            //    COMING BACK TOGETHER: breathe snaps to unity on the flip and every voice still
+            //    breathing shares one 3-bar period, so the band re-aligns in one move. The kit
+            //    returns quietly — the first half of a comeback the exit completes.
+            Section(
+                name = "cloud break",
+                barsMin = 4, barsMax = 4,  // keep min <= max: a backwards range silently pins to barsMin
+                transitions = listOf(
+                    // Both exits ramp the full section: the rain drains to nothing and the
+                    // macros climb home, so "back to normal" arrives rather than cuts.
+                    SectionTransition(targetIndex = 1, weight = 1f, transitionBars = 2),  // -> verse
+                ),
+                // One nearer crack as the rain arrives at full, then the last roll leaves
+                // with the weather on the way back to the band.
+                // EAR-TUNE(user owns after ear test)
+                entryEffects = listOf(
+                    StrikeEffect(intensity = 0.80f, distance = 0.20f),
+                ),
+                exitEffects = listOf(
+                    StrikeEffect(intensity = 0.50f, distance = 0.80f),
+                ),
+                recencyDecay = 0.5f,
+                // The far end of cloud burst' collapse — still short of the verse baseline so
+                // the exit ramp has the last stretch left to travel.
+                macroOverrides = MacroOverrides(
+                    energy = 0.70f, complexity = 0.85f, space = 1.5f, mood = 0.95f,
+                ),
+                // Rain carries the section; rumble sits at a floor under it. The per-bar strike
+                // roll is gated on nothing already ringing and tails run seconds, so a 0.50
+                // chance buys a strike every second or third bar, not one per bar.
+                weather = SectionWeather(rain = 0.85f, rumble = 0.22f, strikeChance = 0.50f, distance = 0.50f),
+                customProgression = verseProgression,
+                chordsPerBar = 1,
+                trackOverrides = mapOf(
+                    // The kit walks back in under the rain — quiet, but the pulse is back.
+                    0 to TrackSectionOverride(volume = 0.62f, density = 0.28f),
+                    1 to TrackSectionOverride(volume = 0.48f, density = 0.16f),
+                    2 to TrackSectionOverride(density = 0.0f),  // hats stay out; the rain owns that band
+                    // The hook comes back up on the bed's period — same breath, shallower
+                    // floor: present again, still weathered.
+                    3 to TrackSectionOverride(
+                        volume = 0.78f, density = 0.9f,
+                        breatheBars = 3, breatheFloor = 0.35f, breatheTimbreSpan = 0.18f,
+                    ),
+                    4 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.45f, delaySend = 0.24f),
+                    5 to TrackSectionOverride(volume = 0.50f, reverbSend = 0.45f, delaySend = 0.38f),
+                    6 to TrackSectionOverride(
+                        volume = 0.58f, density = 0.30f, reverbSend = 0.45f,
+                        holdProbability = 0.85f, holdLengthMin = 6, holdLengthMax = 12,
+                        breatheBars = 3, breatheFloor = 0.35f,
+                    ),
+                    7 to TrackSectionOverride(
+                        volume = 0.24f, density = 0.18f, morph = 0.85f,
+                        reverbSend = 0.45f, delaySend = 0.30f,
+                    ),
+                ),
+            ),
+            // 7: outro — full-band lift, ride it home. Terminal.
             Section(
                 name = "outro",
-                barsMin = 4, barsMax = 8, barStep = 4,
+                barsMin = 4, barsMax = 4,
                 macroOverrides = MacroOverrides(
                     energy = 1.35f, complexity = 0.9f, space = 0.8f, mood = 1.15f,
                 ),
                 customProgression = chorusProgression,
                 chordsPerBar = 1,
+                weather = SectionWeather(rain = 0.09f, rumble = 0.10f, strikeChance = 0f, distance = 1f, rainLevel = 0.9f),
             ),
         )
     }
@@ -365,12 +434,40 @@ class RustBeltVibe : VibeProvider {
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = sectionList.lastIndex,
-                lengthSeconds = 150..240,
+                lengthSeconds = 180..200,
                 sections = sectionList,
             ),
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.D,
             scaleType = ScaleType.DORIAN,
+            // The jam's cast. ROLE gates lead eligibility, so only Bassist and Twang can
+            // lead and the jam is those two trading; 4 and 6 are melodic engines but Chordal
+            // roles, so the Bed is pulled in, never leads. Drummer alwaysActive = dry pocket.
+            band = Band(
+                members = listOf(
+                    BandMember("Drummer", listOf(0, 1, 2, 7), alwaysActive = true,
+                               loudness = 0.70f, creativity = 0.20f),
+                    BandMember("Bassist", listOf(3), loudness = 0.85f, creativity = 0.40f),
+                    BandMember("Twang",   listOf(5), loudness = 0.65f, creativity = 0.60f),
+                    BandMember("Bed",     listOf(4, 6), loudness = 0.45f, creativity = 0.35f),
+                ),
+                handoffMatrix = bandMatrix(
+                    //            DRUM   BASS   TWANG  BED
+                    "Drummer" to row(0.00f, 0.45f, 0.55f, 0.00f),
+                    "Bassist" to row(0.00f, 0.00f, 0.85f, 0.15f),
+                    "Twang"   to row(0.00f, 0.75f, 0.00f, 0.25f),
+                    "Bed"     to row(0.00f, 0.50f, 0.50f, 0.00f),
+                ),
+                pullInMatrix = bandMatrix(
+                    //            DRUM   BASS   TWANG  BED
+                    "Drummer" to row(0.00f, 0.20f, 0.30f, 0.25f),
+                    "Bassist" to row(0.00f, 0.00f, 0.35f, 0.40f),
+                    "Twang"   to row(0.00f, 0.30f, 0.00f, 0.45f),
+                    "Bed"     to row(0.00f, 0.25f, 0.30f, 0.00f),
+                ),
+                pullInBarsMin = 2, pullInBarsMax = 3,
+                barsPerLeadMin = 2, barsPerLeadMax = 4,
+            ),
             seed = 0,
             // --- macro defaults: relaxed pocket, warm, dry-forward ---
             energy = 0.58f,
@@ -380,11 +477,10 @@ class RustBeltVibe : VibeProvider {
             deep = 0.30f,
             // --- THE HOOK (track 3 bass plays it as LickMode.Fill) ---
             // DORIAN degrees: 0=D(root), 1=E(2), 2=F(b3), 3=G(4), 4=A(5), 5=B(6), 6=C(b7), 7=D(oct).
-            // Copyright-safe rewrite: keeps the swampy D-Dorian heartland pocket (scale, low
-            // register, rest density, b7/6 color) but inverts the recognizable signature — a
-            // single anchored root that leans DOWNWARD, an octave POP, and a DESCENDING turn
-            // (the opposite of the faithful thumps -> jump-up -> walk-up). The faithful original
-            // is preserved verbatim in RustBeltOgVibe (WIP, -Pcatalog). 2 bars, sums to 8.0.
+            // Copyright-safe rewrite: keeps the swampy D-Dorian pocket (scale, low register,
+            // rest density, b7/6 color) but inverts the recognizable signature — one anchored
+            // root leaning DOWNWARD, an octave POP, a DESCENDING turn, all the opposite of the
+            // faithful figure. That original is preserved in RustBeltOgVibe (WIP, -Pcatalog).
             lick = Lick(
                 steps = listOf(
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.98f),   // D  root — single anchor
@@ -407,7 +503,7 @@ class RustBeltVibe : VibeProvider {
                 ),
                 loopLength = 8,  // 2 bars; steps sum to 8.0 exactly
             ),
-            lickMutation = 0.22f,  // bumped for copyright distance (more run-to-run drift off the figure)
+            lickMutation = 0.22f,  // high for copyright distance — more run-to-run drift off the figure
             lickOctave = -1,       // auto = midpoint of the bass range (lands around D2)
             genre = GenreProfile(
                 swingAmount = 0.09f,          // lazy-tough pocket — behind the beat, not shuffled
@@ -564,8 +660,8 @@ class RustBeltVibe : VibeProvider {
                         barStrategy = BarStrategy.CALL_RESPONSE,  // waits for the hook, then answers
                     )
                 },
-                // Track 6 — Organ bed (DX3 idx 1 "Hammond", auto-pinned patch selector):
-                // low-mixed sustained root bed; swells forward in the chorus.
+                // Track 6 — Organ bed (DX3): low-mixed sustained root bed, swells forward
+                // in the chorus.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
                     volume = 0.36f,
@@ -581,12 +677,10 @@ class RustBeltVibe : VibeProvider {
                 ).let { organ ->
                     TrackVoice(
                         engineEdm = organ,
-                        // At low energy the drawbar bed dissolves into a string ensemble —
-                        // the original Aether Natalis pad role, glacial chorus LFO and all.
-                        // Tone rides the MELODIC macro map like the rest of the track (no
-                        // statics: unpinned harmonics/timbre/morph never reach the voice).
-                        // Replaces the wetter-DX3 slot (harmonics 0.092); mostly heard in
-                        // breakdown/cloudbreak, bleeds into the jam's mid-energy blend.
+                        // At low energy the drawbar bed dissolves into a string ensemble — the
+                        // sibling Aether Natalis pad role, glacial chorus LFO and all. Tone
+                        // rides the MELODIC macro map; unpinned harmonics/timbre/morph never
+                        // reach the voice. Mostly heard in breakdown and the storm sections.
                         engineSpace = organ.copy(
                             engineId = OrpheusEngineId.ENS,
                             harmonics = 0.5f,  // clear the inherited DX3 patch index — meaningless on ENS
@@ -664,13 +758,8 @@ class RustBeltVibe : VibeProvider {
                 reverbBrightness = 0.50f,
                 deepFloor = 0.24f,
             ),
-            // Two rare surprises from the original Aether Natalis, retuned for a rock
-            // record: a stop-time void (the band cuts fast, the room rings, one ghost
-            // bar of the full band flashes through) and the chant flash above, where
-            // the hook dissolves into the slow glide figure for one statement.
             anomalies = listOf(
-                CrossfadeAnomaly(probability = 0.03f),
-                LickAnomaly(lick = aetherChant, chance = 0.02f),
+                StormAnomaly(probability = 0.04f, durationBarsMin = 1, durationBarsMax = 2, intensity = 0.7f, distance = 0.4f),
             ),
         )
     }
