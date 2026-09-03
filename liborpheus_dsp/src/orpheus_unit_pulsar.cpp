@@ -643,6 +643,16 @@ static void restart_progression_for_section(PulsarState* state,
                 : 0.0f;
         }
     }
+    // init_chord_progression clears anchor_bars/drift_range to a neutral baseline.
+    // Put the vibe's authored values back: this runs at EVERY section entry, and
+    // they are otherwise only set in load_vibe, so without this the first flip
+    // zeroed them for the rest of the song — taking chordTransitionMatrix and the
+    // progression-style Markov with it, since both are gated on drift_range.
+    state->chord_state.anchor_bars =
+        engine->pulsar_progression_anchor.load(std::memory_order_relaxed);
+    state->chord_state.drift_range =
+        engine->pulsar_progression_drift_range.load(std::memory_order_relaxed);
+
     // Reset per-track chord-edge tracker. Re-entering chord 0 in a new section
     // should be treated as the first edge (no glide), same as the initial vibe
     // load — we have no previous chord to slide from across the section boundary.

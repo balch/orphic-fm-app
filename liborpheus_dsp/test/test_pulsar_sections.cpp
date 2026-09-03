@@ -2552,6 +2552,68 @@ static bool test_section_density_regenerates_generative_pattern() {
     return ok;
 }
 
+// ── Authored progression anchor / drift must survive a section flip ──────────
+//
+// init_chord_progression clears anchor_bars and drift_range, and
+// restart_progression_for_section — called unconditionally at every section
+// entry — does not put them back from the atomics afterwards. The unit-level
+// chord tests all set cs.anchor_bars / cs.drift_range by hand after init, so
+// none of them can see whether a vibe's authored values ever reach the engine.
+static bool test_progression_anchor_drift_survive_section_flip() {
+    printf("\n=== Test: authored progression anchor/drift survive a section flip ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    pin_pulsar_rngs(engine);
+    setup_jam_arrangement(engine);
+    // Two 2-bar sections (bars_min == bars_max draws no RNG) so the flip is prompt
+    // and deterministic, with section 0 pinned as the opener.
+    constexpr int kSectionStride = kSectionDataFields;
+    for (int s = 0; s < 2; s++) {
+        const int b = s * kSectionStride;
+        engine->pulsar_section_data[b + 0].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_section_data[b + 1].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_section_data[b + 2].store(1.0f, std::memory_order_relaxed);
+    }
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+    engine->pulsar_progression_anchor.store(4, std::memory_order_relaxed);
+    engine->pulsar_progression_drift_range.store(0.5f, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    engine->pulsar_arrangement_generation.store(2, std::memory_order_release);
+    trigger_vibe_load(engine);
+
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+
+    unit_process_pulsar(&unit, engine, 256, 48000.0f);
+    const int   anchor_at_load = engine->pulsar_state->chord_state.anchor_bars;
+    const float drift_at_load  = engine->pulsar_state->chord_state.drift_range;
+
+    bool flipped = false;
+    for (int i = 0; i < 3000 && !flipped; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        flipped = engine->pulsar_state->section_state.current_section != 0;
+    }
+    const int   anchor_after = engine->pulsar_state->chord_state.anchor_bars;
+    const float drift_after  = engine->pulsar_state->chord_state.drift_range;
+
+    bool ok = true;
+    if (!flipped) { printf("  FAIL: no section flip within the run\n"); ok = false; }
+    if (anchor_at_load != 4) {
+        printf("  FAIL: anchor_bars=%d at load, authored 4\n", anchor_at_load); ok = false; }
+    if (std::fabs(drift_at_load - 0.5f) > 1e-4f) {
+        printf("  FAIL: drift_range=%.3f at load, authored 0.5\n", drift_at_load); ok = false; }
+    if (anchor_after != 4) {
+        printf("  FAIL: anchor_bars=%d after the flip, authored 4\n", anchor_after); ok = false; }
+    if (std::fabs(drift_after - 0.5f) > 1e-4f) {
+        printf("  FAIL: drift_range=%.3f after the flip, authored 0.5\n", drift_after); ok = false; }
+    if (ok) printf("  PASS: anchor=%d drift=%.2f survived the flip\n", anchor_after, drift_after);
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -2563,6 +2625,7 @@ bool run_pulsar_sections_tests() {
     tally(test_section_recency_prevents_immediate_repeat());
     tally(test_section_transition_ramp());
     tally(test_section_macro_interpolation());
+    tally(test_progression_anchor_drift_survive_section_flip());
     tally(test_section_progression_override_applied());
     tally(test_section_progression_inheritance_resets_index());
     tally(test_tension_phase_resets_without_override());
