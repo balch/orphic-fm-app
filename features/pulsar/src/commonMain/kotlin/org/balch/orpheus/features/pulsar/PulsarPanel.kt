@@ -56,6 +56,8 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.theme.proportional
+import org.balch.orpheus.ui.widgets.ChipHorizontalPadding
+import org.balch.orpheus.ui.widgets.ChipVerticalPadding
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.EnumDropdown
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
@@ -185,7 +187,12 @@ fun PulsarPanel(
                             .clickable { actions.setEnvelopeMode((state.envelopeMode + 1) % 3) }
                             .clip(RoundedCornerShape(6.dp))
                             .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            // Shares the dropdowns' insets: ENV sits in the same row as
+                            // VIBE/ROOT/SCALE, so its own numbers would read as a misalignment.
+                            .padding(
+                                horizontal = ChipHorizontalPadding,
+                                vertical = ChipVerticalPadding,
+                            ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(

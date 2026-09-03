@@ -89,6 +89,17 @@ private val MenuContainerVerticalPadding: Dp = 8.dp
 /** Corner radius of the menu surface. Matches M3's `MenuDefaults.shape`. */
 private val MenuCornerRadius: Dp = 4.dp
 
+/**
+ * Insets of the anchor chip's content, and so the chip's height: the label row has no explicit
+ * height and sizes to its text plus these.
+ *
+ * Public because panels hand-roll chips that sit directly beside a dropdown (Pulsar's ENV
+ * cycle button is one), and a chip that keeps its own numbers falls out of step the moment
+ * these change. Use them for anything that has to line up with a dropdown.
+ */
+val ChipHorizontalPadding: Dp = 12.dp
+val ChipVerticalPadding: Dp = 8.dp
+
 /** Drop shadow under the menu surface. Matches M3's `MenuDefaults.ShadowElevation`. */
 private val MenuShadowElevation: Dp = 3.dp
 
@@ -233,7 +244,7 @@ fun <T> EnumDropdown(
                     onClick = { expanded = true },
                     onLongClick = onLongPress,
                 )
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = ChipHorizontalPadding, vertical = ChipVerticalPadding),
             contentAlignment = Alignment.Center,
         ) {
             Row(
