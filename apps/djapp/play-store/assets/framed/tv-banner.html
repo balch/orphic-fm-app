@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; width: 1280px; height: 720px; overflow: hidden; background: #0A0814; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+  <!--
+    Orphic DJ Android TV banner (1280x720, no alpha).
+    Render to PNG (matches the screenshot-framing pipeline):
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+        --window-size=1280,720 --screenshot=tv-banner-1280x720.png \
+        "file://$PWD/tv-banner.html"
+
+    This is the STORE banner, distinct from the 640x360 in-app launcher drawable at
+    androidApp/src/main/res/drawable-nodpi/tv_banner.png. Play requires 1280x720 exactly.
+    The launcher renders it small (~320x180), so the composition is deliberately sparse:
+    one emblem, one wordmark, nothing that dissolves at quarter size.
+  -->
+  <svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t d">
+    <title id="t">Orphic DJ</title>
+    <desc id="d">The Orphic DJ wordmark beside a turntable with the Orpheus emblem at its centre.</desc>
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#0C0A1C"/>
+        <stop offset="0.52" stop-color="#0A0814"/>
+        <stop offset="1" stop-color="#0D0A1E"/>
+      </linearGradient>
+      <linearGradient id="accentH" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#36E0D0"/>
+        <stop offset="0.5" stop-color="#B14CFF"/>
+        <stop offset="1" stop-color="#FF5DC8"/>
+      </linearGradient>
+      <radialGradient id="glowTeal" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#36E0D0" stop-opacity="0.22"/>
+        <stop offset="1" stop-color="#36E0D0" stop-opacity="0"/>
+      </radialGradient>
+      <radialGradient id="glowMag" cx="0.5" cy="0.5" r="0.5">
+        <stop offset="0" stop-color="#E040FB" stop-opacity="0.22"/>
+        <stop offset="1" stop-color="#E040FB" stop-opacity="0"/>
+      </radialGradient>
+      <clipPath id="emblemClip"><circle cx="392" cy="360" r="62"/></clipPath>
+    </defs>
+
+    <rect x="0" y="0" width="1280" height="720" fill="url(#bg)"/>
+    <ellipse cx="240" cy="-40" rx="560" ry="400" fill="url(#glowTeal)"/>
+    <ellipse cx="1120" cy="780" rx="560" ry="400" fill="url(#glowMag)"/>
+
+    <!-- Turntable. Concentric grooves read as texture at full size and as a dark disc when small. -->
+    <g>
+      <circle cx="392" cy="360" r="166" fill="#A6AAB6"/>
+      <circle cx="392" cy="360" r="166" fill="none" stroke="#23232B" stroke-width="9" stroke-dasharray="3 22"/>
+      <circle cx="392" cy="360" r="154" fill="#0B0912"/>
+      <circle cx="392" cy="360" r="142" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+      <circle cx="392" cy="360" r="127" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+      <circle cx="392" cy="360" r="112" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+      <circle cx="392" cy="360" r="97" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+      <circle cx="392" cy="360" r="82" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="1.5"/>
+      <circle cx="392" cy="360" r="62" fill="#201840"/>
+      <image href="../../../androidApp/src/main/res/mipmap-xxxhdpi/orpheus_emblem.png" x="330" y="298" width="124" height="124" clip-path="url(#emblemClip)" preserveAspectRatio="xMidYMid slice"/>
+      <circle cx="392" cy="360" r="68" fill="none" stroke="#E23A4B" stroke-width="8"/>
+    </g>
+
+    <g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif">
+      <text x="646" y="330" font-size="96" font-weight="800" letter-spacing="-3" fill="#FFFFFF">ORPHIC DJ</text>
+      <rect x="650" y="366" width="188" height="10" rx="5" fill="url(#accentH)"/>
+      <text x="652" y="438" font-size="34" font-weight="600" letter-spacing="6" fill="#C9C4E8">AN INTERACTIVE ALBUM</text>
+    </g>
+  </svg>
+</body>
+</html>
