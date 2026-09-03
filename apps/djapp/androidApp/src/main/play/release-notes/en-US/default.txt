@@ -1,6 +1,7 @@
-Easier to read, easier to steer.
+Storms, solos, and a vibe reborn.
 
-• Titles and labels stay readable whatever the visualization is doing behind them.
-• The remote's cursor is unmistakable now, and a mouse click no longer leaves a button lit.
-• Every deck control is reachable from a remote, including the source selectors.
-• A hotter look for the Black Hole Sun visualization.
+• Rust Belt is now Rusted Coast, and it rides out a storm — a downpour that swallows the room, then a cloud break.
+• Weather runs through a song now: rain that falls, thunder that rolls past, lightning that cracks.
+• Solos step clear of the mix, and the band builds behind them instead of holding still.
+• Chord progressions that used to freeze after the first section now evolve all the way through.
+• Roomier controls on phone, tablet and TV.
