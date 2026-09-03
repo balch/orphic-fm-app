@@ -7,7 +7,7 @@ description: Use when cutting a new release of the DJ app (Orphic DJ) — taggin
 
 ## What this skill is for
 
-The DJ app's release pipeline has three main components (git tag → AAB/APK build → Store upload & GitHub release) that all need to stay in sync. Note that we do **not** attach AAB/APK binaries to the GitHub release page anymore, as they are published directly to the Play/App stores. The convention plugin (`build-logic/convention/src/main/kotlin/orpheus.android.app.gradle.kts`) derives versions from `git describe --tags --always --dirty`, so **the tag has to exist before the build** for the artifact name to come out right. If you build first you end up with a `djapp-v1.0-N-gSHA-release.aab` filename and a versionCode based on the rev-list count alone, which won't supersede previous Play Store uploads cleanly.
+The DJ app's release pipeline has three main components (git tag → AAB/APK build → Store upload & GitHub release) that all need to stay in sync. Note that we do **not** attach AAB/APK binaries to the GitHub release page anymore, as they are published directly to the Play/App stores. The convention plugin (`build-logic/convention/src/main/kotlin/orpheus.android.app.gradle.kts`) derives versions from `git describe --tags --always --dirty`, so **the tag has to exist before the build**. Building first does not give you an obviously-wrong filename to catch it by — `versionTag` strips the `-N-gSHA` suffix (line 146), so an untagged HEAD thirteen commits past `v2.0.2` still produces `djapp-v2.0.2-og-release.aab`. The name is clean and **wrong**: it claims to be the previous release while containing unreleased code, and it collides with that release's real artifact in the same output directory. Only the versionCode differs. Tag first — the filename will not tell you if you didn't.
 
 This skill captures the canonical flow plus the recovery paths for the common "I need to add one more commit" and "I never made a GitHub release for v1.0.0" cases.
 
@@ -18,7 +18,7 @@ The convention plugin reads two things at configuration time:
 - `gitVersionCode = git rev-list --count HEAD` — every commit bumps this by 1.
 - `gitVersionName = git describe --tags --always --dirty` — resolves to the tag if HEAD is exactly tagged, otherwise something like `v1.1.0-3-gabc1234`, otherwise the short SHA.
 
-The AAB / APK base name gets `-v$versionTag` appended automatically (`base.archivesName.set("$archivesBase-v$versionTag")`), and the flavor + build type follow. So when HEAD is exactly at a `vX.Y.Z` tag, you get clean filenames like `djapp-v1.9.0-og-release.aab`. When it isn't, you get a noisier suffix. **Always tag before building distributable variants.**
+The AAB / APK base name gets `-v$versionTag` appended automatically (`base.archivesName.set("$archivesBase-v$versionTag")`), and the flavor + build type follow. `versionTag` is `gitVersionName` with `-\d+-g[0-9a-f]+(-dirty)?` **removed**, so the filename shows only the nearest tag whether or not HEAD is on it — `djapp-v1.9.0-og-release.aab` either way. **Always tag before building distributable variants**, and verify with the manifest dump below rather than the filename.
 
 Debug-like build types (`debug`, `debugRelease`) pin to `versionCode = 1` and `versionName = "dev"` so installs aren't invalidated by every commit. Only `release` and `benchmark` use the git-derived numbers.
 
@@ -453,7 +453,7 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 
 ## When something looks off
 
-- **Filename has a `-N-gSHA` suffix** (e.g. `djapp-v1.1.0-3-gabc1234-release.aab`): HEAD isn't on a tag. Either tag HEAD first, or check out the right tag.
+- **You are not sure the artifact was built on the tag**: the filename cannot tell you — `versionTag` strips the `-N-gSHA` suffix, so an off-tag build is named after the *previous* tag and looks legitimate. Dump the manifest (see "Verifying versions match expectations") and check `versionCode` against `git rev-list --count HEAD` at the tag. A stale artifact from the previous release may also be sitting in the same output directory; check mtimes before uploading.
 - **Filename says `-dirty`**: working tree has uncommitted changes. Commit them first — the current flow is to tweak on a feature branch, then land it on `main` as logical, separately revertable commits. Reach for `git stash` only if the change genuinely should not ship, and check first that the dirty files are yours: the tree often carries the user's WIP or a sibling agent's edits.
 - **`gh release create` fails with "release already exists"**: the release exists but maybe without binaries — use `gh release upload <tag> <file>` to add assets, or `gh release edit` to update notes.
 - **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease`.
