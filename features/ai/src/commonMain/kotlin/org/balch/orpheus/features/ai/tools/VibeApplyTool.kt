@@ -159,7 +159,9 @@ class VibeApplyTool(
                 requested feel (bpm, rootNote, scaleType, genre.customProgression, per-track engines,
                 arrangement), then pass the complete edited JSON here.
                 Rules: exactly 8 tracks; progression degrees 0..6; name must be an evocative ORIGINAL
-                name (never a real artist/band/song/album).
+                name (never a real artist/band/song/album); any section that sets soloMode also
+                needs the top-level 'band' field — without it the solo never starts (pulsar_vibe_guide
+                section 7 has one to copy).
                 Instruments — keep each track's engine in its role family when you change it:
                   drums BD/SD/HH/NSE/PAR · bass WSH/VCF/PD/VA/DX · keys DX2 · lead DX3/WSH/FM/WTB ·
                   pad ENS/STR/CHD/GRN/ADD · texture MOD/PAR/SPK/SWM/NES/TRN.

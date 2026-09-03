@@ -130,25 +130,53 @@ data class SoloBehavior(
 )
 
 /**
- * How non-soloing tracks pull back during a solo. Set on [TrackVoice.duckingProfile].
- * Tracks without this use sensible defaults based on their [EnvelopeProfile].
+ * How one non-soloing track pulls back during a bandmate's solo.
+ * Set on [TrackVoice.duckingProfile]; a track that declares none ducks by exactly these
+ * defaults, which are the depths the engine has always applied. So `DuckingProfile()` is a
+ * no-op and every field you set is a deliberate step away from that baseline.
  *
- * @param volumeReduction Volume drop during ducking, 0-1. 0.3 = subtle, 0.7 = dramatic.
- * @param densityReduction Density drop. 0.4 = noticeably sparser.
- * @param ghostReduction Ghost note reduction. 0.5 = half as many ghost notes.
- * @param fillSuppression How much to suppress fills. 0.8 = almost no fills while ducking.
- * @param simplify If true, simplify patterns to basic downbeats while ducking.
- * @param reverbBoost Extra reverb send while ducking (pushes backing tracks further back in the mix).
+ * Does NOT apply to tracks belonging to an always-active band member: "the kit never fully
+ * steps back" is a band-level rule, and a per-track profile must not undo it.
+ *
+ * Only three of the six fields currently reach the audio. The other three are carried all
+ * the way to the render as modifiers that nothing reads, so authoring them changes nothing
+ * today — they are marked below rather than hidden, so no one tunes a dial that is not
+ * connected.
+ *
+ * @param densityReduction Density drop — how many of the track's steps are dropped while
+ *   ducking. 0.2 = the baseline; 0.5 is noticeably sparser. APPLIED.
+ * @param simplify If true, drop the ornament (sub-0.45-velocity) hits and keep only the
+ *   backbone. APPLIED.
+ * @param fillSuppression How much to suppress fills, 0-1. 0.35 = the baseline, 0.9 = almost
+ *   none. APPLIED, but only on a solo handoff bar and only for percussive tracks — that is
+ *   the one seam where a ducked kit is allowed to answer with a fill.
+ * @param volumeReduction Volume drop while ducking, 0-1. NOT YET APPLIED: the render folds
+ *   the modifier into a local velocity that it then discards, so the voice still sounds at
+ *   the step's authored velocity. Wiring it would make every band vibe's ducked tracks
+ *   quieter, so it needs its own change and an ear test.
+ * @param ghostReduction Ghost note reduction. NOT YET APPLIED — the modifier is computed
+ *   and no consumer reads it.
+ * @param reverbBoost Extra reverb send while ducking. NOT YET APPLIED — same as [ghostReduction].
  */
 @Serializable
 data class DuckingProfile(
-    val volumeReduction: Float = 0.3f,
-    val densityReduction: Float = 0.4f,
-    val ghostReduction: Float = 0.5f,
-    val fillSuppression: Float = 0.8f,
+    val volumeReduction: Float = 0.18f,
+    val densityReduction: Float = 0.2f,
+    val ghostReduction: Float = 0.35f,
+    val fillSuppression: Float = 0.35f,
     val simplify: Boolean = true,
     val reverbBoost: Float = 0.1f,
-)
+) {
+    companion object {
+        /**
+         * Floats per track in the `track_ducking_$i` bank: the six fields above plus a
+         * trailing declared flag, since all-zero values are a legitimate "do not duck me"
+         * and cannot double as "the vibe authored nothing".
+         * Mirrors `kTrackDuckingFields` in `liborpheus_dsp/src/pulsar_limits.h`.
+         */
+        const val WIRE_FIELDS = 7
+    }
+}
 
 /**
  * Solo mode for a section — declares what kind of solo happens.

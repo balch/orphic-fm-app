@@ -80,6 +80,10 @@ fun chordMatrix(vararg rows: Pair<String, List<Float>>): List<Float> {
  * Defines members, their track assignments, and interaction matrices.
  * Referenced by [Vibe.band], used by [SoloMode] sections in the arrangement.
  *
+ * A band is what makes a solo happen at all: the engine starts a section solo only when the vibe
+ * ships one, so a [SoloMode] with no band is silently inert (enforced by [Vibe]'s init). See
+ * [BandPresets] for ready-made casts that only need the track indices.
+ *
  * @param members The band members (named track groups with personality traits).
  * @param handoffMatrix NxN Markov matrix for lead handoff probabilities. Build with [bandMatrix].
  * @param pullInMatrix NxN matrix for pull-in probabilities. Build with [bandMatrix].
@@ -100,6 +104,9 @@ data class Band(
 ) {
     init {
         val n = members.size
+        // A memberless band passes the matrix checks (0x0) and reaches the engine as a cast with
+        // nobody in it, which is the bandless failure with extra steps.
+        require(n > 0) { "Band needs at least one member" }
         require(handoffMatrix.size == n * n) {
             "Band.handoffMatrix must have ${n * n} values (members.size² for $n members), got ${handoffMatrix.size}"
         }

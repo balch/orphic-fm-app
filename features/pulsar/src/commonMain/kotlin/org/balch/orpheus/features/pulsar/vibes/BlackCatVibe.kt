@@ -9,6 +9,7 @@ import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.BandPresets
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -170,8 +171,8 @@ class BlackCatVibe : VibeProvider {
                     6 to TrackSectionOverride(density = 0.30f),                  // organ swells in
                 ),
             ),
-            // 3: jam — the band stretches out; the answering lead steps aside so the
-            //    solo system owns the lead voice (RustBelt-proven), horns thin to accents.
+            // 3: jam — the band stretches out; the answering lead thins so the solo system owns
+            //    the lead voice, horns thin to accents.
             Section(
                 name = "jam",
                 barsMin = 8, barsMax = 12,
@@ -188,7 +189,9 @@ class BlackCatVibe : VibeProvider {
                 chordsPerBar = 1,
                 trackOverrides = mapOf(
                     4 to TrackSectionOverride(density = 0.14f),                  // horns thin to accents
-                    5 to TrackSectionOverride(density = 0.0f),                   // lead yields to the solo system
+                    // NOT 0: density 0 is a render mute for the whole section, and the solo
+                    // system does not lift it — the lead's own jam line would be inaudible.
+                    5 to TrackSectionOverride(density = 0.10f),                  // lead steps back for the soloist
                     6 to TrackSectionOverride(volume = 0.50f, delaySend = 0.3f), // organ blooms a little
                     7 to TrackSectionOverride(reverbSend = 0.4f),
                 ),
@@ -244,6 +247,15 @@ class BlackCatVibe : VibeProvider {
             rootNote = RootNote.C_SHARP,
             scaleType = ScaleType.BLUES,
             seed = 0,
+            // The jam's Jam solo needs a cast to hand around; without one the engine never starts
+            // it. Both melodic voices are members, so the hook bass and the lead trade the solo;
+            // horns and organ comp together.
+            band = BandPresets.quartet(
+                kit = listOf(0, 1, 2, 7),
+                bass = listOf(3),
+                lead = listOf(5),
+                colour = listOf(4, 6),
+            ),
             // --- macro defaults: greasy mid-energy strut, dry-forward ---
             energy = 0.56f,
             complexity = 0.70f,

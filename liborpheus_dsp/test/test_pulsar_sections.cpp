@@ -352,7 +352,7 @@ static void push_two_section_ab_arrangement(OrpheusEngine* engine,
     // Clear solo/ducking/markov to defaults
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
-    for (int i = 0; i < 8 * 6; i++)
+    for (int i = 0; i < kNumPulsarTracks * kTrackDuckingFields; i++)
         engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);
@@ -715,7 +715,8 @@ static bool test_tension_override_then_inherit() {
     //   8=chromatic_passing, 9..11=evo_timbre_low/high/prob, 12..14=evo_morph_*,
     //   15..17=evo_harm_*, 18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
     engine->pulsar_section_tension_active[1].store(1, std::memory_order_relaxed);
-    // Tension's own fixed stride, NOT pulsar_section_data's (25) -- see pulsar_limits.h.
+    // Tension's own fixed stride, NOT pulsar_section_data's kSectionDataFields, which
+    // has been widened twice -- see pulsar_limits.h.
     constexpr int kSectionStride = 21;
     const int tb = 1 * kSectionStride;
     // Valid, non-silly defaults so the override struct isn't garbage.
@@ -822,7 +823,8 @@ static bool test_initial_section_tension_override_applied_on_load() {
     // Override on the INITIAL section (0) with distinctive volume = 0.9. Before the
     // fix, load_vibe left the intro on the vibe base (0.3) until the first transition.
     engine->pulsar_section_tension_active[0].store(1, std::memory_order_relaxed);
-    // Tension's own fixed stride, NOT pulsar_section_data's (25) -- see pulsar_limits.h.
+    // Tension's own fixed stride, NOT pulsar_section_data's kSectionDataFields, which
+    // has been widened twice -- see pulsar_limits.h.
     constexpr int kSectionStride = 21;
     const int tb = 0 * kSectionStride;
     engine->pulsar_section_tension_data[tb + 0].store(4.0f, std::memory_order_relaxed);  // inner_bars
@@ -1515,6 +1517,52 @@ static bool test_articulate_bass_solo_idempotent_under_repeats() {
     return ok;
 }
 
+// A hook-driven JAM lead runs render_lick_into_track (authored velocities) then
+// ornament_jam_solo_line (deliberately quieter fills) and only THEN this pass. The
+// beat-position floors would lift every quiet step to 0.85/0.70 — inverting a written
+// diminuendo and pulling the ornaments up level with the hook. preserve_authored_velocity
+// must leave every already-gated step exactly as authored while still inserting slaps.
+static bool test_articulate_bass_solo_preserves_authored_velocity() {
+    // A written contour with steps on both sides of the 0.85/0.70 floors, plus
+    // ornament-level fills at 0.45/0.60 — durations 1.0 as generate_lick_pattern writes.
+    const float authored[16] = {
+        0.98f, 0.0f, 0.45f, 0.0f, 0.74f, 0.86f, 0.78f, 0.0f,
+        0.70f, 0.0f, 0.60f, 0.0f, 1.00f, 0.0f, 0.88f, 0.0f,
+    };
+    PulsarStep kept[16], floored[16];
+    for (int i = 0; i < 16; i++) {
+        kept[i] = (authored[i] > 0.0f) ? make_step(38, authored[i], true, 1.0f)
+                                       : make_step(0, 0.0f, false, 0.0f);
+        floored[i] = kept[i];
+    }
+
+    // Dense slaps so assertion 3 does not hang on one RNG draw.
+    uint32_t seed_a = 9, seed_b = 9;
+    articulate_bass_solo(kept, 16, 0.8f, seed_a, /*preserve_authored_velocity=*/true);
+    articulate_bass_solo(floored, 16, 0.8f, seed_b, /*preserve_authored_velocity=*/false);
+
+    // 1. Every authored note survives at its written velocity.
+    bool velocities_kept = true;
+    for (int i = 0; i < 16; i++) {
+        if (authored[i] <= 0.0f) continue;
+        if (!kept[i].gate || kept[i].velocity != authored[i]) velocities_kept = false;
+    }
+    // 2. Mutation check: without the flag those same steps ARE rewritten, so a
+    //    regression that drops the flag fails assertion 1 rather than passing quietly.
+    int raised = 0;
+    for (int i = 0; i < 16; i++)
+        if (authored[i] > 0.0f && floored[i].velocity != authored[i]) raised++;
+    // 3. Articulation still happens: slaps land on off-beats the hook left open.
+    int slaps = 0;
+    for (int i = 1; i < 16; i += 2)
+        if (authored[i] <= 0.0f && kept[i].gate) slaps++;
+
+    bool ok = velocities_kept && raised >= 4 && slaps > 0;
+    printf("  authored bass solo: velocities_kept=%d floored_would_raise=%d slaps=%d -- %s\n",
+           velocities_kept, raised, slaps, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_solo_fire_boost_never_saturates() {
     // High base + big mods must NOT clamp to 1.0 — headroom-relative lift leaves rests.
     float hi = solo_fire_boost(0.94f, 0.39f, 0.70f);   // the bass runaway case
@@ -1606,7 +1654,10 @@ static bool test_generate_jam_solo_line() {
     BandSoloState st = {}; st.phrase_cursor = 0;
     PulsarStep steps[16]; for (int i=0;i<16;i++) steps[i]=make_step(0,0.0f,false,0.0f);
     uint32_t seed = 11;
-    generate_jam_solo_line(behavior, st, steps, 16, root, scale, chord_degree, octave, current, 0.5f, seed);
+    // 0,0 = no authored range, so notes keep the historical 24..96 clamp and this
+    // test's in-scale / chord-anchor intent is unaffected by the note-range fit.
+    generate_jam_solo_line(behavior, st, steps, 16, root, scale, chord_degree, octave, current,
+                           0.5f, 0, 0, seed);
 
     // 1. Every gated note is in scale (pitch class is a scale degree).
     bool in_scale = true; int gated = 0;
@@ -1632,7 +1683,8 @@ static bool test_generate_jam_solo_line() {
     SoloBehaviorParam b2 = behavior; BandSoloState s2 = {}; int c2 = 0;
     PulsarStep st2[16]; for (int i=0;i<16;i++) st2[i]=make_step(0,0.0f,false,0.0f);
     uint32_t seed2 = 11;
-    generate_jam_solo_line(b2, s2, st2, 16, root, scale, chord_degree, octave, c2, 0.5f, seed2);
+    generate_jam_solo_line(b2, s2, st2, 16, root, scale, chord_degree, octave, c2,
+                           0.5f, 0, 0, seed2);
     bool det = true; for (int i=0;i<16;i++) if (st2[i].gate!=steps[i].gate || st2[i].note!=steps[i].note) det=false;
 
     bool ok = in_scale && downbeats_chord && recorded && det && gated > 0;
@@ -1891,12 +1943,11 @@ static void push_jam_carry_band_arrangement(OrpheusEngine* engine,
     engine->pulsar_band_bars_per_lead_max.store(2, std::memory_order_relaxed);
     engine->pulsar_band_pull_in_bars_min.store(1, std::memory_order_relaxed);
     engine->pulsar_band_pull_in_bars_max.store(1, std::memory_order_relaxed);
-    engine->pulsar_band_improv_carryover.store(0.7f, std::memory_order_relaxed);
     engine->pulsar_band_probability.store(1.0f, std::memory_order_relaxed);
 
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
-    for (int i = 0; i < 8 * 6; i++)
+    for (int i = 0; i < kNumPulsarTracks * kTrackDuckingFields; i++)
         engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);
@@ -2539,6 +2590,7 @@ bool run_pulsar_sections_tests() {
     tally(test_solo_fire_boost_never_saturates());
     tally(test_articulate_bass_solo());
     tally(test_articulate_bass_solo_idempotent_under_repeats());
+    tally(test_articulate_bass_solo_preserves_authored_velocity());
     tally(test_midi_lick_degree_roundtrip_and_synth());
     tally(test_synthesize_lick_below_root_renders_notes_not_rests());
     tally(test_generate_jam_solo_line());

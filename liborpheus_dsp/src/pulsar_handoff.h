@@ -41,6 +41,16 @@ inline float solo_fire_boost(float fire_prob, float density_mod, float fill_mod)
     return fire_prob > 1.0f ? 1.0f : fire_prob;
 }
 
+// Handoff punctuation: shallow a ducked track's density for one bar so the kit can
+// answer a solo pass. Deliberately NOT folded into solo_fire_boost — that helper
+// early-returns on density_mod <= 0, which is exactly the ducked kit this is for.
+// Never pushes past 0: the fill lifts the duck, it does not boost above baseline.
+inline float handoff_fill_duck(float density_mod, float fill_mod) {
+    if (fill_mod <= 0.0f || density_mod >= 0.0f) return density_mod;
+    float d = density_mod + fill_mod;
+    return (d > 0.0f) ? 0.0f : d;
+}
+
 // Pick the MIDI octave (the value render_lick_into_track takes as lick_octave)
 // that places the lick's first note closest to the outgoing soloist's last note,
 // clamped to the genre note range. outgoing_note < 0 => keep auto (-1).

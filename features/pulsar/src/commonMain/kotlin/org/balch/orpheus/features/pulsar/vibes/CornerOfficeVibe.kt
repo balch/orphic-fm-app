@@ -9,6 +9,7 @@ import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.BandPresets
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -228,6 +229,15 @@ class CornerOfficeVibe : VibeProvider {
             rootNote = RootNote.E,
             scaleType = ScaleType.MINOR,
             seed = 0,
+            // The jam's Jam solo needs a cast to hand around; without one the engine never starts
+            // it. The strut bass and the lead are the two melodic voices, so they trade; the funk
+            // stabs and the string machine comp together.
+            band = BandPresets.quartet(
+                kit = listOf(0, 1, 2, 7),
+                bass = listOf(3),
+                lead = listOf(5),
+                colour = listOf(4, 6),
+            ),
             // --- macro defaults: tight strut, studio polish, minor-key cool ---
             energy = 0.66f,
             complexity = 0.50f,

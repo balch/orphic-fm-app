@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar
 
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
+import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
@@ -114,6 +115,41 @@ class PulsarMarshalStrideTest {
             6, descriptor.elementsCount + 1,
             "storm_data bank size should be StormAnomaly's arity plus the declared flag",
         )
+    }
+
+    // --- track_ducking_$i: 6 DuckingProfile fields + declared flag ---
+
+    @Test
+    fun duckingProfileFieldOrderAndWireStrideMatchMarshal() {
+        // The marshal writes these positionally: volumeReduction(0), densityReduction(1),
+        // ghostReduction(2), fillSuppression(3), simplify(4), reverbBoost(5) — then the
+        // synthesized declared flag at 6. A reorder here silently scrambles the bank.
+        val descriptor = DuckingProfile.serializer().descriptor
+        assertEquals(
+            listOf(
+                "volumeReduction", "densityReduction", "ghostReduction",
+                "fillSuppression", "simplify", "reverbBoost",
+            ),
+            (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },
+        )
+        assertEquals(
+            descriptor.elementsCount + 1, DuckingProfile.WIRE_FIELDS,
+            "WIRE_FIELDS should be DuckingProfile's arity plus the declared flag",
+        )
+    }
+
+    @Test
+    fun duckingProfileDefaultsMatchTheEngineDuckConstants() {
+        // These are kUnauthoredDuck* in pulsar_band_solo.h — the duck the engine applies to a
+        // track that authored nothing. Keeping the Kotlin defaults equal to them is what
+        // makes `DuckingProfile()` a no-op rather than a silent deepening of every band vibe.
+        val d = DuckingProfile()
+        assertEquals(0.18f, d.volumeReduction)
+        assertEquals(0.2f, d.densityReduction)
+        assertEquals(0.35f, d.ghostReduction)
+        assertEquals(0.35f, d.fillSuppression)
+        assertEquals(true, d.simplify)
+        assertEquals(0.1f, d.reverbBoost)
     }
 
     // --- breathe: 3 trailing slots on the section_track_* per-track override family ---

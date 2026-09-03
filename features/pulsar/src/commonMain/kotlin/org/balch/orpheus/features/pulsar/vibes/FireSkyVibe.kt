@@ -11,6 +11,7 @@ import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.BandPresets
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -488,6 +489,15 @@ private class FireSkyVibeBase(
             rootNote = RootNote.G,
             scaleType = ScaleType.BLUES,
             seed = 0,
+            // The lead-in's LongFill and the solo's Jam need a cast to hand around; without one
+            // the engine never starts either. Lead and riff-harmony move as one guitar (same
+            // lick a fourth apart), so the solo goes to the pair.
+            band = BandPresets.quartet(
+                kit = listOf(0, 1, 2, 7),
+                bass = listOf(3),
+                lead = listOf(4, 6),
+                colour = listOf(5),
+            ),
             // --- macro defaults: driving, locked, dry-ish rock ---
             energy = 0.54f,
             complexity = 0.78f,

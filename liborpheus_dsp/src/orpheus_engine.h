@@ -1094,7 +1094,7 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_section_comping_humanization_data[kMaxSections * kSectionCompingHumanFields] = {};
 
     std::atomic<float> pulsar_track_solo_behavior[8 * 15] = {};
-    std::atomic<float> pulsar_track_ducking[8 * 6] = {};
+    std::atomic<float> pulsar_track_ducking[kNumPulsarTracks * kTrackDuckingFields] = {};
     std::atomic<float> pulsar_track_solo_markov[8 * 15] = {};
     std::atomic<int>   pulsar_soloist_matrix_active{0};
     std::atomic<float> pulsar_soloist_matrix[64] = {};  // 8x8 row-major
@@ -1108,7 +1108,6 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_band_pull_in_matrix[64] = {};    // 8x8 max
     std::atomic<int>   pulsar_band_pull_in_bars_min{2};
     std::atomic<int>   pulsar_band_pull_in_bars_max{4};
-    std::atomic<float> pulsar_band_improv_carryover{0.7f};
     std::atomic<float> pulsar_band_probability{0.7f};
     std::atomic<int>   pulsar_band_bars_per_lead_min{2};
     std::atomic<int>   pulsar_band_bars_per_lead_max{4};

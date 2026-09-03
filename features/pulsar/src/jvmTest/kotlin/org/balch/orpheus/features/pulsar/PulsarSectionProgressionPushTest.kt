@@ -37,6 +37,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.ChordStep
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
+import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
@@ -596,11 +597,54 @@ class PulsarSectionProgressionPushTest {
             assertEquals(0f, floatPort("track_6_delay_send_space"))
             assertEquals(0f, floatPort("track_6_reverb_send_space"))
         }
+
+    /**
+     * The `track_ducking_$i` bank's declared flag is the whole reason an unauthored track
+     * keeps ducking exactly as it always has: C++ reads slots 0-5 only when slot 6 is set.
+     * Zeros there would be a legitimate "do not duck me", so the flag cannot be inferred
+     * from the values — pin that only the authoring track raises it.
+     */
+    @Test
+    fun `ducking profile reaches the controller behind a declared flag`() = runTest(testDispatcher) {
+        val authored = DuckingProfile(
+            volumeReduction = 0.55f, densityReduction = 0.45f,
+            ghostReduction = 0.15f, fillSuppression = 0.95f,
+            simplify = false, reverbBoost = 0.22f,
+        )
+        val vibe = pushTestVibe(
+            sections = listOf(Section(name = "verse", barsMin = 4, barsMax = 4)),
+            duckingProfiles = mapOf(2 to authored),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val stride = DuckingProfile.WIRE_FIELDS
+        fun duck(track: Int, field: Int) = floatPort("track_ducking_${track * stride + field}")
+
+        assertEquals(authored.volumeReduction, duck(2, 0))
+        assertEquals(authored.densityReduction, duck(2, 1))
+        assertEquals(authored.ghostReduction, duck(2, 2))
+        assertEquals(authored.fillSuppression, duck(2, 3))
+        assertEquals(0f, duck(2, 4), "simplify=false marshals as 0")
+        assertEquals(authored.reverbBoost, duck(2, 5))
+        assertEquals(1f, duck(2, 6), "track 2 authored a profile, so the declared flag is 1")
+
+        // Every other track declared nothing. Its value slots still carry the envelope-profile
+        // fallback, but the flag stays 0, which is what keeps C++ on its own duck constants.
+        vibe.tracks.indices.filter { it != 2 }.forEach { t ->
+            assertEquals(0f, duck(t, 6), "track $t authored no profile, so it must not be declared")
+        }
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 
-private fun pushTestVibe(sections: List<Section>, anomalies: List<Anomaly> = emptyList()): Vibe = Vibe(
+private fun pushTestVibe(
+    sections: List<Section>,
+    anomalies: List<Anomaly> = emptyList(),
+    duckingProfiles: Map<Int, DuckingProfile> = emptyMap(),
+): Vibe = Vibe(
     name = "Section Push Test",
     bpm = 120f,
     rootNote = RootNote.C,
@@ -615,6 +659,7 @@ private fun pushTestVibe(sections: List<Section>, anomalies: List<Anomaly> = emp
             engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VA),
             engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VA),
             role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
+            duckingProfile = duckingProfiles[it],
         )
     },
     arrangement = Arrangement(sections = sections),

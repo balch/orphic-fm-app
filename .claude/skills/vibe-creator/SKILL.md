@@ -55,7 +55,7 @@ This project has a hard rule: **never use trademarked artist, band, album, or so
    - Reggae / skank — `RastaManVibe`.
    - CHORDAL-comping demo — `CompLabVibe` (uses a `generateCompLabVibe` helper — note: the file also contains commented-out family examples).
 3. **Copy that template file** to your new `<Name>Vibe.kt`, change the class name, the display `name`, and then tune each parameter against your musical decomposition. Do not start from a blank file — there are too many required fields.
-4. **Compile.** Run `./gradlew :features:pulsar:compileKotlinJvm` (fast — Pulsar only). Fix any type errors.
+4. **Compile.** Run `./gradlew :features:pulsar:compileKotlinJvm` (fast — Pulsar only). Fix any type errors. If any section sets a `soloMode`, the vibe needs a `band` — `BandPresets.quartet(...)` is the one-liner (see the `Band` section).
 5. **Run it live.** Build the JVM desktop app and load the vibe from the picker. A/B against `DogHouseVibe`.
 6. **Tune by ear.** The file should change first, not any wider code. If you find yourself wanting to change Pulsar DSP, stop — the DogHouseVibe benchmark exists to catch regressions, and vibes should only tune what the schema exposes.
 
@@ -298,11 +298,36 @@ Working example: `FireSky05Vibe` in `FireSkyVibe.kt` (rotates `aiLick`/`tweakLic
 
 The cast of characters for solos. Typically 4 members: Drummer (alwaysActive), Bassist, Keys/Lead, FX. Each member lists which `tracks` it owns.
 
+**A `soloMode` does nothing without a band.** The engine starts a section solo only when the vibe declares a `Vibe.band`; with no band the solo never starts and the section plays as an ordinary one, silently. `Vibe`'s init now rejects this outright — a vibe whose arrangement has any section with a non-null `soloMode` must set `band`. Six shipped vibes carried a dead `SoloMode.Jam` for months before that require existed.
+
+**Use a preset.** `BandPresets` (`models/BandPresets.kt`) builds a working cast from track indices alone — no hand-written matrices:
+
+| Preset | Cast | Use it for |
+| --- | --- | --- |
+| `BandPresets.quartet(kit, bass, lead, colour)` | Drummer (alwaysActive) / Bassist / Lead / Colour | The workhorse. Rock, blues, funk — anything with one star voice. `DogHouseVibe`'s shape. |
+| `BandPresets.tradingLeads(kit, bass, leadA, leadB)` | Drummer (alwaysActive) / Bassist / Lead A / Lead B | Two front-line voices passing the solo back and forth. `SwampSwaggerVibe`, `VelvetLeashVibe`, `SpaceDroneVibe`'s keys-led ensemble. |
+| `BandPresets.twoVoiceTexture(bed, voiceA, voiceB)` | Bed (alwaysActive) / Voice A / Voice B | Sparse ambient. The minimum working band. |
+
+```kotlin
+band = BandPresets.quartet(
+    kit = listOf(0, 1, 2, 7), bass = listOf(3), lead = listOf(5), colour = listOf(4, 6),
+),
+```
+
+Hand-write `Band(...)` only when you want bespoke member names or hand-tuned weights.
+
+**Two members is not a band.** The engine refuses to hand the lead to an `alwaysActive` member, so an anchor plus one voice deadlocks and the drums end up "soloing". Every band needs at least two non-anchor members — which is why `twoVoiceTexture` has three.
+
+**Only `Melodic`-ROLE tracks can lead a jam.** A JAM solo renders an improvised melodic LINE, so its lead member must own at least one track whose `role` is `TrackRole.Melodic`. A melodic-sounding *engine* is irrelevant: an organ on a `TrackRole.Chordal` track cannot lead a jam and the engine will pick around it. Check the roles, not the engine ids, when you decide who is in which member. (`LongFill` and `LickBuilder` are not filtered this way — only `Jam`.)
+
+**Do not `density = 0f` a would-be soloist.** `TrackSectionOverride(density = 0f)` is a render MUTE for the whole section and the solo system does not lift it, so zeroing a melodic track inside its own solo section makes that solo inaudible whenever that member wins the lead. Thin it to 0.1-0.3 instead. "The lead steps aside so the solo system owns it" is exactly the case that breaks.
+
 - `handoffMatrix`: NxN probability of one member passing the lead to another. Build with `bandMatrix(...)` using `row(...)` helpers.
 - `pullInMatrix`: probability of a soloist pulling in another member as a duet partner.
 - `pullInBars*`, `barsPerLead*`: how long pull-ins and leads last.
+- Tracks in NO member get the full support duck during a solo, so give every track an owner.
 
-A decent default (see `DogHouseVibe`, `ArmyStompVibe`) is 4 members — Drummer/Bassist/Keys/FX — with ~0.2-0.4 handoff weights, lower weights into Drummer (drums rarely take the lead).
+A decent hand-written default (see `DogHouseVibe`, `ArmyStompVibe`) is 4 members — Drummer/Bassist/Keys/FX — with ~0.2-0.4 handoff weights, lower weights into Drummer (drums rarely take the lead).
 
 ### `TensionProfile` (build-and-release arc)
 
@@ -357,7 +382,7 @@ Optional but recommended — adds a Markov section graph on top of the vibe.
   - `transitions`: list of `SectionTransition(targetIndex, weight, transitionBars)`. Empty = terminal. **`transitionBars`** (default 0 = hard cut) crossfades the macro overrides toward the destination over the *last* N bars of the source section — a per-edge pre-roll ramp. `DogHouseVibe` leans on this (`bluesLiftBars`/`bluesyDropBars`/`bigBluesLiftBars`); name the bar count after the musical role the ramp serves, not the count.
   - `recencyDecay`: penalizes recently-used transitions (0.4-0.6 is healthy).
   - `macroOverrides`: `MacroOverrides(energy, complexity, space, mood)` — **multipliers** (1.0 = no change, 1.4 = 40% boost). Use `null` to leave the default.
-  - `soloMode`: `SoloMode.Jam(probability)`, `SoloMode.LickBuilder(probability, mutationRate)`, or `SoloMode.LongFill` — these take constructor params, they aren't bare objects.
+  - `soloMode`: `SoloMode.Jam(probability)`, `SoloMode.LickBuilder(probability, mutationRate)`, or `SoloMode.LongFill` — these take constructor params, they aren't bare objects. **Setting any of them requires `Vibe.band`** (see the `Band` section above); without one the engine never starts the solo, and `Vibe`'s init now rejects the combination.
   - `compingStyle` / `compingInversion` / `compingHumanization` / `chordFollow`: per-section overrides applied to **all** CHORDAL/melodic tracks at once.
   - `trackOverrides`: `Map<Int, TrackSectionOverride>` — per-*track* overrides scoped to this section, auto-restored on exit. This is how you pedal one track's hook on the tonic while everything else follows the progression (the octave-fold fix): `trackOverrides = mapOf(4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED))`. `TrackSectionOverride` can also override density/volume/morph/sends/`envelopeProfile`/comping per section. Two carry rules worth knowing:
     - **`density`**: `0` takes the track OUT for the section (clean mute, any role, restored on exit). A *positive* value regenerates the pattern at that density at the boundary, thinning fills and ghosts — but only on tracks whose pattern is generated from density, so on a `Chordal` track or one playing a `LickMode.Fill`/`Squash` figure a positive density does nothing while `0` still mutes. To duck rather than drop, use `volume`.
@@ -365,7 +390,7 @@ Optional but recommended — adds a Markov section graph on top of the vibe.
   - `customProgression` / `chordsPerBar` / `bpmMultiplier`: per-section harmony plus a tempo multiplier (`0.5` = half-time breakdown, `2.0` = double-time burst).
 - `introIndex`: which section opens (default 0; `null` = random weighted start). `outroIndex`: which terminates (`null` = loops forever).
 - `lengthSeconds` (default `150..240`): the song's auto-end window; both bounds must be in `15..1800`.
-- Use the `Arrangement.SIMPLE`, `WITH_SOLOS`, `FULL`, `JAM` presets for quick starts.
+- There are no arrangement presets — write the sections out. Copy the shape from a shipped vibe whose form you want; `RustBeltVibe` is a worked eight-section example.
 
 A typical 5-section arrangement: intro -> verse/groove -> chorus/peak -> solo -> breakdown -> outro. Use macroOverrides to distinguish (chorus: energy=1.3, complexity=1.3; breakdown: energy=0.4, space=1.5).
 
@@ -577,6 +602,8 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
 
 - **"Vibe requires exactly 8 tracks"** runtime error: count your `TrackVoice` entries. For silent placeholders, set `density = 0.0f` on the `TrackVoice` and `volume = 0.0f` inside both `OrpheusEngine` slots.
 - **"Row 'X' has N values, expected M"**: your `bandMatrix` or `chordMatrix` row length does not match the number of members/degrees. `bandMatrix` is NxN where N = number of rows; `chordMatrix` is fixed 7x7.
+- **"section(s) [...] declare a soloMode but Vibe.band is null"**: set `band` (start with `BandPresets.quartet(...)`) or drop the `soloMode` from the named sections. A solo is the band passing a lead around; with no band there is nobody to pass it to.
+- **The solo section sounds like every other section**: the vibe has a band, but the only members that could lead are `alwaysActive`, or their tracks are all `Chordal`/`Percussive` (a `Jam` lead must own a `Melodic`-role track), or the section `density = 0f`s the soloist. See the `Band` section.
 - **"customProgression degrees must be 0..6"**: use 0 (I) through 6 (VII). Do not use negative numbers or values >= 7.
 - **Vibe does not show up in the picker**: verify the `@Inject` + `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())` annotations are both present and the class implements `VibeProvider`. Also rebuild — Metro DI code generation requires a recompile.
 - **Bass wanders off-key**: `chordFollow = ROOT_ONLY` on the bass track snaps it to the chord root. Most driving grooves want this.

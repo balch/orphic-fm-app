@@ -833,8 +833,16 @@ static constexpr float kBassSlapDuration = 0.15f;
 // (a sparse bass solo turning into a loud constant 16th-slap line), it (1) strips any
 // slap inserted by a prior pass before re-inserting, and (2) uses max-toward-floor
 // accents instead of additive boosts so accented beats settle at a fixed level.
+//
+// preserve_authored_velocity SKIPS the accent floors, for a hook-driven jam lead whose
+// dynamics an author wrote. The floors give shape to a line that has none, and a generated
+// one already clears them (generate_jam_solo_line emits 0.90/0.72); on a written contour
+// they only flatten — quiet notes lift to the floor, loud ones stay, so a diminuendo
+// inverts and the jam's deliberately-under ornaments come up level with the hook. Slaps
+// still go in: they land on rests, so they articulate without rewriting a velocity.
 inline void articulate_bass_solo(PulsarStep* steps, int step_count,
-                                 float slap_density, uint32_t& seed) {
+                                 float slap_density, uint32_t& seed,
+                                 bool preserve_authored_velocity = false) {
     if (step_count <= 0) return;
     // (1) Strip slaps inserted by a previous pass (gated off-beat steps carrying the
     // slap signature) so re-articulating a non-regenerated buffer can't accumulate.
@@ -852,8 +860,10 @@ inline void articulate_bass_solo(PulsarStep* steps, int step_count,
             // (2) Beat-position accents as idempotent floors (max, not additive): strong
             // on the quarter (i%4==0), medium on the eighth (i%2==0). max() preserves
             // already-louder source notes and never creeps past the floor on repeats.
-            if (i % 4 == 0)      steps[i].velocity = std::max(steps[i].velocity, 0.85f);
-            else if (i % 2 == 0) steps[i].velocity = std::max(steps[i].velocity, 0.70f);
+            if (!preserve_authored_velocity) {
+                if (i % 4 == 0)      steps[i].velocity = std::max(steps[i].velocity, 0.85f);
+                else if (i % 2 == 0) steps[i].velocity = std::max(steps[i].velocity, 0.70f);
+            }
         } else if ((i % 2) == 1 && slap_density > 0.0f) {
             // Empty off-beat: sparse slap ghost.
             if (pattern_rand01(seed) < slap_density * 0.5f) {

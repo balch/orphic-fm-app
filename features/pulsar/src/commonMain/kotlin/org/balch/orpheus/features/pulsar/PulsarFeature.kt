@@ -1666,9 +1666,11 @@ class PulsarViewModel(
      *   10=rest_probability, 11=hold_probability, 12=density_curve_min,
      *   13=density_curve_max, 14=chromatic_passing
      *
-     * track_ducking[t * 6 + field]:
+     * track_ducking[t * DuckingProfile.WIRE_FIELDS + field]:
      *   0=volume_reduction, 1=density_reduction, 2=ghost_reduction,
-     *   3=fill_suppression, 4=simplify (0/1), 5=reverb_boost
+     *   3=fill_suppression, 4=simplify (0/1), 5=reverb_boost,
+     *   6=declared (0 = the vibe authored no profile, so the engine keeps its own duck
+     *     constants and ignores slots 0-5; all-zero values are a real "do not duck me")
      *
      * track_solo_markov[t * 15 + i] = intervalWeights[i]
      *
@@ -2068,9 +2070,10 @@ class PulsarViewModel(
                 )
             }
 
-            // Ducking profile
+            // Ducking profile. Slot 6 gates slots 0-5: without an authored profile the
+            // engine keeps its own duck constants, so these values stay inert.
             val ducking = tv.duckingProfile ?: defaultDuckingProfile(tv.envelopeProfile)
-            val duckBase = t * 6
+            val duckBase = t * DuckingProfile.WIRE_FIELDS
             fun setDuck(field: Int, v: Float) =
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "track_ducking_${duckBase + field}"),
@@ -2082,7 +2085,10 @@ class PulsarViewModel(
             setDuck(3, ducking.fillSuppression)
             setDuck(4, if (ducking.simplify) 1f else 0f)
             setDuck(5, ducking.reverbBoost)
+            setDuck(6, if (tv.duckingProfile != null) 1f else 0f)
         }
+        // No trailing zero-fill needed: Vibe.init requires exactly 8 tracks, so this loop
+        // rewrites every row of all three banks and no previous vibe's row can survive.
 
         // Void Anomaly config bank (absent => probability 0 = auto-firing disabled).
         val va = vibe.anomalies.filterIsInstance<VoidAnomaly>().firstOrNull()
@@ -2297,21 +2303,30 @@ class PulsarViewModel(
         )
     }
 
+    // Value slots for a track that authored no profile. Inert — the declared flag is 0, so
+    // the engine keeps its own duck constants. Every field is spelled out rather than
+    // inherited so correcting DuckingProfile's defaults could not silently move this table.
     private fun defaultDuckingProfile(profile: EnvelopeProfile): DuckingProfile = when (profile) {
         EnvelopeProfile.RHYTHM -> DuckingProfile(
             volumeReduction = 0.2f, densityReduction = 0.5f,
             ghostReduction = 0.7f, fillSuppression = 0.9f,
+            simplify = true, reverbBoost = 0.1f,
         )
-        EnvelopeProfile.MELODIC -> DuckingProfile()
+        EnvelopeProfile.MELODIC, EnvelopeProfile.DRONE -> DuckingProfile(
+            volumeReduction = 0.3f, densityReduction = 0.4f,
+            ghostReduction = 0.5f, fillSuppression = 0.8f,
+            simplify = true, reverbBoost = 0.1f,
+        )
         EnvelopeProfile.EFFECT -> DuckingProfile(
             volumeReduction = 0.4f, densityReduction = 0.6f,
-            reverbBoost = 0.15f, simplify = false,
+            ghostReduction = 0.5f, fillSuppression = 0.8f,
+            simplify = false, reverbBoost = 0.15f,
         )
         EnvelopeProfile.WILD -> DuckingProfile(
             volumeReduction = 0.5f, densityReduction = 0.7f,
-            fillSuppression = 0.95f,
+            ghostReduction = 0.5f, fillSuppression = 0.95f,
+            simplify = true, reverbBoost = 0.1f,
         )
-        EnvelopeProfile.DRONE -> DuckingProfile()
     }
 
     private fun compingStyleOrSentinel(s: CompingStyle?): Float =

@@ -268,7 +268,7 @@ static void push_two_section_ab_arrangement(OrpheusEngine* engine,
 
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
-    for (int i = 0; i < 8 * 6; i++)
+    for (int i = 0; i < kNumPulsarTracks * kTrackDuckingFields; i++)
         engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);

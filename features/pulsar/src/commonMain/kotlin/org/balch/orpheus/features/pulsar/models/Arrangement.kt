@@ -262,13 +262,9 @@ data class Section(
 
 /**
  * Section-based song structure. Sections transition between each other using
- * weighted Markov chains, creating organic song forms.
- *
- * Use the built-in presets to get started:
- * - `Arrangement.SIMPLE` — groove ↔ variation (2 sections)
- * - `Arrangement.WITH_SOLOS` — groove → solo → build (3 sections)
- * - `Arrangement.FULL` — intro → verse → chorus → solo → breakdown → outro (6 sections)
- * - `Arrangement.JAM` — groove ↔ improv with IMPROVISERS solos (2 sections, open-ended)
+ * weighted Markov chains, creating organic song forms. Every shipped vibe writes
+ * its own sections; there are no arrangement presets. A section carrying a
+ * [SoloMode] also needs a [Vibe.band] — see [BandPresets] for ready-made ones.
  *
  * @param sections Up to 8 sections.
  * @param introIndex Which section to start with (default 0; pass null for random weighted choice).

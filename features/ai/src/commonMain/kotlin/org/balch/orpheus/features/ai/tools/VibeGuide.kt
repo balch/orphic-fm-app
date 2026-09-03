@@ -25,6 +25,24 @@ internal object VibeGuideExamples {
     /** Polymorphic `compingStyle` object form (NOT a bare enum string). */
     const val COMPING_STYLE_EXAMPLE: String =
         """{ "type": "org.balch.orpheus.features.pulsar.models.CompingStyle.FUNK_STABS" }"""
+
+    /**
+     * A complete working `band` — the one any section with a `soloMode` must have. Values mirror
+     * `BandPresets.quartet(kit = [0,1,2,7], bass = [3], lead = [5], colour = [4,6])`, the dev-side
+     * preset, so the agent and a Kotlin author get the same cast; [VibeGuideExamplesTest] asserts
+     * the two stay equal.
+     */
+    const val MINIMUM_BAND: String = """{
+  "members": [
+    { "name": "Drummer", "tracks": [0, 1, 2, 7], "alwaysActive": true, "loudness": 0.7, "creativity": 0.3 },
+    { "name": "Bassist", "tracks": [3], "loudness": 0.8, "creativity": 0.5 },
+    { "name": "Lead", "tracks": [5], "loudness": 0.65, "creativity": 0.6 },
+    { "name": "Colour", "tracks": [4, 6], "loudness": 0.4, "creativity": 0.7 }
+  ],
+  "handoffMatrix": [0.0, 0.3, 0.45, 0.1,  0.2, 0.0, 0.5, 0.15,  0.15, 0.4, 0.0, 0.25,  0.1, 0.3, 0.45, 0.0],
+  "pullInMatrix":  [0.0, 0.3, 0.25, 0.1,  0.25, 0.0, 0.4, 0.15,  0.2, 0.4, 0.0, 0.2,  0.1, 0.25, 0.3, 0.0],
+  "barsPerLeadMin": 4, "barsPerLeadMax": 8
+}"""
 }
 
 /**
@@ -133,6 +151,33 @@ on verse→chorus (build-up anticipation). Name the bar count after its musical 
 
 soloMode on a section activates the band's soloist: Jam(probability) for free improvisation,
 LickBuilder(probability, mutationRate) for melodic construction, LongFill for extended fills.
+
+A soloMode DOES NOTHING WITHOUT A BAND. The engine starts a section solo only when the vibe's
+top-level `band` field is set; with no band the solo never starts and the section plays as an
+ordinary one. The vibe is rejected outright if any section sets soloMode while `band` is null, so
+copy this working four-piece and re-point the track lists at your own layout — kit tracks in
+"Drummer", the bass in "Bassist", the melodic lead in "Lead", pads/comping in "Colour":
+
+"band": ${VibeGuideExamples.MINIMUM_BAND}
+
+The matrices are row-major NxN over the members, in the order they are listed: handoffMatrix[i][j]
+is how likely member i is to pass the lead to member j, pullInMatrix[i][j] how likely i is to pull
+j in as a duet partner. Keep the diagonal at 0 (nobody hands to themselves). Three casts cover
+nearly everything: the four-piece above (one star lead); a two-front-line version where the last
+two members trade at ~0.6 with each other and ~0.3 with the bass (the "trading leads" shape); and
+a sparse ambient version — one alwaysActive bed member plus two voices trading at ~0.85.
+
+Three traps make a band look present but do nothing:
+- ONLY A Melodic-ROLE TRACK CAN LEAD A Jam. A Jam renders an improvised melodic line, so the lead
+  member must own at least one track whose role is Melodic. A melodic-sounding ENGINE is
+  irrelevant — an organ on a Chordal track cannot lead a jam. Check the role, not the engine id.
+  (LongFill and LickBuilder are not filtered this way; only Jam.)
+- TWO MEMBERS IS NOT A BAND. The engine refuses to hand the lead to an alwaysActive member, so an
+  anchor plus one voice deadlocks. Always give a band at least two non-alwaysActive members.
+- DO NOT "density": 0 A WOULD-BE SOLOIST. In a section that declares a soloMode, zeroing a melodic
+  track mutes it for the whole section and the solo system does not lift it, so that member's solo
+  is silent whenever it wins the lead. Thin it to 0.1-0.3 instead of taking it out.
+Also give every track an owner: a track in no member gets the full support duck during a solo.
 
 To peg a lead voice on the tonic while other tracks follow the progression — and as the standard
 fix when a lick lurches on leaping progressions — use trackOverrides keyed by the track index as a
@@ -291,6 +336,10 @@ The highest-value part: translate a described feel into concrete parameter choic
 - There are exactly 8 tracks. Do not add or remove tracks.
 - Progression / customProgression degrees are 0..6 (seven scale degrees).
 - Band matrices are square; chordTransitionMatrix is 7x7.
+- Any section with a soloMode requires a top-level `band` — see section 7 for a working one to
+  copy. "section(s) [...] declare a soloMode but Vibe.band is null" means you skipped it.
+- A `band` must list at least one member (rejected otherwise), and at least two of them should NOT
+  be alwaysActive or the handoff has nowhere to go.
 - Bass should use chordFollow = ROOT_ONLY to stay in key (don't let it chase chord tones out of key).
 - Use FIXED chordFollow sparingly on melodic/chordal tracks — it pins a track off the chord progression; most tracks want FOLLOW.
 - For DX/DX2/DX3, set 'harmonics' deliberately (it picks a patch bank, see section 4).

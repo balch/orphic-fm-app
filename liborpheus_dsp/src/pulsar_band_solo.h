@@ -16,6 +16,13 @@
 // - Always-active members (e.g. drums) simplify but never fully duck
 // ---------------------------------------------------------------------------
 
+// EAR TUNE: how often a soloist handoff is punctuated by a kit fill. The pass is
+// an event, so the answer is probabilistic — every time would read as a tic.
+inline constexpr float kHandoffFillChance = 0.6f;
+// EAR TUNE: how far the kit sheds its duck for that bar, in solo_fill_mod units.
+// 0.45 fully clears the -0.15/-0.2 support ducks, so the fill plays at full density.
+inline constexpr float kHandoffFillDepth = 0.45f;
+
 // ── Select initial lead member (weighted random, prefer non-always-active) ──
 
 // True if member m owns at least one MELODIC track — i.e. it can host a JAM solo
@@ -148,11 +155,37 @@ inline int select_next_lead(
 
 // ── Apply band solo modifiers to per-track state ─────────────────────
 
+// The duck a fully-ducked track takes when its vibe authored no DuckingProfile.
+// These are the values every band vibe has always used, expressed as REDUCTIONS to
+// match the Kotlin sign convention. Kotlin mirrors them as DuckingProfile's defaults.
+inline constexpr float kUnauthoredDuckVolume  = 0.18f;
+inline constexpr float kUnauthoredDuckDensity = 0.2f;
+inline constexpr float kUnauthoredDuckGhost   = 0.35f;
+inline constexpr float kUnauthoredDuckFill    = 0.35f;
+inline constexpr float kUnauthoredDuckReverb  = 0.1f;
+
+// Standard ducking for one track: authored profile if the vibe declared one, else the
+// constants above. Kotlin authors REDUCTIONS, the mods are signed offsets, so the
+// whole set flips sign. `dp == nullptr` means the caller has no bank at all.
+// Only solo_density_mod, solo_simplify and solo_fill_mod reach the render today;
+// volume/ghost/reverb are set here and read by nothing (DuckingProfile's KDoc says so).
+inline void apply_duck_modifiers(PulsarTrackState& ts, const DuckingParam* dp) {
+    const bool authored = (dp != nullptr && dp->declared);
+    ts.is_soloist       = false;
+    ts.solo_volume_mod  = -(authored ? dp->volume_reduction  : kUnauthoredDuckVolume);
+    ts.solo_density_mod = -(authored ? dp->density_reduction : kUnauthoredDuckDensity);
+    ts.solo_ghost_mod   = -(authored ? dp->ghost_reduction   : kUnauthoredDuckGhost);
+    ts.solo_fill_mod    = -(authored ? dp->fill_suppression  : kUnauthoredDuckFill);
+    ts.solo_simplify    =  (authored ? dp->simplify          : true);
+    ts.solo_reverb_mod  =  (authored ? dp->reverb_boost      : kUnauthoredDuckReverb);
+}
+
 inline void apply_band_solo_modifiers(
     PulsarTrackState* tracks,
     const BandSoloConfigParam& config,
     const BandSoloState& state,
-    int num_tracks = kNumPulsarTracks
+    int num_tracks = kNumPulsarTracks,
+    const DuckingParam* track_ducking = nullptr   // kNumPulsarTracks entries, or nullptr
 ) {
     // Build track-to-member lookup (-1 = not in any member)
     int track_member[kNumPulsarTracks];
@@ -169,16 +202,11 @@ inline void apply_band_solo_modifiers(
 
     for (int t = 0; t < num_tracks; t++) {
         int m = track_member[t];
+        const DuckingParam* dp = track_ducking ? &track_ducking[t] : nullptr;
 
         if (m < 0) {
             // Track not in any member: standard ducking
-            tracks[t].is_soloist = false;
-            tracks[t].solo_volume_mod = -0.18f;
-            tracks[t].solo_density_mod = -0.2f;
-            tracks[t].solo_ghost_mod = -0.35f;
-            tracks[t].solo_fill_mod = -0.35f;
-            tracks[t].solo_simplify = true;
-            tracks[t].solo_reverb_mod = 0.1f;
+            apply_duck_modifiers(tracks[t], dp);
             continue;
         }
 
@@ -210,7 +238,9 @@ inline void apply_band_solo_modifiers(
 
             case MemberSoloRole::SUPPORT:
                 if (always_active) {
-                    // Always-active support: simplify but no volume duck
+                    // Always-active support: simplify but no volume duck. Deliberately
+                    // NOT profile-driven — "the kit never fully steps back" is a band
+                    // rule, and an authored per-track duck must not undo it.
                     tracks[t].is_soloist = false;
                     tracks[t].solo_volume_mod = 0.0f;
                     tracks[t].solo_density_mod = -0.15f;
@@ -220,13 +250,7 @@ inline void apply_band_solo_modifiers(
                     tracks[t].solo_reverb_mod = 0.0f;
                 } else {
                     // Standard ducking for non-always-active support
-                    tracks[t].is_soloist = false;
-                    tracks[t].solo_volume_mod = -0.18f;
-                    tracks[t].solo_density_mod = -0.2f;
-                    tracks[t].solo_ghost_mod = -0.35f;
-                    tracks[t].solo_fill_mod = -0.35f;
-                    tracks[t].solo_simplify = true;
-                    tracks[t].solo_reverb_mod = 0.1f;
+                    apply_duck_modifiers(tracks[t], dp);
                 }
                 break;
         }
@@ -241,7 +265,8 @@ inline void start_band_solo(
     const SectionParam& section,
     PulsarTrackState* tracks,
     uint32_t& seed,
-    int num_tracks = kNumPulsarTracks
+    int num_tracks = kNumPulsarTracks,
+    const DuckingParam* track_ducking = nullptr   // per-track authored duck, or nullptr
 ) {
     if (section.solo_mode == SoloModeId::NONE) {
         state.active = false;
@@ -266,6 +291,7 @@ inline void start_band_solo(
     state.solo_lick_octave = -1;
     state.outgoing_last_note = -1;
     state.just_handed_off = false;
+    state.bars_elapsed = 0;
 
     // JAM solos render an improvised melodic LINE, so the lead must own a melodic
     // track; a chordal-only member would no-op into a dead solo. Filter it out.
@@ -304,7 +330,7 @@ inline void start_band_solo(
         }
     }
 
-    apply_band_solo_modifiers(tracks, config, state, num_tracks);
+    apply_band_solo_modifiers(tracks, config, state, num_tracks, track_ducking);
 }
 
 // ── Advance band solo with SoloMode-aware dispatch ──────────────────
@@ -315,13 +341,18 @@ inline void advance_band_solo(
     const SectionParam& section,
     PulsarTrackState* tracks,
     uint32_t& seed,
-    int num_tracks = kNumPulsarTracks
+    int num_tracks = kNumPulsarTracks,
+    const DuckingParam* track_ducking = nullptr   // per-track authored duck, or nullptr
 ) {
     if (!state.active) return;
 
     // Clear the per-bar handoff flag; the expiry block below sets it if a
     // handoff happens THIS bar. The cpp render reads it AFTER this call.
     state.just_handed_off = false;
+
+    // Bars this solo has run, section-wide. Feeds jam_solo_progress() so a jam
+    // builds across its section instead of re-arcing at every handoff.
+    state.bars_elapsed++;
 
     for (int m = 0; m < config.member_count; m++) {
         state.bars_since_lead[m]++;
@@ -442,7 +473,20 @@ inline void advance_band_solo(
         state.just_handed_off = true;
     }
 
-    apply_band_solo_modifiers(tracks, config, state, num_tracks);
+    apply_band_solo_modifiers(tracks, config, state, num_tracks, track_ducking);
+
+    // Handoff punctuation: on the bar the solo passes, the kit answers with a fill.
+    // Rolled ONCE per handoff and written into solo_fill_mod, which the call above
+    // rewrites every bar — so the arming is inherently one bar long. PERCUSSIVE
+    // non-soloists only: the fill is the band answering the pass, not the incoming
+    // soloist filling over its own entrance.
+    if (state.just_handed_off && pattern_rand01(seed) < kHandoffFillChance) {
+        for (int t = 0; t < num_tracks; t++) {
+            if (tracks[t].role != TrackRole::PERCUSSIVE || tracks[t].is_soloist) continue;
+            if (tracks[t].solo_fill_mod < kHandoffFillDepth)
+                tracks[t].solo_fill_mod = kHandoffFillDepth;
+        }
+    }
 }
 
 // ── Clear band solo state and modifiers ──────────────────────────────
@@ -467,6 +511,7 @@ inline void clear_band_solo(
     state.solo_lick_octave = -1;
     state.outgoing_last_note = -1;
     state.just_handed_off = false;
+    state.bars_elapsed = 0;
 
     clear_solo_modifiers(tracks, num_tracks);
 }

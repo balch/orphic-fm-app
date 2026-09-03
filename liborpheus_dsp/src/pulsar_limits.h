@@ -39,6 +39,13 @@ static constexpr int kSectionDataFields = 26;   // pulsar_section_data, pulsar_s
 static constexpr int kSectionProgressionSlots = 12;  // degrees + glides
 static constexpr int kSectionCompingHumanFields = 4;
 
+// Per-track stride of pulsar_track_ducking: the six DuckingProfile fields plus a
+// trailing declared flag. The flag is what keeps a track whose vibe authored no
+// profile on the engine's own duck constants — all-zero values are a legitimate
+// "do not duck me", so they cannot double as "the author said nothing".
+// Kotlin: DuckingProfile.WIRE_FIELDS (pinned in PulsarSectionLimitsTest).
+static constexpr int kTrackDuckingFields = 7;
+
 // The transition unpack in orpheus_unit_pulsar.cpp indexes by kMaxSectionTransitions,
 // so the array must be at least that wide per section. Catches the case where someone
 // raises kMaxSectionTransitions past the reserved stride.

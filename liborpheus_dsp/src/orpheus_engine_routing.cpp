@@ -1267,7 +1267,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strncmp(symbol, "track_ducking_", 14) == 0) {
             int idx = std::atoi(symbol + 14);
-            if (idx >= 0 && idx < 8 * 6)
+            if (idx >= 0 && idx < kNumPulsarTracks * kTrackDuckingFields)
                 engine->pulsar_track_ducking[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "track_solo_markov_", 18) == 0) {
@@ -1305,8 +1305,6 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < 64)
                 engine->pulsar_band_pull_in_matrix[idx].store(value, std::memory_order_relaxed);
         }
-        else if (std::strcmp(symbol, "band_improv_carryover") == 0)
-            engine->pulsar_band_improv_carryover.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "band_probability") == 0)
             engine->pulsar_band_probability.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "band_bars_per_lead_min") == 0)

@@ -11,6 +11,7 @@ import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.BandPresets
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -1067,7 +1068,14 @@ public class MellowHazeVibe : VibeProvider {
         bassLine = null,
         bassLineMutation = 0.5f,
         bassLineOctave = -1,
-        band = null,
+        // The jam's Jam solo needs a cast to hand around; without one the engine never starts it.
+        // Melodic voices are the hook bass (3) and the lead (5) — they trade; the string pads comp.
+        band = BandPresets.quartet(
+          kit = listOf(0, 1, 2, 7),
+          bass = listOf(3),
+          lead = listOf(5),
+          colour = listOf(4, 6),
+        ),
         seed = 0,
         bpm = 76.0f,
         envelopeType = EnvelopeType.BLEND,

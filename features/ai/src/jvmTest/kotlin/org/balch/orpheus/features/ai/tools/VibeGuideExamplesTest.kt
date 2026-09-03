@@ -1,6 +1,8 @@
 package org.balch.orpheus.features.ai.tools
 
 import kotlinx.serialization.decodeFromString
+import org.balch.orpheus.features.pulsar.models.Band
+import org.balch.orpheus.features.pulsar.models.BandPresets
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.ChordStep
 import org.balch.orpheus.features.pulsar.models.CompingStyle
@@ -59,6 +61,35 @@ class VibeGuideExamplesTest {
     fun `compingStyle example decodes to the polymorphic FUNK_STABS subtype`() {
         val style = vibeApplyJson.decodeFromString<CompingStyle>(VibeGuideExamples.COMPING_STYLE_EXAMPLE)
         assertEquals(CompingStyle.FUNK_STABS, style)
+    }
+
+    @Test
+    fun `minimum-band example decodes to exactly the quartet preset a Kotlin author would use`() {
+        // The agent and the dev-side skill must hand out the SAME cast, or the two surfaces drift
+        // and only one of them teaches a band that actually solos.
+        val band = vibeApplyJson.decodeFromString<Band>(VibeGuideExamples.MINIMUM_BAND)
+        assertEquals(
+            BandPresets.quartet(
+                kit = listOf(0, 1, 2, 7), bass = listOf(3), lead = listOf(5), colour = listOf(4, 6),
+            ),
+            band,
+        )
+    }
+
+    @Test
+    fun `STATIC_GUIDE teaches that a soloMode needs a band, and ships one to copy`() {
+        assertTrue(
+            STATIC_GUIDE.contains(VibeGuideExamples.MINIMUM_BAND),
+            "guide dropped the minimum-band example, so the agent has nothing to copy",
+        )
+        assertTrue(
+            STATIC_GUIDE.contains("DOES NOTHING WITHOUT A BAND"),
+            "guide no longer states that a soloMode is inert without a band",
+        )
+        assertTrue(
+            STATIC_GUIDE.contains("ONLY A Melodic-ROLE TRACK CAN LEAD A Jam"),
+            "guide no longer warns that a chordal member cannot lead a jam",
+        )
     }
 
     @Test

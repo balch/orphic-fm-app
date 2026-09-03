@@ -119,6 +119,7 @@ inline void init_section_state(SectionState& state, const ArrangementParams& arr
     }
 
     state.bars_remaining = randomize_section_bars(arr.sections[state.current_section], seed);
+    state.bars_total = state.bars_remaining;
     plan_next_section(state, arr, seed);
 }
 
@@ -192,6 +193,7 @@ inline bool advance_section(
     state.next_space        = -1.0f;
     state.next_mood         = -1.0f;
     state.bars_remaining = randomize_section_bars(arr.sections[next], seed);
+    state.bars_total = state.bars_remaining;
 
     if (!state.intro_done && next != arr.intro_index) {
         state.intro_done = true;

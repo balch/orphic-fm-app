@@ -939,7 +939,8 @@ static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, ui
 static void start_section_solo(PulsarState* state, OrpheusEngine* engine,
                                const SectionParam& sec) {
     start_band_solo(state->band_solo_state, state->band_solo_config,
-                    sec, state->tracks, state->mutation_seed);
+                    sec, state->tracks, state->mutation_seed,
+                    kNumPulsarTracks, state->track_ducking);
     if (sec.solo_mode != SoloModeId::LICK_BUILDER) return;
 
     int lead = state->band_solo_state.lead_member;
@@ -1809,9 +1810,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     engine->pulsar_track_envelope[t].load(std::memory_order_relaxed));
         }
 
-        // Unpack per-track ducking (6 floats per track)
+        // Unpack per-track ducking (kTrackDuckingFields floats per track). Slot 6 is the
+        // declared flag; with it clear the band solo path ignores slots 0-5 entirely.
         for (int t = 0; t < kNumPulsarTracks; t++) {
-            int db = t * 6;
+            int db = t * kTrackDuckingFields;
             DuckingParam& dp = state->track_ducking[t];
             dp.volume_reduction  = engine->pulsar_track_ducking[db + 0].load(std::memory_order_relaxed);
             dp.density_reduction = engine->pulsar_track_ducking[db + 1].load(std::memory_order_relaxed);
@@ -1819,6 +1821,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             dp.fill_suppression  = engine->pulsar_track_ducking[db + 3].load(std::memory_order_relaxed);
             dp.simplify          = engine->pulsar_track_ducking[db + 4].load(std::memory_order_relaxed) > 0.5f;
             dp.reverb_boost      = engine->pulsar_track_ducking[db + 5].load(std::memory_order_relaxed);
+            dp.declared          = engine->pulsar_track_ducking[db + 6].load(std::memory_order_relaxed) > 0.5f;
         }
 
         // Initialize section state machine
@@ -1930,7 +1933,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             pack_band_matrix(bc.pull_in_matrix, pi_src, N);
             bc.pull_in_bars_min = engine->pulsar_band_pull_in_bars_min.load(std::memory_order_relaxed);
             bc.pull_in_bars_max = engine->pulsar_band_pull_in_bars_max.load(std::memory_order_relaxed);
-            bc.improv_carryover = engine->pulsar_band_improv_carryover.load(std::memory_order_relaxed);
             bc.probability = engine->pulsar_band_probability.load(std::memory_order_relaxed);
             bc.bars_per_lead_min = engine->pulsar_band_bars_per_lead_min.load(std::memory_order_relaxed);
             bc.bars_per_lead_max = engine->pulsar_band_bars_per_lead_max.load(std::memory_order_relaxed);
@@ -3443,7 +3445,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         int cur_sec = state->section_state.current_section;
                         const SectionParam& sec_adv = state->arrangement.sections[cur_sec];
                         advance_band_solo(state->band_solo_state, state->band_solo_config,
-                                          sec_adv, state->tracks, state->mutation_seed);
+                                          sec_adv, state->tracks, state->mutation_seed,
+                                          kNumPulsarTracks, state->track_ducking);
                         // Slew smoothed volume/density mods toward freshly-written targets
                         // so solo handoffs resolve over a few bars (2-3 at typical mod
                         // magnitudes, via kSoloModSlew) instead of snapping.
@@ -3455,6 +3458,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 slew_toward(state->tracks[st].solo_density_mod_current,
                                             state->tracks[st].solo_density_mod, kSoloModSlew);
                         }
+                        // Set when the bass leads a JAM off its own authored hook, so the
+                        // articulation pass below leaves the written velocities alone.
+                        bool bass_solo_authored = false;
                         // JAM free improv: generate the lead's chord-anchored line + carryover.
                         // Mutually exclusive with the LickBuilder live-lick block below:
                         // only one of JAM or LICK_BUILDER writes the lead's steps per bar.
@@ -3472,8 +3478,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             }
                             if (mt >= 0) {
                                 if (state->band_solo_state.just_handed_off) {
-                                    constexpr float kImprovCarryover = 0.7f;
-                                    improvisers_handoff(state->band_solo_state, kImprovCarryover,
+                                    // The section's authored Jam lickInfluence IS the carryover:
+                                    // 0 = the incoming soloist ignores the outgoing phrase,
+                                    // 1 = inherits it as strongly as the blend allows.
+                                    improvisers_handoff(state->band_solo_state,
+                                                        clamp01(sec_adv.solo_lick_influence),
                                                         state->track_solo_behavior[mt],
                                                         state->mutation_seed);
                                     state->band_solo_state.phrase_cursor = 0;
@@ -3482,19 +3491,75 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 }
                                 const PulsarScale& sc = kPulsarScales[live_scale];
                                 int cd = state->chord_state.progression[state->chord_state.chord_index];
+                                PulsarTrackState& lts = state->tracks[mt];
+                                // Register for the GENERATED notes: the track's authored
+                                // range wins, then the genre's; fit_jam_note_to_range's
+                                // 24..96 backstop covers a vibe that authors neither.
+                                int jam_nr_low  = engine->pulsar_track_note_range_low[mt].load(
+                                    std::memory_order_relaxed);
+                                int jam_nr_high = engine->pulsar_track_note_range_high[mt].load(
+                                    std::memory_order_relaxed);
+                                if (jam_nr_low <= 0) jam_nr_low = engine->pulsar_genre_note_range_low.load(
+                                    std::memory_order_relaxed);
+                                if (jam_nr_high <= 0) jam_nr_high = engine->pulsar_genre_note_range_high.load(
+                                    std::memory_order_relaxed);
+                                // A lick-driven lead's hook IS the vibe, so ornament it rather
+                                // than overwrite it. Same (channel length + lick mode) pair that
+                                // drives the LickMode::FILL render at load; mt is already MELODIC.
+                                LickMode mt_lick_mode = static_cast<LickMode>(
+                                    engine->pulsar_track_lick_mode[mt].load(std::memory_order_relaxed));
+                                LickChannel mt_ch = track_lick_channel(state, engine, mt);
+                                bool hook_driven = (mt_ch.length > 0 && mt_lick_mode != LickMode::NONE);
+                                bass_solo_authored = hook_driven && (mt == kBassTrack);
+                                if (hook_driven) {
+                                    // Re-render the bare hook (load/déjà-vu recipe + seed) so last
+                                    // bar's ornaments can't compound into the riff. GENRE range, as
+                                    // the load path passed — a different one moves lick_octave_base.
+                                    float mt_mut = state->in_spurt
+                                        ? std::min(1.0f, mt_ch.mutation * 3.0f) : mt_ch.mutation;
+                                    render_lick_into_track(
+                                        lts, mt, mt_ch.lick, mt_ch.length, mt_mut,
+                                        static_cast<uint8_t>(live_root), sc,
+                                        state->seed_counter * 2654435761u,
+                                        lts.bar_strategy, lts.step_count, mt_ch.octave,
+                                        static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(
+                                            std::memory_order_relaxed)),
+                                        static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(
+                                            std::memory_order_relaxed)),
+                                        mt_ch.loop_length,
+                                        engine->pulsar_track_lick_degree_offset[mt].load(
+                                            std::memory_order_relaxed));
+                                }
                                 // Render around the lead track's current register.
                                 int octave = 5;
-                                for (int s = 0; s < state->tracks[mt].step_count; s++)
-                                    if (state->tracks[mt].steps[s].gate) {
-                                        octave = (state->tracks[mt].steps[s].note - static_cast<int>(live_root)) / 12;
+                                for (int s = 0; s < lts.step_count; s++)
+                                    if (lts.steps[s].gate) {
+                                        octave = (lts.steps[s].note - static_cast<int>(live_root)) / 12;
                                         break;
                                     }
-                                generate_jam_solo_line(
-                                    state->track_solo_behavior[mt], state->band_solo_state,
-                                    state->tracks[mt].steps, state->tracks[mt].step_count,
-                                    static_cast<int>(live_root), sc, cd, octave,
-                                    state->track_solo_behavior[mt].markov_current_degree,
-                                    state->tension_intensity, state->mutation_seed);
+                                // Build: bars elapsed in this solo over the section's span.
+                                // tension_intensity used to sit here, but that is the
+                                // per-phrase LFO — it made bar 1 and bar 32 identical.
+                                float jam_progress = jam_solo_progress(
+                                    state->band_solo_state.bars_elapsed,
+                                    state->section_state.bars_total);
+                                if (hook_driven) {
+                                    ornament_jam_solo_line(
+                                        state->track_solo_behavior[mt], state->band_solo_state,
+                                        lts.steps, lts.step_count,
+                                        static_cast<int>(live_root), sc, cd, octave,
+                                        state->track_solo_behavior[mt].markov_current_degree,
+                                        jam_progress, jam_nr_low, jam_nr_high,
+                                        state->mutation_seed);
+                                } else {
+                                    generate_jam_solo_line(
+                                        state->track_solo_behavior[mt], state->band_solo_state,
+                                        lts.steps, lts.step_count,
+                                        static_cast<int>(live_root), sc, cd, octave,
+                                        state->track_solo_behavior[mt].markov_current_degree,
+                                        jam_progress, jam_nr_low, jam_nr_high,
+                                        state->mutation_seed);
+                                }
                             }
                         }
                         // Mutate live lick per bar during LickBuilder only (JAM uses
@@ -3660,13 +3725,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // articulation runs on the freshly-rendered lick steps (LICK_BUILDER
                         // mode) or on the Jam pattern — covering both solo modes.
                         // Scoped to track kBassTrack as soloist so no other instrument or
-                        // non-solo bass is touched.
+                        // non-solo bass is touched. A hook-driven jam lead keeps the
+                        // velocities its author wrote; it gets the slaps, not the accents.
                         {
                             PulsarTrackState& bts = state->tracks[kBassTrack];
                             if (bts.is_soloist) {
                                 constexpr float kBassSlapDensity = 0.35f;  // sparse-syncopated
                                 articulate_bass_solo(bts.steps, bts.step_count,
-                                                     kBassSlapDensity, state->mutation_seed);
+                                                     kBassSlapDensity, state->mutation_seed,
+                                                     bass_solo_authored);
                             }
                         }
                     }
@@ -3891,10 +3958,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     }
 
                     if (!fx_skip) {
+                        // Handoff punctuation: on the bar a solo passed, a percussive
+                        // track armed by advance_band_solo answers with a fill. It sheds
+                        // its duck and gets its ornaments back for this bar only.
+                        const bool fill_bar =
+                            state->band_solo_state.just_handed_off &&
+                            ts.role == TrackRole::PERCUSSIVE && ts.solo_fill_mod > 0.0f;
+
                         // Solo density gating (deterministic per step/track/bar)
                         // Read the smoothed _current value so duck depth crossfades at handoff.
-                        if (ts.solo_density_mod_current < 0.0f &&
-                            !duck_passes(ts.playhead, t, state->loop_count, ts.solo_density_mod_current)) {
+                        float duck_mod = fill_bar
+                            ? handoff_fill_duck(ts.solo_density_mod_current, ts.solo_fill_mod)
+                            : ts.solo_density_mod_current;
+                        if (duck_mod < 0.0f &&
+                            !duck_passes(ts.playhead, t, state->loop_count, duck_mod)) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
                             continue;
@@ -3904,7 +3981,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // drop their ornament (low-velocity) hits and keep only
                         // the backbone. Deterministic, so the same hits vanish
                         // every bar rather than flickering.
-                        if (ts.solo_simplify && step.velocity < 0.45f) {
+                        if (ts.solo_simplify && !fill_bar && step.velocity < 0.45f) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
                             continue;

@@ -623,13 +623,18 @@ struct SoloBehaviorParam {
     int markov_current_degree = 0;   // JAM: persists the markov walk's degree across bars
 };
 
+// Per-track duck depth, authored as REDUCTIONS (positive = duck harder). Defaults
+// mirror Kotlin's DuckingProfile — the duck the band solo path has always applied.
 struct DuckingParam {
-    float volume_reduction = 0.3f;
-    float density_reduction = 0.4f;
-    float ghost_reduction = 0.5f;
-    float fill_suppression = 0.8f;
+    float volume_reduction = 0.18f;
+    float density_reduction = 0.2f;
+    float ghost_reduction = 0.35f;
+    float fill_suppression = 0.35f;
     bool simplify = true;
     float reverb_boost = 0.1f;
+    // False when the vibe authored no profile for this track; the band solo path then
+    // keeps its own constants rather than reading the fields above (pulsar_band_solo.h).
+    bool declared = false;
 };
 
 enum class SoloModeId : uint8_t {
@@ -727,6 +732,9 @@ struct ArrangementParams {
 struct SectionState {
     int current_section = 0;
     int bars_remaining = 0;
+    // Bars the current section was drawn for — the denominator bars_remaining
+    // counts down from. 0 = no section running (jam_solo_progress falls back).
+    int bars_total = 0;
     int bars_since_visit[kMaxSections] = {};
     float transition_progress = 0.0f;
     int transition_target = -1;
@@ -770,7 +778,9 @@ struct BandSoloConfigParam {
     float handoff_matrix[kMaxBandMembers * kMaxBandMembers] = {};
     float pull_in_matrix[kMaxBandMembers * kMaxBandMembers] = {};
     int pull_in_bars_min = 2, pull_in_bars_max = 4;
-    float improv_carryover = 0.7f;
+    // NOTE: the handoff carryover is authored PER SECTION (SectionParam::
+    // solo_lick_influence, slot 12), not per band — there is deliberately no
+    // band-level carryover field here for it to compete with.
     float probability = 0.7f;
     int bars_per_lead_min = 2, bars_per_lead_max = 4;
 };
@@ -796,6 +806,9 @@ struct BandSoloState {
     // Octave chosen for the CURRENT soloist's run (chosen once at handoff, held
     // stable for the run). -1 = not yet set (first bar of a new run).
     int solo_lick_octave = -1;
+    // Bars this solo has run (advance_band_solo increments, start/clear zero).
+    // Numerator of jam_solo_progress() — the jam's build, not a per-soloist arc.
+    int bars_elapsed = 0;
 };
 
 // Wah Anomaly config (unpacked from pulsar_wah_data). Mirrors the Kotlin

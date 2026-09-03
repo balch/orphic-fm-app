@@ -384,13 +384,54 @@ inline int nearest_chord_tone_degree(int degree, int chord_degree, int scale_cou
     return best;
 }
 
+// Nominal jam span used when the section clock is not running (a single-section
+// arrangement never decrements bars_remaining), so a jam still builds instead of
+// freezing at progress 0 for its whole life.
+inline constexpr int kJamNominalBars = 32;
+
+// How far a jam has travelled through its span, 0..1 — the `solo_progress` that
+// shapes markov_next_note's density gate. Section-wide, NOT per-soloist-span: a
+// per-span reset restarts every 2-4 bars, which leaves bar 32 sounding like bar 1.
+inline float jam_solo_progress(int bars_elapsed, int section_bars_total) {
+    int span = (section_bars_total > 0) ? section_bars_total : kJamNominalBars;
+    if (span <= 1) return 1.0f;
+    float p = static_cast<float>(bars_elapsed) / static_cast<float>(span - 1);
+    return (p < 0.0f) ? 0.0f : (p > 1.0f ? 1.0f : p);
+}
+
+// Fit a generated jam note to the soloing track's register. An authored range folds
+// by octave so the pitch class survives instead of piling onto the boundary; the
+// 24..96 backstop stays the hard clamp the un-ranged path has always applied.
+inline int fit_jam_note_to_range(int note, int note_low, int note_high) {
+    if (note_low > 0 && note_high > note_low) {
+        while (note > note_high) note -= 12;
+        while (note < note_low)  note += 12;
+        if (note > note_high) note = note_high;   // range narrower than an octave
+    }
+    if (note < 24) note = 24; if (note > 96) note = 96;
+    return note;
+}
+
+// Scale degree -> MIDI for one jam step: chord-anchor the downbeats, then fit to the
+// track's register. Shared by the create and ornament paths so they cannot drift.
+inline int jam_step_note(int degree, int step_index, int root, const PulsarScale& scale,
+                         int chord_degree, int octave, int note_low, int note_high) {
+    int eff = degree;
+    if ((step_index % 4) == 0) eff = nearest_chord_tone_degree(degree, chord_degree, scale.count);
+    int d = ((eff % scale.count) + scale.count) % scale.count;
+    int oct_off = (eff - d) / scale.count;         // exact since eff-d is a multiple of count
+    return fit_jam_note_to_range(root + octave * 12 + oct_off * 12 + scale.degrees[d],
+                                 note_low, note_high);
+}
+
 // Create-mode: generate a fresh chord-anchored improvised line into steps[] for the
 // Jam lead, recording the phrase for cross-soloist carryover.
 inline void generate_jam_solo_line(SoloBehaviorParam& behavior, BandSoloState& solo_state,
                                    PulsarStep* steps, int step_count,
                                    int root, const PulsarScale& scale, int chord_degree,
                                    int octave, int& current_degree,
-                                   float solo_progress, uint32_t& seed) {
+                                   float solo_progress, int note_low, int note_high,
+                                   uint32_t& seed) {
     if (step_count <= 0 || scale.count <= 0) return;
     for (int s = 0; s < step_count; s++) {
         int degree = markov_next_note(behavior, current_degree, scale.count, solo_progress, seed);
@@ -400,13 +441,41 @@ inline void generate_jam_solo_line(SoloBehaviorParam& behavior, BandSoloState& s
         }
         current_degree = degree;
         record_solo_note(solo_state, degree);
-        int eff = degree;
-        if ((s % 4) == 0) eff = nearest_chord_tone_degree(degree, chord_degree, scale.count);
-        int d = ((eff % scale.count) + scale.count) % scale.count;
-        int oct_off = (eff - d) / scale.count;     // exact since eff-d is a multiple of count
-        int note = root + octave * 12 + oct_off * 12 + scale.degrees[d];
-        if (note < 24) note = 24; if (note > 96) note = 96;
+        int note = jam_step_note(degree, s, root, scale, chord_degree, octave,
+                                 note_low, note_high);
         float vel = 0.6f + 0.3f * ((s % 4) == 0 ? 1.0f : 0.4f);  // accent downbeats
         steps[s] = make_step(static_cast<uint8_t>(note), vel, true, 0.5f);
+    }
+}
+
+// Ornament density floor/ceiling across a jam's build. The floor is deliberately low
+// so a jam OPENS on the bare hook; the ceiling leaves the riff audible under the fills.
+inline constexpr float kJamOrnamentMin = 0.10f;
+inline constexpr float kJamOrnamentMax = 0.85f;
+
+// Ornament-mode: the lead carries an authored hook, so the jam plays in its GAPS —
+// gated steps keep note, velocity and articulation; only rests are candidates.
+// The caller MUST re-render the bare hook first, or last bar's ornaments read as hook.
+inline void ornament_jam_solo_line(SoloBehaviorParam& behavior, BandSoloState& solo_state,
+                                   PulsarStep* steps, int step_count,
+                                   int root, const PulsarScale& scale, int chord_degree,
+                                   int octave, int& current_degree,
+                                   float solo_progress, int note_low, int note_high,
+                                   uint32_t& seed) {
+    if (step_count <= 0 || scale.count <= 0) return;
+    float fill_gate = kJamOrnamentMin + solo_progress * (kJamOrnamentMax - kJamOrnamentMin);
+    for (int s = 0; s < step_count; s++) {
+        if (steps[s].gate) continue;                     // the hook owns this step
+        if (pattern_rand01(seed) > fill_gate) continue;  // leave the gap open
+        int degree = markov_next_note(behavior, current_degree, scale.count, solo_progress, seed);
+        if (degree < 0) continue;                        // markov rest/hold -> gap stays
+        current_degree = degree;
+        record_solo_note(solo_state, degree);
+        int note = jam_step_note(degree, s, root, scale, chord_degree, octave,
+                                 note_low, note_high);
+        // Ornaments answer the hook rather than compete with it: shorter and quieter
+        // than a lead attack, with the downbeat still carrying more weight.
+        float vel = 0.45f + 0.15f * ((s % 4) == 0 ? 1.0f : 0.0f);
+        steps[s] = make_step(static_cast<uint8_t>(note), vel, true, 0.35f);
     }
 }

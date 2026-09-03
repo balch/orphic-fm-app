@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar
 
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.HalfLick
 import java.io.File
 import kotlin.test.Test
@@ -111,6 +112,18 @@ class PulsarSectionLimitsTest {
                 "each other's fields. NOTE: pulsar_section_tension_data shares this " +
                 "constant only for C++-side array sizing — its own indexing stride is " +
                 "independently fixed at 21 and must NOT be pinned to this constant.",
+        )
+    }
+
+    @Test
+    fun `WIRE_FIELDS matches kTrackDuckingFields`() {
+        assertEquals(
+            constant(limitsHeader, "kTrackDuckingFields"),
+            DuckingProfile.WIRE_FIELDS,
+            "This is the per-track float stride pulsar_track_ducking is written and read " +
+                "with. If they disagree, tracks read each other's duck depths — and the " +
+                "trailing declared flag lands on the wrong row, so an unauthored track " +
+                "starts ducking by a neighbour's profile.",
         )
     }
 

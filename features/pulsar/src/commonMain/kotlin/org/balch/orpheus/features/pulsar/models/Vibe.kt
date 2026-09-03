@@ -84,6 +84,9 @@ enum class ScaleType(val scaleIndex: Int) {
  *   anomalies never touch it.
  * @param bassLineMutation How much the bass line varies on repeat, 0-1. Independent of [lickMutation].
  * @param bassLineOctave MIDI octave for the bass line. -1 = auto (midpoint of noteRange), 0-8 = explicit.
+ * @param band The cast that trades solos. REQUIRED as soon as any [Section] declares a
+ *   [SoloMode] — the engine starts a section solo only when a band exists, so a bandless solo
+ *   section silently plays as ordinary. [BandPresets] builds one from track indices alone.
  * @param seed Random seed for pattern generation. Same seed = same patterns. 0 = random.
  * @param bpm Tempo in beats per minute.
  * @param envelopeType Global envelope mode: AD (punchy), TIDES (sustain while held), BLEND (energy-driven mix).
@@ -162,6 +165,17 @@ data class Vibe(
         // an arrangement-less vibe would flash the manual-trigger tint but never fire.
         require(anomalies.isEmpty() || arrangement != null) {
             "anomalies require an arrangement — the Anomaly Engine arms at section boundaries"
+        }
+        // A solo is the BAND passing a lead around, so the engine starts one only when the vibe
+        // ships a band (has_band_solo in orpheus_unit_pulsar.cpp). Without one the section plays
+        // as ordinary and nothing says so — six shipped vibes carried a dead soloMode for months.
+        val soloSections = (arrangement?.sections ?: emptyList())
+            .withIndex().filter { it.value.soloMode != null }
+        require(band != null || soloSections.isEmpty()) {
+            "section(s) ${soloSections.map { "${it.index} '${it.value.name}'" }} declare a " +
+                "soloMode but Vibe.band is null — the engine never starts these solos and the " +
+                "sections play as ordinary. Give the vibe a band (BandPresets.quartet / " +
+                "tradingLeads / twoVoiceTexture take just the track indices) or drop the soloMode."
         }
         // C++ has a single void config bank and a single lick-anomaly slot, so each concrete
         // anomaly type may appear at most once.

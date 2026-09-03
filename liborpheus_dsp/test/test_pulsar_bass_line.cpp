@@ -217,13 +217,12 @@ static void push_bass_channel_lickbuilder_arrangement(OrpheusEngine* engine, int
     engine->pulsar_band_bars_per_lead_max.store(64, std::memory_order_relaxed);
     engine->pulsar_band_pull_in_bars_min.store(2, std::memory_order_relaxed);
     engine->pulsar_band_pull_in_bars_max.store(4, std::memory_order_relaxed);
-    engine->pulsar_band_improv_carryover.store(0.7f, std::memory_order_relaxed);
     engine->pulsar_band_probability.store(1.0f, std::memory_order_relaxed);
 
     // Clear solo/ducking/markov to defaults
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_behavior[i].store(0.0f, std::memory_order_relaxed);
-    for (int i = 0; i < 8 * 6; i++)
+    for (int i = 0; i < kNumPulsarTracks * kTrackDuckingFields; i++)
         engine->pulsar_track_ducking[i].store(0.0f, std::memory_order_relaxed);
     for (int i = 0; i < 8 * 15; i++)
         engine->pulsar_track_solo_markov[i].store(0.0f, std::memory_order_relaxed);
