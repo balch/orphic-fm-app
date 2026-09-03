@@ -10,10 +10,10 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
- * Rust Belt (OG) — FROZEN faithful-reproduction backup of the original bass hook, kept as a
+ * Rusted Coast (OG) — FROZEN faithful-reproduction backup of the original bass hook, kept as a
  * dev A/B reference. Catalog status WIP: dev-only, visible on debuggable / `-Pcatalog=wip`
  * builds for A/B but MUST NEVER be promoted to LIVE, so nothing faithful is ever in a release.
- * It is a verbatim reproduction of a copyrighted hook. It reuses the live [RustBeltVibe]
+ * It is a verbatim reproduction of a copyrighted hook. It reuses the live [RustedCoastVibe]
  * wholesale and swaps ONLY the lick + mutation back to the faithful original, so an A/B against
  * the live vibe isolates exactly the hook. The live vibe carries the copyright-safe rewrite.
  * Do not edit, and never flip it to LIVE — this is the proven tool-validation reference. Git
@@ -22,8 +22,8 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class RustBeltOgVibe : VibeProvider {
-    override val name: String = "Rust Belt OG"
+class RustedCoastOgVibe : VibeProvider {
+    override val name: String = "Rusted Coast OG"
 
     // The faithful 2-bar hook: three thumps on the root, a jump up to the 5th/b7, a staccato
     // walk-up back into the thumps. Preserved verbatim (DORIAN: 0=D,2=F/b3,3=G/4,4=A/5,5=B/6,6=C/b7).
@@ -48,6 +48,6 @@ class RustBeltOgVibe : VibeProvider {
     )
 
     override val vibe: Vibe by lazy {
-        RustBeltVibe().vibe.copy(name = name, lick = ogLick, lickMutation = 0.14f, stepCount = 32)
+        RustedCoastVibe().vibe.copy(name = name, lick = ogLick, lickMutation = 0.14f, stepCount = 32)
     }
 }

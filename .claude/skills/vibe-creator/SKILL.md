@@ -386,11 +386,11 @@ Optional but recommended — adds a Markov section graph on top of the vibe.
   - `compingStyle` / `compingInversion` / `compingHumanization` / `chordFollow`: per-section overrides applied to **all** CHORDAL/melodic tracks at once.
   - `trackOverrides`: `Map<Int, TrackSectionOverride>` — per-*track* overrides scoped to this section, auto-restored on exit. This is how you pedal one track's hook on the tonic while everything else follows the progression (the octave-fold fix): `trackOverrides = mapOf(4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED))`. `TrackSectionOverride` can also override density/volume/morph/sends/`envelopeProfile`/comping per section. Two carry rules worth knowing:
     - **`density`**: `0` takes the track OUT for the section (clean mute, any role, restored on exit). A *positive* value regenerates the pattern at that density at the boundary, thinning fills and ghosts — but only on tracks whose pattern is generated from density, so on a `Chordal` track or one playing a `LickMode.Fill`/`Squash` figure a positive density does nothing while `0` still mutes. To duck rather than drop, use `volume`.
-    - **`morph`**: pins morph for the section so the Space macro's `spaceDecay` cannot overwrite it. On the drum engines (`BD`/`SD`/`HH`) morph is **decay**, so this is how one section gets a long-ringing kick against a tight snare and a washy open hat. See `RustBeltVibe`'s intro.
+    - **`morph`**: pins morph for the section so the Space macro's `spaceDecay` cannot overwrite it. On the drum engines (`BD`/`SD`/`HH`) morph is **decay**, so this is how one section gets a long-ringing kick against a tight snare and a washy open hat. See `RustedCoastVibe`'s intro.
   - `customProgression` / `chordsPerBar` / `bpmMultiplier`: per-section harmony plus a tempo multiplier (`0.5` = half-time breakdown, `2.0` = double-time burst).
 - `introIndex`: which section opens (default 0; `null` = random weighted start). `outroIndex`: which terminates (`null` = loops forever).
 - `lengthSeconds` (default `150..240`): the song's auto-end window; both bounds must be in `15..1800`.
-- There are no arrangement presets — write the sections out. Copy the shape from a shipped vibe whose form you want; `RustBeltVibe` is a worked eight-section example.
+- There are no arrangement presets — write the sections out. Copy the shape from a shipped vibe whose form you want; `RustedCoastVibe` is a worked eight-section example.
 
 A typical 5-section arrangement: intro -> verse/groove -> chorus/peak -> solo -> breakdown -> outro. Use macroOverrides to distinguish (chorus: energy=1.3, complexity=1.3; breakdown: energy=0.4, space=1.5).
 

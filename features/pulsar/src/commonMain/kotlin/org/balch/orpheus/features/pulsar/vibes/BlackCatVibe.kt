@@ -84,7 +84,7 @@ import org.balch.orpheus.features.pulsar.models.chords
  * payoff: IV-IV-i-i, horns come forward, hook transposes with the roots) -> jam
  * (band stretches out over a vamp with an IV lean) -> breakdown (drums + naked
  * hook, one long build) -> outro (V-IV-i turnaround, full band, terminal).
- * A/B against DogHouseVibe and RustBeltVibe.
+ * A/B against DogHouseVibe and RustedCoastVibe.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())

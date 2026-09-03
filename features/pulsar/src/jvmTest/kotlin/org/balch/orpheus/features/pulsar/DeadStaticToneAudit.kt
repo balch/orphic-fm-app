@@ -8,7 +8,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.vibes.BlackCatVibe
 import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
 import org.balch.orpheus.features.pulsar.vibes.OdysseusLoreVibe
-import org.balch.orpheus.features.pulsar.vibes.RustBeltVibe
+import org.balch.orpheus.features.pulsar.vibes.RustedCoastVibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,7 +44,7 @@ class DeadStaticToneAudit {
     /** Vibes swept clean, held at zero so the deletions cannot creep back. */
     private val KNOWN_CLEAN = listOf(
         "BlackCat" to BlackCatVibe().vibe,
-        "RustBelt" to RustBeltVibe().vibe,
+        "RustedCoast" to RustedCoastVibe().vibe,
         "FireSky" to FireSkyVibe().vibe,
         "OdysseusLore" to OdysseusLoreVibe().vibe,
     )
@@ -124,7 +124,7 @@ class DeadStaticToneAudit {
      */
     @Test
     fun `the live DX patch selectors survive the audit`() {
-        val dxEngines = listOf<VibeProvider>(BlackCatVibe(), RustBeltVibe(), FireSkyVibe())
+        val dxEngines = listOf<VibeProvider>(BlackCatVibe(), RustedCoastVibe(), FireSkyVibe())
             .flatMap { it.vibe.tracks }
             .flatMap { listOf(it.engineEdm, it.engineSpace) }
             .filter { it.engineId.forcePinHarmonics }

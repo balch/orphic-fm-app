@@ -25,8 +25,9 @@ import kotlin.test.Test
  * readable size. Inside a full panel render these are a few pixels tall and any change to
  * their insets is invisible.
  *
- * Uses the same labels the Pulsar and Bass panels pass so the widest real chip ("Rust Belt")
- * and the narrowest ("D") are both represented.
+ * Uses the same labels the Pulsar and Bass panels pass so a long real chip ("Rusted Coast")
+ * and the narrowest ("D") are both represented. The true widest live labels are 13 chars
+ * ("Voltage Strut", "Space & Drums"); widthIn(max = 120.dp) is what actually bounds them.
  */
 class DropdownRenderHarness {
 
@@ -45,8 +46,8 @@ class DropdownRenderHarness {
                         EnumDropdown(
                             modifier = Modifier.widthIn(max = 120.dp),
                             label = "VIBE",
-                            selectedDisplay = "Rust Belt",
-                            entries = listOf("Rust Belt"),
+                            selectedDisplay = "Rusted Coast",
+                            entries = listOf("Rusted Coast"),
                             displayName = { it },
                             onSelected = {},
                             color = OrpheusColors.cosmicPurple,

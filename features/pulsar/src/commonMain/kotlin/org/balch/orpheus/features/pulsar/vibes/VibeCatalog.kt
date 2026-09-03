@@ -92,7 +92,7 @@ object VibeCatalog {
         // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
         "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
         "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
-        "Rust Belt" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
+        "Rusted Coast" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
@@ -106,7 +106,7 @@ object VibeCatalog {
         "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
         "Fire Sky CX" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Rust Belt OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Rusted Coast OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Black Cat" to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
         "Black Cat OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
