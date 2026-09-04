@@ -23,7 +23,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RustedCoastOgVibe : VibeProvider {
-    override val name: String = "Rusted Coast OG"
+    override val name: String = "Goat Soup & Whisky OG"
 
     // The faithful 2-bar hook: three thumps on the root, a jump up to the 5th/b7, a staccato
     // walk-up back into the thumps. Preserved verbatim (DORIAN: 0=D,2=F/b3,3=G/4,4=A/5,5=B/6,6=C/b7).

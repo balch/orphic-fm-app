@@ -80,7 +80,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RustedCoastVibe : VibeProvider {
-    override val name: String = "Rusted Coast"
+    override val name: String = "Goat Soup & Whisky"
 
     // Verse hangs on the i: the hook carries all the motion, so the bed stays planted
     // and the bass never transposes until the chorus asks it to.

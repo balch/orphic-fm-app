@@ -87,7 +87,7 @@ object VibeCatalog {
 
     /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
     private val entryList: List<Pair<String, CatalogEntry>> = listOf(
-        "Rusted Coast" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
+        "Goat Soup & Whisky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
         "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
         "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
@@ -104,7 +104,7 @@ object VibeCatalog {
         "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
         "Fire Sky CX" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Rusted Coast OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        "Goat Soup & Whisky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Black Cat" to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
         "Black Cat OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
