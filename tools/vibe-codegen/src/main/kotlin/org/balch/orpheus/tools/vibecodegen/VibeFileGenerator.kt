@@ -15,7 +15,7 @@ private const val VIBES_PACKAGE = "org.balch.orpheus.features.pulsar.vibes"
 
 /**
  * Builds the Kotlin source for a `<className>Vibe.kt` provider from a decoded [Vibe] — the
- * generated-file analog of a hand-authored `*Vibe.kt` (see RustedCoastVibe.kt for the shape this
+ * generated-file analog of a hand-authored `*Vibe.kt` (see RustBeltVibe.kt for the shape this
  * mirrors), except every field is emitted explicitly and there's no musical prose (see the v1
  * scope boundaries in the design spec).
  */

@@ -136,7 +136,7 @@ class VibeInfoMapperTest {
      */
     @Test
     fun `FmPatchNames resolves edge anchors the way a fresh engine load does`() {
-        // RustedCoast / FireSky / BluesBurn organ space slot — 0.092 * 32.64 = 3.003
+        // RustBelt / FireSky / BluesBurn organ space slot — 0.092 * 32.64 = 3.003
         assertEquals("E organ 3", FmPatchNames.patchNameFor(OrpheusEngineId.DX3, 0.092f))
         // VelvetLeashVibe — 0.4596 * 32.64 = 15.001
         assertEquals("Harpsich", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.4596f))

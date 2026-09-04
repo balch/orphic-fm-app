@@ -54,7 +54,7 @@ import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
 
 /**
- * Rusted Coast — a swampy heartland-rock pocket built on a bass hook, dry and lazy-tough.
+ * Rust Belt — a swampy heartland-rock pocket built on a bass hook, dry and lazy-tough.
  *
  * ## The feel
  * Mid-tempo, laid back but insistent. THE BASS IS THE SONG: a round, fingered two-bar
@@ -79,8 +79,8 @@ import org.balch.orpheus.features.pulsar.models.row
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class RustedCoastVibe : VibeProvider {
-    override val name: String = "Goat Soup & Whisky"
+class RustBeltVibe : VibeProvider {
+    override val name: String = "Rust Belt"
 
     // Verse hangs on the i: the hook carries all the motion, so the bed stays planted
     // and the bass never transposes until the chorus asks it to.
@@ -480,7 +480,7 @@ class RustedCoastVibe : VibeProvider {
             // Copyright-safe rewrite: keeps the swampy D-Dorian pocket (scale, low register,
             // rest density, b7/6 color) but inverts the recognizable signature — one anchored
             // root leaning DOWNWARD, an octave POP, a DESCENDING turn, all the opposite of the
-            // faithful figure. That original is preserved in RustedCoastOgVibe (WIP, -Pcatalog).
+            // faithful figure. That original is preserved in RustBeltOgVibe (WIP, -Pcatalog).
             lick = Lick(
                 steps = listOf(
                     LickStep(scaleDegree = 0, duration = 0.5f, velocity = 0.98f),   // D  root — single anchor
