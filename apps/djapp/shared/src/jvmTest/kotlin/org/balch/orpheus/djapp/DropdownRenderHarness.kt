@@ -73,18 +73,17 @@ class DropdownRenderHarness {
                             color = OrpheusColors.cosmicPurple,
                             menuWidth = 140.dp,
                         )
-                        // The two menu-less ones, beside the menu-backed ones they have to match.
-                        // Both were hand-rolled, and ENDING had drifted to half the insets.
-                        LabeledDropdown(
+                        EnumDropdown(
                             label = "ENV",
-                            onClick = {},
-                            minWidth = DropdownCycleMinWidth,
-                        ) {
-                            DropdownValueText(
-                                text = "AD",
-                                color = OrpheusColors.cosmicPurple,
-                            )
-                        }
+                            selectedDisplay = "BLEND",
+                            entries = listOf("BLEND"),
+                            displayName = { it },
+                            onSelected = {},
+                            color = OrpheusColors.cosmicPurple,
+                            menuWidth = 112.dp,
+                        )
+                        // The one menu-less chip, beside the menu-backed ones it has to match.
+                        // It was hand-rolled, and had drifted to half the insets.
                         LabeledDropdown(
                             label = "ENDING",
                             onClick = {},
@@ -107,8 +106,8 @@ class DropdownRenderHarness {
     }
 
     /**
-     * The real panel. ENV and ENDING are not EnumDropdowns, so this is what catches either one
-     * falling out of step with the rest of the row.
+     * The real panel. ENDING is not an EnumDropdown, so this is what catches it falling out of
+     * step with the rest of the row.
      */
     @Test
     fun renderPulsarSelectorRow() {
@@ -142,6 +141,15 @@ class DropdownRenderHarness {
      *
      * Both are needed. A short name has to leave the row on ONE line and only a long one may
      * push onto a second, so either render alone is satisfied by always-wrap or never-wrap.
+     *
+     * The long case is the whole row at its widest, not just the vibe name: a sharp root, the
+     * longest scale, and BLEND. A Row measures each child against what the earlier ones left over
+     * and ENV is measured last, so this is the combination that decides whether the row fits.
+     *
+     * It does not fit, knowingly: this render is roughly 40dp over and ENV ellipsizes. Every value
+     * at once is a corner the row was never budgeted for, and buying the width back costs either
+     * the shared chip insets or the VIBE cap. ENV opens a menu, so the truncated value is still
+     * readable. Treat a *wrapped* row here as the regression, not the ellipsis.
      */
     @Test
     fun renderPulsarSelectorRowNarrow() {
@@ -150,10 +158,15 @@ class DropdownRenderHarness {
         // a real catalog carries.
         val previewVibe = PulsarViewModel.previewFeature().vibeList.first()
         val cases = listOf(
-            "pulsar-panel-narrow-short" to previewVibe,
-            "pulsar-panel-narrow-long" to previewVibe.copy(name = "Kaleidoscope Drift"),
+            "pulsar-panel-narrow-short" to PulsarUiState(vibe = previewVibe),
+            "pulsar-panel-narrow-long" to PulsarUiState(
+                vibe = previewVibe.copy(name = "Kaleidoscope Drift"),
+                rootNote = 1,       // C#
+                scaleIndex = 4,     // Whole Tone
+                envelopeMode = 2,   // BLEND
+            ),
         )
-        for ((name, vibe) in cases) {
+        for ((name, uiState) in cases) {
             val scene = ImageComposeScene(1100, 1400, Density(3f)) {
                 OrpheusTheme {
                     Box(
@@ -163,7 +176,7 @@ class DropdownRenderHarness {
                             .padding(8.dp),
                     ) {
                         PulsarPanel(
-                            pulsar = PulsarViewModel.previewFeature(PulsarUiState(vibe = vibe)),
+                            pulsar = PulsarViewModel.previewFeature(uiState),
                             isExpanded = true,
                             showCollapsedHeader = false,
                         )

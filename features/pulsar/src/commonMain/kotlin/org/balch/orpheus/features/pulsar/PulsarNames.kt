@@ -17,3 +17,11 @@ val PULSAR_SCALE_NAMES: List<String> = listOf(
     "Dorian", "Lydian", "Mixolydian", "Harm Minor", "Min Penta", "Hirajoshi", "In Sen",
     "Blues", "Blues Pent", "Maj Blues",
 )
+
+/**
+ * Display names for each [org.balch.orpheus.features.pulsar.models.EnvelopeType],
+ * indexed by [org.balch.orpheus.features.pulsar.models.EnvelopeType.modeIndex].
+ */
+val PULSAR_ENVELOPE_NAMES: List<String> = listOf(
+    "AD", "WAVES", "BLEND",
+)

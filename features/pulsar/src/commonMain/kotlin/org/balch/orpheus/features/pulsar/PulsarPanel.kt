@@ -63,6 +63,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 private val PULSAR_NOTE_INDICES: List<Int> = PULSAR_NOTE_NAMES.indices.toList()
 private val PULSAR_SCALE_INDICES: List<Int> = PULSAR_SCALE_NAMES.indices.toList()
+private val PULSAR_ENVELOPE_INDICES: List<Int> = PULSAR_ENVELOPE_NAMES.indices.toList()
 
 /**
  * Ceiling on the VIBE value, past which the name ellipsizes.
@@ -163,23 +164,20 @@ fun PulsarPanel(
                     menuWidth = 140.dp,
                 )
 
-                // Cycles in place instead of opening a menu, but wears the same LabeledDropdown
-                // as its neighbours so it can't drift out of step. Needs the floor: without it,
-                // tapping AD to WAVES to BLEND resizes on every tap.
-                LabeledDropdown(
+                // A menu rather than a tap-to-cycle: three modes is few enough to cycle but too
+                // many to read off a chip that only ever shows one of them, and the chip is the
+                // first thing a narrow row ellipsizes.
+                EnumDropdown(
                     label = "ENV",
-                    onClick = { actions.setEnvelopeMode((state.envelopeMode + 1) % 3) },
-                    minWidth = DropdownCycleMinWidth,
-                ) {
-                    DropdownValueText(
-                        text = when (state.envelopeMode) {
-                            1 -> "WAVES"
-                            2 -> "BLEND"
-                            else -> "AD"
-                        },
-                        color = OrpheusColors.cosmicPurple,
-                    )
-                }
+                    selectedDisplay = PULSAR_ENVELOPE_NAMES.getOrElse(state.envelopeMode) {
+                        PULSAR_ENVELOPE_NAMES[0]
+                    },
+                    entries = PULSAR_ENVELOPE_INDICES,
+                    displayName = { PULSAR_ENVELOPE_NAMES[it] },
+                    onSelected = actions.setEnvelopeMode,
+                    color = OrpheusColors.cosmicPurple,
+                    menuWidth = 112.dp,
+                )
             }
         }
 
@@ -367,8 +365,8 @@ fun PulsarPanel(
                     OrpheusColors.darkVoid.copy(alpha = 0.6f)
                 }
 
-                // Same floor as ENV, same reason: the label swings between PLAYS and whichever
-                // style is picked.
+                // Needs the floor: the label swings between PLAYS and whichever style is picked,
+                // and without it the row's width moves with it.
                 LabeledDropdown(
                     label = "ENDING",
                     onClick = { showTransitionSheet = true },

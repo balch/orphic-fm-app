@@ -48,8 +48,8 @@ val DropdownCycleMinWidth: Dp = 64.dp
  * Size of the menu arrow, and so the floor on every value row's height.
  *
  * The arrow is taller than the value text, so it alone sets the height of a menu-backed dropdown.
- * Applying it as a minimum here keeps the menu-less ones (Pulsar's ENV, ENDING) from sitting a few
- * dp shorter than the neighbours they sit beside.
+ * Applying it as a minimum here keeps the menu-less ones (Pulsar's ENDING) from sitting a few dp
+ * shorter than the neighbours they sit beside.
  */
 val DropdownIconSize: Dp = 16.dp
 
@@ -63,10 +63,10 @@ private val DropdownBackground: Color get() = OrpheusColors.darkVoid.copy(alpha 
 /**
  * A caption over a tappable rounded surface, the shape every selector in the app wears.
  *
- * [EnumDropdown] is the common case, but some of these open no menu at all: Pulsar's ENV cycles
- * envelope modes in place and its ENDING opens a settings sheet. Those were hand-rolled copies,
- * which is how ENDING drifted to a 2dp radius and 6/2 insets while the menu-backed ones wore 6dp
- * and 12/8. Routing all three through here keeps that from happening again.
+ * [EnumDropdown] is the common case, but some of these open no menu at all: Pulsar's ENDING opens
+ * a settings sheet instead. Those were hand-rolled copies, which is how ENDING drifted to a 2dp
+ * radius and 6/2 insets while the menu-backed ones wore 6dp and 12/8. Routing them all through
+ * here keeps that from happening again.
  *
  * Sizes to its own value, never to a shared width. [DropdownValueText] keeps that value on one
  * line, which is the part that matters: a `Row` measures each child against what the earlier ones
@@ -165,11 +165,11 @@ private fun LabeledDropdownPreview() {
     OrpheusTheme {
         Box(Modifier.background(OrpheusColors.blackHoleBackground).padding(16.dp)) {
             LabeledDropdown(
-                label = "ENV",
+                label = "ENDING",
                 onClick = {},
                 minWidth = DropdownCycleMinWidth,
             ) {
-                DropdownValueText(text = "WAVES", color = OrpheusColors.cosmicPurple)
+                DropdownValueText(text = "PLAYS", color = OrpheusColors.cosmicPurple)
             }
         }
     }
