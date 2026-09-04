@@ -87,13 +87,11 @@ object VibeCatalog {
 
     /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
     private val entryList: List<Pair<String, CatalogEntry>> = listOf(
-        "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
-        "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
-        // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
-        "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
-        "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
         "Rusted Coast" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
+        "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
+        "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
         "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
+        "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
         "Techno Wobble" to CatalogEntry(VibeStatus.LIVE, tags = listOf("club")),
@@ -110,6 +108,8 @@ object VibeCatalog {
         "Black Cat" to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
         "Black Cat OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
+        // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
+        "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
         "Corner Office" to CatalogEntry(VibeStatus.WIP, tags = listOf("funk", "rock", "riff")),
         "Corner Office OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         // ── STEALTH: grooves and moods ──

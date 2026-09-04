@@ -1,7 +1,6 @@
-Storms, solos, and a vibe reborn.
+Storms, solos, and a new vibe to show it off.
 
-• Rust Belt is now Rusted Coast, and it rides out a storm — a downpour that swallows the room, then a cloud break.
-• Weather runs through a song now: rain that falls, thunder that rolls past, lightning that cracks.
-• Solos step clear of the mix, and the band builds behind them instead of holding still.
-• Chord progressions that used to freeze after the first section now evolve all the way through.
-• Roomier controls on phone, tablet and TV.
+• Android TV support with enhanced full-screen support (on tablets too).
+• Rusted Coast vibe demonstrates the engine's new capabilities.
+• Lightning strikes, thunder claps, and rain add to the ambiance.
+• Teaching the band how to jam with brand new solo mechanics.
