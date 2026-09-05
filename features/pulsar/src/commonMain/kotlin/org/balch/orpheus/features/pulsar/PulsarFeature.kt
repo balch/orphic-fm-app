@@ -280,7 +280,7 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     val notatedScoreFlow: StateFlow<NotatedScore?>
         get() = MutableStateFlow(null)
 
-    /** Live write for the orchestration panel and the color hand. field matches the wire name. */
+    /** Live write for a score-editing host and the color hand. field matches the wire name. */
     fun setScorePartControl(track: Int, field: String, value: Float) {}
 
     /** Mutes the generative tracks while a GATED section waits on the conductor. */
@@ -444,7 +444,7 @@ class PulsarViewModel(
     // Feeds PulsarUiState (and so the persisted blob) through the intent reducer.
     private val notatedScoreIdFlow = MutableStateFlow<String?>(null)
 
-    // Last score actually pushed to the engine -- the orchestration panel renders parts from
+    // Last score actually pushed to the engine -- a score-editing host renders parts from
     // this, and the color hand reads it to know which part it's steering live.
     private val _notatedScoreFlow = MutableStateFlow<NotatedScore?>(null)
     override val notatedScoreFlow: StateFlow<NotatedScore?> = _notatedScoreFlow.asStateFlow()
@@ -2455,7 +2455,7 @@ class PulsarViewModel(
     }
 
     // Float-typed twin of pushNotatedScore's local `put`, shared with setScorePartControl so
-    // a live orchestration-panel edit writes through the identical symbol format.
+    // a live edit from a score-editing host writes through the identical symbol format.
     private fun putF(symbol: String, v: Float) = synthController.setPluginControl(
         PluginControlId(PULSAR_URI, symbol), FloatValue(v)
     )

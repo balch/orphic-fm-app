@@ -89,9 +89,10 @@ export-appstore-*/
 # AI-authored design specs — superseded by the code, stale within days
 docs/superpowers/
 
-# Private app modules (Orphic Baton). Their own repo, github.com/balch/orphic-baton,
-# cloned into noop/. settings.gradle.kts loads noop/settings.gradle.kts when present,
-# so the build works identically with or without the clone.
+# Private app modules. They live in a separate repository, cloned into noop/ by whoever
+# has access; settings.gradle.kts loads noop/settings.gradle.kts when present, so this
+# repo builds identically with or without the clone. Deliberately not a submodule: that
+# would commit the private repo's URL here, which is the one thing this arrangement avoids.
 noop/
 
 # Generated score assets: deny by default, ship by exception.

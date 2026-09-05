@@ -21,7 +21,7 @@ plugins {
 // modules depend on shared ones, never the reverse. Nothing enforced that on its own --
 // with the clone present a backwards dependency compiles perfectly, and breaks only for
 // someone who cloned the public repo alone, which is everybody else. This is the mirror
-// of :apps:baton:shared's checkGplIsolation, and is a no-op when the clone is absent
+// of the private repo's own GPL-isolation guard, and is a no-op when the clone is absent
 // because the private projects are not in the build at all.
 tasks.register("checkPrivateIsolation") {
     group = "verification"
