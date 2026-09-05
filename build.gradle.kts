@@ -34,10 +34,17 @@ tasks.register("checkPrivateIsolation") {
         .filter { it.projectDir.startsWith(privateRoot) }
         .map { it.path }
         .toSet()
-    // Only real dependency buckets. Tooling configurations (the versions plugin's
-    // dependencyUpdatesAggregation, KMP's swiftPM lockfile metadata) aggregate EVERY
-    // project in the build by design, so they name every private module and mean nothing.
-    val declaredBucket = Regex("(implementation|api|compileOnly|runtimeOnly)$", RegexOption.IGNORE_CASE)
+    // Deny by name, rather than allow-listing dependency buckets by suffix. The suffix list
+    // was effectively an endsWith, so a project dependency declared through
+    // configurations.create(...), through ksp/kapt, or through any bucket not ending in one
+    // of the four names was invisible and the guard reported OK. These two are the only
+    // configurations that aggregate EVERY project in the build by design -- the versions
+    // plugin's report input and KMP's swiftPM lockfile metadata -- so they name every private
+    // module and mean nothing; everything else is a real declaration site.
+    //
+    // Still out of reach: build-logic/convention is an included build and is not in
+    // allprojects, so a convention plugin wiring a private module in is not scanned here.
+    val toolingBucket = Regex("dependencyUpdates|swiftPMDependencies", RegexOption.IGNORE_CASE)
     // Short-circuit before the scan, not inside doLast: with no clone present the result is
     // discarded anyway, and computing it realizes every configuration container across the
     // whole build (every KMP source-set bucket in ~76 projects) to build a list nobody reads.
@@ -45,7 +52,7 @@ tasks.register("checkPrivateIsolation") {
         .filterNot { it.projectDir.startsWith(privateRoot) }
         .flatMap { consumer ->
             consumer.configurations
-                .filter { declaredBucket.containsMatchIn(it.name) }
+                .filterNot { toolingBucket.containsMatchIn(it.name) }
                 .flatMap { cfg ->
                     cfg.dependencies
                         .filterIsInstance<ProjectDependency>()
