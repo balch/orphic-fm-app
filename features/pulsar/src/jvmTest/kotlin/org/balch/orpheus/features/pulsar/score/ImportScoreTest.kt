@@ -320,6 +320,7 @@ class ImportScoreFixtureTest {
             json.encodeToString(orchestra),
             File(outDir, "${FifthOrchestraRecipe.ORCHESTRA_NAME}.json"),
             midiFile.name,
+            deliberatelyUnshipped = true,
         )
 
         val full = MidiScoreImporter.convertAllUnmerged(
@@ -329,10 +330,16 @@ class ImportScoreFixtureTest {
             json.encodeToString(full),
             File(outDir, "${FifthOrchestraRecipe.FULL_NAME}.json"),
             midiFile.name,
+            deliberatelyUnshipped = true,
         )
     }
 
-    private fun syncGenerated(generated: String, outFile: File, sourceName: String) {
+    private fun syncGenerated(
+        generated: String,
+        outFile: File,
+        sourceName: String,
+        deliberatelyUnshipped: Boolean = false,
+    ) {
         if (writing) {
             outFile.parentFile?.mkdirs()
             outFile.writeText(generated)
@@ -341,7 +348,18 @@ class ImportScoreFixtureTest {
         }
 
         if (!outFile.isFile) {
-            // Absent means "this asset is deliberately not shipped in this repo", not drift.
+            // Absence alone used to mean "deliberately not shipped", which made it
+            // indistinguishable from a score the gitignore silently swallowed: scores/* is
+            // denied by default, so a new score added without a matching `!` line verifies
+            // here, is skipped by `git add -A`, and then fails at runtime on a resource that
+            // was never packaged. The call site declares the intent instead, so only the two
+            // known exports are allowed to be missing.
+            assertTrue(
+                deliberatelyUnshipped,
+                "${outFile.name} was generated from $sourceName but is not checked in. " +
+                    "scores/* is ignored by default -- add a `!` exception for it in " +
+                    ".gitignore, or pass deliberatelyUnshipped = true if it must not ship.",
+            )
             // fifth-orchestra and fifth-full are ~3.8MB of compose resources that only a
             // score-playing host can reach, so the public app does not carry them; the
             // recipe and the source MIDI stay, so importScore regenerates them on demand.
