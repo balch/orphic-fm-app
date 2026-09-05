@@ -84,8 +84,8 @@ class BellTollsVibe : VibeProvider {
     //                   re-emergence from a breakdown (dub -> groove).
     //   dubFadeBars   — long dreamy fade INTO the dub breakdown — reverb tails
     //                   bloom as the band drops out.
-    private val skankLiftBars = 2
-    private val dubFadeBars = 4
+    private val skankLiftBars = 1
+    private val dubFadeBars = 2
 
     private val sectionList by lazy {
         listOf(
@@ -226,9 +226,15 @@ class BellTollsVibe : VibeProvider {
                     SectionTransition(targetIndex = 3, weight = 0.2f, transitionBars = dubFadeBars),
                 ),
                 recencyDecay = 0.4f,
-                soloMode = SoloMode.LickBuilder(),
+                soloMode = SoloMode.Jam(),
                 macroOverrides = MacroOverrides(
-                    energy = 0.9f, complexity = 1.4f, space = 1.2f, mood = 1.3f,
+                    energy = 0.4f, complexity = 1f, space = 1.2f, mood = .9f,
+                ),
+                // The bass follows the chords here instead of ROOT_ONLY, so a bass-led
+                // jam keeps its improvised pitches (folded into E1..D#2) rather than
+                // collapsing to a root pulse.
+                trackOverrides = mapOf(
+                    3 to TrackSectionOverride(chordFollow = ChordFollow.FOLLOW),
                 ),
             ),
             // 5 OUTRO: Just drums + bass locking in — classic reggae opening.
@@ -282,7 +288,7 @@ class BellTollsVibe : VibeProvider {
                     BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
                         loudness = 0.7f, creativity = 0.3f),
                     BandMember("Bassist", listOf(3),
-                        loudness = 0.85f, creativity = 0.4f),
+                        loudness = 0.5f, creativity = 0.4f),
                     BandMember("Melodica", listOf(4),
                         loudness = 0.55f, creativity = 0.65f),
                     BandMember("Keys", listOf(5, 6),
