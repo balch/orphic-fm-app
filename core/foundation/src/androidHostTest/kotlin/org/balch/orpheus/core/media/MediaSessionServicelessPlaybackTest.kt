@@ -1,6 +1,7 @@
 package org.balch.orpheus.core.media
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioManager
 import android.os.Looper
 import org.junit.runner.RunWith
@@ -10,6 +11,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -89,5 +91,29 @@ class MediaSessionServicelessPlaybackTest {
             .onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
 
         assertEquals(1, handler.pauseFromFocusLossCount, "the transient pauses playback")
+    }
+
+    /**
+     * activate() is posted to the main looper while setServiceIntent is a plain synchronous
+     * field write, so an app registering its intent from its own service's onCreate, or from
+     * a lazily-built graph, lands it after activation has already run. That ordering is only
+     * safe because doStartService reads serviceIntent at play time rather than activation
+     * time; caching it in doActivate would strand such an app with a session that never
+     * starts its service and never retries.
+     */
+    @Test
+    fun `a service intent registered after activate still starts the service on play`() {
+        val handler = FakeActionHandler()
+        val msm = servicelessManager(handler) // activate() runs with no intent
+
+        msm.setServiceIntent(Intent(app, MediaSessionLifecycleTest.TestLibraryService::class.java))
+        msm.updatePlaybackState(isPlaying = true)
+        shadowOf(mainLooper).idle()
+
+        assertNotNull(
+            shadowOf(app).nextStartedService,
+            "the FGS must start once the intent arrives, though activate() ran without one",
+        )
+        assertEquals(0, handler.stopCount, "and the late intent must not roll playback back")
     }
 }
