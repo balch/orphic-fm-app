@@ -307,6 +307,15 @@ actual class MediaSessionManager(
         // updatePlaybackState would then land on a null player.
         ensurePlayer()
         if (isActive) return
+        // No setServiceIntent means the app has no media service and opted out. Activating
+        // anyway wedges it: updatePlaybackState would call doStartService, get false for a
+        // missing intent, read that as a refused FGS start, and roll back through
+        // handler.onStop() -- so play() stopped itself ~13ms later and the app could never
+        // sound. A foreground-only app wants no session at all.
+        if (serviceIntent == null) {
+            log.info { "No media service configured — skipping media session activation" }
+            return
+        }
         log.info { "Activating media session" }
         audioFocusController.setListener(this)
         // We're (re)activating — cancel any pending transient watchdog.
