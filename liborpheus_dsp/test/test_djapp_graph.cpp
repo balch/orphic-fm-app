@@ -15,11 +15,15 @@ static void setup_pulsar_baseline(OrpheusEngine* engine) {
     engine->pulsar_playing.store(1);
     engine->pulsar_mix.store(1.0f);
     setup_fixture_baseline(engine);
-    // Pin a non-zero seed so pattern generation is reproducible. With pulsar_seed==0,
-    // load_vibe() re-stirs the RNG from wall-clock microseconds, so the generated bar
-    // (and thus the reverb/delay TAIL level on stop) varies run-to-run — the rms>0.0001
-    // tail assertions flaked when a sparse bar happened to land before the stop.
-    engine->pulsar_seed.store(0xDA77, std::memory_order_relaxed);
+    // Pin BOTH RNGs, per test rather than once per suite. pulsar_seed alone leaves the
+    // voices drawing from the process-global stmlib::Random, and seeding that only at
+    // suite entry still leaves each test's stream position set by whatever the tests
+    // above it consumed — the same lottery, moved one level up. Reseeding here makes
+    // every test independent of the tally order.
+    // 0xDA77: this suite's TAIL and delay-vs-reverb thresholds are calibrated against
+    // the bar this seed generates. 0xBEA7 renders delay-only and reverb-only nearly
+    // identically and the separation assertions fail.
+    pin_pulsar_rngs(engine, 0xDA77);
     trigger_vibe_load(engine);
     engine->clock_bpm.store(128.0f);
 }
@@ -38,6 +42,20 @@ static void set_pulsar_reverb_sends(OrpheusEngine* engine, float level, int trac
     for (int t = track_start; t < track_end; t++) {
         engine->pulsar_track_reverb_send[t].store(level, std::memory_order_relaxed);
     }
+}
+
+// Drive MUST go through the port. engine->drive_amount is a write-only mirror that
+// unit_process_limiter never reads -- it reads IPORT_DRIVE, which only
+// orpheus_engine_set_port writes (see orpheus_engine_routing.cpp's distortion branch).
+// Storing the atomic leaves the port at its 1.0 default, where tanh() is near-linear on
+// a signal this quiet and the whole distortion stage is inaudible: measured 0.000579
+// against 0.055146 for the same drive set through the port.
+//
+// `amount` is in engine units (1.0 = clean, 15.0 = max), matching drive_amount's scale.
+static void set_drive(OrpheusEngine* engine, float amount, float mix) {
+    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.distortion",
+                            "drive", (amount - 1.0f) / 14.0f);
+    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.distortion", "mix", mix);
 }
 
 // ── Helper: render DJ graph and return stereo buffer ────────────────
@@ -174,8 +192,7 @@ static bool test_djapp_distortion_active() {
     // so no delay/reverb sends needed to test distortion
 
     // Render with drive off (clean)
-    engine->drive_mix.store(0.0f);
-    engine->drive_amount.store(1.0f);
+    set_drive(engine, 1.0f, 0.0f);
     auto clean = render_dj_graph(engine, 48000, 30);
 
     // Reset for driven render
@@ -189,8 +206,7 @@ static bool test_djapp_distortion_active() {
     engine->delay_bypass.store(1);
 
     // Drive cranked up
-    engine->drive_mix.store(1.0f);
-    engine->drive_amount.store(3.0f);
+    set_drive(engine, 3.0f, 1.0f);
     auto driven = render_dj_graph(engine, 48000, 30);
 
     bool clean_ok = clean.rms_l > 0.0001f;
@@ -527,8 +543,7 @@ static bool test_djapp_full_chain() {
     engine->reverb_bypass.store(1);
     engine->delay_bypass.store(1);
 
-    engine->drive_mix.store(0.5f);
-    engine->drive_amount.store(2.0f);
+    set_drive(engine, 2.0f, 0.5f);
 
     // Per-track effect sends
     set_pulsar_delay_sends(engine, 0.5f);
@@ -580,8 +595,7 @@ static bool test_djapp_drive_sweep() {
 
         set_pulsar_delay_sends(engine, 1.0f);
 
-        engine->drive_mix.store(1.0f);
-        engine->drive_amount.store(drive_levels[d]);
+        set_drive(engine, drive_levels[d], 1.0f);
 
         auto r = render_dj_graph(engine, 48000, 30);
 
@@ -644,8 +658,7 @@ static bool test_djapp_distortion_mix() {
         set_pulsar_delay_sends(engine, 1.0f);
 
         // High drive so saturation is obvious
-        engine->drive_amount.store(8.0f);
-        engine->drive_mix.store(mix_levels[m]);
+        set_drive(engine, 8.0f, mix_levels[m]);
 
         auto r = render_dj_graph(engine, 48000, 30);
 
@@ -684,8 +697,7 @@ static bool test_djapp_distortion_mix() {
         e0->pulsar_delay_time_b.store(0.001f);
         e0->pulsar_delay_feedback.store(0.0f);
         set_pulsar_delay_sends(e0, 1.0f);
-        e0->drive_amount.store(8.0f);
-        e0->drive_mix.store(0.0f);
+        set_drive(e0, 8.0f, 0.0f);
         auto dry = render_dj_graph(e0, 48000, 30);
         orpheus_engine_destroy(e0);
 
@@ -701,8 +713,7 @@ static bool test_djapp_distortion_mix() {
         e1->pulsar_delay_time_b.store(0.001f);
         e1->pulsar_delay_feedback.store(0.0f);
         set_pulsar_delay_sends(e1, 1.0f);
-        e1->drive_amount.store(8.0f);
-        e1->drive_mix.store(1.0f);
+        set_drive(e1, 8.0f, 1.0f);
         auto wet = render_dj_graph(e1, 48000, 30);
         orpheus_engine_destroy(e1);
 
@@ -957,8 +968,8 @@ static bool test_djapp_pulsar_effects_independent() {
     engine->pulsar_reverb_time.store(0.7f);
 
     // Set per-track sends
-    set_pulsar_delay_sends(engine, 0.6f, 5, 8);
-    set_pulsar_reverb_sends(engine, 0.6f, 5, 8);
+    set_pulsar_delay_sends(engine, 0.6f);
+    set_pulsar_reverb_sends(engine, 0.6f);
 
     // Render with effects
     auto wet = render_dj_graph(engine, 96000, 30);
@@ -1064,7 +1075,7 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
     e_delay->pulsar_delay_feedback.store(0.4f);
     e_delay->pulsar_reverb_bypass.store(1);
 
-    set_pulsar_delay_sends(e_delay, 0.7f, 5, 8);
+    set_pulsar_delay_sends(e_delay, 0.7f);
     set_pulsar_reverb_sends(e_delay, 0.0f);
 
     auto delay_r = render_dj_graph(e_delay, 96000, 30);
@@ -1086,7 +1097,7 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
     e_reverb->pulsar_reverb_time.store(0.8f);
 
     set_pulsar_delay_sends(e_reverb, 0.0f);
-    set_pulsar_reverb_sends(e_reverb, 0.7f, 5, 8);
+    set_pulsar_reverb_sends(e_reverb, 0.7f);
 
     auto reverb_r = render_dj_graph(e_reverb, 96000, 30);
     orpheus_engine_destroy(e_reverb);
@@ -1109,14 +1120,6 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
 
 bool run_djapp_graph_tests() {
     printf("\n========== DJ APP GRAPH TESTS ==========\n");
-    // setup_pulsar_baseline pins pulsar_seed, but the voices also draw from the
-    // process-global stmlib::Random that every earlier suite has already stirred.
-    // The dedicated delay/reverb TAIL assertions are thresholds on that render, so
-    // without a pin here they are a lottery on suite order -- and on how many voices
-    // the engine renders, which is why growing kNumMainVoices to 24 for the score
-    // pool surfaced it. Restored on the way out so later suites keep their stream.
-    const uint32_t saved_random = stmlib::Random::state();
-    stmlib::Random::Seed(0xDA770000u);
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_djapp_graph_loads());
@@ -1136,7 +1139,6 @@ bool run_djapp_graph_tests() {
     tally(test_djapp_pulsar_effects_independent());
     tally(test_djapp_pulsar_zero_sends());
     tally(test_djapp_pulsar_delay_vs_reverb());
-    stmlib::Random::Seed(saved_random);
     printf("\nDJ App graph tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
