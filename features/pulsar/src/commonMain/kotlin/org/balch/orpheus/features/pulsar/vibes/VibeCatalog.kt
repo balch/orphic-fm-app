@@ -145,6 +145,10 @@ object VibeCatalog {
         "Natalis Shimmer" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Bricklayer's Lament" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
         "Mellow Haze" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+
+        // ── Classical adaptations ──
+        "Symphony No. 5 in C Minor" to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "rock", "riff")),
+        "Jupiter, the Bringer of Jollity" to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "rock", "riff")),
     )
 
     /** Ordered master map: catalog position = picker order; first LIVE entry = default vibe. */

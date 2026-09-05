@@ -1,0 +1,581 @@
+{
+    "name": "fifth-lead",
+    "ppq": 96,
+    "parts": [
+        {
+            "trackIndex": 4,
+            "name": "Fate Motif",
+            "events": [
+                {
+                    "tick": 48,
+                    "durationTicks": 48,
+                    "pitch": 79,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 96,
+                    "durationTicks": 48,
+                    "pitch": 79,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 144,
+                    "durationTicks": 48,
+                    "pitch": 79,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 192,
+                    "durationTicks": 192,
+                    "pitch": 75,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 432,
+                    "durationTicks": 48,
+                    "pitch": 77,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 480,
+                    "durationTicks": 48,
+                    "pitch": 77,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 528,
+                    "durationTicks": 48,
+                    "pitch": 77,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 576,
+                    "durationTicks": 384,
+                    "pitch": 74,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 3312,
+                    "durationTicks": 48,
+                    "pitch": 71,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 3360,
+                    "durationTicks": 48,
+                    "pitch": 71,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 3408,
+                    "durationTicks": 48,
+                    "pitch": 71,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 3456,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 3648,
+                    "durationTicks": 96,
+                    "pitch": 68,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 3840,
+                    "durationTicks": 96,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 4080,
+                    "durationTicks": 48,
+                    "pitch": 68,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 4128,
+                    "durationTicks": 48,
+                    "pitch": 68,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 4176,
+                    "durationTicks": 48,
+                    "pitch": 68,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 4224,
+                    "durationTicks": 384,
+                    "pitch": 65,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 5232,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 5280,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 5328,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 5376,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6000,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6048,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6096,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6144,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6384,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6432,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6480,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6528,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6768,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6816,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6864,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 6912,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 7104,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 7296,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 7488,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 7680,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 7872,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 8064,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 8256,
+                    "durationTicks": 624,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 8880,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 8928,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 8976,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 9024,
+                    "durationTicks": 624,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 9648,
+                    "durationTicks": 48,
+                    "pitch": 67,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 9696,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 9744,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 9792,
+                    "durationTicks": 192,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 9984,
+                    "durationTicks": 192,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 10176,
+                    "durationTicks": 192,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 10368,
+                    "durationTicks": 192,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 10560,
+                    "durationTicks": 96,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 10944,
+                    "durationTicks": 96,
+                    "pitch": 74,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 12336,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 12384,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 12432,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 12480,
+                    "durationTicks": 96,
+                    "pitch": 75,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13104,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13152,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13200,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13248,
+                    "durationTicks": 96,
+                    "pitch": 75,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13872,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13920,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 13968,
+                    "durationTicks": 48,
+                    "pitch": 70,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 14016,
+                    "durationTicks": 96,
+                    "pitch": 75,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 14640,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 14688,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 14736,
+                    "durationTicks": 48,
+                    "pitch": 72,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                },
+                {
+                    "tick": 14784,
+                    "durationTicks": 96,
+                    "pitch": 77,
+                    "velocity": 90,
+                    "hold": false,
+                    "bandRelease": false
+                }
+            ],
+            "timbre": {
+                "engineIndex": 0,
+                "harmonics": 0.5,
+                "timbre": 0.5,
+                "morph": 0.5,
+                "decay": 0.5,
+                "level": 1.0,
+                "colorResponse": 0.0
+            }
+        }
+    ]
+}

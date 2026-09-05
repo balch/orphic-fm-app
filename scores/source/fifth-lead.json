@@ -1,0 +1,14 @@
+{
+    "name": "fifth-lead",
+    "source": "Mutopia Project -- Beethoven, Symphony No. 5 in C minor, Op. 67, 1st movement (Symphony5_1.mid), LilyPond-engraved",
+    "license": "Public Domain (Mutopia Project)",
+    "parts": [
+        {
+            "midiTrack": 12,
+            "trackIndex": 4,
+            "name": "Fate Motif",
+            "transpose": 24,
+            "throughTick": 15360
+        }
+    ]
+}

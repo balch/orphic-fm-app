@@ -36,6 +36,17 @@ This project has a hard rule: **never use trademarked artist, band, album, or so
 - Internal private notes or commit messages can mention the source if it helps — just not the committed source file.
 - Check the existing vibes list before picking a name to avoid duplicates.
 
+### Carve-out: public-domain classical works
+
+Public-domain classical repertoire is **exempt** from the rule above. Composer names, work titles, catalogue numbers, and movement names may all appear in user-facing `name` fields and in KDoc. "Symphony No. 5", "Beethoven", and "BWV 565" are historical facts rather than trademarks, and for a vibe built on the classical canon, naming the work *is* the point. Do not invent an evocative substitute for these.
+
+The exemption is narrow. Both conditions must hold:
+
+1. **The composer died more than 70 years ago and the work was published before 1930.** That clears the EU life-plus-70 term and the US published-works term together, without needing a per-territory analysis. Bach, Beethoven, Mozart, Debussy, Ravel, Holst, and Gershwin all qualify. Shostakovich, Stravinsky, Britten, and anything by a living composer do not.
+2. **You are naming the composition, not a performance of it.** Specific recordings, performers, conductors, ensembles, record labels, and published editions stay off limits. "Symphony No. 5" is fine. "Karajan's Fifth" and "the Bärenreiter edition" are not.
+
+Outside those two conditions nothing changes. A vibe that references a modern band, song, or album still needs an evocative original name.
+
 ## Workflow
 
 1. **Decompose the reference musically.** Before touching code, write down (in your head or scratch) the seven dimensions the schema cares about:
@@ -287,7 +298,7 @@ A repeating melodic figure that a track can snap to. Used by tracks whose role i
 Instead of one static `lick`, a vibe can hold a pool of licks and rotate between them per section. Set `Vibe.lickRotation = LickRotation(pool)`; while active it overrides the static `lick` (keep `lick` set as a fallback seed/load-time pick). Needs an `Arrangement` — rotation happens at section boundaries; without one the pool falls back to a single load-time pick.
 
 - `pool: List<Lick>` — the rotation members; the engine picks one per section (2–4 works well).
-- `MAX_LICK_POOL = 4` caps `pool.size` — plus one more shared slot if the vibe also declares a `LickAnomaly` (see the Anomalies section below): both ride the same C++ lick bank.
+- `MAX_LICK_POOL = 8` caps `pool.size` — plus one more shared slot if the vibe also declares a `LickAnomaly` (see the Anomalies section below): both ride the same C++ lick bank.
 - Copyright: if any pooled lick is a recognizable copyrighted riff, keep the vibe dev-only WIP — never LIVE.
 
 `LickRotation` is **pool-only** now. The rare "swap in an original riff" event that used to live here as `anomaly`/`anomalyChance` is now a **`LickAnomaly`** in `Vibe.anomalies` — configured, force-fired, and auto-rolled independently of the rotation pool (see the Anomalies section below).
@@ -449,7 +460,7 @@ A rare one-statement swap-in of `lick` (e.g. an original riff) over whatever lic
 - `lick`: the `Lick` to swap in — see the `Lick` section above for the step schema.
 - `chance` (0-1, default `0.02`): per-~2-bar-statement swap probability. `0.02` ≈ 1-in-50 (genuinely rare); keep it low so it stays a surprise.
 
-Requires the vibe to have a lick source — either its own `lick` or a `lickRotation` pool (`Vibe.init` enforces this). The anomaly lick rides the **same C++ lick bank as the `LickRotation` pool**, occupying the slot past the pool, so `lickRotation.pool.size + 1` must fit `LickRotation.MAX_LICK_POOL` (4) — also enforced by `Vibe.init`.
+Requires the vibe to have a lick source — either its own `lick` or a `lickRotation` pool (`Vibe.init` enforces this). The anomaly lick rides the **same C++ lick bank as the `LickRotation` pool**, occupying the slot past the pool, so `lickRotation.pool.size + 1` must fit `LickRotation.MAX_LICK_POOL` (8) — also enforced by `Vibe.init`.
 
 #### Authoring shape
 
