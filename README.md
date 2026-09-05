@@ -28,7 +28,9 @@ Orphic-FM combines sounds and harmonics with semi-random math and AI. Twelve voi
 [Details below](#orphic-fm-in-detail).
 
 ## Orphic-DJ - Interactive Album Experience
-PlayStore: https://play.google.com/store/apps/details?id=org.balch.djapp
+
+<a href="https://play.google.com/store/apps/details?id=org.balch.djapp"><img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" height="60" align="middle"></a>
+<a href="https://apps.apple.com/app/id6797065984"><img src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" alt="Download on the App Store" height="40" align="middle"></a>
 
 |                  DJ deck (og edition)                  |                  AI feed (ai edition)                  |
 |:------------------------------------------------------:|:------------------------------------------------------:|
