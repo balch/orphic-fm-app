@@ -392,11 +392,18 @@ static void push_lickbuilder_band_arrangement(OrpheusEngine* engine, int lead_tr
 
 // Pin BOTH RNGs. pulsar_seed alone is not enough: the voices draw from the
 // process-global stmlib::Random, so results stay suite-order dependent without
-// it (see test_pulsar_signal_quality). Callers that care about later suites
-// should save/restore stmlib::Random::state() around the whole suite.
-static void pin_pulsar_rngs(OrpheusEngine* engine) {
-    engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
-    stmlib::Random::Seed(0xBEA70000u);
+// it (see test_pulsar_signal_quality).
+//
+// Call this per test, not once per suite: seeding at suite entry still leaves each
+// test's stream position set by whatever the tests above it drew, so adding or
+// reordering a test re-randomizes the ones after it.
+//
+// The seed is a parameter because a suite's thresholds are calibrated against the
+// pattern one particular seed generates — djapp's delay-vs-reverb separation
+// collapses under 0xBEA7 — but the pinning protocol should not fork along with it.
+static void pin_pulsar_rngs(OrpheusEngine* engine, uint32_t seed = 0xBEA7) {
+    engine->pulsar_seed.store(seed, std::memory_order_relaxed);
+    stmlib::Random::Seed(seed << 16);
 }
 
 static double pulsar_samples_per_step(float bpm, float sample_rate = 48000.0f) {
