@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
@@ -108,7 +110,15 @@ fun PulsarPanel(
         fillHeight = fillHeight,
     ) {
         val state by pulsar.stateFlow.collectAsState()
-        val arrangementState by pulsar.arrangementStateFlow.collectAsState()
+        // scoreTick/scoreHeld free-run at 5Hz once a score plays (other consumers read them);
+        // this panel only renders bar-level fields, so pin them out here
+        // before collecting -- otherwise the step grid would recompose 5x/sec for a score
+        // it never shows.
+        val arrangementState by remember(pulsar) {
+            pulsar.arrangementStateFlow
+                .map { it.copy(scoreTick = 0, scoreHeld = false) }
+                .distinctUntilChanged()
+        }.collectAsState(pulsar.arrangementStateFlow.value.copy(scoreTick = 0, scoreHeld = false))
         val actions = pulsar.actions
 
         // Gated on TV hardware, not LargeScreen: a tablet or fullscreen desktop is LargeScreen

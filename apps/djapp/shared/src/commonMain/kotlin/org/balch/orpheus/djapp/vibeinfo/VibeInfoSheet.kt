@@ -32,6 +32,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.PulsarFeature
@@ -80,7 +82,14 @@ private fun rememberVibeInfoModel(
     vizFlow: StateFlow<PulsarVizData>,
 ): VibeInfoUiModel {
     val uiState by pulsar.stateFlow.collectAsState()
-    val arrangement by pulsar.arrangementStateFlow.collectAsState()
+    // scoreTick/scoreHeld free-run at 5Hz once a score plays (other consumers read them);
+    // this sheet only renders section/track info, so pin them out here --
+    // DJ is CPU-sensitive and must not recompose 5x/sec for a score it never shows.
+    val arrangement by remember(pulsar) {
+        pulsar.arrangementStateFlow
+            .map { it.copy(scoreTick = 0, scoreHeld = false) }
+            .distinctUntilChanged()
+    }.collectAsState(pulsar.arrangementStateFlow.value.copy(scoreTick = 0, scoreHeld = false))
     val viz by vizFlow.collectAsState()
 
     // The C++ engine re-rolls the active engine per audio block in the 0.4–0.6
