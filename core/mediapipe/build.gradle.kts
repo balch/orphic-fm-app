@@ -5,6 +5,15 @@ plugins {
 kotlin {
     android {
         namespace = "org.balch.orpheus.core.mediapipe"
+
+        // publish=true is REQUIRED despite its name: without it a KMP android library
+        // exports no consumer rules at all, even to same-build project consumers. See the
+        // same block in core/ai.
+        @Suppress("UnstableApiUsage")
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.files(project.file("consumer-rules.pro"))
+        }
     }
 
     wasmJs {

@@ -160,14 +160,14 @@ class GestureInterpreter(
 
         // 1. Rule-only signs always win
         if (ruleSign in ruleOnlySigns) {
-            log.debug { "FUSE RULE_ONLY: $ruleSign rule=$ruleConf (ml=$nativeSign/$nativeConf)" }
+            log.frameDebug { "FUSE RULE_ONLY: $ruleSign rule=$ruleConf (ml=$nativeSign/$nativeConf)" }
             return ruleResult
         }
 
         // 2. Both classifiers agree on the same sign — boost confidence
         if (ruleSign != null && ruleSign == nativeSign) {
             val boosted = (maxOf(ruleConf, nativeConf) * AGREEMENT_BOOST).coerceAtMost(0.99f)
-            log.debug { "FUSE AGREE: $ruleSign rule=$ruleConf ml=$nativeConf -> $boosted" }
+            log.frameDebug { "FUSE AGREE: $ruleSign rule=$ruleConf ml=$nativeConf -> $boosted" }
             return ruleSign to boosted
         }
 
@@ -176,25 +176,25 @@ class GestureInterpreter(
             // Geometric signs: trust rule-based (it checks features ML can't see)
             if (ruleSign in geometricSigns) {
                 val penalized = ruleConf * DISAGREEMENT_PENALTY
-                log.debug { "FUSE DISAGREE_GEO: rule=$ruleSign/$ruleConf ml=$nativeSign/$nativeConf -> $ruleSign/$penalized" }
+                log.frameDebug { "FUSE DISAGREE_GEO: rule=$ruleSign/$ruleConf ml=$nativeSign/$nativeConf -> $ruleSign/$penalized" }
                 return ruleSign to penalized
             }
             // Non-geometric: trust higher confidence, penalized
             val winner = if (ruleConf >= nativeConf) ruleSign to ruleConf else nativeSign to nativeConf
             val penalized = winner.second * DISAGREEMENT_PENALTY
-            log.debug { "FUSE DISAGREE: rule=$ruleSign/$ruleConf ml=$nativeSign/$nativeConf -> ${winner.first}/$penalized" }
+            log.frameDebug { "FUSE DISAGREE: rule=$ruleSign/$ruleConf ml=$nativeSign/$nativeConf -> ${winner.first}/$penalized" }
             return winner.first to penalized
         }
 
         // 4. Only rule-based fires
         if (ruleSign != null) {
-            log.debug { "FUSE SINGLE_RULE: $ruleSign/$ruleConf (ml=$nativeSign/$nativeConf)" }
+            log.frameDebug { "FUSE SINGLE_RULE: $ruleSign/$ruleConf (ml=$nativeSign/$nativeConf)" }
             return ruleResult
         }
 
         // 5. Only ML fires
         if (nativeSign != null) {
-            log.debug { "FUSE SINGLE_ML: $nativeSign/$nativeConf (rule=null)" }
+            log.frameDebug { "FUSE SINGLE_ML: $nativeSign/$nativeConf (rule=null)" }
             return nativeSign to nativeConf
         }
 

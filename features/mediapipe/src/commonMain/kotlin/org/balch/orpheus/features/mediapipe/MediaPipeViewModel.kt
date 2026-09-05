@@ -8,11 +8,13 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -355,9 +357,20 @@ class MediaPipeViewModel(
         }
     }
 
+    // Ticks when the platform's camera probe settles, so the UI can learn about a camera
+    // that was not yet known to exist when this flow was first subscribed. Reading
+    // handTracker.isAvailable inline in the combine below would freeze that first answer:
+    // before tracking starts nothing else in the combine ticks, so there would be no
+    // second emission to carry a corrected value. Desktop answers false and then corrects
+    // itself; every other platform emits once from onStart and is done.
+    private val cameraAvailable: Flow<Boolean> =
+        handTracker.availabilityChanges
+            .onStart { emit(handTracker.isAvailable) }
+            .distinctUntilChanged()
+
     override val stateFlow: StateFlow<MediaPipeUiState> =
         combine(
-            combine(_isEnabled, _panelMode) { e, m -> Pair(e, m) },
+            combine(_isEnabled, _panelMode, cameraAvailable) { e, m, a -> Triple(e, m, a) },
             handTracker.results.onStart { emit(null) },
             handTracker.cameraFrame,
             combine(
@@ -373,11 +386,11 @@ class MediaPipeViewModel(
             combine(_isBending, _cachedGestures, _pressedKeys, _keyboardEngineName) { b, g, pk, en ->
                 GestureUiExtras(b, g, pk, en)
             },
-        ) { (enabled, panelMode), result, frame, aslExtras, gestureExtras ->
+        ) { (enabled, panelMode, available), result, frame, aslExtras, gestureExtras ->
             if (!enabled || result == null || result.hands.isEmpty()) {
                 MediaPipeUiState(
                     panelMode = panelMode,
-                    cameraAvailable = handTracker.isAvailable,
+                    cameraAvailable = available,
                     isEnabled = enabled,
                     isTracking = false,
                     cameraFrame = if (enabled) frame else null,
@@ -396,7 +409,7 @@ class MediaPipeViewModel(
             } else {
                 MediaPipeUiState(
                     panelMode = panelMode,
-                    cameraAvailable = handTracker.isAvailable,
+                    cameraAvailable = available,
                     isEnabled = enabled,
                     isTracking = true,
                     hands = result.hands,

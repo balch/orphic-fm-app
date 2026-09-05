@@ -97,18 +97,6 @@ class AslSignClassifier(
         val thumbAboveKnuckles = thumbTip.y < indexMcp.y  // thumb above the fist line
         val thumbBelowWrist = thumbTip.y > wrist.y + refDist * 0.1f  // thumb below wrist
 
-        // Finger state summary for logging
-        val fingerSummary = buildString {
-            append(if (thumb.isExtended) "T" else "t")
-            append(if (index.isExtended) "I" else "i")
-            append(if (middle.isExtended) "M" else "m")
-            append(if (ring.isExtended) "R" else "r")
-            append(if (pinky.isExtended) "P" else "p")
-        }
-
-        // ILY diagnostic: track when 2+ of the 3 ILY fingers are extended
-        val ilyFingers = listOf(thumb.isExtended, index.isExtended, pinky.isExtended).count { it }
-
         // Classify based on finger patterns.
         // Order matters: more specific patterns (e.g., D with thumb-touch)
         // must come before general ones (e.g., 1 = index only).
@@ -269,16 +257,29 @@ class AslSignClassifier(
             }
         }
 
-        // Permanent logging: always log detected sign with finger state
-        val (sign, _) = result
-        if (sign != null) {
-            log.info { "ASL: $sign fingers=$fingerSummary" }
-        } else if (ilyFingers >= 2) {
-            // Near-ILY but didn't match: log diagnostic
-            log.info {
-                "ASL: NONE fingers=$fingerSummary (near-ILY: " +
-                    "midCurled=$middleCurled thumbAbove=$thumbAboveKnuckles " +
-                    "idxCurled=$indexCurled pinkyCurled=$pinkyCurled)"
+        // Per-frame diagnostic. The whole block is gated so the summary strings are
+        // never built during normal playback. See GestureLogging.
+        if (GestureLogging.frameLogging) {
+            val fingerSummary = buildString {
+                append(if (thumb.isExtended) "T" else "t")
+                append(if (index.isExtended) "I" else "i")
+                append(if (middle.isExtended) "M" else "m")
+                append(if (ring.isExtended) "R" else "r")
+                append(if (pinky.isExtended) "P" else "p")
+            }
+            val (sign, _) = result
+            if (sign != null) {
+                log.debug { "ASL: $sign fingers=$fingerSummary" }
+            } else {
+                // Near-ILY but didn't match: log when 2+ of the 3 ILY fingers are extended
+                val ilyFingers = listOf(thumb.isExtended, index.isExtended, pinky.isExtended).count { it }
+                if (ilyFingers >= 2) {
+                    log.debug {
+                        "ASL: NONE fingers=$fingerSummary (near-ILY: " +
+                            "midCurled=$middleCurled thumbAbove=$thumbAboveKnuckles " +
+                            "idxCurled=$indexCurled pinkyCurled=$pinkyCurled)"
+                    }
+                }
             }
         }
 

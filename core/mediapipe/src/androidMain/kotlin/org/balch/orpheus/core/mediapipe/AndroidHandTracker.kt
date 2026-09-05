@@ -4,8 +4,11 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
+import android.view.Display
+import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -71,6 +74,42 @@ class AndroidHandTracker(
     // Pre-allocated buffers to reduce GC pressure at 30fps
     private var reusableMirrorBitmap: Bitmap? = null
     private var reusableFrameBuffer: ByteBuffer? = null
+
+    // Held so the display listener below can retarget it after the bind. ImageAnalysis is the
+    // only use case here; there is no Preview to inherit a PreviewView's rotation from.
+    private var imageAnalysis: ImageAnalysis? = null
+
+    /**
+     * The DEFAULT display's rotation, read through DisplayManager rather than
+     * `Context.getDisplay()`: this tracker is constructed with the APPLICATION context, and a
+     * non-visual context throws on getDisplay() from API 30.
+     */
+    private fun currentRotation(): Int =
+        (context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)
+            ?.getDisplay(Display.DEFAULT_DISPLAY)?.rotation
+            ?: Surface.ROTATION_0
+
+    /**
+     * Keeps [ImageAnalysis.targetRotation] following the device.
+     *
+     * CameraX fixes an ImageAnalysis use case's target rotation at CREATION time and never
+     * updates it -- only Preview tracks its PreviewView automatically. Without this, rotating
+     * the device leaves `ImageProxy.imageInfo.rotationDegrees` describing the orientation the
+     * app STARTED in, so [processImageProxy] rotates every frame by a stale amount.
+     *
+     * That is not only a sideways picture. The same bitmap is what MediaPipe reads, so the
+     * landmarks come back in a frame whose axes are rotated against the screen -- and a consumer
+     * that beats on a VERTICAL stroke and reads dynamics off hand HEIGHT cares. In landscape,
+     * those axes end up swapped.
+     */
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId != Display.DEFAULT_DISPLAY) return
+            imageAnalysis?.targetRotation = currentRotation()
+        }
+    }
 
     override fun start() {
         if (gestureRecognizer != null || handLandmarker != null) return
@@ -164,7 +203,14 @@ class AndroidHandTracker(
                 .setResolutionSelector(resolutionSelector)
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                // Seed from the CURRENT display, not the builder's default: the default is
+                // whatever the display read at construction, which is wrong the moment the app
+                // is launched already in landscape. See displayListener for the rest of it.
+                .setTargetRotation(currentRotation())
                 .build()
+            this.imageAnalysis = imageAnalysis
+            (context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)
+                ?.registerDisplayListener(displayListener, Handler(Looper.getMainLooper()))
 
             imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
                 // Guard against stop() called while analysis is in flight
@@ -186,6 +232,11 @@ class AndroidHandTracker(
 
     override fun stop() {
         isStopping = true // Signal before close — prevents in-flight frames from calling recognizeAsync
+        // Before the use case goes: the listener holds it, and a rotation arriving after
+        // unbind would retarget a dead ImageAnalysis.
+        (context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)
+            ?.unregisterDisplayListener(displayListener)
+        imageAnalysis = null
         lifecycleOwner?.stop()
         lifecycleOwner = null
         // MediaPipe's close() invokes waitUntilGraphDone() which re-throws any persisted

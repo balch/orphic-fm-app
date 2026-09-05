@@ -15,8 +15,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.balch.orpheus.core.gestures.HandLandmark
 import org.balch.orpheus.core.gestures.Handedness
+import org.balch.orpheus.core.gestures.frameDebug
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Frame
 import org.bytedeco.javacv.Java2DFrameConverter
@@ -32,9 +34,20 @@ import java.awt.image.DataBufferInt
  * - The capture loop grabs frames and publishes camera preview at full framerate.
  * - Each frame is sent to MediaPipe via [MediaPipeJni.detectAsync] (non-blocking).
  * - Detection results arrive asynchronously via a native callback.
+ *
+ * @param enableGestureRecognizer whether to run MediaPipe's GestureRecognizer graph, which adds
+ *   [TrackedHand.gestureName] and [TrackedHand.gestureConfidence] on top of the landmarks. Callers
+ *   that read only landmark geometry should pass `false`: the recognizer runs in VIDEO mode, so
+ *   [MediaPipeJni.recognizeGesture] blocks the capture loop until inference finishes, where the
+ *   landmarker's LIVE_STREAM path returns immediately and delivers results on a native thread. A
+ *   graph error costs more still -- the loop backs off 100ms per failed frame, which drags the
+ *   tracker to roughly 10fps and starves anything deriving velocity from frame deltas. Both paths
+ *   are configured `num_hands = 2` and fill handedness identically, so turning this off changes
+ *   nothing but the two gesture fields. Defaults to `true` to preserve existing behaviour.
  */
 class DesktopHandTracker(
     private val deviceIndex: Int = 0,
+    private val enableGestureRecognizer: Boolean = true,
 ) : HandTracker {
 
     private val log = logging("DesktopHandTracker")
@@ -50,6 +63,17 @@ class DesktopHandTracker(
                 else -> null
             }
         }
+
+        /**
+         * The one capture mode both the probe and the capture loop request. Shared rather than
+         * repeated: they must agree, because a probe that opens the device in a mode the
+         * capture loop never uses proves nothing about whether capture will work.
+         */
+        private const val CAPTURE_WIDTH = 640
+        private const val CAPTURE_HEIGHT = 480
+
+        /** How long [stop] will wait for native cleanup before giving up on it. See [stop]. */
+        private const val STOP_TIMEOUT_MS = 2_000L
     }
 
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -61,21 +85,35 @@ class DesktopHandTracker(
     private val _cameraFrame = MutableStateFlow<CameraFrame?>(null)
     override val cameraFrame: StateFlow<CameraFrame?> = _cameraFrame.asStateFlow()
 
-    override val isAvailable: Boolean by lazy {
-        if (CAMERA_FORMAT == null) return@lazy false
-        try {
-            val grabber = FFmpegFrameGrabber("$deviceIndex").apply {
-                format = CAMERA_FORMAT
-                frameRate = 30.0
-            }
-            grabber.start()
-            grabber.stop()
-            grabber.release()
-            true
-        } catch (e: Exception) {
-            log.warn(e) { "Camera availability check failed" }
-            false
-        }
+    private val _availability = MutableStateFlow(false)
+
+    override val isAvailable: Boolean get() = _availability.value
+    override val availabilityChanges: Flow<Boolean> = _availability.asStateFlow()
+
+    /**
+     * Opening a real camera device is the only way to learn whether one is usable, and
+     * `avformat_open_input` can sit for a second or more. So it runs exactly once, here,
+     * on an IO thread at construction — never on whatever thread happens to ask.
+     *
+     * This was a `by lazy`, which put the FFmpeg open on the first caller's thread and
+     * made every other caller block on the lazy's own monitor. On desktop that first
+     * caller is a `LaunchedEffect` body, i.e. the AWT event thread, so an app that probes
+     * at startup stalled its UI on every launch. Worth knowing for whoever reads a thread
+     * dump next: an AWT thread parked in `avformat_open_input` was this, and it looks
+     * exactly like a dependency-injection deadlock without being one.
+     */
+    init {
+        // Optimistic, and deliberately not a probe. Opening a device to ask "is there a
+        // device" cost us an evening: FFmpeg's avfoundation backend needs a thread with a
+        // running CFRunLoop to pump the capture session, so on a bare Dispatchers.IO worker
+        // avformat_open_input never returns -- it SPINS, burning ~100% of a core for the life
+        // of the process (jstack: RUNNABLE, cpu 50.5s of 51.3s elapsed). A coroutine timeout
+        // cannot save you either: withTimeout cancels the coroutine, not the native frame, so
+        // the thread keeps spinning invisibly.
+        //
+        // The capture loop opens the camera anyway and is the honest source of truth, so a
+        // platform that has a camera API is reported available until capture proves otherwise.
+        _availability.value = CAMERA_FORMAT != null
     }
 
     @Volatile
@@ -126,12 +164,16 @@ class DesktopHandTracker(
             var grabber: FFmpegFrameGrabber? = null
             try {
                 // Initialize JNI — try GestureRecognizer first, fall back
-                // to HandLandmarker if model is unavailable.
+                // to HandLandmarker if it is unwanted or the model is unavailable.
                 MediaPipeJni.initialize()
 
-                val gestureModelPath = try {
-                    ModelExtractor.getGestureModelPath()
-                } catch (_: Exception) { null }
+                val gestureModelPath = if (enableGestureRecognizer) {
+                    try {
+                        ModelExtractor.getGestureModelPath()
+                    } catch (_: Exception) { null }
+                } else {
+                    null
+                }
 
                 if (gestureModelPath != null) {
                     useGestureRecognizer = true
@@ -146,9 +188,19 @@ class DesktopHandTracker(
 
                 grabber = FFmpegFrameGrabber("$deviceIndex").apply {
                     format = CAMERA_FORMAT
-                    imageWidth = 640
-                    imageHeight = 480
+                    imageWidth = CAPTURE_WIDTH
+                    imageHeight = CAPTURE_HEIGHT
                     frameRate = 30.0
+                    // No FFmpeg `timeout` here, and that is a finding rather than an omission.
+                    // An AVIOInterruptCB deadline was tried and MEASURED not to fire: the open
+                    // sat 35s against a 5s deadline. When this call hangs it is not waiting on
+                    // I/O -- it is blocked on a macOS camera-permission decision that never
+                    // arrives, because the JVM's TCC identity comes from the top of its process
+                    // ancestry and a gradle daemon rooted at a non-camera-granted app never
+                    // prompts. Reproduces with the bare `ffmpeg` CLI from the same shell, so it
+                    // is not a JVM or coroutine problem at all. Launch from a TCC-granted
+                    // terminal, and prefix with `./gradlew --stop` so no poisoned daemon is
+                    // reused.
                     start()
                 }
 
@@ -229,9 +281,24 @@ class DesktopHandTracker(
         captureJob = null
         // Cancel the capture job and wait for native cleanup in the finally block.
         // This prevents SIGABRT from closing the native recognizer while a JNI call
-        // is still in progress.
+        // is still in progress -- and it matters most for stop-then-start, which is what
+        // toggling the camera panel does.
         job.cancel()
-        runBlocking { job.join() }
+        // BOUNDED, and the bound is the whole point. This runs on the CALLER's thread, which
+        // is a Compose click handler, i.e. the UI thread. Cancellation is cooperative, so a
+        // coroutine parked in a native call never observes it -- an unbounded join then hangs
+        // the UI thread forever with the camera device still claimed, and the machine needs a
+        // reboot to get its camera back. GRABBER_TIMEOUT_MS should stop that happening at all;
+        // this is the backstop for the next native call that finds a way to wedge. A leaked
+        // capture thread is a far smaller failure than a frozen app.
+        val stopped = runBlocking { withTimeoutOrNull(STOP_TIMEOUT_MS) { job.join() } != null }
+        if (!stopped) {
+            log.error {
+                "Capture job ignored cancellation for ${STOP_TIMEOUT_MS}ms -- almost certainly " +
+                    "stuck in a native call. Abandoning it rather than freezing the UI; the " +
+                    "camera device may stay claimed until this process exits."
+            }
+        }
         _cameraFrame.value = null
     }
 
@@ -285,7 +352,7 @@ class DesktopHandTracker(
             }
             val gestureName = names?.getOrNull(h)
             if (gestureScore > 0.5f) {
-                log.debug { "GR frame: name=$gestureName score=${"%.2f".format(gestureScore)}" }
+                log.frameDebug { "GR frame: name=$gestureName score=${"%.2f".format(gestureScore)}" }
             }
             TrackedHand(remapLandmarks(rawLandmarks), handedness, gestureName, gestureScore)
         }
