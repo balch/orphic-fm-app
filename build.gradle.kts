@@ -38,7 +38,10 @@ tasks.register("checkPrivateIsolation") {
     // dependencyUpdatesAggregation, KMP's swiftPM lockfile metadata) aggregate EVERY
     // project in the build by design, so they name every private module and mean nothing.
     val declaredBucket = Regex("(implementation|api|compileOnly|runtimeOnly)$", RegexOption.IGNORE_CASE)
-    val offenders = allprojects
+    // Short-circuit before the scan, not inside doLast: with no clone present the result is
+    // discarded anyway, and computing it realizes every configuration container across the
+    // whole build (every KMP source-set bucket in ~76 projects) to build a list nobody reads.
+    val offenders = if (privatePaths.isEmpty()) emptyList() else allprojects
         .filterNot { it.projectDir.startsWith(privateRoot) }
         .flatMap { consumer ->
             consumer.configurations
@@ -69,5 +72,15 @@ tasks.register("checkPrivateIsolation") {
         logger.lifecycle(
             "checkPrivateIsolation: OK — ${privatePaths.size} private module(s) present, no public module depends on them.",
         )
+    }
+}
+
+// Registering the task above did not make it run: nothing depended on it, so a backwards
+// dependency still reached origin/main unchallenged. Hang it off jvmTest, the entry point
+// this repo already treats as "did I break anything" and the same one FeatureScopeGuardTest
+// uses to enforce a structural invariant.
+allprojects {
+    tasks.matching { it.name == "jvmTest" }.configureEach {
+        dependsOn(rootProject.tasks.named("checkPrivateIsolation"))
     }
 }
