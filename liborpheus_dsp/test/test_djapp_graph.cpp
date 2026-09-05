@@ -1109,6 +1109,14 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
 
 bool run_djapp_graph_tests() {
     printf("\n========== DJ APP GRAPH TESTS ==========\n");
+    // setup_pulsar_baseline pins pulsar_seed, but the voices also draw from the
+    // process-global stmlib::Random that every earlier suite has already stirred.
+    // The dedicated delay/reverb TAIL assertions are thresholds on that render, so
+    // without a pin here they are a lottery on suite order -- and on how many voices
+    // the engine renders, which is why growing kNumMainVoices to 24 for the score
+    // pool surfaced it. Restored on the way out so later suites keep their stream.
+    const uint32_t saved_random = stmlib::Random::state();
+    stmlib::Random::Seed(0xDA770000u);
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_djapp_graph_loads());
@@ -1128,6 +1136,7 @@ bool run_djapp_graph_tests() {
     tally(test_djapp_pulsar_effects_independent());
     tally(test_djapp_pulsar_zero_sends());
     tally(test_djapp_pulsar_delay_vs_reverb());
+    stmlib::Random::Seed(saved_random);
     printf("\nDJ App graph tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
