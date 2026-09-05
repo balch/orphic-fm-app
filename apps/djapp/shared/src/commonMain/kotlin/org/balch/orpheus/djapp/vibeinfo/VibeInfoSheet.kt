@@ -25,23 +25,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.StateFlow
-import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
-import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.widgets.OrpheusSlideUpSheet
 
 /**
@@ -267,25 +263,15 @@ internal fun VibeInfoContent(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 20.dp),
     ) {
-        // ── Header: name + scale tag ────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
+        Text(
+            text = model.name,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = OrpheusColors.onSurfaceDark,
+            modifier = Modifier .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .padding(top = 12.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = model.name,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = OrpheusColors.onSurfaceDark,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            ScaleTag(label = model.scaleName)
-        }
+        )
 
         // ── Meta line: BPM · Key · Scale ────────────────────────────────────
         Text(
@@ -349,20 +335,6 @@ internal fun VibeInfoContent(
 }
 
 // ── Sub-composables ──────────────────────────────────────────────────────────
-
-@Composable
-private fun ScaleTag(label: String, modifier: Modifier = Modifier) {
-    Text(
-        text = label.uppercase(),
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Medium,
-        color = OrpheusColors.cosmicPurple,
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(OrpheusColors.cosmicPurple.copy(alpha = 0.15f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
-}
 
 @Composable
 private fun SectionChip(section: VibeInfoSection) {
