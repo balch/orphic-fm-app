@@ -88,3 +88,18 @@ export-appstore-*/
 
 # AI-authored design specs — superseded by the code, stale within days
 docs/superpowers/
+
+# Private app modules (Orphic Baton). Their own repo, github.com/balch/orphic-baton,
+# cloned into noop/. settings.gradle.kts loads noop/settings.gradle.kts when present,
+# so the build works identically with or without the clone.
+noop/
+
+# Generated score assets: deny by default, ship by exception.
+# `:features:pulsar:importScore` writes every score it can build into this folder,
+# including the multi-part exports that only a score-playing host can select (~3.8MB
+# with no picker in this app). Listing them individually meant each new one had to be
+# remembered; the folder rule means a regenerated score is ignored unless someone
+# deliberately un-ignores it, which is the right way round for bytes that ship publicly.
+# Note the `/*` — excluding the directory itself would make the negation below impossible.
+features/pulsar/src/commonMain/composeResources/files/scores/*
+!features/pulsar/src/commonMain/composeResources/files/scores/fifth-lead.json
