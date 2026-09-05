@@ -70,6 +70,14 @@ static TestSuite suites[] = {
     {"pulsar_wah_anomaly", run_pulsar_wah_anomaly_tests, true},
     {"pulsar_anomaly_arm", run_pulsar_anomaly_arm_tests, true},
     {"pulsar_lick_select", run_pulsar_lick_select_tests, true},
+    {"pulsar_score_clock", run_pulsar_score_clock_tests, true},
+    {"pulsar_score_sched", run_pulsar_score_sched_tests, true},
+    {"score_voice_alloc", run_score_voice_alloc_tests, true},
+    {"score_spike",     run_score_voice_spike_tests, false},
+    {"score_chord",     run_score_chord_path_tests, true},
+    {"score_marshal",   run_score_marshalling_tests, false},  // informational: timing probe
+    {"score_envelope",  run_score_voice_envelope_tests, true},
+    {"pulsar_section_request", run_pulsar_section_request_tests, true},
     {"tension",         run_pulsar_tension_tests,  true},
     {"pulsar_solos",    run_pulsar_solos_tests,    true},
     {"pulsar_sections", run_pulsar_sections_tests, true},
@@ -110,6 +118,11 @@ static TestSuite suites[] = {
     {"master_swell",    run_master_swell_tests,    true},
     {"master_cut",      run_master_cut_tests,      true},
     {"graph-swap",      run_graph_swap_tests,      true},
+
+// Rows for any extra suites CMake added to the target. Absent is the normal case.
+#if __has_include("noop_suites.inc")
+#include "noop_suites.inc"
+#endif
 };
 
 static constexpr int kNumSuites = sizeof(suites) / sizeof(suites[0]);

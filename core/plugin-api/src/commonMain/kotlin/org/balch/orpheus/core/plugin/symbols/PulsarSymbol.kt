@@ -651,6 +651,17 @@ enum class PulsarSymbol(
     ARRANGEMENT_INTRO_INDEX("arrangement_intro_index"),
     ARRANGEMENT_OUTRO_INDEX("arrangement_outro_index"),
     ARRANGEMENT_OUTRO_REQUEST("arrangement_outro_request"),
+    ARRANGEMENT_SECTION_REQUEST("arrangement_section_request"),
+    // Conductor live-gesture ports, all with live C++ rows: TENSION_DRIVE accumulates
+    // deltas and decays per bar; SCORE_HOLD_RELEASE frees parked score cursors;
+    // SCORE_FREE_RUN stops hold flags parking them at all; BAND_HOLD mutes the generative
+    // band until a written cue; SCORE_ACCENT_SCALE scales score-voice accent while
+    // conducting gated passages.
+    TENSION_DRIVE("tension_drive"),
+    SCORE_HOLD_RELEASE("score_hold_release"),
+    SCORE_FREE_RUN("score_free_run"),
+    BAND_HOLD("band_hold"),
+    SCORE_ACCENT_SCALE("score_accent_scale"),
     ANOMALY_REQUEST("anomaly_request"),
     SECTION_DATA_START("section_data_start"),
     SECTION_TRANSITIONS_START("section_transitions_start"),

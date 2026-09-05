@@ -333,9 +333,9 @@ JNI_FN(nativeGetPulsarActiveEngines)(JNIEnv *env, jobject thiz, jintArray out) {
 
 JNIEXPORT void JNICALL
 JNI_FN(nativeGetPulsarArrangement)(JNIEnv *env, jobject thiz, jintArray out) {
-    int data[6] = {-1, 0, 0, 0, -1, 0};
+    int data[8] = {-1, 0, 0, 0, -1, 0, 0, 0};
     sEngine.getPulsarArrangement(data);
-    env->SetIntArrayRegion(out, 0, 6, reinterpret_cast<jint*>(data));
+    env->SetIntArrayRegion(out, 0, 8, reinterpret_cast<jint*>(data));
 }
 
 } // extern "C"

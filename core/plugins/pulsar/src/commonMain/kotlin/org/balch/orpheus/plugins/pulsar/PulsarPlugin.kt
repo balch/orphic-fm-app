@@ -31,6 +31,7 @@ class PulsarPlugin : DspPlugin {
     }
 
     private var _playing = 0
+    private var _scoreFreeRun = 0
     private var _vibeGeneration = 0
     private var _anomalyRequest: Int = 0
     private var _energy = 0.5f
@@ -662,6 +663,12 @@ class PulsarPlugin : DspPlugin {
                 floatType { default = 0.5f; min = 0f; max = 1f
                     get { _trackLpgColour[t] }; set { _trackLpgColour[t] = it } }
             }
+        }
+        // Declared LAST so every existing port keeps its index. A score host writes this before
+        // audio boots, and only declared+stored ports survive the engine recreation in
+        // DesktopEngine::open -- syncNativeBridgeState's generic loop is what re-pushes it.
+        controlPort(PulsarSymbol.SCORE_FREE_RUN) {
+            intType { default = 0; get { _scoreFreeRun }; set { _scoreFreeRun = it } }
         }
     }
 

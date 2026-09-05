@@ -235,7 +235,7 @@ grooves.
 LICK — `{"type":"lick", "lick": {…}, "chance": 0.02}`: a rare one-statement swap-in of an alternate
 riff over whatever lick is playing, reverting after. Requires a lick source (`lick` or `lickRotation`).
 `chance` (0..1) is the per-~2-bar-statement swap probability; keep it low. The anomaly lick shares the
-lick bank, so `lickRotation.pool` size + 1 must be ≤ 4 (MAX_LICK_POOL). See section 10's riff recipe.
+lick bank, so `lickRotation.pool` size + 1 must be ≤ 8 (MAX_LICK_POOL). See section 10's riff recipe.
 
 STANDING WAH (not an anomaly) — `lickWah` on the vibe plus `wahLick: true` on a Melodic track:
 an always-on tempo-synced bandpass on that track's audio. Any melodic track may opt in, the bass
@@ -331,7 +331,7 @@ The highest-value part: translate a described feel into concrete parameter choic
 - Rotating riff (per-section variety, avoids monotony): set `lickRotation.pool` to 2–4 licks and the engine
   swaps between them at section boundaries (needs an arrangement). For a rare surprise, add a
   `{"type":"lick", "lick": {…}, "chance": 0.02}` entry to `anomalies` (≈ 1-in-50 per ~2-bar statement) —
-  that lick cuts in occasionally, then reverts. Pool size + the lick anomaly must be ≤ 4 (MAX_LICK_POOL).
+  that lick cuts in occasionally, then reverts. Pool size + the lick anomaly must be ≤ 8 (MAX_LICK_POOL).
   `lickRotation` overrides the static `lick` while active.
 
 ## 11. Invariants & failure modes

@@ -473,6 +473,28 @@ class PulsarSectionProgressionPushTest {
         }
     }
 
+    @Test
+    fun `lickIndex pushes as slot plus one, and null pushes zero`() = runTest(testDispatcher) {
+        // Section 0: lickIndex left null (roll as usual). Section 1: pinned to slot 2.
+        val sections = listOf(
+            Section(name = "verse", barsMin = 2, barsMax = 2,
+                transitions = listOf(SectionTransition(1, 1f))),
+            Section(name = "chorus", barsMin = 2, barsMax = 2, lickIndex = 2,
+                transitions = listOf(SectionTransition(0, 1f))),
+        )
+        val vibe = pushTestVibe(sections = sections)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        // Field 26 is the lick slot -- it sat at 21 until the weather bed claimed 21-25.
+        // 0 means "no override" because the C++ port array is zero-initialised, so a raw
+        // index would pin slot 0 for every existing vibe.
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        assertEquals(0f, floatPort("section_data_${0 * stride + 26}"))
+        assertEquals(3f, floatPort("section_data_${1 * stride + 26}"))
+    }
+
     /**
      * A vibe switch must apply the incoming vibe's opening section even though the section index
      * did not change — the collector is `distinctUntilChanged` on sectionIndex and nothing resets

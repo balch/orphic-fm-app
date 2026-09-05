@@ -137,6 +137,12 @@ class SynthController() {
         pluginPortSetter = setter
         pluginPortGetter = getter
         nativeSyncCallback = nativeSync
+        // Writes that raced engine construction land now, setter only: their control-change
+        // events already fired at write time. Flows that were merely read stay untouched --
+        // replaying a seed would overwrite the engine's own value.
+        for ((id, flow) in _controlFlows.entries.toList()) {
+            if (flow.consumePendingReplay()) setter(id, flow.value)
+        }
     }
 
     /**
@@ -188,17 +194,26 @@ class SynthController() {
     ) : MutableStateFlow<PortValue> {
         private val flow = MutableStateFlow(initialValue)
 
+        /** A write landed while no engine delegate was wired; setDelegates() owes it a replay. */
+        private var pendingReplay = false
+
+        fun consumePendingReplay(): Boolean = pendingReplay.also { pendingReplay = false }
+
         /**
          * Update the flow value from the engine without triggering pluginPortSetter.
          * Used after preset restore where the plugin already has the value.
          */
         fun updateFromEngine(v: PortValue) {
             flow.value = v
+            // The engine is authoritative now; a pre-wiring write this value just replaced
+            // must not be replayed over it later.
+            pendingReplay = false
         }
 
         /** Forward a value change to the synth engine and emit a legacy control event. */
         private fun onValueChanged(v: PortValue, origin: ControlEventOrigin = ControlEventOrigin.UI) {
-            pluginPortSetter?.invoke(id, v)
+            val setter = pluginPortSetter
+            if (setter != null) setter(id, v) else pendingReplay = true
             emitControlChange(id.key, v.asFloat(), origin)
         }
 

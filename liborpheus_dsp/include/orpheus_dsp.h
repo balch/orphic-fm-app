@@ -170,13 +170,17 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
 void orpheus_engine_get_pulsar_active_engines(OrpheusEngine* engine, int* out);
 
 // ── Pulsar arrangement state read-back (polled at ~5fps from UI thread) ──
-// Reads the current arrangement state into out[6]:
+// Reads the current arrangement state into out[8]:
 //   out[0] = section_index (-1 = inactive)
 //   out[1] = bars_elapsed
 //   out[2] = bars_total
 //   out[3] = solo_active (0 or 1)
 //   out[4] = solo_track (-1 = none)
 //   out[5] = solo_mode
+//   out[6] = notated-score clock position, in ticks (pulsar_score_pos_tick).
+//            A top-level engine field, not gated on out[0]'s arrangement-active
+//            check -- written on every call regardless of arrangement state.
+//   out[7] = any score-driven track currently parked on a hold (pulsar_score_any_held)
 void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out);
 
 #ifdef __cplusplus

@@ -53,8 +53,6 @@
 #undef LUT_FM_FREQUENCY_QUANTIZER_SIZE
 #include "braids/macro_oscillator.h"
 
-#include "orpheus_automation.h"
-
 // Include MI Streams Lorenz generator
 #include "streams/lorenz_generator.h"
 
@@ -74,7 +72,13 @@
 #include <atomic>
 #include <cstring>
 
-static constexpr int kNumMainVoices = 12;
+// Score-conducted playback measures a 22-voice tutti peak on the Fifth;
+// 24 matches kMaxScoreVoices (score_voice_alloc.h) so every pool slot can sound.
+static constexpr int kNumMainVoices = 24;
+
+// orpheus_automation.h's slot layout (gates + freqs per main voice) is derived from
+// kNumMainVoices, so this include must come after the constant above is declared.
+#include "orpheus_automation.h"
 
 // Pulsar viz EXPORT width. The Kotlin<->native step-grid buffer contract is
 // kNumPulsarTracks * kPulsarVizSteps ints/floats (= 256). DECOUPLED from
@@ -89,8 +93,8 @@ static constexpr int kPulsarVizSteps = 32;
 static_assert(kPulsarVizSteps <= kMaxPulsarSteps,
               "viz export reads from the kMaxPulsarSteps-sized PulsarViz struct");
 static constexpr int kNumDrumVoices = 3;
-static constexpr int kDrumVoiceStart = kNumMainVoices;  // 12
-static constexpr int kNumVoices = kNumMainVoices + kNumDrumVoices;  // 15
+static constexpr int kDrumVoiceStart = kNumMainVoices;  // 24
+static constexpr int kNumVoices = kNumMainVoices + kNumDrumVoices;  // 27
 static constexpr int kVoiceAllocBytes = 32768;  // 32KB per voice (generous)
 
 struct OrpheusEngine {
@@ -127,6 +131,9 @@ struct OrpheusEngine {
         bool graph_trigger_pending{false};   // rising edge detected, not yet consumed by render
         bool ext_retrigger{false};           // external gate re-trigger: force ADSR back to attack
         std::atomic<int> engine_changed{0};  // 1 = engine just changed, force LPG retrigger
+        // true only for pooled score voices (orpheus_unit_pulsar mirror loop); selects
+        // the score ADSR mapping and forces the envelope on for engines 19/20.
+        std::atomic<bool> score_driven{false};
     };
     VoiceParams voice_params[kNumVoices];
 
@@ -333,7 +340,9 @@ struct OrpheusEngine {
     std::atomic<float> total_feedback{0.0f};           // master output → LFO feedback (0-1)
 
     // ── Mod Source Routing + FM ─────────────────────────
-    static constexpr int kNumDuos = 6;
+    // Derived, not a separate literal: a duoVoice GraphUnit's moduleIndex*2 must stay
+    // inside kNumMainVoices or unit_process_duo_voice silently rejects it.
+    static constexpr int kNumDuos = kNumMainVoices / 2;
     // Previous block's full output per voice (for audio-rate VOICE_FM cross-mod).
     // Stores post-VCA, post-gain signal (includes envelope shaping and kEngine0OutGain
     // or kOrpheusOutGain), matching JSyn where voiceA.output connects post-VCA.
@@ -919,7 +928,7 @@ struct OrpheusEngine {
     // Plain buffers guarded by pulsar_lick_pool_count's release store (same publish
     // contract as pulsar_lick / pulsar_lick_length). kMaxLickPool bank slots hold the
     // rotation members plus one optional anomaly lick.
-    static constexpr int kMaxLickPool = 4;
+    static constexpr int kMaxLickPool = 8;
     float pulsar_lick_pool_data[kMaxLickPool * kMaxLickSteps * kLickFieldsPerStep] = {};
     int   pulsar_lick_pool_len[kMaxLickPool]  = {};
     int   pulsar_lick_pool_loop[kMaxLickPool] = {};
@@ -971,6 +980,12 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_intro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_request{0};
+    // Conductor's section jump. Value is section index + 1; 0 = no request, so a
+    // zero-initialised atomic cannot be mistaken for a request for section 0.
+    std::atomic<int> pulsar_arrangement_section_request{0};
+    // Conductor tension gestures accumulate deltas here; the unit folds them into
+    // tension_intensity per bar and decays the held value back toward the piece's own arc.
+    std::atomic<float> pulsar_tension_drive{0.0f};
     std::atomic<float> pulsar_section_data[kMaxSections * kSectionDataFields] = {};
     // Void Anomaly: 8-float config bank [0]=prob, [1]=floor, [2]=rampDown, [3]=floorMin,
     // [4]=floorMax, [5]=rampUp, [6]=ghost, [7]=declared flag (1.0 when the vibe declares a
@@ -1205,6 +1220,69 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_track_evo_note_follow[8] = {};
     std::atomic<int>   pulsar_track_evo_pitch_mode[8] = {};
     std::atomic<float> pulsar_track_evo_voicing_tension[8] = {};
+
+    // ── Notated Score Wire Format ─────────────────────
+    // One written note. Integer ticks at 96 PPQ; flags bit 0 = hold.
+    struct ScoreEvent {
+        int32_t  tick;
+        uint16_t duration;
+        uint8_t  pitch;
+        uint8_t  velocity;
+        uint8_t  flags;
+    };
+
+    // Plain buffers, published under TWO release stores rather than snapshotted: the
+    // arrays are ~393KB, far too large to copy into PulsarState the way the much smaller
+    // pulsar_lick_pool_data is. The writer fills a track's events and count, THEN releases
+    // pulsar_track_score_driven for that track, THEN releases pulsar_score_generation
+    // (see pushNotatedScore). The audio thread acquires the generation once — which is
+    // what latches PulsarState::score_armed — and acquires the per-track flag every block
+    // before it touches either array. A rewrite clears the flag first, so the array is
+    // unpublished while it is being overwritten.
+    ScoreEvent pulsar_score_events[kNumPulsarTracks][kMaxScoreEvents] = {};
+    int        pulsar_score_event_count[kNumPulsarTracks] = {};
+
+    // 1 = this track's notes come from the score, not the pattern generator. Doubles as
+    // the per-track publish flag for the two arrays above.
+    std::atomic<int> pulsar_track_score_driven[kNumPulsarTracks] = {};
+
+    // Bumped last after a score upload; arms the audio side and resets the score clock.
+    std::atomic<int> pulsar_score_generation{0};
+
+    // 1 = the generative band is held silent while the score plays alone. Cleared by a
+    // score event carrying flags bit 1, which is how a piece opens on the motif and brings
+    // the band in later. Pulsar's audio is muted while held, but the score machinery still
+    // runs -- otherwise the clock that must release the hold would never advance.
+    std::atomic<int> pulsar_band_hold{0};
+
+    // Per-part sound for score-driven voices; defaults mirror Kotlin PartTimbre.
+    struct ScorePartParams {
+        std::atomic<int>   engine_index{0};
+        std::atomic<float> harmonics{0.5f};
+        std::atomic<float> timbre{0.5f};
+        std::atomic<float> morph{0.5f};
+        std::atomic<float> decay{0.5f};
+        std::atomic<float> level{1.0f};
+    };
+    ScorePartParams pulsar_score_part[kNumPulsarTracks];
+
+    // A parked cursor (score_cursors[t].held) freezes score_clock_advance for the whole
+    // ensemble. hold_release is a fetch_add counter, consumed via exchange(0) every block,
+    // so a beat during an unheld score is a harmless no-op rather than a stuck flag.
+    std::atomic<int>   pulsar_score_hold_release{0};
+    // 1 = hold flags never park (a watch mode: nobody is conducting, so the piece
+    // plays itself at its written ticks). Deliberately NOT cleared by the vibe-load reset
+    // below: it is a conducting-mode policy owned by the app, not per-piece state, and
+    // clearing it there would silently re-arm the gate behind a load.
+    std::atomic<int>   pulsar_score_free_run{0};
+    // Multiplies the mirror's per-note accent; gated beats set it per beat, elastic
+    // sections leave it at the neutral 1.
+    std::atomic<float> pulsar_score_accent_scale{1.0f};
+
+    // Published once per block for the conducting ribbon: the clock's tick position and
+    // whether any track is currently parked.
+    std::atomic<int> pulsar_score_pos_tick{0};
+    std::atomic<int> pulsar_score_any_held{0};
 
     // ── Pulsar Dedicated Delay ────────────────────────
     // Separate delay instance for Pulsar sends, independent from the shared voice delay.

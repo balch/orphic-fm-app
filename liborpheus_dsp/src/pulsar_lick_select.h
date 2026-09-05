@@ -31,11 +31,20 @@ inline bool lick_roll_anomaly(uint32_t& rng, float chance) {
 // (precedence: anomaly wins). force is checked FIRST in the short-circuit so a forced
 // call never touches lick_roll_anomaly's rand01() draw. Returns the desired slot, or
 // -1 when pool_count <= 0. Advances rng only where it actually rolls.
+//
+// forced_index >= 0 pins the rotation to that slot instead of rolling, for Scores that
+// assign a theme per section. The anomaly still outranks it, so a theme restatement
+// keeps working. Pinning consumes no RNG, so a pinned section leaves the stream
+// identical to one that never rotated.
 inline int lick_resolve_desired(uint32_t& rng, bool section_changed, int pool_count,
                                 int anomaly_index, float anomaly_chance, int& active_rotation,
-                                bool force_anomaly = false) {
+                                bool force_anomaly = false, int forced_index = -1) {
     if (pool_count <= 0) return -1;
-    if (section_changed) active_rotation = lick_pick_rotation(rng, pool_count);
+    if (forced_index >= 0 && forced_index < pool_count) {
+        active_rotation = forced_index;
+    } else if (section_changed) {
+        active_rotation = lick_pick_rotation(rng, pool_count);
+    }
     bool want_anomaly = (anomaly_index >= 0) && (force_anomaly || lick_roll_anomaly(rng, anomaly_chance));
     return want_anomaly ? anomaly_index : active_rotation;
 }

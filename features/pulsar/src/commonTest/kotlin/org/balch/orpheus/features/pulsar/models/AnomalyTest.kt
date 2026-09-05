@@ -177,10 +177,10 @@ class AnomalyTest {
 
     @Test
     fun rejects_bank_capacity_overflow() {
-        // rotation pool of 4 + 1 lick anomaly = 5 slots > MAX_LICK_POOL (4).
+        // rotation pool of 8 + 1 lick anomaly = 9 slots > MAX_LICK_POOL (8).
         assertFailsWith<IllegalArgumentException> {
             base.copy(
-                lickRotation = LickRotation(pool = listOf(smallLick, smallLick, smallLick, smallLick)),
+                lickRotation = LickRotation(pool = List(8) { smallLick }),
                 anomalies = listOf(LickAnomaly(lick = smallLick)),
             )
         }

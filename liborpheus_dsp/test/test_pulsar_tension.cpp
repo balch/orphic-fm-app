@@ -7,6 +7,8 @@
 #include <cstring>
 #include <vector>
 
+static constexpr const char* PULSAR_URI = "org.balch.orpheus.plugins.pulsar";
+
 // ── Tension intensity, driven through the real unit ──
 //
 // Both tests below used to recompute (loop_count % inner) / inner in their own
@@ -829,6 +831,175 @@ static bool test_equal_inner_outer_bars_curve_the_walkup() {
     return ok;
 }
 
+// ── conductor tension_drive ──
+//
+// tension_drive is a live conductor gesture routed through orpheus_engine_set_port:
+// deltas CAS-accumulate in engine->pulsar_tension_drive until the next bar boundary,
+// where tension_drive_step() (called from mutate_patterns, which runs once per bar on
+// track 0's loop wrap) consumes them into state->tension_drive_held, clamps to [-1,1],
+// decays by 0.97, and folds the result into tension_intensity.
+
+static bool test_tension_drive_raises_intensity_above_baseline() {
+    printf("\n=== Test: two +0.15 tension_drive deltas raise intensity above baseline ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.7f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_tension_inner_bars.store(8, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+    engine->pulsar_seed.store(99, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    // The first block forces the lazy state-init + load_vibe path, which zeroes both
+    // pulsar_tension_drive and tension_drive_held. Deltas must be written AFTER this
+    // call, or the port-reset would consume them before mutate_patterns ever sees them.
+    unit_process_pulsar(&unit, engine, 256, 48000.0f);
+    orpheus_engine_set_port(engine, PULSAR_URI, "tension_drive", 0.15f);
+    orpheus_engine_set_port(engine, PULSAR_URI, "tension_drive", 0.15f);
+
+    // Run until the first bar boundary (loop_count -> 1) consumes the accumulated deltas.
+    float driven_intensity = -1.0f, held = 0.0f;
+    int last_loop = -1;
+    for (int i = 0; i < 20000 && driven_intensity < 0.0f; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            last_loop = ps->loop_count;
+            if (last_loop == 1) {
+                driven_intensity = ps->tension_intensity;
+                held = ps->tension_drive_held;
+            }
+        }
+    }
+
+    // No-drive baseline at the same bar: inner_phase = (1 % 8) / 8, outer_scale = 1
+    // (outer_bars = 0 short-circuits the outer-cycle modulation).
+    float baseline = 1.0f / 8.0f;
+    float expected_bump = 0.30f * 0.97f;  // two 0.15 deltas, one decay step
+    float bump = driven_intensity - baseline;
+
+    bool ok = driven_intensity >= 0.0f
+           && std::fabs(bump - expected_bump) < 0.02f
+           && std::fabs(held - expected_bump) < 0.001f;
+    printf("  bar1 intensity=%.4f baseline=%.4f bump=%.4f (want ~%.4f) held=%.4f -- %s\n",
+           driven_intensity, baseline, bump, expected_bump, held, ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+static bool test_tension_drive_negative_clamps_and_holds_floor() {
+    printf("\n=== Test: two -1.0 tension_drive deltas clamp intensity >= 0, held at the floor ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.7f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_tension_inner_bars.store(8, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+    engine->pulsar_seed.store(99, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    unit_process_pulsar(&unit, engine, 256, 48000.0f);  // force load_vibe's port-reset first
+    orpheus_engine_set_port(engine, PULSAR_URI, "tension_drive", -1.0f);
+    orpheus_engine_set_port(engine, PULSAR_URI, "tension_drive", -1.0f);
+
+    float intensity = -1.0f, held = 1.0f;
+    int last_loop = -1;
+    for (int i = 0; i < 20000 && intensity < 0.0f; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            last_loop = ps->loop_count;
+            if (last_loop == 1) {
+                intensity = ps->tension_intensity;
+                held = ps->tension_drive_held;
+            }
+        }
+    }
+
+    // Sum of deltas (-2.0) clamps to -1.0 before the 0.97 decay step -> held ~= -0.97.
+    // baseline (0.125) + held (~-0.97) is deeply negative, so clamp01 floors it at 0.
+    bool ok = intensity >= 0.0f
+           && intensity < 0.001f
+           && held >= -1.0f
+           && std::fabs(held - (-0.97f)) < 0.01f;
+    printf("  bar1 intensity=%.4f (want 0, clamped) held=%.4f (want ~-0.97) -- %s\n",
+           intensity, held, ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+static bool test_tension_drive_decays_toward_baseline_after_silence() {
+    printf("\n=== Test: a tension_drive nudge fades back toward baseline over silence ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.7f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_tension_inner_bars.store(8, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+    engine->pulsar_seed.store(99, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    unit_process_pulsar(&unit, engine, 256, 48000.0f);  // force load_vibe's port-reset first
+    orpheus_engine_set_port(engine, PULSAR_URI, "tension_drive", 0.15f);
+
+    // 0.97/bar decay is slower than the brief's "~32 bars" ballpark suggests: a single
+    // 0.15 nudge (0.1455 right after the consuming bar) needs ~37 silent bars to fall
+    // under the 0.05 tolerance (0.15 * 0.97^37 =~ 0.049). This runs to bar 50 for margin
+    // and flags the discrepancy in the task report.
+    constexpr int kTargetBar = 50;
+    float intensity = -1.0f, held = 1.0f;
+    int last_loop = -1;
+    for (int i = 0; i < 20000 && intensity < 0.0f; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        if (ps->loop_count != last_loop) {
+            last_loop = ps->loop_count;
+            if (last_loop == kTargetBar) {
+                intensity = ps->tension_intensity;
+                held = ps->tension_drive_held;
+            }
+        }
+    }
+
+    float baseline = static_cast<float>(kTargetBar % 8) / 8.0f;
+    float deviation = std::fabs(intensity - baseline);
+    bool ok = intensity >= 0.0f && deviation < 0.05f;
+    printf("  bar%d intensity=%.4f baseline=%.4f deviation=%.4f (want <0.05) held=%.4f -- %s\n",
+           kTargetBar, intensity, baseline, deviation, held, ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_tension_tests() {
     printf("\n========== PULSAR TENSION TESTS ==========\n");
     // Several tests here call pin_pulsar_rngs, which re-seeds the process-global
@@ -859,6 +1030,10 @@ bool run_pulsar_tension_tests() {
     tally(test_original_lick_immutable());
     tally(test_random_spurt_fires());
     tally(test_tension_evo_release_speed_decays_over_bars());
+    // conductor tension_drive
+    tally(test_tension_drive_raises_intensity_above_baseline());
+    tally(test_tension_drive_negative_clamps_and_holds_floor());
+    tally(test_tension_drive_decays_toward_baseline_after_silence());
     tally(test_equal_inner_outer_bars_curve_the_walkup());
     stmlib::Random::Seed(saved_random);
     printf("\nPulsar tension tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");

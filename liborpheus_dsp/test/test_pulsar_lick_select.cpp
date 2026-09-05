@@ -149,6 +149,50 @@ static bool test_force_anomaly_with_no_anomaly_slot_returns_rotation() {
     return ok;
 }
 
+// forced_index: a Score pins a section's lick to a specific rotation slot instead of
+// rolling. The anomaly still outranks the pin (a theme-restatement anomaly must keep
+// firing), and a pin must consume no RNG so a pinned section's stream matches an
+// unpinned one exactly.
+static bool test_forced_index_pins_the_slot() {
+    printf("\n=== Test: forced_index pins the slot and consumes no RNG ===\n");
+    uint32_t rng = 4242u;
+    uint32_t before = rng;
+    int active = 0;
+    int got = lick_resolve_desired(rng, /*section_changed=*/true, /*pool_count=*/8,
+                                   /*anomaly_index=*/-1, /*anomaly_chance=*/0.0f,
+                                   active, /*force_anomaly=*/false, /*forced_index=*/5);
+    bool ok = (got == 5) && (active == 5) && (rng == before);
+    printf("  got=%d active=%d rng_moved=%d -- %s\n",
+           got, active, rng != before, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_forced_index_still_yields_to_anomaly() {
+    printf("\n=== Test: the lick anomaly outranks a pinned slot ===\n");
+    uint32_t rng = 88u;
+    int active = 0;
+    int got = lick_resolve_desired(rng, /*section_changed=*/true, /*pool_count=*/8,
+                                   /*anomaly_index=*/3, /*anomaly_chance=*/1.0f,
+                                   active, /*force_anomaly=*/false, /*forced_index=*/5);
+    bool ok = (got == 3);
+    printf("  got=%d -- %s\n", got, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_negative_forced_index_rolls_as_before() {
+    printf("\n=== Test: forced_index -1 leaves rotation behaviour unchanged ===\n");
+    uint32_t a = 555u, b = 555u;
+    int active_a = 0, active_b = 0;
+    bool ok = true;
+    for (int i = 0; i < 50; i++) {
+        int ra = lick_resolve_desired(a, true, 8, -1, 0.0f, active_a, false, -1);
+        int rb = lick_resolve_desired(b, true, 8, -1, 0.0f, active_b, false);  // default
+        if (ra != rb) { ok = false; break; }
+    }
+    printf("  %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 #include "test_pulsar_helpers.h"
 #include "orpheus_engine.h"
 #include "orpheus_unit_pulsar.h"
@@ -201,6 +245,74 @@ static bool test_lick_pool_round_trip() {
     printf("  pool_count=%d picked=%d lick[0].deg=%d -- %s\n",
            ps ? ps->lick_pool_count : -1, ps ? ps->current_lick_index : -1,
            ps ? ps->lick[0].scale_degree : -1, ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+// Bank round-trip at slot 7 (kMaxLickPool - 1), the slot that exists only after the
+// 4->8 cap raise. Extends test_lick_pool_round_trip's shape to the new top slot, with
+// pool_count=8 so load_vibe's `pool_count > kMaxLickPool` clamp is exercised at the
+// real ceiling instead of being trivially satisfied by a low count.
+static bool test_lick_pool_round_trip_top_slot() {
+    printf("\n=== Test: lick_pool bank round-trips at slot 7 (the new top slot) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+
+    const int F = OrpheusEngine::kLickFieldsPerStep;      // 4
+    const int S = OrpheusEngine::kMaxLickSteps;           // 64
+    auto putStep = [&](int slot, int step, float deg, float dur, float vel, float glide) {
+        int b = slot * (S * F) + step * F;
+        engine->pulsar_lick_pool_data[b + 0] = deg;
+        engine->pulsar_lick_pool_data[b + 1] = dur;
+        engine->pulsar_lick_pool_data[b + 2] = vel;
+        engine->pulsar_lick_pool_data[b + 3] = glide;
+    };
+    // Slot 0: low-index control, so a pass isn't just luck at one array offset.
+    putStep(0, 0, 2.f, 0.5f, 0.75f, -1.f); putStep(0, 1, 3.f, 0.5f, 0.75f, -1.f);
+    engine->pulsar_lick_pool_len[0] = 2; engine->pulsar_lick_pool_loop[0] = 8;
+    // Slot 7: the new top slot. 3 distinct steps (a different count than slot 0) so a
+    // truncated bank (old cap 4) or a stride/index mixup is unmistakable.
+    putStep(7, 0, 5.f, 0.25f, 0.625f, 0.125f);
+    putStep(7, 1, 6.f, 0.5f,  0.75f,  0.25f);
+    putStep(7, 2, 7.f, 0.75f, 0.875f, 0.375f);
+    engine->pulsar_lick_pool_len[7] = 3; engine->pulsar_lick_pool_loop[7] = 12;
+    engine->pulsar_lick_anomaly_index = -1;
+    engine->pulsar_lick_anomaly_chance = 0.0f;
+    // pool_count=8 hits load_vibe's `if (pool_count > kMaxLickPool) pool_count =
+    // kMaxLickPool;` clamp at the real ceiling -- under the old cap of 4 this would
+    // silently clamp to 4 and slot 7 would never unpack.
+    engine->pulsar_lick_pool_count.store(8, std::memory_order_release);
+
+    engine->pulsar_seed.store(4242, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);  // warm-up: PulsarState is lazy
+
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = ps
+        && ps->lick_pool_count == 8   // not silently clamped down to the old cap
+        && ps->lick_pool_len[0] == 2
+        && ps->lick_pool[0][0].scale_degree == 2 && ps->lick_pool[0][1].scale_degree == 3
+        && ps->lick_pool_len[7] == 3 && ps->lick_pool_loop[7] == 12
+        && ps->lick_pool[7][0].scale_degree == 5 && ps->lick_pool[7][0].duration == 0.25f
+        && ps->lick_pool[7][0].velocity == 0.625f && ps->lick_pool[7][0].glide_rate == 0.125f
+        && ps->lick_pool[7][1].scale_degree == 6 && ps->lick_pool[7][1].duration == 0.5f
+        && ps->lick_pool[7][2].scale_degree == 7 && ps->lick_pool[7][2].duration == 0.75f
+        // Whichever slot the initial rotation pick landed on (0..7), the active lick
+        // must be self-consistent with that slot's bank data -- same invariant as
+        // test_lick_pool_round_trip, generalized from a 2-member to an 8-member pool.
+        && ps->current_lick_index >= 0 && ps->current_lick_index < 8
+        && ps->lick_length == ps->lick_pool_len[ps->current_lick_index]
+        && ps->lick[0].scale_degree == ps->lick_pool[ps->current_lick_index][0].scale_degree;
+    printf("  pool_count=%d slot7_len=%d slot7=[%d,%d,%d] picked=%d -- %s\n",
+           ps ? ps->lick_pool_count : -1, ps ? ps->lick_pool_len[7] : -1,
+           ps ? ps->lick_pool[7][0].scale_degree : -1, ps ? ps->lick_pool[7][1].scale_degree : -1,
+           ps ? ps->lick_pool[7][2].scale_degree : -1, ps ? ps->current_lick_index : -1,
+           ok ? "PASS" : "FAIL");
     orpheus_engine_destroy(engine);
     return ok;
 }
@@ -386,6 +498,89 @@ static bool test_manual_trigger_forces_lick_anomaly_once() {
     return ok;
 }
 
+// Regression (Task 3 review, Finding 1): the INITIAL section's lick pin must apply from
+// load, not just after the first lick-loop wrap. load_vibe picks a random rotation slot
+// and renders the FILL/Squash tracks from it BEFORE the arrangement is unpacked; without
+// a fixup, a Score whose opening section pins a slot plays a random lick first and then
+// audibly swaps once the per-statement resolve path (:2770) first runs.
+//
+// The UNPINNED pick is deliberately play-scoped: load_vibe's lick_select_seed stirs in
+// wall-clock time so rotation varies run to run (see its derivation, ~load_vibe:832),
+// independent of the vibe's own pulsar_seed. That means a single trial pinned to one
+// slot of a small pool has a real chance of coincidentally landing there even with the
+// fixup completely missing -- confirmed empirically while verifying this test: an
+// earlier 2-member version of this test passed under a deliberately broken decode
+// because that run's random pick happened to match the pin by chance. An 8-member pool
+// pinned to slot 7, repeated over kTrials independent engine loads, requiring EVERY
+// trial to land on 7, caps the false-pass probability at (1/8)^kTrials.
+static bool test_initial_section_lick_pin_applies_immediately() {
+    printf("\n=== Test: initial section's pinned lick applies on load, not after a wrap ===\n");
+    const int kTrials = 10;
+    const int kPinnedSlot = 7;
+    bool ok = true;
+    for (int trial = 0; trial < kTrials && ok; trial++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+        unit.type = UNIT_PULSAR; unit.enabled = true;
+        engine->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        setup_fixture_baseline(engine);
+
+        const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
+        auto putStep = [&](int slot, int step, float deg) {
+            int b = slot * (S * F) + step * F;
+            engine->pulsar_lick_pool_data[b + 0] = deg;
+            engine->pulsar_lick_pool_data[b + 1] = 0.5f;
+            engine->pulsar_lick_pool_data[b + 2] = 0.8f;
+            engine->pulsar_lick_pool_data[b + 3] = -1.f;
+        };
+        // 8 distinct degrees so a wrong (random) pick is unmistakable.
+        for (int s = 0; s < 8; s++) {
+            putStep(s, 0, static_cast<float>(s));
+            engine->pulsar_lick_pool_len[s] = 1;
+            engine->pulsar_lick_pool_loop[s] = 8;
+        }
+        engine->pulsar_lick_anomaly_index = -1;
+        engine->pulsar_lick_anomaly_chance = 0.0f;
+        engine->pulsar_lick_pool_count.store(8, std::memory_order_release);
+
+        setup_jam_arrangement(engine);
+        // The helper defaults intro_index to -1 (random weighted start); pin it to 0 so
+        // the section carrying the lick pin below is deterministically the initial one.
+        engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+        // Pin section 0's lick to kPinnedSlot: field 26 = lick_index+1.
+        constexpr int kSectionStride = kSectionDataFields;
+        engine->pulsar_section_data[0 * kSectionStride + 26].store(
+            static_cast<float>(kPinnedSlot + 1), std::memory_order_relaxed);
+
+        engine->pulsar_seed.store(4242, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+        // ONE block: at 120 BPM / 48 kHz this is far short of a bar, so section_changed
+        // is false and the runtime resolve path's rotation re-roll never runs. Whatever
+        // is audible here came only from load_vibe's own pin fixup, not a later wrap.
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+
+        PulsarState* ps = engine->pulsar_state;
+        bool trial_ok = ps
+            && ps->section_state.current_section == 0
+            && ps->current_lick_index == kPinnedSlot
+            && ps->active_rotation_index == kPinnedSlot
+            && ps->lick[0].scale_degree == ps->lick_pool[kPinnedSlot][0].scale_degree;
+        if (!trial_ok) {
+            printf("  trial %d FAILED: section=%d picked=%d active=%d lick[0].deg=%d\n",
+                   trial, ps ? ps->section_state.current_section : -1,
+                   ps ? ps->current_lick_index : -1, ps ? ps->active_rotation_index : -1,
+                   ps ? ps->lick[0].scale_degree : -1);
+            ok = false;
+        }
+        orpheus_engine_destroy(engine);
+    }
+    printf("  %d/%d trials landed on slot %d -- %s\n", ok ? kTrials : 0, kTrials, kPinnedSlot,
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 // Regression: a rotation vibe with step_count > kMaxPulsarSteps must NOT overflow the
 // fixed ts.steps[kMaxPulsarSteps] buffer when a swap re-renders the Fill tracks.
 // regenerate_lick_tracks must clamp step_count exactly like the load / deja-vu paths.
@@ -439,6 +634,20 @@ static bool test_regenerate_clamps_step_count() {
     return ok;
 }
 
+// Pure lick_pick_rotation distribution check at N=8 -- pool_count is a runtime
+// argument here, so this does NOT exercise kMaxLickPool or the real bank at all.
+// See test_lick_pool_round_trip_top_slot for the actual cap-raise regression guard.
+static bool test_rotation_reaches_top_slot() {
+    printf("\n=== Test: an 8-member pool eventually picks slot 7 ===\n");
+    uint32_t rng = 2024u;
+    bool saw_top = false;
+    for (int i = 0; i < 5000 && !saw_top; i++) {
+        if (lick_pick_rotation(rng, 8) == 7) saw_top = true;
+    }
+    printf("  saw_top=%d -- %s\n", saw_top, saw_top ? "PASS" : "FAIL");
+    return saw_top;
+}
+
 bool run_pulsar_lick_select_tests() {
     printf("\n=== Pulsar Lick Select ===\n");
     int passed = 0, failed = 0;
@@ -453,10 +662,16 @@ bool run_pulsar_lick_select_tests() {
     run(test_resolve_no_anomaly_when_index_negative);
     run(test_force_anomaly_overrides_zero_chance);
     run(test_force_anomaly_with_no_anomaly_slot_returns_rotation);
+    run(test_forced_index_pins_the_slot);
+    run(test_forced_index_still_yields_to_anomaly);
+    run(test_negative_forced_index_rolls_as_before);
     run(test_lick_pool_round_trip);
+    run(test_lick_pool_round_trip_top_slot);
+    run(test_rotation_reaches_top_slot);
     run(test_section_rotation_consistency);
     run(test_anomaly_forced_when_chance_one);
     run(test_manual_trigger_forces_lick_anomaly_once);
+    run(test_initial_section_lick_pin_applies_immediately);
     run(test_regenerate_clamps_step_count);
     printf("\n  Pulsar Lick Select: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);

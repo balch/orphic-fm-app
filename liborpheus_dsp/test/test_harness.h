@@ -528,6 +528,14 @@ bool run_pulsar_lick_wah_tests();
 bool run_pulsar_wah_anomaly_tests();
 bool run_pulsar_anomaly_arm_tests();
 bool run_pulsar_lick_select_tests();
+bool run_pulsar_score_clock_tests();
+bool run_pulsar_score_sched_tests();
+bool run_score_voice_alloc_tests();
+bool run_score_voice_spike_tests();
+bool run_score_voice_envelope_tests();
+bool run_score_chord_path_tests();
+bool run_score_marshalling_tests();
+bool run_pulsar_section_request_tests();
 bool run_pulsar_timing_tests();
 bool run_pulsar_marshalling_tests();
 bool run_pulsar_start_tests();
@@ -566,3 +574,8 @@ bool run_master_swell_tests();
 bool run_master_cut_tests();
 bool run_spectrum_tests();
 bool run_graph_swap_tests();
+
+// Declarations for any extra suites CMake added to the target. Absent is the normal case.
+#if __has_include("noop_suites.h")
+#include "noop_suites.h"
+#endif

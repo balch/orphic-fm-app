@@ -204,7 +204,7 @@ class DspSynthEngine(
     /** Push current voice state to C++ engine so it matches Kotlin on startup. */
     private fun syncNativeBridgeState() {
         // Reset all voice gates to prevent stale gates from previous preset/T-gen routing
-        for (v in 0 until 15) {
+        for (v in 0 until NUM_VOICES) {
             nativeBridge.nativeSetVoiceGate(v, false)
         }
         val vp = pluginProvider.voicePlugin
@@ -291,7 +291,7 @@ class DspSynthEngine(
             pluginProvider.fluxPlugin.setDrumPitchSource(i, routing.drumPitchSources[i] - DrumTriggerSource.FLUX_X1.ordinal + 1)
             // Activate drum voice in C++ if it has an external trigger source
             if (routing.drumTriggerSources[i] != 0) {
-                nativeBridge.nativeSetVoiceActive(12 + i, true) // kDrumVoiceStart=12
+                nativeBridge.nativeSetVoiceActive(DRUM_VOICE_START + i, true)
             }
             pluginProvider.fluxPlugin.setQuadTriggerSource(i, voiceManager.getQuadTriggerSource(i))
             pluginProvider.fluxPlugin.setQuadPitchSource(i, voiceManager.getQuadPitchSource(i))

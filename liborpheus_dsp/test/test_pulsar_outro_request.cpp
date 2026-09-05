@@ -164,6 +164,59 @@ bool test_outro_request_falls_through_when_no_outro_index() {
     return c.ok;
 }
 
+// Integration: the tests above hand-roll the pull logic inline, never touching the real
+// consumption code in unit_process_pulsar(). This drives the actual atomic through a
+// render loop and checks retraction self-clears (exchange, not load).
+bool test_outro_request_retraction_through_real_engine() {
+    std::printf("\n=== Test: outro_request retraction through the real atomic/engine path ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    setup_jam_arrangement(engine);
+    engine->pulsar_seed.store(4242, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(300.0f, std::memory_order_relaxed);
+
+    // pulsar_state is allocated lazily on the first unit_process_pulsar() call, so it
+    // must be fetched AFTER warming up, not before (a pre-fetched pointer is null here).
+    for (int block = 0; block < 20; block++) unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    PulsarState* ps = engine->pulsar_state;
+    bool starts_clear = ps && !ps->section_state.outro_triggered;
+
+    // Arm through the real port.
+    engine->pulsar_arrangement_outro_request.store(1, std::memory_order_relaxed);
+    bool armed = false;
+    for (int block = 0; block < 100 && !armed; block++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        if (ps->section_state.outro_triggered) armed = true;
+    }
+    // Self-clears on consumption: exchange(), not load() — a regression back to load()
+    // would leave this atomic stuck at 1 forever.
+    bool armed_self_cleared =
+        engine->pulsar_arrangement_outro_request.load(std::memory_order_relaxed) == 0;
+
+    // Retract through the real port — the branch under test (orpheus_unit_pulsar.cpp,
+    // `else if (outro_req < 0) ... = false;`). Deleting that branch would hang this loop.
+    engine->pulsar_arrangement_outro_request.store(-1, std::memory_order_relaxed);
+    bool retracted = false;
+    for (int block = 0; block < 100 && !retracted; block++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        if (!ps->section_state.outro_triggered) retracted = true;
+    }
+    bool retract_self_cleared =
+        engine->pulsar_arrangement_outro_request.load(std::memory_order_relaxed) == 0;
+
+    bool ok = starts_clear && armed && armed_self_cleared && retracted && retract_self_cleared;
+    std::printf("  starts_clear=%d armed=%d armed_self_cleared=%d retracted=%d retract_self_cleared=%d -- %s\n",
+                starts_clear, armed, armed_self_cleared, retracted, retract_self_cleared,
+                ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 }  // namespace
 
 bool run_pulsar_outro_request_tests() {
@@ -176,6 +229,7 @@ bool run_pulsar_outro_request_tests() {
     tally(test_outro_request_latches_through_the_unit());
     tally(test_outro_request_routes_to_outro_index_at_boundary());
     tally(test_outro_request_falls_through_when_no_outro_index());
+    tally(test_outro_request_retraction_through_real_engine());
     stmlib::Random::Seed(saved_random);
     std::printf("\nPulsar outro_request tests: %s\n",
                 suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");

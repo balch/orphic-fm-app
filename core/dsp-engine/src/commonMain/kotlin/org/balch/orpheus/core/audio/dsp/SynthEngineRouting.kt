@@ -53,7 +53,7 @@ class SynthEngineRouting(
         // Drum voices start inactive (active=0) and only get activated by pad hits.
         // Without this, the active check returns before external gates are read.
         if (sourceIndex != 0) {
-            val voiceIndex = 12 + drumIndex // kDrumVoiceStart=12
+            val voiceIndex = DRUM_VOICE_START + drumIndex
             nativeBridge.nativeSetVoiceActive(voiceIndex, true)
         }
     }

@@ -15,6 +15,8 @@
 #include "pulsar_rng.h"
 #include "pulsar_anomaly_arm.h"
 #include "pulsar_breathe.h"
+#include "pulsar_score_clock.h"
+#include "pulsar_score_sched.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -134,6 +136,18 @@ static inline float rand01(uint32_t& state) {
 
 // ── Mutation: evolve patterns each loop ─────────────────────────────
 
+// One per-bar step of the conductor's tension drive: consume accumulated deltas, clamp
+// the held value, decay it (~gone in a section at 0.97/bar) so the piece's arc reasserts.
+// mutate_patterns() runs once per bar (on track 0's loop wrap), which is what makes the
+// 0.97-per-call decay rate a per-bar rate.
+static inline float tension_drive_step(PulsarState* state, OrpheusEngine* engine) {
+    const float delta = engine->pulsar_tension_drive.exchange(0.0f, std::memory_order_relaxed);
+    float held = state->tension_drive_held + delta;
+    held = std::max(-1.0f, std::min(1.0f, held)) * 0.97f;
+    state->tension_drive_held = held;
+    return held;
+}
+
 static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine* engine) {
     state->loop_count++;
 
@@ -147,9 +161,9 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             float outer_phase = static_cast<float>(state->loop_count % outer) / static_cast<float>(outer);
             outer_scale = (1.0f - state->tension.outer_depth) + state->tension.outer_depth * outer_phase;
         }
-        state->tension_intensity = inner_phase * outer_scale;
+        state->tension_intensity = clamp01(inner_phase * outer_scale + tension_drive_step(state, engine));
     } else {
-        state->tension_intensity = 0.0f;
+        state->tension_intensity = clamp01(tension_drive_step(state, engine));
     }
 
     // ── TENS-2: step the evolution smoother ONCE PER BAR ──
@@ -1605,6 +1619,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     reload_vibe_tension(engine, state);
     state->tension_intensity = 0.0f;
     state->tension_evo_smooth = 0.0f;
+    state->tension_drive_held = 0.0f;
 
     // ── Load arrangement from engine atomics ──
     // pulsar_arrangement_generation uses acquire ordering as the fence.
@@ -1654,6 +1669,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             // Slot 15 retired (was the legacy per-section exit-scratch length); the
             // generic transition-fx bank (trans_fx_data_$i, see below) is the only
             // scratch-at-flip mechanism now. Left unread so it stays inert.
+
+            // Slot 26: pinned lick. 0 = no override, so a zero-initialised port cannot
+            // pin slot 0 by accident.
+            int lick_slot = static_cast<int>(engine->pulsar_section_data[base + 26].load(std::memory_order_relaxed));
+            sec.lick_index = (lick_slot > 0) ? (lick_slot - 1) : -1;
 
             // Slot 16: jamCarry — continue an in-flight band solo across this
             // section's entry seam (see SectionParam::jam_carry).
@@ -1865,6 +1885,24 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 // the tracks this section actually changes. Same reason as the tension
                 // block: no advance_section fires for the section we start in.
                 apply_section_densities(state, engine, &sec);
+
+                // Apply the initial section's PINNED LICK, for the same reason as the
+                // tension override above: the per-statement resolve path honors the pin,
+                // but it only runs at the next lick-loop wrap. The rotation pick above
+                // (pool_count>0 block, before the arrangement was unpacked) already
+                // rolled a random slot and rendered the FILL/Squash tracks from it, so
+                // without this the intro would start on a random lick and audibly swap
+                // to the pinned one at the first wrap. Runs after the densities for the
+                // same ordering as the section-change path; the two touch disjoint
+                // tracks (apply_section_densities leaves lick tracks alone).
+                if (state->lick_pool_count > 0 && sec.lick_index >= 0 &&
+                    sec.lick_index < state->lick_pool_count &&
+                    sec.lick_index != state->active_rotation_index) {
+                    state->active_rotation_index = sec.lick_index;
+                    state->current_lick_index = sec.lick_index;
+                    apply_pool_lick(state, sec.lick_index);
+                    regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u);
+                }
 
                 // Apply per-track section overrides for the initial section so
                 // chordal patterns generated above match the active section's
@@ -2183,6 +2221,15 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // bleed into the new arrangement. Placed after arrangement loading so that
     // it always runs regardless of whether arr_active is set.
     engine->pulsar_arrangement_outro_request.store(0, std::memory_order_relaxed);
+    engine->pulsar_arrangement_section_request.store(0, std::memory_order_relaxed);
+    engine->pulsar_tension_drive.store(0.f, std::memory_order_relaxed);
+    // Notated-score position: restart at the top so re-selecting a piece (or reloading
+    // the same one) doesn't resume mid-score from a prior play-through.
+    score_clock_reset(state->score_clock);
+    for (int t = 0; t < kNumPulsarTracks; t++) state->score_cursors[t] = PulsarScoreCursor{};
+    // A new vibe starts with no beat in flight and no accent scaling from the last piece.
+    engine->pulsar_score_hold_release.store(0, std::memory_order_relaxed);
+    engine->pulsar_score_accent_scale.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_anomaly_request.store(0, std::memory_order_relaxed);
     state->prev_anomaly_request = 0;
     state->force_lick_anomaly = false;  // per-vibe hygiene: no forced anomaly carries over
@@ -2550,6 +2597,149 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // 16th-note grid: 4 steps per beat
     double steps_per_second = (static_cast<double>(bpm) / 60.0) * 4.0;
     double samples_per_step = static_cast<double>(sample_rate) / steps_per_second;
+
+    // Notated-score position. Independent of the step grid above: score tracks do not
+    // live on Pulsar's 16-steps-per-bar lattice, which is what lets a 2/4 piece work.
+    {
+        int gen = engine->pulsar_score_generation.load(std::memory_order_acquire);
+        if (gen != state->score_generation_seen) {
+            state->score_generation_seen = gen;
+            // This acquire is the read half of the publish contract: the writer stores the
+            // generation last, with release, so everything it wrote before that store is
+            // visible here. score_armed carries that guarantee to the per-track firing
+            // below, which would otherwise read the plain arrays with no fence at all.
+            state->score_armed = true;
+            score_clock_reset(state->score_clock);
+            for (int t = 0; t < kNumPulsarTracks; t++) state->score_cursors[t] = PulsarScoreCursor{};
+            // Defensive: a bank slot the mirror doesn't reclaim below (still held across
+            // the reset) must not carry a stale flag. The mirror re-asserts true for
+            // anything still claimed once it runs later this block.
+            for (int v = 0; v < kNumMainVoices; v++)
+                engine->voice_params[v].score_driven.store(false, std::memory_order_relaxed);
+        }
+        // A parked cursor freezes the WHOLE ensemble clock: the held note's end_tick never
+        // arrives (it sustains as long as the conductor waits) and no backlog accumulates,
+        // so release can never fire a burst. The beat IS the next note's downbeat: resuming
+        // from wherever the HELD note's own tick left the clock (rather than the freed
+        // cursor's next event) makes the note wait for the free-run clock to catch up --
+        // anywhere from one motif gap (48 ticks) to a full fermata (240 ticks) late. So on
+        // release, snap tick_pos forward to the soonest freed cursor's next event; never
+        // backward, since a non-monotonic score must not rewind the clock.
+        bool any_held = false;
+        if (state->score_armed)
+            for (int t = 0; t < kNumPulsarTracks; t++) any_held |= state->score_cursors[t].held;
+        const bool free_run = engine->pulsar_score_free_run.load(std::memory_order_relaxed) != 0;
+        // Putting the baton down mid-gated-passage: a cursor parked by the conducting stint
+        // that just ended has to be freed here, since score_collect_due's own free_run check
+        // never runs while the cursor is already held. Freed WITHOUT the release path's
+        // snap-forward below -- that snap exists because a conductor's stroke IS the next
+        // downbeat, whereas free-run wants the clock to cover the written distance itself.
+        if (free_run && any_held) {
+            for (int t = 0; t < kNumPulsarTracks; t++) state->score_cursors[t].held = false;
+            any_held = false;
+        }
+        const int rel = engine->pulsar_score_hold_release.exchange(0, std::memory_order_relaxed);
+        if (rel > 0 && any_held) {
+            int min_tick = -1;
+            for (int t = 0; t < kNumPulsarTracks; t++) {
+                if (!state->score_cursors[t].held) continue;
+                state->score_cursors[t].held = false;
+                if (engine->pulsar_track_score_driven[t].load(std::memory_order_acquire) == 0)
+                    continue;
+                const int idx = state->score_cursors[t].index;
+                if (idx >= engine->pulsar_score_event_count[t]) continue;
+                const int tick = engine->pulsar_score_events[t][idx].tick;
+                if (min_tick < 0 || tick < min_tick) min_tick = tick;
+            }
+            if (min_tick >= 0 && static_cast<double>(min_tick) > state->score_clock.tick_pos)
+                state->score_clock.tick_pos = static_cast<double>(min_tick);
+            any_held = false;
+        }
+        if (!any_held)
+            score_clock_advance(state->score_clock, num_frames, bpm, sample_rate);
+
+        // ── Written notes → voice pool → the engine's voice bank ──
+        // Once per block, not per track: the pool is flat, so a chord's notes compete for
+        // slots across the whole ensemble rather than within one track. This replaces the
+        // old per-track fire loop, where every due event wrote the same ts.target_pitch and
+        // a chord could only ever sound as its final note.
+        if (state->score_armed) {
+            const int now_tick = static_cast<int>(state->score_clock.tick_pos);
+            const int32_t release_samples = static_cast<int32_t>(sample_rate * 0.02f);
+            score_voices_advance(state->score_pool, num_frames);
+            score_voices_expire(state->score_pool, now_tick, release_samples);
+
+            const double tps = score_ticks_per_sample(bpm, sample_rate);
+            for (int t = 0; t < kNumPulsarTracks; t++) {
+                if (engine->pulsar_track_score_driven[t].load(std::memory_order_acquire) == 0)
+                    continue;
+                ScoreTrackCursor cursor{state->score_cursors[t].index, state->score_cursors[t].held};
+                OrpheusEngine::ScoreEvent due[16];
+                const int n = score_collect_due(engine->pulsar_score_events[t],
+                                                engine->pulsar_score_event_count[t],
+                                                cursor, now_tick, due, 16, free_run);
+                state->score_cursors[t].index = cursor.index;
+                state->score_cursors[t].held  = cursor.held;
+                for (int i = 0; i < n; i++) {
+                    // flags bit 1 releases the band. The score conducts Pulsar here: the
+                    // piece opens on written parts alone and the backing enters on cue.
+                    if (due[i].flags & 2)
+                        engine->pulsar_band_hold.store(0, std::memory_order_relaxed);
+                    // note_id is unique per track so a later note-off cannot match another
+                    // track's voice. Duration is ticks; end_tick is what expiry compares.
+                    score_voice_start(state->score_pool,
+                                      /*note_id=*/t * kMaxScoreEvents + cursor.index + i,
+                                      /*part=*/t, due[i].pitch, due[i].velocity,
+                                      now_tick + static_cast<int32_t>(due[i].duration));
+                }
+            }
+            (void)tps;
+
+            // The pool is the source of truth; mirror it onto the bank every block. Voices
+            // beyond the bank are simply not heard -- score_voice_alloc packs from slot 0,
+            // so that only happens once the pool is bigger than the bank.
+            for (int v = 0; v < state->score_pool.count && v < kNumMainVoices; v++) {
+                const ScoreVoice& sv = state->score_pool.voices[v];
+                if (score_voice_is_free(sv)) {
+                    engine->voice_params[v].gate.store(0, std::memory_order_relaxed);
+                    // Slot left score duty: un-claim it so a later non-score use of this
+                    // bank slot doesn't inherit the score ADSR/taper.
+                    engine->voice_params[v].score_driven.store(false, std::memory_order_relaxed);
+                    continue;
+                }
+                engine->voice_params[v].active.store(1, std::memory_order_relaxed);
+                // ever_triggered gates rendering and nothing else sets it on this path;
+                // without it the voice stays silent with no error anywhere.
+                engine->voice_params[v].ever_triggered.store(1, std::memory_order_relaxed);
+                engine->voice_params[v].tune.store(static_cast<float>(sv.pitch),
+                                                   std::memory_order_relaxed);
+                engine->voice_params[v].gate.store(sv.gate ? 1 : 0, std::memory_order_relaxed);
+                const auto& pp = engine->pulsar_score_part[sv.part];
+                auto& vp = engine->voice_params[v];
+                // Only this loop ever sets score_driven; it selects the score ADSR
+                // mapping and sustain taper in unit_process_plaits.
+                vp.score_driven.store(true, std::memory_order_relaxed);
+                vp.harmonics.store(pp.harmonics.load(std::memory_order_relaxed), std::memory_order_relaxed);
+                vp.timbre.store(pp.timbre.load(std::memory_order_relaxed), std::memory_order_relaxed);
+                vp.morph.store(pp.morph.load(std::memory_order_relaxed), std::memory_order_relaxed);
+                vp.decay.store(pp.decay.load(std::memory_order_relaxed), std::memory_order_relaxed);
+                const int want_engine = pp.engine_index.load(std::memory_order_relaxed);
+                if (vp.engine_index.exchange(want_engine, std::memory_order_relaxed) != want_engine)
+                    vp.engine_changed.store(1, std::memory_order_relaxed);
+                vp.accent.store(
+                    (0.2f + 0.8f * (static_cast<float>(sv.velocity) / 127.0f))
+                        * pp.level.load(std::memory_order_relaxed)
+                        * engine->pulsar_score_accent_scale.load(std::memory_order_relaxed),
+                    std::memory_order_relaxed);
+            }
+        }
+
+        // Published for the conducting ribbon (Task 8 reads both): the clock's own tick
+        // position and whether any track is currently parked on a hold.
+        engine->pulsar_score_pos_tick.store(
+            static_cast<int>(state->score_clock.tick_pos), std::memory_order_relaxed);
+        engine->pulsar_score_any_held.store(any_held ? 1 : 0, std::memory_order_relaxed);
+    }
 
     // ── Elastic tempo: slow random walk scaled by (1 - energy) ──
     // Cap the wander at ±5% at energy=0. (The old ±15% ceiling was masked by
@@ -2993,15 +3183,17 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                 // ── Section / Solo advancement ──
                 if (state->arrangement.active) {
-                    // Pull any pending outro request before advancing so the
-                    // boundary handler in advance_section() can re-route to
-                    // arr.outro_index this bar. Sticky once set; cleared by
-                    // load_vibe() on arrangement reload.
-                    const int outro_req = engine->pulsar_arrangement_outro_request.load(
-                        std::memory_order_relaxed);
-                    if (outro_req != 0 && !state->section_state.outro_triggered) {
-                        state->section_state.outro_triggered = true;
-                    }
+                    // Pull pending conductor requests before advancing, so the boundary
+                    // handler in advance_section() can honor them this bar. Both ports
+                    // self-clear on consumption: an ending or a jump must be retractable.
+                    const int outro_req = engine->pulsar_arrangement_outro_request.exchange(
+                        0, std::memory_order_relaxed);
+                    if (outro_req > 0)      state->section_state.outro_triggered = true;
+                    else if (outro_req < 0) state->section_state.outro_triggered = false;
+
+                    const int sec_req = engine->pulsar_arrangement_section_request.exchange(
+                        0, std::memory_order_relaxed);
+                    if (sec_req > 0) state->section_state.pending_section_request = sec_req - 1;
 
                     // Anomaly Engine: edge-detect the manual trigger counter and fire every
                     // anomaly this vibe DECLARES. A vibe with no declared anomaly ignores the
@@ -3234,9 +3426,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // Cosmetic: tension_intensity is recomputed every bar from loop_count
                         // in mutate_patterns(), so this zero is observable only on the
                         // entry bar. tension_evo_smooth is actually smoothed across bars,
-                        // so zeroing it here DOES reset the timbre-evolution arc.
+                        // so zeroing it here DOES reset the timbre-evolution arc. Same for
+                        // tension_drive_held: a conductor nudge held from the outgoing
+                        // section must not bleed into the new one's arc.
                         state->tension_intensity  = 0.0f;
                         state->tension_evo_smooth = 0.0f;
+                        state->tension_drive_held = 0.0f;
 
                         // --- Breathe: restart the cycle at the top on section entry ---
                         // The envelope is reset, not just the bar, and that matters on the
@@ -3473,10 +3668,17 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     // manual trigger) is a one-shot override consumed here regardless of
                     // whether it actually changed the slot. Swap + re-render only on change.
                     if (state->lick_pool_count > 0) {
+                        // arrangement.active guards the pin: load_vibe's no-arrangement path
+                        // clears active/section_count but not the sections[] array itself, so
+                        // an inactive arrangement can still hold a stale pin from the last vibe.
+                        const int pinned_lick = state->arrangement.active
+                            ? state->arrangement.sections[state->section_state.current_section].lick_index
+                            : -1;
                         int desired = lick_resolve_desired(
                             state->lick_select_seed, section_changed, state->lick_pool_count,
                             state->lick_anomaly_index, state->lick_anomaly_chance,
-                            state->active_rotation_index, state->force_lick_anomaly);
+                            state->active_rotation_index, state->force_lick_anomaly,
+                            pinned_lick);
                         state->force_lick_anomaly = false;
                         if (desired != state->current_lick_index) {
                             apply_pool_lick(state, desired);
@@ -4028,6 +4230,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
             }
 
+            // Notated-score playback: this track's notes come from the score, not the
+            // pattern generator. Skip pattern-driven gate handling entirely so a step
+            // boundary that happens to land during this block never overwrites what the
+            // score scheduler wrote (see the per-block firing below, outside this loop).
+            // pulsar_advance_playhead already ran above and stays harmless/unread; the
+            // engine/pan/volume/macro setup earlier in this per-track iteration (and the
+            // render pipeline below) is untouched, so the track's TrackVoice configuration
+            // still applies in full — only the note SOURCE changes.
+            if (engine->pulsar_track_score_driven[t].load(std::memory_order_acquire) != 0) {
+                ts.in_hold = false;   // don't let a stale hold-chain force gate_for_render high
+                continue;
+            }
+
             if (ts.playhead >= kMaxPulsarSteps) ts.playhead = 0;
             const PulsarStep& step = ts.steps[ts.playhead];
 
@@ -4445,6 +4660,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ts.glide_rate = 0.0f;
             }
         }
+
+        // Score firing moved out of this per-track loop: with a flat voice pool a chord's
+        // notes compete for slots across the whole ensemble, so it runs once per block up
+        // where the score clock advances. See the score pass above.
 
         // Determine note and accent from current step
         float note_for_render = ts.current_pitch;
@@ -5216,6 +5435,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (bp >= 1.0f) bp -= 1.0f;
         engine->beat_phase.store(bp, std::memory_order_relaxed);
         engine->clock_bpm.store(bpm, std::memory_order_relaxed);
+    }
+
+    // ── Band hold: the score plays alone until it cues the backing in ──
+    // Muted HERE rather than by an early return at the top, because everything above --
+    // the score clock, the firing pass, the voice bank sync -- has to keep running while
+    // the band is silent. An early return would freeze the very clock whose next event
+    // clears the hold, and the band would never enter.
+    if (engine->pulsar_band_hold.load(std::memory_order_relaxed) != 0) {
+        std::memset(out_l, 0, num_frames * sizeof(float));
+        std::memset(out_r, 0, num_frames * sizeof(float));
+        std::memset(engine->pulsar_delay_send_l, 0, num_frames * sizeof(float));
+        std::memset(engine->pulsar_delay_send_r, 0, num_frames * sizeof(float));
+        std::memset(engine->pulsar_reverb_send_l, 0, num_frames * sizeof(float));
+        std::memset(engine->pulsar_reverb_send_r, 0, num_frames * sizeof(float));
     }
 
     // ── Copy to graph output buffers for effects routing ──

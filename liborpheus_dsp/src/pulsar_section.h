@@ -107,6 +107,7 @@ inline void init_section_state(SectionState& state, const ArrangementParams& arr
     state.next_mood = -1.0f;
     state.next_section_planned = -1;
     state.next_section_trans_bars = 0;
+    state.pending_section_request = -1;
 
     if (!arr.active || arr.section_count == 0) return;
 
@@ -181,6 +182,14 @@ inline bool advance_section(
     if (state.outro_triggered && arr.outro_index >= 0 && arr.outro_index < arr.section_count) {
         next = arr.outro_index;
     }
+
+    // An explicit request outranks the outro: it is the more recent and more specific
+    // instruction, and both self-clear once consumed.
+    if (state.pending_section_request >= 0
+        && state.pending_section_request < arr.section_count) {
+        next = state.pending_section_request;
+    }
+    state.pending_section_request = -1;
 
     state.current_section     = next;
     state.transition_target   = -1;

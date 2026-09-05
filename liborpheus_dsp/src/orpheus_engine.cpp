@@ -132,14 +132,13 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->voice_pan[6].store(-0.7f);
     engine->voice_pan[7].store(0.7f);
     // Voices 8-11: Quad 2 / REPL
-    // Voices 12-14: Drum voices (center)
+    // Voices kDrumVoiceStart..+2: Drum voices (center)
     for (int i = 8; i < kNumVoices; i++)
         engine->voice_pan[i].store(0.0f);
 
-    // Default drum voice params (matching Kotlin DrumPlugin musical defaults)
-    // BD (voice 12): MIDI note 28 + 0.3*24 = 35.2 (~62Hz, low kick)
-    // SD (voice 13): MIDI note 48 + 0.4*24 = 57.6 (~220Hz, mid snare)
-    // HH (voice 14): MIDI note 60 + 0.6*24 = 74.4 (~700Hz, bright hat)
+    // Default drum voice params (matching Kotlin DrumPlugin musical defaults), starting
+    // at kDrumVoiceStart: BD MIDI 28+0.3*24=35.2 (~62Hz), SD MIDI 48+0.4*24=57.6 (~220Hz),
+    // HH MIDI 60+0.6*24=74.4 (~700Hz)
     static const float kDrumDefaultNote[] = {35.2f, 57.6f, 74.4f};
     static const int kDrumEngineIndices[] = {21, 22, 23};
     for (int i = 0; i < kNumDrumVoices; i++) {
@@ -151,7 +150,7 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         vp.engine_index.store(kDrumEngineIndices[i]);
     }
 
-    // Initialize automation slots: 0-11 = voice gates, 12-23 = voice freqs
+    // Initialize automation slots: 0..kNumMainVoices-1 = gates, next kNumMainVoices = freqs
     for (int i = 0; i < kNumMainVoices; i++) {
         auto& gate_slot = engine->automation_slots[i];
         gate_slot.target = AUTO_TARGET_VOICE_GATE;

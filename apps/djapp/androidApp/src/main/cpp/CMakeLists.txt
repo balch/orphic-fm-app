@@ -43,5 +43,9 @@ add_library(orpheus_oboe SHARED
 
 target_include_directories(orpheus_oboe PRIVATE ${oboe_SOURCE_DIR}/include)
 target_link_libraries(orpheus_oboe android log oboe orpheus_dsp)
-target_compile_options(orpheus_oboe PRIVATE -Wall -Werror "$<$<CONFIG:RELEASE>:-O3 -ffast-math>")
+# RelWithDebInfo too — AGP uses it for release natives, so a Release-only gate never
+# fired. See the same note in liborpheus_dsp/CMakeLists.txt.
+target_compile_options(orpheus_oboe PRIVATE -Wall -Werror
+    "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-O3>"
+    "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-ffast-math>")
 target_link_options(orpheus_oboe PRIVATE "-Wl,-z,max-page-size=16384")

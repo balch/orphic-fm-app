@@ -283,7 +283,7 @@ class PulsarSongEnding(
             return
         }
         _endingTriggered.value = true
-        // C++ pins current_section to outro_index once armed (the request is sticky), so
+        // C++ pins current_section to outro_index once armed (outro_triggered latches), so
         // capture the final section NOW. onArrangementTick's capture needs a section-index
         // CHANGE, which never comes when we arm while already in the outro section (e.g.
         // Tremolo Tide's breakdown, outroIndex == lastIndex), stranding it at -1 forever.

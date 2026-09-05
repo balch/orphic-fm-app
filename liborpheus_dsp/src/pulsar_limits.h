@@ -32,10 +32,11 @@ static constexpr int kMaxSectionTransitions = 8;
 
 // Per-section wire strides (floats/ints per section in each array). Governs allocation
 // size for BOTH arrays below, but only pulsar_section_data's own indexing uses the full
-// width (slots 21-25 are SectionWeather) — pulsar_section_tension_data's indexing stays
-// independently fixed at 21 (see the tb/tBase literals in orpheus_unit_pulsar.cpp and
-// PulsarFeature.pushArrangement); it never grew those 5 slots.
-static constexpr int kSectionDataFields = 26;   // pulsar_section_data, pulsar_section_tension_data
+// width (slots 21-25 are SectionWeather, slot 26 is the pinned lick) —
+// pulsar_section_tension_data's indexing stays independently fixed at 21 (see the
+// tb/tBase literals in orpheus_unit_pulsar.cpp and PulsarFeature.pushArrangement); it
+// never grew those slots.
+static constexpr int kSectionDataFields = 27;   // pulsar_section_data, pulsar_section_tension_data
 static constexpr int kSectionProgressionSlots = 12;  // degrees + glides
 static constexpr int kSectionCompingHumanFields = 4;
 
@@ -45,6 +46,10 @@ static constexpr int kSectionCompingHumanFields = 4;
 // "do not duck me", so they cannot double as "the author said nothing".
 // Kotlin: DuckingProfile.WIRE_FIELDS (pinned in PulsarSectionLimitsTest).
 static constexpr int kTrackDuckingFields = 7;
+
+// Notated-score events per track. 4096 x 12 bytes x 8 tracks is ~393KB of preallocated
+// wire buffer. Mirrored by NotatedScore.MAX_SCORE_EVENTS on the Kotlin side.
+static constexpr int kMaxScoreEvents = 4096;
 
 // The transition unpack in orpheus_unit_pulsar.cpp indexes by kMaxSectionTransitions,
 // so the array must be at least that wide per section. Catches the case where someone

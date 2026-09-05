@@ -103,6 +103,27 @@ static void compute_adsr_from_speed(float speed, float sr,
     release_coeff = std::exp(-6.908f / (release_s * sr));
 }
 
+// Score voices only: orchestral envelope. Attack/release are tens to a few hundred ms
+// (an eighth note at tempo), not compute_adsr_from_speed's second-long drone range.
+static void compute_score_adsr(float speed, float sr,
+                               float& attack_rate, float& decay_coeff,
+                               float& sustain_level, float& release_coeff) {
+    float eased = speed * speed;
+    float attack_s  = 0.005f + eased * 0.145f;  // 5ms – 150ms
+    float decay_s   = 0.05f  + eased * 0.35f;
+    sustain_level    = 0.8f   + eased * 0.2f;
+    float release_s = 0.15f  + eased * 0.45f;   // 150ms – 600ms
+
+    attack_rate   = 1.0f / (attack_s * sr);
+    decay_coeff   = std::exp(-6.908f / (decay_s * sr));
+    release_coeff = std::exp(-6.908f / (release_s * sr));
+}
+
+// Score sustain taper: notes drift toward this fraction of sustain instead of holding
+// flat. PROVISIONAL — calibrated by ear, 2026-08-20 Fifth-orchestra session.
+constexpr float kScoreSustainFloorRatio = 0.6f;
+constexpr float kScoreSustainTauSeconds = 3.5f;
+
 // Compute scaled hold matching Kotlin: (hold^(4-speed*3)) × (0.5+speed*1.5)
 static float compute_scaled_hold(float hold, float speed) {
     if (hold < 0.001f) return 0.0f;
@@ -579,9 +600,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float voice_peak = 0.0f;
 
         if (idx < kNumMainVoices) {
-            // String and Modal engines have built-in decay (physical models) —
-            // skip external ADSR to avoid double-enveloping their output.
-            bool already_enveloped = (engine_index == 19 || engine_index == 20);
+            bool score = vp.score_driven.load(std::memory_order_relaxed);
+            // String and Modal engines have built-in decay (physical models) — skip
+            // external ADSR to avoid double-enveloping. Score voices always get it.
+            bool already_enveloped = !score && (engine_index == 19 || engine_index == 20);
 
             if (already_enveloped) {
                 for (int i = 0; i < num_frames; i++) {
@@ -589,15 +611,28 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     if (abs_s > voice_peak) voice_peak = abs_s;
                 }
             } else {
-            // Main voices: full ADSR + hold VCA
+            // Main voices: full ADSR + hold VCA. Score voices use the orchestral
+            // mapping (short attack/release) instead of compute_adsr_from_speed's
+            // second-long drone range.
             float attack_rate, decay_coeff, sustain_level, release_coeff;
-            compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
-                                     sustain_level, release_coeff);
+            if (score) {
+                compute_score_adsr(env_speed, sr, attack_rate, decay_coeff,
+                                    sustain_level, release_coeff);
+            } else {
+                compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
+                                         sustain_level, release_coeff);
+            }
             // Trigger mode: percussive envelope (sustain = 0)
             {
                 int q = idx / 4;
                 if (q < 3 && engine->quad_trigger_mode[q].load(std::memory_order_relaxed))
                     sustain_level = 0.0f;
+            }
+            // Score sustain taper: drift toward a floor instead of holding flat.
+            float sustain_floor = 0.0f, taper_coeff = 0.0f;
+            if (score) {
+                sustain_floor = sustain_level * kScoreSustainFloorRatio;
+                taper_coeff = std::exp(-1.0f / (kScoreSustainTauSeconds * sr));
             }
 
             for (int i = 0; i < num_frames; i++) {
@@ -625,7 +660,12 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         }
                         break;
                     case 3: // SUSTAIN
-                        osc.env_level = sustain_level;
+                        if (score) {
+                            osc.env_level = sustain_floor +
+                                            (osc.env_level - sustain_floor) * taper_coeff;
+                        } else {
+                            osc.env_level = sustain_level;
+                        }
                         break;
                     case 4: // RELEASE
                         osc.env_level *= release_coeff;

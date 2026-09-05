@@ -233,6 +233,9 @@ data class Section(
      *  below lands on it, +1 fires one bar in. Negatives cannot reach back into the departing
      *  section — the edge that arrives is not known until the flip — so they collapse to 0. */
     val entryEffects: List<TransitionEffect> = emptyList(),
+    /** Pin this section's lick to a [LickRotation.pool] slot. Null = rotate as usual.
+     *  Scores use this to give each section its own theme. */
+    val lickIndex: Int? = null,
 ) {
     init {
         customProgression?.let { validateProgression(it, "Section.customProgression") }
@@ -242,6 +245,11 @@ data class Section(
         require(barStep in 1..16) { "Section.barStep must be 1..16, got $barStep" }
         require(bpmMultiplier > 0f) { "Section.bpmMultiplier must be > 0, got $bpmMultiplier" }
         require(bpmRampBars >= 0) { "Section.bpmRampBars must be >= 0, got $bpmRampBars" }
+        lickIndex?.let {
+            require(it in 0 until LickRotation.MAX_LICK_POOL) {
+                "Section.lickIndex must be 0..${LickRotation.MAX_LICK_POOL - 1}, got $it"
+            }
+        }
         require(exitEffects.size <= TransitionEffect.MAX_PER_FLIP) {
             "Section.exitEffects size ${exitEffects.size} exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
         }
@@ -349,7 +357,8 @@ data class Arrangement(
 
         /**
          * Floats per section in the `section_data_$i` bank (slots 0-20 existing fields,
-         * 21-25 [SectionWeather]). MUST equal `kSectionDataFields` in `pulsar_limits.h`.
+         * 21-25 [SectionWeather], 26 [Section.lickIndex]). MUST equal `kSectionDataFields`
+         * in `pulsar_limits.h`.
          * `PulsarSectionLimitsTest` parses the header and fails if these drift apart.
          *
          * NOT shared with the co-located `pulsar_section_tension_data` bank: that array
@@ -358,6 +367,6 @@ data class Arrangement(
          * in `PulsarFeature.pushArrangement` and `orpheus_unit_pulsar.cpp`) — tension never
          * grew the 5 weather slots, so bumping this constant again must NOT touch those.
          */
-        const val SECTION_DATA_FIELDS = 26
+        const val SECTION_DATA_FIELDS = 27
     }
 }

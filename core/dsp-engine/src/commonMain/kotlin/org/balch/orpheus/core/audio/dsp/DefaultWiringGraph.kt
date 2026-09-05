@@ -16,11 +16,27 @@ import kotlin.math.sin
  *   reverb (parallel send from horn) ->
  *   hard clip -> master out (interleaved stereo)
  *
- *   3x Dedicated drum voices (slots 12-14) -> drum sum ->
+ *   3x Dedicated drum voices (slots DRUM_VOICE_START..+2) -> drum sum ->
  *     MAIN path: drum resonator -> limiter -> clip -> master out
  *     FX path: drum sum -> main resonator excitation inputs
  *   Drum routing toggle: drumDirectGain (MAIN) vs drumChainGain (FX)
+ *
+ * This graph only wires 12 main voices (0-11); it does not need the full 24-slot score
+ * bank a score-playing host wires, since this app never arms a score.
  */
+// Must track OrpheusEngine::kDrumVoiceStart (= kNumMainVoices) in orpheus_engine.h: the
+// engine's default drum init and orpheus_engine_trigger_drum() both address voice_params
+// at this offset, and this graph's drum GraphUnits have to read the same slots.
+// internal (not private): SynthEngineRouting and DspSynthEngine's own drum-activation
+// calls must read this exact constant too, not a second hardcoded copy of it.
+internal const val DRUM_VOICE_START = 24
+// Mirrors OrpheusEngine::kNumDrumVoices (orpheus_engine.h): bd, sd, hh.
+internal const val NUM_DRUM_VOICES = 3
+// Mirrors OrpheusEngine::kNumVoices = kNumMainVoices + kNumDrumVoices -- the engine's
+// full addressable voice_params range. Anything that must reach every possible voice
+// slot (not just the manual 12-voice bank) needs this, not DRUM_VOICE_START alone.
+internal const val NUM_VOICES = DRUM_VOICE_START + NUM_DRUM_VOICES
+
 fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Default pan values matching Kotlin StereoPlugin and C++ defaults:
     // 0,1=center, 2,3=left(-0.3), 4,5=right(0.3), 6=left(-0.7), 7=right(0.7), 8-11=center
@@ -74,7 +90,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val drumOutsR = mutableListOf<UnitRef>()
 
     for (d in 0 until 3) {
-        val dp = plaits("d${d}_p") { moduleIndex = (12 + d).toFloat() }
+        val dp = plaits("d${d}_p") { moduleIndex = (DRUM_VOICE_START + d).toFloat() }
         drumPlaitsUnits.add(dp)
         val dv = multiply("d${d}_vol") { inputB = drumSlotGains[d] }
         val (gl, gr) = panGains(0f)  // center pan
@@ -266,10 +282,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val tidesUnit = tides("tides")
     clock.outRight to tidesUnit.inputA      // beat pulse for clock sync
 
-    // Wire Grids triggers to dedicated drum voices (slots 12, 13, 14)
-    gridsUnit.out to drumPlaitsUnits[0].gate        // kick → drum voice 12
-    gridsUnit.outRight to drumPlaitsUnits[1].gate   // snare → drum voice 13
-    gridsUnit.aux to drumPlaitsUnits[2].gate        // hat → drum voice 14
+    // Wire Grids triggers to dedicated drum voices (slots DRUM_VOICE_START..+2)
+    gridsUnit.out to drumPlaitsUnits[0].gate        // kick → drum voice DRUM_VOICE_START
+    gridsUnit.outRight to drumPlaitsUnits[1].gate   // snare → drum voice DRUM_VOICE_START+1
+    gridsUnit.aux to drumPlaitsUnits[2].gate        // hat → drum voice DRUM_VOICE_START+2
 
     // Beat-quantized looper
     val looper = looper("looper")

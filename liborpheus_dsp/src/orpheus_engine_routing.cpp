@@ -428,7 +428,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->quad_trigger_mode[2].store(static_cast<int>(value), std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.drum") == 0) {
-        // Drum synthesis parameters: map 0-1 knob values to voice_params for drum voices 12-14
+        // Drum synthesis parameters: map 0-1 knob values to voice_params for drum voices
+        // (kDrumVoiceStart..+2)
         // Frequency is converted from 0-1 to MIDI note range (matching Kotlin DrumPlugin.frequencyToNote)
         auto set_drum_param = [&](int drum_index, const char* sym) {
             auto& vp = engine->voice_params[kDrumVoiceStart + drum_index];
@@ -979,6 +980,16 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_progression_anchor.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "progression_drift_range") == 0)
             engine->pulsar_progression_drift_range.store(value, std::memory_order_relaxed);
+        // Exact match BEFORE the "tension_" prefix branch below: that branch's inner
+        // if-chain has no "drive" case, so if this were placed after it, "tension_drive"
+        // would match the prefix, fall through doing nothing, and never reach here.
+        // Deltas ADD (accumulate-on-write) so a conductor nudge can't overwrite one the
+        // unit hasn't consumed yet.
+        else if (std::strcmp(symbol, "tension_drive") == 0) {
+            float cur = engine->pulsar_tension_drive.load(std::memory_order_relaxed);
+            while (!engine->pulsar_tension_drive.compare_exchange_weak(
+                cur, cur + value, std::memory_order_relaxed)) {}
+        }
         else if (std::strncmp(symbol, "tension_", 8) == 0) {
             const char* t = symbol + 8;
             if (std::strcmp(t, "inner_bars") == 0)
@@ -1085,6 +1096,79 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < 8)
                 engine->pulsar_track_lick_source[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
+        // ── Notated Score ──
+        else if (std::strncmp(symbol, "score_driven_", 13) == 0) {
+            int idx = std::atoi(symbol + 13);
+            if (idx >= 0 && idx < kNumPulsarTracks)
+                // Release: the flag is written after this track's events and count, so
+                // acquiring it on the audio side orders those plain writes too. Clearing
+                // it before a rewrite is what unpublishes the array (see pushNotatedScore).
+                engine->pulsar_track_score_driven[idx].store(static_cast<int>(value), std::memory_order_release);
+        }
+        else if (std::strncmp(symbol, "score_count_", 12) == 0) {
+            int idx = std::atoi(symbol + 12);
+            if (idx >= 0 && idx < kNumPulsarTracks) {
+                // Clamped to the wire array's actual capacity: score_collect_due trusts
+                // this count as its loop bound against pulsar_score_events[t][kMaxScoreEvents],
+                // so an unclamped value here is an audio-thread out-of-bounds read.
+                int count = static_cast<int>(value);
+                if (count < 0) count = 0;
+                if (count > kMaxScoreEvents) count = kMaxScoreEvents;
+                engine->pulsar_score_event_count[idx] = count;
+            }
+        }
+        else if (std::strncmp(symbol, "score_ev_", 9) == 0) {
+            // Flat index over [track][event][field], 4 fields per event:
+            // 0=tick, 1=duration, 2=pitch|velocity packed, 3=flags. See pushNotatedScore.
+            int idx = std::atoi(symbol + 9);
+            const int total = kNumPulsarTracks * kMaxScoreEvents * 4;
+            if (idx >= 0 && idx < total) {
+                int t  = idx / (kMaxScoreEvents * 4);
+                int r  = idx % (kMaxScoreEvents * 4);
+                int e  = r / 4;
+                int f  = r % 4;
+                OrpheusEngine::ScoreEvent& dst = engine->pulsar_score_events[t][e];
+                switch (f) {
+                    case 0: dst.tick     = static_cast<int32_t>(value); break;
+                    case 1: dst.duration = static_cast<uint16_t>(value); break;
+                    case 2: {
+                        int packed = static_cast<int>(value);
+                        dst.pitch    = static_cast<uint8_t>(packed & 0x7F);
+                        dst.velocity = static_cast<uint8_t>((packed >> 7) & 0x7F);
+                        break;
+                    }
+                    case 3: dst.flags = static_cast<uint8_t>(value); break;
+                }
+            }
+        }
+        else if (std::strcmp(symbol, "band_hold") == 0)
+            engine->pulsar_band_hold.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strncmp(symbol, "score_part_", 11) == 0) {
+            const char* rest = symbol + 11;
+            const int t = std::atoi(rest);
+            const char* us = std::strchr(rest, '_');
+            if (t >= 0 && t < kNumPulsarTracks && us != nullptr) {
+                auto& pp = engine->pulsar_score_part[t];
+                const char* field = us + 1;
+                if      (std::strcmp(field, "engine") == 0)    pp.engine_index.store(static_cast<int>(value), std::memory_order_relaxed);
+                else if (std::strcmp(field, "harmonics") == 0) pp.harmonics.store(value, std::memory_order_relaxed);
+                else if (std::strcmp(field, "timbre") == 0)    pp.timbre.store(value, std::memory_order_relaxed);
+                else if (std::strcmp(field, "morph") == 0)     pp.morph.store(value, std::memory_order_relaxed);
+                else if (std::strcmp(field, "decay") == 0)     pp.decay.store(value, std::memory_order_relaxed);
+                else if (std::strcmp(field, "level") == 0)     pp.level.store(value, std::memory_order_relaxed);
+            }
+        }
+        else if (std::strcmp(symbol, "score_generation") == 0)
+            engine->pulsar_score_generation.store(static_cast<int>(value), std::memory_order_release);
+        // A beat is an event, not a level: fetch_add so a rapid double-tap can never be
+        // lost to a plain store racing the audio thread's exchange(0).
+        else if (std::strcmp(symbol, "score_hold_release") == 0)
+            engine->pulsar_score_hold_release.fetch_add(static_cast<int>(value), std::memory_order_relaxed);
+        // A level, not an event: this is "is anyone conducting", so last-write-wins is right.
+        else if (std::strcmp(symbol, "score_free_run") == 0)
+            engine->pulsar_score_free_run.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "score_accent_scale") == 0)
+            engine->pulsar_score_accent_scale.store(value, std::memory_order_relaxed);
         // ── Arrangement / Sections ──
         else if (std::strcmp(symbol, "arrangement_active") == 0)
             engine->pulsar_arrangement_active.store(static_cast<int>(value), std::memory_order_relaxed);
@@ -1096,6 +1180,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_arrangement_outro_index.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "arrangement_outro_request") == 0)
             engine->pulsar_arrangement_outro_request.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "arrangement_section_request") == 0)
+            engine->pulsar_arrangement_section_request.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strncmp(symbol, "section_data_", 13) == 0) {
             int idx = std::atoi(symbol + 13);
             if (idx >= 0 && idx < kMaxSections * kSectionDataFields)

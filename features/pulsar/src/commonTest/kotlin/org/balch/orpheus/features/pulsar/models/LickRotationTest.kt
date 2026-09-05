@@ -16,10 +16,10 @@ class LickRotationTest {
 
     @Test
     fun pool_within_max_pool() {
-        // pool alone must fit MAX_LICK_POOL = 4; 5 members overflow. (The LickAnomaly slot that
+        // pool alone must fit MAX_LICK_POOL = 8; 9 members overflow. (The LickAnomaly slot that
         // also shares the bank is validated together in Vibe.init, not here.)
         assertFailsWith<IllegalArgumentException> {
-            LickRotation(pool = listOf(l1, l2, l1, l2, l1))
+            LickRotation(pool = List(9) { l1 })
         }
     }
 
@@ -29,5 +29,22 @@ class LickRotationTest {
         val json = Json.encodeToString(LickRotation.serializer(), r)
         val back = Json.decodeFromString(LickRotation.serializer(), json)
         assertEquals(r, back)
+    }
+
+    @Test
+    fun `pool accepts eight members`() {
+        val step = LickStep(scaleDegree = 0, duration = 0.5f)
+        val lick = Lick(steps = listOf(step))
+        val rotation = LickRotation(pool = List(8) { lick })
+        assertEquals(8, rotation.pool.size)
+    }
+
+    @Test
+    fun `pool rejects nine members`() {
+        val step = LickStep(scaleDegree = 0, duration = 0.5f)
+        val lick = Lick(steps = listOf(step))
+        assertFailsWith<IllegalArgumentException> {
+            LickRotation(pool = List(9) { lick })
+        }
     }
 }

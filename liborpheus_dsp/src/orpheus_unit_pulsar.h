@@ -11,6 +11,8 @@
 #include "stmlib/dsp/dsp.h"
 #include "stmlib/dsp/filter.h"
 #include "frames/poly_lfo.h"
+#include "pulsar_score_clock.h"
+#include "score_voice_alloc.h"
 
 static constexpr int kMaxPulsarSteps = 64;
 static constexpr int kMarkovIntervals = 15;
@@ -535,7 +537,7 @@ inline void pulsar_advance_playhead(PulsarTrackState& ts, HalfLickMode mode) {
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
 static constexpr int kMaxLickSteps = 64;
 static constexpr int kLickFieldsPerStep = 4;   // degree, duration, velocity, glide
-static constexpr int kMaxLickPool = 4;   // MUST equal OrpheusEngine::kMaxLickPool
+static constexpr int kMaxLickPool = 8;   // MUST equal OrpheusEngine::kMaxLickPool
 static_assert(kMaxLickSteps <= kMaxPulsarSteps,
               "a FILL lick is written into a step_count-sized sequencer buffer");
 static constexpr int kMaxProgressionLength = 12;  // up to a literal 12-bar blues
@@ -713,6 +715,8 @@ struct SectionParam {
     int8_t custom_progression[kMaxProgressionLength] = {};
     // Per-section chord-change rate override (0 = no override, 1..4 = override value)
     int chords_per_bar_override = 0;
+    // Per-section lick slot (-1 = roll as usual). Scores pin a theme per section.
+    int lick_index = -1;
     // Per-section CompingHumanization override (applies to ALL CHORDAL tracks).
     bool has_comping_humanization_override = false;
     float comping_humanization_drop = 0.0f;
@@ -750,6 +754,10 @@ struct SectionState {
     int transition_target = -1;
     bool intro_done = false;
     bool outro_triggered = false;
+    // Conductor's section request, held here rather than read at the call site because
+    // it arrives mid-section and advance_section() returns early on non-boundary bars.
+    // -1 = none. Consumed at the boundary.
+    int pending_section_request = -1;
     float target_energy = -1.0f, target_complexity = -1.0f;
     float target_space = -1.0f, target_mood = -1.0f;
     // Destination overrides during a transition crossfade. Populated when a
@@ -971,6 +979,22 @@ struct StormConfig {
     float distance = 0.4f;
 };
 
+// Per-track notated-score cursor, field-for-field identical to ScoreTrackCursor
+// (pulsar_score_sched.h). It is a separate type rather than a reuse of that one:
+// pulsar_score_sched.h needs OrpheusEngine::ScoreEvent for score_collect_due's
+// signature, and this header is #included from INSIDE orpheus_engine.h (before
+// OrpheusEngine's body, so the type is still incomplete there) — including
+// pulsar_score_sched.h here would cycle straight back into orpheus_engine.h and
+// fail with "incomplete type 'OrpheusEngine' named in nested name specifier"
+// (confirmed by trying it). orpheus_unit_pulsar.cpp includes pulsar_score_sched.h
+// itself (safe there: it always follows a direct orpheus_engine.h include, by
+// which point OrpheusEngine is complete) and bridges to/from a real
+// ScoreTrackCursor immediately around each score_collect_due call.
+struct PulsarScoreCursor {
+    int  index = 0;
+    bool held  = false;
+};
+
 // ── Persistent state (heap-allocated on first process call) ──────────────
 static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 
@@ -987,6 +1011,19 @@ struct PulsarState {
     int current_vibe_generation;
     bool initialized;
     float smooth_energy, smooth_complexity, smooth_space, smooth_mood;
+
+    // Notated-score playback. One clock for the whole ensemble so every written part
+    // shares a position; one cursor per track. See PulsarScoreCursor above for why
+    // this isn't ScoreTrackCursor directly.
+    ScoreClock        score_clock;
+    PulsarScoreCursor score_cursors[kNumPulsarTracks];
+    // Seeded to the atomic's own initial value so a fresh state is NOT a generation
+    // change: score_armed must stay false until a score is really published.
+    int               score_generation_seen = 0;
+    bool              score_armed = false;
+    // Written notes sound on the engine's voice bank, not on the per-track Pulsar voices:
+    // a chord needs a slot each, and the bank is where independent pitches already exist.
+    ScoreVoicePool    score_pool;
 
     // Per-voice allocation buffers for OrpheusVoice::Init
     uint8_t voice_alloc_buffers[kNumPulsarTracks][kVoiceAllocBytes_Pulsar];
@@ -1049,6 +1086,8 @@ struct PulsarState {
     TensionParams tension;
     float tension_intensity = 0.0f;
     float tension_evo_smooth = 0.0f;
+    // Conductor's live tension nudge (see tension_drive_step in orpheus_unit_pulsar.cpp).
+    float tension_drive_held = 0.0f;
 
     // Section / Solo system
     ArrangementParams arrangement;

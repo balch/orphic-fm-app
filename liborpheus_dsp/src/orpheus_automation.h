@@ -4,7 +4,11 @@
 #include <cmath>
 #include <cstring>
 
-static constexpr int kMaxAutomationSlots = 32;   // 12 gates + 12 freqs + 8 spare
+// Layout (see orpheus_engine.cpp's init loop and orpheus_engine_voice.cpp's slot-index
+// formula): slots 0..kNumMainVoices-1 = gates, kNumMainVoices..2*kNumMainVoices-1 = freqs,
+// plus 8 spare. Derived so a bigger voice bank can't silently overflow this array again --
+// it used to be a bare literal (32 = 2*12+8) that stayed put while kNumMainVoices moved.
+static constexpr int kMaxAutomationSlots = 2 * kNumMainVoices + 8;
 static constexpr int kMaxAutomationPoints = 128;  // max events per path
 
 // Identifies the target of an automation path

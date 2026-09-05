@@ -332,9 +332,9 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarActiveEngin
 JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarArrangement(
         JNIEnv *env, jobject thiz, jintArray out) {
-    int data[6] = {-1, 0, 0, 0, -1, 0};
+    int data[8] = {-1, 0, 0, 0, -1, 0, 0, 0};
     sEngine.getPulsarArrangement(data);
-    env->SetIntArrayRegion(out, 0, 6, reinterpret_cast<jint*>(data));
+    env->SetIntArrayRegion(out, 0, 8, reinterpret_cast<jint*>(data));
 }
 
 JNIEXPORT void JNICALL

@@ -225,8 +225,12 @@ target_compile_options(orpheus_dsp PRIVATE
     -Wno-char-subscripts
     -Wno-tautological-compare
     -Wno-implicit-const-int-float-conversion
-    "$<$<CONFIG:Release>:-O3>"
-    "$<$<CONFIG:Release>:-ffast-math>"
+    # RelWithDebInfo too, not just Release: AGP builds Android release natives as
+    # RelWithDebInfo, so a Release-only gate silently shipped Android at -O2 with no
+    # fast-math while desktop, iOS and the test suite all ran -O3 -ffast-math. Android was
+    # the one platform running math nothing tested.
+    "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-O3>"
+    "$<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-ffast-math>"
 )
 
 # Define TEST to use non-ARM code paths in stmlib
@@ -286,6 +290,14 @@ if(BUILD_TESTS)
         test/test_pulsar_wah_anomaly.cpp
         test/test_pulsar_anomaly_arm.cpp
         test/test_pulsar_lick_select.cpp
+        test/test_pulsar_score_clock.cpp
+        test/test_pulsar_score_sched.cpp
+        test/test_score_voice_alloc.cpp
+        test/test_score_voice_spike.cpp
+        test/test_score_voice_envelope.cpp
+        test/test_score_chord_path.cpp
+        test/test_score_marshalling.cpp
+        test/test_pulsar_section_request.cpp
         test/test_pulsar_timing.cpp
         test/test_pulsar_start.cpp
         test/test_pulsar_lick_marshalling.cpp
@@ -324,15 +336,25 @@ if(BUILD_TESTS)
         test/test_master_cut.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
+
+    # Extra suites, when the directory exists. Absent is the normal case.
+    set(NOOP_TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../noop/liborpheus_dsp/test")
+    file(GLOB NOOP_TEST_SRC "${NOOP_TEST_DIR}/*.cpp")
+    if(NOOP_TEST_SRC)
+        target_sources(orpheus_dsp_test PRIVATE ${NOOP_TEST_SRC})
+    endif()
+
     target_include_directories(orpheus_dsp_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/test"
+        "${NOOP_TEST_DIR}"
         "${EURORACK_DIR}"
     )
     target_compile_definitions(orpheus_dsp_test PRIVATE
         TEST
         ORPHEUS_TESTING
         TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
+        NOOP_TEST_DATA_DIR="${NOOP_TEST_DIR}/data"
     )
 
     # Re-export the production graph from Kotlin before running tests.

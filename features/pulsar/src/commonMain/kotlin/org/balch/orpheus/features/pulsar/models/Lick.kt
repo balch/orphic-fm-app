@@ -99,7 +99,7 @@ data class LickRotation(
          * Max bank slots. Bounds `pool` PLUS any [org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly] lick sharing the C++ lick bank
          * (validated together in [Vibe.init]). MUST equal C++ kMaxLickPool.
          */
-        const val MAX_LICK_POOL = 4
+        const val MAX_LICK_POOL = 8
     }
 }
 

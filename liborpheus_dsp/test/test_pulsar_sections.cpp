@@ -716,7 +716,7 @@ static bool test_tension_override_then_inherit() {
     //   15..17=evo_harm_*, 18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
     engine->pulsar_section_tension_active[1].store(1, std::memory_order_relaxed);
     // Tension's own fixed stride, NOT pulsar_section_data's kSectionDataFields, which
-    // has been widened twice -- see pulsar_limits.h.
+    // has been widened repeatedly (weather, then the pinned lick) -- see pulsar_limits.h.
     constexpr int kSectionStride = 21;
     const int tb = 1 * kSectionStride;
     // Valid, non-silly defaults so the override struct isn't garbage.
@@ -824,7 +824,7 @@ static bool test_initial_section_tension_override_applied_on_load() {
     // fix, load_vibe left the intro on the vibe base (0.3) until the first transition.
     engine->pulsar_section_tension_active[0].store(1, std::memory_order_relaxed);
     // Tension's own fixed stride, NOT pulsar_section_data's kSectionDataFields, which
-    // has been widened twice -- see pulsar_limits.h.
+    // has been widened repeatedly (weather, then the pinned lick) -- see pulsar_limits.h.
     constexpr int kSectionStride = 21;
     const int tb = 0 * kSectionStride;
     engine->pulsar_section_tension_data[tb + 0].store(4.0f, std::memory_order_relaxed);  // inner_bars
@@ -921,6 +921,58 @@ static bool test_section_comping_humanization_override_loads() {
                s1.comping_humanization_octave, s1.comping_humanization_extension,
                (s1_drop_ok && s1_ghost_ok && s1_octave_ok && s1_ext_ok) ? "OK" : "FAIL");
         ok = s0_ok && s1_active_ok && s1_drop_ok && s1_ghost_ok && s1_octave_ok && s1_ext_ok;
+    } else {
+        printf("  FAIL: PulsarState was null after process call\n");
+    }
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+// Regression (Task 3 review, Finding 2): the field-21 "+1" decode had no C++ coverage.
+// Reverting orpheus_unit_pulsar.cpp's `lick_slot - 1` back to a raw pass-through failed
+// nothing in the suite before this test existed -- section 0's untouched (zero) field
+// would silently decode as "pinned to slot 0" instead of -1 ("no override"), which is
+// exactly the failure mode the brief called the single most important correctness
+// property in the task. The sections[0].lick_index == -1 assertion is the one that
+// actually catches a raw decode; sections[1] alone would pass either way.
+static bool test_section_lick_index_decodes_plus_one() {
+    printf("\n=== Test: section_data field 26 decodes as lick_index+1 (0 = no override) ===\n");
+
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+
+    // Two-section arrangement so we have indices 0 and 1.
+    push_two_section_ab_arrangement(engine, 1);
+
+    // Section 0: left untouched -- field 26 stays at its zero-init default.
+    // Section 1: lick_index pinned to slot 3, encoded as 3+1=4.
+    engine->pulsar_section_data[1 * kSectionDataFields + 26].store(4.0f, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    // One process call to flush load_vibe into PulsarState.
+    unit_process_pulsar(&unit, engine, 64, 48000.0f);
+
+    PulsarState* ps = engine->pulsar_state;
+    bool ok = (ps != nullptr);
+    if (ok) {
+        const SectionParam& s0 = ps->arrangement.sections[0];
+        const SectionParam& s1 = ps->arrangement.sections[1];
+        bool s0_ok = (s0.lick_index == -1);
+        bool s1_ok = (s1.lick_index == 3);
+        printf("  section 0 lick_index=%d (expected -1, no override) -- %s\n",
+               s0.lick_index, s0_ok ? "OK" : "FAIL");
+        printf("  section 1 lick_index=%d (expected 3, from encoded 4) -- %s\n",
+               s1.lick_index, s1_ok ? "OK" : "FAIL");
+        ok = s0_ok && s1_ok;
     } else {
         printf("  FAIL: PulsarState was null after process call\n");
     }
@@ -2828,6 +2880,7 @@ bool run_pulsar_sections_tests() {
     tally(test_fill_lick_48_steps_renders_and_wraps());
     tally(test_section_macro_crossfade());
     tally(test_section_comping_humanization_override_loads());
+    tally(test_section_lick_index_decodes_plus_one());
     tally(test_section_macro_subbar_lerp());
     tally(test_randomize_section_bars_bounds());
     tally(test_select_next_section_never_returns_out_of_range_target());

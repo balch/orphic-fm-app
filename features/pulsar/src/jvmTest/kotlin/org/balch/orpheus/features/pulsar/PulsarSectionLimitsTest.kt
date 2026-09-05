@@ -3,19 +3,23 @@ package org.balch.orpheus.features.pulsar
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.HalfLick
+import org.balch.orpheus.features.pulsar.models.LickRotation
+import org.balch.orpheus.features.pulsar.models.NotatedScore
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Holds the Kotlin arrangement limits in lockstep with the C++ wire.
+ * Holds the Kotlin arrangement and notated-score limits in lockstep with the C++ wire.
  *
- * The arrangement crosses into the audio thread through PREALLOCATED atomic arrays, so
- * a Kotlin-side cap larger than the C++ one does not crash — the routing layer in
- * `orpheus_engine_routing.cpp` bounds-checks each write and SILENTLY DROPS anything past
- * the end. The failure mode is a section that simply never arrives, which is close to
- * impossible to diagnose from the audio. This test makes the drift a build failure.
+ * Both cross into the audio thread through PREALLOCATED, fixed-capacity buffers — atomic
+ * arrays for the arrangement, plain arrays published behind release stores for the score
+ * (see `OrpheusEngine::pulsar_score_events`). Either way a Kotlin-side cap larger than the
+ * C++ one does not crash: the routing layer in `orpheus_engine_routing.cpp` bounds-checks
+ * each write and SILENTLY DROPS anything past the end. The failure mode is a section — or
+ * a written note — that simply never arrives, which is close to impossible to diagnose
+ * from the audio. This test makes the drift a build failure.
  *
  * Paths are relative to the module directory (Gradle's test working dir).
  */
@@ -25,6 +29,7 @@ class PulsarSectionLimitsTest {
     private val engineHeader = File("../../liborpheus_dsp/src/orpheus_engine.h")
     private val pulsarHeader = File("../../liborpheus_dsp/src/orpheus_unit_pulsar.h")
     private val transFxHeader = File("../../liborpheus_dsp/src/pulsar_transition_fx.h")
+    private val scoreClockHeader = File("../../liborpheus_dsp/src/pulsar_score_clock.h")
 
     private fun constant(source: File, name: String): Int {
         assertTrue(source.exists(), "missing C++ source ${source.absolutePath}")
@@ -85,6 +90,27 @@ class PulsarSectionLimitsTest {
     }
 
     @Test
+    fun `MAX_LICK_POOL matches OrpheusEngine kMaxLickPool`() {
+        assertEquals(
+            constant(engineHeader, "kMaxLickPool"),
+            LickRotation.MAX_LICK_POOL,
+            "LickRotation.MAX_LICK_POOL must equal OrpheusEngine::kMaxLickPool in orpheus_engine.h. " +
+                "A larger Kotlin cap does not fail loudly — extra lick-pool writes are silently " +
+                "dropped by the routing bounds check in orpheus_engine_routing.cpp.",
+        )
+    }
+
+    @Test
+    fun `orpheus_unit_pulsar kMaxLickPool mirrors OrpheusEngine kMaxLickPool`() {
+        assertEquals(
+            constant(engineHeader, "kMaxLickPool"),
+            constant(pulsarHeader, "kMaxLickPool"),
+            "orpheus_unit_pulsar.h's kMaxLickPool must equal OrpheusEngine::kMaxLickPool: " +
+                "PulsarState::lick_pool is sized from the former, the routing bounds check from the latter.",
+        )
+    }
+
+    @Test
     fun `HalfLick ordinals mirror the C++ HalfLickMode wire values`() {
         // halfLick rides tension slot 7 as its ordinal, so the orders must match exactly.
         val body = pulsarHeader.readText()
@@ -107,11 +133,22 @@ class PulsarSectionLimitsTest {
         assertEquals(
             constant(limitsHeader, "kSectionDataFields"),
             Arrangement.SECTION_DATA_FIELDS,
-            "This is the per-section float stride pulsar_section_data (and its weather " +
-                "slots 21-24) is written and read with. If they disagree, sections read " +
-                "each other's fields. NOTE: pulsar_section_tension_data shares this " +
-                "constant only for C++-side array sizing — its own indexing stride is " +
+            "This is the per-section float stride pulsar_section_data (weather on slots " +
+                "21-25, the pinned lick on 26) is written and read with. If they disagree, " +
+                "sections read each other's fields. NOTE: pulsar_section_tension_data shares " +
+                "this constant only for C++-side array sizing — its own indexing stride is " +
                 "independently fixed at 21 and must NOT be pinned to this constant.",
+        )
+    }
+
+    @Test
+    fun `MAX_SCORE_EVENTS matches kMaxScoreEvents`() {
+        assertEquals(
+            constant(limitsHeader, "kMaxScoreEvents"),
+            NotatedScore.MAX_SCORE_EVENTS,
+            "NotatedScore.MAX_SCORE_EVENTS must equal kMaxScoreEvents in pulsar_limits.h. " +
+                "The routing layer silently drops writes past its bound, so a partial change " +
+                "arrives as a score with its tail missing rather than as an error.",
         )
     }
 
@@ -174,6 +211,16 @@ class PulsarSectionLimitsTest {
         )
         assertEquals(
             enumValue(transFxHeader, "TransFxType", "TRANS_FX_STRIKE"), TransitionFxWire.TYPE_STRIKE,
+        )
+    }
+
+    @Test
+    fun `PPQ matches kScorePpq`() {
+        assertEquals(
+            constant(scoreClockHeader, "kScorePpq"),
+            NotatedScore.PPQ,
+            "NotatedScore.PPQ must equal kScorePpq in pulsar_score_clock.h. A mismatch " +
+                "silently misplaces every event in every score rather than failing.",
         )
     }
 }

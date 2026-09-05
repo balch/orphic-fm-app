@@ -91,7 +91,7 @@ void orpheus_engine_set_voice_decay(OrpheusEngine* engine,
 
 void orpheus_engine_trigger_drum(OrpheusEngine* engine,
                                  int drum_index, float accent) {
-    // Drum voices 12-14: engine_index, tune, timbre, morph, harmonics
+    // Drum voices (kDrumVoiceStart..+2): engine_index, tune, timbre, morph, harmonics
     // are all set via set_port (and init defaults). Trigger sets gate + accent.
     // Gate is auto-cleared after each render (one-shot, line ~776 in orpheus_units.cpp).
     // Re-triggering works because the idle exit resets trigger_state_ after decay.
@@ -192,7 +192,7 @@ void orpheus_engine_set_automation(OrpheusEngine* engine,
     if (!engine || count <= 0 || count > kMaxAutomationPoints) return;
     if (voice_index < 0 || voice_index >= kNumMainVoices) return;
 
-    // Slot layout: 0-11 = gates, 12-23 = freqs
+    // Slot layout: 0..kNumMainVoices-1 = gates, kNumMainVoices..2*kNumMainVoices-1 = freqs
     int slot_idx = (target == AUTO_TARGET_VOICE_FREQ)
         ? kNumMainVoices + voice_index
         : voice_index;
@@ -308,6 +308,13 @@ void orpheus_engine_get_pulsar_active_engines(OrpheusEngine* engine, int* out) {
 
 void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
     if (!engine || !out) { if (out) out[0] = -1; return; }
+    // The notated-score clock lives directly on engine, not on PulsarState, and advances
+    // whenever a score is armed -- independent of whether a Pulsar arrangement is
+    // configured (the two are orthogonal). Read it once and write it on every path below,
+    // including the two "arrangement inactive" early returns, so a score played with no
+    // arrangement configured doesn't read back stale zeros here.
+    const int score_tick = engine->pulsar_score_pos_tick.load(std::memory_order_relaxed);
+    const int score_held = engine->pulsar_score_any_held.load(std::memory_order_relaxed);
     const PulsarState* ps = engine->pulsar_state;
     // Use arr_viz_section_index as the gate (not arrangement.active which is a
     // non-atomic bool and may not be visible across threads).
@@ -319,6 +326,8 @@ void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
         out[3] = 0;
         out[4] = -1;
         out[5] = 0;
+        out[6] = score_tick;
+        out[7] = score_held;
         return;
     }
     int sec = ps->arr_viz_section_index.load(std::memory_order_relaxed);
@@ -329,6 +338,8 @@ void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
         out[3] = 0;
         out[4] = -1;
         out[5] = 0;
+        out[6] = score_tick;
+        out[7] = score_held;
         return;
     }
     out[0] = sec;
@@ -337,6 +348,8 @@ void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
     out[3] = ps->arr_viz_solo_active.load(std::memory_order_relaxed) ? 1 : 0;
     out[4] = ps->arr_viz_solo_track.load(std::memory_order_relaxed);
     out[5] = ps->arr_viz_solo_mode.load(std::memory_order_relaxed);
+    out[6] = score_tick;
+    out[7] = score_held;
 }
 
 }  // extern "C"

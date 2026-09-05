@@ -21,7 +21,7 @@ static bool test_drum_trigger() {
         orpheus_engine_trigger_drum(engine, d, 0.8f);
 
         // Verify voice params were set correctly
-        int voice_idx = 12 + d; // kDrumVoiceStart + drum_index
+        int voice_idx = kDrumVoiceStart + d;
         int engine_index = engine->voice_params[voice_idx].engine_index.load();
         int gate = engine->voice_params[voice_idx].gate.load();
 
@@ -554,7 +554,7 @@ static bool test_graph_effects_bypass_parity() {
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 8: Warps source buffer routing — SYNTH vs REPL
-// Main voices (0-11) → source 0 (SYNTH), drum voices (12-14) → source 2 (REPL)
+// Main voices → source 0 (SYNTH), drum voices (kDrumVoiceStart..+2) → source 2 (REPL)
 // ═══════════════════════════════════════════════════════════════════
 static bool test_warps_source_routing() {
     printf("\n=== Test: Warps source routing (SYNTH vs DRUMS) ===\n");
@@ -587,7 +587,7 @@ static bool test_warps_source_routing() {
     graph->units[1].type = UNIT_PLAITS; graph->units[1].id = 1;
     graph->units[1].enabled = true;
     unit_init(&graph->units[1], sr);
-    graph->units[1].state.module.index = 12; // drum voice
+    graph->units[1].state.module.index = kDrumVoiceStart; // drum voice
 
     graph->units[2].type = UNIT_PASS_THROUGH; graph->units[2].id = 2;
     graph->units[2].enabled = true; unit_init(&graph->units[2], sr);

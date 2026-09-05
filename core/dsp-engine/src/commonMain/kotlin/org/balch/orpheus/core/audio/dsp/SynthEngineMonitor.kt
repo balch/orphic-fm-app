@@ -140,7 +140,7 @@ class SynthEngineMonitor(
     private val pulsarPlayheads = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarActiveEngines = IntArray(PULSAR_NUM_TRACKS) { -1 }
-    private val arrangementBuf = IntArray(6)
+    private val arrangementBuf = IntArray(8)
 
     // Guards every poll-lifecycle transition below (the five Job refs plus the
     // uiVisible / monitoringActive / *Requested flags). start/stopMonitoring run
@@ -426,6 +426,8 @@ class SynthEngineMonitor(
                         soloActive = arrangementBuf[3] != 0,
                         soloTrack = arrangementBuf[4],
                         soloMode = arrangementBuf[5],
+                        scoreTick = arrangementBuf[6],
+                        scoreHeld = arrangementBuf[7] != 0,
                     )
                 } else null
                 delay(200.milliseconds)

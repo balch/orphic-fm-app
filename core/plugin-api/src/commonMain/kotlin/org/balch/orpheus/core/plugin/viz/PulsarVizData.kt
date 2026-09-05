@@ -58,6 +58,21 @@ data class PulsarVizData(
     }
 }
 
+/**
+ * Live Pulsar arrangement snapshot, polled at 5Hz (see SynthEngineMonitor) and NOT gated
+ * on UI visibility -- background consumers (song auto-advance, media-session metadata)
+ * depend on it staying current.
+ *
+ * [scoreTick] and [scoreHeld] mirror the notated-score clock (`pulsar_score_pos_tick`/
+ * `pulsar_score_any_held`) that score-driven consumers read. At the C-getter level they
+ * are independent of [sectionIndex]/[barsElapsed]/[barsTotal] above -- populated even with
+ * no Pulsar arrangement configured. At the monitor layer, though, the whole state is gated
+ * on an active arrangement (sectionIdx >= 0), so consumers only see these fields while an
+ * arrangement runs -- a score-only piece would need that gate revisited. [scoreTick] also
+ * changes on essentially every poll while a score plays, which makes this data class emit
+ * on every 5Hz tick during playback instead of only on a section change; intentional, since
+ * the conducting ribbon needs a live tick, not an occasional event.
+ */
 data class PulsarArrangementState(
     val sectionIndex: Int,
     val barsElapsed: Int,
@@ -67,6 +82,13 @@ data class PulsarArrangementState(
     val soloMode: Int,
     val bandSolo: Boolean = false,
     val bandMemberNames: List<String> = emptyList(),
+    /**
+     * Ticks elapsed since the current vibe/score was loaded; free-runs regardless of
+     * whether a score is armed. Do not use scoreTick==0 to detect absence of a score.
+     */
+    val scoreTick: Int = 0,
+    /** True while any score-driven track is parked on a hold event. */
+    val scoreHeld: Boolean = false,
 )
 
 val ARRANGEMENT_STATE_UNKNOWN = PulsarArrangementState(-1, 0, 0, false, -1, 0)

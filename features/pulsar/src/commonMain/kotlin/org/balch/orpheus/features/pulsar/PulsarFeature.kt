@@ -76,6 +76,8 @@ import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickSource
+import org.balch.orpheus.features.pulsar.models.NotatedScore
+import org.balch.orpheus.features.pulsar.models.NotatedScoreProvider
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.PitchEvolution
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
@@ -106,6 +108,7 @@ import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.seconds
 
 @Serializable
@@ -116,6 +119,12 @@ data class PulsarUiState(
     val bpm: Float = 128f,
     val vibeName: String = "",
     val vibe: Vibe,
+    /**
+     * Id of the notated score currently driving a track, if any. Persisted alongside
+     * [vibeName]: the written part is not in the port map, so restoring the vibe alone
+     * would silently hand the score's track back to the pattern generator.
+     */
+    val notatedScoreId: String? = null,
     val energy: Float = 0.5f,
     val complexity: Float = 0.3f,
     val space: Float = 0.4f,
@@ -213,6 +222,7 @@ private sealed interface PulsarIntent {
     data class Playing(val value: Boolean) : PulsarIntent
     data class GlobalPaused(val value: Boolean) : PulsarIntent
     data class VibeChange(val value: Vibe) : PulsarIntent
+    data class NotatedScore(val value: String?) : PulsarIntent
     data class Energy(val value: Float) : PulsarIntent
     data class Complexity(val value: Float) : PulsarIntent
     data class Space(val value: Float) : PulsarIntent
@@ -252,6 +262,29 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
      * leaves state unchanged when the name doesn't match any vibe.
      */
     fun applyVibeByName(name: String): Boolean = false
+
+    /**
+     * Resolve [id] against the registered [NotatedScoreProvider]s and push its score, or
+     * clear the previously-pushed one when [id] is `null` or matches nothing. A plain
+     * provider-push could only ever say "load this" -- it had no way to say "nothing plays
+     * here now," and the C++ side doesn't clear `score_driven` flags on its own: `load_vibe`
+     * resets the score clock and cursors but leaves the previous vibe's flags and event
+     * array exactly as they were last pushed. Fire-and-forget on the feature's own coroutine
+     * scope -- callers need no coroutine of their own, since the asset read is `suspend` (a
+     * bundled resource, not a hardcoded value). A no-op default so preview/stub
+     * `PulsarFeature` implementations don't need to implement it.
+     */
+    fun applyNotatedScore(id: String?) {}
+
+    /** Last score pushed by [applyNotatedScore]/`pushNotatedScore`, or `null` when none is driven. */
+    val notatedScoreFlow: StateFlow<NotatedScore?>
+        get() = MutableStateFlow(null)
+
+    /** Live write for the orchestration panel and the color hand. field matches the wire name. */
+    fun setScorePartControl(track: Int, field: String, value: Float) {}
+
+    /** Mutes the generative tracks while a GATED section waits on the conductor. */
+    fun setBandHold(held: Boolean) {}
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -359,6 +392,11 @@ class PulsarViewModel(
     dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
     vibeProviders: Set<VibeProvider>,
+    // Default keeps direct test construction terse; in the app graph the real
+    // Set<NotatedScoreProvider> multibinding (FifthSymphonyScore today) always wins over
+    // this empty default -- same "a real binding beats the default" contract
+    // vibeCatalogPolicy below documents and relies on.
+    notatedScoreProviders: Set<NotatedScoreProvider> = emptySet(),
     // Default keeps direct test construction terse; in the app graphs the per-platform
     // VibeCatalogPolicyProvider binding always wins (android debuggable-flag -> WIP, desktop
     // -Pcatalog level default live, iOS debug binary -> WIP, wasm live).
@@ -393,6 +431,23 @@ class PulsarViewModel(
 
     // Cheap accessor — never forces Vibe construction.
     override val vibeNames: List<String> = curatedProviders.map { it.name }
+
+    // Id -> provider, resolved once at construction (these instances live for the
+    // ViewModel's lifetime, so a provider's own `cached` field actually caches -- unlike a
+    // fresh `FifthSymphonyScore()` built per call). No catalog/curation step yet: Phase A
+    // has exactly one notated score, and NotatedScoreProvider.name is deliberately its own
+    // key, distinct from any VibeProvider.name (see FifthSymphonyScore's KDoc).
+    private val notatedScoresById: Map<String, NotatedScoreProvider> =
+        notatedScoreProviders.associateBy { it.name }
+
+    // Id of the score last pushed, so every path that re-applies the vibe can re-push it.
+    // Feeds PulsarUiState (and so the persisted blob) through the intent reducer.
+    private val notatedScoreIdFlow = MutableStateFlow<String?>(null)
+
+    // Last score actually pushed to the engine -- the orchestration panel renders parts from
+    // this, and the color hand reads it to know which part it's steering live.
+    private val _notatedScoreFlow = MutableStateFlow<NotatedScore?>(null)
+    override val notatedScoreFlow: StateFlow<NotatedScore?> = _notatedScoreFlow.asStateFlow()
 
     private val log = logging("PulsarVM")
 
@@ -739,6 +794,7 @@ class PulsarViewModel(
             if (vibeFlow.value.arrangement != null) {
                 log.debug { "Re-applying vibe after engine init" }
                 applyVibe(vibeFlow.value)
+                reapplyNotatedScore()
             }
         }
         // If the underlying C++ engine is recreated mid-session (Android: Oboe
@@ -746,13 +802,28 @@ class PulsarViewModel(
         // current vibe recipe. DspSynthEngine handles graph + port-map sync;
         // the per-vibe track engines / harmonics / lick steps are NOT in the
         // port map, so without this re-push Pulsar would stay silent until
-        // the user manually picks a vibe again.
+        // the user manually picks a vibe again. The notated score is in that
+        // same non-port-mapped set, and re-applying the vibe alone would hand
+        // its track back to the pattern generator.
         scope.launch(dispatcherProvider.io) {
             synthEngine.engineRecreatedFlow.collect {
                 log.info { "Engine recreated — re-applying vibe ${vibeFlow.value.name}" }
                 applyVibe(vibeFlow.value)
+                reapplyNotatedScore()
             }
         }
+    }
+
+    /**
+     * Re-push the score last applied, if any. Every path that re-applies the vibe must call
+     * this: `applyVibe` pushes the vibe's own generative recipe, which includes the lick the
+     * score-driven track would otherwise play. A no-op when no score is in play, so apps
+     * with no [NotatedScoreProvider]s registered pay nothing.
+     */
+    private fun reapplyNotatedScore() {
+        val id = notatedScoreIdFlow.value ?: return
+        log.debug { "Re-applying notated score '$id'" }
+        applyNotatedScore(id)
     }
 
     // Enrichment collector moved to PulsarSession (Step 1 of the PulsarSession extraction):
@@ -866,6 +937,7 @@ class PulsarViewModel(
         playingId.map { PulsarIntent.Playing(it.asInt() != 0) },
         mutedId.map { PulsarIntent.GlobalPaused(it.asInt() != 0) },
         vibeFlow.map { PulsarIntent.VibeChange(it) },
+        notatedScoreIdFlow.map { PulsarIntent.NotatedScore(it) },
         energyId.map { PulsarIntent.Energy(it.asFloat()) },
         complexityId.map { PulsarIntent.Complexity(it.asFloat()) },
         spaceId.map { PulsarIntent.Space(it.asFloat()) },
@@ -906,6 +978,7 @@ class PulsarViewModel(
                         is PulsarIntent.Playing -> state.copy(playing = intent.value)
                         is PulsarIntent.GlobalPaused -> state.copy(globalPaused = intent.value)
                         is PulsarIntent.VibeChange -> state.copy(vibe = intent.value, vibeName = intent.value.name)
+                        is PulsarIntent.NotatedScore -> state.copy(notatedScoreId = intent.value)
                         is PulsarIntent.Energy -> state.copy(energy = intent.value)
                         is PulsarIntent.Complexity -> state.copy(complexity = intent.value)
                         is PulsarIntent.Space -> state.copy(space = intent.value)
@@ -1116,6 +1189,10 @@ class PulsarViewModel(
         pushEffectiveSends(saved.deep)
         percMixId.value = FloatValue(saved.percMix)
         envelopeModeId.value = IntValue(saved.envelopeMode)
+        // The written part is not in the port map and applyVibe above just pushed the
+        // generative lick over its track, so the score has to be restored with the vibe --
+        // otherwise a saved classical selection comes back playing the wrong notes.
+        saved.notatedScoreId?.let { applyNotatedScore(it) }
         log.debug { "Restored Pulsar state: vibe=${saved.vibe.name}, bpm=${saved.bpm}" }
     }
 
@@ -1653,7 +1730,8 @@ class PulsarViewModel(
      *   15=reserved (retired: was exitScratchMs, see the zeroing comment below), 16=jamCarry, 17=reserved,
      *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override,
      *   21=weather_rain, 22=weather_rumble, 23=weather_strike_chance, 24=weather_distance,
-     *   25=weather_rain_level (SectionWeather; all-zero when [Section.weather] is null)
+     *   25=weather_rain_level (SectionWeather; all-zero when [Section.weather] is null),
+     *   26=lick_index+1 (0=no override)
      *
      * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
      *   0=targetIndex, 1=weight, 2=transitionBars
@@ -1738,7 +1816,9 @@ class PulsarViewModel(
             // [0]=bars_min, [1]=bars_max, [2]=bar_step (1 = any value in
             //   [bars_min, bars_max]; 2 = odd-or-even-only stride), [3]=recency_decay,
             // [4]=transition_count, [5]=energy, [6]=complexity, [7]=space, [8]=mood,
-            // [9..17]=solo data (format depends on new vs legacy system)
+            // [9..17]=solo data (format depends on new vs legacy system),
+            // [18]=comping_style_override, [19]=comping_inversion_override,
+            // [20]=chord_follow_override, [21]=lick_index+1 (0 = no override)
             setSection(0, section.barsMin.toFloat())
             setSection(1, section.barsMax.toFloat())
             setSection(2, section.barStep.toFloat())
@@ -1798,6 +1878,8 @@ class PulsarViewModel(
             setSection(23, weather?.strikeChance ?: 0f)
             setSection(24, weather?.distance ?: 0f)
             setSection(25, weather?.rainLevel ?: 0f)
+            // [26]=lick_index+1 (0 = no override; the port array is zero-initialised)
+            setSection(26, ((section.lickIndex ?: -1) + 1).toFloat())
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.
@@ -2281,6 +2363,114 @@ class PulsarViewModel(
             IntValue(1)
         )
     }
+
+    /**
+     * [PulsarFeature.applyNotatedScore]: resolves [id] against [notatedScoresById] and loads
+     * that provider's asset off the UI caller's stack, pushing it once ready. `null` or an
+     * unmatched id clears instead -- see [PulsarFeature.applyNotatedScore]'s KDoc for why
+     * that clear is required, not optional. `scope` outlives any single caller (see
+     * [FeatureCoroutineScope]'s KDoc), so this is safe to fire from a click handler that
+     * won't itself stick around.
+     *
+     * A load failure (missing asset, malformed JSON, a failed `require` in `NotatedScore`'s
+     * init) is caught and logged rather than left to crash `scope`'s uncaught-exception path
+     * (it has no [kotlinx.coroutines.CoroutineExceptionHandler] -- see
+     * [FeatureCoroutineScope]) -- and clears the track rather than leaving a stale score
+     * pushed, so a bad asset can't strand a previous piece's notes under the new vibe.
+     * [CancellationException] is deliberately excluded from "load failure" and rethrown --
+     * swallowing it here would break structured concurrency if this coroutine is ever
+     * cancelled mid-load (not true today, since [FeatureCoroutineScope] lives for the
+     * process, but its own KDoc leaves the door open for tests and future teardown).
+     */
+    override fun applyNotatedScore(id: String?) {
+        val provider = id?.let { notatedScoresById[it] }
+        if (id != null && provider == null) {
+            log.warn { "No NotatedScoreProvider registered for id '$id'; clearing score-driven tracks" }
+        }
+        // Remember only what actually resolved, so an unmatched id doesn't get re-pushed
+        // (and re-warned) on every later vibe re-apply.
+        notatedScoreIdFlow.value = if (provider != null) id else null
+        scope.launch {
+            val score = try {
+                provider?.score()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log.warn(e) { "Failed to load notated score '$id'; clearing score-driven tracks" }
+                null
+            }
+            pushNotatedScore(score)
+        }
+    }
+
+    /**
+     * Uploads a notated score, or clears one when [score] is null.
+     *
+     * Pitch and velocity share one write as 7-bit fields, halving the wire traffic for
+     * what is by far the largest payload this ViewModel pushes.
+     *
+     * Write order IS the publish contract, because the audio thread reads the score event
+     * arrays every block rather than only on a generation change. Per track: clear
+     * `score_driven_` (unpublishing the array before it is overwritten), write the events,
+     * then the count that bounds them, then set `score_driven_` again. `score_generation`
+     * goes LAST for the whole push, matching how arrangement_generation works -- it is what
+     * arms the C++ side and resets the score clock. Writing any flag before its data lets
+     * the engine act on a half-written array; `PulsarScorePushTest` pins the order.
+     */
+    fun pushNotatedScore(score: NotatedScore?) {
+        val parts = score?.parts?.associateBy { it.trackIndex }.orEmpty()
+        fun put(symbol: String, v: Int) = synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, symbol), IntValue(v)
+        )
+        for (t in 0..7) {
+            put("score_driven_$t", 0)
+            val part = parts[t]
+            if (part == null) {
+                put("score_count_$t", 0)
+                continue
+            }
+            val base = t * NotatedScore.MAX_SCORE_EVENTS * 4
+            val pt = part.timbre
+            putF("score_part_${t}_engine", pt.engineIndex.toFloat())
+            putF("score_part_${t}_harmonics", pt.harmonics)
+            putF("score_part_${t}_timbre", pt.timbre)
+            putF("score_part_${t}_morph", pt.morph)
+            putF("score_part_${t}_decay", pt.decay)
+            putF("score_part_${t}_level", pt.level)
+            part.events.forEachIndexed { i, e ->
+                val o = base + i * 4
+                put("score_ev_${o + 0}", e.tick)
+                // Wire field is uint16_t; a raw static_cast truncates rather than clamps
+                // (65536 -> 0), so an out-of-range value would silently corrupt the duration
+                // instead of just capping it. Coerce here so marshalling can't produce that.
+                put("score_ev_${o + 1}", e.durationTicks.coerceAtMost(65535))
+                put("score_ev_${o + 2}", e.pitch or (e.velocity shl 7))
+                put("score_ev_${o + 3}", (if (e.hold) 1 else 0) or (if (e.bandRelease) 2 else 0))
+            }
+            put("score_count_$t", part.events.size)
+            put("score_driven_$t", 1)
+        }
+        put("score_generation", ++scoreGeneration)
+        _notatedScoreFlow.value = score
+    }
+
+    // Float-typed twin of pushNotatedScore's local `put`, shared with setScorePartControl so
+    // a live orchestration-panel edit writes through the identical symbol format.
+    private fun putF(symbol: String, v: Float) = synthController.setPluginControl(
+        PluginControlId(PULSAR_URI, symbol), FloatValue(v)
+    )
+
+    /** [PulsarFeature.setScorePartControl]: writes straight through, no local state to mirror. */
+    override fun setScorePartControl(track: Int, field: String, value: Float) {
+        putF("score_part_${track}_$field", value)
+    }
+
+    /** [PulsarFeature.setBandHold]: writes straight through, no local state to mirror. */
+    override fun setBandHold(held: Boolean) {
+        synthController.setPluginControl(PulsarSymbol.BAND_HOLD.controlId, IntValue(if (held) 1 else 0))
+    }
+
+    private var scoreGeneration = 0
 
     private fun defaultSoloBehavior(profile: EnvelopeProfile): SoloBehavior = when (profile) {
         EnvelopeProfile.RHYTHM -> SoloBehavior(
