@@ -1,146 +1,84 @@
-# Orphic DJ — Play Store listing draft
+# Orphic DJ — Play Store listing
 
-This is the source-of-truth document for everything that goes into the Play Console
-"Main store listing" form. Fill in each section, then paste from here into the
-Console UI. Keeping it under version control means you can iterate, get review
-comments, and recover the text if you need to re-submit.
+**The marketing copy is not in this file.** It lives in
+[`../androidApp/src/main/play/`](../androidApp/src/main/play/) and is uploaded from there by
+Gradle Play Publisher. Edit the `.txt` files; this document holds only the fields that have no
+file in that tree.
 
----
+This file used to carry a second copy of the descriptions and drifted from what actually shipped —
+it claimed 9 vibes against the tree's 11 and was missing an entire paragraph. A pointer can't drift.
 
-## Decided already
+## Where each field lives
+
+Published from the tree — edit the file, never the Console:
+
+| Field | File | Limit |
+|---|---|---|
+| Title | `listings/en-US/title.txt` | 30 |
+| Short description | `listings/en-US/short-description.txt` | 80 |
+| Full description | `listings/en-US/full-description.txt` | 4,000 |
+| What's New | `release-notes/en-US/default.txt` | 500 |
+| Icon, feature graphic, screenshots | `listings/en-US/graphics/` | see below |
+| Contact email / website | `contact-email.txt`, `contact-website.txt` | — |
+| Default language | `default-language.txt` | — |
+
+Two different tasks push them, which is why "publish a build" and "change the listing" are separate
+acts:
+
+```bash
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha
+```
+
+That uploads the AAB **and** `release-notes/` for that release only. Title, descriptions and
+graphics move separately via `publishListing` / `publishOgApps` — so "leave the listing alone"
+during a release is the default, not something you have to arrange. See the `release-djapp` skill.
+
+## Console-only fields
+
+No file backs these. They are set once in the Play Console and are the reason this document still
+exists. Full walkthrough in [`play-console-setup.md`](play-console-setup.md).
 
 | Field | Value |
-|-------|-------|
-| App name | `Orphic DJ: Play It Live` *(Play store title, 23 chars. Leads with the live/interactive hook, the app's real differentiator, and exits the contested "generative music" keyword. Title is Play's highest-weight ranking field. On-device launcher label stays `Orphic DJ`.)* |
-| Default language | English (US) |
-| Category — primary | Music & Audio |
-| Category — secondary | _(optional, see "Tags" below)_ |
-| Contact email | `orphic.fm.apps@gmail.com` |
-| Website | `https://orphic.fm` |
-| Privacy policy | `https://orphic.fm/dj/privacy/` |
+|---|---|
+| Primary category | `Music & Audio` |
+| Tags (max 5, fixed dropdown) | `Music`, `Music & Audio` |
+| Privacy policy | `https://orphic.fm/dj/privacy/` (Policy → App content) |
+| Content rating, Data safety, Target audience | see `play-console-setup.md` §6 |
 
----
+**Why the title is `Orphic DJ: Play It Live`** and not the launcher label: title is Play's
+highest-weight ranking field, so it leads with the live/interactive hook — the app's real
+differentiator — and stays out of the contested "generative music" keyword. The on-device launcher
+label remains plain `Orphic DJ` (`androidApp/src/main/res/values/strings.xml`).
 
-## Short description — 80 char hard limit
+## Writing rules
 
-This is the line that appears under the app name in search results and on the
-detail page. It's the most read piece of copy in the listing — your one-line
-pitch.
+Constraints Play hard-blocks or fails review on:
 
-**Easy. Playful. Infinite. Live electronic music for focus, sleep & parties.**
+- Short description ≤ 80 chars. No ALL-CAPS marketing words, no emoji, no other app's trademark.
+- No comparisons to named competitors ("like Spotify") — automatic review failure.
+- No unsubstantiable claims ("the best", "AI-powered" unless the data-safety form defends it).
+- No promo codes, sale language, or "act now" — Play treats those as spam.
 
-### Constraints
+Conventions this listing keeps, which are ours rather than Play's:
 
-- ≤ 80 characters (Play Console hard-blocks longer text).
-- No ALL-CAPS marketing words ("FREE", "BEST", etc.).
-- No trademark of other apps or services.
-- No emoji.
-- No "Spotify-like" or comparisons to specific competitors.
+- Lead in the first 1–2 sentences. Play truncates after a few lines on small phones.
+- Bullets ≤ 80 chars, grouped by what the user does, not by subsystem.
+- Never name internal subsystems (`Pulsar`, `C++ DSP graph`) or third-party DSP modules — the
+  latter is a trademark problem as well as a clarity one.
+- No roadmap promises with dates.
+- Keep the counted bullets (`• N original vibes`) true. The vibe count is the number of literal
+  `CatalogEntry(VibeStatus.LIVE` entries in `VibeCatalog.kt` — grepping for the bare enum name
+  overcounts, because doc comments mention it too.
 
----
+## Assets
 
-## Full description — 4000 char hard limit
+Sources render to PNG under `assets/`, and the shipped copies live in the tree's `graphics/`:
 
-Shown on the listing detail page. Most users scan; few read every word. Format
-matters more than total length.
+- `assets/framed/hero-card.html`, `feature-graphic.html`, `tv-banner.html` — headline art
+- `assets/framed/frame.html`, `frame-large.html`, `frame-widgets.html` — the screenshot captions
+- `assets/screenshots/` — raw captures; `assets/framed/*.png` — rendered frames
 
-```
-Orphic DJ is live electronic music you perform with four knobs. No decks, no skills, no two performances alike. Twist Energy, Complexity, Mood, and Space and the music reshapes around you in real time. Open the DJ module to drop effects and ride the mix. Underneath, it composes itself endlessly, so every performance is a piece that never repeats.
+Captions are baked into the images, so fixing copy in a caption means re-rendering the PNG and
+re-running `publishListing`, not just editing text.
 
-No streaming. No library. No playlists. Just four knobs and music you play.
-
-WHAT YOU CONTROL
-Four knobs shape the entire mix:
-• Energy: from calm ambient drift to a driving beat
-• Complexity: from sparse and minimal to rich and layered
-• Mood: from bright and uplifting to dark and moody
-• Space: from intimate and dry to vast and reverberant
-
-WHAT'S INSIDE
-• 9 original vibes
-• 11 live visualizations
-• 8 generative tracks
-• 5 mixer controls
-• 4 ambiance knobs
-• 2 turntables
-• 1 home-screen widget
-∞ infinite music
-
-MADE FOR EVERY MOMENT
-• Focus & study: steady, distraction-free instrumental music for deep work
-• Relax & sleep: a built-in timer fades you off to sleep
-• House parties: open the DJ module, layer effects, drop changes live
-• Drives & commutes: music that never repeats and never needs a signal
-
-Completely free. No account, no network, no ads, no in-app purchases, no tracking. Your music never leaves your device.
-
-Tune into orphic.fm for more from Orpheus.
-```
-
-### Recommended structure (~600–1200 chars total — short is fine)
-
-1. **Opening (1–2 sentences).** What the app *is* and what makes it different.
-   Don't bury the lead — Play truncates after a few lines on smaller phones.
-2. **Feature bullets (4–7).** Each line ≤ 80 chars, action verb at the front.
-   Group features by what the user does, not by internal subsystem.
-3. **For whom / when** (1 short paragraph). Sets the use-case context.
-4. **Optional — what's NOT in the app.** Especially powerful when honesty is a
-   feature. ("No accounts. No ads. No streaming. No internet.")
-5. **Optional — a 1-line dev story or "why".** Caveat: keep it brief — anything
-   that reads like a manifesto pushes users away.
-
-### Style rules Play actually checks
-
-- **No claims you can't substantiate.** Skip "the best", "the fastest", "AI-
-  powered" (unless you can defend it on the data-safety form).
-- **No comparisons to specific competitors by name.** "Like Spotify" / "better
-  than Apple Music" → review fails.
-- **No "FREE" in headers when the app has IAPs or ads** — we have neither so
-  this is safe to mention, but Play prefers you let the price tag speak.
-- **No promo codes, sale language, or "act now"** — Play's policy treats those
-  as spam.
-
-### Things I would NOT put in the description
-
-- Internal subsystem names ("Pulsar engine", "C++ DSP graph") — meaningless to
-  users; save them for marketing pages later if you write any.
-- Third-party DSP module names. Trademark issue + irrelevant to the listener.
-- Long technical pedigree. The Play Store listing is a sales surface, not a
-  GitHub README.
-- Roadmap promises with specific timelines. "More creation tools will follow"
-  is fine; "Q3 2026 update" boxes you in.
-
----
-
-## Tags — up to 5
-
-Play uses these for categorization and surfacing in related-apps. The list
-Play offers is fixed; you pick from a dropdown.
-
-**Selected:**
-
-- `Music`
-- `Music & Audio`
-
----
-
-## Release notes — what's new in this version
-
-Shown next to the version number. Keep it short — most users glance at the
-first 80 chars.
-
-**v1.0.0:**
-
-> v1.0.0 — Orphic DJ — throwing against the wall to see what sticks.
-
----
-
-## Checklist
-
-- [x] Short description — finalized above
-- [x] Full description — finalized above
-- [x] Release notes for v1.0.0 — finalized above
-- [x] Tags — `Music`, `Music & Audio`
-- [x] Primary category — `Music & Audio`
-- [x] GitHub repo link — not included
-- [x] Screenshots — 7 captioned frames (1080×1920) in `assets/framed/`: by-the-numbers hero (`hero-card.html`), Four knobs, vibes, mix, DJ, timer, widget. Wired into `play/.../phone-screenshots/01–07.png`. Raw captures in `assets/screenshots/`.
+Apple's equivalent copy is in [`../app-store/`](../app-store/), which mirrors this layout.

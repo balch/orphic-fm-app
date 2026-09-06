@@ -4,7 +4,10 @@ A click-through checklist for getting Orphic DJ from "AAB on disk" to "closed-te
 opt-in URL in beta testers' inboxes." Intended to be followed in order; each section
 is self-contained so you can pause and resume.
 
-Companion document: [`listing.md`](listing.md) holds the marketing copy.
+Companion document: [`listing.md`](listing.md) holds the Console-only fields (category, tags,
+privacy policy, title rationale). The marketing copy itself lives in
+[`../androidApp/src/main/play/`](../androidApp/src/main/play/) and is uploaded by Gradle Play
+Publisher — this walkthrough's manual-paste steps are the first-time path, not the ongoing one.
 
 ---
 
@@ -15,7 +18,8 @@ Have these to hand:
 - [ ] Google account that owns the Play Console developer license (`balch61@gmail.com`)
 - [ ] $25 one-time developer registration fee (already paid if you've used the console before)
 - [ ] Phone with the app installed for screenshots
-- [ ] `apps/djapp/play-store/listing.md` open in another window (you'll paste from it)
+- [ ] `apps/djapp/androidApp/src/main/play/listings/en-US/` open in another window (the copy you'll
+      paste); `apps/djapp/play-store/listing.md` for the Console-only fields
 - [ ] Final app icon: `apps/djapp/play-store/assets/play-icon-512.png`
 - [ ] Feature graphic: `apps/djapp/play-store/assets/feature-graphic-1024x500.png`
 - [ ] Phone screenshots (≥2; see §3 below for capture instructions)
@@ -119,19 +123,24 @@ names (Pulsar, etc.).
 
 ## 4. Main store listing (left rail → Grow → Store presence → Main store listing)
 
-Paste from `listing.md`:
+Paste from `../androidApp/src/main/play/`, which is the published source of truth. Paths below are
+relative to that directory:
 
 | Field | Source | Notes |
 |---|---|---|
 | App name | "Orphic DJ" | already set in §2 |
-| Short description | `listing.md` § Short description | ≤ 80 chars |
-| Full description | `listing.md` § Full description | ≤ 4000 chars |
-| App icon | `assets/play-icon-512.png` | 512×512 |
-| Feature graphic | `assets/feature-graphic-1024x500.png` | 1024×500 |
-| Phone screenshots | `assets/screenshots/*.png` | min 2 |
-| 7-inch tablet screenshots | _(skip for v1)_ | optional |
-| 10-inch tablet screenshots | _(skip for v1)_ | optional |
+| Title | `listings/en-US/title.txt` | ≤ 30 chars |
+| Short description | `listings/en-US/short-description.txt` | ≤ 80 chars |
+| Full description | `listings/en-US/full-description.txt` | ≤ 4000 chars |
+| App icon | `listings/en-US/graphics/icon/` | 512×512 |
+| Feature graphic | `listings/en-US/graphics/feature-graphic/` | 1024×500 |
+| Phone screenshots | `listings/en-US/graphics/phone-screenshots/` | min 2 |
+| Tablet / TV screenshots | `graphics/{seven-inch,ten-inch,tv}-*/` | optional |
 | Video | _(skip)_ | optional |
+
+**After the first time, don't paste at all.** `publishListing` / `publishOgApps` upload all of the
+above from those files. Hand-editing in the Console puts the store ahead of the repo, and the next
+publish silently reverts it.
 
 Click **Save** at the bottom. You can come back and edit anytime; Play
 re-reviews the listing on each save but doesn't delay releases.
@@ -332,14 +341,14 @@ Store within ~15 minutes.
    - Version name: `1.0.0` ← assumes you tag HEAD as `v1.0.0` before building
    - Permissions list matches §7
 5. **Release name** (internal): `1.0.0 – first closed beta`
-6. **Release notes** (per locale; en-US):
-
-   ```
-   <PASTE FROM listing.md § Release notes WHEN FINALIZED>
-   ```
+6. **Release notes** (per locale; en-US): paste the contents of
+   `../androidApp/src/main/play/release-notes/en-US/default.txt`.
 
    Keep it short. The first 80 chars are what shows up under the version
    number in the user's Play Store updates list.
+
+   On every release after this one, `publishOgReleaseBundle` sends that file along with the AAB —
+   so the note is edited in the repo before cutting the release, never typed into the Console.
 
 7. Click **Save**, then **Review release**, then **Start rollout to closed
    testing**.
@@ -423,8 +432,11 @@ views.
 
 ## Appendix C — Files in this directory
 
-- `listing.md` — marketing copy (short / full description, release notes, tags)
+- `listing.md` — Console-only fields (category, tags, privacy policy, title rationale) and the
+  writing rules. **Not** the copy; that lives in `../androidApp/src/main/play/`.
 - `play-console-setup.md` — this document
-- `assets/play-icon-512.png` — Play Store app icon
-- `assets/feature-graphic-1024x500.png` — Play Store feature graphic
-- `assets/screenshots/*.png` — phone screenshots (TODO)
+- `distribution-requirements.md` — per-region legal compliance record
+- `assets/framed/*.html` — render sources for the store graphics and screenshot captions
+- `assets/framed/*.png`, `assets/screenshots/*.png` — rendered frames and raw captures
+- `assets/appstore/` — iPad screenshots for the Apple listing (copy in `../app-store/`)
+- `.secrets/` — GPP service account + App Store Connect `.p8` (gitignored)
