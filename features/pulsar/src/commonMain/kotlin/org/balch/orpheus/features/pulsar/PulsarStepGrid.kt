@@ -13,11 +13,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,19 +32,21 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
@@ -53,7 +57,6 @@ import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
-import kotlin.random.Random
 
 /** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX */
 internal val TrackColors = listOf(
@@ -69,51 +72,70 @@ internal val TrackColors = listOf(
 
 private const val NUM_TRACKS = 8
 private const val MAX_STEPS = 32
-private const val MAX_PARTICLES = 50
 
-private class GridParticle {
-    var x = 0f; var y = 0f; var vx = 0f; var vy = 0f
-    var radius = 0f; var color: Color = Color.Transparent
-    var life = 0f; var decay = 2f; var active = false
-}
+// Stroke is a class, not a value class: build each once rather than per shape per frame.
+private val SelectionStroke = Stroke(width = 1.5f)
+private val CellBorderStroke = Stroke(width = 1f)
+private val TraceGlowStroke = Stroke(width = 4f)
+private val TraceStroke = Stroke(width = 1.5f)
 
-private class GridParticlePool {
-    val particles = Array(MAX_PARTICLES) { GridParticle() }
-    private var nextIndex = 0
+/**
+ * The embossed cell's highlight and shadow gradients, one pair per track, rebuilt only when
+ * that track's cell size changes. Both run from the cell's top-left corner to its bottom-right,
+ * so they are drawn inside a translate() to the cell, and the cell's alpha goes on the draw
+ * call rather than into the stops. Before this, every lit cell built both gradients every
+ * frame: ~120 gradient objects and Skia shaders per frame, most of the grid's garbage.
+ */
+private class CellBrushCache {
+    private val widths = FloatArray(NUM_TRACKS) { -1f }
+    private val heights = FloatArray(NUM_TRACKS) { -1f }
+    private val highlights = arrayOfNulls<Brush>(NUM_TRACKS)
+    private val shadows = arrayOfNulls<Brush>(NUM_TRACKS)
 
-    fun spawn(x: Float, y: Float, color: Color, velocity: Float, energy: Float) {
-        val count = (energy * 4).toInt().coerceIn(1, 4)
-        repeat(count) {
-            val p = particles[nextIndex % MAX_PARTICLES]
-            nextIndex++
-            p.x = x; p.y = y
-            p.vx = (Random.nextFloat() - 0.5f) * 30f
-            p.vy = -(20f + Random.nextFloat() * 40f)
-            p.radius = 2f + velocity * 3f
-            p.color = color; p.life = 1f
-            p.decay = 1.8f + Random.nextFloat() * 0.4f
-            p.active = true
-        }
+    fun highlight(track: Int, w: Float, h: Float): Brush {
+        refresh(track, w, h)
+        return highlights[track]!!
     }
 
-    fun update(dt: Float) {
-        for (p in particles) {
-            if (!p.active) continue
-            p.x += p.vx * dt; p.y += p.vy * dt
-            p.life -= p.decay * dt
-            if (p.life <= 0f) { p.active = false; p.life = 0f }
-        }
+    fun shadow(track: Int, w: Float, h: Float): Brush {
+        refresh(track, w, h)
+        return shadows[track]!!
+    }
+
+    private fun refresh(track: Int, w: Float, h: Float) {
+        if (widths[track] == w && heights[track] == h) return
+        widths[track] = w
+        heights[track] = h
+        highlights[track] = Brush.linearGradient(
+            0f to Color.White.copy(alpha = 0.3f),
+            0.3f to Color.Transparent,
+            start = Offset.Zero,
+            end = Offset(w, h),
+        )
+        shadows[track] = Brush.linearGradient(
+            0f to Color.Transparent,
+            0.7f to Color.Black.copy(alpha = 0.15f),
+            1f to Color.Black.copy(alpha = 0.3f),
+            start = Offset.Zero,
+            end = Offset(w, h),
+        )
     }
 }
 
 /**
  * Canvas-drawn step grid visualization showing 8 tracks x up to 32 steps.
- * Features glowing cells, playhead afterglow trail, energy particles,
- * waveform traces, beat pulse, and liquid glass overlay.
+ * Features glowing cells, playhead afterglow trail, waveform traces,
+ * beat pulse, and liquid glass overlay.
+ *
+ * [vizData] is a State rather than a value on purpose. The engine emits a new PulsarVizData
+ * every 16ms during playback; taken as a plain parameter it recomposed this whole composable
+ * at 60Hz, and the frame loop below, a LaunchedEffect(Unit), kept the first emission forever
+ * and never saw a playhead move. It is read only inside draw lambdas and that loop, so an
+ * emission invalidates the draw and nothing else.
  */
 @Composable
 fun PulsarStepGrid(
-    vizData: PulsarVizData,
+    vizData: State<PulsarVizData>,
     trackVizFlows: List<StateFlow<FloatArray>> = List(NUM_TRACKS) { MutableStateFlow(FloatArray(0)) },
     energy: Float = 0.5f,
     space: Float = 0.4f,
@@ -131,9 +153,14 @@ fun PulsarStepGrid(
     val cellGap = 2f
     val trackGap = 4f
 
-    val particlePool = remember { GridParticlePool() }
-    var beatPulse by remember { mutableFloatStateOf(1f) }
-    val prevPlayheads = remember { IntArray(NUM_TRACKS) { -1 } }
+    val cellBrushes = remember { CellBrushCache() }
+    val tracePaths = remember { List(NUM_TRACKS) { Path() } }
+    // No whole-grid transform lives here. A 3% beat-pulse scale on the outer graphicsLayer used
+    // to fire on every step advance of track 0, which repainted 84% of the canvas on the step
+    // frame and 83% on the next one; at high energy, where steps land every few frames, that
+    // read as the screen shimmering. It had never actually rendered before the frame loop
+    // started seeing live data, so removing it restores what shipped rather than changing it.
+    // A pulse on real kick hits, decaying over ~150ms, would be the version worth having.
     val smoothedLevels = remember { FloatArray(NUM_TRACKS) }
     // Running peak per track for stable waveform normalization (slow decay)
     val trackPeaks = remember { FloatArray(NUM_TRACKS) { 0.1f } }
@@ -143,48 +170,47 @@ fun PulsarStepGrid(
     // the waveform Canvas's drawScope below, which invalidates only the draw.
     val trackWaveformStates = trackVizFlows.map { it.collectAsState() }
 
+    // The only composition-phase readers of the viz data: the frame loop's gate and the glass
+    // layers. Each takes exactly the field it needs through derivedStateOf, so the body
+    // recomposes when playback starts or stops and when the step count changes, not per
+    // emission.
+    val isPlaying by remember(vizData) { derivedStateOf { vizData.value.playheads[0] >= 0 } }
+    val steps0 by remember(vizData) {
+        derivedStateOf { vizData.value.stepCounts[0].coerceAtMost(MAX_STEPS) }
+    }
+    val playhead0 by remember(vizData) { derivedStateOf { vizData.value.playheads[0] } }
+
+    // Runs only while there is something to animate: playback (level smoothing and the beat
+    // pulse) or a pulse still settling after a stop. Between songs it parks in snapshotFlow
+    // waiting on the play state alone, so nothing holds the frame clock and Android's display
+    // pipeline can idle while the app sits open. Parking there rather than re-keying the
+    // effect matters: the state write that starts playback wakes it before that frame's clock
+    // fires, so the first step is animated on the frame it belongs to.
     LaunchedEffect(Unit) {
-        var lastNanos = 0L
         while (true) {
-            withFrameNanos { nanos ->
-                val dt = if (lastNanos == 0L) 0.016f
-                else ((nanos - lastNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
-                lastNanos = nanos
-                particlePool.update(dt)
-                if (beatPulse > 1f) beatPulse = (beatPulse - dt * 15f).coerceAtLeast(1f)
+            snapshotFlow { isPlaying }.first { it }
+            var lastNanos = 0L
+            while (isPlaying) {
+                withFrameNanos { nanos ->
+                    val viz = vizData.value
+                    val dt = if (lastNanos == 0L) 0.016f
+                    else ((nanos - lastNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+                    lastNanos = nanos
 
-                // Smooth track levels: fast attack (~10ms), slow decay (~300ms)
-                for (t in 0 until NUM_TRACKS) {
-                    val raw = vizData.trackLevels[t].coerceIn(0f, 1f)
-                    if (raw > smoothedLevels[t]) {
-                        smoothedLevels[t] += (raw - smoothedLevels[t]) * (1f - kotlin.math.exp(-dt / 0.01f))
-                    } else {
-                        smoothedLevels[t] *= (1f - dt * 3f).coerceAtLeast(0f)
-                    }
-                    // Running peak for waveform normalization: fast attack, very slow decay (~10s)
-                    if (raw > trackPeaks[t]) {
-                        trackPeaks[t] = raw
-                    } else {
-                        trackPeaks[t] *= (1f - dt * 0.1f).coerceAtLeast(0f)  // ~10s decay
-                        if (trackPeaks[t] < 0.01f) trackPeaks[t] = 0.01f     // floor
-                    }
-                }
-
-                for (t in 0 until NUM_TRACKS) {
-                    val ph = vizData.playheads[t]
-                    if (ph != prevPlayheads[t] && ph >= 0) {
-                        prevPlayheads[t] = ph
-                        if (t == 0) beatPulse = 1.03f
-                        if (ph < vizData.stepCounts[t] &&
-                            vizData.stepGates[t][ph] &&
-                            vizData.stepVelocities[t][ph] > 0.5f) {
-                            val steps = vizData.stepCounts[t].coerceIn(1, MAX_STEPS)
-                            val cellW = 360f / steps
-                            val trackH = 100f / NUM_TRACKS
-                            val cx = ph * cellW + cellW / 2
-                            val cy = t * trackH + trackH / 2
-                            particlePool.spawn(cx, cy, TrackColors[t],
-                                vizData.stepVelocities[t][ph], energy)
+                    // Smooth track levels: fast attack (~10ms), slow decay (~300ms)
+                    for (t in 0 until NUM_TRACKS) {
+                        val raw = viz.trackLevels[t].coerceIn(0f, 1f)
+                        if (raw > smoothedLevels[t]) {
+                            smoothedLevels[t] += (raw - smoothedLevels[t]) * (1f - kotlin.math.exp(-dt / 0.01f))
+                        } else {
+                            smoothedLevels[t] *= (1f - dt * 3f).coerceAtLeast(0f)
+                        }
+                        // Running peak for waveform normalization: fast attack, very slow decay (~10s)
+                        if (raw > trackPeaks[t]) {
+                            trackPeaks[t] = raw
+                        } else {
+                            trackPeaks[t] *= (1f - dt * 0.1f).coerceAtLeast(0f)  // ~10s decay
+                            if (trackPeaks[t] < 0.01f) trackPeaks[t] = 0.01f     // floor
                         }
                     }
                 }
@@ -207,10 +233,6 @@ fun PulsarStepGrid(
 
     BoxWithConstraints(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = beatPulse
-                scaleY = beatPulse
-            }
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF0A0A12))
             .pointerInput(selectedTrack) {
@@ -224,24 +246,26 @@ fun PulsarStepGrid(
             }
     ) {
 
-        // Layer 0: Canvas draws cells, glow, particles
+        // Layer 0: Canvas draws cells and glow
         Canvas(
             modifier = Modifier.matchParentSize()
                 .liquefiableVizEffects(gridLiquidState)
         ) {
+            // Read in the draw phase: an emission redraws this Canvas, nothing recomposes.
+            val viz = vizData.value
             val totalTrackGaps = (NUM_TRACKS - 1) * trackGap
             val trackHeight = (size.height - totalTrackGaps) / NUM_TRACKS
 
             // Layer 2-5: Cells, glow, playhead, selection
             for (track in 0 until NUM_TRACKS) {
-                val rawSteps = vizData.stepCounts[track]
+                val rawSteps = viz.stepCounts[track]
                 if (rawSteps < 2) continue  // no data yet — skip track
                 val steps = rawSteps.coerceAtMost(MAX_STEPS)
                 val trackY = track * (trackHeight + trackGap)
                 val totalCellGaps = (steps - 1) * cellGap
                 val cellWidth = (size.width - totalCellGaps) / steps
                 val color = TrackColors[track]
-                val playhead = vizData.playheads[track]
+                val playhead = viz.playheads[track]
 
                 // Selection highlight border
                 if (track == selectedTrack) {
@@ -250,14 +274,14 @@ fun PulsarStepGrid(
                         topLeft = Offset(-2f, trackY - 2f),
                         size = Size(size.width + 4f, trackHeight + 4f),
                         cornerRadius = CornerRadius(4f, 4f),
-                        style = Stroke(width = 1.5f),
+                        style = SelectionStroke,
                     )
                 }
 
                 for (step in 0 until steps) {
                     val cellX = step * (cellWidth + cellGap)
-                    val gate = vizData.stepGates[track][step]
-                    val velocity = vizData.stepVelocities[track][step].coerceIn(0f, 1f)
+                    val gate = viz.stepGates[track][step]
+                    val velocity = viz.stepVelocities[track][step].coerceIn(0f, 1f)
                     val isAtPlayhead = step == playhead
                     val trackLevel = smoothedLevels[track].coerceIn(0f, 1f)
                     val corner = CornerRadius(3f, 3f)
@@ -270,110 +294,74 @@ fun PulsarStepGrid(
                         cornerRadius = corner,
                     )
 
-                    // Active cell — raised embossed square
+                    // Active cell — raised embossed square, drawn in the cell's own frame:
+                    // translate to it and scale the playhead pulse about its centre, so the
+                    // cached gradients need no per-cell geometry and the alpha rides the call.
                     if (gate) {
-                        val cx = cellX + cellWidth / 2
-                        val cy = trackY + trackHeight / 2
                         val baseAlpha = if (isAtPlayhead) {
                             (0.4f + trackLevel * 0.6f).coerceAtMost(1f)
                         } else {
                             velocity * 0.7f
                         }
                         val pulse = if (isAtPlayhead) 1f + trackLevel * 0.1f else 1f
-                        val blobW = cellWidth * pulse
-                        val blobH = trackHeight * pulse
-                        val blobX = cx - blobW / 2
-                        val blobY = cy - blobH / 2
+                        val cell = Size(cellWidth, trackHeight)
 
-                        // Glow halo
-                        if (isAtPlayhead && trackLevel > 0.02f) {
-                            val glowPad = 2f + trackLevel * 5f
+                        withTransform({
+                            translate(cellX, trackY)
+                            if (pulse != 1f) scale(pulse, pulse, Offset(cellWidth / 2, trackHeight / 2))
+                        }) {
+                            // Glow halo
+                            if (isAtPlayhead && trackLevel > 0.02f) {
+                                val glowPad = 2f + trackLevel * 5f
+                                drawRoundRect(
+                                    color = color.copy(alpha = trackLevel * 0.4f),
+                                    topLeft = Offset(-glowPad, -glowPad),
+                                    size = Size(cellWidth + glowPad * 2, trackHeight + glowPad * 2),
+                                    cornerRadius = CornerRadius(4f, 4f),
+                                    blendMode = BlendMode.Plus,
+                                )
+                            }
+
+                            // Solid fill
                             drawRoundRect(
-                                color = color.copy(alpha = trackLevel * 0.4f),
-                                topLeft = Offset(blobX - glowPad, blobY - glowPad),
-                                size = Size(blobW + glowPad * 2, blobH + glowPad * 2),
-                                cornerRadius = CornerRadius(4f, 4f),
-                                blendMode = BlendMode.Plus,
+                                color = color.copy(alpha = baseAlpha),
+                                size = cell,
+                                cornerRadius = corner,
+                            )
+
+                            // Top-left highlight
+                            drawRoundRect(
+                                brush = cellBrushes.highlight(track, cellWidth, trackHeight),
+                                size = cell,
+                                cornerRadius = corner,
+                                alpha = baseAlpha,
+                            )
+
+                            // Bottom-right shadow — depth
+                            drawRoundRect(
+                                brush = cellBrushes.shadow(track, cellWidth, trackHeight),
+                                size = cell,
+                                cornerRadius = corner,
+                                alpha = baseAlpha,
+                            )
+
+                            // Border
+                            drawRoundRect(
+                                color = color.copy(alpha = baseAlpha * 0.5f),
+                                size = cell,
+                                cornerRadius = corner,
+                                style = CellBorderStroke,
                             )
                         }
-
-                        // Solid fill
-                        drawRoundRect(
-                            color = color.copy(alpha = baseAlpha),
-                            topLeft = Offset(blobX, blobY),
-                            size = Size(blobW, blobH),
-                            cornerRadius = corner,
-                        )
-
-                        // Top-left highlight
-                        drawRoundRect(
-                            brush = Brush.linearGradient(
-                                colorStops = arrayOf(
-                                    0f to Color.White.copy(alpha = baseAlpha * 0.3f),
-                                    0.3f to Color.Transparent,
-                                ),
-                                start = Offset(blobX, blobY),
-                                end = Offset(blobX + blobW, blobY + blobH),
-                            ),
-                            topLeft = Offset(blobX, blobY),
-                            size = Size(blobW, blobH),
-                            cornerRadius = corner,
-                        )
-
-                        // Bottom-right shadow — depth
-                        drawRoundRect(
-                            brush = Brush.linearGradient(
-                                colorStops = arrayOf(
-                                    0f to Color.Transparent,
-                                    0.7f to Color.Black.copy(alpha = baseAlpha * 0.15f),
-                                    1f to Color.Black.copy(alpha = baseAlpha * 0.3f),
-                                ),
-                                start = Offset(blobX, blobY),
-                                end = Offset(blobX + blobW, blobY + blobH),
-                            ),
-                            topLeft = Offset(blobX, blobY),
-                            size = Size(blobW, blobH),
-                            cornerRadius = corner,
-                        )
-
-                        // Border
-                        drawRoundRect(
-                            color = color.copy(alpha = baseAlpha * 0.5f),
-                            topLeft = Offset(blobX, blobY),
-                            size = Size(blobW, blobH),
-                            cornerRadius = corner,
-                            style = Stroke(width = 1f),
-                        )
                     }
 
                 }
-            }
-
-            // Layer 6: Particles
-            for (p in particlePool.particles) {
-                if (!p.active) continue
-                val r = p.radius * (0.5f + 0.5f * p.life)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to p.color.copy(alpha = p.life),
-                            0.5f to p.color.copy(alpha = p.life * 0.5f),
-                            1f to Color.Transparent,
-                        ),
-                        center = Offset(p.x, p.y),
-                        radius = r,
-                    ),
-                    center = Offset(p.x, p.y),
-                    radius = r,
-                    blendMode = BlendMode.Plus,
-                )
             }
 
             // (signal traces drawn ON TOP of glass — see overlay Canvas below)
         }
 
         // Layer 7: Liquid glass overlay — only when playing
-        val isPlaying = vizData.playheads[0] >= 0
         if (isPlaying) {
             Box(
                 modifier = Modifier
@@ -391,13 +379,11 @@ fun PulsarStepGrid(
 
         // Layer 7.5: Playhead glass column — its own glass effect
         // 2x the base glass params except frost which is 0.5x
-        if (isPlaying && vizData.stepCounts[0] >= 2) {
-            val steps = vizData.stepCounts[0].coerceAtMost(MAX_STEPS)
-            val phPos = vizData.playheads[0].coerceIn(0, steps - 1)
+        if (isPlaying && steps0 >= 2) {
+            val steps = steps0
             val totalCellGaps = (steps - 1) * cellGap
             val gridWidthDp = maxWidth.value  // actual rendered width from BoxWithConstraints
             val cellW = (gridWidthDp - totalCellGaps) / steps
-            val phX = phPos * (cellW + cellGap)
 
             val playheadScope = VisualizationLiquidScope(
                 refraction = (refraction * 2f).coerceAtMost(1f),
@@ -410,7 +396,12 @@ fun PulsarStepGrid(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(cellW.dp)
-                    .offset(x = phX.dp)
+                    // The lambda form reads the playhead in the layout phase, so the column
+                    // moves each step without recomposing anything.
+                    .offset {
+                        val phPos = playhead0.coerceIn(0, steps - 1)
+                        IntOffset((phPos * (cellW + cellGap)).dp.roundToPx(), 0)
+                    }
                     .liquidVizEffects(
                         gridLiquidState,
                         playheadScope,
@@ -424,12 +415,13 @@ fun PulsarStepGrid(
 
         // Layer 8: Signal traces ON TOP of glass — real waveforms like other panels
         Canvas(modifier = Modifier.matchParentSize()) {
+            val viz = vizData.value
             val totalTrackGaps = (NUM_TRACKS - 1) * trackGap
             val trackHeight = (size.height - totalTrackGaps) / NUM_TRACKS
             val boldness = 1f + frost * 2f
 
             for (track in 0 until NUM_TRACKS) {
-                if (vizData.stepCounts[track] < 2) continue
+                if (viz.stepCounts[track] < 2) continue
                 // Read inside drawScope so flow emissions only invalidate this draw.
                 val data = trackWaveformStates[track].value
                 if (data.isEmpty()) continue
@@ -443,7 +435,7 @@ fun PulsarStepGrid(
                 // Use running peak for stable normalization (not per-frame max)
                 val maxVal = trackPeaks[track].coerceAtLeast(0.01f)
 
-                val path = Path()
+                val path = tracePaths[track].apply { rewind() }
                 val xStep = size.width / data.size.coerceAtLeast(1)
 
                 var prevY = baseY
@@ -471,14 +463,14 @@ fun PulsarStepGrid(
                 drawPath(
                     path = path,
                     color = color.copy(alpha = (0.08f * boldness).coerceAtMost(0.25f)),
-                    style = Stroke(width = 4f),
+                    style = TraceGlowStroke,
                     blendMode = BlendMode.Plus,
                 )
                 // Main trace
                 drawPath(
                     path = path,
                     color = color.copy(alpha = (0.25f * boldness).coerceAtMost(0.6f)),
-                    style = Stroke(width = 1.5f),
+                    style = TraceStroke,
                 )
             }
         }
@@ -582,12 +574,16 @@ private fun PulsarStepGridPreview() {
         for (i in listOf(3, 7, 11, 15)) { gates[7][i] = true; velocities[7][i] = 0.6f }
 
         PulsarStepGrid(
-            vizData = PulsarVizData(
-                stepGates = gates,
-                stepVelocities = velocities,
-                playheads = intArrayOf(4, 4, 4, 4, 4, 4, 4, 4),
-                stepCounts = stepCounts,
-            ),
+            vizData = remember {
+                mutableStateOf(
+                    PulsarVizData(
+                        stepGates = gates,
+                        stepVelocities = velocities,
+                        playheads = intArrayOf(4, 4, 4, 4, 4, 4, 4, 4),
+                        stepCounts = stepCounts,
+                    ),
+                )
+            },
             energy = 0.7f,
             space = 0.4f,
             complexity = 0.5f,
@@ -603,7 +599,7 @@ private fun PulsarStepGridIdlePreview() {
     OrpheusTheme {
         // Default PulsarVizData — no gates, playheads at -1
         PulsarStepGrid(
-            vizData = PulsarVizData(),
+            vizData = remember { mutableStateOf(PulsarVizData()) },
         )
     }
 }

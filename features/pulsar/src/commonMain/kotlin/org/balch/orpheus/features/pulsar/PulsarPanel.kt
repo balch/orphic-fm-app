@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -97,7 +98,11 @@ fun PulsarPanel(
     // without expanding this panel. Everywhere else it stays here.
     showEndingControl: Boolean = true,
 ) {
-    val vizData by vizFlow.collectAsState()
+    // Held as State, not unwrapped: the flow emits every 16ms during playback, and the grid
+    // reads it in its draw phase. The one field this panel reads in composition goes through
+    // derivedStateOf so the panel recomposes when the anomaly duck moves, not per emission.
+    val vizState = vizFlow.collectAsState()
+    val voidGain by remember(vizState) { derivedStateOf { vizState.value.voidGain } }
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "PULSE",
@@ -147,7 +152,7 @@ fun PulsarPanel(
                     onSelected = { actions.setVibe(it) },
                     color = OrpheusColors.cosmicPurple,
                     onLongPress = actions.onTriggerAnomaly,
-                    highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - vizData.voidGain),
+                    highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
                     valueMaxWidth = VibeValueMaxWidth,
                     // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
                     menuWidth = 200.dp,
@@ -200,7 +205,7 @@ fun PulsarPanel(
             val songEndingOn by actions.songEndingEnabled.collectAsState()
             val resolvedStyle by actions.resolvedTransitionStyle.collectAsState()
             PulsarStepGrid(
-                vizData = vizData,
+                vizData = vizState,
                 trackVizFlows = trackVizFlows,
                 energy = state.energy,
                 space = state.space,
