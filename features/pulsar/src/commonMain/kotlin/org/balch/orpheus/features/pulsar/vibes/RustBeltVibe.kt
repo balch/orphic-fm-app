@@ -365,7 +365,7 @@ class RustBeltVibe : VibeProvider {
                 transitions = listOf(
                     // Both exits ramp the full section: the rain drains to nothing and the
                     // macros climb home, so "back to normal" arrives rather than cuts.
-                    SectionTransition(targetIndex = 1, weight = 1f, transitionBars = 2),  // -> verse
+                    SectionTransition(targetIndex = 1, weight = 1f, transitionBars = 3),  // -> verse
                 ),
                 // One nearer crack as the rain arrives at full, then the last roll leaves
                 // with the weather on the way back to the band.
@@ -380,7 +380,7 @@ class RustBeltVibe : VibeProvider {
                 // The far end of cloud burst' collapse — still short of the verse baseline so
                 // the exit ramp has the last stretch left to travel.
                 macroOverrides = MacroOverrides(
-                    energy = 0.70f, complexity = 0.85f, space = 1.5f, mood = 0.95f,
+                    energy = 0.90f, complexity = 0.85f, space = 1.5f, mood = 0.95f,
                 ),
                 // Rain carries the section; rumble sits at a floor under it. The per-bar strike
                 // roll is gated on nothing already ringing and tails run seconds, so a 0.50
