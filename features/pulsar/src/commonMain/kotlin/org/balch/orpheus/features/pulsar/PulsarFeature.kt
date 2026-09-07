@@ -536,6 +536,16 @@ class PulsarViewModel(
     private val trackEvoRhythmicIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_RHYTHMIC.ordinal + i].controlId)
     }
+    // Per-track OSC FM (EDM slot). Effective only when the track's engine is OSC.
+    private val trackFmRatioIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_RATIO.ordinal + i].controlId)
+    }
+    private val trackFmShapeIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_SHAPE.ordinal + i].controlId)
+    }
+    private val trackFmFreeHzIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ.ordinal + i].controlId)
+    }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val trackMacroIds = (0..7).map { t ->
         (0 until PulsarSymbol.TRACK_MACRO_STRIDE).map { m ->
@@ -706,6 +716,9 @@ class PulsarViewModel(
     private val trackGlideRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE_SPACE.ordinal + it].controlId) }
     private val trackLpgDecaySpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_DECAY_SPACE.ordinal + it].controlId) }
     private val trackLpgColourSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_COLOUR_SPACE.ordinal + it].controlId) }
+    private val trackFmRatioSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_RATIO_SPACE.ordinal + it].controlId) }
+    private val trackFmShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_SHAPE_SPACE.ordinal + it].controlId) }
+    private val trackFmFreeHzSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ_SPACE.ordinal + it].controlId) }
 
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
@@ -1265,6 +1278,14 @@ class PulsarViewModel(
             trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
             trackMorphIds[i].value = FloatValue(edm.morph)
             trackMorphSpaceIds[i].value = FloatValue(spa.morph)
+            // OSC FM: ratio/shape/freeHz. Depth deliberately rides morph above,
+            // not a field here, so it inherits evolution/tension/accent/pinMorph.
+            trackFmRatioIds[i].value = FloatValue(edm.fmRatio)
+            trackFmRatioSpaceIds[i].value = FloatValue(spa.fmRatio)
+            trackFmShapeIds[i].value = FloatValue(edm.fmShape)
+            trackFmShapeSpaceIds[i].value = FloatValue(spa.fmShape)
+            trackFmFreeHzIds[i].value = FloatValue(edm.fmFreeHz)
+            trackFmFreeHzSpaceIds[i].value = FloatValue(spa.fmFreeHz)
             // Effective pin: vibe-author opt-in OR engine-enforced (DX-family
             // harmonics is a quantized 32-step patch selector — never let the
             // macro range slide between patches).

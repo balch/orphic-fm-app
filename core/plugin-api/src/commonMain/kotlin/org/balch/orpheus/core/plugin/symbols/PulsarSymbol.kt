@@ -197,6 +197,36 @@ enum class PulsarSymbol(
     TRACK_6_EVO_RHYTHMIC("track_6_evo_rhythmic"),
     TRACK_7_EVO_RHYTHMIC("track_7_evo_rhythmic"),
 
+    // Per-track OSC FM: modulator ratio (8 entries, EDM slot)
+    TRACK_0_FM_RATIO("track_0_fm_ratio"),
+    TRACK_1_FM_RATIO("track_1_fm_ratio"),
+    TRACK_2_FM_RATIO("track_2_fm_ratio"),
+    TRACK_3_FM_RATIO("track_3_fm_ratio"),
+    TRACK_4_FM_RATIO("track_4_fm_ratio"),
+    TRACK_5_FM_RATIO("track_5_fm_ratio"),
+    TRACK_6_FM_RATIO("track_6_fm_ratio"),
+    TRACK_7_FM_RATIO("track_7_fm_ratio"),
+
+    // Per-track OSC FM: modulator waveform shape (8 entries, EDM slot)
+    TRACK_0_FM_SHAPE("track_0_fm_shape"),
+    TRACK_1_FM_SHAPE("track_1_fm_shape"),
+    TRACK_2_FM_SHAPE("track_2_fm_shape"),
+    TRACK_3_FM_SHAPE("track_3_fm_shape"),
+    TRACK_4_FM_SHAPE("track_4_fm_shape"),
+    TRACK_5_FM_SHAPE("track_5_fm_shape"),
+    TRACK_6_FM_SHAPE("track_6_fm_shape"),
+    TRACK_7_FM_SHAPE("track_7_fm_shape"),
+
+    // Per-track OSC FM: free-run modulator rate in Hz, overrides ratio (8 entries, EDM slot)
+    TRACK_0_FM_FREE_HZ("track_0_fm_free_hz"),
+    TRACK_1_FM_FREE_HZ("track_1_fm_free_hz"),
+    TRACK_2_FM_FREE_HZ("track_2_fm_free_hz"),
+    TRACK_3_FM_FREE_HZ("track_3_fm_free_hz"),
+    TRACK_4_FM_FREE_HZ("track_4_fm_free_hz"),
+    TRACK_5_FM_FREE_HZ("track_5_fm_free_hz"),
+    TRACK_6_FM_FREE_HZ("track_6_fm_free_hz"),
+    TRACK_7_FM_FREE_HZ("track_7_fm_free_hz"),
+
     // Vibe step count
     STEP_COUNT("step_count"),
 
@@ -1261,6 +1291,33 @@ enum class PulsarSymbol(
     TRACK_5_LPG_COLOUR_SPACE("track_5_lpg_colour_space"),
     TRACK_6_LPG_COLOUR_SPACE("track_6_lpg_colour_space"),
     TRACK_7_LPG_COLOUR_SPACE("track_7_lpg_colour_space"),
+
+    TRACK_0_FM_RATIO_SPACE("track_0_fm_ratio_space"),
+    TRACK_1_FM_RATIO_SPACE("track_1_fm_ratio_space"),
+    TRACK_2_FM_RATIO_SPACE("track_2_fm_ratio_space"),
+    TRACK_3_FM_RATIO_SPACE("track_3_fm_ratio_space"),
+    TRACK_4_FM_RATIO_SPACE("track_4_fm_ratio_space"),
+    TRACK_5_FM_RATIO_SPACE("track_5_fm_ratio_space"),
+    TRACK_6_FM_RATIO_SPACE("track_6_fm_ratio_space"),
+    TRACK_7_FM_RATIO_SPACE("track_7_fm_ratio_space"),
+
+    TRACK_0_FM_SHAPE_SPACE("track_0_fm_shape_space"),
+    TRACK_1_FM_SHAPE_SPACE("track_1_fm_shape_space"),
+    TRACK_2_FM_SHAPE_SPACE("track_2_fm_shape_space"),
+    TRACK_3_FM_SHAPE_SPACE("track_3_fm_shape_space"),
+    TRACK_4_FM_SHAPE_SPACE("track_4_fm_shape_space"),
+    TRACK_5_FM_SHAPE_SPACE("track_5_fm_shape_space"),
+    TRACK_6_FM_SHAPE_SPACE("track_6_fm_shape_space"),
+    TRACK_7_FM_SHAPE_SPACE("track_7_fm_shape_space"),
+
+    TRACK_0_FM_FREE_HZ_SPACE("track_0_fm_free_hz_space"),
+    TRACK_1_FM_FREE_HZ_SPACE("track_1_fm_free_hz_space"),
+    TRACK_2_FM_FREE_HZ_SPACE("track_2_fm_free_hz_space"),
+    TRACK_3_FM_FREE_HZ_SPACE("track_3_fm_free_hz_space"),
+    TRACK_4_FM_FREE_HZ_SPACE("track_4_fm_free_hz_space"),
+    TRACK_5_FM_FREE_HZ_SPACE("track_5_fm_free_hz_space"),
+    TRACK_6_FM_FREE_HZ_SPACE("track_6_fm_free_hz_space"),
+    TRACK_7_FM_FREE_HZ_SPACE("track_7_fm_free_hz_space"),
 
     // Pulsar dedicated effect parameters (pushed on vibe change)
     PULSAR_DELAY_TIME_A("pulsar_delay_time_a"),

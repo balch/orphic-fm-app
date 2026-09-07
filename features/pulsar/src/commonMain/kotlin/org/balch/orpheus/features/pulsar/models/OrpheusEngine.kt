@@ -91,4 +91,27 @@ data class OrpheusEngine(
      * unaffected; the walk only kicks in when the user moves the knob.
      */
     val harmonicsMacroRange: Float = 0.0f,
-)
+    /**
+     * Modulator frequency as a multiple of the carrier. `0f` = FM off.
+     * Integer values (1, 2, 3) are harmonic; fractional (1.5, 2.7) go clangy.
+     * Effective only on [OrpheusEngineId.OSC].
+     *
+     * FM depth is **[morph]** on OSC tracks, not a field of its own, so it
+     * inherits section-energy evolution, tension, accent and [pinMorph].
+     */
+    val fmRatio: Float = 0f,
+    /** Modulator waveform: 0 sine, 0.5 triangle, 1 square. Higher = brighter. */
+    val fmShape: Float = 0f,
+    /**
+     * Non-zero overrides [fmRatio] with a fixed free-running rate in Hz,
+     * reproducing the Orpheus panel's +-200Hz behavior for pasted presets.
+     * Timbre then changes with every note, which is why ratio mode is default.
+     */
+    val fmFreeHz: Float = 0f,
+) {
+    init {
+        require(fmRatio in 0f..16f) { "fmRatio must be 0..16, was $fmRatio" }
+        require(fmShape in 0f..1f) { "fmShape must be 0..1, was $fmShape" }
+        require(fmFreeHz in 0f..2000f) { "fmFreeHz must be 0..2000, was $fmFreeHz" }
+    }
+}
