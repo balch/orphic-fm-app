@@ -20,7 +20,6 @@ import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
-import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
@@ -191,26 +190,33 @@ class KickingBubblegumVibe : VibeProvider {
                 },
                 // Track 3 — THE GESTURE. glideRate 0 on the voice means only the step that
                 // asks for a slide gets one, so the A always lands dead-on and just the fall
-                // is a slide. SUSTAINED follows the gate, so the A holds its full two beats.
-                // The delay send IS the echo.
+                // is a slide. The delay send IS the echo.
+                //
+                // OSC is the panel's own tri+square oscillator, and it bypasses OrpheusVoice
+                // entirely: no LPG and no velocity accent, so Pulsar's AD envelope is the
+                // whole shape. That is blunter and more percussive than a Plaits voice —
+                // which is the point here.
+                //
+                // harmonics/timbre/morph are deliberately NOT authored. On OSC all three are
+                // macro- and evolution-driven on this track, so a static would be a value the
+                // gate never lets through. The ranges below are where they really live.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX,
+                    engineId = OrpheusEngineId.OSC,
                     volume = 0.90f,
-                    // DX bank 0 is the bass bank. idx 1 "Mooger Low": a Moog-style low, which
-                    // is the voice portamento was invented on. Centerpoint is (idx + 0.5) / 32.64
-                    // — NOT the bank table's "Harm" column, which lists lower EDGES and resolves
-                    // one patch low. DX auto-pins harmonics, so this is a hard patch select.
-                    // Swaps: 0.015f Solid bass · 0.260f S.Bas 27.7 · 0.322f Syn-bass 2.
-                    harmonics = 0.046f,
-                    noteRangeLow = 28,        // E1
-                    noteRangeHigh = 52,       // E3, auto lick octave centers on E2
+                    // Modulator an octave up: harmonic, so it adds bite without smearing the
+                    // fundamental. 1f is fatter and buzzier, 1.5f goes clangy.
+                    fmRatio = 2f,
+                    fmShape = 0.12f,          // near-sine modulator, few sidebands
+                    // E2. Also OSC's playability floor (kOscModRange.note_min = 40) — below it
+                    // the render clamp folds notes UP an octave, so a stray mutated note would
+                    // jump register. The auto lick octave still centers on E2, so the two
+                    // authored notes are unchanged: E2 = 40, A2 = 45.
+                    noteRangeLow = 40,
+                    noteRangeHigh = 52,       // E3
                     reverbSend = 0.12f,
                     reverbBrightness = 0.30f,
                     delaySend = 0.40f,
                     glideRate = 0f,
-                    lpgMode = LpgMode.SUSTAINED,
-                    lpgDecay = 0.35f,
-                    lpgColour = 0.40f,
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
@@ -222,10 +228,15 @@ class KickingBubblegumVibe : VibeProvider {
                         pan = 0.00f,
                         density = 0.95f,
                         envelopeProfile = EnvelopeProfile.MELODIC,
-                        // Density is rolled per gated step. Pinning it near 1 means the two
-                        // notes ALWAYS fire: the sparseness is authored, not rolled.
                         macroMap = TrackMacroMap.MELODIC.copy(
+                            // Density is rolled per gated step. Pinning it near 1 means the two
+                            // notes ALWAYS fire: the sparseness is authored, not rolled.
                             energyDensity = MacroTarget(0.92f, 1.0f),
+                            // Harmonics is self-feedback grit on OSC and the render clamps it
+                            // at kOscModRange.harmonics_max = 0.35. MELODIC's stock 0.3-0.7
+                            // would sit pinned at max feedback with most of the Mood knob dead;
+                            // this keeps the default around 0.15 and gives the knob real travel.
+                            moodHarmonics = MacroTarget(0.05f, 0.30f),
                         ),
                         barStrategy = BarStrategy.REPEAT,
                     )
@@ -294,8 +305,15 @@ class KickingBubblegumVibe : VibeProvider {
                 tonal = TonalTension(),  // no octave pop, no passing tones: two notes stay two notes
                 timing = 0f,             // gate lengths never loosen; loosening reads as slide
                 evolution = EvolutionTension(
+                    // On OSC, timbre is the triangle-to-square blend: the bass starts round
+                    // and squares off as the climb goes up.
                     timbreLow = 0.20f, timbreHigh = 0.80f, timbreProbability = 0.95f,
-                    morphLow = 0.20f, morphHigh = 0.75f, morphProbability = 0.90f,
+                    // And morph is the FM index, morph * 8 radians. 0.10-0.38 is index
+                    // 0.8-3.0: the modulator arrives without the tone going clangy. The old
+                    // 0.20-0.75 was written for a DX voice and would run to index 6 here.
+                    // These bounds REPLACE the macro value on ~90% of steps, so this is where
+                    // the bass's FM depth actually comes from.
+                    morphLow = 0.10f, morphHigh = 0.38f, morphProbability = 0.90f,
                     // A knee on the tone: evolution is (intensity - attackPoint) / (1 - attackPoint),
                     // so the timbre barely stirs early and opens late.
                     attackPoint = 0.12f,
