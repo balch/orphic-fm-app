@@ -18,6 +18,11 @@ struct PulsarOscState {
 // no-clamp condition harmonics*200 < carrier_hz (70Hz vs the 82.4Hz note-40
 // carrier) -- past it, self-feedback drives freq negative and freezes the
 // oscillator at OscCore::Next's 1Hz floor instead of a tone.
+//
+// The DC blocker below now rescues that regime: note 36 at harmonics 0.35 and
+// note 40 at harmonics 1.00 both hold pitch within 6 cents. So these two bounds
+// exist only to dodge a bug that is fixed, and could relax. Left alone here
+// because widening the OSC range is a sound decision needing its own ear test.
 static constexpr EngineModRange kOscModRange =
     { 0.00f,0.35f, 0.00f,1.00f, 0.00f,1.00f, 12.0f, true,true, 0.0f,0.0f,0.0f, 40 };
 
@@ -29,6 +34,15 @@ constexpr float kFmIndexMax = 8.0f;
 
 // OscCore's phase is in cycles, so a radian index converts by 1/2pi.
 constexpr float kIndexToCycles = 1.0f / (2.0f * 3.14159265358979f);
+
+// Corner of the DC blocker on OscCore's self-feedback path, which is what makes
+// a Pulsar OSC track play its written note (see OscCore::Next). The blocker
+// starts from zero state, so a fresh note rises into tune over the first few
+// cycles; 30Hz holds that scoop to ~22ms, against 58ms at 10Hz, while every
+// steady-state pitch inside kOscModRange lands within 1.5 cents. It also stays
+// far enough below note 40's 82.4Hz carrier to keep working an octave lower and
+// at triple the harmonics ceiling, which 40Hz does not (+45 cents at note 32).
+constexpr float kFeedbackHpHz = 30.0f;
 
 // Modulator waveform: sine (0) through triangle (0.5) to square (1).
 // Crossfading rather than switching keeps fm_shape continuous under macro
@@ -91,6 +105,10 @@ inline void process_osc_block(
     const float mod_inc = mod_hz / sample_rate;
     const float deviation_hz = morph * 200.0f;                      // free-run only
     const float pm_cycles = morph * kFmIndexMax * kIndexToCycles;   // ratio only
+    // Pulsar opts into the self-feedback DC blocker; the Orpheus panel's own
+    // call sites pass nothing and keep the untuned behaviour they shipped with.
+    const float fb_hp_coeff =
+        1.0f - std::exp(-2.0f * 3.14159265358979f * kFeedbackHpHz / sample_rate);
 
     for (int i = 0; i < num_frames; i++) {
         float freq = carrier_hz;
@@ -102,7 +120,8 @@ inline void process_osc_block(
             state.mod_phase += mod_inc;
             state.mod_phase -= std::floor(state.mod_phase);
         }
-        out[i] = state.core.Next(freq, sample_rate, timbre, harmonics, phase_offset)
+        out[i] = state.core.Next(freq, sample_rate, timbre, harmonics,
+                                 phase_offset, fb_hp_coeff)
                  * kEngine0OutGain;
     }
 }

@@ -285,22 +285,94 @@ static bool test_gate_edge_resets_modulator_phase() {
     return ok;
 }
 
+// Completed-cycle rate of a square render, from the first to the last sign
+// change so the count is not quantized by where the window happens to end.
+// An even number of half cycles, because self-feedback skews the duty cycle and
+// an odd count would carry half that skew into the answer.
+static double square_rate_hz(const float* buf, int n, double sr) {
+    int first = -1, last = -1, crossings = 0;
+    for (int i = 1; i < n; i++) {
+        if ((buf[i] > 0.0f) != (buf[i - 1] > 0.0f)) {
+            if (first < 0) first = i;
+            last = i;
+            crossings++;
+        }
+    }
+    int halves = crossings - 1;
+    if (halves < 2) return 0.0;
+    if (halves & 1) halves--;
+    // Re-walk to the crossing that closes an even count.
+    int seen = 0, end = first;
+    for (int i = first + 1; i <= last; i++) {
+        if ((buf[i] > 0.0f) != (buf[i - 1] > 0.0f)) {
+            if (++seen == halves) { end = i; break; }
+        }
+    }
+    return (halves / 2.0) / ((end - first) / sr);
+}
+
+// RULING: a Pulsar OSC track must play the note the sequencer wrote.
+//
+// Self-FM runs the two half cycles at f0+-D, but each also LASTS 1/(f0+-D), so
+// completed cycles arrive at the harmonic mean and the pitch falls. Untreated
+// that is -2204 cents at note 40 and -29 at note 72, measured with feedback at
+// the kOscModRange ceiling. The DC blocker Pulsar opts into makes the mean rate
+// f0 in closed form, and the four notes below read under 0.1 cents.
+//
+// Square (timbre 1.0) both maximizes the error and makes the measurement exact:
+// two sign changes per cycle regardless of duty skew.
+static bool test_feedback_holds_pitch_at_the_clamp_ceiling() {
+    printf("\n=== Test: self-feedback keeps the written pitch (Pulsar path) ===\n");
+    const double kSr = 48000.0;
+    const float notes[4] = { 40.0f, 45.0f, 55.0f, 72.0f };
+    // 7x the worst residual measured anywhere in kOscModRange (1.42 cents, at
+    // note 40) and still ~150x tighter than the untreated oscillator's smallest
+    // error, note 72's -29.
+    const double kToleranceCents = 10.0;
+    // The blocker starts from zero state, so a fresh note rises into tune over
+    // roughly 22ms. Skip 250ms, then measure a full second.
+    const int kSkip = 12000, kMeasure = 48000;
+    static float out[kSkip + kMeasure];
+    bool ok = true;
+
+    for (int k = 0; k < 4; k++) {
+        PulsarOscState st;
+        // FM fully off: ratio 0 and free-run 0, so this isolates self-feedback.
+        osc::process_osc_block(st, notes[k], kOscModRange.harmonics_max,
+                               /*timbre=*/1.0f, /*morph=*/0.0f,
+                               /*fm_ratio=*/0.0f, /*fm_shape=*/0.0f,
+                               /*fm_free_hz=*/0.0f, 1, (float)kSr,
+                               out, kSkip + kMeasure);
+        double f0 = 440.0 * std::pow(2.0, (notes[k] - 69.0) / 12.0);
+        double rate = square_rate_hz(out + kSkip, kMeasure, kSr);
+        double cents = (rate > 0.0) ? 1200.0 * std::log2(rate / f0) : -9999.0;
+        printf("  note %.0f: want %.2f Hz, got %.2f Hz (%+.2f cents)\n",
+               notes[k], f0, rate, cents);
+        if (std::fabs(cents) > kToleranceCents) ok = false;
+    }
+    printf("Self-feedback pitch: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_all_settings_sweep_is_finite() {
     printf("\n=== Test: full parameter sweep stays finite and bounded ===\n");
     bool ok = true;
     int checked = 0;
     static float out[65536];
-    // Converged worst-case |DC| is 0.5503 at note=40 harm=0.35 timbre=1.00
+    // Converged worst-case |DC| is 0.3533 at note=40 harm=0.35 timbre=1.00
     // morph=0: self-feedback skews a square wave's duty cycle toward -1 while
-    // still swinging the full range, so it is asymmetry, not a freeze. (The
-    // raw core reads 0.8466 there; the kernel's kEngine0OutGain scales it.)
+    // still swinging the full range, so it is asymmetry, not a freeze. It read
+    // 0.5503 before the feedback path was DC blocked; two thirds of the skew
+    // survives, which is the growl the harmonics knob exists for.
     const double kMaxDcOffset = 0.58;
     double worst_dc = 0.0;
     // note starts at kOscModRange.note_min and harm ends at .harmonics_max,
-    // which keeps self-feedback's no-clamp condition (harmonics*200 <
-    // carrier_hz) true throughout. Ratio-mode FM is phase modulation and never
-    // touches freq, so nothing else can reach the floor: instrumenting
-    // OscCore counted 0 clamps in 19,891,980 swept samples.
+    // which keeps self-feedback's steady-state no-clamp condition
+    // (harmonics*200 < carrier_hz) true throughout. The DC blocker overswings
+    // to ~1.5 while its estimate settles, so the floor does engage during the
+    // note-on scoop: 6,014 of 19,891,980 swept samples (0.03%), worst render
+    // 1,087 consecutive samples (23ms) at note 40. Ratio-mode FM is phase
+    // modulation and never touches freq, so nothing else reaches the floor.
     for (float note = kOscModRange.note_min; note <= 96.0f; note += 8.0f)
     for (float harm = 0.0f; harm <= kOscModRange.harmonics_max; harm += kOscModRange.harmonics_max / 2.0f)
     for (float timb = 0.0f; timb <= 1.0f; timb += 0.5f)
@@ -369,6 +441,7 @@ bool run_osc_tests() {
     if (test_ratio_mode_holds_index_across_notes()) suite_pass++; else suite_fail++;
     if (test_free_run_mode_is_pitch_independent()) suite_pass++; else suite_fail++;
     if (test_gate_edge_resets_modulator_phase()) suite_pass++; else suite_fail++;
+    if (test_feedback_holds_pitch_at_the_clamp_ceiling()) suite_pass++; else suite_fail++;
     if (test_all_settings_sweep_is_finite()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

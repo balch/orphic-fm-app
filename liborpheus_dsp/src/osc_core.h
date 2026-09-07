@@ -15,6 +15,7 @@ struct OscCore {
     float tri_phase = 0.0f;
     float sq_phase = 0.0f;
     float prev_output = 0.0f;
+    float fb_dc = 0.0f;
 
     // One sample. `freq` is the already-modulated carrier in Hz: callers add
     // vibrato, bend, coupling and external FM before calling. `feedback` adds
@@ -25,9 +26,22 @@ struct OscCore {
     // reads the waveforms without touching the accumulators, so the long-run
     // rate stays exactly `freq`. Defaulted to 0, where the read phase is
     // bit-identical to the stored phase and the panel path is unchanged.
+    //
+    // `fb_hp_coeff` DC-blocks the self-feedback signal. Self-FM runs the two
+    // half cycles at f0+-D, but each one also LASTS 1/(f0+-D), so completed
+    // cycles arrive at the harmonic mean f0(1-(D/f0)^2) and the pitch goes flat,
+    // by two octaves at note 40 with feedback 0.35. Removing the feedback
+    // signal's mean makes that rate f0 exactly: at the fixed point the square
+    // case reduces to f0 = D(mu - 1/mu), which is the completed-cycle rate. So
+    // this is closed form rather than a tuned constant. Defaulted to 0, which
+    // pins fb_dc at zero and leaves the panel path bit-identical.
     inline float Next(float freq, float sr, float sharpness, float feedback,
-                      float phase_offset = 0.0f) {
-        freq += prev_output * feedback * 200.0f;
+                      float phase_offset = 0.0f, float fb_hp_coeff = 0.0f) {
+        // One-pole DC blocker: subtracting the running mean before the update
+        // is the standard `y = x - x1 + R*y1` with R = 1 - fb_hp_coeff.
+        const float fb = prev_output - fb_dc;
+        fb_dc += fb_hp_coeff * fb;
+        freq += fb * feedback * 200.0f;
         // Floor: feedback FM at low pitches can drive freq negative, which
         // reverses phase and squeals.
         if (freq < 1.0f) freq = 1.0f;
