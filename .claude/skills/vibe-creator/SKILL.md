@@ -158,9 +158,10 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
   - Lead: `DX3` (FM brass/strings/pads — see below), `WSH` (distorted), `FM` (2-op), `WTB` (wavetable).
   - Pad: `ENS` (string ensemble), `STR` (string model), `GRN` (granular), `CHD` (chord engine), `ADD` (additive), `DX3` (FM cinematic pads).
   - Texture/FX: `MOD` (modal/metallic), `PAR` (particles), `SPK` (speech), `SWM` (swarm), `NES` (chiptune), `TRN` (wave terrain).
+  - Bass / keys / lead, 2-op FM: `OSC` — the Orpheus panel's own triangle/square oscillator rather than a Plaits engine. See the OSC subsection below.
   - **Important**: `DX` / `DX2` / `DX3` share a 6-op FM voice but load different 32-patch sysex banks. `harmonics` is a **patch selector** (quantized to 32 zones), not a tone control. **See `references/fm_patches.md`** for the bank tables before using a DX engine.
 - **`volume`** (default `0.8`): Track volume. Start ~0.8 for leads, 0.3-0.5 for texture.
-- **`harmonics` / `timbre` / `morph`** (default `0.5`): Plaits engine knobs, meaning varies per engine. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md`.** Always set explicitly on DX engines.
+- **`harmonics` / `timbre` / `morph`** (default `0.5`): Plaits engine knobs, meaning varies per engine. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md`.** Always set explicitly on DX engines. **On `OSC`, `morph` is FM depth and is capped differently — see the OSC subsection below.**
 - **`pinHarmonics` / `pinTimbre` / `pinMorph`** (default `false`): When `true`, the corresponding parameter is used verbatim at render time — bypasses the macro map's range, evolution drift, accent boost, and slow-LFO modulation. Per-engine playability floor still applies. Use this to lock a tone color from vibe code (paste-from-Orpheus workflow). **DX-family (`DX`/`DX2`/`DX3`) auto-pin harmonics** — their `harmonics` is a quantized patch selector and the loader forces `pinHarmonics = true` on them regardless of the field's value. When pinning DX harmonics, set `harmonics = (patchIndex + 0.5f) / (32f * 1.02f)` to land cleanly inside the desired bucket — the `1.02f` factor mirrors the DX engine's internal scaling, and the `+ 0.5f` aims at the bucket's midpoint. **Both terms are required.** The quantizer floors rather than rounds, so `patchIndex / (32f * 1.02f)` is the bucket's *lower edge* and resolves to `patchIndex - 1`; dropping the `1.02f` instead drifts off by one above index 24.
 - **`harmonicsModulation`** (default `0.0f`): Optional opt-in escape hatch for *pinned* harmonics. When non-zero, the slow LFO is allowed to walk harmonics by ±this much around the pinned base, giving a bounded patch-walking texture effect that's otherwise locked out by the pin contract. The walk depth is `harmonicsModulation × modLfoDepth × texture_curve`, so the LFO depth still controls the overall amplitude. A useful value for DX-family pads is `0.03f`–`0.10f` (walks within a tonal-family neighborhood); above `0.20f` the patches start drifting unpredictably. See `references/fm_patches.md` for the full discussion.
 - **`harmonicsMacroSource` / `harmonicsMacroRange`** (default `MOOD` / `0.0f`): User-knob-driven DX patch walk. **DX-family only.** When `harmonicsMacroRange > 0`, the live macro selected by `harmonicsMacroSource` (default `MOOD`) walks harmonics across `[base − range, base + range]` as the user moves the knob. At the macro's midpoint (`0.5f`) the walk is zero — the pinned base patch plays. This restores the pre-pin feel where a small mood tweak shifted DX voices on the same rhythm. Independent of `harmonicsModulation` (LFO-driven) — they sum. Typical values: `0.05f` ≈ ±2 patches per full knob sweep, `0.10f` ≈ ±3 patches. See `references/fm_patches.md` for the discussion.
@@ -173,6 +174,21 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
 - **`glideRate`** (default `0.0`): Portamento. 0 = instant, 0.3 = smooth, 0.6+ = very slow.
 - **`lpgMode`** (default `ENGINE_DEFAULT`): Vactrol LPG mode — `BYPASS` (raw), `SUSTAINED` (gate-following), `PLUCK` (asymmetric bloom), or `ENGINE_DEFAULT` (consult per-engine table). Set explicitly per voice when EDM/Space want different envelope behavior (e.g. `PLUCK` for a WSH bass on EDM, `BYPASS` for a STR drone on Space).
 - **`lpgDecay` / `lpgColour`** (default `0.5`): Vactrol decay length and HF bleed.
+
+#### `OrpheusEngineId.OSC` — the panel oscillator with FM
+
+Not a Plaits engine: a triangle/square oscillator with self-feedback, the same voice the Orpheus synth panel plays, so a panel sound pastes straight into a vibe. `harmonics` is self-feedback grit, `timbre` crossfades triangle (0) to square (1), and three extra fields drive a second oscillator modulating the first.
+
+- **`fmRatio`** (default `0f` = FM off, range `0..16`): modulator frequency as a multiple of the carrier. Integers (1, 2, 3) are harmonic and stay in tune; fractional (1.5, 2.7) go clangy and bell-like. This is the field to reach for first.
+- **`fmShape`** (default `0f`, range `0..1`): modulator waveform, sine (0) through triangle (0.5) to square (1). Higher = more sidebands = brighter and buzzier.
+- **`fmFreeHz`** (default `0f`, range `0..2000`): overrides `fmRatio` with a fixed free-running rate in Hz, reproducing the panel's literal ±200 Hz frequency modulation for a pasted preset. Timbre then changes with every note and low notes bend sharp, which is why ratio mode is the default. Only use it to transfer a panel sound verbatim.
+
+**FM depth is `morph`, not a field of its own.** Unpinned, morph resolves from the SPACE macro through the track's `spaceDecay` range before the authored value is read, so the SPACE knob sweeps FM index live and whatever you write in `morph` is inert. That is usually what you want. To make the authored value the depth instead, set `pinMorph = true`. Accent never reaches morph — the velocity boost applies to harmonics and timbre only.
+
+**Playability limits** (`kOscModRange` in `liborpheus_dsp/src/pulsar_osc.h`), applied at render time whether you like them or not:
+
+- `harmonics` is **capped at 0.35**. Above that, self-feedback exceeds the carrier at low pitches and the oscillator freezes into a thump instead of a tone. Write `harmonics <= 0.35` so what you author is what you hear.
+- Notes below **40** are folded up an octave. Keep `noteRangeLow >= 40`, or the step grid will show a pitch the track does not play.
 
 #### `TrackVoice` (track-level)
 
