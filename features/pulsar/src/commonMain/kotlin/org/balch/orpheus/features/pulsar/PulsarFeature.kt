@@ -1215,7 +1215,20 @@ class PulsarViewModel(
         // MIX_GATED (Orpheus): mix saves as 0 (user dials it in each session).
         // EXPLICIT (DJ app): mix saves as 1 (always audible, play/pause gates audio).
         val savedMix = if (playbackMode == PulsarPlaybackMode.MIX_GATED) 0f else 1f
-        val toSave = state.copy(playing = false, selectedTrack = null, mix = savedMix, trackMuted = List(8) { false })
+        // bpm is persisted as the 1.0x BASE, because restoreSavedState multiplies it by the
+        // opening section's bpmMultiplier on the way back in. state.bpm is the LIVE tempo and
+        // already carries lastSectionMult, so saving it raw made each launch multiply again —
+        // the opening tempo became a function of how many times the app had been opened.
+        // Dividing here keeps the two sides in the same units and makes restore idempotent.
+        val sectionMult = lastSectionMult.takeIf { it > 0.01f } ?: 1.0f
+        val baseBpm = state.bpm / sectionMult
+        val toSave = state.copy(
+            playing = false,
+            selectedTrack = null,
+            mix = savedMix,
+            trackMuted = List(8) { false },
+            bpm = baseBpm,
+        )
         val json = persistJson.encodeToString(PulsarUiState.serializer(), toSave)
         appPreferencesRepository.update { it.copy(lastPulsarJson = json) }
     }

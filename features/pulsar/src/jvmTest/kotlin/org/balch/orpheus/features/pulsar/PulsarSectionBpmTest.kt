@@ -302,6 +302,58 @@ class PulsarSectionBpmTest {
                 "restore of FireSky (saved body bpm $savedBpm) must open the half-time intro " +
                     "at $savedBpm * 0.72 = 60.48 — not the flat saved $savedBpm")
         }
+
+    @Test
+    fun `persisted bpm is the 1_0x base, so relaunching does not re-apply the intro multiplier`() =
+        runTest(testDispatcher) {
+            // Ear-test repro: the tempo heard on the FIRST launch after a change differed from
+            // the second. restoreSavedState() treats the persisted bpm as the 1.0x BASE and
+            // multiplies it by the opening section's multiplier, but saveState() was persisting
+            // state.bpm — the LIVE, already-multiplied tempo. Each launch multiplied again, so
+            // the opening tempo was a function of how many times the app had been opened.
+            val prefs = StubPrefs()
+            val tempo = GlobalTempo(StubAudioEngine())
+            makeViewModel(
+                vibe = FireSkyVibe().vibe,
+                globalTempo = tempo,
+                providers = setOf(FireSkyVibe()),
+                prefs = prefs,
+            )
+            advanceUntilIdle()
+
+            val base = FireSkyVibe().vibe.bpm            // 84 — the 1.0x body tempo
+            val intro = base * 0.72f                     // 60.48 — the half-time cold open
+            assertBpmNear(intro.toDouble(), tempo.getBpm(), "session 1 must open at the intro tempo")
+
+            val persisted = prefs.load().lastPulsarJson
+            assertTrue(persisted != null, "the debounced save must have run")
+            val savedBpm = persistJson.decodeFromString<PulsarUiState>(persisted).bpm
+            assertBpmNear(
+                base.toDouble(), savedBpm.toDouble(),
+                "saveState must persist the 1.0x BASE ($base), not the live intro tempo " +
+                    "($intro) — restoreSavedState re-applies the multiplier on the way back in",
+            )
+
+            // The property that actually matters: launch 2 sounds like launch 1.
+            val tempo2 = GlobalTempo(StubAudioEngine())
+            makeViewModel(
+                vibe = FireSkyVibe().vibe,
+                globalTempo = tempo2,
+                providers = setOf(FireSkyVibe()),
+                prefs = StubPrefs(AppPreferences(lastPulsarJson = persisted)),
+                engine = ArrangementStubEngine(
+                    MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN),
+                    graphReadyDeferred = CompletableDeferred(),  // isolate the restore push
+                ),
+            )
+            advanceUntilIdle()
+
+            assertBpmNear(
+                intro.toDouble(), tempo2.getBpm(),
+                "relaunching from the saved state must reopen at $intro — the same tempo as " +
+                    "session 1, not $intro * 0.72",
+            )
+        }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
