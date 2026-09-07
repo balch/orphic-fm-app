@@ -146,7 +146,11 @@ data class TrackSectionOverride(
  * @param transitions Where this section can go next. List of (targetIndex, weight,
  *   transitionBars) edges. Empty = terminal section (arrangement ends here).
  *   Per-edge `transitionBars` controls macro pre-roll crossfade — see [SectionTransition].
- * @param recencyDecay Penalty for recently-visited sections in transition selection, 0-1.
+ * @param recencyDecay Share of its authored weight a target keeps while it is the section
+ *   just left, 0-1. 1.0 = no penalty (pure weighted-random over [transitions]); 0.5 = the
+ *   section just left is half as likely as its weight alone implies; 0.0 = it is skipped
+ *   entirely while any other edge is available. The share ramps back to full over later
+ *   section visits (1/2, then 2/3, ...), so it is counted in visits, not bars.
  * @param macroOverrides Multiply macro values during this section.
  *   e.g., `MacroOverrides(energy = 1.4f)` boosts energy 40% during this section.
  * @param tensionOverride Replace the vibe's tension profile for this section.
@@ -243,6 +247,9 @@ data class Section(
             require(it in 1..4) { "Section.chordsPerBar must be 1..4, got $it" }
         }
         require(barStep in 1..16) { "Section.barStep must be 1..16, got $barStep" }
+        require(recencyDecay in 0f..1f) {
+            "Section.recencyDecay must be 0..1, got $recencyDecay"
+        }
         require(bpmMultiplier > 0f) { "Section.bpmMultiplier must be > 0, got $bpmMultiplier" }
         require(bpmRampBars >= 0) { "Section.bpmRampBars must be >= 0, got $bpmRampBars" }
         lickIndex?.let {

@@ -188,6 +188,135 @@ static bool test_section_recency_prevents_immediate_repeat() {
     return ok;
 }
 
+// ── recency_decay weighting ────────────────────────────────────────────
+// recency_decay is the share of its authored weight that a section keeps
+// while it is the one just left: 1.0 = no penalty, 0.0 = fully suppressed.
+// The share ramps back to 1.0 over subsequent section visits.
+
+// n fully-connected sections, equal edge weights, fixed bars each.
+static ArrangementParams make_recency_arrangement(int n, float decay) {
+    ArrangementParams arr = {};
+    arr.active = true;
+    arr.section_count = n;
+    arr.intro_index = -1;
+    arr.outro_index = -1;
+    for (int s = 0; s < n; s++) {
+        arr.sections[s].bars_min = 4;
+        arr.sections[s].bars_max = 4;
+        arr.sections[s].recency_decay = decay;
+        int t = 0;
+        for (int d = 0; d < n && t < kMaxSectionTransitions; d++) {
+            if (d == s) continue;
+            arr.sections[s].transitions[t].target_index = d;
+            arr.sections[s].transitions[t].weight = 1.0f;
+            arr.sections[s].transitions[t].transition_bars = 0;
+            t++;
+        }
+        arr.sections[s].transition_count = t;
+    }
+    return arr;
+}
+
+// Fraction of section changes that return to the section played one change
+// earlier (A->B->A). -1 if the arrangement stalled instead of transitioning.
+static float bounce_back_rate(const ArrangementParams& arr, uint32_t seed_v, int changes) {
+    SectionState state;
+    uint32_t seed = seed_v;
+    init_section_state(state, arr, seed);
+    int prev = -1, cur = state.current_section;
+    int bounces = 0, total = 0;
+    int guard = changes * 64 + 4096;
+    while (total < changes && guard-- > 0) {
+        if (advance_section(state, arr, seed)) {
+            if (prev >= 0) {
+                total++;
+                if (state.current_section == prev) bounces++;
+            }
+            prev = cur;
+            cur = state.current_section;
+        }
+    }
+    return (total >= changes) ? bounces / (float)total : -1.0f;
+}
+
+static bool test_recency_decay_one_honors_authored_weights() {
+    printf("\n=== Test: recency_decay 1.0 reproduces the authored edge weights ===\n");
+    ArrangementParams arr = make_recency_arrangement(3, 1.0f);
+    // Section 0 prefers section 1 over section 2, three to one.
+    arr.sections[0].transitions[0].weight = 0.75f;  // -> 1
+    arr.sections[0].transitions[1].weight = 0.25f;  // -> 2
+
+    SectionState state;
+    uint32_t seed = 4242;
+    init_section_state(state, arr, seed);
+    int from = state.current_section;
+    int to1 = 0, to2 = 0;
+    for (int i = 0; i < 200000 && (to1 + to2) < 4000; i++) {
+        if (advance_section(state, arr, seed)) {
+            if (from == 0) {
+                if (state.current_section == 1) to1++;
+                else if (state.current_section == 2) to2++;
+            }
+            from = state.current_section;
+        }
+    }
+    float share = (to1 + to2 > 0) ? to1 / (float)(to1 + to2) : 0.0f;
+    bool ok = share > 0.71f && share < 0.79f;
+    printf("  0->1 share: %.1f%% of %d departures (authored 75.0%%) -- %s\n",
+           share * 100.0f, to1 + to2, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_recency_decay_zero_bans_immediate_return() {
+    printf("\n=== Test: recency_decay 0.0 never returns to the section just left ===\n");
+    ArrangementParams arr = make_recency_arrangement(3, 0.0f);
+    float rate = bounce_back_rate(arr, 4242, 4000);
+    bool ok = rate == 0.0f;
+    printf("  A->B->A rate: %.2f%% -- %s\n", rate * 100.0f, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_recency_decay_scales_repeat_suppression() {
+    printf("\n=== Test: recency_decay spans a usable range, not a fixed penalty ===\n");
+    ArrangementParams a0 = make_recency_arrangement(3, 0.0f);
+    ArrangementParams a5 = make_recency_arrangement(3, 0.5f);
+    ArrangementParams a1 = make_recency_arrangement(3, 1.0f);
+    float r0 = bounce_back_rate(a0, 4242, 4000);
+    float r5 = bounce_back_rate(a5, 4242, 4000);
+    float r1 = bounce_back_rate(a1, 4242, 4000);
+    // The whole point of the fix: authored values must produce different
+    // musical behaviour. 0.4 vs 0.6 used to differ by ~0.1 of a percent.
+    bool ok = r0 < 0.01f
+           && r5 > r0 + 0.15f && r5 < 0.44f
+           && r1 > r5 + 0.05f && r1 > 0.45f && r1 < 0.55f;
+    printf("  A->B->A rate: decay 0.0 = %.1f%%, 0.5 = %.1f%%, 1.0 = %.1f%% -- %s\n",
+           r0 * 100.0f, r5 * 100.0f, r1 * 100.0f, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_recency_decay_zero_still_advances_on_sole_edge() {
+    printf("\n=== Test: recency_decay 0.0 still transitions when the only edge goes back ===\n");
+    // Two sections that can only point at each other: suppressing the section
+    // just left zeroes the sole edge, which must not strand the arrangement.
+    ArrangementParams arr = make_recency_arrangement(2, 0.0f);
+    SectionState state;
+    uint32_t seed = 909;
+    init_section_state(state, arr, seed);
+    bool seen[2] = {false, false};
+    seen[state.current_section] = true;
+    int changes = 0;
+    for (int i = 0; i < 4096; i++) {
+        if (advance_section(state, arr, seed)) {
+            changes++;
+            seen[state.current_section] = true;
+        }
+    }
+    bool ok = changes >= 8 && seen[0] && seen[1];
+    printf("  section changes in 4096 bars: %d, both sections reached: %s -- %s\n",
+           changes, (seen[0] && seen[1]) ? "yes" : "no", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_section_transition_ramp() {
     printf("\n=== Test: pre-roll ramp occupies last N bars of source section ===\n");
 
@@ -2620,7 +2749,7 @@ static bool test_select_next_section_never_returns_out_of_range_target() {
 
 // The outro path is the other writer of current_section, and outro_index is unpacked
 // unclamped. An out-of-range one used to index arr.sections[] and write past the end of
-// bars_since_visit[kMaxSections].
+// visits_since_visit[kMaxSections].
 static bool test_advance_section_rejects_out_of_range_outro() {
     bool ok = true;
     const int bad_indices[] = { kMaxSections, kMaxSections + 5, 99 };
@@ -2868,6 +2997,10 @@ bool run_pulsar_sections_tests() {
     tally(test_section_advance_countdown());
     tally(test_section_transitions_eventually());
     tally(test_section_recency_prevents_immediate_repeat());
+    tally(test_recency_decay_one_honors_authored_weights());
+    tally(test_recency_decay_zero_bans_immediate_return());
+    tally(test_recency_decay_scales_repeat_suppression());
+    tally(test_recency_decay_zero_still_advances_on_sole_edge());
     tally(test_section_transition_ramp());
     tally(test_section_macro_interpolation());
     tally(test_progression_anchor_drift_survive_section_flip());

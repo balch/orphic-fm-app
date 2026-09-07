@@ -38,6 +38,21 @@ class PulsarVibeSectionValidationTest {
         }
     }
 
+    @Test fun sectionRecencyDecayRejectsOutOfRange() {
+        assertFailsWith<IllegalArgumentException> {
+            Section(name = "bad", recencyDecay = 1.5f)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Section(name = "bad", recencyDecay = -0.1f)
+        }
+    }
+
+    @Test fun sectionRecencyDecayAcceptsBothEndpoints() {
+        // 0.0 fully suppresses the section just left; 1.0 disables the penalty.
+        Section(name = "ban", recencyDecay = 0f)
+        Section(name = "off", recencyDecay = 1f)
+    }
+
     @Test fun sectionValidOverridesConstruct() {
         // Must not throw
         Section(name = "ok", customProgression = chords(0, 5, 3, 4), chordsPerBar = 2)

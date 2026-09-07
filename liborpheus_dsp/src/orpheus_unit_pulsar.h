@@ -741,6 +741,10 @@ struct ArrangementParams {
     bool active = false;
 };
 
+// Recency counter ceiling. A section this many visits back reads as effectively
+// never played, so its edge carries its full authored weight.
+constexpr int kSectionNeverVisited = 64;
+
 // ── Runtime state machines ──────────────────────────────────────────
 
 struct SectionState {
@@ -749,7 +753,11 @@ struct SectionState {
     // Bars the current section was drawn for — the denominator bars_remaining
     // counts down from. 0 = no section running (jam_solo_progress falls back).
     int bars_total = 0;
-    int bars_since_visit[kMaxSections] = {};
+    // Section visits since each section was last current, not bars: a 4-8 bar
+    // section saturates any per-bar decay curve within a single section, which
+    // is what left recency_decay with no audible range. Saturates at
+    // kSectionNeverVisited, which is also the seed for never-visited sections.
+    int visits_since_visit[kMaxSections] = {};
     float transition_progress = 0.0f;
     int transition_target = -1;
     bool intro_done = false;

@@ -19,20 +19,37 @@ inline int select_next_section(
     // Zero-initialised: an out-of-range target `continue`s without writing its slot.
     float weights[kMaxSectionTransitions] = {};
     float total = 0.0f;
+    // recency_decay is the share of its authored weight a section keeps while it is
+    // the one just left; the share ramps back to full over later visits.
+    // 1.0 = no penalty at all, 0.0 = the section just left is fully suppressed.
+    float keep = sec.recency_decay;
+    if (keep < 0.0f) keep = 0.0f;
+    if (keep > 1.0f) keep = 1.0f;
     for (int i = 0; i < sec.transition_count; i++) {
         int target = sec.transitions[i].target_index;
         if (target < 0 || target >= arr.section_count) continue;
         float base_weight = sec.transitions[i].weight;
-        int bars_ago = state.bars_since_visit[target];
-        float recency = 1.0f;
-        for (int p = 0; p < bars_ago && p < 32; p++) {
-            recency *= sec.recency_decay;
-        }
-        weights[i] = base_weight * (0.05f + 0.95f * (1.0f - recency));
-        // A negative authored weight (or recency_decay > 1) would be summed into total but
-        // skipped by the selection loop, leaving the two integrating different distributions.
+        // 1.0 for the section just left, then 1/2, 1/3, ... as visits accumulate.
+        float recency = 1.0f / (1.0f + static_cast<float>(state.visits_since_visit[target]));
+        weights[i] = base_weight * (keep + (1.0f - keep) * (1.0f - recency));
+        // A negative authored weight would be summed into total but skipped by the
+        // selection loop, leaving the two integrating different distributions.
         if (weights[i] < 0.0f) weights[i] = 0.0f;
         total += weights[i];
+    }
+
+    // keep == 0 zeroes every candidate whenever they were all just visited — a
+    // two-section pair pointing only at each other, or a sparse graph whose sole
+    // outgoing edge leads back. Fall back to the authored weights rather than
+    // stranding the arrangement in its current section forever.
+    if (total <= 0.0f) {
+        for (int i = 0; i < sec.transition_count; i++) {
+            int target = sec.transitions[i].target_index;
+            if (target < 0 || target >= arr.section_count) continue;
+            float w = sec.transitions[i].weight;
+            weights[i] = (w > 0.0f) ? w : 0.0f;
+            total += weights[i];
+        }
     }
 
     if (total <= 0.0f) return current;
@@ -119,6 +136,14 @@ inline void init_section_state(SectionState& state, const ArrangementParams& arr
         state.intro_done = true;
     }
 
+    // memset left every counter at zero, i.e. "just played". Seed the sections we
+    // have not played yet as least-recent so the first transition weighs them by
+    // their authored weights instead of penalising the whole arrangement equally.
+    for (int i = 0; i < arr.section_count; i++) {
+        state.visits_since_visit[i] = kSectionNeverVisited;
+    }
+    state.visits_since_visit[state.current_section] = 0;
+
     state.bars_remaining = randomize_section_bars(arr.sections[state.current_section], seed);
     state.bars_total = state.bars_remaining;
     plan_next_section(state, arr, seed);
@@ -136,11 +161,6 @@ inline bool advance_section(
     uint32_t& seed
 ) {
     if (!arr.active || arr.section_count <= 1) return false;
-
-    for (int i = 0; i < arr.section_count; i++) {
-        state.bars_since_visit[i]++;
-    }
-    state.bars_since_visit[state.current_section] = 0;
 
     state.bars_remaining--;
 
@@ -178,7 +198,7 @@ inline bool advance_section(
     // toward a different target. Re-route at the boundary; the ramp may have
     // morphed toward the wrong destination, but the outro takes precedence.
     // Bounds-checked like intro_index: outro_index is authored and unpacked unclamped, and
-    // current_section indexes both arr.sections[] and state.bars_since_visit[kMaxSections].
+    // current_section indexes both arr.sections[] and state.visits_since_visit[kMaxSections].
     if (state.outro_triggered && arr.outro_index >= 0 && arr.outro_index < arr.section_count) {
         next = arr.outro_index;
     }
@@ -190,6 +210,13 @@ inline bool advance_section(
         next = state.pending_section_request;
     }
     state.pending_section_request = -1;
+
+    // Age every section by one visit and reset the one being left, before the flip
+    // so plan_next_section() below sees the outgoing section at zero visits ago.
+    for (int i = 0; i < arr.section_count; i++) {
+        if (state.visits_since_visit[i] < kSectionNeverVisited) state.visits_since_visit[i]++;
+    }
+    state.visits_since_visit[state.current_section] = 0;
 
     state.current_section     = next;
     state.transition_target   = -1;
