@@ -13,11 +13,13 @@ struct PulsarOscState {
     int prev_gate = 0;
 };
 
-// Playability bounds for OSC. kEngineModRanges is [24] indexed by Plaits id, so
-// engine_index -1 cannot index it. harmonics_max bounds self-feedback because
-// the macro map sweeps harmonics on unpinned tracks and full feedback squeals.
+// Playability bounds for OSC (kEngineModRanges is [24] indexed by Plaits id,
+// so engine_index -1 cannot use it). harmonics_max and note_min hold the
+// no-clamp condition harmonics*200 < carrier_hz (70Hz vs the 82.4Hz note-40
+// carrier) -- past it, self-feedback drives freq negative and freezes the
+// oscillator at OscCore::Next's 1Hz floor instead of a tone.
 static constexpr EngineModRange kOscModRange =
-    { 0.00f,0.65f, 0.00f,1.00f, 0.00f,1.00f, 12.0f, true,true, 0.0f,0.0f,0.0f, 24 };
+    { 0.00f,0.35f, 0.00f,1.00f, 0.00f,1.00f, 12.0f, true,true, 0.0f,0.0f,0.0f, 40 };
 
 namespace osc {
 

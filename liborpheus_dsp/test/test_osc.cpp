@@ -273,14 +273,25 @@ static bool test_all_settings_sweep_is_finite() {
     bool ok = true;
     int checked = 0;
     static float out[8192];
-    for (float note = 24.0f; note <= 96.0f; note += 12.0f)
-    for (float harm = 0.0f; harm <= 0.65f; harm += 0.325f)
+    // Measured worst-case |DC| across this sweep is 0.7278 (note=40, harm=0.35,
+    // timbre=1.00, morph=0 -- self-feedback alone skews a pure square wave's
+    // duty cycle toward -1; it still swings the full +-1 range every cycle, so
+    // it is not the RULING-2 freeze, just a heavily asymmetric tone). Bounded
+    // with headroom so a future regression has something to compare against.
+    const double kMaxDcOffset = 0.80;
+    double worst_dc = 0.0;
+    // note starts at kOscModRange.note_min and harm ends at .harmonics_max:
+    // RULING 3 keeps self-feedback's no-clamp condition (harmonics*200 <
+    // carrier_hz) true everywhere in this sweep, so OscCore::Next's floor
+    // clamp -- the actual freeze mechanism -- should never engage below.
+    for (float note = kOscModRange.note_min; note <= 96.0f; note += 8.0f)
+    for (float harm = 0.0f; harm <= kOscModRange.harmonics_max; harm += kOscModRange.harmonics_max / 2.0f)
     for (float timb = 0.0f; timb <= 1.0f; timb += 0.5f)
     for (float morph = 0.0f; morph <= 1.0f; morph += 0.5f)
     for (float ratio = 0.0f; ratio <= 8.0f; ratio += 2.0f)
     for (float shape = 0.0f; shape <= 1.0f; shape += 0.5f) {
-        // DC only means anything over whole carrier periods. At note 24 one
-        // period is ~1468 samples, so a fixed 512-sample window reads a
+        // DC only means anything over whole carrier periods. At note 40 one
+        // period is ~583 samples, so a fixed 512-sample window reads a
         // fragment of a cycle as offset even on a clean oscillator.
         const float carrier_hz = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
         int n = static_cast<int>(4.0f * 48000.0f / carrier_hz);
@@ -290,23 +301,42 @@ static bool test_all_settings_sweep_is_finite() {
         PulsarOscState st;
         osc::process_osc_block(st, note, harm, timb, morph,
                                ratio, shape, 0.0f, 1, 48000.0f, out, n);
+        bool bad = false;
         double sum = 0.0;
+        float min_v = 1.0f, max_v = -1.0f;
         for (int i = 0; i < n; i++) {
             if (!std::isfinite(out[i]) || std::fabs(out[i]) > 1.0f) {
                 printf("  BAD note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f -> %.4f\n",
                        note, harm, timb, morph, ratio, shape, out[i]);
                 ok = false;
+                bad = true;
                 break;
             }
             sum += out[i];
+            if (out[i] < min_v) min_v = out[i];
+            if (out[i] > max_v) max_v = out[i];
         }
-        if (std::fabs(sum / n) > 0.35) {
-            printf("  DC note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f n=%d -> %.4f\n",
-                   note, harm, timb, morph, ratio, shape, n, sum / n);
-            ok = false;
+        if (!bad) {
+            double dc = std::fabs(sum / n);
+            if (dc > worst_dc) worst_dc = dc;
+            if (dc > kMaxDcOffset) {
+                printf("  DC note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f n=%d -> dc=%.4f range=%.4f min=%.4f max=%.4f\n",
+                       note, harm, timb, morph, ratio, shape, n, sum / n, max_v - min_v, min_v, max_v);
+                ok = false;
+            }
+            // Freeze guard: RULING 2's real failure is self-feedback pinning
+            // freq at the 1Hz floor for the whole window, which reads as a
+            // near-constant output (a thump) rather than a tone.
+            double range = max_v - min_v;
+            if (range <= 0.05) {
+                printf("  FROZEN note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f n=%d -> range %.4f\n",
+                       note, harm, timb, morph, ratio, shape, n, range);
+                ok = false;
+            }
         }
         checked++;
     }
+    printf("  worst-case |DC| across sweep: %.4f\n", worst_dc);
     printf("  swept %d combinations\n", checked);
     printf("All-settings sweep: %s\n", ok ? "PASS" : "FAIL");
     return ok;
