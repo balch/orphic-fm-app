@@ -147,9 +147,11 @@ class ModPioneerVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.OSC,
                     volume = 0.85f,
-                    harmonics = 0.0f,
-                    morph = 0f,
-                    timbre = .2f,
+                    harmonics = 0.15f,   // light self-feedback grit
+                    timbre = 0.25f,      // mostly triangle, keeps the low end clean
+                    morph = 0.35f,       // FM index, opens up as section energy rises
+                    fmRatio = 2f,        // octave modulator, harmonic
+                    fmShape = 0.15f,     // near-sine, few sidebands
                     noteRangeLow = 45,
                     noteRangeHigh = 57,
                     glideRate = 0.20f,

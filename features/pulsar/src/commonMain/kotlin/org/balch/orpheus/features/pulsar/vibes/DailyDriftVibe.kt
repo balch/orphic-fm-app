@@ -56,8 +56,9 @@ import kotlin.time.Clock
  *                   drifts on the same wall-clock day.
  *
  * The character: 88 BPM, A minor, BLEND envelopes, four "time-of-day" sections.
- * DX2 keys + DX3 lead use macro-driven patch walking, so the seed-derived
- * mood/energy defaults *also* shift which FM patches play that day.
+ * DX3 lead uses macro-driven patch walking, so the seed-derived mood/energy
+ * defaults *also* shift which FM patches it plays that day.  OSC keys ride
+ * the same mood macro directly, with harmonics left unpinned instead.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -384,14 +385,17 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
                     barStrategy = BarStrategy.REPEAT,
                 )
             },
-            // 4 — keys.  DX2 chord stabs — mood-driven patch walk gives the
-            // day's "keyboard voice".  `LRZ` Lorenz chaos on space slot for ambient mode.
+            // 4 — keys.  OSC FM chord stabs, harmonics unpinned so the mood
+            // macro drives the day's "keyboard voice".  Space slot is OSC
+            // too, tuned gentler and sine-toned for ambient mode.
             OrpheusEngine(
                 engineId = OrpheusEngineId.OSC,
                 volume = 0.5f,
-                harmonics = 0.35f,                // DX2 mid-bank base patch
-                harmonicsMacroRange = 0.06f,     // ±~2 patches across mood sweep
-                timbre = 0.55f, morph = 0.5f,
+                harmonics = 0.20f,               // self-feedback, macro-swept
+                harmonicsMacroRange = 0.0f,      // inert on OSC, DX-family only
+                timbre = 0.40f, morph = 0.40f,   // morph is FM index here
+                fmRatio = 3f,                    // bell-leaning odd ratio
+                fmShape = 0.10f,
                 noteRangeLow = 55, noteRangeHigh = 68,
                 delaySend = 0.25f, reverbSend = 0.35f,
             ).let { keys ->
@@ -399,12 +403,13 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
                     engineEdm = keys,
                     engineSpace = keys.copy(
                         engineId = OrpheusEngineId.OSC,
-                        // Keys is track 4 — Pulsar's mod-LFO only runs on tracks 5+
-                        // or DRONE envelopes, so harmonics here cannot be LFO-walked.
-                        // Leave harmonics unpinned so the macroMap (mood) drives it —
-                        // that gives motion via section transitions (dawn→noon→dusk).
-                        harmonics = 0.15f, timbre = 0.18f, morph = 0.22f,
-                        harmonicsMacroRange = 0.0f,  // explicit: ROS is not DX-family
+                        // Keys is track 4 and Pulsar's mod-LFO only runs on tracks 5+
+                        // or DRONE envelopes, so harmonics cannot be LFO-walked here.
+                        // Left unpinned so the macroMap (mood) drives it through the
+                        // dawn/noon/dusk section transitions.
+                        harmonics = 0.15f, timbre = 0.20f, morph = 0.20f,
+                        fmRatio = 1f, fmShape = 0.0f,   // gentle, sine, unison
+                        harmonicsMacroRange = 0.0f,     // inert on OSC
                     ),
                     role = TrackRole.Chordal(
                         comping = ChordComping(
