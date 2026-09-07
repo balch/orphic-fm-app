@@ -171,8 +171,11 @@ static bool test_pulsar_osc_renders() {
                            0.0f, 0.0f, 0.0f, 1, 48000.0f, out, 2048);
     float peak = 0.0f;
     for (int i = 0; i < 2048; i++) peak = std::max(peak, std::fabs(out[i]));
-    printf("  peak=%.4f\n", peak);
-    bool ok = (peak > 0.1f) && (peak <= 1.0f);
+    printf("  peak=%.4f (bound %.4f)\n", peak, kEngine0OutGain);
+    // The kernel's real ceiling: OscCore crossfades two unit-amplitude waves, so
+    // |audio| <= 1 and the only trim is kEngine0OutGain. A dropped or wrong gain
+    // fails here — the Pulsar bus cannot, its limiter saturates on any solo.
+    bool ok = (peak > 0.1f) && (peak <= kEngine0OutGain + 1e-6f);
     printf("Pulsar OSC render: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
@@ -319,7 +322,9 @@ static bool test_all_settings_sweep_is_finite() {
         double sum = 0.0;
         float min_v = 1.0f, max_v = -1.0f;
         for (int i = 0; i < n; i++) {
-            if (!std::isfinite(out[i]) || std::fabs(out[i]) > 1.0f) {
+            // kEngine0OutGain, not 1.0: the kernel's own ceiling, so a lost or
+            // doubled output gain shows up as a sweep failure.
+            if (!std::isfinite(out[i]) || std::fabs(out[i]) > kEngine0OutGain + 1e-6f) {
                 printf("  BAD note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f -> %.4f\n",
                        note, harm, timb, morph, ratio, shape, out[i]);
                 ok = false;
@@ -357,13 +362,13 @@ static bool test_all_settings_sweep_is_finite() {
 }
 
 bool run_osc_tests() {
-    bool ok = true;
-    ok &= test_osc_core_extraction_preserves_output();
-    ok &= test_pulsar_osc_renders();
-    ok &= test_fm_off_is_off();
-    ok &= test_ratio_mode_holds_index_across_notes();
-    ok &= test_free_run_mode_is_pitch_independent();
-    ok &= test_gate_edge_resets_modulator_phase();
-    ok &= test_all_settings_sweep_is_finite();
-    return ok;
+    int suite_pass = 0, suite_fail = 0;
+    if (test_osc_core_extraction_preserves_output()) suite_pass++; else suite_fail++;
+    if (test_pulsar_osc_renders()) suite_pass++; else suite_fail++;
+    if (test_fm_off_is_off()) suite_pass++; else suite_fail++;
+    if (test_ratio_mode_holds_index_across_notes()) suite_pass++; else suite_fail++;
+    if (test_free_run_mode_is_pitch_independent()) suite_pass++; else suite_fail++;
+    if (test_gate_edge_resets_modulator_phase()) suite_pass++; else suite_fail++;
+    if (test_all_settings_sweep_is_finite()) suite_pass++; else suite_fail++;
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

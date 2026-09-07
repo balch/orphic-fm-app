@@ -100,8 +100,9 @@ static bool test_pulsar_track_renders_osc() {
     bool all_pass = true;
     all_pass &= state_evolved;
     all_pass &= (peak > 0.001f);
-    all_pass &= (peak < 1.5f);
-    // kOscModRange arm of the floors block: harmonics ceiling, note octave fold.
+    // No upper bound on the BUS peak: kPulsarOutputGain 3.3 saturates the master
+    // soft_limit for any soloed track, so this number pins at ~1.0 whatever the
+    // kernel does. The kernel's real ceiling is asserted in the osc suite.
     all_pass &= (max_mod_harm <= kOscModRange.harmonics_max + 1e-6f);
     all_pass &= (max_mod_harm >= kOscModRange.harmonics_max - 1e-6f);
     all_pass &= (min_step_note < kOscModRange.note_min);
