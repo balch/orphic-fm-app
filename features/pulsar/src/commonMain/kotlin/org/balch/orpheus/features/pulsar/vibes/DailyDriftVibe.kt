@@ -386,8 +386,9 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
                 )
             },
             // 4 — keys.  OSC FM chord stabs, harmonics unpinned so the mood
-            // macro drives the day's "keyboard voice".  Space slot is OSC
-            // too, tuned gentler and sine-toned for ambient mode.
+            // macro drives the day's "keyboard voice".  Both slots hold OSC, and
+            // the render collapses matching slots to the EDM one, so this track
+            // is effectively single-slot: nothing in the engineSpace copy is heard.
             OrpheusEngine(
                 engineId = OrpheusEngineId.OSC,
                 volume = 0.5f,
@@ -402,15 +403,11 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
             ).let { keys ->
                 TrackVoice(
                     engineEdm = keys,
+                    // Kept as a parked ambient variant for the day a different engine
+                    // lands here. The distinct FM values are gone rather than left
+                    // to read as a second voice nobody can hear.
                     engineSpace = keys.copy(
-                        engineId = OrpheusEngineId.OSC,
-                        // Keys is track 4 and Pulsar's mod-LFO only runs on tracks 5+
-                        // or DRONE envelopes, so harmonics cannot be LFO-walked here.
-                        // Left unpinned so the macroMap (mood) drives it through the
-                        // dawn/noon/dusk section transitions.
                         harmonics = 0.15f, timbre = 0.20f, morph = 0.20f,
-                        fmRatio = 1f, fmShape = 0.0f,   // gentle, sine, unison
-                        harmonicsMacroRange = 0.0f,     // inert on OSC
                     ),
                     role = TrackRole.Chordal(
                         comping = ChordComping(
