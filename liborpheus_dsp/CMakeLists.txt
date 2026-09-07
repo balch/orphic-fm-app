@@ -334,6 +334,7 @@ if(BUILD_TESTS)
         test/test_master_crossfade.cpp
         test/test_master_swell.cpp
         test/test_master_cut.cpp
+        test/test_osc.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
 

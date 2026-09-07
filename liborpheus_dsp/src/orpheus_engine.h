@@ -2,6 +2,7 @@
 
 #include "orpheus_dsp.h"
 #include "orpheus_compat.h"
+#include "osc_core.h"
 #include "pulsar_limits.h"
 #include "pulsar_transition_fx.h"
 #include "orpheus_graph.h"
@@ -306,16 +307,13 @@ struct OrpheusEngine {
     // ── Per-voice Engine 0 (OSC mode) state ─────────
     // Used when engine_index == -1 (OSC mode): triangle+square with ADSR + hold
     struct VoiceOscState {
-        float tri_phase = 0.0f;
-        float sq_phase = 0.0f;
+        OscCore core;
         // ADSR envelope
         float env_level = 0.0f;
         int   env_stage = 0;  // 0=idle, 1=attack, 2=decay, 3=sustain, 4=release
         bool  env_gate_was_on = false;
         // Smoothed hold ramp (20ms)
         float hold_smoothed = 0.0f;
-        // Self-feedback (previous sample output for FM-like feedback)
-        float prev_output = 0.0f;
     };
     VoiceOscState voice_osc_state[kNumVoices];
 

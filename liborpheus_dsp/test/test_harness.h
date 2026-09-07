@@ -574,6 +574,7 @@ bool run_master_swell_tests();
 bool run_master_cut_tests();
 bool run_spectrum_tests();
 bool run_graph_swap_tests();
+bool run_osc_tests();
 
 // Declarations for any extra suites CMake added to the target. Absent is the normal case.
 #if __has_include("noop_suites.h")

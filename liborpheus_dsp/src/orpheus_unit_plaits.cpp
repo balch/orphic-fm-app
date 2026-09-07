@@ -417,27 +417,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 freq += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
             }
 
-            // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
-            freq += osc.prev_output * feedback_amount * 200.0f;
-
-            // Floor: prevent negative frequency from feedback FM at low pitches
-            // (causes phase reversal → harsh squeal artifacts)
-            if (freq < 1.0f) freq = 1.0f;
-
-            // Triangle oscillator: 4×|phase-0.5| - 1
-            float tri = 4.0f * std::fabs(osc.tri_phase - 0.5f) - 1.0f;
-            // Square oscillator
-            float sq = (osc.sq_phase < 0.5f) ? 1.0f : -1.0f;
-
-            // Crossfade: (tri × (1-sharp)) + (sq × sharp)
-            float audio = tri * (1.0f - sharpness) + sq * sharpness;
-
-            // Advance phases (unmodulated — feedback only affects read position)
-            float phase_inc = freq / sr;
-            osc.tri_phase += phase_inc;
-            osc.tri_phase -= std::floor(osc.tri_phase);
-            osc.sq_phase += phase_inc;
-            osc.sq_phase -= std::floor(osc.sq_phase);
+            float audio = osc.core.Next(freq, sr, sharpness, feedback_amount);
 
             // ADSR envelope (with external re-trigger support)
             bool gate_on = actual_gate != 0;
@@ -480,7 +460,6 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // VCA = audio × (envelope + hold)
             float vca = osc.env_level + osc.hold_smoothed;
             float sample = audio * vca;
-            osc.prev_output = audio;  // store pre-VCA for feedback
             out[i] = sample * kEngine0OutGain;
 
             float abs_s = std::fabs(sample);
@@ -1143,27 +1122,7 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 freqA += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
             }
 
-            // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
-            freqA += oscA.prev_output * feedbackA * 200.0f;
-
-            // Floor: prevent negative frequency from feedback FM at low pitches
-            if (freqA < 1.0f) freqA = 1.0f;
-
-            // Triangle oscillator
-            float triA = 4.0f * std::fabs(oscA.tri_phase - 0.5f) - 1.0f;
-
-            // Square oscillator
-            float sqA = (oscA.sq_phase < 0.5f) ? 1.0f : -1.0f;
-
-            // Crossfade
-            float audioA = triA * (1.0f - sharpnessA) + sqA * sharpnessA;
-
-            // Advance phases
-            float phase_incA = freqA / sr;
-            oscA.tri_phase += phase_incA;
-            oscA.tri_phase -= std::floor(oscA.tri_phase);
-            oscA.sq_phase += phase_incA;
-            oscA.sq_phase -= std::floor(oscA.sq_phase);
+            float audioA = oscA.core.Next(freqA, sr, sharpnessA, feedbackA);
 
             // ADSR envelope (with external re-trigger support)
             bool gate_onA = gateA != 0;
@@ -1207,7 +1166,6 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             // VCA
             float vcaA = oscA.env_level + oscA.hold_smoothed;
             sampleA = audioA * vcaA * kEngine0OutGain;
-            oscA.prev_output = audioA;  // pre-VCA for feedback
 
             float absA = std::fabs(sampleA);
             if (absA > peakA) peakA = absA;
@@ -1253,27 +1211,7 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 freqB += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
             }
 
-            // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
-            freqB += oscB.prev_output * feedbackB * 200.0f;
-
-            // Floor: prevent negative frequency from feedback FM at low pitches
-            if (freqB < 1.0f) freqB = 1.0f;
-
-            // Triangle oscillator
-            float triB = 4.0f * std::fabs(oscB.tri_phase - 0.5f) - 1.0f;
-
-            // Square oscillator
-            float sqB = (oscB.sq_phase < 0.5f) ? 1.0f : -1.0f;
-
-            // Crossfade
-            float audioB = triB * (1.0f - sharpnessB) + sqB * sharpnessB;
-
-            // Advance phases
-            float phase_incB = freqB / sr;
-            oscB.tri_phase += phase_incB;
-            oscB.tri_phase -= std::floor(oscB.tri_phase);
-            oscB.sq_phase += phase_incB;
-            oscB.sq_phase -= std::floor(oscB.sq_phase);
+            float audioB = oscB.core.Next(freqB, sr, sharpnessB, feedbackB);
 
             // ADSR envelope (with external re-trigger support)
             bool gate_onB = gateB != 0;
@@ -1316,7 +1254,6 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             // VCA
             float vcaB = oscB.env_level + oscB.hold_smoothed;
             sampleB = audioB * vcaB * kEngine0OutGain;
-            oscB.prev_output = audioB;  // pre-VCA for feedback
 
             float absB = std::fabs(sampleB);
             if (absB > peakB) peakB = absB;
