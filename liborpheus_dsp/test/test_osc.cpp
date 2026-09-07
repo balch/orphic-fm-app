@@ -221,26 +221,39 @@ static bool test_ratio_mode_holds_index_across_notes() {
     return ok;
 }
 
+// Spread of one render divided by the carrier period, the same normalization
+// test_ratio_mode_holds_index_across_notes uses. Raw spread scales with the
+// carrier, so unnormalized it measures pitch rather than modulation.
+static double normalized_spread(float note, float morph, float fm_free_hz,
+                                float* buf, int n) {
+    PulsarOscState st;
+    osc::process_osc_block(st, note, 0.0f, 0.0f, morph,
+                           0.0f, 0.0f, fm_free_hz, 1, 48000.0f, buf, n);
+    double f = 440.0 * std::pow(2.0, (note - 69.0) / 12.0);
+    return spectral_spread(buf, n) * (48000.0 / f);
+}
+
 static bool test_free_run_mode_is_pitch_independent() {
     printf("\n=== Test: free-run mode uses a fixed rate, not the carrier ===\n");
-    // Same fmFreeHz at two notes must produce the SAME absolute deviation,
-    // which means the normalized spread must DIFFER across notes. This is the
-    // panel-faithful behavior and the reason ratio mode exists.
-    PulsarOscState lo_st, hi_st;
-    float lo[4096], hi[4096];
-    osc::process_osc_block(lo_st, 36.0f, 0.0f, 0.0f, 0.5f,
-                           0.0f, 0.0f, 180.0f, 1, 48000.0f, lo, 4096);
-    osc::process_osc_block(hi_st, 84.0f, 0.0f, 0.0f, 0.5f,
-                           0.0f, 0.0f, 180.0f, 1, 48000.0f, hi, 4096);
-    double s_lo = spectral_spread(lo, 4096);
-    double s_hi = spectral_spread(hi, 4096);
-    printf("  spread note36=%.4f note84=%.4f\n", s_lo, s_hi);
-    // Direction-flipped from the original guess: OscCore's frequency floor
-    // clamps ~27% of note36's buffer (a +-100Hz swing on a 65Hz carrier),
-    // suppressing its delta. Both notes still diverge ~14x, so compare symmetrically.
-    double ratio = (s_lo > s_hi) ? (s_lo / s_hi) : (s_hi / s_lo);
-    bool ok = (s_lo > 1e-6) && (s_hi > 1e-6) && (ratio > 1.5);
-    printf("  divergence ratio = %.3f\n", ratio);
+    // A fixed +-200Hz is a huge index on a 65Hz carrier and a tenth of one on a
+    // 1046Hz carrier, so free-run must diverge across notes far harder than an
+    // unmodulated baseline does. 12800 samples is 48 whole 180Hz mod cycles.
+    static float buf[12800];
+    const int kN = 12800;
+    double on_lo = normalized_spread(36.0f, 1.0f, 180.0f, buf, kN);
+    double on_hi = normalized_spread(84.0f, 1.0f, 180.0f, buf, kN);
+    double off_lo = normalized_spread(36.0f, 1.0f, 0.0f, buf, kN);
+    double off_hi = normalized_spread(84.0f, 1.0f, 0.0f, buf, kN);
+    double on_ratio = std::max(on_lo, on_hi) / std::min(on_lo, on_hi);
+    double off_ratio = std::max(off_lo, off_hi) / std::min(off_lo, off_hi);
+    printf("  FM on : note36=%.4f note84=%.4f  ratio=%.4f\n", on_lo, on_hi, on_ratio);
+    printf("  FM off: note36=%.4f note84=%.4f  ratio=%.4f\n", off_lo, off_hi, off_ratio);
+    // Measured: FM-off 6.9353/6.7767 -> 1.023, so normalization does remove the
+    // 16x carrier gap; free-run 10.5789/6.7727 -> 1.562. Scaling free-run
+    // deviation with the carrier instead collapses the FM-on ratio to ~1.17.
+    bool ok = (std::min(on_lo, on_hi) > 1e-6)
+              && (off_ratio < 1.10)
+              && (on_ratio > 1.35) && (on_ratio > 1.25 * off_ratio);
     printf("Free-run pitch dependence: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
@@ -272,31 +285,28 @@ static bool test_all_settings_sweep_is_finite() {
     printf("\n=== Test: full parameter sweep stays finite and bounded ===\n");
     bool ok = true;
     int checked = 0;
-    static float out[8192];
-    // Measured worst-case |DC| across this sweep is 0.7278 (note=40, harm=0.35,
-    // timbre=1.00, morph=0 -- self-feedback alone skews a pure square wave's
-    // duty cycle toward -1; it still swings the full +-1 range every cycle, so
-    // it is not the RULING-2 freeze, just a heavily asymmetric tone). Bounded
-    // with headroom so a future regression has something to compare against.
-    const double kMaxDcOffset = 0.80;
+    static float out[65536];
+    // Converged worst-case |DC| is 0.8466 at note=40 harm=0.35 timbre=1.00
+    // morph=0: self-feedback skews a square wave's duty cycle toward -1 while
+    // still swinging the full +-1 range, so it is asymmetry, not a freeze.
+    const double kMaxDcOffset = 0.90;
     double worst_dc = 0.0;
-    // note starts at kOscModRange.note_min and harm ends at .harmonics_max:
-    // RULING 3 keeps self-feedback's no-clamp condition (harmonics*200 <
-    // carrier_hz) true everywhere in this sweep, so OscCore::Next's floor
-    // clamp -- the actual freeze mechanism -- should never engage below.
+    // note starts at kOscModRange.note_min and harm ends at .harmonics_max,
+    // which keeps self-feedback's no-clamp condition (harmonics*200 <
+    // carrier_hz) true throughout, so the 1Hz floor should never engage.
     for (float note = kOscModRange.note_min; note <= 96.0f; note += 8.0f)
     for (float harm = 0.0f; harm <= kOscModRange.harmonics_max; harm += kOscModRange.harmonics_max / 2.0f)
     for (float timb = 0.0f; timb <= 1.0f; timb += 0.5f)
     for (float morph = 0.0f; morph <= 1.0f; morph += 0.5f)
     for (float ratio = 0.0f; ratio <= 8.0f; ratio += 2.0f)
     for (float shape = 0.0f; shape <= 1.0f; shape += 0.5f) {
-        // DC only means anything over whole carrier periods. At note 40 one
-        // period is ~583 samples, so a fixed 512-sample window reads a
-        // fragment of a cycle as offset even on a clean oscillator.
+        // 32 periods is sized for convergence, not merely for whole cycles:
+        // the duty-cycle skew settles slowly, reading -0.7278 at 4 periods and
+        // -0.8466 from 32 on (measured out to 256), so 4 would under-report.
         const float carrier_hz = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
-        int n = static_cast<int>(4.0f * 48000.0f / carrier_hz);
+        int n = static_cast<int>(32.0f * 48000.0f / carrier_hz);
         if (n < 512) n = 512;
-        if (n > 8192) n = 8192;
+        if (n > 65536) n = 65536;
 
         PulsarOscState st;
         osc::process_osc_block(st, note, harm, timb, morph,
