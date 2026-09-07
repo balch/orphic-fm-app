@@ -60,6 +60,49 @@ class PulsarPluginLickPortsTest {
     }
 
     @Test
+    fun `plugin registers every track OSC FM symbol on both engine slots`() {
+        // The FM families shipped as routing rows only. An engine recreation
+        // (DesktopEngine::open, an Android headphone route change) zeroes the C++
+        // atomics and syncNativeBridgeState replays declared ports alone, so an
+        // OSC track lost its FM mid-session while harmonics/timbre/morph came back.
+        val plugin = PulsarPlugin()
+        val registered = plugin.ports.map { it.symbol }.toSet()
+        for (family in listOf("FM_RATIO", "FM_SHAPE", "FM_FREE_HZ")) {
+            for (suffix in listOf("", "_SPACE")) {
+                val symbols = PulsarSymbol.entries.filter {
+                    it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))
+                }
+                assertEquals(8, symbols.size, "expected 8 TRACK_n_$family$suffix symbols")
+                val missing = symbols.filterNot { it.symbol in registered }
+                assertTrue(
+                    missing.isEmpty(),
+                    "missing ${missing.size} $family$suffix ports: ${missing.map { it.symbol }}"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `every OSC FM port stores a written value for the boot sync to replay`() {
+        // Registration alone is not the contract: syncNativeBridgeState re-pushes
+        // getPortValue(), so a port that accepts a write without storing it is
+        // just as lost. Distinct values also catch a stride that shadows a neighbour.
+        val plugin = PulsarPlugin()
+        val written = PulsarSymbol.entries
+            .filter { it.name.matches(Regex("TRACK_[0-7]_FM_(RATIO|SHAPE|FREE_HZ)(_SPACE)?")) }
+            .mapIndexed { i, sym -> sym to (i + 1) * 0.01f }
+        assertEquals(48, written.size, "expected 6 families x 8 tracks")
+        written.forEach { (sym, v) ->
+            assertTrue(plugin.setPortValue(sym.symbol, PortValue.FloatValue(v)),
+                "setPortValue(${sym.symbol}) rejected — port not registered")
+        }
+        written.forEach { (sym, v) ->
+            assertEquals(v, plugin.getPortValue(sym.symbol)?.asFloat(),
+                "${sym.symbol} did not hold its value — a later port shadows it")
+        }
+    }
+
+    @Test
     fun `plugin registers every track macro-map symbol with the declared stride`() {
         val macroBlock = PulsarSymbol.entries.filter { it.name.matches(Regex("TRACK_[0-7]_MACRO_.*")) }
         assertEquals(

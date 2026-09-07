@@ -71,6 +71,13 @@ class PulsarPlugin : DspPlugin {
     private var _trackPinHarmonics = IntArray(8) { 0 }
     private var _trackPinTimbre = IntArray(8) { 0 }
     private var _trackPinMorph = IntArray(8) { 0 }
+    // OSC FM, both engine slots. 0 = FM off, which is what every non-OSC track leaves them at.
+    private var _trackFmRatio = FloatArray(8) { 0f }
+    private var _trackFmRatioSpace = FloatArray(8) { 0f }
+    private var _trackFmShape = FloatArray(8) { 0f }
+    private var _trackFmShapeSpace = FloatArray(8) { 0f }
+    private var _trackFmFreeHz = FloatArray(8) { 0f }
+    private var _trackFmFreeHzSpace = FloatArray(8) { 0f }
     private var _trackHarmonicsModulation = FloatArray(8) { 0f }
     // Default source = 4 (MOOD) so an opt-in user only has to set the range.
     private var _trackHarmonicsMacroSource = IntArray(8) { 4 }
@@ -273,6 +280,46 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH.ordinal + t]) {
                 floatType { default = 0.3f; min = 0f; max = 1f; get { _trackMorph[t] }; set { _trackMorph[t] = it } }
+            }
+        }
+        // Per-track OSC FM. Both slots are declared, unlike HARMONICS/TIMBRE/MORPH
+        // _SPACE: DesktopEngine::open and an Android route change recreate the C++
+        // engine and zero its atomics, and only declared+stored ports get re-pushed,
+        // so an undeclared slot would drop to FM-off mid-session.
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_RATIO.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 16f
+                    get { _trackFmRatio[t] }; set { _trackFmRatio[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_RATIO_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 16f
+                    get { _trackFmRatioSpace[t] }; set { _trackFmRatioSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_SHAPE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackFmShape[t] }; set { _trackFmShape[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_SHAPE_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackFmShapeSpace[t] }; set { _trackFmShapeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 2000f
+                    get { _trackFmFreeHz[t] }; set { _trackFmFreeHz[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 2000f
+                    get { _trackFmFreeHzSpace[t] }; set { _trackFmFreeHzSpace[t] = it } }
             }
         }
         // Per-track pin flags (EDM slot). Space-slot equivalents flow through
