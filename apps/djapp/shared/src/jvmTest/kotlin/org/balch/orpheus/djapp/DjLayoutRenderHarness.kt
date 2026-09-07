@@ -914,6 +914,81 @@ class DjLayoutRenderHarness {
     }
 
     /**
+     * The bottom bar's Timer item, which now keeps its icon and hangs the countdown under the
+     * label instead of swapping the icon out for it. Renders idle / running / paused side by side
+     * plus the full bar with a running timer, so the two things that can go wrong here are
+     * visible: the countdown clipping out of the item, and the Timer item standing taller than
+     * its neighbours once the third line appears (TvBottomBarMinHeight reserves that line's room
+     * on every item precisely so it cannot).
+     */
+    @Test
+    fun renderTimerBottomBarStates() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        fun timer(status: TimerStatus, remaining: kotlin.time.Duration) =
+            TimerViewModel.previewFeature(
+                TimerUiState(initialTime = 45.minutes, remainingTime = remaining, status = status),
+            )
+        runCatching {
+            val scene = ImageComposeScene(1560, 460, Density(1f)) {
+                OrpheusTheme {
+                    Column(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            listOf(
+                                Triple("idle", TimerStatus.IDLE, 45.minutes),
+                                Triple("running (secs)", TimerStatus.RUNNING, 53.seconds),
+                                Triple("running (mins)", TimerStatus.RUNNING, 12.minutes),
+                                Triple("running (hrs)", TimerStatus.RUNNING, 67.minutes),
+                                Triple("paused", TimerStatus.PAUSED, 12.minutes),
+                                Triple("docked+running", TimerStatus.RUNNING, 53.seconds),
+                            ).forEachIndexed { index, (tag, status, remaining) ->
+                                // DjTvBottomBar fillMaxWidth()s internally, so each swatch needs a
+                                // fixed width rather than fighting its siblings for the full Row.
+                                Column(
+                                    modifier = Modifier.width(200.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(tag, color = Color.White, fontSize = 11.sp)
+                                    DjTvBottomBar(
+                                        panels = listOf(TimerTab),
+                                        isDocked = { index == 5 },
+                                        onToggle = {},
+                                        timerFeature = timer(status, remaining),
+                                        pulsarFeature = PulsarViewModel.previewFeature(),
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            "Real 7-item bar, timer running — every item must stay the same height:",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                        )
+                        DjTvBottomBar(
+                            panels = bottomBarPanels(largeScreenPanels()),
+                            isDocked = { it == PulsarTab || it == TimerTab },
+                            onToggle = {},
+                            timerFeature = timer(TimerStatus.RUNNING, 53.seconds),
+                            pulsarFeature = PulsarViewModel.previewFeature(),
+                        )
+                    }
+                }
+            }
+            try {
+                File(outDir, "timer-bottombar-states.png").writeBytes(scene.render().encodeToData()!!.bytes)
+            } finally {
+                scene.close()
+            }
+        }.onFailure {
+            if (it is IllegalStateException) throw it
+            println("[render-harness] timer bottom bar states skipped: $it")
+        }
+    }
+
+    /**
      * [TimerPanel]'s transport buttons in every focus permutation this task added: ambient
      * (non-TV, unchanged), TV idle, TV Start/Stop focused (both IDLE and RUNNING, to prove the
      * persistent RUNNING wash and the focus plate read as separate signals), and TV Reset

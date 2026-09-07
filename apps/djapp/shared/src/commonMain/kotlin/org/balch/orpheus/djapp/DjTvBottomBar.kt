@@ -64,14 +64,25 @@ import kotlin.time.Duration.Companion.seconds
  */
 private val TvBottomBarIconSize = 56.dp
 
-/** Label/countdown/value text size for a bottom bar item — doubled from the original 13sp. */
+/** Label/value text size for a bottom bar item — doubled from the original 13sp. */
 private val TvBottomBarLabelSize = 24.sp
+
+/**
+ * Timer countdown text size — a step under the label so the label stays the item's name and the
+ * countdown reads as the value beneath it, not as a second title.
+ */
+private val TvBottomBarCountdownSize = 20.sp
 
 /**
  * Minimum touch/focus target. Width and height are NOT forced equal: these are icon-over-label
  * columns, so width naturally follows the (short) label text while height carries the "twice as
  * big" read. Forcing width to match the doubled height too (a literal 152dp square) would blow
  * the ~1150dp usable budget for seven items at 1280dp — see DjTvBottomBar's doc comment.
+ *
+ * The height also has to keep clearing the tallest item state — Timer with a running countdown
+ * line under its label — so that starting a timer never grows the bar and reflows the dock above
+ * it. It does at 148dp (verified by rendering: three-line content measures ~143dp), so this stays
+ * where it was; the render harness's timer-bottombar-states shot is the check if it ever moves.
  */
 private val TvBottomBarMinWidth = 100.dp
 private val TvBottomBarMinHeight = 148.dp
@@ -124,7 +135,8 @@ internal fun bottomBarPanels(dockable: List<DjRoute>): List<DjRoute> =
  * DJ/Mix/Horn/Timer, just placed last in display order.
  *
  * Two items carry an extra signal beyond docked/focused:
- * - Timer shows a live countdown in place of its icon while running or paused.
+ * - Timer keeps its icon and label and adds a live countdown line beneath them while running
+ *   or paused.
  * - Ends shows the *selected ending style* as its label (mirroring `PulsarPanel`'s own ENDING
  *   pill labelling exactly, via the same [PulsarFeature.actions] state, so the two can never
  *   disagree) and gets a third, independent visual channel — a glowing ring — when
@@ -234,8 +246,9 @@ fun DjTvBottomBar(
 }
 
 /**
- * One item: icon (or, for Timer while running/paused, a live countdown) plus label. Three
- * independent signals, each on its own visual channel so none can be mistaken for another:
+ * One item: icon over label, plus — for Timer while running/paused — a countdown line under the
+ * label. Three independent signals, each on its own visual channel so none can be mistaken for
+ * another:
  * - Docked state (a panel is currently shown) is a persistent [accent] tint/wash.
  * - Focus (the D-pad cursor is on this item right now) is an opaque [accent]-tinted raised plate.
  * - [armed] (Ends only, currently) is a glowing ring drawn OUTSIDE the plate/wash, in
@@ -319,18 +332,17 @@ private fun TvBottomBarItem(
                 )
                 .padding(horizontal = 14.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            // Top-packed, deliberately: every item's icon and label then sit at the same height
+            // across the row, and Timer's countdown hangs into the slack underneath instead of
+            // pushing its own icon up out of line with its neighbours'.
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (countdownText != null) {
-                TvBottomBarCountdownText(text = countdownText, dimmed = countdownDimmed)
-            } else {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = tint,
-                    modifier = Modifier.size(TvBottomBarIconSize),
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier.size(TvBottomBarIconSize),
+            )
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -339,6 +351,9 @@ private fun TvBottomBarItem(
                 maxLines = 1,
                 softWrap = false,
             )
+            if (countdownText != null) {
+                TvBottomBarCountdownText(text = countdownText, dimmed = countdownDimmed)
+            }
         }
 
         // Whether this panel is on screen, said outright — but only under the cursor. On every
@@ -377,7 +392,7 @@ private fun TvBottomBarCountdownText(text: String, dimmed: Boolean) {
     Text(
         text = text,
         fontFamily = FontFamily.Monospace,
-        fontSize = TvBottomBarLabelSize,
+        fontSize = TvBottomBarCountdownSize,
         maxLines = 1,
         softWrap = false,
         color = OrpheusColors.sleepMoonlight.copy(alpha = alpha),
