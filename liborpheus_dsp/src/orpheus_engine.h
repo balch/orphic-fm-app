@@ -872,6 +872,9 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_mod_harmonics_debug[8]{};
     std::atomic<float> pulsar_track_mod_timbre_debug[8]{};
     std::atomic<float> pulsar_track_mod_morph_debug[8]{};
+    // Same peek for the post-playability-floor note, so a test can see the
+    // octave fold an engine's note_min applies.
+    std::atomic<float> pulsar_track_note_debug[8]{};
 #endif
     std::atomic<int>   pulsar_track_envelope[8]{};
     std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL

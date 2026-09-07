@@ -45,6 +45,17 @@ static_assert(sizeof(OrpheusEngine::pulsar_lick_wah_data) /
 
 static constexpr float kTidesNorm = 0.125f;
 
+// Lowest note the pattern generator may write for a track's engine. OSC
+// (engine_index < 0) cannot index kEngineModRanges, and without its floor here
+// the generator writes below note_min and the render-time clamp folds the note
+// up an octave while the step grid and viz still show the original pitch.
+// Braids (100+) and chaos (200+) have no table entry, hence 0 = no limit.
+static inline int engine_note_floor(int engine_index) {
+    if (engine_index < 0) return kOscModRange.note_min;
+    if (engine_index < 24) return kEngineModRanges[engine_index].note_min;
+    return 0;
+}
+
 // Storm send taps. Fixed rather than authored: the weather voice has no per-engine
 // send atomics behind it, and a wide reverb wash is what turns a dry rain bed into
 // weather — the pulsar reverb is the only diffusion the storm gets. The reverb tap is
@@ -1093,8 +1104,7 @@ static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
         const float density_ovr = engine->pulsar_track_density_override[t].load(std::memory_order_relaxed);
         const int nr_low  = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
         const int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
-        const int eng_note_min = (ts.engine_index >= 0 && ts.engine_index < 24)
-            ? kEngineModRanges[ts.engine_index].note_min : 0;
+        const int eng_note_min = engine_note_floor(ts.engine_index);
 
         generate_track_pattern(ts, t, percussive, genre,
                                static_cast<uint8_t>(root), scale, bar1_len, section_seed,
@@ -1495,8 +1505,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             float density_ovr = engine->pulsar_track_density_override[t].load(std::memory_order_relaxed);
             int nr_low = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
             int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
-            int eng_note_min = (ts.engine_index >= 0 && ts.engine_index < 24)
-                ? kEngineModRanges[ts.engine_index].note_min : 0;
+            int eng_note_min = engine_note_floor(ts.engine_index);
             generate_track_pattern(ts, t, (role == TrackRole::PERCUSSIVE), genre,
                                    static_cast<uint8_t>(root), scale, bar1_len, base_seed,
                                    0, hold_prob, hold_min, hold_max,
@@ -4209,8 +4218,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             float density_ovr = engine->pulsar_track_density_override[rt].load(std::memory_order_relaxed);
                             int nr_low = engine->pulsar_track_note_range_low[rt].load(std::memory_order_relaxed);
                             int nr_high = engine->pulsar_track_note_range_high[rt].load(std::memory_order_relaxed);
-                            int eng_nm = (rts.engine_index >= 0 && rts.engine_index < 24)
-                                ? kEngineModRanges[rts.engine_index].note_min : 0;
+                            int eng_nm = engine_note_floor(rts.engine_index);
                             generate_track_pattern(rts, rt, perc, rg,
                                                    static_cast<uint8_t>(rr), rscale, bar1_reset, reset_seed,
                                                    0, hold_prob, hold_min, hold_max,
@@ -4951,6 +4959,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         engine->pulsar_track_mod_harmonics_debug[t].store(clamp01(mod_harmonics), std::memory_order_relaxed);
         engine->pulsar_track_mod_timbre_debug[t].store(clamp01(mod_timbre), std::memory_order_relaxed);
         engine->pulsar_track_mod_morph_debug[t].store(clamp01(mod_morph), std::memory_order_relaxed);
+        engine->pulsar_track_note_debug[t].store(note_for_render, std::memory_order_relaxed);
 #endif
 
         if (ts.engine_index >= 100 && ts.engine_index < 200) {

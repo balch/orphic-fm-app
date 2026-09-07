@@ -286,10 +286,11 @@ static bool test_all_settings_sweep_is_finite() {
     bool ok = true;
     int checked = 0;
     static float out[65536];
-    // Converged worst-case |DC| is 0.8466 at note=40 harm=0.35 timbre=1.00
+    // Converged worst-case |DC| is 0.5503 at note=40 harm=0.35 timbre=1.00
     // morph=0: self-feedback skews a square wave's duty cycle toward -1 while
-    // still swinging the full +-1 range, so it is asymmetry, not a freeze.
-    const double kMaxDcOffset = 0.90;
+    // still swinging the full range, so it is asymmetry, not a freeze. (The
+    // raw core reads 0.8466 there; the kernel's kEngine0OutGain scales it.)
+    const double kMaxDcOffset = 0.58;
     double worst_dc = 0.0;
     // note starts at kOscModRange.note_min and harm ends at .harmonics_max,
     // which keeps self-feedback's no-clamp condition (harmonics*200 <
@@ -301,8 +302,8 @@ static bool test_all_settings_sweep_is_finite() {
     for (float ratio = 0.0f; ratio <= 8.0f; ratio += 2.0f)
     for (float shape = 0.0f; shape <= 1.0f; shape += 0.5f) {
         // 32 periods is sized for convergence, not merely for whole cycles:
-        // the duty-cycle skew settles slowly, reading -0.7278 at 4 periods and
-        // -0.8466 from 32 on (measured out to 256), so 4 would under-report.
+        // the duty-cycle skew settles slowly, reading -0.4731 at 4 periods and
+        // -0.5503 from 32 on (measured out to 256), so 4 would under-report.
         const float carrier_hz = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
         int n = static_cast<int>(32.0f * 48000.0f / carrier_hz);
         if (n < 512) n = 512;

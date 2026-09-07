@@ -2,6 +2,7 @@
 
 #include "osc_core.h"
 #include "pulsar_mod_ranges.h"
+#include "orpheus_voice.h"   // kEngine0OutGain
 #include <cmath>
 
 // Per-track OSC state for the Pulsar beat machine, used when engine_index < 0.
@@ -52,6 +53,10 @@ inline float mod_wave(float phase, float shape) {
 // Ratio mode scales deviation by mod_hz, which holds the modulation index
 // I = morph * kFmIndexMax constant at every note. Free-run mode (fm_free_hz > 0)
 // keeps the Orpheus panel's literal +-200Hz so a pasted preset transfers.
+//
+// kEngine0OutGain is the same trim the three main-synth OSC sites apply. Without
+// it a Pulsar OSC track runs 1.54x hotter than the panel voice it reproduces and
+// ~1.8x hotter than the VCF engine it used to be misrouted to.
 inline void process_osc_block(
         PulsarOscState& state,
         float note,
@@ -84,7 +89,7 @@ inline void process_osc_block(
             state.mod_phase += mod_inc;
             state.mod_phase -= std::floor(state.mod_phase);
         }
-        out[i] = state.core.Next(freq, sample_rate, timbre, harmonics);
+        out[i] = state.core.Next(freq, sample_rate, timbre, harmonics) * kEngine0OutGain;
     }
 }
 
