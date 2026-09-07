@@ -1278,8 +1278,8 @@ class PulsarViewModel(
             trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
             trackMorphIds[i].value = FloatValue(edm.morph)
             trackMorphSpaceIds[i].value = FloatValue(spa.morph)
-            // OSC FM: ratio/shape/freeHz. Depth deliberately rides morph above,
-            // not a field here, so it inherits evolution/tension/accent/pinMorph.
+            // OSC FM: ratio/shape/freeHz. Depth rides morph above, not a field here,
+            // so an unpinned OSC track takes its FM index from the SPACE macro.
             trackFmRatioIds[i].value = FloatValue(edm.fmRatio)
             trackFmRatioSpaceIds[i].value = FloatValue(spa.fmRatio)
             trackFmShapeIds[i].value = FloatValue(edm.fmShape)

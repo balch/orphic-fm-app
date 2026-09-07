@@ -393,7 +393,8 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
                 volume = 0.5f,
                 harmonics = 0.20f,               // self-feedback, macro-swept
                 harmonicsMacroRange = 0.0f,      // inert on OSC, DX-family only
-                timbre = 0.40f, morph = 0.40f,   // morph is FM index here
+                timbre = 0.40f,
+                morph = 0.40f,                   // inert: unpinned, so SPACE sets FM index
                 fmRatio = 3f,                    // bell-leaning odd ratio
                 fmShape = 0.10f,
                 noteRangeLow = 55, noteRangeHigh = 68,

@@ -149,7 +149,7 @@ class ModPioneerVibe : VibeProvider {
                     volume = 0.85f,
                     harmonics = 0.15f,   // light self-feedback grit
                     timbre = 0.25f,      // mostly triangle, keeps the low end clean
-                    morph = 0.35f,       // FM index, opens up as section energy rises
+                    morph = 0.35f,       // inert: unpinned, so the SPACE knob sets FM index
                     fmRatio = 2f,        // octave modulator, harmonic
                     fmShape = 0.15f,     // near-sine, few sidebands
                     noteRangeLow = 45,

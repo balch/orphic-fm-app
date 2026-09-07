@@ -96,8 +96,11 @@ data class OrpheusEngine(
      * Integer values (1, 2, 3) are harmonic; fractional (1.5, 2.7) go clangy.
      * Effective only on [OrpheusEngineId.OSC].
      *
-     * FM depth is **[morph]** on OSC tracks, not a field of its own, so it
-     * inherits section-energy evolution, tension, accent and [pinMorph].
+     * FM depth is **[morph]** on OSC tracks, not a field of its own. Unpinned,
+     * morph resolves from the SPACE macro through the track's `spaceDecay` range,
+     * so the SPACE knob sweeps FM index live and the authored [morph] is inert.
+     * Set [pinMorph] to make the authored value the depth. Accent never reaches
+     * morph — the velocity boost applies to harmonics and timbre only.
      */
     val fmRatio: Float = 0f,
     /** Modulator waveform: 0 sine, 0.5 triangle, 1 square. Higher = brighter. */
