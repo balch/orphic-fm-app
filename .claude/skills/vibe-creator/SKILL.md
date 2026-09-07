@@ -392,9 +392,9 @@ Exceeding sections throws at `Arrangement.<init>`; exceeding edges is clamped si
 
 ### `VibeEffects` (dedicated delay + reverb tuning)
 
-- `delayTimeA/B`: two delay taps, 0-1 of a bar. 0.25 = 16th, 0.375 = dotted-8th, 0.5 = half.
-- `delayFeedback`: 0.2 = subtle, 0.5 = moderate, 0.7+ = runaway.
-- `delayDamping`: high-freq rolloff per repeat (darker with higher).
+- `delayTimeA/B`: two delay taps, 0-1 mapped to **0.01..2.0 seconds** (`0.01 + v * 1.99`, see `orpheus_unit_pulsar_delay.cpp`), tempo-independent — NOT a fraction of a bar. To hit a note value, convert: at 80 BPM a dotted-8th is 0.5625 s, so `(0.5625 - 0.01) / 1.99 ≈ 0.28`. Same mapping as the main dual delay's TIME knobs, so values copy across from a desktop preset verbatim.
+- `delayFeedback`: 0.2 = subtle, 0.5 = moderate, 0.7+ = runaway (capped at 0.95 in C++).
+- `delayDamping`: routed to C++ but never read by the Pulsar delay today — a no-op.
 - `reverbSize`: 0.3 = room, 0.6 = hall, 0.9 = cathedral.
 - `reverbDamping`: low-pass on tail.
 - `reverbBrightness`: warm (0.3) vs shimmery (0.8).
