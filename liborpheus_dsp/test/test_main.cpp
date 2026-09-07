@@ -119,6 +119,7 @@ static TestSuite suites[] = {
     {"master_cut",      run_master_cut_tests,      true},
     {"graph-swap",      run_graph_swap_tests,      true},
     {"osc",             run_osc_tests,             true},
+    {"pulsar_osc",      run_pulsar_osc_tests,      true},
 
 // Rows for any extra suites CMake added to the target. Absent is the normal case.
 #if __has_include("noop_suites.inc")

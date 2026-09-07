@@ -4916,6 +4916,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (mr.note_min > 0 && note_for_render < mr.note_min) {
                 while (note_for_render < mr.note_min) note_for_render += 12.0f;
             }
+        } else if (ts.engine_index < 0) {
+            // OSC cannot index kEngineModRanges; bound self-feedback and pitch.
+            const EngineModRange& mr = kOscModRange;
+            if (mod_harmonics > mr.harmonics_max) mod_harmonics = mr.harmonics_max;
+            if (mod_timbre < mr.timbre_floor) mod_timbre = mr.timbre_floor;
+            if (mod_morph < mr.morph_floor) mod_morph = mr.morph_floor;
+            if (mr.note_min > 0 && note_for_render < mr.note_min) {
+                while (note_for_render < mr.note_min) note_for_render += 12.0f;
+            }
         }
 
         // ── Render voice ──
@@ -4986,6 +4995,27 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 sample_rate,
                 track_buffer + trig_off,
                 num_frames - trig_off);
+        } else if (ts.engine_index < 0) {
+            // OSC: split at the intra-block step boundary like the chaos and
+            // OrpheusVoice paths, so the onset lands on the true boundary
+            // sample instead of a full block early.
+            const int trig_off =
+                (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
+                    ? ts.trigger_offset : 0;
+            if (trig_off > 0) {
+                osc::process_osc_block(
+                    ts.osc_state, note_for_render,
+                    clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
+                    ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
+                    ts.gate_pre_boundary ? 1 : 0,
+                    sample_rate, track_buffer, trig_off);
+            }
+            osc::process_osc_block(
+                ts.osc_state, note_for_render,
+                clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
+                ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
+                gate_for_render,
+                sample_rate, track_buffer + trig_off, num_frames - trig_off);
         } else {
             // Sub-block trigger accuracy: split the render at the intra-block
             // step-boundary offset so the voice's gate edge — and with it the
