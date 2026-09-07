@@ -4,6 +4,7 @@
 // directly, bypassing plaits::Voice's LPG, limiter, and int16 conversion.
 // This matches the Kotlin (JSyn) signal path: engine.render() -> outGain -> softLimit().
 
+#include "osc_core.h"   // kEngine0OutGain
 #include "stmlib/utils/buffer_allocator.h"
 
 // Undefine Braids resource macros that collide with Plaits
@@ -50,10 +51,7 @@ static constexpr int kOrpheusBlockSize = 24;
 // Number of registered Plaits engines.
 static constexpr int kOrpheusMaxEngines = 24;
 
-// Engine 0 (triangle/square oscillator) output gain.
-// Balances Engine 0 level against Plaits engines so switching engines
-// doesn't produce a jarring volume jump.
-static constexpr float kEngine0OutGain = 0.65f;
+// kEngine0OutGain now lives in osc_core.h, included above.
 
 // Per-engine output gain for Orpheus voice rendering.
 // Scaled from MI registration out_gain × ~0.56 to match Kotlin levels,

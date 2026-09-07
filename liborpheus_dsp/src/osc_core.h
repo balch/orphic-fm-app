@@ -2,6 +2,12 @@
 
 #include <cmath>
 
+// Engine 0 (triangle/square oscillator) output gain.
+// Balances Engine 0 level against Plaits engines so switching engines
+// doesn't produce a jarring volume jump. Lives beside the oscillator it trims
+// so callers do not have to pull in the whole Plaits chain to reach it.
+static constexpr float kEngine0OutGain = 0.65f;
+
 // Triangle/square oscillator with self-feedback FM, shared by the main-synth
 // OSC voice and the Pulsar OSC kernel so the two cannot drift apart.
 // Extracted from three identical copies in orpheus_unit_plaits.cpp.

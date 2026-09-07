@@ -1,8 +1,7 @@
 #pragma once
 
-#include "osc_core.h"
+#include "osc_core.h"        // OscCore, kEngine0OutGain
 #include "pulsar_mod_ranges.h"
-#include "orpheus_voice.h"   // kEngine0OutGain
 #include <cmath>
 
 // Per-track OSC state for the Pulsar beat machine, used when engine_index < 0.
