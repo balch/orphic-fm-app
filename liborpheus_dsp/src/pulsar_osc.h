@@ -23,8 +23,12 @@ static constexpr EngineModRange kOscModRange =
 
 namespace osc {
 
-// Modulation index at morph = 1. I = morph * kFmIndexMax.
+// Modulation index at morph = 1, in radians (DX7 indices run to ~10).
+// I = morph * kFmIndexMax.
 constexpr float kFmIndexMax = 8.0f;
+
+// OscCore's phase is in cycles, so a radian index converts by 1/2pi.
+constexpr float kIndexToCycles = 1.0f / (2.0f * 3.14159265358979f);
 
 // Modulator waveform: sine (0) through triangle (0.5) to square (1).
 // Crossfading rather than switching keeps fm_shape continuous under macro
@@ -49,9 +53,16 @@ inline float mod_wave(float phase, float shape) {
 // at the call site, because the chaos engines shipped for months without one
 // when that was left to callers.
 //
-// Ratio mode scales deviation by mod_hz, which holds the modulation index
-// I = morph * kFmIndexMax constant at every note. Free-run mode (fm_free_hz > 0)
-// keeps the Orpheus panel's literal +-200Hz so a pasted preset transfers.
+// The two modes modulate different things, deliberately.
+//
+// Ratio mode is PHASE modulation at index I = morph * kFmIndexMax, so the
+// carrier rate is untouched and the pitch is the written note at every index.
+// Linear FM at that index would drive the carrier negative and OscCore's 1Hz
+// floor would half-rectify it, lifting perceived pitch by octaves.
+//
+// Free-run mode (fm_free_hz > 0) stays on the FREQUENCY path with the Orpheus
+// panel's literal +-200Hz, floor clamping included, so a pasted panel preset
+// transfers exactly. It is pitch-bending by design and ratio mode is the default.
 //
 // kEngine0OutGain is the same trim the three main-synth OSC sites apply. Without
 // it a Pulsar OSC track runs 1.54x hotter than the panel voice it reproduces and
@@ -78,17 +89,21 @@ inline void process_osc_block(
     const float mod_hz = free_run ? fm_free_hz : carrier_hz * fm_ratio;
     const bool fm_on = mod_hz > 0.0f && morph > 0.0f;
     const float mod_inc = mod_hz / sample_rate;
-    const float deviation = free_run ? (morph * 200.0f)
-                                     : (morph * kFmIndexMax * mod_hz);
+    const float deviation_hz = morph * 200.0f;                      // free-run only
+    const float pm_cycles = morph * kFmIndexMax * kIndexToCycles;   // ratio only
 
     for (int i = 0; i < num_frames; i++) {
         float freq = carrier_hz;
+        float phase_offset = 0.0f;
         if (fm_on) {
-            freq += mod_wave(state.mod_phase, fm_shape) * deviation;
+            const float m = mod_wave(state.mod_phase, fm_shape);
+            if (free_run) freq += m * deviation_hz;
+            else          phase_offset = m * pm_cycles;
             state.mod_phase += mod_inc;
             state.mod_phase -= std::floor(state.mod_phase);
         }
-        out[i] = state.core.Next(freq, sample_rate, timbre, harmonics) * kEngine0OutGain;
+        out[i] = state.core.Next(freq, sample_rate, timbre, harmonics, phase_offset)
+                 * kEngine0OutGain;
     }
 }
 

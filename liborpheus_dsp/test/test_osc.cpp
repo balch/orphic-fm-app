@@ -210,12 +210,13 @@ static bool test_ratio_mode_holds_index_across_notes() {
         spread[k] = spectral_spread(out, 4096) * (48000.0 / f);
         printf("  note %.0f: normalized spread %.4f\n", notes[k], spread[k]);
     }
-    // Constant index means the normalized spread should cluster. Widened from
-    // 1.15 to 1.35: measured hi/lo is 1.283, still an order of magnitude
-    // tighter than free-run mode's divergence, so the bound was miscalibrated.
+    // Constant index means the normalized spread should cluster. Tightened
+    // 1.35 -> 1.20 once phase modulation removed the floor-clamp asymmetry:
+    // measured hi/lo is 1.170, the residual being note 84's naive modulator
+    // aliasing at 2093Hz, which the slope proxy reads as lost sideband energy.
     double lo = std::min({spread[0], spread[1], spread[2]});
     double hi = std::max({spread[0], spread[1], spread[2]});
-    bool ok = (lo > 1e-6) && (hi / lo < 1.35);
+    bool ok = (lo > 1e-6) && (hi / lo < 1.20);
     printf("  ratio hi/lo = %.3f\n", hi / lo);
     printf("Ratio-mode index constancy: %s\n", ok ? "PASS" : "FAIL");
     return ok;
@@ -294,7 +295,9 @@ static bool test_all_settings_sweep_is_finite() {
     double worst_dc = 0.0;
     // note starts at kOscModRange.note_min and harm ends at .harmonics_max,
     // which keeps self-feedback's no-clamp condition (harmonics*200 <
-    // carrier_hz) true throughout, so the 1Hz floor should never engage.
+    // carrier_hz) true throughout. Ratio-mode FM is phase modulation and never
+    // touches freq, so nothing else can reach the floor: instrumenting
+    // OscCore counted 0 clamps in 19,891,980 swept samples.
     for (float note = kOscModRange.note_min; note <= 96.0f; note += 8.0f)
     for (float harm = 0.0f; harm <= kOscModRange.harmonics_max; harm += kOscModRange.harmonics_max / 2.0f)
     for (float timb = 0.0f; timb <= 1.0f; timb += 0.5f)
