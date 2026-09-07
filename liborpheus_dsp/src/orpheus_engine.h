@@ -881,6 +881,9 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_track_bar_strategy[8]{};  // BarStrategy enum (0-4)
     std::atomic<int>   pulsar_track_evo_rhythmic[8]{};
     std::atomic<int>   pulsar_step_count{16};           // 16, 32, or 64
+    // Authored lift for load_vibe's opening pattern only (0 = unset). Combined with
+    // the track's engine floor via max() -- see Vibe.openingNoteFloor.
+    std::atomic<int>   pulsar_opening_note_floor{0};
 
     // Per-track macro maps (set by Kotlin on vibe load)
     // 8 targets × 2 (min/max) = 16 floats per track

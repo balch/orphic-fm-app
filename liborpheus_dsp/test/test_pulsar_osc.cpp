@@ -313,6 +313,133 @@ static bool test_pulsar_osc_note_floor_reaches_the_generator() {
     return ok;
 }
 
+// Shared fixture for the opening_note_floor tests below: bass (track 3) on a real
+// engine (not OSC), a note range wide enough to expose a floor, and density_override
+// so a single bar carries a spread of notes to inspect.
+static void setup_opening_floor_fixture(OrpheusEngine* engine, int engine_index) {
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    pin_pulsar_rngs(engine);
+    engine->pulsar_track_engine_edm[3].store(engine_index, std::memory_order_relaxed);
+    engine->pulsar_track_engine_space[3].store(engine_index, std::memory_order_relaxed);
+    engine->pulsar_track_note_range_low[3].store(24, std::memory_order_relaxed);
+    engine->pulsar_track_note_range_high[3].store(56, std::memory_order_relaxed);
+    engine->pulsar_track_density_override[3].store(0.8f, std::memory_order_relaxed);
+    engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
+}
+
+static int lowest_gated_note(OrpheusEngine* engine, int track, int* gated_out) {
+    const PulsarTrackState& ts = engine->pulsar_state->tracks[track];
+    int min_note = 128, gated = 0;
+    for (int s = 0; s < ts.step_count; s++) {
+        if (!ts.steps[s].gate) continue;
+        gated++;
+        if (ts.steps[s].note < min_note) min_note = ts.steps[s].note;
+    }
+    *gated_out = gated;
+    return min_note;
+}
+
+// FireSky's actual scenario: WSH (engine 9, note_min 0) with an authored
+// opening_note_floor of 33 (PD's floor) must lift the FIRST generated pattern to 33+,
+// even though WSH's own floor would allow notes all the way down.
+static bool test_pulsar_opening_note_floor_lifts_the_first_pattern() {
+    printf("\n=== Test: opening_note_floor lifts load_vibe's first pattern above the engine floor ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_opening_floor_fixture(engine, 9);  // WSH, note_min 0
+    // Widen the range down past the opening floor -- otherwise the note range alone
+    // (24-56) never asks the generator for anything below 33 and the assertion below
+    // would pass whether or not the lift actually ran (bass_root centers on the
+    // range midpoint, so this also has to clear an octave-bucket boundary, not just
+    // lower the nominal minimum).
+    engine->pulsar_track_note_range_low[3].store(4, std::memory_order_relaxed);
+    engine->pulsar_opening_note_floor.store(33, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+
+    int gated = 0;
+    int min_note = lowest_gated_note(engine, 3, &gated);
+    printf("  engine=WSH(floor 0), opening_note_floor=33, %d gated steps, lowest note=%d\n", gated, min_note);
+
+    bool ok = (gated > 0) && (min_note >= 33);
+    printf("Opening note floor lifts the first pattern: %s\n", ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+// Same fixture generated twice: once with opening_note_floor left at its default
+// (0/unset) and once with it explicitly stored as 0. max(floor, 0) == floor whenever
+// floor >= 0 (true for every engine table entry), so the two must be byte-identical --
+// proving 0 is a true no-op rather than a floor of its own, which is what every other
+// vibe relies on (none of them set this field).
+static bool test_pulsar_opening_note_floor_unset_matches_explicit_zero() {
+    printf("\n=== Test: opening_note_floor unset generates identically to an explicit 0 ===\n");
+
+    OrpheusEngine* engine_default = orpheus_engine_create(48000.0f);
+    GraphUnit unit_default;
+    make_osc_unit(unit_default);
+    setup_opening_floor_fixture(engine_default, 9);  // WSH, note_min 0
+    // pulsar_opening_note_floor left at its default-constructed 0 -- no store.
+    trigger_vibe_load(engine_default);
+    unit_process_pulsar(&unit_default, engine_default, kBlockFrames, 48000.0f);
+
+    OrpheusEngine* engine_explicit = orpheus_engine_create(48000.0f);
+    GraphUnit unit_explicit;
+    make_osc_unit(unit_explicit);
+    setup_opening_floor_fixture(engine_explicit, 9);  // WSH, note_min 0
+    engine_explicit->pulsar_opening_note_floor.store(0, std::memory_order_relaxed);
+    trigger_vibe_load(engine_explicit);
+    unit_process_pulsar(&unit_explicit, engine_explicit, kBlockFrames, 48000.0f);
+
+    const PulsarTrackState& ts_default = engine_default->pulsar_state->tracks[3];
+    const PulsarTrackState& ts_explicit = engine_explicit->pulsar_state->tracks[3];
+    bool identical = ts_default.step_count == ts_explicit.step_count;
+    int gated = 0;
+    for (int s = 0; identical && s < ts_default.step_count; s++) {
+        if (ts_default.steps[s].gate != ts_explicit.steps[s].gate ||
+            ts_default.steps[s].note != ts_explicit.steps[s].note) {
+            identical = false;
+        }
+        if (ts_default.steps[s].gate) gated++;
+    }
+    printf("  engine=WSH(floor 0), %d gated steps, unset-vs-explicit-0 identical=%s\n",
+           gated, identical ? "yes" : "no");
+
+    bool ok = (gated > 0) && identical;
+    printf("Unset opening_note_floor matches explicit 0: %s\n", ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine_default);
+    orpheus_engine_destroy(engine_explicit);
+    return ok;
+}
+
+// An authored floor below the engine's own floor must never win -- max(), never a
+// replacement. VA (engine 8) floors at 40; an opening_note_floor of 20 must not pull
+// generation down below 40.
+static bool test_pulsar_opening_note_floor_never_lowers_the_engine_floor() {
+    printf("\n=== Test: opening_note_floor below the engine floor never lowers it ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_opening_floor_fixture(engine, 8);  // VA, note_min 40
+    engine->pulsar_opening_note_floor.store(20, std::memory_order_relaxed);  // below VA's 40
+
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+
+    int gated = 0;
+    int min_note = lowest_gated_note(engine, 3, &gated);
+    printf("  engine=VA(floor 40), opening_note_floor=20, %d gated steps, lowest note=%d\n", gated, min_note);
+
+    bool ok = (gated > 0) && (min_note >= 40);
+    printf("Opening floor below the engine floor never lowers it: %s\n", ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_osc_tests() {
     printf("\n=== Pulsar OSC Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -320,5 +447,8 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_osc_respects_trigger_offset()) suite_pass++; else suite_fail++;
     if (test_pulsar_osc_renders_the_whole_block()) suite_pass++; else suite_fail++;
     if (test_pulsar_osc_note_floor_reaches_the_generator()) suite_pass++; else suite_fail++;
+    if (test_pulsar_opening_note_floor_lifts_the_first_pattern()) suite_pass++; else suite_fail++;
+    if (test_pulsar_opening_note_floor_unset_matches_explicit_zero()) suite_pass++; else suite_fail++;
+    if (test_pulsar_opening_note_floor_never_lowers_the_engine_floor()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -737,6 +737,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_lick_octave.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "step_count") == 0)
             engine->pulsar_step_count.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "opening_note_floor") == 0)
+            engine->pulsar_opening_note_floor.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "lick_loop_length") == 0)
             engine->pulsar_lick_loop_length.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "lick_length") == 0)

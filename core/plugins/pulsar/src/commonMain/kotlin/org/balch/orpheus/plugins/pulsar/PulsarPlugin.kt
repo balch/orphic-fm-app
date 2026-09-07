@@ -86,6 +86,7 @@ class PulsarPlugin : DspPlugin {
     private var _trackRole = IntArray(8) { if (it < 3) 0 else 1 }
     private val _trackBarStrategy = IntArray(8) { 0 }
     private var _stepCount = 16
+    private var _openingNoteFloor = 0
     private var _trackMacro = FloatArray(8 * PulsarSymbol.TRACK_MACRO_STRIDE) { 0.5f }
     private var _genreDensity = floatArrayOf(0.5f, 0.35f, 0.8f, 0.4f, 0.3f, 0.2f, 0.15f, 0.08f)
     private var _genreSwing = 0.02f
@@ -379,6 +380,12 @@ class PulsarPlugin : DspPlugin {
         }
         controlPort(PulsarSymbol.STEP_COUNT) {
             intType { default = _stepCount; get { _stepCount }; set { _stepCount = it } }
+        }
+        // Declared (not just routed) so an engine recreate — DesktopEngine::open, an
+        // Android route change — replays it via syncNativeBridgeState instead of
+        // silently dropping back to 0. See commit 604eb9254 for the OSC FM ports hole.
+        controlPort(PulsarSymbol.OPENING_NOTE_FLOOR) {
+            intType { default = _openingNoteFloor; get { _openingNoteFloor }; set { _openingNoteFloor = it } }
         }
 
         // Per-track macro maps (TRACK_MACRO_STRIDE entries per track: 7 targets × min/max)

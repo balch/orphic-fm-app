@@ -168,6 +168,10 @@ class FireSkyVibe : VibeProvider {
                 LickAnomaly(lick = ogLick, chance = 0.005f),
             ),
             stepCount = 32,
+            // PD's note_min (engine_note_floor) — the register the bass opened in when a
+            // load-order bug had it inherit the previously-loaded vibe's floor. Kept as an
+            // authored opening gesture; it decays after bar 1 as the vibe mutates.
+            openingNoteFloor = 33,
         )
     }
 }

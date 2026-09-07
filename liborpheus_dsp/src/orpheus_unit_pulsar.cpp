@@ -1511,6 +1511,13 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             int nr_low = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
             int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
             int eng_note_min = engine_note_floor(ts.engine_index);
+            // Opening-only lift (e.g. FireSky borrowing BellTolls' PD floor): max(), never a
+            // replacement, so it can raise this load's pattern but never play below what the
+            // engine itself tolerates. apply_section_densities and the deja-vu reset do NOT
+            // apply this -- they keep the engine floor alone, which is what lets the lift decay
+            // as the vibe mutates instead of acting as a permanent transpose.
+            int opening_floor = engine->pulsar_opening_note_floor.load(std::memory_order_relaxed);
+            if (opening_floor > eng_note_min) eng_note_min = opening_floor;
             generate_track_pattern(ts, t, (role == TrackRole::PERCUSSIVE), genre,
                                    static_cast<uint8_t>(root), scale, bar1_len, base_seed,
                                    0, hold_prob, hold_min, hold_max,

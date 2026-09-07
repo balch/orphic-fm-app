@@ -112,6 +112,11 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param deep Starting depth 0-1. Controls wet/dry mix for vibe effects (delay + reverb).
  * @param stepCount Steps per pattern. 16 = standard, 32 = double-length phrases,
  *   64 = quad-length phrases (max).
+ * @param openingNoteFloor Optional floor for the load-time generated pattern only, combined
+ *   with the track's engine floor via `max()` so it can raise a track's opening notes but
+ *   never lower them below what the engine plays cleanly. Every later regeneration (section
+ *   changes, deja-vu resets) reads the engine floor alone, so the lift decays as the vibe
+ *   evolves — an opening gesture, not a permanent transpose. Null = no lift.
  * @param tension Build-and-release arc configuration.
  * @param arrangement Optional section-based structure (verse, chorus, solo, etc.)
  * @param effects Delay and reverb tuning for this vibe.
@@ -149,6 +154,7 @@ data class Vibe(
     val mood: Float = 0.5f,
     val deep: Float = 0.5f,
     val stepCount: Int = 16,
+    val openingNoteFloor: Int? = null,
     val tension: TensionProfile = TensionProfile(),
     val arrangement: Arrangement? = null,
     val progressionAnchor: ProgressionAnchor = ProgressionAnchor.EVERY_4,
@@ -160,6 +166,9 @@ data class Vibe(
     init {
         require(tracks.size == 8) {
             "Vibe requires exactly 8 tracks, got ${tracks.size}"
+        }
+        require(openingNoteFloor == null || openingNoteFloor in 0..127) {
+            "openingNoteFloor must be 0-127 (MIDI note range), got $openingNoteFloor"
         }
         // The Anomaly Engine only arms while a section graph is active — a declared anomaly on
         // an arrangement-less vibe would flash the manual-trigger tint but never fire.

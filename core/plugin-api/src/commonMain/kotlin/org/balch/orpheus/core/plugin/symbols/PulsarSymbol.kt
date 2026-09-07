@@ -230,6 +230,10 @@ enum class PulsarSymbol(
     // Vibe step count
     STEP_COUNT("step_count"),
 
+    // Vibe-level opening note floor: authored lift for the load-time generated
+    // pattern only (0 = unset). See Vibe.openingNoteFloor.
+    OPENING_NOTE_FLOOR("opening_note_floor"),
+
     // Per-track macro maps: ENERGY_VOL (16 entries per track × 8 tracks = 128)
     TRACK_0_MACRO_ENERGY_VOL_MIN("track_0_macro_energy_vol_min"),
     TRACK_0_MACRO_ENERGY_VOL_MAX("track_0_macro_energy_vol_max"),

@@ -547,6 +547,7 @@ class PulsarViewModel(
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ.ordinal + i].controlId)
     }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
+    private val openingNoteFloorId = synthController.controlFlow(PulsarSymbol.OPENING_NOTE_FLOOR.controlId)
     private val trackMacroIds = (0..7).map { t ->
         (0 until PulsarSymbol.TRACK_MACRO_STRIDE).map { m ->
             synthController.controlFlow(
@@ -1389,6 +1390,8 @@ class PulsarViewModel(
             }
         }
         stepCountId.value = IntValue(vibe.stepCount)
+        // 0 = no opening floor; the port carries a number, so null can't cross it directly.
+        openingNoteFloorId.value = IntValue(vibe.openingNoteFloor ?: 0)
         pushEffectiveSends(deepId.value.asFloat())
 
         // Push vibe-defined effect params to dedicated Pulsar delay/reverb
