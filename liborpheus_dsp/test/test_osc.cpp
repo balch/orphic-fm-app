@@ -272,18 +272,26 @@ static bool test_all_settings_sweep_is_finite() {
     printf("\n=== Test: full parameter sweep stays finite and bounded ===\n");
     bool ok = true;
     int checked = 0;
+    static float out[8192];
     for (float note = 24.0f; note <= 96.0f; note += 12.0f)
     for (float harm = 0.0f; harm <= 0.65f; harm += 0.325f)
     for (float timb = 0.0f; timb <= 1.0f; timb += 0.5f)
     for (float morph = 0.0f; morph <= 1.0f; morph += 0.5f)
     for (float ratio = 0.0f; ratio <= 8.0f; ratio += 2.0f)
     for (float shape = 0.0f; shape <= 1.0f; shape += 0.5f) {
+        // DC only means anything over whole carrier periods. At note 24 one
+        // period is ~1468 samples, so a fixed 512-sample window reads a
+        // fragment of a cycle as offset even on a clean oscillator.
+        const float carrier_hz = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
+        int n = static_cast<int>(4.0f * 48000.0f / carrier_hz);
+        if (n < 512) n = 512;
+        if (n > 8192) n = 8192;
+
         PulsarOscState st;
-        float out[512];
         osc::process_osc_block(st, note, harm, timb, morph,
-                               ratio, shape, 0.0f, 1, 48000.0f, out, 512);
+                               ratio, shape, 0.0f, 1, 48000.0f, out, n);
         double sum = 0.0;
-        for (int i = 0; i < 512; i++) {
+        for (int i = 0; i < n; i++) {
             if (!std::isfinite(out[i]) || std::fabs(out[i]) > 1.0f) {
                 printf("  BAD note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f -> %.4f\n",
                        note, harm, timb, morph, ratio, shape, out[i]);
@@ -292,10 +300,9 @@ static bool test_all_settings_sweep_is_finite() {
             }
             sum += out[i];
         }
-        // DC offset guard: the oscillator is bipolar and should average near zero.
-        if (std::fabs(sum / 512.0) > 0.35) {
-            printf("  DC note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f -> %.4f\n",
-                   note, harm, timb, morph, ratio, shape, sum / 512.0);
+        if (std::fabs(sum / n) > 0.35) {
+            printf("  DC note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f n=%d -> %.4f\n",
+                   note, harm, timb, morph, ratio, shape, n, sum / n);
             ok = false;
         }
         checked++;
