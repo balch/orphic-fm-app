@@ -1307,6 +1307,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
 
+        // Must land before any generation work below reads it (e.g. via
+        // engine_note_floor) -- otherwise the floor comes from whichever engine
+        // the track played last vibe, not the one this load is switching to.
+        ts.engine_index = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+
         // Read per-track voice config from atomics
         ts.volume = engine->pulsar_track_volume[t].load(std::memory_order_relaxed);
         ts.pan = engine->pulsar_track_pan[t].load(std::memory_order_relaxed);
@@ -1528,8 +1533,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                    ch.loop_length);
             }
         }
-
-        ts.engine_index = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
 
         // Reset state
         ts.playhead = 0;

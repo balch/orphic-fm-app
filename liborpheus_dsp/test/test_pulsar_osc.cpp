@@ -265,16 +265,16 @@ static bool test_pulsar_osc_renders_the_whole_block() {
     return ok;
 }
 
-// The pattern generator has to hear OSC's note_min too. When it does not, it
-// writes below the floor and the render-time clamp folds the note up an octave
-// while the step grid and viz still show the pitch the generator wrote.
+// The pattern generator has to hear OSC's note_min on the vibe's FIRST load, not
+// just from a second load onward. ts.engine_index defaults to 0 (VCF, floor 30)
+// until load_vibe refreshes it from the atomics; if generation reads the field
+// before that refresh, it floors against whatever engine happened to occupy the
+// track before (VCF's 30) instead of the vibe actually being loaded (OSC's 40).
 //
-// Track 3 (BASS) with a 24..56 note range lands on 38 when the floor is missing.
-// The reload is deliberate: load_vibe generates the pattern before it refreshes
-// ts.engine_index from the atomics, so the OSC index is only in place from the
-// second load on.
+// Track 3 (BASS) with a 24..56 note range exercises this: the pinned seed drives
+// enough gated steps that a wrong (lower) floor lets a note through under it.
 static bool test_pulsar_osc_note_floor_reaches_the_generator() {
-    printf("\n=== Test: the pattern generator gets OSC's note floor ===\n");
+    printf("\n=== Test: the pattern generator gets OSC's note floor on the first load ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
 
     GraphUnit unit;
@@ -292,8 +292,8 @@ static bool test_pulsar_osc_note_floor_reaches_the_generator() {
     engine->pulsar_track_density_override[3].store(0.8f, std::memory_order_relaxed);
     engine->clock_bpm.store(128.0f, std::memory_order_relaxed);
 
-    trigger_vibe_load(engine);
-    for (int i = 0; i < 4; i++) unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+    // Single load, single block: state doesn't exist yet, so this is the engine's
+    // lazy-init path, which calls load_vibe exactly once. No warm-up reload.
     trigger_vibe_load(engine);
     unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
 
@@ -308,7 +308,7 @@ static bool test_pulsar_osc_note_floor_reaches_the_generator() {
            ts3.engine_index, gated, min_note, kOscModRange.note_min);
 
     bool ok = (gated > 0) && (min_note >= kOscModRange.note_min);
-    printf("Generator note floor: %s\n", ok ? "PASS" : "FAIL");
+    printf("Generator note floor on first load: %s\n", ok ? "PASS" : "FAIL");
     orpheus_engine_destroy(engine);
     return ok;
 }
