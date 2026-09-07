@@ -17,6 +17,7 @@ import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
+import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.models.ProgressionStyle
@@ -25,6 +26,7 @@ import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionTransition
+import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
@@ -160,6 +162,12 @@ class ModPioneerVibe : VibeProvider {
                         engineEdm = bass,
                         engineSpace = bass,
                         role = TrackRole.Melodic(chordFollow = ChordFollow.FOLLOW),
+                        // OSC clamps harmonics at kOscModRange.harmonics_max = 0.35, so the
+                        // stock 0.3-0.6 range left 83% of the mood knob's feedback travel dead.
+                        // MELODIC also widens moodTimbre to 0.4-0.8 for the tri/square blend.
+                        macroMap = TrackMacroMap.MELODIC.copy(
+                            moodHarmonics = MacroTarget(0.15f, 0.35f),
+                        ),
                         density = 0.45f,
                         barStrategy = BarStrategy.REPEAT,
                     )
