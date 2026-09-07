@@ -272,12 +272,21 @@ static bool test_load_clears_carried_phase_inversion() {
     return cleared;
 }
 
-// ── Test 6: a load while stopped defers the downbeat to the first play block ─
-// The `mix <= 0.001f || !playing` early return sits ABOVE the generation check,
-// so a vibe swapped while stopped does not load at all — the OLD window stays
-// live until playback opens, and only then does the new one engage.
+// ── Test 6: a load while stopped is CONSUMED immediately, downbeat still on play ─
+// The generation check sits ABOVE the `mix <= 0.001f || !playing` early return, so a
+// vibe swapped while stopped loads on that block rather than waiting for playback.
+//
+// This ordering is a correctness requirement, not a preference. The boot sequence
+// always leaves a generation pending (the first audio block runs load_vibe before the
+// graph-ready re-apply has pushed the real vibe), and that pending bump is the engine's
+// only chance to replace the torn snapshot. Deferring it behind playback stranded the
+// correction: until Play in the DJ app, and in Orpheus — where the ViewModel forces mix
+// to 0 on every vibe load — until the MIX knob crossed 0.001, which could be never.
+//
+// What must NOT change is the downbeat guarantee: however early the vibe loads, the
+// first audible block still opens on step 0 (the start-hold pins the timeline).
 static bool test_stopped_load_fires_downbeat_on_play() {
-    printf("\n=== Test: load while stopped fires the downbeat when play opens ===\n");
+    printf("\n=== Test: load while stopped is consumed at once, downbeat still on play ===\n");
     OrpheusEngine* engine = make_start_engine(setup_fixture_dense_fast);  // 16-step
     GraphUnit unit = make_start_unit();
 
@@ -298,10 +307,17 @@ static bool test_stopped_load_fires_downbeat_on_play() {
     trigger_vibe_load(engine);
     for (int b = 0; b < 3; b++) unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
 
-    bool held = state->tracks[0].wrap_len == 16 && state->tracks[0].playhead == parked;
-    printf("  while stopped: wrap_len=%d playhead=%d (want 16, %d — old vibe frozen) -- %s\n",
-           state->tracks[0].wrap_len, state->tracks[0].playhead, parked,
-           held ? "PASS" : "FAIL");
+    // The pending generation must be consumed while stopped — that is the whole point of
+    // hoisting the check. load_vibe stamps current_vibe_generation, so a match proves the
+    // load ran; the old 16-step window and its parked playhead are gone with it. (wrap_len
+    // reads 0 here rather than 32: load_vibe resets it and only a processed block recomputes
+    // it, and the block returned at the mute gate right after loading.)
+    int pending = engine->pulsar_vibe_generation.load(std::memory_order_relaxed);
+    bool consumed = state->current_vibe_generation == pending &&
+                    state->tracks[0].playhead == 0;
+    printf("  while stopped: current_gen=%d (want %d) playhead=%d (want 0) -- %s\n",
+           state->current_vibe_generation, pending, state->tracks[0].playhead,
+           consumed ? "PASS" : "FAIL");
 
     engine->pulsar_playing.store(1, std::memory_order_relaxed);
     unit_process_pulsar(&unit, engine, kObserveBlock, kSampleRate);
@@ -310,7 +326,7 @@ static bool test_stopped_load_fires_downbeat_on_play() {
            state->tracks[0].wrap_len, state->tracks[0].playhead, fired ? "PASS" : "FAIL");
 
     orpheus_engine_destroy(engine);
-    return precondition && held && fired;
+    return precondition && consumed && fired;
 }
 
 // ── Test 7: a load during a band solo is not ducked by the old solo ────────

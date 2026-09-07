@@ -168,9 +168,6 @@ class PulsarPlugin : DspPlugin {
         controlPort(PulsarSymbol.PLAYING) {
             intType { default = 0; get { _playing }; set { _playing = it } }
         }
-        controlPort(PulsarSymbol.VIBE_GENERATION) {
-            intType { default = 0; get { _vibeGeneration }; set { _vibeGeneration = it } }
-        }
         controlPort(PulsarSymbol.ANOMALY_REQUEST) {
             intType { default = 0; get { _anomalyRequest }; set { _anomalyRequest = it } }
         }
@@ -718,11 +715,24 @@ class PulsarPlugin : DspPlugin {
                     get { _trackLpgColour[t] }; set { _trackLpgColour[t] = it } }
             }
         }
-        // Declared LAST so every existing port keeps its index. A score host writes this before
-        // audio boots, and only declared+stored ports survive the engine recreation in
-        // DesktopEngine::open -- syncNativeBridgeState's generic loop is what re-pushes it.
+        // A score host writes this before audio boots, and only declared+stored ports survive
+        // the engine recreation in DesktopEngine::open -- syncNativeBridgeState's generic loop
+        // is what re-pushes it.
         controlPort(PulsarSymbol.SCORE_FREE_RUN) {
             intType { default = 0; get { _scoreFreeRun }; set { _scoreFreeRun = it } }
+        }
+        // vibe_generation is the release fence for EVERY port above, so it is declared LAST.
+        // applyVibe already writes it last, pairing with the acquire load in
+        // unit_process_pulsar. But syncNativeBridgeState does not replay applyVibe's write
+        // order -- it walks plugin.ports and pushes in DECLARATION order. Declared early (it
+        // used to be port 1 of 933), the fence reached C++ before the 931 track/lick/arrangement
+        // ports it fences, and an audio block landing inside that window ran load_vibe against a
+        // torn snapshot: the new generation with the previous vibe's data. load_vibe stamps
+        // current_vibe_generation, so the mismatch that would trigger a corrective reload was
+        // gone and the stale patterns played for the rest of the session.
+        // Same data-before-fence contract the lick buffer documents above; keep it last.
+        controlPort(PulsarSymbol.VIBE_GENERATION) {
+            intType { default = 0; get { _vibeGeneration }; set { _vibeGeneration = it } }
         }
     }
 

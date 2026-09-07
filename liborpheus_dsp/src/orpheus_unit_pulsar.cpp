@@ -2458,6 +2458,25 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->initialized = true;
     }
 
+    // ── Handle vibe change ──
+    // PT-1: acquire load pairs with the release store in engine_routing.cpp so
+    // the full param snapshot (per-track/tension/genre/band atomics written
+    // before the Kotlin generation bump) is coherent before load_vibe reads it.
+    //
+    // ABOVE the playing/mix gate below, deliberately. A pending generation is the
+    // engine's only chance to correct a lazy-init load that consumed a torn or
+    // pre-graph-load snapshot, and the boot sequence always leaves one pending: the
+    // first audio block runs before the graph-ready re-apply. Gated behind playback,
+    // that correction waited for the user -- until Play in the DJ app, and in Orpheus
+    // (MIX_GATED, where the ViewModel forces mix to 0 on every vibe load) until the
+    // MIX knob crossed 0.001, which could be never. Loading a vibe while silent costs
+    // one pattern regeneration and no audio; the start-hold below still pins the
+    // downbeat to step 0, so the injected boundary is not spent here.
+    int vibe_gen = engine->pulsar_vibe_generation.load(std::memory_order_acquire);
+    if (vibe_gen != state->current_vibe_generation) {
+        load_vibe(state, vibe_gen, engine);
+    }
+
     // ── Check playing state ──
     bool playing = engine->pulsar_playing.load(std::memory_order_relaxed) != 0;
     float mix = engine->pulsar_mix.load(std::memory_order_relaxed);
@@ -2490,15 +2509,6 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // audio gap regardless. The old master-bus wah counted down through a pause because
         // it lived downstream of this return, not because anything wanted it to.
         return;
-    }
-
-    // ── Handle vibe change ──
-    // PT-1: acquire load pairs with the release store in engine_routing.cpp so
-    // the full param snapshot (per-track/tension/genre/band atomics written
-    // before the Kotlin generation bump) is coherent before load_vibe reads it.
-    int vibe_gen = engine->pulsar_vibe_generation.load(std::memory_order_acquire);
-    if (vibe_gen != state->current_vibe_generation) {
-        load_vibe(state, vibe_gen, engine);
     }
 
     // ── Re-quantize melodic notes when root/scale changes live ──
@@ -2831,9 +2841,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // mix is a straight linear gain (output_gain = mix * kPulsarOutputGain), so
     // the mute point above is about -60dB. In MIX_GATED (Orpheus) the ViewModel
     // forces mix to 0 on every vibe load and the user dials it back up, and the
-    // `mix <= 0.001f` return sits ABOVE the generation check -- so load_vibe
-    // first ran, and the downbeat was spent, on the block where the knob crossed
-    // 0.001. The whole point of the injected boundary was lost there.
+    // load_vibe now runs while still muted (the generation check was hoisted above
+    // the `mix <= 0.001f` return, so a pending vibe lands promptly instead of waiting
+    // on the knob) -- which means the downbeat would otherwise be spent silently,
+    // before the knob crosses 0.001. The injected boundary must survive that.
     //
     // Holding the TIMELINE (not just the boundary) is what keeps the downbeat on
     // step 0: gating the boundary alone would let natural boundaries advance the
