@@ -4,6 +4,7 @@
 #include "pulsar_transition_fx.h"
 #include "orpheus_voice.h"
 #include "orpheus_unit_chaos.h"
+#include "pulsar_osc.h"
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
 #include "orpheus_wah_core.h"
@@ -242,6 +243,12 @@ struct PulsarTrackState {
     // [kChaosEngineMin, kChaosEngineMax]. Default-initialized to the canonical
     // seed (x=0.1, y=0, z=0) so the first block evolves into the attractor.
     ChaosVoiceState chaos_state;
+    // Per-track OSC oscillator and modulator phase. Used when engine_index < 0.
+    PulsarOscState osc_state;
+    // FM params resolved per block from the active engine slot.
+    float fm_ratio = 0.0f;
+    float fm_shape = 0.0f;
+    float fm_free_hz = 0.0f;
     PulsarStep steps[kMaxPulsarSteps];
     int step_count;
     int playhead;

@@ -3019,6 +3019,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.harmonics_modulation   = PULSAR_PICK(harmonics_modulation);
             ts.harmonics_macro_source = PULSAR_PICK(harmonics_macro_source);
             ts.harmonics_macro_range  = PULSAR_PICK(harmonics_macro_range);
+            ts.fm_ratio   = PULSAR_PICK(fm_ratio);
+            ts.fm_shape   = PULSAR_PICK(fm_shape);
+            ts.fm_free_hz = PULSAR_PICK(fm_free_hz);
         }
 
         // ── Apply macro modulation ──

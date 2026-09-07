@@ -774,6 +774,18 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_morph[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "morph_space") == 0)
                 engine->pulsar_track_morph_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_ratio") == 0)
+                engine->pulsar_track_fm_ratio[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_ratio_space") == 0)
+                engine->pulsar_track_fm_ratio_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_shape") == 0)
+                engine->pulsar_track_fm_shape[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_shape_space") == 0)
+                engine->pulsar_track_fm_shape_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_free_hz") == 0)
+                engine->pulsar_track_fm_free_hz[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_free_hz_space") == 0)
+                engine->pulsar_track_fm_free_hz_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics") == 0)
                 engine->pulsar_track_pin_harmonics[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics_space") == 0)

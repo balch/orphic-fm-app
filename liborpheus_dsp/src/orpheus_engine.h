@@ -834,6 +834,14 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_timbre_space[8]{};
     std::atomic<float> pulsar_track_morph[8]{};
     std::atomic<float> pulsar_track_morph_space[8]{};
+    // OSC FM modulator, per track, per engine slot. Read by the engine_index < 0
+    // branch in unit_process_pulsar; ignored by every other engine.
+    std::atomic<float> pulsar_track_fm_ratio[8]{};
+    std::atomic<float> pulsar_track_fm_ratio_space[8]{};
+    std::atomic<float> pulsar_track_fm_shape[8]{};
+    std::atomic<float> pulsar_track_fm_shape_space[8]{};
+    std::atomic<float> pulsar_track_fm_free_hz[8]{};
+    std::atomic<float> pulsar_track_fm_free_hz_space[8]{};
     // Per-track pin flags (one per param per slot). 0 = not pinned (default,
     // current macroMap-driven behavior); non-zero = use ts.harmonics/timbre/morph
     // verbatim, bypassing macros/evolution/accent/LFO. See orpheus_unit_pulsar.cpp.
