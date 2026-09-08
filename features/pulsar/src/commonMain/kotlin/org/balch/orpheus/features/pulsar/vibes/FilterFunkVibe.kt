@@ -333,7 +333,9 @@ class FilterFunkVibe : VibeProvider {
                                 style = CompingStyle.FUNK_STABS,
                                 arpMode = ArpMode.AUTO,
                                 arpSpeed = 0.1f,
-                                arpDirection = ArpDirection.UP_DOWN,
+                                // Pinned to UP: ear-tuned back when UP_DOWN was a
+                                // synonym for UP, so UP is the shipped sound.
+                                arpDirection = ArpDirection.UP,
                                 sectionInversion = SectionInversion.SECOND_INVERSION,
                                 humanization = CompingHumanization(
                                     dropProbability = .1f,

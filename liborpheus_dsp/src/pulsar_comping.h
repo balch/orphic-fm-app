@@ -18,6 +18,33 @@ inline bool engine_has_native_chord(int engine_id) {
     return engine_id == 14;
 }
 
+// A track's playable register: per-track range, else the genre's, else a final fallback.
+// Both the fills and the humanizer bound their pitches with this, so it lives in one place
+// rather than being re-derived at each call site.
+struct NoteRange { uint8_t lo; uint8_t hi; };
+
+inline NoteRange resolve_note_range(int track_low, int track_high,
+                                    int genre_low, int genre_high) {
+    int lo = track_low  > 0 ? track_low  : genre_low;
+    int hi = track_high > 0 ? track_high : genre_high;
+    if (lo <= 0) lo = 48;
+    if (hi <= 0) hi = 72;
+    if (hi < lo) hi = lo;
+    NoteRange r;
+    r.lo = static_cast<uint8_t>(lo);
+    r.hi = static_cast<uint8_t>(hi);
+    return r;
+}
+
+// UP_DOWN cannot be expressed inside a single stab: up-down over n notes has
+// 2n-2 positions, and the arp voicing is 2 notes (root + 3rd), so it collapses
+// to plain UP. Resolve it across stabs instead — successive stabs mirror each
+// other (root->3rd, then 3rd->root). Callers flip `down_phase` per retrigger.
+inline ArpDirectionId resolve_arp_direction(ArpDirectionId dir, bool down_phase) {
+    if (dir != ArpDirectionId::UP_DOWN) return dir;
+    return down_phase ? ArpDirectionId::DOWN : ArpDirectionId::UP;
+}
+
 // Compute chord tones (root, 3rd, 5th, 7th) in MIDI space from root MIDI + scale.
 // Applies inversion (rotation + octave shift) before direction ordering.
 // Writes up to 4 notes ordered by arp direction; returns count.
@@ -83,7 +110,9 @@ inline int compute_chord_tones(
             for (int i = 0; i < voicing_count; i++) out_notes[i] = static_cast<uint8_t>(raw[voicing_count - 1 - i]);
             break;
         case ArpDirectionId::UP_DOWN:
-            // simple: same as UP for now (up-down needs more slots than we have)
+            // Callers resolve UP_DOWN to UP or DOWN per stab via
+            // resolve_arp_direction(); reaching here means an unresolved value,
+            // so fall back to UP rather than inventing an ordering.
             for (int i = 0; i < voicing_count; i++) out_notes[i] = static_cast<uint8_t>(raw[i]);
             break;
         case ArpDirectionId::RANDOM: {
@@ -520,13 +549,23 @@ inline void apply_fill_drop_out(
 // All probabilities scaled by complexity (0-1).
 // First active step is anchor-protected from drops and octave jumps.
 // Deterministic from seed.
+// note_range_low/high bound every pitch this writes. The octave jump and the extension
+// rewrite pitch, so without the range they can push a voice out of its authored register —
+// a -12 on a pad drops it under the bass. The fill helpers already take the same pair.
 inline void apply_humanization(
     PulsarStep* steps, int step_count,
     float drop_prob, float ghost_prob,
     float oct_jump_prob, float ext_prob,
+    uint8_t note_range_low, uint8_t note_range_high,
     float complexity, uint32_t seed)
 {
     if (complexity <= 0.0f) return;
+
+    // Degenerate ranges would otherwise reject every candidate and silently disable
+    // pitch humanization; fall back to the full MIDI span rather than doing nothing.
+    int lo = static_cast<int>(note_range_low);
+    int hi = static_cast<int>(note_range_high);
+    if (hi <= lo) { lo = 0; hi = 127; }
 
     // Find anchor (first non-hold active step)
     int anchor = -1;
@@ -565,20 +604,26 @@ inline void apply_humanization(
                 continue;
             }
 
-            // Octave jump
+            // Octave jump. When the drawn direction would leave the register, try the
+            // other one — a note near the top of the range jumps down rather than out.
+            // If the range is narrower than an octave neither fits, so the note stands.
             if (eff_oct > 0.0f && next_rand() < eff_oct) {
                 int shift = (next_rand() < 0.5f) ? 12 : -12;
-                int nn = static_cast<int>(steps[i].note) + shift;
-                if (nn >= 0 && nn <= 127) {
+                int base = static_cast<int>(steps[i].note);
+                int nn = base + shift;
+                if (nn < lo || nn > hi) nn = base - shift;
+                if (nn >= lo && nn <= hi) {
                     steps[i].note = static_cast<uint8_t>(nn);
                 }
             }
 
-            // Extension (add 9th ~2 semis or 11th ~5 semis flavor)
+            // Extension (add 9th ~2 semis or 11th ~5 semis flavor). Skipped rather than
+            // folded when it would overshoot: folding an octave down would move the
+            // register, which is the opposite of what an extension is for.
             if (eff_ext > 0.0f && next_rand() < eff_ext) {
                 int shift = (next_rand() < 0.5f) ? 2 : 5;
                 int nn = static_cast<int>(steps[i].note) + shift;
-                if (nn >= 0 && nn <= 127) {
+                if (nn >= lo && nn <= hi) {
                     steps[i].note = static_cast<uint8_t>(nn);
                 }
             }

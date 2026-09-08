@@ -666,15 +666,14 @@ public class BricklayerSLamentVibe : VibeProvider {
             role = TrackRole.Chordal(
               comping = ChordComping(
                 style = CompingStyle.PAD,
-                arpMode = ArpMode.AUTO,
-                arpSpeed = 0.2f,
-                arpDirection = ArpDirection.UP,
-                sectionInversion = SectionInversion.FOLLOW_STYLE,
+                // Root-only texture bed — sustained, not rolled. AUTO would arpeggiate
+                // it (PAR is not CHD), which is the wrong gesture for a drone pad.
+                arpMode = ArpMode.NEVER,
                 humanization = CompingHumanization(
-                  dropProbability = 0.0f,
-                  ghostProbability = 0.0f,
-                  octaveJumpProbability = 0.0f,
-                  extensionProbability = 0.0f,
+                  dropProbability = 0.12f,
+                  ghostProbability = 0.10f,
+                  octaveJumpProbability = 0.08f,
+                  extensionProbability = 0.20f,
                 ),
                 fills = CompingFills(
                   everyNBars = 0,
@@ -790,20 +789,22 @@ public class BricklayerSLamentVibe : VibeProvider {
             role = TrackRole.Chordal(
               comping = ChordComping(
                 style = CompingStyle.ROCK_DOWNBEATS,
+                // The one arpeggiating voice in the vibe. Slower roll than the 0.2
+                // default so the second note leans rather than blips.
                 arpMode = ArpMode.AUTO,
-                arpSpeed = 0.2f,
+                arpSpeed = 0.12f,
                 arpDirection = ArpDirection.UP,
                 sectionInversion = SectionInversion.FOLLOW_STYLE,
                 humanization = CompingHumanization(
-                  dropProbability = 0.15f,
-                  ghostProbability = 0.1f,
-                  octaveJumpProbability = 0.1f,
-                  extensionProbability = 0.0f,
+                  dropProbability = 0.18f,
+                  ghostProbability = 0.20f,
+                  octaveJumpProbability = 0.16f,
+                  extensionProbability = 0.22f,
                 ),
                 fills = CompingFills(
-                  everyNBars = 0,
+                  everyNBars = 8,
                   fillType = FillType.ASCENDING_ARP,
-                  skipProbability = 0.0f,
+                  skipProbability = 0.35f,
                 ),
               ),
               chordFollow = ChordFollow.FOLLOW,
@@ -914,15 +915,13 @@ public class BricklayerSLamentVibe : VibeProvider {
             role = TrackRole.Chordal(
               comping = ChordComping(
                 style = CompingStyle.PAD,
-                arpMode = ArpMode.AUTO,
-                arpSpeed = 0.2f,
-                arpDirection = ArpDirection.UP,
-                sectionInversion = SectionInversion.FOLLOW_STYLE,
+                // Quiet far-right string bed — sustains under the DX3 comp.
+                arpMode = ArpMode.NEVER,
                 humanization = CompingHumanization(
-                  dropProbability = 0.0f,
-                  ghostProbability = 0.0f,
-                  octaveJumpProbability = 0.0f,
-                  extensionProbability = 0.0f,
+                  dropProbability = 0.10f,
+                  ghostProbability = 0.08f,
+                  octaveJumpProbability = 0.10f,
+                  extensionProbability = 0.18f,
                 ),
                 fills = CompingFills(
                   everyNBars = 0,

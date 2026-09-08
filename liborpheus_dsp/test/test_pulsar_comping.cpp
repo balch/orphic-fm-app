@@ -142,7 +142,7 @@ bool run_pulsar_comping_tests() {
         generate_chordal_pattern(steps, 16, CompingStyleId::ROCK_DOWNBEATS, 0, 0, minor, 36, 72);
         PulsarStep original[16];
         std::memcpy(original, steps, sizeof(steps));
-        apply_humanization(steps, 16, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 42u);
+        apply_humanization(steps, 16, 0.0f, 0.0f, 0.0f, 0.0f, 36, 72, 1.0f, 42u);
         bool ok = std::memcmp(steps, original, sizeof(steps)) == 0;
         if (ok) { printf("    PASS\n"); pass++; } else { printf("    FAIL\n"); fail++; }
     }
@@ -156,7 +156,7 @@ bool run_pulsar_comping_tests() {
         for (int seed = 1; seed <= 50; seed++) {
             PulsarStep copy[16];
             std::memcpy(copy, steps, sizeof(steps));
-            apply_humanization(copy, 16, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, static_cast<uint32_t>(seed));
+            apply_humanization(copy, 16, 1.0f, 0.0f, 0.0f, 0.0f, 36, 72, 1.0f, static_cast<uint32_t>(seed));
             if (!copy[0].gate) { anchor_survived = false; break; }
         }
         if (anchor_survived) { printf("    PASS\n"); pass++; } else { printf("    FAIL\n"); fail++; }
@@ -168,8 +168,8 @@ bool run_pulsar_comping_tests() {
         PulsarStep b[16] = {};
         generate_chordal_pattern(a, 16, CompingStyleId::ROCK_DOWNBEATS, 0, 0, minor, 36, 72);
         std::memcpy(b, a, sizeof(a));
-        apply_humanization(a, 16, 0.3f, 0.3f, 0.3f, 0.3f, 1.0f, 12345u);
-        apply_humanization(b, 16, 0.3f, 0.3f, 0.3f, 0.3f, 1.0f, 12345u);
+        apply_humanization(a, 16, 0.3f, 0.3f, 0.3f, 0.3f, 36, 72, 1.0f, 12345u);
+        apply_humanization(b, 16, 0.3f, 0.3f, 0.3f, 0.3f, 36, 72, 1.0f, 12345u);
         bool ok = std::memcmp(a, b, sizeof(a)) == 0;
         if (ok) { printf("    PASS\n"); pass++; } else { printf("    FAIL\n"); fail++; }
     }
@@ -291,6 +291,121 @@ bool run_pulsar_comping_tests() {
         }
         if (ok) { printf("    PASS\n"); pass++; }
         else { printf("    FAIL — note out of range\n"); fail++; }
+    }
+
+    // ── Arp direction resolution ────────────────────────────────────
+    {
+        printf("  Test 25: arp direction — UP/DOWN/RANDOM pass through unchanged\n");
+        bool ok = (resolve_arp_direction(ArpDirectionId::UP, false) == ArpDirectionId::UP)
+               && (resolve_arp_direction(ArpDirectionId::UP, true) == ArpDirectionId::UP)
+               && (resolve_arp_direction(ArpDirectionId::DOWN, false) == ArpDirectionId::DOWN)
+               && (resolve_arp_direction(ArpDirectionId::DOWN, true) == ArpDirectionId::DOWN)
+               && (resolve_arp_direction(ArpDirectionId::RANDOM, true) == ArpDirectionId::RANDOM);
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL — phase must only affect UP_DOWN\n"); fail++; }
+    }
+    {
+        printf("  Test 26: arp direction — UP_DOWN alternates with the phase flag\n");
+        bool ok = (resolve_arp_direction(ArpDirectionId::UP_DOWN, false) == ArpDirectionId::UP)
+               && (resolve_arp_direction(ArpDirectionId::UP_DOWN, true) == ArpDirectionId::DOWN);
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL — UP_DOWN must mirror on alternate stabs\n"); fail++; }
+    }
+    {
+        // The regression this guards: UP_DOWN used to be a synonym for UP, so a
+        // two-note root+fifth arp played the identical figure on every stab.
+        printf("  Test 27: arp direction — UP_DOWN reverses note order between stabs\n");
+        const PulsarScale& minor = kPulsarScales[0];
+        uint8_t up[4] = {}, down[4] = {};
+        int n_up = compute_chord_tones(
+            60, 0, minor, 2, resolve_arp_direction(ArpDirectionId::UP_DOWN, false),
+            SectionInversionId::FOLLOW_STYLE, 1u, up);
+        int n_down = compute_chord_tones(
+            60, 0, minor, 2, resolve_arp_direction(ArpDirectionId::UP_DOWN, true),
+            SectionInversionId::FOLLOW_STYLE, 1u, down);
+        bool ok = (n_up == 2 && n_down == 2
+                   && up[0] == down[1] && up[1] == down[0]
+                   && up[0] != up[1]);
+        if (ok) {
+            printf("    PASS: up=[%d,%d] down=[%d,%d]\n", up[0], up[1], down[0], down[1]);
+            pass++;
+        } else {
+            printf("    FAIL: up=[%d,%d] down=[%d,%d]\n", up[0], up[1], down[0], down[1]);
+            fail++;
+        }
+    }
+
+    // ── Humanization respects the track's note range ────────────────
+    // apply_humanization rewrites pitch (octave jump +/-12, extension +2/+5) and used to
+    // clamp only to MIDI 0..127, so a jump could drop a pad an octave under its authored
+    // register. The fill helpers already clamp; these pin the same guarantee here.
+    {
+        printf("  Test 28: humanization — octave jump stays inside [lo, hi]\n");
+        const uint8_t LO = 48, HI = 72;
+        bool in_range = true, moved = false;
+        for (uint32_t s = 1; s <= 64 && in_range; s++) {
+            PulsarStep steps[16] = {};
+            for (int i = 0; i < 6; i++) {
+                steps[i].gate = true; steps[i].note = 71; steps[i].raw_note = 71;
+                steps[i].velocity = 0.8f; steps[i].duration = 0.5f;
+            }
+            apply_humanization(steps, 16, 0.0f, 0.0f, 1.0f, 0.0f, LO, HI, 1.0f, s);
+            for (int i = 0; i < 16; i++) {
+                if (!steps[i].gate) continue;
+                if (steps[i].note < LO || steps[i].note > HI) { in_range = false; break; }
+                if (steps[i].note != 71) moved = true;
+            }
+        }
+        // `moved` guards the lazy fix: clamping by simply never jumping would also pass.
+        bool ok = in_range && moved;
+        if (ok) { printf("    PASS: stayed in [%d,%d] and still jumped\n", LO, HI); pass++; }
+        else { printf("    FAIL: in_range=%d moved=%d\n", (int)in_range, (int)moved); fail++; }
+    }
+    {
+        printf("  Test 29: humanization — an extension that would overshoot is skipped\n");
+        // note 71 in [48,72]: +2 = 73 and +5 = 76 both overshoot, so the note must not move.
+        // Skipping is deliberate — folding down an octave would displace the register.
+        const uint8_t LO = 48, HI = 72;
+        bool held = true;
+        for (uint32_t s = 1; s <= 32 && held; s++) {
+            PulsarStep steps[16] = {};
+            for (int i = 0; i < 6; i++) {
+                steps[i].gate = true; steps[i].note = 71; steps[i].raw_note = 71;
+                steps[i].velocity = 0.8f; steps[i].duration = 0.5f;
+            }
+            apply_humanization(steps, 16, 0.0f, 0.0f, 0.0f, 1.0f, LO, HI, 1.0f, s);
+            for (int i = 0; i < 16; i++) {
+                if (steps[i].gate && steps[i].note != 71) { held = false; break; }
+            }
+        }
+        if (held) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL — extension pushed a note past hi\n"); fail++; }
+    }
+    {
+        printf("  Test 30: humanization — combined sweep never leaves the range\n");
+        const uint8_t ranges[3][2] = {{48,72},{36,60},{60,67}};
+        bool ok = true;
+        for (int r = 0; r < 3 && ok; r++) {
+            uint8_t LO = ranges[r][0], HI = ranges[r][1];
+            for (uint32_t s = 1; s <= 32 && ok; s++) {
+                PulsarStep steps[16] = {};
+                for (int i = 0; i < 8; i++) {
+                    steps[i].gate = true;
+                    steps[i].note = static_cast<uint8_t>(LO + (i * 3) % (HI - LO + 1));
+                    steps[i].raw_note = steps[i].note;
+                    steps[i].velocity = 0.8f; steps[i].duration = 0.5f;
+                }
+                apply_humanization(steps, 16, 0.1f, 0.3f, 0.8f, 0.8f, LO, HI, 1.0f, s);
+                for (int i = 0; i < 16; i++) {
+                    if (steps[i].gate && (steps[i].note < LO || steps[i].note > HI)) {
+                        printf("    note %d outside [%d,%d] (seed %u)\n", steps[i].note, LO, HI, s);
+                        ok = false; break;
+                    }
+                }
+            }
+        }
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { fail++; }
     }
 
     printf("\n  Pulsar Comping: %d passed, %d failed\n", pass, fail);

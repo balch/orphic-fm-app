@@ -467,14 +467,13 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                     if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
                     const PulsarScale& sc = kPulsarScales[si];
                     int r = engine->pulsar_root_note.load(std::memory_order_relaxed);
-                    int nr_low  = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
-                    int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
-                    if (nr_low  <= 0) nr_low  = engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed);
-                    if (nr_high <= 0) nr_high = engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed);
-                    if (nr_low  <= 0) nr_low  = 48;  // final safety fallback
-                    if (nr_high <= 0) nr_high = 72;
-                    const uint8_t lo = static_cast<uint8_t>(nr_low);
-                    const uint8_t hi = static_cast<uint8_t>(nr_high);
+                    const NoteRange nr = resolve_note_range(
+                        engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed),
+                        engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed),
+                        engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed),
+                        engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed));
+                    const uint8_t lo = nr.lo;
+                    const uint8_t hi = nr.hi;
                     const int octv   = comping_default_octave(ts.comping_style);
 
                     switch (ts.fill_type) {
@@ -535,8 +534,14 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                     }
                 }
             }
+            const NoteRange hnr = resolve_note_range(
+                engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed),
+                engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed),
+                engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed),
+                engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed));
             apply_humanization(ts.steps, ts.step_count,
                                h_drop, h_ghost, h_oct, h_ext,
+                               hnr.lo, hnr.hi,
                                complexity, seed);
         }
     }
@@ -1341,6 +1346,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.arp_note_count = 0;
         ts.arp_index = 0;
         ts.arp_next_sample = 0;
+        ts.arp_updown_down = false;
         std::memset(ts.arp_notes, 0, sizeof(ts.arp_notes));
         ts.bars_since_fill = 0;
         ts.chordal_base_valid = false;
@@ -4516,12 +4522,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                                     uint32_t seed = static_cast<uint32_t>(
                                         state->loop_count * 0x9E3779B9u) ^ static_cast<uint32_t>(t);
-                                    // 2 notes (root + 5th) by default — less blippy than triad arps.
-                                    // With arpDirection = DOWN, plays 5th then root — like a grace
-                                    // note landing on the root. Chord color comes from humanization.
+                                    // 2 notes by default — less blippy than triad arps. Note this
+                                    // is root + 3rd, not root + 5th: voicing_count 2 takes
+                                    // intervals[0..1] = {root, 3rd}; the 5th needs a count of 3.
+                                    // With DOWN, plays 3rd then root — like a grace note landing
+                                    // on the root. Chord color comes from humanization.
+                                    // UP_DOWN resolves per stab so successive stabs mirror.
+                                    ArpDirectionId eff_dir =
+                                        resolve_arp_direction(ts.arp_direction, ts.arp_updown_down);
+                                    if (ts.arp_direction == ArpDirectionId::UP_DOWN) {
+                                        ts.arp_updown_down = !ts.arp_updown_down;
+                                    }
                                     ts.arp_note_count = compute_chord_tones(
                                         midi_note, cd, arp_sc,
-                                        2 /* root + 5th */, ts.arp_direction, ts.section_inversion, seed, ts.arp_notes);
+                                        2 /* root + 3rd */, eff_dir, ts.section_inversion, seed, ts.arp_notes);
 
                                     // First note plays immediately via target_pitch already set above.
                                     // Override with computed arp_notes[0] for consistent ordering.

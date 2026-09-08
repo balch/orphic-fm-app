@@ -320,6 +320,28 @@ The highest-value part: translate a described feel into concrete parameter choic
   degree, column = next).
 - chordsPerBar = 1 → slow (one chord per bar); 2 = standard; 4 = busy.
 
+### Chordal comping and arpeggiation
+- arpMode is the highest-consequence field on a Chordal track, and its default is NOT neutral.
+  `AUTO` arpeggiates on EVERY engine except CHD — a Chordal track on PAR, STR, DX3, ENS, VA or WTB
+  with AUTO rolls root→third on every stab. Only CHD plays a true block chord under AUTO. For a
+  sustained pad, a drone bed, or block stabs, you must write `NEVER` explicitly.
+- AT MOST ONE Chordal track may arpeggiate. Two or more AUTO tracks on non-CHD engines produce
+  identical, synchronized root→third figures — the single strongest "cheap sequencer" tell in the
+  whole schema. Pick the one comping voice (usually the mid-register, moderate-density one) and set
+  every other Chordal track to `NEVER`.
+- The arpeggiating track wants arpSpeed 0.10–0.15. At 0.2+ the second note blips instead of leaning;
+  0.9–1.0 is a strummed chord, not an arp — use that only for a deliberate stab.
+- Never ship an all-zero CompingHumanization with fills.everyNBars = 0. That combination repeats a
+  byte-identical bar forever, which no player does. Give a comping track dropProbability and
+  ghostProbability in the 0.10–0.30 band and fills every 4–8 bars with skipProbability 0.2–0.4.
+  Zero those only when the vibe is deliberately mechanical (industrial, motorik, chiptune).
+- octaveJumpProbability and extensionProbability are different in kind from the other two: they
+  shift a step ±12 semitones and add 2 or 5 semitones, so they rewrite PITCH rather than rhythm,
+  they can both land on one step, and every probability is scaled up by complexity — loudest in the
+  busiest late sections. They default to 0 for that reason. Set them on ONE track when a part wants
+  harmonic wandering, keep them under ~0.2, and never put them on two chordal tracks that both
+  arpeggiate, or the voices scatter against each other.
+
 ### Lick / riff
 - Repetitive 2-note riff (garage rock, industrial): 2 steps with long durations, lickMutation <= 0.3,
   lickMode = Fill. The riff locks in and barely drifts.
@@ -344,5 +366,7 @@ The highest-value part: translate a described feel into concrete parameter choic
   be alwaysActive or the handoff has nowhere to go.
 - Bass should use chordFollow = ROOT_ONLY to stay in key (don't let it chase chord tones out of key).
 - Use FIXED chordFollow sparingly on melodic/chordal tracks — it pins a track off the chord progression; most tracks want FOLLOW.
+- No more than one Chordal track may leave arpMode at AUTO on a non-CHD engine (see section 10) —
+  the rest must say NEVER, or the vibe stacks identical arpeggios.
 - For DX/DX2/DX3, set 'harmonics' deliberately (it picks a patch bank, see section 4).
 """

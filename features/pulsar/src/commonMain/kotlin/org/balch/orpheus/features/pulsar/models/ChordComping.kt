@@ -112,16 +112,23 @@ data class CompingFills(
 /**
  * Probabilistic per-bar variations for CHORDAL tracks — the "Keith Richards" layer.
  * All probabilities scaled by complexity (complexity=0 → no variations).
+ *
+ * The defaults vary RHYTHM but never PITCH. An all-zero block repeats an identical bar
+ * forever, which reads as a sequencer rather than a player, so drop and ghost carry a
+ * gentle floor just under the median of the ear-tuned vibes. The two pitch probabilities
+ * stay 0: they rewrite harmony, they compound when several chordal tracks arpeggiate at
+ * once, and complexity scaling makes an inherited value loudest exactly where a section
+ * is already busiest. Those two are authored per vibe, never inherited.
  */
 @Serializable
 data class CompingHumanization(
     /** Chance per non-anchor active step to be dropped for this bar. */
-    val dropProbability: Float = 0.0f,
+    val dropProbability: Float = 0.15f,
     /** Chance per inactive step to become a low-velocity ghost stab. */
-    val ghostProbability: Float = 0.0f,
-    /** Chance per non-anchor active step to shift ±12 semitones. */
+    val ghostProbability: Float = 0.15f,
+    /** Chance per non-anchor active step to shift ±12 semitones. Opt-in, see above. */
     val octaveJumpProbability: Float = 0.0f,
-    /** Chance per active step to add extension interval (+2 or +5 semis). */
+    /** Chance per active step to add extension interval (+2 or +5 semis). Opt-in. */
     val extensionProbability: Float = 0.0f,
 )
 

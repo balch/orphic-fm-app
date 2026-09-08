@@ -288,7 +288,9 @@ class BlacktopBoogieVibe : VibeProvider {
                                 style = CompingStyle.BLUES_SHUFFLE,
                                 arpMode = ArpMode.AUTO,
                                 arpSpeed = 0.18f,
-                                arpDirection = ArpDirection.UP_DOWN,
+                                // Pinned to UP: ear-tuned back when UP_DOWN was a
+                                // synonym for UP, so UP is the shipped sound.
+                                arpDirection = ArpDirection.UP,
                                 sectionInversion = SectionInversion.FIRST_INVERSION,
                                 humanization = CompingHumanization(
                                     dropProbability = 0.2f,

@@ -400,6 +400,8 @@ struct PulsarTrackState {
     int arp_note_count = 0;
     int arp_index = 0;
     int64_t arp_next_sample = 0;
+    // Flips per stab so ArpDirectionId::UP_DOWN mirrors between stabs.
+    bool arp_updown_down = false;
 
     // Humanization probabilities (CHORDAL only, loaded from atomics each bar)
     float human_drop_prob = 0.0f;
