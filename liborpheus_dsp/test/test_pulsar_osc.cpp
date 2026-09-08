@@ -638,6 +638,74 @@ static bool test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step() {
     return ok;
 }
 
+// Same hold-step re-gating, seen by the TIDES envelope instead of the LPG. The
+// spurious voice_active drop reaches ExtractGateFlags as a falling+rising pair,
+// so the envelope releases and re-attacks partway through a held note. Nothing
+// about this is OSC-specific — it is the shared envelope path — but the OSC
+// fixture is the one that can render a two-note phrase with no LPG in the way.
+static bool test_pulsar_tides_envelope_holds_through_a_held_note() {
+    printf("\n=== Test: TIDES envelope does not re-attack on hold steps ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+
+    engine->pulsar_track_volume[0].store(0.12f, std::memory_order_relaxed);
+    engine->pulsar_track_volume_space[0].store(0.12f, std::memory_order_relaxed);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+
+    // TIDES envelope, LPG out of the way: the envelope is the only shaper.
+    engine->pulsar_envelope_mode.store(1, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode[0].store(0, std::memory_order_relaxed);   // BYPASS
+    engine->pulsar_track_lpg_mode_space[0].store(0, std::memory_order_relaxed);
+
+    engine->pulsar_lick[0].scale_degree = 2;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.95f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[1].scale_degree = 0;
+    engine->pulsar_lick[1].duration = 1.5f;
+    engine->pulsar_lick[1].velocity = 0.85f;
+    engine->pulsar_lick[1].glide_rate = 0.35f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.05f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(2, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(80.0f, std::memory_order_relaxed);
+
+    // Read the envelope level directly rather than inferring it from audio: a
+    // 10 ms gate gap under a slow envelope barely moves the peak, but it is
+    // plainly visible as the level falling and then climbing back.
+    const int kBlocks = 1200;
+    int recoveries = 0, gate_low_midnote = 0;
+    float prev_env = 0.0f;
+    bool prev_active = false;
+    for (int i = 0; i < kBlocks; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (!ts.voice_active && prev_active && ts.in_hold) gate_low_midnote++;
+        prev_active = ts.voice_active;
+        float env = ts.tides_env_level;
+        // An AR envelope under a continuously held note never climbs back after
+        // falling. Any recovery is a release+attack the note did not ask for.
+        if (i > 0 && prev_env > 0.05f && env > prev_env * 1.05f) recoveries++;
+        prev_env = env;
+    }
+    orpheus_engine_destroy(engine);
+
+    printf("  gate dropped mid-note %d times; envelope recoveries: %d\n",
+           gate_low_midnote, recoveries);
+
+    bool ok = (recoveries == 0);
+    if (!ok) printf("  FAIL: envelope re-attacked %d times inside held notes\n", recoveries);
+    printf("TIDES holds through a held note: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_osc_tests() {
     printf("\n=== Pulsar OSC Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -650,5 +718,6 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_opening_note_floor_never_lowers_the_engine_floor()) suite_pass++; else suite_fail++;
     if (test_pulsar_osc_lpg_pluck_decays_under_held_gate()) suite_pass++; else suite_fail++;
     if (test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step()) suite_pass++; else suite_fail++;
+    if (test_pulsar_tides_envelope_holds_through_a_held_note()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

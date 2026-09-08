@@ -4656,7 +4656,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.gate_timer -= static_cast<float>(num_frames);
             if (ts.gate_timer <= 0.0f) {
                 ts.gate_timer = 0.0f;
-                ts.voice_active = false;
+                // in_hold means the next step continues this same note, so an
+                // underrun here is block-rate quantization (and the drunk offset
+                // shortening the timer), not the end of the note. Clearing the
+                // gate would hand every envelope reading voice_active a release
+                // and an attack the phrase never asked for: the Tides generator
+                // re-attacks, and a PLUCK-mode LPG re-blooms. The hold path
+                // re-arms the timer on the next step, and the chain always ends
+                // on a step with hold=false, so the note still stops on time.
+                if (!ts.in_hold) ts.voice_active = false;
             }
         }
 
