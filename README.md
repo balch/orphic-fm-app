@@ -49,7 +49,7 @@ Orphic-DJ is an interactive album that lets the user control each Vibe. Four kno
 
 > **Built from Orphic-FM.** Orphic-DJ is assembled from the synth's own parts. The same C++ engine renders every voice, and the same plugin modules supply the delays, reverb, and drums. Pulsar is an original generative engine composed on top of them.
 
-## One Engine, Two Apps
+## One Engine + Multiple UI Panels = Multiple Apps
 
 Everything below the UI is shared. The C++ engine ports the Eurorack firmware and provides graph-based audio routing. Above it sit the shared Kotlin `core/*` layers (plugin system, DSP graph, event bus) and the `features/*` modules (Compose panels + ViewModels). The two apps are thin compositions of those parts: on Android the engine runs natively via [Oboe](https://github.com/google/oboe) at 48kHz, on desktop over JNI with [miniaudio](https://miniaud.io/), on the web through [Emscripten](https://emscripten.org/) WASM in a Web Worker, and on iOS as a static library rendered by `AVAudioEngine`.
 
