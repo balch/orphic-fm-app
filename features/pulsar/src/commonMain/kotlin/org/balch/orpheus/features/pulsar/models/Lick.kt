@@ -12,6 +12,15 @@ import kotlinx.serialization.Serializable
  *   0 = instant pitch jump; 0.3 = smooth; 0.6+ = very slow slide. The sentinel
  *   matches the C++ engine's `glide_rate` convention exactly (no boxing, no
  *   marshalling translation).
+ * @param hitProbability Chance this note fires at all, before tension lifts it. `1f`
+ *   (default) always fires. Tension raises it toward certainty as the section climbs:
+ *   `effective = hitProbability + (1 - hitProbability) * tensionIntensity`, so `0.3f`
+ *   fires about a third of the time at rest and every time at peak tension. A note that
+ *   loses its roll drops whole, taking its hold steps with it, and the note after it is
+ *   struck clean rather than slid into, since there is nothing to glide from.
+ *
+ *   Wired for [Vibe.lick] only. [Vibe.bassLine] and [LickRotation] steps still travel the
+ *   4-float transport and would ignore it, so [Vibe] rejects a non-default value there.
  */
 @Serializable
 data class LickStep(
@@ -19,6 +28,7 @@ data class LickStep(
     val duration: Float,
     val velocity: Float = 0.8f,
     val glideRate: Float = -1f,
+    val hitProbability: Float = 1f,
 )
 
 /**
@@ -38,6 +48,9 @@ data class Lick(
     init {
         require(steps.size <= MAX_LICK_STEPS) {
             "Lick steps size ${steps.size} exceeds MAX_LICK_STEPS=$MAX_LICK_STEPS"
+        }
+        require(steps.all { it.hitProbability in 0f..1f }) {
+            "Lick hitProbability must be in 0f..1f, got ${steps.map { it.hitProbability }}"
         }
         require(steps.all { it.glideRate == -1f || it.glideRate in 0f..1f }) {
             "LickStep.glideRate must be -1 (use track default) or in 0..1, got " +

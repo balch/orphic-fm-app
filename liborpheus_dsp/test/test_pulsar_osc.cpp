@@ -786,6 +786,76 @@ static bool test_pulsar_density_drops_whole_notes_not_note_heads() {
     return ok;
 }
 
+// A lick step can carry a probability that its note fires at all, and tension
+// lifts that probability toward certainty: effective_p = p + (1-p) * tension.
+// The gesture starts uncertain and arrives as the section climbs.
+//
+// tension_intensity comes from (loop_count % inner_bars) / inner_bars, so
+// inner_bars = 1 pins it at 0; pushing pulsar_tension_drive every block holds it
+// near 1 (the drive is a decaying hold, exchanged to 0 each bar). Density is
+// pinned so the density roll cannot be mistaken for this one.
+static float lick_head_fire_rate(float hit_prob, bool high_tension) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_tension_inner_bars.store(1, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+
+    // One note, 2.0 beats = 8 steps, head at step 0.
+    engine->pulsar_lick[0].scale_degree = 0;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.9f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[0].hit_probability = hit_prob;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(1, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(150.0f, std::memory_order_relaxed);
+
+    int fires = 0;
+    for (int i = 0; i < 6000; i++) {
+        if (high_tension) engine->pulsar_tension_drive.store(1.0f, std::memory_order_relaxed);
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (ts.pending_retrig && ts.playhead == 0) fires++;
+    }
+    const int cycles = engine->pulsar_state->loop_count;
+    orpheus_engine_destroy(engine);
+    return (cycles > 0) ? static_cast<float>(fires) / static_cast<float>(cycles) : -1.0f;
+}
+
+static bool test_pulsar_lick_hit_probability_is_lifted_by_tension() {
+    printf("\n=== Test: lick hitProbability gates the note, tension lifts it ===\n");
+    const float always_lo = lick_head_fire_rate(1.0f, false);
+    const float never_lo  = lick_head_fire_rate(0.0f, false);
+    const float never_hi  = lick_head_fire_rate(0.0f, true);
+    const float half_lo   = lick_head_fire_rate(0.5f, false);
+
+    printf("  p=1.0 low tension  -> %.2f  (must be ~1: every existing lick relies on this)\n", always_lo);
+    printf("  p=0.0 low tension  -> %.2f  (must be 0)\n", never_lo);
+    printf("  p=0.0 high tension -> %.2f  (tension lifts it to near certain)\n", never_hi);
+    printf("  p=0.5 low tension  -> %.2f  (roughly half)\n", half_lo);
+
+    bool ok = true;
+    if (always_lo < 0.99f) { printf("  FAIL: default probability must always fire\n"); ok = false; }
+    if (never_lo > 0.01f)  { printf("  FAIL: p=0 at zero tension must never fire\n"); ok = false; }
+    if (never_hi < 0.80f)  { printf("  FAIL: tension must lift p=0 toward certain\n"); ok = false; }
+    if (half_lo < 0.30f || half_lo > 0.70f) { printf("  FAIL: p=0.5 should land near half\n"); ok = false; }
+    printf("Lick hitProbability: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_osc_tests() {
     printf("\n=== Pulsar OSC Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -800,5 +870,6 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step()) suite_pass++; else suite_fail++;
     if (test_pulsar_tides_envelope_holds_through_a_held_note()) suite_pass++; else suite_fail++;
     if (test_pulsar_density_drops_whole_notes_not_note_heads()) suite_pass++; else suite_fail++;
+    if (test_pulsar_lick_hit_probability_is_lifted_by_tension()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

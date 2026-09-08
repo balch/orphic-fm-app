@@ -101,6 +101,8 @@ class PulsarPlugin : DspPlugin {
     private var _lickLength = 0
     private var _lickLoopLength = 0
     private var _lickData = FloatArray(PulsarSymbol.LICK_DATA_COUNT) { 0f }
+    // Defaults to 1: a lick that never writes these ports must always fire.
+    private var _lickHitProb = FloatArray(PulsarSymbol.LICK_HIT_PROB_COUNT) { 1f }
     // Tension profile
     private var _tensionInnerBars = 4
     private var _tensionOuterBars = 0
@@ -441,6 +443,11 @@ class PulsarPlugin : DspPlugin {
         for (i in 0 until PulsarSymbol.LICK_DATA_COUNT) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i]) {
                 floatType { default = 0f; get { _lickData[i] }; set { _lickData[i] = it } }
+            }
+        }
+        for (i in 0 until PulsarSymbol.LICK_HIT_PROB_COUNT) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.LICK_HIT_PROB_0.ordinal + i]) {
+                floatType { default = 1f; get { _lickHitProb[i] }; set { _lickHitProb[i] = it } }
             }
         }
         controlPort(PulsarSymbol.LICK_LOOP_LENGTH) {

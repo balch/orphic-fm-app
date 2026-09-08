@@ -79,7 +79,12 @@ class KickingBubblegumVibe : VibeProvider {
     // struck clean. Glide on every step is what turns this from a lick into one smear.
     private val introLick = Lick(
         steps = listOf(
-            LickStep(scaleDegree = 0, duration = .25f, velocity = 0.5f),
+            // The pickup is a maybe. At rest it lands about a third of the time; the
+            // tension staircase lifts it toward certain as the section climbs, so the
+            // phrase gathers itself over the 4 bars and re-arms on the self-edge. When
+            // it does not land the A is struck clean instead of slid into, because
+            // there is no note to glide from.
+            LickStep(scaleDegree = 0, duration = .25f, velocity = 0.5f, hitProbability = 0.35f),
             LickStep(scaleDegree = 2, duration = 2.0f, velocity = 0.95f, glideRate = .12f),
             LickStep(scaleDegree = 0, duration = .5f, velocity = 0.85f, glideRate = .3f),
         ),

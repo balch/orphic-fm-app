@@ -220,6 +220,15 @@ data class Vibe(
             "Vibe.anomalies may contain at most one LickAnomaly"
         }
         // A LickAnomaly rides the lick bank, so the vibe must supply a lick source to ride over.
+        // hitProbability rides a parallel port block that only Vibe.lick pushes. The
+        // bassLine and rotation-pool transports are still 4 floats wide, so a value set
+        // there would be silently ignored at render time. Fail at authoring instead.
+        require(bassLine == null || bassLine.steps.all { it.hitProbability >= 1f }) {
+            "LickStep.hitProbability is wired for Vibe.lick only; Vibe.bassLine steps ignore it"
+        }
+        require(lickRotation == null || lickRotation.pool.all { l -> l.steps.all { it.hitProbability >= 1f } }) {
+            "LickStep.hitProbability is wired for Vibe.lick only; lickRotation pool steps ignore it"
+        }
         require(lickAnomalies.isEmpty() || lickRotation != null || lick != null) {
             "Vibe.anomalies has a LickAnomaly but the vibe has no lick source (set lick or lickRotation)"
         }

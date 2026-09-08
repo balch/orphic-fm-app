@@ -1062,6 +1062,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 }
             }
         }
+        else if (std::strncmp(symbol, "lick_hit_prob_", 14) == 0) {
+            // Parallel to lick_data_, one port per step. No prefix here is a prefix of
+            // another, so this branch's position in the chain does not matter.
+            int step = std::atoi(symbol + 14);
+            if (step >= 0 && step < OrpheusEngine::kMaxLickSteps)
+                engine->pulsar_lick[step].hit_probability = value;
+        }
         else if (std::strncmp(symbol, "lick_pool_data_", 15) == 0) {
             int idx = std::atoi(symbol + 15);
             if (idx >= 0 && idx < OrpheusEngine::kMaxLickPool *

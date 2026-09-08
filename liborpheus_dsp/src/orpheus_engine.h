@@ -929,6 +929,8 @@ struct OrpheusEngine {
         float duration;
         float velocity;
         float glide_rate;  // -1 = use track default; >= 0 = per-step override
+        // Chance this step's note fires at all, before tension lifts it. 1 = always.
+        float hit_probability = 1.0f;
     };
     std::atomic<int> pulsar_lick_length{0};        // 0 = no lick (pure generative)
     std::atomic<int> pulsar_lick_loop_length{0};   // beats; 0 = no rest padding

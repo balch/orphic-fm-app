@@ -52,6 +52,7 @@ inline PulsarStep make_step(uint8_t note, float velocity, bool gate, float durat
     PulsarStep s = {note, note, velocity, gate, duration};
     s.hold = false;
     s.glide_rate = -1.0f;  // sentinel: use track default unless lick overrides
+    s.hit_probability = 1.0f;  // generated steps always fire; only licks author this
     return s;
 }
 
@@ -761,6 +762,7 @@ inline void generate_lick_pattern(
             steps[step_pos] = make_step(midi_note, vel, true, 1.0f);
             steps[step_pos].hold = (slots > 1);
             steps[step_pos].glide_rate = ls.glide_rate;
+            steps[step_pos].hit_probability = ls.hit_probability;
         }
         for (int h = 1; h < slots && (step_pos + h) < step_count; h++) {
             steps[step_pos + h] = make_step(midi_note, vel, true, 1.0f);

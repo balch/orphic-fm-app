@@ -37,6 +37,13 @@ struct PulsarStep {
     float duration;    // gate length as fraction of step (0.0-1.0)
     bool hold;         // if true, extend gate into next step (no retrigger)
     float glide_rate;  // -1 = use track default; >= 0 = per-step override (set by lick)
+    // Carried from the lick onto the note's HEAD step only, like glide_rate. Rolled
+    // at trigger time so the outcome varies per repeat and reads live tension.
+    //
+    // Defaulted here rather than only in make_step: the comping generators build
+    // steps with `steps[i] = {}` and then set fields directly, so without this a
+    // chordal track would arrive with probability 0 and never fire a note.
+    float hit_probability = 1.0f;
 };
 
 struct PulsarMacroTarget {
@@ -564,6 +571,7 @@ struct PulsarLickStep {
     float duration;
     float velocity;
     float glide_rate;  // -1 = use track default; >= 0 = per-step override
+    float hit_probability = 1.0f;  // 0-1 chance the note fires, lifted toward 1 by tension
 };
 
 struct PulsarChordState {

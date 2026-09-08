@@ -577,6 +577,10 @@ class PulsarViewModel(
     private val lickDataIds = (0 until Lick.MAX_LICK_STEPS * Lick.LICK_FIELDS_PER_STEP).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i].controlId)
     }
+    // Parallel block: one port per step, not a fifth field in the stride above.
+    private val lickHitProbIds = (0 until Lick.MAX_LICK_STEPS).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.LICK_HIT_PROB_0.ordinal + i].controlId)
+    }
 
     // Tension control flows
     private val tensionInnerBarsId = synthController.controlFlow(PulsarSymbol.TENSION_INNER_BARS.controlId)
@@ -1486,6 +1490,7 @@ class PulsarViewModel(
                 lickDataIds[base + 2].value = FloatValue(step.velocity)
                 // -1 = "use the track's TrackVoice.glideRate"; explicit value overrides.
                 lickDataIds[base + 3].value = FloatValue(step.glideRate)
+                lickHitProbIds[i].value = FloatValue(step.hitProbability)
             }
             lickMutationId.value = FloatValue(vibe.lickMutation)
             lickOctaveId.value = IntValue(vibe.lickOctave)

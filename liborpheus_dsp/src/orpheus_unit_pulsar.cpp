@@ -1246,6 +1246,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             state->lick[i].duration = engine->pulsar_lick[i].duration;
             state->lick[i].velocity = engine->pulsar_lick[i].velocity;
             state->lick[i].glide_rate = engine->pulsar_lick[i].glide_rate;
+            state->lick[i].hit_probability = engine->pulsar_lick[i].hit_probability;
         }
     }
     state->lick_mutation = engine->pulsar_lick_mutation.load(std::memory_order_relaxed);
@@ -1274,6 +1275,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 state->lick_pool[s][i].duration     = engine->pulsar_lick_pool_data[b + 1];
                 state->lick_pool[s][i].velocity     = engine->pulsar_lick_pool_data[b + 2];
                 state->lick_pool[s][i].glide_rate   = engine->pulsar_lick_pool_data[b + 3];
+                // The pool transport is still 4 floats wide, so pool licks always fire.
+                state->lick_pool[s][i].hit_probability = 1.0f;
             }
         }
         state->active_rotation_index = lick_pick_rotation(state->lick_select_seed, pool_count);
@@ -4409,6 +4412,26 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                         // TEXTURE/FX at low energy: always fire so hold chains work
                         if (t >= 5 && energy < 0.4f) fires = true;
+
+                        // Per-step authored uncertainty, lifted toward certainty by
+                        // tension: a gesture that starts as a maybe and arrives as the
+                        // section climbs. Only the note's HEAD carries a probability
+                        // (the generator writes it there alone), and a failed roll goes
+                        // out through the same rejection path as the density roll, so
+                        // suppress_hold_tail drops the whole note rather than its head.
+                        // Derived from the density roll's hash but decorrelated, so a
+                        // step is not gated twice by the same number.
+                        if (fires && step.hit_probability < 0.999f) {
+                            const float p_eff =
+                                step.hit_probability +
+                                (1.0f - step.hit_probability) * state->tension_intensity;
+                            const uint32_t hh =
+                                step_hash(ts.playhead, t, state->loop_count) * 2654435761u
+                                + 0x9E3779B9u;
+                            const float hroll =
+                                static_cast<float>(hh & 0xFFFF) / 65535.0f;
+                            if (hroll >= p_eff) fires = false;
+                        }
 
                         if (fires) {
                             // Apply velocity variation from complexity
