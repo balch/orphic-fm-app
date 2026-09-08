@@ -245,6 +245,10 @@ struct PulsarTrackState {
     ChaosVoiceState chaos_state;
     // Per-track OSC oscillator and modulator phase. Used when engine_index < 0.
     PulsarOscState osc_state;
+    // Vactrol LPG for the OSC branch. The OSC kernel has no VCA and bypasses
+    // OrpheusVoice, so without this the track reaches the mix with Pulsar's
+    // envelope alone, which sustains at full level for the whole gate.
+    OrpheusLpg osc_lpg;
     // FM params resolved per block from the active engine slot.
     float fm_ratio = 0.0f;
     float fm_shape = 0.0f;

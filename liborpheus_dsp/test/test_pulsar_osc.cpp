@@ -5,6 +5,7 @@
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/pulsar_osc.h"
 #include "../src/orpheus_graph.h"
+#include "../src/pulsar_pattern_gen.h"
 #include <cstdio>
 #include <cmath>
 #include <cstring>
@@ -440,6 +441,203 @@ static bool test_pulsar_opening_note_floor_never_lowers_the_engine_floor() {
     return ok;
 }
 
+// LPG_PLUCK must shape the OSC branch the way it shapes a Plaits voice: a
+// vactrol bloom on note-on, then an asymmetric decay that keeps falling while
+// the gate is still high. Without the LPG the OSC path is a bare oscillator
+// under Pulsar's "AD" envelope, which is really attack + 100% sustain — it
+// holds full level for the whole gate, so the note reads as an organ rather
+// than a plucked string.
+//
+// Measured on the bus with the track turned well down, because kPulsarOutputGain
+// 3.3 saturates the master soft_limit for a soloed track at normal volume and a
+// saturated peak would flatten exactly the decay this asserts.
+//
+// Returns late/early peak ratio within the longest held gate, or -1 on a setup
+// that could not be measured.
+static float osc_held_gate_decay_ratio(int lpg_mode, float lpg_decay) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+
+    // Well under the soft_limit knee: 3.3 * 0.12 = 0.4 peak.
+    engine->pulsar_track_volume[0].store(0.12f, std::memory_order_relaxed);
+    engine->pulsar_track_volume_space[0].store(0.12f, std::memory_order_relaxed);
+
+    // Both slots are OSC, so active_lpg_mode resolves to the EDM slot; set them
+    // together so the pick cannot silently choose an unset value.
+    engine->pulsar_track_lpg_mode[0].store(lpg_mode, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode_space[0].store(lpg_mode, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay[0].store(lpg_decay, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay_space[0].store(lpg_decay, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour_space[0].store(0.5f, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(70.0f, std::memory_order_relaxed);  // long gates
+
+    static const int kBlocks = 400;
+    static float blk_peak[400];
+    static bool  blk_active[400];
+    for (int i = 0; i < kBlocks; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        float pk = 0.0f;
+        for (int s = 0; s < kBlockFrames; s++) {
+            float al = std::fabs(engine->pulsar_out_l[s]);
+            float ar = std::fabs(engine->pulsar_out_r[s]);
+            if (al > pk) pk = al;
+            if (ar > pk) pk = ar;
+        }
+        blk_peak[i] = pk;
+        blk_active[i] = engine->pulsar_state->tracks[0].voice_active;
+    }
+    orpheus_engine_destroy(engine);
+
+    int best_start = -1, best_len = 0, cur_start = -1, cur_len = 0;
+    for (int i = 0; i < kBlocks; i++) {
+        if (blk_active[i]) {
+            if (cur_len == 0) cur_start = i;
+            cur_len++;
+            if (cur_len > best_len) { best_len = cur_len; best_start = cur_start; }
+        } else {
+            cur_len = 0;
+        }
+    }
+
+    const int q = best_len / 4;
+    if (best_len < 8 || q < 1) return -1.0f;
+
+    float early = 0.0f, late = 0.0f;
+    for (int i = best_start; i < best_start + q; i++)
+        if (blk_peak[i] > early) early = blk_peak[i];
+    for (int i = best_start + best_len - q; i < best_start + best_len; i++)
+        if (blk_peak[i] > late) late = blk_peak[i];
+    if (early <= 0.001f) return -1.0f;
+    return late / early;
+}
+
+static bool test_pulsar_osc_lpg_pluck_decays_under_held_gate() {
+    printf("\n=== Test: OSC honors LPG_PLUCK (decays while the gate is held) ===\n");
+
+    const float bypass = osc_held_gate_decay_ratio(LPG_BYPASS, 0.5f);
+    const float fast   = osc_held_gate_decay_ratio(LPG_PLUCK,  0.2f);
+    const float slow   = osc_held_gate_decay_ratio(LPG_PLUCK,  0.8f);
+
+    printf("  late/early peak within the held gate:\n");
+    printf("    BYPASS            = %.3f  (flat sustain, the bug)\n", bypass);
+    printf("    PLUCK decay=0.2   = %.3f  (short ring)\n", fast);
+    printf("    PLUCK decay=0.8   = %.3f  (long ring)\n", slow);
+
+    bool ok = true;
+    if (bypass < 0.0f || fast < 0.0f || slow < 0.0f) {
+        printf("  FAIL: no held gate long enough to measure\n");
+        return false;
+    }
+    // Bypass must stay flat — this is the shape the OSC bass had.
+    if (bypass < 0.85f) {
+        printf("  FAIL: BYPASS should hold level flat, got %.3f\n", bypass);
+        ok = false;
+    }
+    // A fast pluck must fall hard inside the gate.
+    if (fast > 0.40f) {
+        printf("  FAIL: PLUCK decay=0.2 barely decayed (%.3f) — LPG not applied\n", fast);
+        ok = false;
+    }
+    // And lpg_decay must actually reach the vactrol: a longer decay rings longer.
+    if (!(slow > fast)) {
+        printf("  FAIL: lpg_decay does not reach the LPG (0.8 ratio %.3f <= 0.2 ratio %.3f)\n",
+               slow, fast);
+        ok = false;
+    }
+
+    printf("OSC LPG_PLUCK decay: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// A held note spans several sequencer steps: the first carries the gate, the rest
+// are hold continuations. gate_timer is decremented at block rate, so when a step
+// boundary falls inside a block the gate briefly drops and the hold path raises it
+// again — a rising edge that is NOT a note onset. Under a flat envelope that dip is
+// inaudible, but LPG_PLUCK re-blooms the vactrol on it, turning a two-note phrase
+// into fourteen plucks.
+//
+// Drives the real sequencer with a two-note lick whose notes span 8 and 6 steps, and
+// counts audible re-articulations. The gate-onset count is reported alongside as the
+// contrast: the sequencer still toggles voice_active many times either way.
+static bool test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step() {
+    printf("\n=== Test: LPG_PLUCK blooms per note onset, not per hold step ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+
+    engine->pulsar_track_volume[0].store(0.12f, std::memory_order_relaxed);
+    engine->pulsar_track_volume_space[0].store(0.12f, std::memory_order_relaxed);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+
+    engine->pulsar_track_lpg_mode[0].store(2, std::memory_order_relaxed);   // PLUCK
+    engine->pulsar_track_lpg_mode_space[0].store(2, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay[0].store(0.62f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay_space[0].store(0.62f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour[0].store(0.35f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour_space[0].store(0.35f, std::memory_order_relaxed);
+
+    // Two notes: 2.0 beats (8 steps) then 1.5 beats (6 steps), 8-beat loop.
+    engine->pulsar_lick[0].scale_degree = 2;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.95f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[1].scale_degree = 0;
+    engine->pulsar_lick[1].duration = 1.5f;
+    engine->pulsar_lick[1].velocity = 0.85f;
+    engine->pulsar_lick[1].glide_rate = 0.35f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.05f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(2, std::memory_order_relaxed);  // publish last
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(80.0f, std::memory_order_relaxed);
+
+    // Count vactrol blooms directly off the LPG envelope rather than guessing at
+    // them from the audio peak: a glide sweeping the gate's cutoff also moves the
+    // peak, which makes peak-jump counting produce false onsets. A bloom is the
+    // envelope gain jumping up; anything else is the decay running.
+    const int kBlocks = 1200;
+    int note_ons = 0, blooms = 0;
+    float prev_gain = 0.0f;
+    for (int i = 0; i < kBlocks; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (ts.pending_retrig) note_ons++;
+        float g = ts.osc_lpg.envelope.gain();
+        if (g > prev_gain * 1.5f && g > 0.05f) blooms++;
+        prev_gain = g;
+    }
+    orpheus_engine_destroy(engine);
+
+    printf("  %.1f s / 2 cycles: note onsets=%d, vactrol blooms=%d\n",
+           kBlocks * kBlockFrames / 48000.0f, note_ons, blooms);
+
+    bool ok = true;
+    if (note_ons < 3) {
+        printf("  FAIL: fixture fired almost no notes (%d) - not a real test\n", note_ons);
+        ok = false;
+    }
+    // The property under test: exactly one bloom per note onset. Blooming per hold
+    // step gave 14 per cycle against 2 note onsets.
+    if (blooms != note_ons) {
+        printf("  FAIL: %d blooms for %d note onsets - the vactrol is retriggering off-note\n",
+               blooms, note_ons);
+        ok = false;
+    }
+    printf("Bloom per note onset: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_osc_tests() {
     printf("\n=== Pulsar OSC Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -450,5 +648,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_opening_note_floor_lifts_the_first_pattern()) suite_pass++; else suite_fail++;
     if (test_pulsar_opening_note_floor_unset_matches_explicit_zero()) suite_pass++; else suite_fail++;
     if (test_pulsar_opening_note_floor_never_lowers_the_engine_floor()) suite_pass++; else suite_fail++;
+    if (test_pulsar_osc_lpg_pluck_decays_under_held_gate()) suite_pass++; else suite_fail++;
+    if (test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

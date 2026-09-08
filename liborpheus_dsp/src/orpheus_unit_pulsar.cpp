@@ -2443,6 +2443,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             stmlib::BufferAllocator allocator(
                 state->voice_alloc_buffers[t], kVoiceAllocBytes_Pulsar);
             state->tracks[t].voice.Init(&allocator);
+            state->tracks[t].osc_lpg.Init();
             state->tracks[t].braids_voice.Init();
             state->tracks[t].tides_env.Init();
             state->tracks[t].mod_poly_lfo.Init();
@@ -5046,13 +5047,34 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             const int trig_off =
                 (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
                     ? ts.trigger_offset : 0;
+            // OSC has no row in kOrpheusLpgDefault (that table cannot be
+            // indexed by -1), so ENGINE_DEFAULT resolves to BYPASS here and
+            // the LPG stays strictly opt-in per vibe.
+            LpgMode osc_lpg_mode = static_cast<LpgMode>(active_lpg_mode);
+            if (osc_lpg_mode == LPG_ENGINE_DEFAULT) osc_lpg_mode = LPG_BYPASS;
+
+            // The vactrol blooms on a note ONSET, not on any rising gate edge.
+            // gate_timer is decremented at block rate, so a held note whose step
+            // boundary falls inside a block drops voice_active for that block and
+            // the hold continuation raises it again; treating those as note-ons
+            // re-blooms the LPG several times per note. pending_retrig is set only
+            // by the normal trigger path (never by the hold path) and is still
+            // intact here — the Tides envelope below is what consumes it.
+            const bool osc_note_on = ts.pending_retrig;
+
             if (trig_off > 0) {
+                const int g_pre = ts.gate_pre_boundary ? 1 : 0;
                 osc::process_osc_block(
                     ts.osc_state, note_for_render,
                     clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
                     ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
-                    ts.gate_pre_boundary ? 1 : 0,
+                    g_pre,
                     sample_rate, track_buffer, trig_off);
+                // The onset lands at trig_off, so the pre-boundary segment is
+                // always the previous note's tail: never a bloom.
+                ts.osc_lpg.Process(osc_lpg_mode, note_for_render,
+                                   ts.lpg_decay, ts.lpg_colour,
+                                   false, g_pre, track_buffer, trig_off);
             }
             osc::process_osc_block(
                 ts.osc_state, note_for_render,
@@ -5060,6 +5082,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
                 gate_for_render,
                 sample_rate, track_buffer + trig_off, num_frames - trig_off);
+            ts.osc_lpg.Process(osc_lpg_mode, note_for_render,
+                               ts.lpg_decay, ts.lpg_colour,
+                               osc_note_on, gate_for_render,
+                               track_buffer + trig_off, num_frames - trig_off);
         } else {
             // Sub-block trigger accuracy: split the render at the intra-block
             // step-boundary offset so the voice's gate edge — and with it the

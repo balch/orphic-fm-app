@@ -140,6 +140,62 @@ static const LpgMode kOrpheusLpgDefault[kOrpheusMaxEngines] = {
     LPG_BYPASS,    // 23: HiHat
 };
 
+// Standalone vactrol LPG over an already-rendered buffer, in place.
+//
+// OrpheusVoice owns one of these internally; Pulsar's OSC branch needs its own
+// because it bypasses the voice entirely and would otherwise reach the mix with
+// no envelope but Pulsar's, which sustains at full level for the whole gate.
+//
+// Processes in kOrpheusBlockSize chunks so the vactrol sees the same call rate
+// it does inside the voice — the decay constants scale with the chunk length,
+// so a caller's arbitrary segment length keeps identical time constants.
+struct OrpheusLpg {
+    plaits::LPGEnvelope envelope;
+    plaits::LowPassGate filter;
+
+    void Init() {
+        envelope.Init();
+        filter.Init();
+    }
+
+    void Process(LpgMode mode, float note, float lpg_decay, float lpg_colour,
+                 bool rising_edge, int gate, float* buf, int num_frames) {
+        if (mode == LPG_BYPASS || num_frames <= 0) return;
+        int done = 0;
+        bool rise = rising_edge;
+        while (done < num_frames) {
+            int chunk = num_frames - done;
+            if (chunk > kOrpheusBlockSize) chunk = kOrpheusBlockSize;
+
+            // Plaits' formulas (voice.cc:236-243), block length parameterized.
+            const float bs = static_cast<float>(chunk);
+            const float kSr = plaits::kSampleRate;
+            const float short_decay =
+                (200.0f * bs) / kSr * stmlib::SemitonesToRatio(-96.0f * lpg_decay);
+            const float decay_tail =
+                (20.0f * bs) / kSr *
+                stmlib::SemitonesToRatio(-72.0f * lpg_decay + 12.0f * lpg_colour) -
+                short_decay;
+
+            if (mode == LPG_PLUCK) {
+                // Only the chunk carrying the note-on re-triggers the bloom;
+                // after that the asymmetric decay runs regardless of gate.
+                if (rise) envelope.Trigger();
+                const float attack = plaits::NoteToFrequency(note) * bs * 2.0f;
+                envelope.ProcessPing(attack, short_decay, decay_tail, lpg_colour);
+            } else {
+                envelope.ProcessLP((gate != 0) ? 1.0f : 0.0f,
+                                   short_decay, decay_tail, lpg_colour);
+            }
+
+            filter.Process(envelope.gain(), envelope.frequency(),
+                           envelope.hf_bleed(), buf + done, chunk);
+            rise = false;
+            done += chunk;
+        }
+    }
+};
+
 // Soft saturation matching Kotlin DspPlaitsUnit.softLimit():
 // Linear below 0.5, tanh saturation above.
 static inline float soft_limit(float x) {
