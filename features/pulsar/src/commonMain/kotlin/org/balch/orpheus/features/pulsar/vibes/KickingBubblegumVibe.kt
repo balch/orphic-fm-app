@@ -20,6 +20,7 @@ import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
+import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
@@ -66,16 +67,21 @@ class KickingBubblegumVibe : VibeProvider {
 
     // E BLUES degrees: 0=E root, 1=G b3, 2=A 4, 3=Bb b5, 4=B 5, 5=D b7.
     //
-    // Two notes, then silence. loopLength 8 = 2 bars, and the expander clears everything
-    // past the notes to rests, so the 4.5 beats after the E are the gap the echo lives in.
-    // Nothing is authored there, which means mutation can never fill it.
+    // E, up to A, back to E, up to G, back to E. 3 beats of notes; the expander clears
+    // the rest of the pattern to rests, so what follows is the gap the echo lives in.
     //
-    // Four numbers to move by ear: how long A holds, how long E rings, how fast it falls,
-    // and how much silence follows (loopLength).
+    // glideRate is a TIME and the ear reads pitch from a note's ATTACK, so a glide has
+    // to land inside the first few tens of ms or the note is heard at the pitch it left,
+    // not the one it arrives at. 0.12 lands in ~85 ms; 0.28 takes ~170 ms, which is the
+    // entire length of a .25f note here, and 0.38 (~260 ms) never arrives at all.
+    //
+    // So the slides live on the two LONG notes and the short returns to the root are
+    // struck clean. Glide on every step is what turns this from a lick into one smear.
     private val introLick = Lick(
         steps = listOf(
-            LickStep(scaleDegree = 2, duration = 2.0f, velocity = 0.95f),
-            LickStep(scaleDegree = 0, duration = 1.5f, velocity = 0.85f, glideRate = 0.35f),
+            LickStep(scaleDegree = 0, duration = .25f, velocity = 0.5f),
+            LickStep(scaleDegree = 2, duration = 2.0f, velocity = 0.95f, glideRate = .12f),
+            LickStep(scaleDegree = 0, duration = .5f, velocity = 0.85f, glideRate = .3f),
         ),
         loopLength = 8,
     )
@@ -96,7 +102,15 @@ class KickingBubblegumVibe : VibeProvider {
                     // Morph is DECAY on the drum engines, so this is the long ringing kick.
                     // Pinning it here also keeps the tension evolution sweep off the kit and
                     // on the bass, which is the only voice whose tone should be moving.
-                    0 to TrackSectionOverride(volume = 0.82f, morph = 0.85f, density = 0.25f),
+                    0 to TrackSectionOverride(
+                        volume = 0.82f,
+                        morph = 0.85f,
+                        density = 0.25f,
+                        // The gap belongs to the bass echo. Enough send to place the
+                        // kick in the same room, not enough to fill the four bars after it.
+                        reverbSend = 0.25f,
+                        delaySend = 0.20f,
+                    ),
                     1 to TrackSectionOverride(density = 0f),   // snare waits
                     2 to TrackSectionOverride(density = 0f),   // hat waits
                     6 to TrackSectionOverride(volume = 0.12f), // the bed is a rumor
@@ -142,7 +156,7 @@ class KickingBubblegumVibe : VibeProvider {
                 chordsPerBar = 1,
                 customProgression = tonicProgression,
             ),
-            progressionAnchor = ProgressionAnchor.EVERY_8,
+            progressionAnchor = ProgressionAnchor.EVERY_16,
             progressionDriftRange = 0.05f,  // planted
             tracks = listOf(
                 // Track 0 — Kick (BD): the heartbeat. Long decay set per section.
@@ -192,10 +206,10 @@ class KickingBubblegumVibe : VibeProvider {
                 // asks for a slide gets one, so the A always lands dead-on and just the fall
                 // is a slide. The delay send IS the echo.
                 //
-                // OSC is the panel's own tri+square oscillator, and it bypasses OrpheusVoice
-                // entirely: no LPG and no velocity accent, so Pulsar's AD envelope is the
-                // whole shape. That is blunter and more percussive than a Plaits voice —
-                // which is the point here.
+                // OSC is the panel's own tri+square oscillator and bypasses OrpheusVoice,
+                // so the vactrol below is the note's whole shape. Pulsar's AD envelope holds
+                // full level for the entire gate, which on its own reads as an organ.
+                // lpgMode PLUCK is what makes this a struck string instead.
                 //
                 // harmonics/timbre/morph are deliberately NOT authored. On OSC all three are
                 // macro- and evolution-driven on this track, so a static would be a value the
@@ -203,6 +217,12 @@ class KickingBubblegumVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.OSC,
                     volume = 0.90f,
+                    // The pluck. PLUCK blooms on note-on then decays regardless of how long
+                    // the gate is held, so both notes get an attack and a ring.
+                    // lpgDecay is ring LENGTH: 0.2 is a short thud, 0.8 nearly sustains.
+                    lpgMode = LpgMode.PLUCK,
+                    lpgDecay = 0.70f,        // long enough that the slide lands while it still sounds
+                    lpgColour = 0.35f,        // dark tail, bite only on the attack
                     // Modulator an octave up: harmonic, so it adds bite without smearing the
                     // fundamental. 1f is fatter and buzzier, 1.5f goes clangy.
                     fmRatio = 2f,
@@ -215,14 +235,14 @@ class KickingBubblegumVibe : VibeProvider {
                     noteRangeHigh = 52,       // E3
                     reverbSend = 0.12f,
                     reverbBrightness = 0.30f,
-                    delaySend = 0.40f,
-                    glideRate = 0f,
+                    delaySend = 0.20f,
+                    glideRate = .2f,
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
                         engineSpace = bass,
                         role = TrackRole.Melodic(
-                            chordFollow = ChordFollow.ROOT_ONLY,
+                            chordFollow = ChordFollow.FOLLOW,
                             lickMode = LickMode.Fill,
                         ),
                         pan = 0.00f,
@@ -323,12 +343,12 @@ class KickingBubblegumVibe : VibeProvider {
             ),
             // Both delays map 0..1 to 0.01..2.0 SECONDS (not bars).
             effects = VibeEffects(
-                delayTimeA = 0.375f,      // 0.76 s, one beat at 80 BPM: the echo after the fall
-                delayTimeB = 0.5f,        // 1.0 s
-                delayFeedback = 0.50f,    // four or five repeats across the gap
-                delayDamping = 0.60f,     // routed but unread by the Pulsar delay today
-                reverbSize = 0.60f,       // a wide empty street
-                reverbDamping = 0.50f,
+//                delayTimeA = 0.375f,      // 0.76 s, one beat at 80 BPM: the echo after the fall
+//                delayTimeB = 0.5f,        // 1.0 s
+//                delayFeedback = 0.50f,    // four or five repeats across the gap
+//                delayDamping = 0.60f,     // routed but unread by the Pulsar delay today
+//                reverbSize = 0.60f,       // a wide empty street
+ //               reverbDamping = 0.50f,
                 reverbBrightness = 0.35f,
                 deepFloor = 0.30f,        // the echo survives Space at zero
             ),
