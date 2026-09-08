@@ -577,6 +577,12 @@ static bool test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step() {
     engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
     engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
     engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    // Pin density near 1 the way an authored gesture does, so both notes always
+    // fire. Without this the density roll drops whole notes (by design, since the
+    // whole-note fix) and the count below measures the roll, not the envelope.
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(1.0f, std::memory_order_relaxed);
 
     engine->pulsar_track_lpg_mode[0].store(2, std::memory_order_relaxed);   // PLUCK
     engine->pulsar_track_lpg_mode_space[0].store(2, std::memory_order_relaxed);
@@ -655,6 +661,12 @@ static bool test_pulsar_tides_envelope_holds_through_a_held_note() {
     engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
     engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
     engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    // Pin density near 1 the way an authored gesture does, so both notes always
+    // fire. Without this the density roll drops whole notes (by design, since the
+    // whole-note fix) and the count below measures the roll, not the envelope.
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(1.0f, std::memory_order_relaxed);
 
     // TIDES envelope, LPG out of the way: the envelope is the only shaper.
     engine->pulsar_envelope_mode.store(1, std::memory_order_relaxed);
@@ -706,6 +718,74 @@ static bool test_pulsar_tides_envelope_holds_through_a_held_note() {
     return ok;
 }
 
+// Density is rolled per gated STEP, but a multi-step note is one musical event:
+// its head carries the trigger and the rest are hold continuations. When the head
+// loses its roll the rejection clears in_hold, so the tail steps stop looking like
+// continuations and fall through to the trigger path — firing the note late, from
+// the wrong step, and without its glide (the reject also cleared prev_step_gated).
+//
+// One note spanning steps 0..7, density set mid so rolls genuinely fail. Every
+// trigger must land on step 0; a trigger on any other step is the tail firing.
+static bool test_pulsar_density_drops_whole_notes_not_note_heads() {
+    printf("\n=== Test: a lost density roll drops the whole note, not just its head ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);       // AD: leaves pending_retrig readable
+    // Mid density so some rolls fail and some pass — the whole point of the test.
+    engine->pulsar_track_macros[0].energy_density_min.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(0.5f, std::memory_order_relaxed);
+
+    // One note, 2.0 beats = 8 sequencer steps, head at step 0.
+    engine->pulsar_lick[0].scale_degree = 0;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.9f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(1, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(140.0f, std::memory_order_relaxed);  // more cycles per run
+
+    // A tail step is one whose predecessor is gated with hold=true. Checking the
+    // live pattern rather than a fixed step index keeps the assertion honest when
+    // the deja-vu reset regenerates the pattern partway through the run.
+    int total = 0, tail_fires = 0, head_fires = 0;
+    for (int i = 0; i < 4000; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (!ts.pending_retrig) continue;
+        int ph = ts.playhead;
+        if (ph < 0 || ph >= ts.step_count) continue;
+        total++;
+        int prev = (ph == 0) ? (ts.step_count - 1) : (ph - 1);
+        if (ts.steps[prev].gate && ts.steps[prev].hold) tail_fires++;
+        else head_fires++;
+    }
+    orpheus_engine_destroy(engine);
+
+    printf("  triggers: %d total, %d on note heads, %d on hold-tail steps\n",
+           total, head_fires, tail_fires);
+
+    bool ok = true;
+    if (total < 5) {
+        printf("  FAIL: fixture produced almost no triggers (%d) - not a real test\n", total);
+        ok = false;
+    }
+    if (tail_fires != 0) {
+        printf("  FAIL: %d triggers fired from hold-tail steps instead of the note head\n", tail_fires);
+        ok = false;
+    }
+    printf("Density drops whole notes: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_osc_tests() {
     printf("\n=== Pulsar OSC Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -719,5 +799,6 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_osc_lpg_pluck_decays_under_held_gate()) suite_pass++; else suite_fail++;
     if (test_pulsar_osc_lpg_blooms_once_per_note_not_per_hold_step()) suite_pass++; else suite_fail++;
     if (test_pulsar_tides_envelope_holds_through_a_held_note()) suite_pass++; else suite_fail++;
+    if (test_pulsar_density_drops_whole_notes_not_note_heads()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

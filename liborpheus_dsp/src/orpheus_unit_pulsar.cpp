@@ -1586,6 +1586,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.current_velocity = 0.8f;
         ts.glide_rate = 0.0f;
         ts.prev_step_gated = false;
+        ts.suppress_hold_tail = false;
         ts.last_chord_index = -1;
         ts.mod_poly_lfo.Init();
         ts.mod_slope.Init();
@@ -2453,6 +2454,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             std::memset(state->tracks[t].mod_lfo_output, 0, sizeof(state->tracks[t].mod_lfo_output));
             state->tracks[t].mod_lfo_initialized = true;
             state->tracks[t].in_hold = false;
+            state->tracks[t].suppress_hold_tail = false;
             state->tracks[t].hold_steps_remaining = 0;
         }
         // PT-1: acquire load (like the steady-state path below) so the param
@@ -4290,6 +4292,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if (state->void_state.suppress_note_ons) {
                     ts.prev_step_gated = false;
                     ts.in_hold = false;
+                    ts.suppress_hold_tail = step.hold;
+                    continue;
+                }
+                // Density is rolled per gated STEP, but a multi-step note is one
+                // musical event. When its head lost the roll the rejection cleared
+                // in_hold, so the steps behind it no longer look like continuations
+                // and would fall through to the trigger path below — firing the note
+                // late, off the wrong step, and without its glide (prev_step_gated
+                // was cleared too). Drop the whole chain instead; step.hold carries
+                // the suppression to the last step of the note and no further.
+                if (ts.suppress_hold_tail) {
+                    ts.suppress_hold_tail = step.hold;
+                    ts.prev_step_gated = false;
+                    ts.in_hold = false;
                     continue;
                 }
                 // Hold continuation: previous step had hold=true, extend gate without retrigger
@@ -4315,6 +4331,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (fx_prob <= 0.001f && lift <= 0.001f) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
+                            ts.suppress_hold_tail = step.hold;
                             fx_skip = true;
                         }
                     }
@@ -4334,6 +4351,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             !duck_passes(ts.playhead, t, state->loop_count, duck_mod)) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
+                            ts.suppress_hold_tail = step.hold;
                             continue;
                         }
 
@@ -4344,6 +4362,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (ts.solo_simplify && !fill_bar && step.velocity < 0.45f) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
+                            ts.suppress_hold_tail = step.hold;
                             continue;
                         }
 
@@ -4590,11 +4609,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 ts.current_pitch = ts.target_pitch;
                             }
                             ts.prev_step_gated = true;
+                            ts.suppress_hold_tail = false;
                             // Start or continue a hold chain if this step has hold=true
                             ts.in_hold = step.hold;
                         } else {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
+                            ts.suppress_hold_tail = step.hold;
                         }
                     }
                 }

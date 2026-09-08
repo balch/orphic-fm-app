@@ -316,6 +316,10 @@ struct PulsarTrackState {
     float target_pitch;      // target from current step
     float glide_rate;        // per-sample pitch change (MIDI notes/sample)
     bool prev_step_gated;    // was the previous step also gated
+    // Set when a gated step is rejected (density roll, duck, solo simplify). Makes
+    // the rest of that note's hold chain drop with it instead of falling through to
+    // the trigger path as fresh onsets. Cleared by the last step of the chain.
+    bool suppress_hold_tail = false;
     int last_chord_index = -1;   // track chord-change edges for per-chord glide
     BarStrategy bar_strategy;
 
