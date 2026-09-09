@@ -3,6 +3,18 @@ plugins {
     alias(libs.plugins.metro)
 }
 
+// ── Golden fixture guarding the Kotlin<->Swift widget wire schema ─────────────
+// fixtures/snapshot-golden.json lives outside this module (in iosApp/), so without
+// an explicit Gradle input, a fixture-only edit leaves jvmTest UP-TO-DATE and
+// DjWidgetGoldenFixtureTest silently never reruns. See its KDoc for how to
+// regenerate the fixture.
+tasks.named<Test>("jvmTest") {
+    inputs.files(file("../iosApp/DjWidgetExtension/fixtures/snapshot-golden.json"))
+        .withPropertyName("widgetGoldenFixture")
+        .withPathSensitivity(PathSensitivity.NAME_ONLY)
+        .optional()
+}
+
 kotlin {
     android {
         namespace = "org.balch.orpheus.djapp"
