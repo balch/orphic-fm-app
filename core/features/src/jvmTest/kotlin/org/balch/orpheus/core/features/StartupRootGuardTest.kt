@@ -46,7 +46,10 @@ class StartupRootGuardTest {
             "apps/orpheus/webApp/src/wasmJsMain/kotlin/org/balch/orpheus/main.wasmJs.kt",
             "apps/djapp/androidApp/src/main/kotlin/org/balch/djapp/DjAppApplication.kt",
             "apps/djapp/desktopApp/src/main/kotlin/org/balch/orpheus/djapp/main.kt",
-            "apps/djapp/shared/src/iosMain/kotlin/org/balch/orpheus/djapp/main.ios.kt",
+            // DjApp's iOS startup moved out of the composition: AppDelegate calls
+            // DjAppHost.bootGraph(), which is where the hook now runs. main.ios.kt
+            // only consumes the already-booted graph.
+            "apps/djapp/shared/src/iosMain/kotlin/org/balch/orpheus/djapp/DjAppHost.kt",
         )
 
         /** Roots that no longer belong on a graph interface at all. */
