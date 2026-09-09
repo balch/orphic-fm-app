@@ -14,6 +14,7 @@ targets:
       - path: DjApp
         excludes:
           - Info.plist
+      - path: DjAppWidgetShared
     info:
       path: DjApp/Info.plist
       properties:
@@ -43,6 +44,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app
+        CODE_SIGN_ENTITLEMENTS: DjApp/DjApp.entitlements
         APP_DISPLAY_NAME: "Orphic DJ"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         OTHER_LDFLAGS:
@@ -75,6 +77,8 @@ targets:
           FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
             - "$(inherited)"
             - "$(SRCROOT)/../shared/build/bin/iosSimulatorArm64/releaseFramework"
+    dependencies:
+      - target: DjWidgetExtension
     # Compose Multiplatform resources (album art posters etc.) are read at
     # runtime from <app bundle>/compose-resources/ (the CMP iOS reader's
     # fallback for statically linked frameworks). The bare xcodegen build has
@@ -172,4 +176,56 @@ targets:
             - "$(inherited)"
             - "$(SRCROOT)/../ai/build/bin/iosSimulatorArm64/releaseFramework"
 
+  DjWidgetExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: DjWidgetExtension
+        excludes:
+          - Info.plist
+          - DjWidgetExtension.entitlements
+          - fixtures
+      - path: DjAppWidgetShared
+    info:
+      path: DjWidgetExtension/Info.plist
+      properties:
+        CFBundleDisplayName: "Orphic DJ"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app.widget
+        CODE_SIGN_ENTITLEMENTS: DjWidgetExtension/DjWidgetExtension.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: "Orphic DJ"
+        # Fallback for ad-hoc Xcode builds; the archive script overrides both
+        # from git (nearest tag / total commit count) — see build-logic's
+        # orpheus.android.app.gradle.kts for the Android-side equivalent.
+        MARKETING_VERSION: "1.9.0"
+        CURRENT_PROJECT_VERSION: "3"
+        SKIP_INSTALL: "YES"
+        # No OTHER_LDFLAGS / FRAMEWORK_SEARCH_PATHS here — deliberate. The extension
+        # never links DjAppShared; DjTransportIntent.swift only declares the button,
+        # DjAppHost.perform() runs in the app process. Do not add a framework link
+        # or a Compose-resources copy phase to this target.
+        # iPhone and iPad, matching DjApp's TARGETED_DEVICE_FAMILY — a widget
+        # extension can only appear on the device families its host app supports,
+        # and DjApp's iPad support exists for the large-screen dock (900x500dp+).
+        TARGETED_DEVICE_FAMILY: "1,2"
 
+  DjWidgetExtensionTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: DjWidgetExtensionTests
+      - path: DjWidgetExtension/fixtures
+        buildPhase: resources
+      - path: DjAppWidgetShared
+    dependencies:
+      - target: DjWidgetExtension
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
