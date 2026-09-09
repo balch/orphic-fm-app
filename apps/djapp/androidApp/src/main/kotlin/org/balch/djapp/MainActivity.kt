@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjApp
+import org.balch.orpheus.djapp.startDjAudio
 import org.balch.orpheus.djapp.tvDensityScale
 
 class MainActivity : ComponentActivity() {
@@ -74,6 +75,7 @@ class MainActivity : ComponentActivity() {
                         if (controller.state.value == PlaybackState.Playing) controller.pause()
                         else controller.play()
                     },
+                    startAudio = { graph.startDjAudio() },
                 ) {
                     InAppUpdateHost(
                         manager = graph.inAppUpdateManager,

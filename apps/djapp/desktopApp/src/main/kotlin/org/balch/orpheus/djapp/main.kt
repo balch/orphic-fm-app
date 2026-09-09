@@ -46,6 +46,7 @@ fun main() {
                     if (controller.state.value == PlaybackState.Playing) controller.pause()
                     else controller.play()
                 },
+                startAudio = { graph.startDjAudio() },
             )
             }
         }

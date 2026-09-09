@@ -1,19 +1,14 @@
 package org.balch.orpheus.djapp
 
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.window.ComposeUIViewController
-import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
-import org.balch.orpheus.djapp.di.DjAppGraphIos
 import platform.UIKit.UIApplication
 
 fun MainViewController() = ComposeUIViewController {
-    val graph = remember {
-        createGraphFactory<DjAppGraphIos.Factory>().create()
-    }
-    // Builds every @StartupRoot, then the graph's startup features.
-    remember { graph.startupInitializer.run() }
+    // The graph is built by DjAppHost from AppDelegate, not here — a background
+    // launch never composes, so construction cannot live in the composition.
+    val graph = DjAppHost.requireGraph()
 
     // Keep the screen awake only while actively playing, mirroring the Android
     // MainActivity's FLAG_KEEP_SCREEN_ON gating on PlaybackController.state.
@@ -34,5 +29,6 @@ fun MainViewController() = ComposeUIViewController {
             if (controller.state.value == PlaybackState.Playing) controller.pause()
             else controller.play()
         },
+        startAudio = { DjAppHost.startAudio() },
     )
 }

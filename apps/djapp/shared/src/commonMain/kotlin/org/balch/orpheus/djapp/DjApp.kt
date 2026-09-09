@@ -21,7 +21,6 @@ import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.SynthFeatureRegistry
 import org.balch.orpheus.core.features.feature
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.djapp.di.DjAppGraph
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.visualizations.VizFeature
@@ -38,6 +37,11 @@ import org.balch.orpheus.ui.widgets.VizBackground
 fun DjApp(
     graph: DjAppGraph,
     onTogglePlayback: () -> Unit = {},
+    /**
+     * Starts the audio engine and applies the DJ voicing. Android Auto and iOS
+     * start audio outside the composition, so each platform passes its own.
+     */
+    startAudio: suspend () -> Unit,
     updateOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     CompositionLocalProvider(
@@ -58,30 +62,13 @@ fun DjApp(
             // Android Auto also starts the engine from DjMediaBrowserService
             // .onCreate so audio works when no Activity is composed. On the
             // launcher path (no service bound yet) this LaunchedEffect is the
-            // start trigger. On the JVM/iOS desktop paths there is no service,
-            // so this is the only call.
+            // start trigger. The JVM desktop path has no service, so this is
+            // its only call there; iOS also reaches DjAppHost.startAudio()
+            // from a cold-launch widget tap, entirely outside this composition.
             LaunchedEffect(Unit) {
                 withContext(Dispatchers.Default) {
-                    graph.synthOrchestrator.start()
-
+                    startAudio()
                     graph.synthEngine.setTurntableVizEnabled(true)
-
-                    // DJ-tuned reverb: short tail, high diffusion for tight space.
-                    // Only audible when user dials up a reverb send.
-                    // Persistence will override on subsequent launches.
-                    val engine = graph.synthEngine
-                    engine.setPluginPort(
-                        "org.balch.orpheus.plugins.reverb", "time",
-                        PortValue.FloatValue(0.35f)
-                    )
-                    engine.setPluginPort(
-                        "org.balch.orpheus.plugins.reverb", "damping",
-                        PortValue.FloatValue(0.6f)
-                    )
-                    engine.setPluginPort(
-                        "org.balch.orpheus.plugins.reverb", "diffusion",
-                        PortValue.FloatValue(0.7f)
-                    )
                 }
             }
 
