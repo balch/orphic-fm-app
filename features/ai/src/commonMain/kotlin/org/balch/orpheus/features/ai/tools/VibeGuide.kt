@@ -332,9 +332,16 @@ The highest-value part: translate a described feel into concrete parameter choic
 - The arpeggiating track wants arpSpeed 0.10–0.15. At 0.2+ the second note blips instead of leaning;
   0.9–1.0 is a strummed chord, not an arp — use that only for a deliberate stab.
 - Never ship an all-zero CompingHumanization with fills.everyNBars = 0. That combination repeats a
-  byte-identical bar forever, which no player does. Give a comping track dropProbability and
-  ghostProbability in the 0.10–0.30 band and fills every 4–8 bars with skipProbability 0.2–0.4.
-  Zero those only when the vibe is deliberately mechanical (industrial, motorik, chiptune).
+  byte-identical bar forever, which no player does. Give a comping track dropProbability in the
+  0.10–0.30 band and fills every 4–8 bars with skipProbability 0.2–0.4. Zero those only when the
+  vibe is deliberately mechanical (industrial, motorik, chiptune).
+- ghostProbability fires on the steps you left EMPTY, so how much of it a style can take depends
+  on how dense that style is. On a busy pattern (FUNK_STABS, GOSPEL_STABS, DOUBLE_TIME comping)
+  0.15–0.30 reads as a player filling the pocket. On a sparse one it writes a different part:
+  REGGAE_SKANK is two hits and fourteen rests, and the rests ARE the skank — keep it at 0 there,
+  and under 0.1 on PAD and ROCK_DOWNBEATS. It defaults to 0, so omitting it is always safe.
+- CompingHumanization fields are independent: naming three of them still inherits the fourth.
+  Write out every field you care about rather than assuming the block as a whole is authored.
 - octaveJumpProbability and extensionProbability are different in kind from the other two: they
   shift a step ±12 semitones and add 2 or 5 semitones, so they rewrite PITCH rather than rhythm,
   they can both land on one step, and every probability is scaled up by complexity — loudest in the
