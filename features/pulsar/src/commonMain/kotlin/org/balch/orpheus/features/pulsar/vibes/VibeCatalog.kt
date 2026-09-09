@@ -101,6 +101,7 @@ object VibeCatalog {
         "Odysseus Lore" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "wah", "psych")),
 
 // -----------------------------
+        "Double Shift" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "drone", "lope")),
         "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
         "Fire Sky CX" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
