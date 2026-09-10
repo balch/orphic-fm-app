@@ -4,7 +4,16 @@ import kotlinx.serialization.Serializable
 
 /**
  * One note in a bass lick pattern.
- * @param scaleDegree Index into the current scale (0 = root, 1 = 2nd degree, etc.)
+ * @param scaleDegree Index into the current scale (0 = root, 1 = 2nd degree, etc.).
+ *   Degrees at or above the scale's size wrap with an octave bump, so in a 6-note
+ *   hexatonic scale degree 6 is the root an octave up — that is how a figure reaches a
+ *   higher register without moving [Lick]'s octave.
+ *
+ *   **A NEGATIVE degree is a REST** for this step's full [duration], not a note below
+ *   the root. It is the only way to author silence inside a figure ([Lick.loopLength]
+ *   only pads silence onto the end), so a call-and-response reply opens with one.
+ *   At high [Vibe.lickMutation] a rest can still turn into a note, with probability
+ *   `mutation * 0.3` per cycle; set mutation to 0 for a rest that never moves.
  * @param duration Note length in beats (0.25 = 16th, 0.5 = 8th, 1.0 = quarter)
  * @param velocity Hit strength 0-1 (lower = ghost note feel)
  * @param glideRate Optional per-note portamento. `-1f` (default) = use the active
@@ -19,8 +28,10 @@ import kotlinx.serialization.Serializable
  *   loses its roll drops whole, taking its hold steps with it, and the note after it is
  *   struck clean rather than slid into, since there is nothing to glide from.
  *
- *   Wired for [Vibe.lick] only. [Vibe.bassLine] and [LickRotation] steps still travel the
- *   4-float transport and would ignore it, so [Vibe] rejects a non-default value there.
+ *   Honored on all three authored channels — [Vibe.lick], [Vibe.bassLine] and the
+ *   [LickRotation] pool. Each carries it in a port block parallel to its own 4-float
+ *   step transport, rather than as a fifth field in that stride, so existing step
+ *   indices mean the same thing on both sides of the bridge.
  */
 @Serializable
 data class LickStep(

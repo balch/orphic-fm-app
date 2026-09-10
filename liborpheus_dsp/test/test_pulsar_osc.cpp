@@ -856,6 +856,129 @@ static bool test_pulsar_lick_hit_probability_is_lifted_by_tension() {
     return ok;
 }
 
+// Which authored channel the probability under test travels. The single lick reaches
+// C++ through its own per-step port block; the rotation pool and the bass line ride
+// their own transports, and each needed a parallel block of its own to carry this.
+enum class ProbChannel { Pool, BassLine };
+
+// Same measurement as lick_head_fire_rate, but the probability is authored on a
+// channel OTHER than the single lick. The single lick is always set up as an
+// always-firing decoy, so a pass here cannot come from the channel silently falling
+// back to it — if the transport drops the probability, the rate returns 1.0.
+static float authored_channel_fire_rate(float hit_prob, ProbChannel channel) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_tension_inner_bars.store(1, std::memory_order_relaxed);  // pins tension at 0
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+
+    // Decoy: one note, 2.0 beats = 8 steps, head at step 0, always fires.
+    engine->pulsar_lick[0].scale_degree = 0;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.9f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[0].hit_probability = 1.0f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(1, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+
+    if (channel == ProbChannel::Pool) {
+        // Slot 0, step 0: the same figure, carrying the probability under test.
+        engine->pulsar_lick_pool_data[0] = 0.0f;   // degree
+        engine->pulsar_lick_pool_data[1] = 2.0f;   // duration
+        engine->pulsar_lick_pool_data[2] = 0.9f;   // velocity
+        engine->pulsar_lick_pool_data[3] = -1.0f;  // glide
+        engine->pulsar_lick_pool_hit_prob[0] = hit_prob;
+        engine->pulsar_lick_pool_len[0]  = 1;
+        engine->pulsar_lick_pool_loop[0] = 8;
+        engine->pulsar_lick_pool_count.store(1, std::memory_order_release);
+    } else {
+        engine->pulsar_track_lick_source[0].store(1, std::memory_order_relaxed);  // BASS
+        engine->pulsar_bass_line[0].scale_degree = 0;
+        engine->pulsar_bass_line[0].duration = 2.0f;
+        engine->pulsar_bass_line[0].velocity = 0.9f;
+        engine->pulsar_bass_line[0].glide_rate = -1.0f;
+        engine->pulsar_bass_line[0].hit_probability = hit_prob;
+        engine->pulsar_bass_line_mutation.store(0.0f, std::memory_order_relaxed);
+        engine->pulsar_bass_line_octave.store(-1, std::memory_order_relaxed);
+        engine->pulsar_bass_line_loop.store(8, std::memory_order_relaxed);
+        engine->pulsar_bass_line_length.store(1, std::memory_order_release);
+    }
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(150.0f, std::memory_order_relaxed);
+
+    int fires = 0;
+    for (int i = 0; i < 6000; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (ts.pending_retrig && ts.playhead == 0) fires++;
+    }
+    const int cycles = engine->pulsar_state->loop_count;
+    orpheus_engine_destroy(engine);
+    return (cycles > 0) ? static_cast<float>(fires) / static_cast<float>(cycles) : -1.0f;
+}
+
+static bool check_channel_carries_probability(const char* label, ProbChannel channel) {
+    const float always = authored_channel_fire_rate(1.0f, channel);
+    const float never  = authored_channel_fire_rate(0.0f, channel);
+    const float half   = authored_channel_fire_rate(0.5f, channel);
+    printf("  %s: p=1.0 -> %.2f   p=0.0 -> %.2f   p=0.5 -> %.2f\n",
+           label, always, never, half);
+
+    bool ok = true;
+    if (always < 0.99f) {
+        printf("  FAIL: %s p=1 must always fire\n", label); ok = false;
+    }
+    // The decoy single lick fires every cycle, so a dropped probability reads as 1.0
+    // here. This is the assert that the parallel transport actually arrived.
+    if (never > 0.01f) {
+        printf("  FAIL: %s p=0 must never fire (transport dropped the probability?)\n", label);
+        ok = false;
+    }
+    if (half < 0.30f || half > 0.70f) {
+        printf("  FAIL: %s p=0.5 should land near half\n", label); ok = false;
+    }
+    return ok;
+}
+
+static bool test_pulsar_authored_channels_carry_hit_probability() {
+    printf("\n=== Test: the pool and bass-line channels carry hitProbability ===\n");
+    bool ok = check_channel_carries_probability("rotation pool", ProbChannel::Pool);
+    ok &= check_channel_carries_probability("bass line", ProbChannel::BassLine);
+    printf("Authored-channel hitProbability: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// An unpushed pool slot must fall open to "always fires". The bank is plain memory
+// reused across vibe loads, and 0 is a MEANINGFUL probability here, so a zero-init
+// slot would silence a lick that never authored one.
+static bool test_pulsar_unpushed_pool_probability_defaults_to_firing() {
+    printf("\n=== Test: an unpushed pool hit probability defaults to firing ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool ok = true;
+    for (int i = 0; i < OrpheusEngine::kMaxLickPool * OrpheusEngine::kMaxLickSteps; i++) {
+        if (engine->pulsar_lick_pool_hit_prob[i] != 1.0f) {
+            printf("  FAIL: slot %d seeded %.2f, expected 1.0\n",
+                   i, engine->pulsar_lick_pool_hit_prob[i]);
+            ok = false;
+            break;
+        }
+    }
+    orpheus_engine_destroy(engine);
+    printf("Unpushed pool probability: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_osc_tests() {
     printf("\n=== Pulsar OSC Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -871,5 +994,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_tides_envelope_holds_through_a_held_note()) suite_pass++; else suite_fail++;
     if (test_pulsar_density_drops_whole_notes_not_note_heads()) suite_pass++; else suite_fail++;
     if (test_pulsar_lick_hit_probability_is_lifted_by_tension()) suite_pass++; else suite_fail++;
+    if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
+    if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

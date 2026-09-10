@@ -1519,6 +1519,12 @@ class PulsarViewModel(
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "bass_line_data_${base + 3}"),
                     FloatValue(step.glideRate))
+                // Parallel block, one port per step. Pushed unconditionally: the C++
+                // bank is plain memory reused across vibe loads, so a step left unwritten
+                // would inherit the previous vibe's probability.
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "bass_line_hit_prob_$i"),
+                    FloatValue(step.hitProbability))
             }
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "bass_line_mutation"),
@@ -1566,6 +1572,13 @@ class PulsarViewModel(
                     synthController.setPluginControl(
                         PluginControlId(PULSAR_URI, "lick_pool_data_${base + 3}"),
                         FloatValue(s.glideRate))
+                    // Parallel bank, indexed per (slot, step) rather than through the
+                    // 4-float stride above. Pushed unconditionally for the same reason
+                    // as the bass line's: the bank outlives a single vibe load.
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI,
+                            "lick_pool_hit_prob_${slot * Lick.MAX_LICK_STEPS + step}"),
+                        FloatValue(s.hitProbability))
                 }
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "lick_pool_len_$slot"),

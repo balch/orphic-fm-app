@@ -1275,8 +1275,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 state->lick_pool[s][i].duration     = engine->pulsar_lick_pool_data[b + 1];
                 state->lick_pool[s][i].velocity     = engine->pulsar_lick_pool_data[b + 2];
                 state->lick_pool[s][i].glide_rate   = engine->pulsar_lick_pool_data[b + 3];
-                // The pool transport is still 4 floats wide, so pool licks always fire.
-                state->lick_pool[s][i].hit_probability = 1.0f;
+                // Probability rides its own parallel bank, indexed per (slot, step)
+                // rather than through the 4-float stride above.
+                state->lick_pool[s][i].hit_probability =
+                    engine->pulsar_lick_pool_hit_prob[s * kMaxLickSteps + i];
             }
         }
         state->active_rotation_index = lick_pick_rotation(state->lick_select_seed, pool_count);
@@ -1300,6 +1302,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->bass_line[i].duration     = engine->pulsar_bass_line[i].duration;
         state->bass_line[i].velocity     = engine->pulsar_bass_line[i].velocity;
         state->bass_line[i].glide_rate   = engine->pulsar_bass_line[i].glide_rate;
+        state->bass_line[i].hit_probability = engine->pulsar_bass_line[i].hit_probability;
     }
     state->bass_line_mutation = engine->pulsar_bass_line_mutation.load(std::memory_order_relaxed);
     state->bass_line_octave   = engine->pulsar_bass_line_octave.load(std::memory_order_relaxed);

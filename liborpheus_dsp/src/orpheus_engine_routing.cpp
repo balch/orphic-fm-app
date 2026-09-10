@@ -1075,6 +1075,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                     OrpheusEngine::kMaxLickSteps * OrpheusEngine::kLickFieldsPerStep)
                 engine->pulsar_lick_pool_data[idx] = value;
         }
+        else if (std::strncmp(symbol, "lick_pool_hit_prob_", 19) == 0) {
+            // Parallel to lick_pool_data_, one port per (slot, step): index is
+            // slot * kMaxLickSteps + step. Same reason for being parallel rather than
+            // a fifth stride field as lick_hit_prob_ above.
+            int idx = std::atoi(symbol + 19);
+            if (idx >= 0 && idx < OrpheusEngine::kMaxLickPool * OrpheusEngine::kMaxLickSteps)
+                engine->pulsar_lick_pool_hit_prob[idx] = value;
+        }
         else if (std::strncmp(symbol, "lick_pool_len_", 14) == 0) {
             int idx = std::atoi(symbol + 14);
             if (idx >= 0 && idx < OrpheusEngine::kMaxLickPool)
@@ -1103,6 +1111,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                     case 3: engine->pulsar_bass_line[step].glide_rate = value; break;  // -1 = use track default
                 }
             }
+        }
+        else if (std::strncmp(symbol, "bass_line_hit_prob_", 19) == 0) {
+            // Parallel to bass_line_data_, one port per step — the bass line's own
+            // copy of the lick_hit_prob_ block.
+            int step = std::atoi(symbol + 19);
+            if (step >= 0 && step < OrpheusEngine::kMaxLickSteps)
+                engine->pulsar_bass_line[step].hit_probability = value;
         }
         else if (std::strcmp(symbol, "bass_line_loop") == 0)
             engine->pulsar_bass_line_loop.store(static_cast<int>(value), std::memory_order_relaxed);

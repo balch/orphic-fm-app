@@ -27,6 +27,12 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
         engine->pulsar_section_track_density[i].store(-1.0f, std::memory_order_relaxed);
 
+    // Same reasoning for the lick pool's hit probabilities: 0 means "fires only at peak
+    // tension", so a zero-init slot would silence a pool lick that never authored one.
+    // Seed the always-fires default the single-lick block gets from LickStepAtomic.
+    for (int i = 0; i < OrpheusEngine::kMaxLickPool * OrpheusEngine::kMaxLickSteps; i++)
+        engine->pulsar_lick_pool_hit_prob[i] = 1.0f;
+
     // Initialize all Plaits voices (OrpheusVoice: direct engine render)
     for (int i = 0; i < kNumVoices; i++) {
         stmlib::BufferAllocator allocator(

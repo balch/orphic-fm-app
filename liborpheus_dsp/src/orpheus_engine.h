@@ -944,6 +944,12 @@ struct OrpheusEngine {
     // rotation members plus one optional anomaly lick.
     static constexpr int kMaxLickPool = 8;
     float pulsar_lick_pool_data[kMaxLickPool * kMaxLickSteps * kLickFieldsPerStep] = {};
+    // Per-step hit probability for the pool, parallel to pulsar_lick_pool_data rather
+    // than a fifth field in its stride — widening that stride would change what every
+    // existing lick_pool_data index means on both sides of the bridge. Seeded to 1.0f
+    // in orpheus_engine_create: 0 is a MEANINGFUL probability ("fires only at peak
+    // tension"), so an unpushed slot must NOT read as zero-init silence.
+    float pulsar_lick_pool_hit_prob[kMaxLickPool * kMaxLickSteps] = {};
     int   pulsar_lick_pool_len[kMaxLickPool]  = {};
     int   pulsar_lick_pool_loop[kMaxLickPool] = {};
     float pulsar_lick_anomaly_chance = 0.0f;   // 0 = no anomaly
