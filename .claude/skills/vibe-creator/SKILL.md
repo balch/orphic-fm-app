@@ -302,7 +302,7 @@ Use when a track should play chord voicings. See `CompLabVibe.kt` for a matrix o
 
 ### `Lick` — the bass riff (optional)
 
-A repeating melodic figure that a track can snap to. Used by tracks whose role is `TrackRole.Melodic(lickMode = LickMode.Fill)` (spans whole bar) or `LickMode.Squash` (compresses to fit). Max 32 steps.
+A repeating melodic figure that a track can snap to. Used by tracks whose role is `TrackRole.Melodic(lickMode = LickMode.Fill)` (spans whole bar) or `LickMode.Squash` (compresses to fit). Max 64 steps (`Lick.MAX_LICK_STEPS`, mirroring C++ `kMaxLickSteps`).
 
 - Each `LickStep`: `scaleDegree` (0 = root, 1 = 2nd degree, …), `duration` in beats, `velocity` 0-1. **A negative `scaleDegree` is a REST** for that step's duration — *not* a below-root note (verified in `pulsar_pattern_gen.h`: `if (degree < 0)` skips the slots). The rest is reliable at low `lickMutation`; at high mutation a negative step has a `~mutation × 0.3` chance of filling in with a random note instead. This is how you put silence *between* notes inside a lick (e.g. stop-time: hit, hit, rest, walk-up).
 - `loopLength` (in beats): larger than the sum of step durations adds rest padding. Use this for "phrase then space" feels.
