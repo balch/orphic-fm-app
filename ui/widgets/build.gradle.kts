@@ -44,5 +44,13 @@ kotlin {
             // the ModalBottomSheet's own window (ImmersiveSheetEffect).
             implementation(libs.androidx.core.ktx)
         }
+
+        jvmTest.dependencies {
+            // runComposeUiTest: the knob's long press shares a pointer with its drag, and only a
+            // real pointer sequence proves a drag cancels it. The desktop runtime brings the
+            // skiko natives a headless scene needs, as the app modules' jvmMain already does.
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
+        }
     }
 }

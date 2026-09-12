@@ -390,6 +390,9 @@ fun PulsarPanel(
             }
         }
 
+        // ModeOne (every vibe on its name-hash seed, for A/B listening): a long press on the COMPLEXITY
+        // knob toggles it, and the knob pulses while it is on.
+        val modeOne by actions.modeOne.collectAsState()
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Bottom,
@@ -412,6 +415,8 @@ fun PulsarPanel(
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
                 valueFormatter = null,
+                onLongPress = actions.onToggleModeOne,
+                pulseGlow = modeOne,
             )
             RotaryKnob(
                 value = state.mood,

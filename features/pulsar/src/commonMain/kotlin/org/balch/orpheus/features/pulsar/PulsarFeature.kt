@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -202,6 +201,17 @@ data class PulsarPanelActions(
      * tint itself as trigger confirmation.
      */
     val anomalyArmed: StateFlow<Boolean> = MutableStateFlow(false),
+    /**
+     * True while Mode One pins every vibe to its name-hash seed ([PulsarViewModel.modeOneSeed]), so two
+     * builds can be A/B'd on the same roll. Session-only: never persisted, and a vibe
+     * change leaves it on. The COMPLEXITY knob pulses while it is set.
+     */
+    val modeOne: StateFlow<Boolean> = MutableStateFlow(false),
+    /**
+     * Long-press handler for the COMPLEXITY knob. Flips [modeOne] and restarts the
+     * current vibe, so the seed change is heard now rather than at the next vibe load.
+     */
+    val onToggleModeOne: () -> Unit = {},
 ) {
     companion object {
         val EMPTY = PulsarPanelActions()
@@ -407,6 +417,9 @@ class PulsarViewModel(
     // and the companion's ANOMALY_HIGHLIGHT constant for the auto-clear window.
     private val _anomalyArmed = MutableStateFlow(false)
     private var anomalyArmedResetJob: Job? = null
+    // One Mode (PulsarPanelActions.modeOne). A plain flow, not a PulsarUiState field: the
+    // state blob is persisted, and this must not outlive the session.
+    private val _modeOne = MutableStateFlow(false)
     private val energyId = synthController.controlFlow(PulsarSymbol.ENERGY.controlId)
     private val complexityId = synthController.controlFlow(PulsarSymbol.COMPLEXITY.controlId)
     private val spaceId = synthController.controlFlow(PulsarSymbol.SPACE.controlId)
@@ -857,6 +870,14 @@ class PulsarViewModel(
             }
         },
         anomalyArmed = _anomalyArmed.asStateFlow(),
+        modeOne = _modeOne.asStateFlow(),
+        onToggleModeOne = {
+            val on = !_modeOne.value
+            _modeOne.value = on
+            log.info { "Mode One ${if (on) "on: every vibe plays its name-hash seed" else "off"}" }
+            // Restart the playing vibe so the seed change is heard now, not at the next load.
+            applyVibe(vibeFlow.value)
+        },
     )
 
     // ═══════════════════════════════════════════════════════════
@@ -1466,7 +1487,7 @@ class PulsarViewModel(
                 PluginControlId(PULSAR_URI, "lick_pool_count"), FloatValue(0f))
         }
 
-        seedId.value = IntValue(vibe.seed)
+        seedId.value = IntValue(if (_modeOne.value) modeOneSeed(vibe) else vibe.seed)
         envelopeModeId.value = IntValue(vibe.envelopeType.modeIndex)
 
         // Push tension profile
@@ -2347,6 +2368,17 @@ class PulsarViewModel(
          * trigger landed.
          */
         private val ANOMALY_HIGHLIGHT = 8.seconds
+
+        /**
+         * The seed a vibe loads with while Mode One is on: the low 24 bits of its name's
+         * hash. Fixed per vibe, so a build-to-build listen compares the same roll, and
+         * different per vibe, so two kits with similar numbers do not collapse onto one
+         * pattern (on a shared seed Dog House and Rust Belt rolled identical drums).
+         * Kotlin's String.hashCode is the same on every platform. 24 bits because the port
+         * crosses to C++ as a float; nonzero because seed 0 means "random per load".
+         */
+        internal fun modeOneSeed(vibe: Vibe): Int =
+            (vibe.name.hashCode() and 0xFFFFFF).coerceAtLeast(1)
 
         private val previewVibe = Vibe(
             name = "Preview",
