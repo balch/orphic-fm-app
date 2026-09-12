@@ -439,6 +439,66 @@ static bool test_regenerate_clamps_step_count() {
     return ok;
 }
 
+// A nonzero pulsar_seed must replay the whole song, the opening pool pick included, so a
+// locked vibe (and Mode One, which pins every vibe) opens on the same figure each play.
+// load_vibe used to stir the wall clock into lick_select_seed and void_seed whatever the
+// seed, so Fire Sky .5f opened on a different pool member per launch. Eight fresh engines,
+// a full 4-member pool (this release's kMaxLickPool): a coincidental pass under the old
+// stir is (1/4)^7.
+static bool test_pinned_seed_replays_the_opening_pick() {
+    printf("\n=== Test: a pinned seed picks the same opening slot and RNG seeds on every load ===\n");
+    const int kTrials = 8;
+    const int kPool = OrpheusEngine::kMaxLickPool;
+    int first_pick = -1;
+    uint32_t first_lick_seed = 0, first_void_seed = 0;
+    bool ok = true;
+    for (int trial = 0; trial < kTrials && ok; trial++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+        unit.type = UNIT_PULSAR; unit.enabled = true;
+        engine->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        setup_fixture_baseline(engine);
+
+        const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
+        for (int s = 0; s < kPool; s++) {
+            int b = s * (S * F);
+            engine->pulsar_lick_pool_data[b + 0] = static_cast<float>(s);
+            engine->pulsar_lick_pool_data[b + 1] = 0.5f;
+            engine->pulsar_lick_pool_data[b + 2] = 0.8f;
+            engine->pulsar_lick_pool_data[b + 3] = -1.f;
+            engine->pulsar_lick_pool_len[s] = 1;
+            engine->pulsar_lick_pool_loop[s] = 8;
+        }
+        engine->pulsar_lick_anomaly_index = -1;
+        engine->pulsar_lick_anomaly_chance = 0.0f;
+        engine->pulsar_lick_pool_count.store(kPool, std::memory_order_release);
+
+        engine->pulsar_seed.store(4242, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) { ok = false; }
+        else if (trial == 0) {
+            first_pick = ps->current_lick_index;
+            first_lick_seed = ps->lick_select_seed;
+            first_void_seed = ps->void_seed;
+        } else if (ps->current_lick_index != first_pick
+                   || ps->lick_select_seed != first_lick_seed
+                   || ps->void_seed != first_void_seed) {
+            printf("  trial %d differs: pick %d vs %d, lick_select_seed %u vs %u, void_seed %u vs %u\n",
+                   trial, ps->current_lick_index, first_pick,
+                   ps->lick_select_seed, first_lick_seed, ps->void_seed, first_void_seed);
+            ok = false;
+        }
+        orpheus_engine_destroy(engine);
+    }
+    printf("  opening slot %d on every load -- %s\n", first_pick, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_lick_select_tests() {
     printf("\n=== Pulsar Lick Select ===\n");
     int passed = 0, failed = 0;
@@ -458,6 +518,7 @@ bool run_pulsar_lick_select_tests() {
     run(test_anomaly_forced_when_chance_one);
     run(test_manual_trigger_forces_lick_anomaly_once);
     run(test_regenerate_clamps_step_count);
+    run(test_pinned_seed_replays_the_opening_pick);
     printf("\n  Pulsar Lick Select: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);
 }
