@@ -1193,21 +1193,25 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // previous vibe left behind.
     state->mutation_seed = base_seed;
 
-    // Void RNG: always stir from the wall clock so the anomaly's occurrence
-    // varies per play, independent of the (possibly pinned) pattern seed.
+    // Void RNG and lick-select RNG (the pool rotation and lick anomaly). Both are
+    // salted apart from the pattern seed and from each other. On the random path they
+    // also stir the wall clock in, so the anomaly's occurrence and the rotation vary
+    // per play. On a pinned seed they derive from base_seed alone: SEED-1 above promises
+    // a locked roll replays exactly, and that has to include which figure a pool vibe
+    // opens on and when its anomaly fires, or Mode One's A/B hears a different song each
+    // launch (Fire Sky .5f did, until 2026-09-12).
     {
-        uint64_t vstir = static_cast<uint64_t>(
-            std::chrono::steady_clock::now().time_since_epoch().count());
-        state->void_seed = base_seed ^ static_cast<uint32_t>(vstir * 0x9E3779B9u) ^ 0xA5A5A5A5u;
-    }
-
-    // Lick-select RNG: play-scoped, independent of the pattern seed AND void_seed, so
-    // Fire Sky .5f rotation + anomaly vary per play. Distinct salt from void_seed.
-    {
-        uint64_t lstir = static_cast<uint64_t>(
-            std::chrono::steady_clock::now().time_since_epoch().count());
-        state->lick_select_seed = base_seed ^ static_cast<uint32_t>(lstir * 0x2545F491u) ^ 0x5A5A5A5Au;
-        if (state->lick_select_seed == 0) state->lick_select_seed = 0x1234567u;  // xorshift needs nonzero
+        uint32_t vstir = 0, lstir = 0;
+        if (seed_val == 0) {
+            const uint64_t now = static_cast<uint64_t>(
+                std::chrono::steady_clock::now().time_since_epoch().count());
+            vstir = static_cast<uint32_t>(now * 0x9E3779B9u);
+            lstir = static_cast<uint32_t>(now * 0x2545F491u);
+        }
+        state->void_seed = base_seed ^ vstir ^ 0xA5A5A5A5u;
+        if (state->void_seed == 0) state->void_seed = 0xA5A5A5A5u;  // xorshift needs nonzero
+        state->lick_select_seed = base_seed ^ lstir ^ 0x5A5A5A5Au;
+        if (state->lick_select_seed == 0) state->lick_select_seed = 0x1234567u;
     }
 
     // Snap macro smoothers to the current engine atomics so the new vibe's

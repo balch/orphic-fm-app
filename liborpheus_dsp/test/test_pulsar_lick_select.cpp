@@ -504,15 +504,16 @@ static bool test_manual_trigger_forces_lick_anomaly_once() {
 // a fixup, a Score whose opening section pins a slot plays a random lick first and then
 // audibly swaps once the per-statement resolve path (:2770) first runs.
 //
-// The UNPINNED pick is deliberately play-scoped: load_vibe's lick_select_seed stirs in
-// wall-clock time so rotation varies run to run (see its derivation, ~load_vibe:832),
-// independent of the vibe's own pulsar_seed. That means a single trial pinned to one
-// slot of a small pool has a real chance of coincidentally landing there even with the
-// fixup completely missing -- confirmed empirically while verifying this test: an
-// earlier 2-member version of this test passed under a deliberately broken decode
-// because that run's random pick happened to match the pin by chance. An 8-member pool
-// pinned to slot 7, repeated over kTrials independent engine loads, requiring EVERY
-// trial to land on 7, caps the false-pass probability at (1/8)^kTrials.
+// The UNPINNED pick is play-scoped only for seed 0: load_vibe's lick_select_seed stirs in
+// wall-clock time on the random path so rotation varies run to run (see its derivation in
+// load_vibe). A pinned seed replays the same pick (test_pinned_seed_replays_the_opening_pick),
+// which is why this test's pulsar_seed matters: a single trial pinned to one slot of a
+// small pool could coincidentally land there even with the fixup completely missing --
+// confirmed empirically while verifying this test: an earlier 2-member version of this
+// test passed under a deliberately broken decode because that run's random pick happened
+// to match the pin by chance. An 8-member pool pinned to slot 7, repeated over kTrials
+// independent engine loads, requiring EVERY trial to land on 7, keeps a lucky pick from
+// hiding a broken fixup.
 static bool test_initial_section_lick_pin_applies_immediately() {
     printf("\n=== Test: initial section's pinned lick applies on load, not after a wrap ===\n");
     const int kTrials = 10;
@@ -648,6 +649,64 @@ static bool test_rotation_reaches_top_slot() {
     return saw_top;
 }
 
+// A nonzero pulsar_seed must replay the whole song, the opening pool pick included, so a
+// locked vibe (and Mode One, which pins every vibe) opens on the same figure each play.
+// load_vibe used to stir the wall clock into lick_select_seed and void_seed whatever the
+// seed, so Fire Sky .5f opened on a different pool member per launch. Eight fresh engines,
+// an 8-member pool: a coincidental pass under the old stir is (1/8)^7.
+static bool test_pinned_seed_replays_the_opening_pick() {
+    printf("\n=== Test: a pinned seed picks the same opening slot and RNG seeds on every load ===\n");
+    const int kTrials = 8;
+    int first_pick = -1;
+    uint32_t first_lick_seed = 0, first_void_seed = 0;
+    bool ok = true;
+    for (int trial = 0; trial < kTrials && ok; trial++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+        unit.type = UNIT_PULSAR; unit.enabled = true;
+        engine->pulsar_playing.store(1, std::memory_order_relaxed);
+        engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+        setup_fixture_baseline(engine);
+
+        const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
+        for (int s = 0; s < 8; s++) {
+            int b = s * (S * F);
+            engine->pulsar_lick_pool_data[b + 0] = static_cast<float>(s);
+            engine->pulsar_lick_pool_data[b + 1] = 0.5f;
+            engine->pulsar_lick_pool_data[b + 2] = 0.8f;
+            engine->pulsar_lick_pool_data[b + 3] = -1.f;
+            engine->pulsar_lick_pool_len[s] = 1;
+            engine->pulsar_lick_pool_loop[s] = 8;
+        }
+        engine->pulsar_lick_anomaly_index = -1;
+        engine->pulsar_lick_anomaly_chance = 0.0f;
+        engine->pulsar_lick_pool_count.store(8, std::memory_order_release);
+
+        engine->pulsar_seed.store(4242, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) { ok = false; }
+        else if (trial == 0) {
+            first_pick = ps->current_lick_index;
+            first_lick_seed = ps->lick_select_seed;
+            first_void_seed = ps->void_seed;
+        } else if (ps->current_lick_index != first_pick
+                   || ps->lick_select_seed != first_lick_seed
+                   || ps->void_seed != first_void_seed) {
+            printf("  trial %d differs: pick %d vs %d, lick_select_seed %u vs %u, void_seed %u vs %u\n",
+                   trial, ps->current_lick_index, first_pick,
+                   ps->lick_select_seed, first_lick_seed, ps->void_seed, first_void_seed);
+            ok = false;
+        }
+        orpheus_engine_destroy(engine);
+    }
+    printf("  opening slot %d on every load -- %s\n", first_pick, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_lick_select_tests() {
     printf("\n=== Pulsar Lick Select ===\n");
     int passed = 0, failed = 0;
@@ -673,6 +732,7 @@ bool run_pulsar_lick_select_tests() {
     run(test_manual_trigger_forces_lick_anomaly_once);
     run(test_initial_section_lick_pin_applies_immediately);
     run(test_regenerate_clamps_step_count);
+    run(test_pinned_seed_replays_the_opening_pick);
     printf("\n  Pulsar Lick Select: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);
 }
