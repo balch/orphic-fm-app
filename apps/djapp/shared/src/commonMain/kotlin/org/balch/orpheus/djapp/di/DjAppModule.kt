@@ -12,6 +12,8 @@ import org.balch.orpheus.core.features.AgentGreetingMode
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
+import org.balch.orpheus.djapp.HornTab
+import org.balch.orpheus.features.horn.HornPanelAvailability
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.playback.OverlaySubtitleProducer
 import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
@@ -57,6 +59,15 @@ interface DjAppModule {
 
         @Provides
         fun provideRestoreStrategy(): RestoreStrategy = RestoreStrategy.USER_PREFERENCES
+
+        /**
+         * The horn panel exists only while no contribution replaces its tab (the AI edition
+         * swaps in the AI tab). A horn the user cannot see must not run, so the horn feature
+         * reads this before restoring its persisted mix.
+         */
+        @Provides
+        fun provideHornPanelAvailability(contributions: Set<DjTabContribution>): HornPanelAvailability =
+            HornPanelAvailability { contributions.none { it.replaces == HornTab } }
 
         @Provides
         fun providePulsarPlaybackMode(): PulsarPlaybackMode = PulsarPlaybackMode.EXPLICIT

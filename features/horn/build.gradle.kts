@@ -17,5 +17,9 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.pluginApi)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }

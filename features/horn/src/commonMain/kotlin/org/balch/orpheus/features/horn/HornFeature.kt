@@ -31,6 +31,17 @@ import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 
+/**
+ * Whether the app puts a horn panel in front of the user. An app graph binds this; with no
+ * binding the view model's constructor default says the panel is visible, which is the
+ * Orpheus synth's case. The DJ app's AI edition swaps the Horn tab for the AI tab, and a
+ * horn that no screen can reach must not run: a persisted mix would otherwise apply a
+ * Leslie to every vibe with nothing on screen to show it.
+ */
+fun interface HornPanelAvailability {
+    fun isVisible(): Boolean
+}
+
 @Immutable
 @Serializable
 data class HornUiState(
@@ -114,6 +125,8 @@ class HornViewModel(
     scope: FeatureCoroutineScope,
     persistence: FeatureStatePersistence,
     private val restoreStrategy: RestoreStrategy,
+    // Default keeps direct test construction terse; an app binding always wins over it.
+    private val panelAvailability: HornPanelAvailability = HornPanelAvailability { true },
 ) : HornFeature {
 
     private val speedFlow = synthController.controlFlow(HornSymbol.SPEED.controlId)
@@ -161,10 +174,14 @@ class HornViewModel(
                 speedFlow.value = FloatValue(saved.speed)
                 ratioFlow.value = FloatValue(saved.ratio)
                 depthFlow.value = FloatValue(saved.depth)
-                mixFlow.value = FloatValue(saved.mix)
+                // A horn no screen can reach stays silent; the other knobs still restore so
+                // the panel comes back as it was left. Saving this state writes mix 0 back,
+                // which is the intent: the last thing this app did was run without a horn.
+                mixFlow.value = FloatValue(if (panelAvailability.isVisible()) saved.mix else 0f)
                 brakeFlow.value = IntValue(if (saved.brake) 1 else 0)
             },
         )
+        if (!panelAvailability.isVisible()) mixFlow.value = FloatValue(0f)
     }
 
     private fun reduce(state: HornUiState, intent: HornIntent): HornUiState =
