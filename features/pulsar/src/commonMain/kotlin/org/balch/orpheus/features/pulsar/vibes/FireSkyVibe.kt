@@ -600,12 +600,12 @@ private class FireSkyVibeBase(
                     reverbSend = 0.16f,
                     delaySend = 0.14f,
                     glideRate = 0.0f,         // no slur — every riff note distinct
-                    // SUSTAINED: the vactrol follows the gate, so a riff note holds level for
-                    // its whole length, the flat sustain 2.0.5 had by accident (its hold steps
-                    // re-plucked every 16th). PLUCK at 0.5 read as too picked once a pluck
-                    // became one bloom per note. Decay is now the release tail only.
-                    lpgMode = LpgMode.SUSTAINED,
-                    lpgDecay = 0.80f,
+                    lpgMode = LpgMode.PLUCK,  // picked attack per note
+                    // Long ring: a 1-beat note falls ~6 dB before the next pick, 8ths hold
+                    // level. 0.5 read as too picked once a pluck became one bloom per note
+                    // (2.0.5 re-plucked every 16th by accident); SUSTAINED lost the pick.
+                    // Not clamped: >1 rings longer still, 1.3 is flat.
+                    lpgDecay = 0.95f,
                     lpgColour = 0.55f,
                 ).let { lead ->
                     TrackVoice(
