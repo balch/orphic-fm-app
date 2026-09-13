@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.draw.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,6 +66,7 @@ fun ExpandedDrawSequencerScreen(
     val actions = sequencerFeature.actions
     val state = uiState.sequencer
     val activeParameter = uiState.activeParameter
+    val scrollState = rememberScrollState()
 
     val shape = RoundedCornerShape(16.dp)
     val accentColor = OrpheusColors.neonCyan
@@ -108,6 +110,7 @@ fun ExpandedDrawSequencerScreen(
                     state = state,
                     activeParameter = activeParameter,
                     actions = actions,
+                    scrollState = scrollState,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -214,6 +217,7 @@ private fun ParameterListPanel(
     state: DrawSequencerState,
     activeParameter: DrawSequencerParameter?,
     actions: DrawSequencerPanelActions,
+    scrollState: ScrollState,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -234,7 +238,7 @@ private fun ParameterListPanel(
 
         Column(
             verticalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.verticalScroll(rememberScrollState())
+            modifier = Modifier.verticalScroll(scrollState)
         ) {
             DrawSequencerParameter.entries.forEach { param ->
                 val isIncluded = param in state.config.selectedParameters
