@@ -211,7 +211,7 @@ Not a Plaits engine: a triangle/square oscillator with self-feedback, the same v
 | Field | Macro that drives it | Effect on render |
 |---|---|---|
 | `energyVolume` | Energy | Per-track output gain multiplier. |
-| `energyDensity` | Energy | Per-step note-trigger probability. |
+| `energyDensity` | Energy | Per-step note-trigger probability for GENERATED steps. Lick steps skip this roll; use `LickStep.hitProbability` for a lick note that is a maybe. |
 | `complexitySwing` | Complexity | Note timing offset (track 0 only — drives the bar swing). |
 | `complexityVariation` | Complexity | Step-pattern mutation amount. |
 | `spaceDecay` | **Space** (not mood!) | Drives `morph` when `pinMorph = false`. |

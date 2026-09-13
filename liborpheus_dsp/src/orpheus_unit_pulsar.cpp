@@ -4420,6 +4420,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // TEXTURE/FX at low energy: always fire so hold chains work
                         if (t >= 5 && energy < 0.4f) fires = true;
 
+                        // Lick steps are the authored part, not a generated pattern to
+                        // thin: the vibe's density already chose them, and a note meant
+                        // as a maybe says so through hit_probability below. Rolling
+                        // energy_density here too double-gated every hook, and since a
+                        // lost head now drops its whole hold chain, a ringing lick note
+                        // became a hole the length of the note.
+                        if (step.from_lick) fires = true;
+
                         // Per-step authored uncertainty, lifted toward certainty by
                         // tension: a gesture that starts as a maybe and arrives as the
                         // section climbs. Only the note's HEAD carries a probability

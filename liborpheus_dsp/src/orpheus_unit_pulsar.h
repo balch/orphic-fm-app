@@ -44,6 +44,10 @@ struct PulsarStep {
     // steps with `steps[i] = {}` and then set fields directly, so without this a
     // chordal track would arrive with probability 0 and never fire a note.
     float hit_probability = 1.0f;
+    // True on every step a lick generator wrote (head and hold tail). Lick steps are
+    // the authored part, so the trigger path skips the energy_density roll on them;
+    // hit_probability above is the authored channel for a note that is a maybe.
+    bool from_lick = false;
 };
 
 struct PulsarMacroTarget {

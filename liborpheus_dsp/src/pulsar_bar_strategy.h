@@ -217,6 +217,7 @@ inline void bar_strategy_call_response(
             if (step_pos < half) {
                 steps[step_pos] = make_step(midi_note, vel, true, gate_frac);
                 steps[step_pos].glide_rate = ls.glide_rate;
+                steps[step_pos].from_lick = true;
             }
             step_pos += slots;
         }
@@ -293,6 +294,7 @@ inline void bar_strategy_call_response(
             if (step_pos < total_step_count) {
                 steps[step_pos] = make_step(midi_note, vel, true, gate_frac);
                 steps[step_pos].glide_rate = ls.glide_rate;
+                steps[step_pos].from_lick = true;
             }
             step_pos += slots;
         }

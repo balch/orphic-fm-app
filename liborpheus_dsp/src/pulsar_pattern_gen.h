@@ -763,10 +763,12 @@ inline void generate_lick_pattern(
             steps[step_pos].hold = (slots > 1);
             steps[step_pos].glide_rate = ls.glide_rate;
             steps[step_pos].hit_probability = ls.hit_probability;
+            steps[step_pos].from_lick = true;
         }
         for (int h = 1; h < slots && (step_pos + h) < step_count; h++) {
             steps[step_pos + h] = make_step(midi_note, vel, true, 1.0f);
             steps[step_pos + h].hold = (h < slots - 1);
+            steps[step_pos + h].from_lick = true;
         }
         step_pos += slots;
     }

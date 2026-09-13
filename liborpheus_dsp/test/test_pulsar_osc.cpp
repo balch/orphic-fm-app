@@ -718,16 +718,17 @@ static bool test_pulsar_tides_envelope_holds_through_a_held_note() {
     return ok;
 }
 
-// Density is rolled per gated STEP, but a multi-step note is one musical event:
-// its head carries the trigger and the rest are hold continuations. When the head
-// loses its roll the rejection clears in_hold, so the tail steps stop looking like
+// A note's head is rolled (density for generated steps, hitProbability for lick
+// steps), but a multi-step note is one musical event: its head carries the trigger
+// and the rest are hold continuations. When the head loses its roll the rejection
+// clears in_hold, so the tail steps stop looking like
 // continuations and fall through to the trigger path — firing the note late, from
 // the wrong step, and without its glide (the reject also cleared prev_step_gated).
 //
 // One note spanning steps 0..7, density set mid so rolls genuinely fail. Every
 // trigger must land on step 0; a trigger on any other step is the tail firing.
 static bool test_pulsar_density_drops_whole_notes_not_note_heads() {
-    printf("\n=== Test: a lost density roll drops the whole note, not just its head ===\n");
+    printf("\n=== Test: a lost head roll drops the whole note, not just its head ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit;
     make_osc_unit(unit);
@@ -736,15 +737,17 @@ static bool test_pulsar_density_drops_whole_notes_not_note_heads() {
     engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
     engine->pulsar_step_count.store(32, std::memory_order_relaxed);
     engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);       // AD: leaves pending_retrig readable
-    // Mid density so some rolls fail and some pass — the whole point of the test.
-    engine->pulsar_track_macros[0].energy_density_min.store(0.5f, std::memory_order_relaxed);
-    engine->pulsar_track_macros[0].energy_density_max.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_tension_inner_bars.store(1, std::memory_order_relaxed);  // tension 0: no lift
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
 
-    // One note, 2.0 beats = 8 sequencer steps, head at step 0.
+    // One note, 2.0 beats = 8 sequencer steps, head at step 0. Lick steps skip the
+    // energy_density roll, so the rejection under test is the hitProbability roll:
+    // mid probability so some heads fail and some pass — the whole point of the test.
     engine->pulsar_lick[0].scale_degree = 0;
     engine->pulsar_lick[0].duration = 2.0f;
     engine->pulsar_lick[0].velocity = 0.9f;
     engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[0].hit_probability = 0.5f;
     engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
     engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
@@ -853,6 +856,67 @@ static bool test_pulsar_lick_hit_probability_is_lifted_by_tension() {
     if (never_hi < 0.80f)  { printf("  FAIL: tension must lift p=0 toward certain\n"); ok = false; }
     if (half_lo < 0.30f || half_lo > 0.70f) { printf("  FAIL: p=0.5 should land near half\n"); ok = false; }
     printf("Lick hitProbability: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// The playback energy_density roll is the generator's second gate: the first is the
+// TrackVoice density that decides which steps get written. An authored lick is not a
+// generated pattern — its steps ARE the part, and hitProbability is the channel a vibe
+// uses when it wants a note to be a maybe. Rolling energy_density on lick heads on top of
+// that double-gated every hook, and since the whole-note fix a lost head is a hole the
+// length of the note rather than a one-step delay. Lick heads therefore skip the roll.
+//
+// Density pinned to 0 makes fire_prob = vel * 0.5 = 0.45: a generated head would fire
+// well under half the time, so a lick head firing every cycle is unambiguous.
+static bool test_pulsar_lick_heads_skip_the_energy_density_roll() {
+    printf("\n=== Test: lick note heads skip the energy_density roll ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_tension_inner_bars.store(1, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+
+    // One note, 2.0 beats = 8 steps, head at step 0, default hitProbability (1.0).
+    engine->pulsar_lick[0].scale_degree = 0;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.9f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[0].hit_probability = 1.0f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(1, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(150.0f, std::memory_order_relaxed);
+
+    int fires = 0;
+    for (int i = 0; i < 6000; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (ts.pending_retrig && ts.playhead == 0) fires++;
+    }
+    const int cycles = engine->pulsar_state->loop_count;
+    orpheus_engine_destroy(engine);
+
+    printf("  head fired on %d of %d cycles at energy_density 0\n", fires, cycles);
+    bool ok = true;
+    if (cycles < 5) {
+        printf("  FAIL: fixture ran almost no cycles (%d) - not a real test\n", cycles);
+        ok = false;
+    }
+    if (fires < cycles) {
+        printf("  FAIL: %d lick heads lost the energy_density roll\n", cycles - fires);
+        ok = false;
+    }
+    printf("Lick heads skip density roll: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -994,6 +1058,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_tides_envelope_holds_through_a_held_note()) suite_pass++; else suite_fail++;
     if (test_pulsar_density_drops_whole_notes_not_note_heads()) suite_pass++; else suite_fail++;
     if (test_pulsar_lick_hit_probability_is_lifted_by_tension()) suite_pass++; else suite_fail++;
+    if (test_pulsar_lick_heads_skip_the_energy_density_roll()) suite_pass++; else suite_fail++;
     if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
     if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
