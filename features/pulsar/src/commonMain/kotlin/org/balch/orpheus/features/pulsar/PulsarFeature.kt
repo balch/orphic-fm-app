@@ -101,6 +101,7 @@ import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
 import org.balch.orpheus.features.pulsar.models.lickMode
 import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
+import org.balch.orpheus.features.pulsar.playback.SectionQueue
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
 import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
@@ -295,6 +296,16 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
 
     /** Mutes the generative tracks while a GATED section waits on the conductor. */
     fun setBandHold(held: Boolean) {}
+
+    /** Section queued by [queueSection] to play when the current one ends, or -1. */
+    val queuedSectionFlow: StateFlow<Int>
+        get() = MutableStateFlow(-1)
+
+    /**
+     * Play section [index] when the current section ends. Ignored for the playing section and
+     * while the outro is armed. A no-op default for preview and stub implementations.
+     */
+    fun queueSection(index: Int) {}
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -864,6 +875,20 @@ class PulsarViewModel(
     // init{} subscribes regardless of whether this ViewModel has been constructed.
     override val arrangementStateFlow: StateFlow<PulsarArrangementState> get() = pulsarSession.arrangementStateFlow
 
+    private val sectionQueue = SectionQueue { portValue ->
+        synthController.setPluginControl(PulsarSymbol.ARRANGEMENT_SECTION_REQUEST.controlId, IntValue(portValue))
+    }
+    override val queuedSectionFlow: StateFlow<Int> get() = sectionQueue.queued
+
+    override fun queueSection(index: Int) {
+        sectionQueue.request(
+            index = index,
+            currentSection = arrangementStateFlow.value.sectionIndex,
+            sectionCount = vibeFlow.value.arrangement?.sections?.size ?: 0,
+            outroArmed = songEndingEventSource.endingTriggered.value,
+        )
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Actions
     // ═══════════════════════════════════════════════════════════
@@ -1140,6 +1165,7 @@ class PulsarViewModel(
                 .filter { it >= 0 }
                 .distinctUntilChanged()
                 .collect { sectionIndex ->
+                    sectionQueue.onSectionObserved(sectionIndex)
                     applyTrackOverridesForSection(sectionIndex)
                 }
         }
@@ -1282,6 +1308,8 @@ class PulsarViewModel(
         // a re-apply of the playing vibe emits nothing, stranding the outro.
         // Before pushArrangement so the cleared port precedes its fence.
         songEndingEventSource.onVibeApplied()
+        // The engine drops a pending section request on load; the queued chip goes with it.
+        sectionQueue.clear()
         // globalTempo will be set to vibe.bpm below — that is the 1.0× baseline
         // for the section-BPM collector to compose multipliers against.
         lastSectionMult = 1.0f

@@ -83,8 +83,9 @@ internal class StubSongEndingEventSource :
         kotlinx.coroutines.flow.MutableSharedFlow()
     override val finalSectionIndex: kotlinx.coroutines.flow.StateFlow<Int> =
         MutableStateFlow(-1)
-    override val endingTriggered: kotlinx.coroutines.flow.StateFlow<Boolean> =
-        MutableStateFlow(false)
+    /** Settable so a ViewModel test can arm the outro without running PulsarSongEnding. */
+    val endingTriggeredFlow = MutableStateFlow(false)
+    override val endingTriggered: kotlinx.coroutines.flow.StateFlow<Boolean> get() = endingTriggeredFlow
     override val resolvedTransitionStyle: kotlinx.coroutines.flow.StateFlow<TransitionStyle> =
         MutableStateFlow(TransitionStyle.FADE)
     override fun armOutro() { /* no-op for VM-construction tests */ }
