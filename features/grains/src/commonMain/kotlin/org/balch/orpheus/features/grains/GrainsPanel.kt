@@ -80,123 +80,162 @@ fun GrainsPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Spacer(Modifier.weight(0.5f))
-                
-                // Mode Selector
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    val segColors = SegmentedButtonDefaults.colors(
-                        activeContainerColor = panelColor,
-                        activeContentColor = OrpheusColors.lakersPurple,
-                        inactiveContentColor = panelColor,
-                        inactiveContainerColor = OrpheusColors.lakersPurpleDark
-                    )
-                    Learnable(
-                        controlId = "clouds_mode",
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        SingleChoiceSegmentedButtonRow(
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            GrainsMode.entries.forEachIndexed { index, mode ->
-                                SegmentedButton(
-                                    shape = SegmentedButtonDefaults.itemShape(
-                                        index = index,
-                                        count = GrainsMode.entries.size
-                                    ),
-                                    onClick = { actions.setMode(mode) },
-                                    selected = state.mode == mode,
-                                    colors = segColors,
-                                    icon = {}
-                                ) {
-                                    Text(
-                                        text = mode.displayName,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        maxLines = 1
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-                
+
+                GrainsModeSelector(state = state, actions = actions, panelColor = panelColor)
+
                 // Main content: Knobs on left, Buttons on right
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left side: Knobs in 2 rows
-                    Column(
+                    GrainsKnobBank(
+                        state = state,
+                        actions = actions,
+                        panelColor = panelColor,
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Knobs row 1
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            val knobTrackColor = OrpheusColors.grainsRed
-                            val knobProgressColor = panelColor
-                            val knobColor = OrpheusColors.fadedCyan
-                            val labelColor = panelColor
+                    )
 
-                            RotaryKnob(state.position, actions.setPosition, label = "POS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_position")
-                            RotaryKnob(state.size, actions.setSize, label = "SIZE", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_size")
-                            RotaryKnob(state.pitch, actions.setPitch, label = "PITCH", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_pitch")
-                        }
-                        
-                        // Knobs row 2
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            val knobTrackColor = OrpheusColors.grainsRed
-                            val knobProgressColor = panelColor
-                            val knobColor = OrpheusColors.fadedCyan
-                            val labelColor = panelColor
-
-                            RotaryKnob(state.density, actions.setDensity, label = "DENS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_density")
-                            RotaryKnob(state.texture, actions.setTexture, label = "TEX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_texture")
-                            RotaryKnob(state.feedback, actions.setFeedback, label = "FB", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_feedback")
-                            RotaryKnob(state.reverb, actions.setReverb, label = "REV", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_reverb")
-                            RotaryKnob(state.dryWet, actions.setDryWet, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_mix")
-                        }
-                    }
-                    
                     Spacer(Modifier.width(16.dp))
-                    
-                    // Right side: Buttons stacked vertically (TRIG on top)
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Trigger (Momentary) - ON TOP
-                        GrainsButton(
-                            label = "TRIG",
-                            active = false,
-                            onClick = { actions.trigger() },
-                            accentColor = OrpheusColors.fadedCyan,
-                            controlId = "clouds_trigger"
-                        )
-                        
-                        // Freeze Toggle - BELOW
-                        GrainsButton(
-                            label = "FREEZE",
-                            active = state.freeze,
-                            onClick = { actions.setFreeze(!state.freeze) },
-                            accentColor = panelColor,
-                            controlId = "clouds_freeze"
-                        )
-                    }
+
+                    GrainsTrigFreezeButtons(state = state, actions = actions, panelColor = panelColor)
                 }
-                
+
                 Spacer(Modifier.weight(0.5f))
             }
         }
+    }
+}
+
+/**
+ * Processing-mode segmented button row (Granular / Stretch / Looping Delay / Spectral).
+ */
+@Composable
+private fun GrainsModeSelector(
+    state: GrainsUiState,
+    actions: GrainsPanelActions,
+    panelColor: Color,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        val segColors = SegmentedButtonDefaults.colors(
+            activeContainerColor = panelColor,
+            activeContentColor = OrpheusColors.lakersPurple,
+            inactiveContentColor = panelColor,
+            inactiveContainerColor = OrpheusColors.lakersPurpleDark
+        )
+        Learnable(
+            controlId = "clouds_mode",
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                GrainsMode.entries.forEachIndexed { index, mode ->
+                    SegmentedButton(
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = GrainsMode.entries.size
+                        ),
+                        onClick = { actions.setMode(mode) },
+                        selected = state.mode == mode,
+                        colors = segColors,
+                        icon = {}
+                    ) {
+                        Text(
+                            text = mode.displayName,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Main parameter knobs (POS, SIZE, PITCH, DENS, TEX, FB, REV, MIX) in two rows.
+ */
+@Composable
+private fun GrainsKnobBank(
+    state: GrainsUiState,
+    actions: GrainsPanelActions,
+    panelColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Knobs row 1
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            val knobTrackColor = OrpheusColors.grainsRed
+            val knobProgressColor = panelColor
+            val knobColor = OrpheusColors.fadedCyan
+            val labelColor = panelColor
+
+            RotaryKnob(state.position, actions.setPosition, label = "POS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_position")
+            RotaryKnob(state.size, actions.setSize, label = "SIZE", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_size")
+            RotaryKnob(state.pitch, actions.setPitch, label = "PITCH", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_pitch")
+        }
+
+        // Knobs row 2
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            val knobTrackColor = OrpheusColors.grainsRed
+            val knobProgressColor = panelColor
+            val knobColor = OrpheusColors.fadedCyan
+            val labelColor = panelColor
+
+            RotaryKnob(state.density, actions.setDensity, label = "DENS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_density")
+            RotaryKnob(state.texture, actions.setTexture, label = "TEX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_texture")
+            RotaryKnob(state.feedback, actions.setFeedback, label = "FB", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_feedback")
+            RotaryKnob(state.reverb, actions.setReverb, label = "REV", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_reverb")
+            RotaryKnob(state.dryWet, actions.setDryWet, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_mix")
+        }
+    }
+}
+
+/**
+ * TRIG (momentary) and FREEZE (toggle) buttons stacked vertically.
+ */
+@Composable
+private fun GrainsTrigFreezeButtons(
+    state: GrainsUiState,
+    actions: GrainsPanelActions,
+    panelColor: Color,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Trigger (Momentary) - ON TOP
+        GrainsButton(
+            label = "TRIG",
+            active = false,
+            onClick = { actions.trigger() },
+            accentColor = OrpheusColors.fadedCyan,
+            controlId = "clouds_trigger"
+        )
+
+        // Freeze Toggle - BELOW
+        GrainsButton(
+            label = "FREEZE",
+            active = state.freeze,
+            onClick = { actions.setFreeze(!state.freeze) },
+            accentColor = panelColor,
+            controlId = "clouds_freeze"
+        )
     }
 }
 
@@ -210,7 +249,7 @@ private fun GrainsButton(
 ) {
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
-    
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier.size(32.dp)
