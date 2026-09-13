@@ -75,6 +75,7 @@ import org.balch.orpheus.features.pulsar.mixer.MixerPanel
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
 import org.balch.orpheus.features.reverb.ReverbPanel
 import org.balch.orpheus.features.reverb.ReverbViewModel
+import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerPanel
 import org.balch.orpheus.features.timer.TimerStatus
 import org.balch.orpheus.features.timer.TimerUiState
@@ -307,165 +308,46 @@ fun DjAppScreen(
                 }
             }
 
-            if (isLargeScreen) {
-                // TV: the visualization owns the screen and panels dock around its edges.
-                // Nothing fills the centre, so the VizBackground sibling reads through.
-                DjPanelDock(
-                    panels = dockedPanels.orEmpty(),
-                    modifier = Modifier.fillMaxSize(),
-                ) { route, panelModifier ->
-                    routePanel(route, panelModifier, true)
-                }
-            } else if (isLandscape) {
-                // Landscape: Header top, Pulsar left + nav content right
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    PulsarPanel(
-                        modifier = Modifier.weight(.5f).fillMaxHeight(),
-                        pulsar = pulsarFeature,
-                        vizFlow = synthEngine.pulsarVizFlow,
-                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                        isExpanded = true,
-                        onExpandedChange = {},
-                        showCollapsedHeader = false,
-                        showExpandedTitle = false,
-                    )
-                    Column(
-                        modifier = Modifier
-                            .weight(.5f)
-                            .fillMaxHeight()
-                            .padding(top = 4.dp)) {
-                        DjAppHeaderRow(
-                            vizFeature = vizFeature,
-                            onInfoClick = { activeSheet = VibeInfoTab },
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalPadding = 0.dp,
-                        )
-                        navContent(Modifier)
-                    }
-                }
-            } else {
-                // Portrait: Header, Pulsar top, nav content bottom
-                Column(modifier = Modifier.fillMaxSize()) {
-                    DjAppHeaderRow(
-                        vizFeature = vizFeature,
-                        onInfoClick = { activeSheet = VibeInfoTab },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                    PulsarPanel(
-                        pulsar = pulsarFeature,
-                        vizFlow = synthEngine.pulsarVizFlow,
-                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                        modifier = Modifier.weight(.6f).fillMaxWidth(),
-                        isExpanded = true,
-                        onExpandedChange = {},
-                        showCollapsedHeader = false,
-                        showExpandedTitle = false,
-                    )
-                    navContent(Modifier.weight(.4f).fillMaxWidth())
-                }
-            }
+            DjAppMainContent(
+                isLargeScreen = isLargeScreen,
+                isLandscape = isLandscape,
+                dockedPanels = dockedPanels.orEmpty(),
+                pulsarFeature = pulsarFeature,
+                synthEngine = synthEngine,
+                vizFeature = vizFeature,
+                onShowVibeInfo = { activeSheet = VibeInfoTab },
+                routePanel = routePanel,
+                navContent = navContent,
+            )
 
-            // VibeInfo is title-triggered, not a tab contribution, so it keeps its dedicated
-            // composable — but shares the single activeSheet state.
-            if (activeSheet == VibeInfoTab && !isLargeScreen) {
-                VibeInfoSheet(
-                    pulsar = pulsarFeature,
-                    vizFlow = synthEngine.pulsarVizFlow,
-                    onDismiss = { activeSheet = null },
-                )
-            }
-
-            // Contributions stay composed while closed (isOpen tracks activeSheet) so they can
-            // cancel in-flight work on close — see DjTabContribution.Content's kdoc.
-            tabContributions.forEach { contribution ->
-                if (contribution.route.opensAsSheet) {
-                    contribution.Content(
-                        isOpen = activeSheet == contribution.route,
-                        modifier = Modifier.fillMaxSize(),
-                        isLandscape = isLandscape,
-                        onDismiss = { activeSheet = null },
-                    )
-                }
-            }
+            DjAppOverlaySheets(
+                activeSheet = activeSheet,
+                isLargeScreen = isLargeScreen,
+                isLandscape = isLandscape,
+                pulsarFeature = pulsarFeature,
+                synthEngine = synthEngine,
+                tabContributions = tabContributions,
+                onDismiss = { activeSheet = null },
+            )
         }
 
         if (isLargeScreen) {
-            // TV layout: top bar (global actions) + bottom bar (panel toggles) around the stage.
-            // Provides the TV compositionLocals shared widgets and docked panels read — see each
-            // local's own kdoc (LocalTvFocusChrome, LocalTvFocusRegion, LocalTelevisionHardware)
-            // for what it gates. remember: the holder must survive recomposition or focus resets.
+            // remember: the holder must survive recomposition or focus resets.
             val focusRegion = remember { TvFocusRegionHolder() }
-            CompositionLocalProvider(
-                LocalTvFocusChrome provides true,
-                LocalTvFocusRegion provides focusRegion,
-                LocalTelevisionHardware provides isTelevisionHardware(),
-            ) {
-                // Renders nothing — owns only the idle-fade coroutine. Kept as its own composable
-                // (not inlined here) so recomposing it on every key event never re-invokes the
-                // Column below, let alone Pulsar or any docked panel.
-                TvFocusIdleWatcher(focusRegion)
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        // Tunnels through here before reaching whatever's focused — this ONLY
-                        // timestamps activity and always returns false, so it never consumes the
-                        // event or otherwise changes behavior. Confirmed safe: nothing else in
-                        // this tree uses onPreviewKeyEvent, and every D-pad adjust-mode handler
-                        // (RotaryKnob, SegmentedAlgoKnob, BenderFaderWidget) uses onKeyEvent,
-                        // which fires during the later bubbling phase exactly as before.
-                        .onPreviewKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown) focusRegion.notifyActivity()
-                            false
-                        },
-                ) {
-                    DjTvTopBar(
-                        vizFeature = vizFeature,
-                        pulsarFeature = pulsarFeature,
-                        onTogglePlayback = onTogglePlayback,
-                        // The bar's top/left/right edges are all physical screen edges here.
-                        modifier = Modifier.windowInsetsPadding(
-                            platformSafeAreaInsets().only(
-                                WindowInsetsSides.Top + WindowInsetsSides.Start +
-                                    WindowInsetsSides.End
-                            )
-                        ),
-                    )
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) { stage() }
-                    DjTvBottomBar(
-                        // Sheet-only tab contributions (e.g. AI) have no dock slot of their own;
-                        // appending them here is their only entry point on this layout. Branch on
-                        // dockablePanels membership, NOT route.opensAsSheet — VibeInfoTab also has
-                        // opensAsSheet=true (it governs only the phone/tablet path per its own
-                        // kdoc) but IS in dockablePanels, so it must keep toggling the dock, not
-                        // activeSheet.
-                        panels = bottomBarPanels(dockablePanels) + tabs.filter { it.opensAsSheet },
-                        isDocked = { route ->
-                            if (route in dockablePanels) route in dockedPanels.orEmpty()
-                            else route == activeSheet
-                        },
-                        onToggle = { route ->
-                            if (route in dockablePanels) {
-                                toggleDocked(route)
-                            } else {
-                                activeSheet = if (activeSheet == route) null else route
-                            }
-                        },
-                        timerFeature = timerFeature,
-                        pulsarFeature = pulsarFeature,
-                        // Bottom/left/right edges are all physical screen edges here.
-                        modifier = Modifier.windowInsetsPadding(
-                            platformSafeAreaInsets().only(
-                                WindowInsetsSides.Bottom + WindowInsetsSides.Start +
-                                    WindowInsetsSides.End
-                            )
-                        ),
-                    )
-                }
-            }
+            DjAppTvChrome(
+                focusRegion = focusRegion,
+                vizFeature = vizFeature,
+                pulsarFeature = pulsarFeature,
+                timerFeature = timerFeature,
+                onTogglePlayback = onTogglePlayback,
+                dockablePanels = dockablePanels,
+                dockedPanels = dockedPanels,
+                activeSheet = activeSheet,
+                tabs = tabs,
+                onToggleDocked = toggleDocked,
+                onActiveSheetChange = { activeSheet = it },
+                stage = stage,
+            )
         } else {
             DjAppNavScaffold(
                 isSelected = { route ->
@@ -494,6 +376,212 @@ fun DjAppScreen(
             ) {
                 stage()
             }
+        }
+    }
+}
+
+/**
+ * Main content area: TV dock, landscape split (Pulsar left, nav right), or portrait stack
+ * (header, Pulsar, nav) depending on [isLargeScreen] / [isLandscape].
+ */
+@Composable
+private fun DjAppMainContent(
+    isLargeScreen: Boolean,
+    isLandscape: Boolean,
+    dockedPanels: List<DjRoute>,
+    pulsarFeature: PulsarFeature,
+    synthEngine: SynthEngine,
+    vizFeature: VizFeature,
+    onShowVibeInfo: () -> Unit,
+    routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit,
+    navContent: @Composable (Modifier) -> Unit,
+) {
+    if (isLargeScreen) {
+        // TV: the visualization owns the screen and panels dock around its edges.
+        // Nothing fills the centre, so the VizBackground sibling reads through.
+        DjPanelDock(
+            panels = dockedPanels,
+            modifier = Modifier.fillMaxSize(),
+        ) { route, panelModifier ->
+            routePanel(route, panelModifier, true)
+        }
+    } else if (isLandscape) {
+        // Landscape: Header top, Pulsar left + nav content right
+        Row(modifier = Modifier.fillMaxWidth()) {
+            PulsarPanel(
+                modifier = Modifier.weight(.5f).fillMaxHeight(),
+                pulsar = pulsarFeature,
+                vizFlow = synthEngine.pulsarVizFlow,
+                trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+            Column(
+                modifier = Modifier
+                    .weight(.5f)
+                    .fillMaxHeight()
+                    .padding(top = 4.dp)) {
+                DjAppHeaderRow(
+                    vizFeature = vizFeature,
+                    onInfoClick = onShowVibeInfo,
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalPadding = 0.dp,
+                )
+                navContent(Modifier)
+            }
+        }
+    } else {
+        // Portrait: Header, Pulsar top, nav content bottom
+        Column(modifier = Modifier.fillMaxSize()) {
+            DjAppHeaderRow(
+                vizFeature = vizFeature,
+                onInfoClick = onShowVibeInfo,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            PulsarPanel(
+                pulsar = pulsarFeature,
+                vizFlow = synthEngine.pulsarVizFlow,
+                trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                modifier = Modifier.weight(.6f).fillMaxWidth(),
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+            navContent(Modifier.weight(.4f).fillMaxWidth())
+        }
+    }
+}
+
+/**
+ * Modal overlays layered on top of the main content: the Vibe Info sheet (phone/tablet only —
+ * TV docks it as a panel instead) and any tab contributions that open as sheets (e.g. AI).
+ */
+@Composable
+private fun DjAppOverlaySheets(
+    activeSheet: DjRoute?,
+    isLargeScreen: Boolean,
+    isLandscape: Boolean,
+    pulsarFeature: PulsarFeature,
+    synthEngine: SynthEngine,
+    tabContributions: List<DjTabContribution>,
+    onDismiss: () -> Unit,
+) {
+    // VibeInfo is title-triggered, not a tab contribution, so it keeps its dedicated
+    // composable — but shares the single activeSheet state.
+    if (activeSheet == VibeInfoTab && !isLargeScreen) {
+        VibeInfoSheet(
+            pulsar = pulsarFeature,
+            vizFlow = synthEngine.pulsarVizFlow,
+            onDismiss = onDismiss,
+        )
+    }
+
+    // Contributions stay composed while closed (isOpen tracks activeSheet) so they can
+    // cancel in-flight work on close — see DjTabContribution.Content's kdoc.
+    tabContributions.forEach { contribution ->
+        if (contribution.route.opensAsSheet) {
+            contribution.Content(
+                isOpen = activeSheet == contribution.route,
+                modifier = Modifier.fillMaxSize(),
+                isLandscape = isLandscape,
+                onDismiss = onDismiss,
+            )
+        }
+    }
+}
+
+/**
+ * TV layout: top bar (global actions) + bottom bar (panel toggles) around the stage. Provides
+ * the TV compositionLocals shared widgets and docked panels read — see each local's own kdoc
+ * (LocalTvFocusChrome, LocalTvFocusRegion, LocalTelevisionHardware) for what it gates.
+ */
+@Composable
+private fun DjAppTvChrome(
+    focusRegion: TvFocusRegionHolder,
+    vizFeature: VizFeature,
+    pulsarFeature: PulsarFeature,
+    timerFeature: TimerFeature,
+    onTogglePlayback: () -> Unit,
+    dockablePanels: List<DjRoute>,
+    dockedPanels: List<DjRoute>?,
+    activeSheet: DjRoute?,
+    tabs: List<DjRoute>,
+    onToggleDocked: (DjRoute) -> Unit,
+    onActiveSheetChange: (DjRoute?) -> Unit,
+    stage: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(
+        LocalTvFocusChrome provides true,
+        LocalTvFocusRegion provides focusRegion,
+        LocalTelevisionHardware provides isTelevisionHardware(),
+    ) {
+        // Renders nothing — owns only the idle-fade coroutine. Kept as its own composable
+        // (not inlined here) so recomposing it on every key event never re-invokes the
+        // Column below, let alone Pulsar or any docked panel.
+        TvFocusIdleWatcher(focusRegion)
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                // Tunnels through here before reaching whatever's focused — this ONLY
+                // timestamps activity and always returns false, so it never consumes the
+                // event or otherwise changes behavior. Confirmed safe: nothing else in
+                // this tree uses onPreviewKeyEvent, and every D-pad adjust-mode handler
+                // (RotaryKnob, SegmentedAlgoKnob, BenderFaderWidget) uses onKeyEvent,
+                // which fires during the later bubbling phase exactly as before.
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown) focusRegion.notifyActivity()
+                    false
+                },
+        ) {
+            DjTvTopBar(
+                vizFeature = vizFeature,
+                pulsarFeature = pulsarFeature,
+                onTogglePlayback = onTogglePlayback,
+                // The bar's top/left/right edges are all physical screen edges here.
+                modifier = Modifier.windowInsetsPadding(
+                    platformSafeAreaInsets().only(
+                        WindowInsetsSides.Top + WindowInsetsSides.Start +
+                            WindowInsetsSides.End
+                    )
+                ),
+            )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) { stage() }
+            DjTvBottomBar(
+                // Sheet-only tab contributions (e.g. AI) have no dock slot of their own;
+                // appending them here is their only entry point on this layout. Branch on
+                // dockablePanels membership, NOT route.opensAsSheet — VibeInfoTab also has
+                // opensAsSheet=true (it governs only the phone/tablet path per its own
+                // kdoc) but IS in dockablePanels, so it must keep toggling the dock, not
+                // activeSheet.
+                panels = bottomBarPanels(dockablePanels) + tabs.filter { it.opensAsSheet },
+                isDocked = { route ->
+                    if (route in dockablePanels) route in dockedPanels.orEmpty()
+                    else route == activeSheet
+                },
+                onToggle = { route ->
+                    if (route in dockablePanels) {
+                        onToggleDocked(route)
+                    } else {
+                        onActiveSheetChange(if (activeSheet == route) null else route)
+                    }
+                },
+                timerFeature = timerFeature,
+                pulsarFeature = pulsarFeature,
+                // Bottom/left/right edges are all physical screen edges here.
+                modifier = Modifier.windowInsetsPadding(
+                    platformSafeAreaInsets().only(
+                        WindowInsetsSides.Bottom + WindowInsetsSides.Start +
+                            WindowInsetsSides.End
+                    )
+                ),
+            )
         }
     }
 }
