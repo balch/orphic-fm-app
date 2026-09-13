@@ -1,6 +1,8 @@
 package org.balch.orpheus.djapp.vibeinfo
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +70,7 @@ fun VibeInfoSheet(
         skipPartiallyExpanded = true,
         inactivityTimeoutMs = null,
     ) {
-        VibeInfoContent(model = model)
+        VibeInfoContent(model = model, onSectionClick = pulsar::queueSection)
     }
 }
 
@@ -91,6 +93,9 @@ private fun rememberVibeInfoModel(
             .distinctUntilChanged()
     }.collectAsStateWithLifecycle(initialValue = pulsar.arrangementStateFlow.value.copy(scoreTick = 0, scoreHeld = false))
     val viz by vizFlow.collectAsStateWithLifecycle()
+    // remember: stub PulsarFeatures return a fresh default flow per access.
+    val queuedSection by remember(pulsar) { pulsar.queuedSectionFlow }.collectAsStateWithLifecycle()
+    val outroArmed by remember(pulsar) { pulsar.actions.outroArmed }.collectAsStateWithLifecycle()
 
     // The C++ engine re-rolls the active engine per audio block in the 0.4–0.6
     // crossfade zone, so viz.activeEngines flickers at mid-energy. Stabilize it
@@ -112,12 +117,14 @@ private fun rememberVibeInfoModel(
     // playingMask is a single Int that only changes when a track crosses the
     // threshold.
     val playingMask = playingTrackMask(viz)
-    return remember(uiState.vibe, arrangement, uiState.energy, stableViz.activeEngines, playingMask) {
+    return remember(uiState.vibe, arrangement, uiState.energy, stableViz.activeEngines, playingMask, queuedSection, outroArmed) {
         mapVibeInfo(
             vibe = uiState.vibe,
             arrangement = arrangement,
             viz = stableViz,
             energy = uiState.energy,
+            queuedSectionIndex = queuedSection,
+            outroArmed = outroArmed,
         )
     }
 }
@@ -164,7 +171,7 @@ fun VibeInfoPanel(
         fillHeight = fillHeight,
         modifier = modifier,
     ) {
-        VibeInfoContent(model = model)
+        VibeInfoContent(model = model, onSectionClick = pulsar::queueSection)
     }
 }
 
@@ -265,6 +272,7 @@ private fun rememberStableViz(viz: PulsarVizData): PulsarVizData {
 internal fun VibeInfoContent(
     model: VibeInfoUiModel,
     modifier: Modifier = Modifier,
+    onSectionClick: (Int) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -302,8 +310,8 @@ internal fun VibeInfoContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                model.sections.forEach { section ->
-                    SectionChip(section = section)
+                model.sections.forEachIndexed { index, section ->
+                    SectionChip(section = section, onClick = { onSectionClick(index) })
                 }
             }
         }
@@ -346,16 +354,18 @@ internal fun VibeInfoContent(
 // ── Sub-composables ──────────────────────────────────────────────────────────
 
 @Composable
-private fun SectionChip(section: VibeInfoSection) {
+private fun SectionChip(section: VibeInfoSection, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(6.dp)
     val bgColor = when {
         section.isNowPlaying -> OrpheusColors.neonCyan.copy(alpha = 0.18f)
-        section.isPast       -> OrpheusColors.onSurfaceDark.copy(alpha = 0.05f)
+        section.isQueued     -> OrpheusColors.cosmicPurple.copy(alpha = 0.28f)
         else                 -> OrpheusColors.cosmicPurple.copy(alpha = 0.10f)
     }
     val textColor = when {
         section.isNowPlaying -> OrpheusColors.neonCyan
-        section.isPast       -> OrpheusColors.onSurfaceDark.copy(alpha = 0.30f)
-        else                 -> OrpheusColors.onSurfaceDark.copy(alpha = 0.70f)
+        section.isQueued     -> OrpheusColors.neonCyan.copy(alpha = 0.85f)
+        section.canQueue     -> OrpheusColors.onSurfaceDark.copy(alpha = 0.70f)
+        else                 -> OrpheusColors.onSurfaceDark.copy(alpha = 0.30f)
     }
     Text(
         text = section.name,
@@ -363,8 +373,13 @@ private fun SectionChip(section: VibeInfoSection) {
         fontWeight = if (section.isNowPlaying) FontWeight.SemiBold else FontWeight.Normal,
         color = textColor,
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(shape)
             .background(bgColor)
+            .then(
+                if (section.isQueued) Modifier.border(1.dp, OrpheusColors.neonCyan.copy(alpha = 0.6f), shape)
+                else Modifier
+            )
+            .clickable(enabled = section.canQueue, onClickLabel = "Play next", onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
 }
@@ -459,11 +474,11 @@ private fun fixtureVibeInfoModel(): VibeInfoUiModel = VibeInfoUiModel(
     keyName = "D",
     scaleName = "Minor",
     sections = listOf(
-        VibeInfoSection(name = "Intro", isNowPlaying = false, isPast = true),
-        VibeInfoSection(name = "Verse", isNowPlaying = true, isPast = false),
-        VibeInfoSection(name = "Chorus", isNowPlaying = false, isPast = false),
-        VibeInfoSection(name = "Bridge", isNowPlaying = false, isPast = false),
-        VibeInfoSection(name = "Outro", isNowPlaying = false, isPast = false),
+        VibeInfoSection(name = "Intro",  isNowPlaying = false, isQueued = false, canQueue = true),
+        VibeInfoSection(name = "Verse",  isNowPlaying = true,  isQueued = false, canQueue = false),
+        VibeInfoSection(name = "Chorus", isNowPlaying = false, isQueued = true,  canQueue = true),
+        VibeInfoSection(name = "Bridge", isNowPlaying = false, isQueued = false, canQueue = true),
+        VibeInfoSection(name = "Outro",  isNowPlaying = false, isQueued = false, canQueue = true),
     ),
     tracks = listOf(
         VibeInfoTrack(label = "KICK",    role = "Drums/Perc",   instrument = "Kick 808",      isPlaying = true),
@@ -497,6 +512,17 @@ private fun PreviewVibeInfoNoSections() {
             VibeInfoContent(
                 model = fixtureVibeInfoModel().copy(sections = emptyList()),
             )
+        }
+    }
+}
+
+@Preview(name = "VibeInfoContent – outro armed", widthDp = 360, heightDp = 560)
+@Composable
+private fun PreviewVibeInfoOutroArmed() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.deepPurple, contentColor = OrpheusColors.onSurfaceDark) {
+            val model = fixtureVibeInfoModel()
+            VibeInfoContent(model = model.copy(sections = model.sections.map { it.copy(canQueue = false) }))
         }
     }
 }

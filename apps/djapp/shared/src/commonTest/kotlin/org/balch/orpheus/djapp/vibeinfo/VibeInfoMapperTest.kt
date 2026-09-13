@@ -196,11 +196,10 @@ class VibeInfoMapperTest {
         assertEquals("Grain", result.tracks[4].instrument)
     }
 
-    // ─── Assertion 2: section isNowPlaying / isPast ─────────────────────────────
+    // ─── Assertion 2: section now-playing / queued / queueable ─────────────────
 
     @Test
-    fun `section at sectionIndex is now-playing and earlier sections are past`() {
-        // sectionIndex=2 → chorus=nowPlaying; intro+verse=past
+    fun `section at sectionIndex is now-playing and cannot be queued`() {
         val result = mapVibeInfo(
             vibe = testVibe,
             arrangement = defaultArrangement(sectionIndex = 2),
@@ -209,30 +208,41 @@ class VibeInfoMapperTest {
         )
 
         assertEquals(3, result.sections.size)
-
+        assertTrue(result.sections[2].isNowPlaying, "chorus: is now-playing")
+        assertFalse(result.sections[2].canQueue, "chorus: the playing section cannot be queued")
         assertFalse(result.sections[0].isNowPlaying, "intro: not now-playing")
-        assertTrue(result.sections[0].isPast,        "intro: is past")
-
-        assertFalse(result.sections[1].isNowPlaying, "verse: not now-playing")
-        assertTrue(result.sections[1].isPast,        "verse: is past")
-
-        assertTrue(result.sections[2].isNowPlaying,  "chorus: is now-playing")
-        assertFalse(result.sections[2].isPast,       "chorus: not past (it is current)")
+        assertTrue(result.sections[0].canQueue, "intro: queueable")
+        assertTrue(result.sections[1].canQueue, "verse: queueable")
     }
 
     @Test
-    fun `first section is now-playing with no past sections`() {
+    fun `queued section index marks only that section queued`() {
         val result = mapVibeInfo(
             vibe = testVibe,
             arrangement = defaultArrangement(sectionIndex = 0),
             viz = PulsarVizData(),
             energy = 0.5f,
+            queuedSectionIndex = 2,
         )
 
-        assertTrue(result.sections[0].isNowPlaying)
-        assertFalse(result.sections[0].isPast)
-        assertFalse(result.sections[1].isNowPlaying)
-        assertFalse(result.sections[1].isPast)
+        assertFalse(result.sections[0].isQueued)
+        assertFalse(result.sections[1].isQueued)
+        assertTrue(result.sections[2].isQueued)
+    }
+
+    @Test
+    fun `an armed outro makes no section queueable but keeps the queued mark`() {
+        val result = mapVibeInfo(
+            vibe = testVibe,
+            arrangement = defaultArrangement(sectionIndex = 0),
+            viz = PulsarVizData(),
+            energy = 0.5f,
+            queuedSectionIndex = 1,
+            outroArmed = true,
+        )
+
+        assertTrue(result.sections.none { it.canQueue }, "no chip is tappable while the outro is armed")
+        assertTrue(result.sections[1].isQueued, "a request made before arming is still pending")
     }
 
     @Test

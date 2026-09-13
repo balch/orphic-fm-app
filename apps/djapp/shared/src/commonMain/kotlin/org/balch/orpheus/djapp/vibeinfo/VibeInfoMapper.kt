@@ -28,19 +28,25 @@ const val DEFAULT_TRACK_LEVEL_THRESHOLD = 0.02f
  *                          The live [PulsarVizData.activeEngines] id (what the DSP is actually
  *                          playing) is preferred when it matches one of the track's two slots.
  * @param trackLevelThreshold  Minimum peak audio level for a track to be considered "playing".
+ * @param queuedSectionIndex  Section queued to play next (PulsarFeature.queuedSectionFlow), or -1.
+ * @param outroArmed          True while the song's outro is armed; no section can be queued then.
  */
 fun mapVibeInfo(
     vibe: Vibe,
     arrangement: PulsarArrangementState,
     viz: PulsarVizData,
     energy: Float,
+    queuedSectionIndex: Int = -1,
+    outroArmed: Boolean = false,
     trackLevelThreshold: Float = DEFAULT_TRACK_LEVEL_THRESHOLD,
 ): VibeInfoUiModel {
     val sections = vibe.arrangement?.sections?.mapIndexed { index, section ->
+        val isNowPlaying = index == arrangement.sectionIndex
         VibeInfoSection(
             name = section.name,
-            isNowPlaying = index == arrangement.sectionIndex,
-            isPast = index < arrangement.sectionIndex,
+            isNowPlaying = isNowPlaying,
+            isQueued = index == queuedSectionIndex,
+            canQueue = !isNowPlaying && !outroArmed,
         )
     } ?: emptyList()
 

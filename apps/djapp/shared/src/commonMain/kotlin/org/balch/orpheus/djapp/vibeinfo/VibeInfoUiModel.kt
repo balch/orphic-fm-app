@@ -3,7 +3,10 @@ package org.balch.orpheus.djapp.vibeinfo
 data class VibeInfoSection(
     val name: String,
     val isNowPlaying: Boolean,
-    val isPast: Boolean,
+    /** Queued to play when the current section ends. */
+    val isQueued: Boolean,
+    /** Tapping queues it. Mirrors SectionQueue.request: not the playing section, not while the outro is armed. */
+    val canQueue: Boolean,
 )
 
 data class VibeInfoTrack(
