@@ -146,9 +146,10 @@ private fun QuadPitchHoldColumn(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
+        modifier = Modifier
             .width(80.dp)
-            .fillMaxHeight(),
+            .fillMaxHeight()
+            .then(modifier),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
