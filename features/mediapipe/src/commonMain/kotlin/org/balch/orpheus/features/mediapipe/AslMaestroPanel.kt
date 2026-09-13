@@ -20,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.gestures.GestureMode
 import org.balch.orpheus.features.mediapipe.shader.CameraEffectCanvas
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -86,120 +87,19 @@ fun AslMaestroPanel(
             contentAlignment = Alignment.Center,
         ) {
             when (state.panelMode) {
-                GesturePanelMode.VIZ -> {
-                    // Transparent — viz background shows through, but hands are drawn on top
-                    for ((index, hand) in state.hands.withIndex()) {
-                        HandSkeletonOverlay(
-                            landmarks = hand.landmarks,
-                            isPinching = state.gestureStates.getOrNull(index)?.isPinching == true,
-                            landmarkColor = if (hand.handedness == org.balch.orpheus.core.gestures.Handedness.LEFT) Color.Cyan else OrpheusColors.synthGreen,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-
-                GesturePanelMode.OFF -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "Off",
-                            color = Color.Gray.copy(alpha = 0.4f),
-                            fontSize = 11.sp,
-                        )
-                    }
-                }
-
-                GesturePanelMode.CAMERA -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val frame = state.cameraFrame
-
-                        if (frame != null) {
-                            val bitmap: ImageBitmap = remember(frame) { frame.toImageBitmap() }
-                            val imageAspect = bitmap.width.toFloat() / bitmap.height.toFloat()
-
-                            Box(modifier = Modifier.aspectRatio(imageAspect)) {
-                                CameraEffectCanvas(
-                                    cameraImage = bitmap,
-                                    engine = feature.engine,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-
-                                if (state.gestureMode == GestureMode.KEYBOARD) {
-                                    KeyboardOverlay(
-                                        pressedKeys = state.pressedKeys,
-                                        engineName = state.keyboardEngineName,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-
-                                for ((index, hand) in state.hands.withIndex()) {
-                                    HandSkeletonOverlay(
-                                        landmarks = hand.landmarks,
-                                        isPinching = state.gestureStates.getOrNull(index)?.isPinching == true,
-                                        landmarkColor = if (hand.handedness == org.balch.orpheus.core.gestures.Handedness.LEFT) Color.Cyan else OrpheusColors.synthGreen,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            }
-                        } else if (!state.isEnabled) {
-                            Text(
-                                text = if (state.cameraAvailable) "Tap to start camera" else "Camera not available",
-                                color = Color.Gray,
-                                fontSize = 11.sp,
-                            )
-                        } else {
-                            Text(
-                                text = "Waiting for camera...",
-                                color = Color.Gray,
-                                fontSize = 11.sp,
-                            )
-                        }
-                    }
-                }
+                GesturePanelMode.VIZ -> VizModeOverlay(state)
+                GesturePanelMode.OFF -> OffModeContent()
+                GesturePanelMode.CAMERA -> CameraModeContent(state, feature.engine)
             }
 
             // Three-way toggle overlaid in top-left corner
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HorizontalSwitch3Way(
-                    state = switchState,
-                    onStateChange = { newState ->
-                        val newMode = when (newState) {
-                            Switch3WayState.START -> {
-                                if (state.cameraAvailable) requestCameraPermission()
-                                GesturePanelMode.VIZ
-                            }
-                            Switch3WayState.MIDDLE -> GesturePanelMode.OFF
-                            Switch3WayState.END -> {
-                                if (state.cameraAvailable) {
-                                    requestCameraPermission()
-                                    GesturePanelMode.CAMERA
-                                } else {
-                                    return@HorizontalSwitch3Way
-                                }
-                            }
-                        }
-                        actions.setPanelMode(newMode)
-                    },
-                    color = OrpheusColors.synthGreen,
-                    startText = "VIZ",
-                    endText = "CAM",
-                )
-            }
+            ModeToggleRow(
+                state = state,
+                actions = actions,
+                switchState = switchState,
+                requestCameraPermission = requestCameraPermission,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
 
             // ASL selection breadcrumb bar overlaid at bottom (when tracking is active)
             if (state.panelMode == GesturePanelMode.CAMERA || state.panelMode == GesturePanelMode.VIZ) {
@@ -217,6 +117,144 @@ fun AslMaestroPanel(
                 )
             }
         }
+    }
+}
+
+/**
+ * VIZ mode content: transparent background — the viz layer shows through —
+ * with hand skeletons drawn on top of whatever is tracked.
+ */
+@Composable
+private fun VizModeOverlay(state: MediaPipeUiState) {
+    for ((index, hand) in state.hands.withIndex()) {
+        HandSkeletonOverlay(
+            landmarks = hand.landmarks,
+            isPinching = state.gestureStates.getOrNull(index)?.isPinching == true,
+            landmarkColor = if (hand.handedness == org.balch.orpheus.core.gestures.Handedness.LEFT) Color.Cyan else OrpheusColors.synthGreen,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+/**
+ * OFF mode content: a plain black placeholder.
+ */
+@Composable
+private fun OffModeContent() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Off",
+            color = Color.Gray.copy(alpha = 0.4f),
+            fontSize = 11.sp,
+        )
+    }
+}
+
+/**
+ * CAMERA mode content: the live feed through the audio-reactive shader canvas,
+ * with keyboard and hand-skeleton overlays, or a status placeholder while the
+ * feed isn't available yet.
+ */
+@Composable
+private fun CameraModeContent(state: MediaPipeUiState, engine: SynthEngine?) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        val frame = state.cameraFrame
+
+        if (frame != null) {
+            val bitmap: ImageBitmap = remember(frame) { frame.toImageBitmap() }
+            val imageAspect = bitmap.width.toFloat() / bitmap.height.toFloat()
+
+            Box(modifier = Modifier.aspectRatio(imageAspect)) {
+                CameraEffectCanvas(
+                    cameraImage = bitmap,
+                    engine = engine,
+                    modifier = Modifier.fillMaxSize(),
+                )
+
+                if (state.gestureMode == GestureMode.KEYBOARD) {
+                    KeyboardOverlay(
+                        pressedKeys = state.pressedKeys,
+                        engineName = state.keyboardEngineName,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                for ((index, hand) in state.hands.withIndex()) {
+                    HandSkeletonOverlay(
+                        landmarks = hand.landmarks,
+                        isPinching = state.gestureStates.getOrNull(index)?.isPinching == true,
+                        landmarkColor = if (hand.handedness == org.balch.orpheus.core.gestures.Handedness.LEFT) Color.Cyan else OrpheusColors.synthGreen,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        } else if (!state.isEnabled) {
+            Text(
+                text = if (state.cameraAvailable) "Tap to start camera" else "Camera not available",
+                color = Color.Gray,
+                fontSize = 11.sp,
+            )
+        } else {
+            Text(
+                text = "Waiting for camera...",
+                color = Color.Gray,
+                fontSize = 11.sp,
+            )
+        }
+    }
+}
+
+/**
+ * Three-way mode toggle (VIZ / OFF / CAMERA), overlaid on the panel content.
+ * Caller supplies alignment via [modifier].
+ */
+@Composable
+private fun ModeToggleRow(
+    state: MediaPipeUiState,
+    actions: MediaPipePanelActions,
+    switchState: Switch3WayState,
+    requestCameraPermission: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalSwitch3Way(
+            state = switchState,
+            onStateChange = { newState ->
+                val newMode = when (newState) {
+                    Switch3WayState.START -> {
+                        if (state.cameraAvailable) requestCameraPermission()
+                        GesturePanelMode.VIZ
+                    }
+                    Switch3WayState.MIDDLE -> GesturePanelMode.OFF
+                    Switch3WayState.END -> {
+                        if (state.cameraAvailable) {
+                            requestCameraPermission()
+                            GesturePanelMode.CAMERA
+                        } else {
+                            return@HorizontalSwitch3Way
+                        }
+                    }
+                }
+                actions.setPanelMode(newMode)
+            },
+            color = OrpheusColors.synthGreen,
+            startText = "VIZ",
+            endText = "CAM",
+        )
     }
 }
 
