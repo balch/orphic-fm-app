@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.presets
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -114,7 +115,8 @@ fun PresetsPanel(
             },
         )
 
-        PresetList(presetProps = presetProps)
+        val scrollState = rememberScrollState()
+        PresetList(presetProps = presetProps, scrollState = scrollState)
     }
 
     PresetDialogs(
@@ -189,9 +191,8 @@ private fun PresetActionButtons(
 @Composable
 private fun PresetList(
     presetProps: PresetProps,
+    scrollState: ScrollState,
 ) {
-    val scrollState = rememberScrollState()
-
     Row(
         modifier = Modifier
             .widthIn(min = 240.dp)
