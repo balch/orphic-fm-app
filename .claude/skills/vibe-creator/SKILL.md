@@ -105,7 +105,7 @@ How often the Markov progression resets to its starting state. `EVERY_4` or `EVE
 
 ### `tracks` — exactly 8 `TrackVoice`s
 
-Convention (not enforced): 0=kick, 1=snare, 2=hat, 3=bass, 4=keys/lead, 5-6=texture/FX, 7=wildcard. Any track can use any engine.
+Convention (not enforced): 0=kick, 1=snare, 2=hat, 3=bass, 4=keys/lead, 5-6=texture/FX, 7=wildcard. Any track can use any engine. The index does carry engine behaviour, though: tracks 5-7 ride the FX fader and are volume-notched to 0.05 across energy 0.45..0.55 (`texture_energy_curve`), track 7's note-ons are probability-gated (silent at default macros), and tracks 3-4 get a mid-energy boost instead. A `Melodic` track with a `lickMode` other than `None` skips the notch, so a riff double or harmony line on 5-6 is heard at mid energy; a `Chordal` pad or a lick-less melodic voice there is not.
 
 A `TrackVoice` is split into **two layers**:
 1. **Per-voice character** lives on `OrpheusEngine` — separate instances for `engineEdm` (high energy) and `engineSpace` (low energy). The two slots crossfade based on the Energy macro.

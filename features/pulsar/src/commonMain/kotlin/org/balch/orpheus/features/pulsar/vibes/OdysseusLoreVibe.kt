@@ -281,18 +281,14 @@ class OdysseusLoreVibe : VibeProvider {
                 // energy > 0.6) as well as the outro. Index carries behavior independently of
                 // TrackRole; see the branches on `t` in orpheus_unit_pulsar.cpp.
                 //
-                // Track 6 is not free of that either: tracks >= 5 are the texture band, so this
-                // voice is scaled by texture_energy_curve(energy), a notch pinned at 0.05 across
-                // energy 0.45..0.55 that ramps back to 1.0 by 0.65. Base energy 0.55 sits exactly
-                // on the notch floor, so the harmony is a whisper in the VERSE (no override),
-                // full from the RISE (0.66) through the VAMP (0.69) and PEAK (0.83), and just
-                // as full in the OUTRO (0.30): the curve is full below 0.35 too, not just by
-                // 0.65, notched only across 0.45..0.55. That reads as a second player who
-                // sits out the verse and comes in for the jam, which is the arrangement we want,
-                // but it is forced rather than chosen: tracks 0-2 are the kit, 3 is the bass bus
-                // and 4 is the lead, so track 4 is the ONLY slot with no texture duck. Lifting
-                // the harmony into the verse means base energy >= 0.65, which drives the whole
-                // lament harder and narrows the verse-to-jam contrast the structure is built on.
+                // Track 6 used to sit in that band too: tracks >= 5 are scaled by
+                // texture_energy_curve(energy), a notch pinned at 0.05 across energy 0.45..0.55,
+                // and base energy 0.55 put the harmony on the notch floor for the whole VERSE.
+                // A MELODIC track carrying a lick now skips the notch (the engine treats it as a
+                // foreground line, like a soloist), so the harmony plays in the verse as well as
+                // the jam. Not ear-tested since that change; if the verse wants the old
+                // "second player sits out" feel, that is a section density override now, not
+                // an energy trick.
                 //
                 // It plays the same lick as track 4 offset +2 scale degrees, a diatonic third in
                 // a 7-note scale. It will NOT lock to the lead in parallel thirds, and that is
