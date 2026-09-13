@@ -1099,6 +1099,55 @@ static bool test_section_request_does_not_refire_an_elapsed_exit_row() {
     return ok;
 }
 
+// ── a request in the first bar keeps a row staged at countdown 0 ─────────────
+static bool test_section_request_in_the_first_bar_keeps_its_early_row() {
+    printf("\n=== Test: a request in the section's first bar does not drop a row due at the next tick ===\n");
+    OrpheusEngine* engine = make_trans_fx_engine();
+    // Wildcard exit row whose offset equals the full section length: staged at
+    // countdown 0 on entry, so it is due at the section's FIRST bar tick, one bar
+    // before the flip -- not fired yet, since no tick has run.
+    write_trans_fx_row(engine, 0, /*section*/0, kTransFxEdgeAny, TRANS_FX_TAPE_STOP, /*offset*/-2.0f, /*ms*/40.0f);
+    trigger_vibe_load(engine);
+
+    GraphUnit unit = make_trans_fx_unit();
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);  // allocates pulsar_state and loads
+    const int bars_total = engine->pulsar_state->section_state.bars_total;
+
+    // Request s0 (edge 1, not the drawn s1), a plan change made inside the section's
+    // first bar -- before any tick, so the row above is still at countdown 0.
+    engine->pulsar_arrangement_section_request.store(1, std::memory_order_relaxed);
+    const bool active_when_stored = engine->master_tape_stop_l.is_active();
+
+    int bars_remaining_at_consume = -1;
+    bool armed_before_flip = false;
+    bool flipped = false;
+    for (int i = 0; i < kMaxBlocks && !flipped; i++) {
+        const int before_bars = engine->pulsar_state->section_state.bars_remaining;
+        const int req_before = engine->pulsar_arrangement_section_request.load(std::memory_order_relaxed);
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        if (req_before != 0 && bars_remaining_at_consume < 0
+            && engine->pulsar_arrangement_section_request.load(std::memory_order_relaxed) == 0) {
+            bars_remaining_at_consume = before_bars;  // bars_remaining as the request was consumed
+        }
+        flipped = engine->pulsar_state->section_state.bars_remaining > before_bars;
+        if (!flipped && engine->master_tape_stop_l.is_active()) armed_before_flip = true;
+    }
+
+    bool ok = true;
+    if (active_when_stored) { printf("  FAIL: tape stop already active when the request was stored\n"); ok = false; }
+    if (bars_remaining_at_consume != bars_total) {
+        printf("  FAIL: request consumed at bars_remaining=%d, bars_total=%d (first bar not reached)\n",
+               bars_remaining_at_consume, bars_total);
+        ok = false;
+    }
+    if (!flipped) { printf("  FAIL: section never flipped within %d blocks\n", kMaxBlocks); ok = false; }
+    if (!armed_before_flip) { printf("  FAIL: the row due at the first tick never fired\n"); ok = false; }
+    if (ok) printf("  PASS: the first-bar row survived the re-stage and fired at its tick\n");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_transition_fx_tests() {
     printf("\n=== Pulsar Transition FX Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -1127,6 +1176,7 @@ bool run_pulsar_transition_fx_tests() {
     if (test_restage_drops_elapsed_rows()) suite_pass++; else suite_fail++;
     if (test_section_request_fires_the_requested_edges_row()) suite_pass++; else suite_fail++;
     if (test_section_request_does_not_refire_an_elapsed_exit_row()) suite_pass++; else suite_fail++;
+    if (test_section_request_in_the_first_bar_keeps_its_early_row()) suite_pass++; else suite_fail++;
 
     stmlib::Random::Seed(saved_random);
     TEST_SUITE_RETURN(suite_pass, suite_fail);

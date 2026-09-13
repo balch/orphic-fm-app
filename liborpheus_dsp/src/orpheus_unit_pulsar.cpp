@@ -822,7 +822,9 @@ static void fire_transition_fx(OrpheusEngine* engine, PulsarState* state,
 
 // Re-stage the pending list for the section that is now current and the edge it plans
 // to leave by. Called at vibe load, at every flip, and when a section request re-plans
-// mid-section, so a stale edge's rows can never survive into the next section.
+// mid-section, so a stale edge's rows can never survive into the next section. A request
+// arriving in the section's first bar (bars_remaining still == bars_total, no tick yet)
+// must not drop rows staged at countdown 0 -- those are due at the next tick, not fired.
 static void stage_transition_fx_for_planned_edge(PulsarState* state, bool after_request = false) {
     state->pending_fx_count = 0;
     if (!state->arrangement.active || state->trans_fx_count == 0) return;
@@ -836,7 +838,9 @@ static void stage_transition_fx_for_planned_edge(PulsarState* state, bool after_
         state->trans_fx, state->trans_fx_count,
         state->section_state.current_section, edge,
         state->section_state.bars_remaining,
-        state->pending_fx, kMaxPendingFx, /*drop_elapsed*/ after_request);
+        state->pending_fx, kMaxPendingFx,
+        /*drop_elapsed*/ after_request &&
+            state->section_state.bars_remaining < state->section_state.bars_total);
 }
 
 // Fire and disarm every pending whose bar countdown has run out. after_flip rows are
