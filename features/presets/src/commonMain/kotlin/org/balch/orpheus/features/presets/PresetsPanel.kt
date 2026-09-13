@@ -97,119 +97,170 @@ fun PresetsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        // Buttons row - ABOVE file list
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+        PresetActionButtons(
+            presetProps = presetProps,
+            buttonColors = buttonColors,
+            onNewClick = {
+                showNewDialog = true
+                presetProps.presetActions.setDialogActive(true)
+            },
+            onOverrideClick = {
+                showOverrideDialog = true
+                presetProps.presetActions.setDialogActive(true)
+            },
+            onDeleteClick = {
+                showDeleteDialog = true
+                presetProps.presetActions.setDialogActive(true)
+            },
+        )
+
+        PresetList(presetProps = presetProps)
+    }
+
+    PresetDialogs(
+        presetProps = presetProps,
+        showNewDialog = showNewDialog,
+        onNewDialogDismissed = { showNewDialog = false },
+        showOverrideDialog = showOverrideDialog,
+        onOverrideDialogDismissed = { showOverrideDialog = false },
+        showDeleteDialog = showDeleteDialog,
+        onDeleteDialogDismissed = { showDeleteDialog = false },
+    )
+}
+
+/**
+ * NEW / OVR / DEL button row for preset management.
+ */
+@Composable
+private fun PresetActionButtons(
+    presetProps: PresetProps,
+    buttonColors: ButtonColors,
+    onNewClick: () -> Unit,
+    onOverrideClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // NEW button
+        Button(
+            onClick = onNewClick,
+            colors = buttonColors
         ) {
-            // NEW button
-            Button(
-                onClick = {
-                    showNewDialog = true
-                    presetProps.presetActions.setDialogActive(true)
-                },
-                colors = buttonColors
-            ) {
-                Text(
-                    "NEW",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            Button(
-                onClick = {
-                    showOverrideDialog = true
-                    presetProps.presetActions.setDialogActive(true)
-                },
-                colors = buttonColors,
-                enabled = (presetProps.selectedPreset != null),
-            ) {
-                Text(
-                    "OVR",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            // DEL button
-            Button(
-                onClick = {
-                    showDeleteDialog = true
-                    presetProps.presetActions.setDialogActive(true)
-                },
-                enabled = (presetProps.selectedPreset != null),
-                colors = buttonColors,
-            ) {
-
-                Text(
-                    "DEL",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
+            Text(
+                "NEW",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
 
-        // Scrollable preset list with border
-        val scrollState = rememberScrollState()
-
-        Row(
-            modifier = Modifier
-                .widthIn(min = 240.dp)
-                .padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .border(
-                    1.dp,
-                    OrpheusColors.presetOrange.copy(alpha = 0.3f),
-                    RoundedCornerShape(6.dp)
-                )
-                .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
+        Button(
+            onClick = onOverrideClick,
+            colors = buttonColors,
+            enabled = (presetProps.selectedPreset != null),
         ) {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(scrollState)
-                    .padding(4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                presetProps.presets.forEach { preset ->
-                    val isSelected = presetProps.selectedPreset?.name == preset.name
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(
-                                if (isSelected) OrpheusColors.presetOrange.copy(alpha = 0.2f)
-                                else Color.Transparent
-                            )
-                            .clickable {
-                                presetProps.presetActions.applyPreset(preset)
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            preset.name,
-                            fontSize = 10.sp,
-                            color = if (isSelected) OrpheusColors.presetOrange else Color.White.copy(
-                                alpha = 0.7f
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+            Text(
+                "OVR",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        // DEL button
+        Button(
+            onClick = onDeleteClick,
+            enabled = (presetProps.selectedPreset != null),
+            colors = buttonColors,
+        ) {
+
+            Text(
+                "DEL",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+/**
+ * Scrollable, bordered list of saved presets. Tapping a row applies it.
+ */
+@Composable
+private fun PresetList(
+    presetProps: PresetProps,
+) {
+    val scrollState = rememberScrollState()
+
+    Row(
+        modifier = Modifier
+            .widthIn(min = 240.dp)
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .border(
+                1.dp,
+                OrpheusColors.presetOrange.copy(alpha = 0.3f),
+                RoundedCornerShape(6.dp)
+            )
+            .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(scrollState)
+                .padding(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            presetProps.presets.forEach { preset ->
+                val isSelected = presetProps.selectedPreset?.name == preset.name
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (isSelected) OrpheusColors.presetOrange.copy(alpha = 0.2f)
+                            else Color.Transparent
                         )
-                    }
+                        .clickable {
+                            presetProps.presetActions.applyPreset(preset)
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        preset.name,
+                        fontSize = 10.sp,
+                        color = if (isSelected) OrpheusColors.presetOrange else Color.White.copy(
+                            alpha = 0.7f
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
     }
+}
 
-    // Dialogs
+/**
+ * NEW / OVR / DEL confirmation dialogs, shown one at a time based on which flag is set.
+ */
+@Composable
+private fun PresetDialogs(
+    presetProps: PresetProps,
+    showNewDialog: Boolean,
+    onNewDialogDismissed: () -> Unit,
+    showOverrideDialog: Boolean,
+    onOverrideDialogDismissed: () -> Unit,
+    showDeleteDialog: Boolean,
+    onDeleteDialogDismissed: () -> Unit,
+) {
     if (showNewDialog) {
         PresetNameDialog(
             onConfirm = { name ->
                 presetProps.presetActions.saveNewPreset(name)
-                showNewDialog = false
+                onNewDialogDismissed()
                 presetProps.presetActions.setDialogActive(false)
             },
             onDismiss = {
-                showNewDialog = false
+                onNewDialogDismissed()
                 presetProps.presetActions.setDialogActive(false)
             }
         )
@@ -221,11 +272,11 @@ fun PresetsPanel(
             message = "Overwrite '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
                 presetProps.selectedPreset?.let { presetProps.presetActions.overridePreset(it) }
-                showOverrideDialog = false
+                onOverrideDialogDismissed()
                 presetProps.presetActions.setDialogActive(false)
             },
             onDismiss = {
-                showOverrideDialog = false
+                onOverrideDialogDismissed()
                 presetProps.presetActions.setDialogActive(false)
             },
             isDestructive = true
@@ -238,11 +289,11 @@ fun PresetsPanel(
             message = "Delete '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
                 presetProps.selectedPreset?.let { presetProps.presetActions.deletePreset(it) }
-                showDeleteDialog = false
+                onDeleteDialogDismissed()
                 presetProps.presetActions.setDialogActive(false)
             },
             onDismiss = {
-                showDeleteDialog = false
+                onDeleteDialogDismissed()
                 presetProps.presetActions.setDialogActive(false)
             },
             isDestructive = true
