@@ -337,7 +337,11 @@ struct OrpheusVoice {
             int num_frames,
             LpgMode lpg_mode = LPG_BYPASS,
             float lpg_decay = 0.5f,
-            float lpg_colour = 0.5f) {
+            float lpg_colour = 0.5f,
+            // A note-on the caller already knows about. The gate edge alone misses
+            // it whenever notes run back to back and the gate never falls, which
+            // left every such note after the first without its PLUCK bloom.
+            bool retrigger = false) {
 
         // Clamp engine index to valid range.
         if (engine_index < 0) engine_index = 0;
@@ -394,7 +398,8 @@ struct OrpheusVoice {
         while (frames_rendered < num_frames) {
             // Trigger edge detection (Schmitt trigger).
             bool gate_on = (gate != 0);
-            bool rising_edge = gate_on && !trigger_state_;
+            bool rising_edge = (gate_on && !trigger_state_) || retrigger;
+            retrigger = false;  // the onset lands on this call's first fresh block only
             trigger_state_ = gate_on;
 
             // Build engine parameters.

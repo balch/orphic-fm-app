@@ -859,6 +859,98 @@ static bool test_pulsar_lick_hit_probability_is_lifted_by_tension() {
     return ok;
 }
 
+// A Plaits-engine track (the OrpheusVoice path, not OSC) blooms its PLUCK vactrol on
+// the voice's gate rising edge. A lick of back-to-back notes never drops the gate:
+// each note's timer runs to the next head, which re-arms it before the underrun can
+// clear voice_active. Every note after the first therefore arrived with no bloom and
+// decayed into silence — the Fire Sky lead going quiet the moment its verse put it on
+// the WSH/PLUCK slot. 2.0.5 only sounded right because its hold steps dropped the gate
+// every step. The note-on (pending_retrig) is the onset; the gate edge is not.
+static bool test_pulsar_voice_lpg_blooms_on_every_note_on_under_a_held_gate() {
+    printf("\n=== Test: a Plaits voice's PLUCK blooms on every note-on, gate never falling ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+    engine->pulsar_track_engine_edm[0].store(9, std::memory_order_relaxed);    // WSH
+    engine->pulsar_track_engine_space[0].store(9, std::memory_order_relaxed);
+    engine->pulsar_track_volume[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_volume_space[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);       // AD
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode[0].store(2, std::memory_order_relaxed);   // PLUCK
+    engine->pulsar_track_lpg_mode_space[0].store(2, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay_space[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour_space[0].store(0.5f, std::memory_order_relaxed);
+
+    // Two 4-beat notes fill the 8-beat loop exactly: no rest, so the gate never falls.
+    engine->pulsar_lick[0].scale_degree = 0;
+    engine->pulsar_lick[0].duration = 4.0f;
+    engine->pulsar_lick[0].velocity = 0.9f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[1].scale_degree = 2;
+    engine->pulsar_lick[1].duration = 4.0f;
+    engine->pulsar_lick[1].velocity = 0.9f;
+    engine->pulsar_lick[1].glide_rate = -1.0f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(2, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);  // a note = 2 s, longer than the pluck
+
+    // An audible onset is the block peak jumping well above the previous block's:
+    // the vactrol opening. A note that arrives without a bloom just keeps decaying.
+    const int kBlocks = 1200;
+    int note_ons = 0, audible = 0, gate_drops = 0;
+    float prev_peak = 0.0f;
+    bool prev_gate = false;
+    for (int i = 0; i < kBlocks; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (ts.pending_retrig) note_ons++;
+        if (prev_gate && !ts.voice_active) gate_drops++;
+        prev_gate = ts.voice_active;
+        float peak = 0.0f;
+        for (int k = 0; k < kBlockFrames; k++) {
+            float a = std::fabs(engine->pulsar_out_l[k]);
+            if (a > peak) peak = a;
+        }
+        if (peak > 0.01f && peak > prev_peak * 4.0f) audible++;
+        prev_peak = peak;
+    }
+    orpheus_engine_destroy(engine);
+
+    printf("  %.1f s: note onsets=%d, audible blooms=%d, gate drops=%d\n",
+           kBlocks * kBlockFrames / 48000.0f, note_ons, audible, gate_drops);
+
+    bool ok = true;
+    if (note_ons < 4) {
+        printf("  FAIL: fixture fired almost no notes (%d) - not a real test\n", note_ons);
+        ok = false;
+    }
+    // One drop is the load boundary; a drop per note would hand the voice its edge back.
+    if (gate_drops > 1) {
+        printf("  FAIL: the gate fell %d times - the fixture no longer holds it, so the test is vacuous\n", gate_drops);
+        ok = false;
+    }
+    if (audible < note_ons) {
+        printf("  FAIL: %d of %d note-ons arrived without a bloom (the voice only plucks on a gate edge)\n",
+               note_ons - audible, note_ons);
+        ok = false;
+    }
+    printf("Plaits voice PLUCK per note-on: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 // The playback energy_density roll is the generator's second gate: the first is the
 // TrackVoice density that decides which steps get written. An authored lick is not a
 // generated pattern — its steps ARE the part, and hitProbability is the channel a vibe
@@ -1059,6 +1151,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_density_drops_whole_notes_not_note_heads()) suite_pass++; else suite_fail++;
     if (test_pulsar_lick_hit_probability_is_lifted_by_tension()) suite_pass++; else suite_fail++;
     if (test_pulsar_lick_heads_skip_the_energy_density_roll()) suite_pass++; else suite_fail++;
+    if (test_pulsar_voice_lpg_blooms_on_every_note_on_under_a_held_gate()) suite_pass++; else suite_fail++;
     if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
     if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);

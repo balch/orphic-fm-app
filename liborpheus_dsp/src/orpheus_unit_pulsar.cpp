@@ -5182,6 +5182,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     ts.lpg_colour
                 );
             }
+            // The onset segment carries the note-on itself: the voice's gate edge
+            // cannot see it when lick notes run back to back and the gate never
+            // falls, and PLUCK only blooms on an edge. Same contract as osc_note_on
+            // above; the hold path never sets pending_retrig, so holds do not bloom.
             ts.voice.Render(
                 ts.engine_index,
                 gate_for_render,
@@ -5194,7 +5198,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 num_frames - trig_off,
                 static_cast<LpgMode>(active_lpg_mode),
                 ts.lpg_decay,
-                ts.lpg_colour
+                ts.lpg_colour,
+                ts.pending_retrig
             );
         }
 
