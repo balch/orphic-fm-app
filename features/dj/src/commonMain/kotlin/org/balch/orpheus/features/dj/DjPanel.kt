@@ -450,146 +450,45 @@ fun DjPanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            // Deck A platter + source
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            DeckColumn(
+                deck = 0,
+                state = state,
+                actions = actions,
+                vizData = vizA,
+                djColors = djColors,
+                deckColor = djColors.deckAColor,
+                deckLabel = "A",
+                focused = focusedDeck == 0,
+                adjusting = grabbedDeck == 0,
+                beatMillis = { beatMillis },
+                onBounds = { platterABounds = it },
+                onFocusChanged = { focused -> if (focused) focusedDeck = 0 else if (focusedDeck == 0) focusedDeck = -1 },
+                onAdjustingChanged = { grabbed -> if (grabbed) grabbedDeck = 0 else if (grabbedDeck == 0) grabbedDeck = -1 },
                 modifier = Modifier.weight(1f),
-            ) {
-                SourceDropdown(
-                    source = state.sourceA,
-                    onSourceChange = actions.setSourceA,
-                    color = djColors.panelColor,
-                )
-                TurntablePlatter(
-                    vizData = vizA,
-                    frozen = state.frozenA,
-                    locked = state.lockedA,
-                    velocity = state.velocityA,
-                    wet = state.wetA,
-                    deckColor = djColors.deckAColor,
-                    frozenColor = djColors.frozenColor,
-                    deckLabel = "A",
-                    focused = focusedDeck == 0,
-                    adjusting = grabbedDeck == 0,
-                    onBounds = { platterABounds = it },
-                    onToggleLock = { actions.toggleLock(0) },
-                    modifier = Modifier
-                        .size(100.dp)
-                        .deckDpad(
-                            deck = 0,
-                            actions = actions,
-                            zoneOrder = state.zoneOrder,
-                            beatMillis = { beatMillis },
-                            onFocusChanged = { focused -> if (focused) focusedDeck = 0 else if (focusedDeck == 0) focusedDeck = -1 },
-                            onAdjustingChanged = { grabbed -> if (grabbed) grabbedDeck = 0 else if (grabbedDeck == 0) grabbedDeck = -1 },
-                        ),
-                )
-            }
+            )
 
-            // Center: Fader A | DELAY/REVERB knobs | Fader B
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                // Fader A
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("A", color = djColors.deckAColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    BenderFaderWidget(
-                        value = state.wetA * 2f - 1f,
-                        onValueChange = { v -> actions.setWetA((v + 1f) / 2f) },
-                        trackHeight = 120,
-                        trackWidth = 8,
-                        thumbWidth = 32,
-                        thumbHeight = 18,
-                        accentColor = djColors.deckAColor,
-                        springBack = false,
-                    )
-                }
+            FaderAndSendKnobsRow(
+                state = state,
+                actions = actions,
+                djColors = djColors,
+            )
 
-                // Knobs stacked vertically between faders
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    RotaryKnob(
-                        value = state.delaySend,
-                        onValueChange = actions.setDelaySend,
-                        label = "DLY",
-                        size = 28.dp,
-                        trackColor = djColors.knobTrackColor,
-                        progressColor = djColors.knobProgressColor,
-                        knobColor = djColors.knobColor,
-                        labelColor = djColors.labelColor,
-                        controlId = "dj_delay_send",
-                        valueFormatter = null,
-                    )
-                    RotaryKnob(
-                        value = state.reverbSend,
-                        onValueChange = actions.setReverbSend,
-                        label = "RVB",
-                        size = 28.dp,
-                        trackColor = djColors.knobTrackColor,
-                        progressColor = djColors.knobProgressColor,
-                        knobColor = djColors.knobColor,
-                        labelColor = djColors.labelColor,
-                        controlId = "dj_reverb_send",
-                        valueFormatter = null,
-                    )
-                }
-
-                // Fader B
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("B", color = djColors.deckBColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    BenderFaderWidget(
-                        value = state.wetB * 2f - 1f,
-                        onValueChange = { v -> actions.setWetB((v + 1f) / 2f) },
-                        trackHeight = 120,
-                        trackWidth = 8,
-                        thumbWidth = 32,
-                        thumbHeight = 18,
-                        accentColor = djColors.deckBColor,
-                        springBack = false,
-                    )
-                }
-            }
-
-            // Deck B platter + source
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            DeckColumn(
+                deck = 1,
+                state = state,
+                actions = actions,
+                vizData = vizB,
+                djColors = djColors,
+                deckColor = djColors.deckBColor,
+                deckLabel = "B",
+                focused = focusedDeck == 1,
+                adjusting = grabbedDeck == 1,
+                beatMillis = { beatMillis },
+                onBounds = { platterBBounds = it },
+                onFocusChanged = { focused -> if (focused) focusedDeck = 1 else if (focusedDeck == 1) focusedDeck = -1 },
+                onAdjustingChanged = { grabbed -> if (grabbed) grabbedDeck = 1 else if (grabbedDeck == 1) grabbedDeck = -1 },
                 modifier = Modifier.weight(1f),
-            ) {
-                SourceDropdown(
-                    source = state.sourceB,
-                    onSourceChange = actions.setSourceB,
-                    color = djColors.panelColor,
-                )
-                TurntablePlatter(
-                    vizData = vizB,
-                    frozen = state.frozenB,
-                    locked = state.lockedB,
-                    velocity = state.velocityB,
-                    wet = state.wetB,
-                    deckColor = djColors.deckBColor,
-                    frozenColor = djColors.frozenColor,
-                    deckLabel = "B",
-                    focused = focusedDeck == 1,
-                    adjusting = grabbedDeck == 1,
-                    onBounds = { platterBBounds = it },
-                    onToggleLock = { actions.toggleLock(1) },
-                    modifier = Modifier
-                        .size(100.dp)
-                        .deckDpad(
-                            deck = 1,
-                            actions = actions,
-                            zoneOrder = state.zoneOrder,
-                            beatMillis = { beatMillis },
-                            onFocusChanged = { focused -> if (focused) focusedDeck = 1 else if (focusedDeck == 1) focusedDeck = -1 },
-                            onAdjustingChanged = { grabbed -> if (grabbed) grabbedDeck = 1 else if (grabbedDeck == 1) grabbedDeck = -1 },
-                        ),
-                )
-            }
+            )
         }
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -637,6 +536,140 @@ fun DjPanel(
 // ─────────────────────────────────────────────────────────────────────────────
 // Private composables
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * One deck's source selector + turntable platter, wired for D-pad grab/scratch.
+ * [deck] (0=A, 1=B) selects which half of [state] the deck reads.
+ */
+@Composable
+private fun DeckColumn(
+    deck: Int,
+    state: DjUiState,
+    actions: DjPanelActions,
+    vizData: FloatArray,
+    djColors: DjColors,
+    deckColor: Color,
+    deckLabel: String,
+    focused: Boolean,
+    adjusting: Boolean,
+    beatMillis: () -> Long,
+    onBounds: (Rect) -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    onAdjustingChanged: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier,
+    ) {
+        SourceDropdown(
+            source = if (deck == 0) state.sourceA else state.sourceB,
+            onSourceChange = if (deck == 0) actions.setSourceA else actions.setSourceB,
+            color = djColors.panelColor,
+        )
+        TurntablePlatter(
+            vizData = vizData,
+            frozen = if (deck == 0) state.frozenA else state.frozenB,
+            locked = if (deck == 0) state.lockedA else state.lockedB,
+            velocity = if (deck == 0) state.velocityA else state.velocityB,
+            wet = if (deck == 0) state.wetA else state.wetB,
+            deckColor = deckColor,
+            frozenColor = djColors.frozenColor,
+            deckLabel = deckLabel,
+            focused = focused,
+            adjusting = adjusting,
+            onBounds = onBounds,
+            onToggleLock = { actions.toggleLock(deck) },
+            modifier = Modifier
+                .size(100.dp)
+                .deckDpad(
+                    deck = deck,
+                    actions = actions,
+                    zoneOrder = state.zoneOrder,
+                    beatMillis = beatMillis,
+                    onFocusChanged = onFocusChanged,
+                    onAdjustingChanged = onAdjustingChanged,
+                ),
+        )
+    }
+}
+
+/**
+ * Center console between the two decks: Fader A, DELAY/REVERB send knobs, Fader B.
+ */
+@Composable
+private fun FaderAndSendKnobsRow(
+    state: DjUiState,
+    actions: DjPanelActions,
+    djColors: DjColors,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        // Fader A
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("A", color = djColors.deckAColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            BenderFaderWidget(
+                value = state.wetA * 2f - 1f,
+                onValueChange = { v -> actions.setWetA((v + 1f) / 2f) },
+                trackHeight = 120,
+                trackWidth = 8,
+                thumbWidth = 32,
+                thumbHeight = 18,
+                accentColor = djColors.deckAColor,
+                springBack = false,
+            )
+        }
+
+        // Knobs stacked vertically between faders
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            RotaryKnob(
+                value = state.delaySend,
+                onValueChange = actions.setDelaySend,
+                label = "DLY",
+                size = 28.dp,
+                trackColor = djColors.knobTrackColor,
+                progressColor = djColors.knobProgressColor,
+                knobColor = djColors.knobColor,
+                labelColor = djColors.labelColor,
+                controlId = "dj_delay_send",
+                valueFormatter = null,
+            )
+            RotaryKnob(
+                value = state.reverbSend,
+                onValueChange = actions.setReverbSend,
+                label = "RVB",
+                size = 28.dp,
+                trackColor = djColors.knobTrackColor,
+                progressColor = djColors.knobProgressColor,
+                knobColor = djColors.knobColor,
+                labelColor = djColors.labelColor,
+                controlId = "dj_reverb_send",
+                valueFormatter = null,
+            )
+        }
+
+        // Fader B
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("B", color = djColors.deckBColor, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            BenderFaderWidget(
+                value = state.wetB * 2f - 1f,
+                onValueChange = { v -> actions.setWetB((v + 1f) / 2f) },
+                trackHeight = 120,
+                trackWidth = 8,
+                thumbWidth = 32,
+                thumbHeight = 18,
+                accentColor = djColors.deckBColor,
+                springBack = false,
+            )
+        }
+    }
+}
 
 /**
  * Circular turntable platter with radial waveform visualization and drag-to-scratch.
