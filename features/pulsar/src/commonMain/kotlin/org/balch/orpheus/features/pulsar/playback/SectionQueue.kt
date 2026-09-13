@@ -15,11 +15,14 @@ class SectionQueue(private val writeRequest: (portValue: Int) -> Unit) {
     val queued: StateFlow<Int> = _queued.asStateFlow()
 
     /**
-     * Queues [index]; the last request wins. Ignored for the playing section, which would only
-     * repeat, and while the outro is armed, since a request outranks it.
+     * Queues [index]; the last request wins. Ignored for the playing section (would only
+     * repeat), while the outro is armed (a request outranks it), and for the index already
+     * queued, since a request for it is already in flight.
      */
     fun request(index: Int, currentSection: Int, sectionCount: Int, outroArmed: Boolean): Boolean {
-        if (outroArmed || index !in 0 until sectionCount || index == currentSection) return false
+        if (index !in 0 until sectionCount) return false
+        if (!canQueue(index, currentSection, outroArmed)) return false
+        if (index == _queued.value) return false
         _queued.value = index
         // The port reads 0 as "no request", so it carries the index plus one.
         writeRequest(index + 1)
@@ -28,7 +31,7 @@ class SectionQueue(private val writeRequest: (portValue: Int) -> Unit) {
 
     /** Clears the queue once the requested section is the one playing. */
     fun onSectionObserved(sectionIndex: Int) {
-        if (sectionIndex == _queued.value) _queued.value = NONE
+        _queued.compareAndSet(sectionIndex, NONE)
     }
 
     /** A vibe load resets the engine's arrangement, and any pending request with it. */
@@ -38,5 +41,9 @@ class SectionQueue(private val writeRequest: (portValue: Int) -> Unit) {
 
     companion object {
         const val NONE = -1
+
+        /** Shared with the vibe info chips so a tappable chip is always one the queue accepts. */
+        fun canQueue(index: Int, currentSection: Int, outroArmed: Boolean): Boolean =
+            !outroArmed && index != currentSection
     }
 }

@@ -45,6 +45,13 @@ class SectionQueueTest {
     }
 
     @Test
+    fun `re-requesting the already queued section is ignored`() {
+        assertTrue(queue.request(index = 2, currentSection = 0, sectionCount = 4, outroArmed = false))
+        assertFalse(queue.request(index = 2, currentSection = 0, sectionCount = 4, outroArmed = false))
+        assertEquals(listOf(3), writes)
+    }
+
+    @Test
     fun `clear drops the queued section without writing the port`() {
         queue.request(index = 2, currentSection = 0, sectionCount = 4, outroArmed = false)
         queue.clear()
