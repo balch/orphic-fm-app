@@ -238,6 +238,64 @@ static bool test_soloist_on_texture_slot_escapes_the_notch() {
     return pass;
 }
 
+// A melodic track that carries the vibe's lick is a foreground line wherever it sits, not a
+// texture layer. Fire Sky's riff double on track 6 read ~26 dB under the same voice on
+// track 4 at energy 0.54 because the texture notch keyed on the index alone.
+static double render_lick_track(int track, float energy) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(energy, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    // Same voice on every slot so the index is the only variable.
+    engine->pulsar_track_engine_edm[track].store(9, std::memory_order_relaxed);
+    engine->pulsar_track_engine_space[track].store(9, std::memory_order_relaxed);
+    engine->pulsar_track_volume[track].store(0.6f, std::memory_order_relaxed);
+    engine->pulsar_track_role[track].store(1, std::memory_order_relaxed);
+    engine->pulsar_track_lick_mode[track].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_seed.store(0x5EED, std::memory_order_relaxed);
+    stmlib::Random::Seed(0x5EED);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    solo_track(engine, track);
+    trigger_vibe_load(engine);
+
+    constexpr int kBlock = 256, kWarm = 600, kTotal = 1800;
+    double sum = 0.0; long n = 0;
+    for (int b = 0; b < kTotal; b++) {
+        unit_process_pulsar(&unit, engine, kBlock, 48000.0f);
+        if (b < kWarm) continue;
+        for (int i = 0; i < kBlock; i++) {
+            sum += (double)engine->pulsar_out_l[i] * engine->pulsar_out_l[i]; n++;
+        }
+    }
+    orpheus_engine_destroy(engine);
+    return n ? std::sqrt(sum / n) : 0.0;
+}
+
+static bool test_lick_track_on_texture_slot_escapes_the_notch() {
+    printf("\n  A melodic lick track on a texture slot escapes the energy notch without soloing\n");
+    double notch = render_lick_track(5, 0.5f);
+    double clear = render_lick_track(5, 0.65f);
+    double lead  = render_lick_track(4, 0.5f);
+    bool audible = clear > 1e-4 && lead > 1e-4;
+    bool lifted = notch >= clear * 0.5;
+    bool pass = audible && lifted;
+    printf("    rms t5@0.5=%.6f t5@0.65=%.6f t4@0.5=%.6f (%.1f dB under t4; want t5@0.5 >= 0.5x t5@0.65) -- %s\n",
+           notch, clear, lead, 20.0 * std::log10(lead > 0 ? notch / lead : 1e-9),
+           pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // Track 7 never fires at energy 0.5 / complexity 0.5 (FX probability is 0). Leading must.
 static bool test_soloist_on_fx_slot_fires() {
     printf("\n  Soloist on the FX slot fires through the FX gate\n");
@@ -701,6 +759,7 @@ bool run_pulsar_texture_tests() {
     if (test_evo_timbre_sweep_respects_the_authored_window()) pass++; else fail++;
     if (test_soloist_on_texture_slot_escapes_the_notch()) pass++; else fail++;
     if (test_soloist_on_fx_slot_fires()) pass++; else fail++;
+    if (test_lick_track_on_texture_slot_escapes_the_notch()) pass++; else fail++;
 
     // ── Summary ──
     printf("\n  Pulsar Texture: %d passed, %d failed\n", pass, fail);
