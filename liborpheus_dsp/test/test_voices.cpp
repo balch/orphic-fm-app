@@ -416,6 +416,59 @@ static bool test_swarm_particle_knob_remapping() {
     return all_pass;
 }
 
+// Duo depth smoothers settle on a 20ms time constant at any block size, and coupling's rate
+// does not depend on how many duos are sounding.
+static bool test_duo_depth_smoothing_time_constant() {
+    printf("\n=== Test: Duo depth smoothing time constant ===\n");
+    constexpr float kSr = 48000.0f, kTarget = 0.8f, kTau = 0.020f, kTol = 0.002f;
+    constexpr int kSettleFrames = 5120;  // ~5.3 time constants, whole blocks for every size below
+    const float ideal = kTarget * (1.0f - std::exp(-static_cast<float>(kSettleFrames) / (kTau * kSr)));
+
+    struct Case { int engine_index; int block; int duos; };
+    const Case cases[] = {
+        {-1, 64, 1}, {-1, 128, 1}, {-1, 512, 1},
+        { 8, 64, 1}, { 8, 128, 1}, { 8, 512, 1},
+        { 8, 128, 6},
+    };
+    bool all_pass = true;
+    for (const Case& c : cases) {
+        OrpheusEngine* engine = orpheus_engine_create(kSr);
+        if (!load_production_graph(engine)) {
+            orpheus_engine_destroy(engine);
+            return false;
+        }
+        for (int v = 0; v < c.duos * 2; v++) {
+            auto& vp = engine->voice_params[v];
+            vp.active.store(1);
+            vp.ever_triggered.store(1);
+            vp.engine_index.store(c.engine_index);
+            vp.tune.store(v % 2 ? 67.0f : 60.0f);
+            vp.gate.store(1);
+        }
+        engine->mod_source[0].store(0);  // VOICE_FM
+        engine->mod_depth[0].store(kTarget);
+        engine->fm_depth[0].store(kTarget);
+        engine->coupling_depth.store(kTarget);
+
+        auto* graph = engine->graph.load(std::memory_order_acquire);
+        std::vector<float> buf(c.block * 2, 0.0f);
+        for (int f = 0; f < kSettleFrames; f += c.block)
+            orpheus_graph_process(graph, engine, buf.data(), c.block);
+
+        float fd = engine->smooth_fm_depth[0];
+        float md = engine->smooth_mod_depth[0];
+        float cp = engine->smooth_coupling_depth;
+        // Engine 0 never reads mod depth, so only Plaits duos smooth it.
+        bool ok = std::fabs(fd - ideal) < kTol && std::fabs(cp - ideal) < kTol &&
+                  (c.engine_index < 0 || std::fabs(md - ideal) < kTol);
+        printf("  engine %2d block %3d duos %d: fm %.4f mod %.4f coupling %.4f (ideal %.4f) %s\n",
+               c.engine_index, c.block, c.duos, fd, md, cp, ideal, ok ? "PASS" : "FAIL");
+        all_pass &= ok;
+        orpheus_engine_destroy(engine);
+    }
+    return all_pass;
+}
+
 bool run_voice_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -428,5 +481,6 @@ bool run_voice_tests() {
     tally(test_idle_detection_recovery());
     tally(test_engine0_harmonics_morph());
     tally(test_swarm_particle_knob_remapping());
+    tally(test_duo_depth_smoothing_time_constant());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
