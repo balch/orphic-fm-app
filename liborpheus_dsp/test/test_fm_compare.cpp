@@ -232,16 +232,21 @@ bool run_fm_compare_tests() {
     printf("  python3 %s/compare_fm.py\n", output_dir);
 
     // ── Plaits duo FM verification ──
-    // Plaits VOICE_FM should produce measurably different output from dry baseline
+    // Timbre mod reshapes the waveform without necessarily moving its RMS, so compare the
+    // residual against dry rather than the two levels.
     {
         auto plaits_dry = render_fm_scenario({"plaits_dry", 1, 0.0f, 0.0f, 0.0f, 5.0f, 0.0f, 8, 8});
         auto plaits_fm  = render_fm_scenario({"plaits_fm_hi", 0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, 8, 8});
         int n = (int)(SR * DURATION);
         float dry_rms = compute_rms(plaits_dry.data(), n * 2);
-        float fm_rms  = compute_rms(plaits_fm.data(), n * 2);
-        float diff = std::fabs(fm_rms - dry_rms);
-        printf("\nPlaits duo FM check: dry_rms=%.4f fm_rms=%.4f diff=%.4f\n", dry_rms, fm_rms, diff);
-        if (diff < 0.001f) {
+        float resid_sq = 0.0f;
+        for (int i = 0; i < n * 2; i++) {
+            float d = plaits_fm[i] - plaits_dry[i];
+            resid_sq += d * d;
+        }
+        float resid_rms = std::sqrt(resid_sq / (n * 2));
+        printf("\nPlaits duo FM check: dry_rms=%.4f residual_rms=%.4f\n", dry_rms, resid_rms);
+        if (resid_rms < 0.01f * dry_rms) {
             printf("  FAIL: Plaits VOICE_FM produced no timbral change vs dry\n");
             all_pass = false;
         } else {
@@ -257,18 +262,17 @@ bool run_fm_compare_tests() {
         auto mixed_fm  = render_fm_scenario({"mixed_fm_hi", 0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, -1, 8});
         int n = (int)(SR * DURATION);
         // Extract right channel (Plaits voice B) from interleaved stereo
-        float dry_sum_sq = 0.0f, fm_sum_sq = 0.0f;
+        float dry_sum_sq = 0.0f, resid_sq = 0.0f;
         for (int i = 0; i < n; i++) {
             float d = mixed_dry[i * 2 + 1];
             float f = mixed_fm[i * 2 + 1];
             dry_sum_sq += d * d;
-            fm_sum_sq += f * f;
+            resid_sq += (f - d) * (f - d);
         }
         float dry_rms = std::sqrt(dry_sum_sq / n);
-        float fm_rms  = std::sqrt(fm_sum_sq / n);
-        float diff = std::fabs(fm_rms - dry_rms);
-        printf("\nMixed duo FM check (R chan): dry_rms=%.4f fm_rms=%.4f diff=%.4f\n", dry_rms, fm_rms, diff);
-        if (diff < 0.001f) {
+        float resid_rms = std::sqrt(resid_sq / n);
+        printf("\nMixed duo FM check (R chan): dry_rms=%.4f residual_rms=%.4f\n", dry_rms, resid_rms);
+        if (resid_rms < 0.01f * dry_rms) {
             printf("  FAIL: Mixed duo VOICE_FM produced no timbral change vs dry\n");
             all_pass = false;
         } else {
