@@ -42,7 +42,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.balch.orpheus.core.audio.TransitionSpec
-import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
@@ -137,34 +136,20 @@ fun PulsarPanel(
         // this is the heaviest panel.
         if (!LocalTelevisionHardware.current) {
             val vibeList = remember { pulsar.vibeList }
-            // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
-            // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
-            // dips below 1 and deepens the tint, breathing back as the mix returns.
-            val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
             PulsarSelectorRow(
                 state = state,
                 actions = actions,
                 vibeList = vibeList,
-                anomalyArmed = anomalyArmed,
                 voidGain = voidGain,
             )
         }
 
-        val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
-        val finalSectionIdx by actions.finalSectionIndex.collectAsStateWithLifecycle()
-        val songEndingOn by actions.songEndingEnabled.collectAsStateWithLifecycle()
-        val resolvedStyle by actions.resolvedTransitionStyle.collectAsStateWithLifecycle()
         PulsarStepGridSection(
             vizState = vizState,
             trackVizFlows = trackVizFlows,
             state = state,
             actions = actions,
             arrangementState = arrangementState,
-            activeTransition = activeTransition,
-            finalSectionIndex = finalSectionIdx,
-            // RANDOM is already pre-rolled to a concrete substyle here, so the suffix
-            // never reads "verse 3/8, RANDOM".
-            pendingTransition = if (songEndingOn) resolvedStyle else null,
         )
 
         // Voice detail strip. Auto-dismisses after 10s idle, suppressed while a picker is open.
@@ -270,9 +255,12 @@ private fun PulsarSelectorRow(
     state: PulsarUiState,
     actions: PulsarPanelActions,
     vibeList: List<Vibe>,
-    anomalyArmed: Boolean,
     voidGain: Float,
 ) {
+    // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
+    // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
+    // dips below 1 and deepens the tint, breathing back as the mix returns.
+    val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Top,
@@ -340,10 +328,11 @@ private fun PulsarStepGridSection(
     state: PulsarUiState,
     actions: PulsarPanelActions,
     arrangementState: PulsarArrangementState,
-    activeTransition: TransitionStyle?,
-    finalSectionIndex: Int,
-    pendingTransition: TransitionStyle?,
 ) {
+    val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
+    val finalSectionIndex by actions.finalSectionIndex.collectAsStateWithLifecycle()
+    val songEndingOn by actions.songEndingEnabled.collectAsStateWithLifecycle()
+    val resolvedStyle by actions.resolvedTransitionStyle.collectAsStateWithLifecycle()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -361,7 +350,9 @@ private fun PulsarStepGridSection(
             arrangement = state.vibe.arrangement,
             activeTransition = activeTransition,
             finalSectionIndex = finalSectionIndex,
-            pendingTransition = pendingTransition,
+            // RANDOM is already pre-rolled to a concrete substyle here, so the suffix
+            // never reads "verse 3/8, RANDOM".
+            pendingTransition = if (songEndingOn) resolvedStyle else null,
             modifier = Modifier
                 .width(360.dp)
                 .height(120.dp)
