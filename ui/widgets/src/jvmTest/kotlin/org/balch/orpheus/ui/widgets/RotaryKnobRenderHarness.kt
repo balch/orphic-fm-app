@@ -17,8 +17,8 @@ import java.io.File
 import kotlin.test.Test
 
 /**
- * Renders the Pulsar macro knobs with the COMPLEXITY knob in One Mode, at 3x, so the pulse
- * glow can be judged as pixels rather than imagined. Writes PNGs under `build/widgets-render`,
+ * Renders the Pulsar macro knobs with the COMPLEXITY knob in Mode One, at 3x, so the label
+ * pulse can be judged as pixels rather than imagined. Writes PNGs under `build/widgets-render`,
  * asserts nothing, and swallows every throwable so a headless box without skia natives can't
  * fail the build. Run:
  *
@@ -51,7 +51,7 @@ class RotaryKnobRenderHarness {
                                     value = 0.3f, onValueChange = {}, label = "COMPLEXITY",
                                     size = 48.dp, progressColor = OrpheusColors.cosmicPurple,
                                     valueFormatter = null,
-                                    pulseGlow = true,
+                                    pulseLabel = true,
                                 )
                                 RotaryKnob(
                                     value = 0.5f, onValueChange = {}, label = "MOOD",
@@ -63,9 +63,9 @@ class RotaryKnobRenderHarness {
                     }
                 }
                 try {
-                    File(outDir, "one-mode-glow-dim.png")
+                    File(outDir, "one-mode-pulse-dim.png")
                         .writeBytes(scene.render(nanoTime = 0L).encodeToData()!!.bytes)
-                    File(outDir, "one-mode-glow-bright.png")
+                    File(outDir, "one-mode-pulse-bright.png")
                         .writeBytes(scene.render(nanoTime = 700_000_000L).encodeToData()!!.bytes)
                 } finally {
                     scene.close()
