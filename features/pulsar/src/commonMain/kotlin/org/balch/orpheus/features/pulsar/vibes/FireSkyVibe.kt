@@ -594,23 +594,21 @@ private class FireSkyVibeBase(
                 // like a real blues figure; intro/chorus/outro pin it FIXED (see sections).
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.78f,
+                    volume = 0.58f,
                     noteRangeLow = 50,        // D3
                     noteRangeHigh = 69,       // A4 — low-mid guitar register
                     reverbSend = 0.16f,
                     delaySend = 0.14f,
                     glideRate = 0.0f,         // no slur — every riff note distinct
                     lpgMode = LpgMode.PLUCK,  // picked attack per note
-                    // The riff's 8th-note pulse IS this pluck decaying inside each note: at
-                    // 60 BPM 2.0.5 fell ~24 dB per 8th (0.5 matches it), 0.95 and SUSTAINED
-                    // go flat and the vibe loses its drive. 0.6 keeps the pulse ~6 dB softer.
                     // Not clamped: >1 rings longer still, 1.3 is flat.
-                    lpgDecay = 0.60f,
-                    lpgColour = 0.55f,
+                    lpgDecay = 0.6f,
+                    lpgColour = 0.7f,
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
                         engineSpace = lead.copy(
+                            volume = .78f,
                             engineId = OrpheusEngineId.DX3,
                             harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
                             lpgMode = LpgMode.SUSTAINED
