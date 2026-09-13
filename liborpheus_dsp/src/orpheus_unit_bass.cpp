@@ -394,29 +394,20 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     if (seq.smooth_note == 0.0f) {
         seq.smooth_note = target_note;  // init on first render
     }
-    if (step_slide && step_gate) {
-        float glide_ms = 80.0f * std::exp(-2.1f * envelope_param);
-        float glide_samples = glide_ms * 0.001f * sample_rate;
-        float glide_coeff = (glide_samples > 1.0f) ? (1.0f - std::exp(-1.0f / (glide_samples * 0.3f))) : 1.0f;
-        // Apply per-block smoothing (block-rate is sufficient for pitch glide)
-        seq.smooth_note += glide_coeff * num_frames * (target_note - seq.smooth_note);
-    } else {
+    bool gliding = step_slide && step_gate;
+    if (!gliding) {
         seq.smooth_note = target_note;
     }
-    float note = seq.smooth_note;
+    float glide_ms = 80.0f * std::exp(-2.1f * envelope_param);
+    float glide_tau = glide_ms * 0.001f * 0.3f;  // seconds, stepped per render chunk
 
     // ── Set accent boosts ──
     engine->bass_accent_drive_boost = step_accent ? (0.3f * accent_amount) : 0.0f;
 
     // Accent cutoff flare: target is +0.35 timbre boost on accented steps.
-    // Smoothed with fast attack (~2ms) / slow decay (~60ms) for the classic
-    // accent sweep — filter snaps open then slowly closes back down.
+    // Smoothed per render chunk with fast attack (~2ms) / slow decay (~60ms) for the
+    // classic accent sweep: the filter snaps open, then slowly closes back down.
     float accent_timbre_target = step_accent ? (0.35f * accent_amount) : 0.0f;
-    float flare_attack = 1.0f - std::exp(-1.0f / (0.002f * sample_rate));  // ~2ms
-    float flare_decay  = 1.0f - std::exp(-1.0f / (0.06f * sample_rate));   // ~60ms
-    float flare_coeff = (accent_timbre_target > engine->bass_accent_timbre_boost)
-                        ? flare_attack : flare_decay;
-    engine->bass_accent_timbre_boost += flare_coeff * (accent_timbre_target - engine->bass_accent_timbre_boost);
 
     // ── Determine gate to pass to voice ──
     int render_gate;
@@ -444,46 +435,21 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     //   lfo_morph_buffer     → resonance (harmonics)
     //   lfo_pitch_buffer     → pitch
     //   lfo_harmonics_buffer → envelope (reduced depth to avoid clicks)
+    // Sampled per render chunk below, along with Flux X pitch and Flux Y timbre.
     float lfo_depth = engine->bass_lfo_mix.load(std::memory_order_relaxed);
-    float mod_timbre = 0.0f, mod_harmonics = 0.0f, mod_pitch = 0.0f, mod_envelope = 0.0f;
-    if (lfo_depth > 0.001f) {
-        // Sample LFO at block midpoint (block-rate modulation, matching Plaits pattern)
-        int mid = num_frames / 2;
-        mod_timbre    = engine->lfo_output_buffer[mid]     * lfo_depth * 0.5f;
-        mod_harmonics = engine->lfo_morph_buffer[mid]      * lfo_depth * 0.5f;
-        mod_pitch     = engine->lfo_pitch_buffer[mid]      * lfo_depth * 0.5f;  // ±0.5 semitone
-        mod_envelope  = engine->lfo_harmonics_buffer[mid]  * lfo_depth * 0.3f;  // reduced to avoid envelope pop
-    }
+    float* ext_x = resolve_flux_x(engine, pitch_src);
 
     // NOTE: Tides modulation of bass was removed — it applied unconditionally
     // whenever tides_mix > 0, modifying bass pitch/timbre/harmonics without
     // user consent. If Tides→Bass modulation is desired in the future, it
     // should be gated by an explicit mod source selector (like Plaits has).
 
-    // Apply pitch modulation
-    note += mod_pitch;
-
-    // ── Flux X pitch modulation ──
-    float* ext_x = resolve_flux_x(engine, pitch_src);
-    if (ext_x != nullptr) {
-        // X buffer contains exp2(v)-1 values (frequency ratio offset).
-        // Convert back to semitones: 12 * log2(1 + x_val)
-        int mid = num_frames / 2;
-        float x_val = ext_x[mid];
-        if (x_val > -0.99f) {
-            float semitones = 12.0f * std::log2f(1.0f + x_val);
-            note += semitones;
-        }
-    }
-
-    // Apply envelope modulation
-    float modulated_envelope = std::max(0.0f, std::min(1.0f, envelope_param + mod_envelope));
-
     // ── Render voice ──
     // Force retrigger on new step (or Flux T rising edge): reset both OrpheusVoice's
     // Schmitt trigger AND the envelope's gate state so both see a fresh rising edge.
     // Without this, all-gates-on patterns never retrigger after the first note.
     bool retrigger = false;
+    int flux_edge = 0;  // first sample of a Flux T note; Flux X before it is the previous note's
     if (ext_t != nullptr) {
         // Detect rising edge in T buffer for retrigger
         bool t_rising = (ext_t[num_frames / 2] > 0.5f) && (ext_t[0] <= 0.5f);
@@ -492,6 +458,7 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
             engine->bass_voice.remainder_count_ = 0;  // discard stale pre-trigger samples
             seq.env_gate_prev = false;
             retrigger = true;
+            while (flux_edge < num_frames / 2 && ext_t[flux_edge] <= 0.5f) flux_edge++;
         }
     } else if (new_step_fired && step_gate && !step_slide) {
         // Normal trigger: retrigger voice + envelope for fresh attack.
@@ -505,58 +472,22 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     }
     // Slide steps: no retrigger — envelope continues (legato), pitch glides
 
-    // Apply cutoff/resonance modulation to voice params
-    float timbre_val = std::max(0.0f, std::min(1.0f,
-        bp.timbre.load(std::memory_order_relaxed) + mod_timbre));
-
     // Remap RESO knob for the VCF engine.
     // The VCF engine's resonance is V-shaped: |harmonics - 0.5| controls Q,
     // so harmonics=0.0 and 1.0 both give MAXIMUM resonance, while 0.5 gives
     // zero. This is confusing for a bass RESO knob where 0 should mean "off".
     // Remap: RESO 0→0.5 (no resonance), RESO 1→0.0 (max resonance).
+    float raw_timbre = bp.timbre.load(std::memory_order_relaxed);
     float raw_reso = bp.harmonics.load(std::memory_order_relaxed);
-    float harmonics_val;
+    float base_harmonics;
     if (bass_engine == 0) {
         // VCF Acid: remap so RESO 0=off, RESO 1=max
-        harmonics_val = 0.5f * (1.0f - raw_reso);
+        base_harmonics = 0.5f * (1.0f - raw_reso);
     } else {
-        harmonics_val = raw_reso;
+        base_harmonics = raw_reso;
     }
-    harmonics_val = std::max(0.0f, std::min(1.0f, harmonics_val + mod_harmonics));
-
-    // ── Flux Y timbre modulation ──
-    if (timbre_src > 0) {
-        // Y buffer is clamped [-1, +1] by unit_process_marbles.
-        // Scale to ±0.3 for subtle tonal variation without extreme jumps.
-        int mid = num_frames / 2;
-        float y_val = engine->marbles_y_buffer[mid];
-        timbre_val = std::max(0.0f, std::min(1.0f, timbre_val + y_val * 0.3f));
-    }
-
-    // Smooth timbre/harmonics to prevent filter coefficient clicks (~5ms).
-    // smooth_coeff() is per-sample; scale by num_frames for block-rate application
-    // (same approximation used by portamento's glide_coeff * num_frames).
-    float tc = smooth_coeff(sample_rate) * num_frames;
-    if (tc > 1.0f) tc = 1.0f;  // clamp for very large blocks
-    engine->bass_smooth_timbre += tc * (timbre_val - engine->bass_smooth_timbre);
-    engine->bass_smooth_harmonics += tc * (harmonics_val - engine->bass_smooth_harmonics);
-
-    // Apply accent cutoff flare on top of smoothed timbre (post-smooth so the
-    // flare envelope shape isn't smeared by the parameter smoother)
-    float render_timbre = std::min(1.0f, engine->bass_smooth_timbre + engine->bass_accent_timbre_boost);
-
-    float raw_out[kMaxFrames];
-    engine->bass_voice.Render(
-        plaits_engine_index,
-        render_gate,
-        note,
-        engine->bass_smooth_harmonics,
-        render_timbre,
-        bp.morph.load(std::memory_order_relaxed),
-        bp.accent.load(std::memory_order_relaxed),
-        raw_out,
-        num_frames
-    );
+    float morph = bp.morph.load(std::memory_order_relaxed);
+    float accent = bp.accent.load(std::memory_order_relaxed);
 
     // ── Apply envelope, output gain, and mix ──
     // Bass voice needs headroom boost: Plaits output is soft-limited to ~±1,
@@ -575,22 +506,88 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     float lpf_coeff = 1.0f - std::exp(-2.0f * 3.14159265f * 12000.0f / sample_rate);
     float lpf = engine->bass_lpf_state;
 
-    for (int i = 0; i < num_frames; i++) {
-        smooth_mix += mix_coeff * (target_mix - smooth_mix);
+    // Render in Plaits-sized chunks so glide, flare, cutoff smoothing and modulation move
+    // every 24 samples. Stepped once per host block they staircase at 512 frames.
+    float raw_out[kOrpheusBlockSize];
+    for (int start = 0; start < num_frames; start += kOrpheusBlockSize) {
+        int frames = std::min(kOrpheusBlockSize, num_frames - start);
+        int mid = start + frames / 2;
 
-        float sample = raw_out[i];
+        if (gliding) {
+            seq.smooth_note += block_smooth_coeff(sample_rate, frames, glide_tau) * (target_note - seq.smooth_note);
+        }
+        float flare_tau = (accent_timbre_target > engine->bass_accent_timbre_boost) ? 0.002f : 0.06f;
+        engine->bass_accent_timbre_boost += block_smooth_coeff(sample_rate, frames, flare_tau)
+                                            * (accent_timbre_target - engine->bass_accent_timbre_boost);
 
-        if (use_external_envelope) {
-            bool gate_for_env = (render_gate != 0);
-            float env = process_envelope(seq, gate_for_env, modulated_envelope, step_accent, accent_amount, sample_rate);
-            sample *= env;
+        float mod_timbre = 0.0f, mod_harmonics = 0.0f, mod_pitch = 0.0f, mod_envelope = 0.0f;
+        if (lfo_depth > 0.001f) {
+            mod_timbre    = engine->lfo_output_buffer[mid]     * lfo_depth * 0.5f;
+            mod_harmonics = engine->lfo_morph_buffer[mid]      * lfo_depth * 0.5f;
+            mod_pitch     = engine->lfo_pitch_buffer[mid]      * lfo_depth * 0.5f;  // ±0.5 semitone
+            mod_envelope  = engine->lfo_harmonics_buffer[mid]  * lfo_depth * 0.3f;  // reduced to avoid envelope pop
         }
 
-        // Apply one-pole LPF to raw sample (before gain/mix) to catch retrigger clicks
-        // at the source. Filtering after mix would cause the LPF state to lag during
-        // mix ramps (bypass transitions), producing brief volume swells.
-        lpf += lpf_coeff * (sample - lpf);
-        out[i] = lpf * kBassOutputGain * smooth_mix;
+        float note = seq.smooth_note + mod_pitch;
+        if (ext_x != nullptr) {
+            // X buffer contains exp2(v)-1 values (frequency ratio offset).
+            // Convert back to semitones: 12 * log2(1 + x_val)
+            // The note restarts at the block start, so read its pitch from past the T edge
+            float x_val = ext_x[std::max(mid, flux_edge)];
+            if (x_val > -0.99f) {
+                note += 12.0f * std::log2f(1.0f + x_val);
+            }
+        }
+
+        float modulated_envelope = std::max(0.0f, std::min(1.0f, envelope_param + mod_envelope));
+        float timbre_val = std::max(0.0f, std::min(1.0f, raw_timbre + mod_timbre));
+        float harmonics_val = std::max(0.0f, std::min(1.0f, base_harmonics + mod_harmonics));
+
+        if (timbre_src > 0) {
+            // Flux Y is clamped [-1, +1] by unit_process_marbles.
+            // Scale to ±0.3 for subtle tonal variation without extreme jumps.
+            float y_val = engine->marbles_y_buffer[mid];
+            timbre_val = std::max(0.0f, std::min(1.0f, timbre_val + y_val * 0.3f));
+        }
+
+        // Smooth timbre/harmonics to prevent filter coefficient clicks (~5ms)
+        float tc = block_smooth_coeff(sample_rate, frames, 0.005f);
+        engine->bass_smooth_timbre += tc * (timbre_val - engine->bass_smooth_timbre);
+        engine->bass_smooth_harmonics += tc * (harmonics_val - engine->bass_smooth_harmonics);
+
+        // Apply accent cutoff flare on top of smoothed timbre (post-smooth so the
+        // flare envelope shape isn't smeared by the parameter smoother)
+        float render_timbre = std::min(1.0f, engine->bass_smooth_timbre + engine->bass_accent_timbre_boost);
+
+        engine->bass_voice.Render(
+            plaits_engine_index,
+            render_gate,
+            note,
+            engine->bass_smooth_harmonics,
+            render_timbre,
+            morph,
+            accent,
+            raw_out,
+            frames
+        );
+
+        for (int i = 0; i < frames; i++) {
+            smooth_mix += mix_coeff * (target_mix - smooth_mix);
+
+            float sample = raw_out[i];
+
+            if (use_external_envelope) {
+                bool gate_for_env = (render_gate != 0);
+                float env = process_envelope(seq, gate_for_env, modulated_envelope, step_accent, accent_amount, sample_rate);
+                sample *= env;
+            }
+
+            // Apply one-pole LPF to raw sample (before gain/mix) to catch retrigger clicks
+            // at the source. Filtering after mix would cause the LPF state to lag during
+            // mix ramps (bypass transitions), producing brief volume swells.
+            lpf += lpf_coeff * (sample - lpf);
+            out[start + i] = lpf * kBassOutputGain * smooth_mix;
+        }
     }
 
     engine->bass_lpf_state = lpf;

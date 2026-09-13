@@ -696,6 +696,333 @@ static bool test_bass_vcf_click_detection() {
     return pass;
 }
 
+// ── Block-size independent smoothing ──────────────────────────────
+// Desktop renders 512-frame blocks. Glide, accent flare and cutoff smoothing must keep
+// their time constants there, and a slide must move inside a block, not once per block.
+
+static const float kBassSr = 48000.0f;
+
+// Every bass setting explicit: VCF engine, chromatic scale, no mod sources, clock stopped.
+static OrpheusEngine* make_bass_engine(GraphUnit& u, float envelope, int root_note) {
+    OrpheusEngine* engine = orpheus_engine_create(kBassSr);
+    engine->bass_mix.store(1.0f);
+    engine->bass_bypass.store(0);
+    engine->bass_root_note.store(root_note);
+    engine->bass_scale.store(0);
+    engine->bass_step_count.store(4);
+    engine->bass_mutation.store(0.0f);
+    engine->bass_envelope.store(envelope);
+    engine->bass_engine.store(0);
+    engine->bass_clock_div.store(2);
+    engine->bass_accent_amount.store(1.0f);
+    engine->bass_jitter.store(0.0f);
+    engine->bass_lfo_mix.store(0.0f);
+    engine->bass_trigger_source.store(0);
+    engine->bass_pitch_source.store(0);
+    engine->bass_timbre_source.store(0);
+    engine->bass_key_override.store(0);
+    engine->clock_running.store(0);
+    engine->clock_bpm.store(120.0f);
+    engine->bass_params.timbre.store(0.5f);
+    engine->bass_params.harmonics.store(0.0f);
+    engine->bass_params.morph.store(0.5f);
+    engine->bass_params.accent.store(0.5f);
+
+    std::memset(&u, 0, sizeof(u));
+    u.type = UNIT_BASS_VOICE;
+    u.enabled = true;
+    unit_init(&u, kBassSr);
+    unit_process_bass_voice(&u, engine, 128, kBassSr);  // initializes the sequencer
+
+    BassSequencerState& seq = engine->bass_seq_state;
+    for (int i = 0; i < kMaxBassSteps; i++) {
+        seq.mutation_buffer[i] = 0.0f;
+        seq.gate_buffer[i] = 0.9f;
+        seq.accent_buffer[i] = 0.0f;
+    }
+    seq.current_step = 0;
+    seq.tick_counter = 0;
+    engine->bass_accent_timbre_boost = 0.0f;  // the init pattern accents step 0
+    return engine;
+}
+
+// glide_ms = 80 * exp(-2.1 * envelope); the one-pole time constant is 0.3 of that.
+static float bass_glide_tau_samples(float envelope) {
+    return 0.3f * 80.0f * std::exp(-2.1f * envelope) * 0.001f * kBassSr;
+}
+
+// Reads pitch from upward zero crossings. Root 72 keeps the period (92 to 46 samples) short
+// enough to see the note move inside one 512-frame block.
+static bool test_bass_slide_moves_within_a_block() {
+    printf("\n=== Test: Bass slide pitch moves within a block at 128 and 512 frames ===\n");
+    bool pass = true;
+    for (int n : {128, 512}) {
+        for (float env : {0.2f, 0.7f}) {
+            GraphUnit u;
+            OrpheusEngine* engine = make_bass_engine(u, env, 72);
+            BassSequencerState& seq = engine->bass_seq_state;
+            engine->bass_step_count.store(2);
+            engine->bass_accent_amount.store(0.0f);
+            seq.gate_buffer[1] = 0.5f;      // slide
+            seq.mutation_buffer[1] = 0.5f;  // to 84
+            engine->clock_bpm.store(117.1875f);  // 6144 samples per step, a multiple of both sizes
+            engine->clock_running.store(1);
+
+            std::vector<float> audio;
+            long slide_start = -1, slide_end = -1;
+            while (slide_end < 0 && audio.size() < 48000) {
+                long start = static_cast<long>(audio.size());
+                unit_process_bass_voice(&u, engine, n, kBassSr);
+                int step = seq.current_step % 2;
+                if (step == 1 && slide_start < 0) slide_start = start;
+                if (step == 0 && slide_start >= 0) slide_end = start;
+                const float* out = u.output_buffers[OPORT_OUT];
+                audio.insert(audio.end(), out, out + n);
+            }
+
+            std::vector<double> crossings;
+            for (size_t i = 1; i < audio.size(); i++) {
+                if (audio[i - 1] < 0.0f && audio[i] >= 0.0f) {
+                    crossings.push_back(static_cast<double>(i - 1) + audio[i - 1] / (audio[i - 1] - audio[i]));
+                }
+            }
+            const double tau = bass_glide_tau_samples(env);
+            double worst = 0.0;
+            int measured = 0;
+            for (size_t k = 1; k < crossings.size(); k++) {
+                double mid = 0.5 * (crossings[k] + crossings[k - 1]);
+                // Skip periods that straddle a step boundary: the next step snaps and retriggers.
+                if (mid < slide_start + 48 || crossings[k] >= slide_end) continue;
+                double note = 69.0 + 12.0 * std::log2(kBassSr / (crossings[k] - crossings[k - 1]) / 440.0);
+                double expect = 84.0 - 12.0 * std::exp(-(mid - slide_start) / tau);
+                worst = std::max(worst, std::fabs(note - expect));
+                measured++;
+            }
+            bool ok = slide_end > 0 && measured > 50 && worst < 0.5;
+            printf("  N=%3d env=%.1f  %d periods  worst pitch error %.3f st  %s\n",
+                   n, env, measured, worst, ok ? "ok" : "FAIL");
+            pass = pass && ok;
+            orpheus_engine_destroy(engine);
+        }
+    }
+    printf("Bass slide moves within a block: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_bass_glide_time_constant() {
+    printf("\n=== Test: Bass glide follows its time constant at 128 and 512 frames ===\n");
+    bool pass = true;
+    for (int n : {128, 512}) {
+        for (float env : {0.2f, 0.7f, 1.0f}) {
+            GraphUnit u;
+            OrpheusEngine* engine = make_bass_engine(u, env, 36);
+            BassSequencerState& seq = engine->bass_seq_state;
+            // Clock stopped on a slide step: the target holds at 48 while the note glides from 36.
+            seq.current_step = 1;
+            seq.gate_buffer[1] = 0.5f;
+            seq.mutation_buffer[1] = 0.5f;
+            seq.smooth_note = 36.0f;
+
+            const float tau = bass_glide_tau_samples(env);
+            float worst = 0.0f, peak_note = 36.0f;
+            bool finite = true;
+            for (int t = n; t <= 4800; t += n) {
+                unit_process_bass_voice(&u, engine, n, kBassSr);
+                if (!std::isfinite(seq.smooth_note)) finite = false;
+                float expect = 48.0f - 12.0f * std::exp(-t / tau);
+                worst = std::max(worst, std::fabs(seq.smooth_note - expect));
+                peak_note = std::max(peak_note, seq.smooth_note);
+            }
+            bool ok = finite && worst < 0.02f && peak_note <= 48.001f;
+            printf("  N=%3d env=%.1f  worst deviation %.4f st  peak note %.3f  %s\n",
+                   n, env, worst, peak_note, ok ? "ok" : "FAIL");
+            pass = pass && ok;
+            orpheus_engine_destroy(engine);
+        }
+    }
+    printf("Bass glide time constant: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_bass_long_slide_stays_finite() {
+    printf("\n=== Test: A 1.5 s slide at the fastest glide stays finite on 512-frame blocks ===\n");
+    GraphUnit u;
+    OrpheusEngine* engine = make_bass_engine(u, 1.0f, 36);
+    BassSequencerState& seq = engine->bass_seq_state;
+    seq.current_step = 1;
+    seq.gate_buffer[1] = 0.5f;
+    seq.mutation_buffer[1] = 0.5f;
+    seq.smooth_note = 36.0f;
+
+    bool finite = true;
+    for (int t = 0; t < 72000; t += 512) {
+        unit_process_bass_voice(&u, engine, 512, kBassSr);
+        if (!std::isfinite(seq.smooth_note)) finite = false;
+        const float* out = u.output_buffers[OPORT_OUT];
+        for (int i = 0; i < 512; i++) {
+            if (!std::isfinite(out[i])) finite = false;
+        }
+    }
+    float err = std::fabs(seq.smooth_note - 48.0f);
+    bool pass = finite && err < 0.001f;
+    printf("  finite: %s  final note %.4f (target 48)\n", finite ? "yes" : "no", seq.smooth_note);
+    printf("Bass long slide stays finite: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
+static bool test_bass_accent_flare_time_constants() {
+    printf("\n=== Test: Accent flare opens over ~2 ms and closes over ~60 ms at 128 and 512 frames ===\n");
+    const float kTarget = 0.35f;  // accent_amount 1
+    const float kAttackTau = 0.002f * kBassSr;
+    const float kDecayTau = 0.06f * kBassSr;
+    bool pass = true;
+    for (int n : {128, 512}) {
+        GraphUnit u;
+        OrpheusEngine* engine = make_bass_engine(u, 0.5f, 36);
+        BassSequencerState& seq = engine->bass_seq_state;
+        seq.accent_buffer[0] = 0.9f;  // clock stopped on an accented step
+
+        float attack_worst = 0.0f;
+        for (int t = n; t <= 9600; t += n) {
+            unit_process_bass_voice(&u, engine, n, kBassSr);
+            float expect = kTarget * (1.0f - std::exp(-t / kAttackTau));
+            attack_worst = std::max(attack_worst, std::fabs(engine->bass_accent_timbre_boost - expect));
+        }
+        float v0 = engine->bass_accent_timbre_boost;
+        seq.accent_buffer[0] = 0.0f;
+        float decay_worst = 0.0f;
+        for (int t = n; t <= 9600; t += n) {
+            unit_process_bass_voice(&u, engine, n, kBassSr);
+            float expect = v0 * std::exp(-t / kDecayTau);
+            decay_worst = std::max(decay_worst, std::fabs(engine->bass_accent_timbre_boost - expect));
+        }
+        bool ok = attack_worst < 0.003f && decay_worst < 0.003f;
+        printf("  N=%3d  attack worst %.4f  decay worst %.4f  (boost after 200 ms accent %.4f)  %s\n",
+               n, attack_worst, decay_worst, v0, ok ? "ok" : "FAIL");
+        pass = pass && ok;
+        orpheus_engine_destroy(engine);
+    }
+    printf("Bass accent flare time constants: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_bass_timbre_smoothing_time_constant() {
+    printf("\n=== Test: Cutoff and resonance smooth over ~5 ms at 128 and 512 frames ===\n");
+    const float kTau = 0.005f * kBassSr;
+    bool pass = true;
+    for (int n : {128, 512}) {
+        GraphUnit u;
+        OrpheusEngine* engine = make_bass_engine(u, 0.5f, 36);
+        engine->bass_params.timbre.store(0.2f);
+        engine->bass_params.harmonics.store(0.0f);  // VCF remap: RESO 0 -> 0.5
+        for (int t = 0; t < 24000; t += n) unit_process_bass_voice(&u, engine, n, kBassSr);
+        float start_timbre = engine->bass_smooth_timbre;
+        float start_harmonics = engine->bass_smooth_harmonics;
+
+        engine->bass_params.timbre.store(0.8f);
+        engine->bass_params.harmonics.store(1.0f);  // RESO 1 -> 0.0
+        float worst = 0.0f;
+        for (int t = n; t <= 2304; t += n) {
+            unit_process_bass_voice(&u, engine, n, kBassSr);
+            float decay = std::exp(-t / kTau);
+            worst = std::max(worst, std::fabs(engine->bass_smooth_timbre - (0.8f - (0.8f - start_timbre) * decay)));
+            worst = std::max(worst, std::fabs(engine->bass_smooth_harmonics - start_harmonics * decay));
+        }
+        bool ok = worst < 0.003f;
+        printf("  N=%3d  start timbre %.3f harmonics %.3f  worst deviation %.4f  %s\n",
+               n, start_timbre, start_harmonics, worst, ok ? "ok" : "FAIL");
+        pass = pass && ok;
+        orpheus_engine_destroy(engine);
+    }
+    printf("Bass timbre smoothing time constant: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// A Flux T retrigger starts the note at the block start, so the chunks before the edge must
+// already play the new note's Flux X pitch, not the previous note's.
+static bool test_bass_flux_t_note_starts_on_its_flux_x_pitch() {
+    printf("\n=== Test: A Flux T note starts on its own Flux X pitch at 512 frames ===\n");
+    const int n = 512, edge = 240;
+    GraphUnit u;
+    OrpheusEngine* engine = make_bass_engine(u, 0.5f, 72);
+    engine->bass_accent_amount.store(0.0f);
+    engine->bass_trigger_source.store(2);
+    engine->bass_pitch_source.store(2);
+    engine->clock_bpm.store(1.0f);  // no sequencer step fires during the test
+    engine->clock_running.store(1);
+
+    for (int i = 0; i < kMaxFrames; i++) {
+        engine->marbles_t2_buffer[i] = 0.0f;
+        engine->marbles_x2_buffer[i] = 0.0f;  // +0 st
+    }
+    for (int b = 0; b < 2; b++) unit_process_bass_voice(&u, engine, n, kBassSr);
+
+    // T rises and X steps up an octave on the same sample.
+    for (int i = edge; i < n; i++) {
+        engine->marbles_t2_buffer[i] = 1.0f;
+        engine->marbles_x2_buffer[i] = 1.0f;  // exp2(1) - 1: +12 st
+    }
+    unit_process_bass_voice(&u, engine, n, kBassSr);
+    const float* out = u.output_buffers[OPORT_OUT];
+
+    std::vector<double> crossings;
+    for (int i = 1; i < edge; i++) {
+        if (out[i - 1] < 0.0f && out[i] >= 0.0f) {
+            crossings.push_back(static_cast<double>(i - 1) + out[i - 1] / (out[i - 1] - out[i]));
+        }
+    }
+    double sum = 0.0;
+    int periods = 0;
+    for (size_t k = 1; k < crossings.size(); k++) {
+        if (crossings[k - 1] < 24.0) continue;  // the oscillator glides into the first chunk
+        sum += 69.0 + 12.0 * std::log2(kBassSr / (crossings[k] - crossings[k - 1]) / 440.0);
+        periods++;
+    }
+    double mean = periods > 0 ? sum / periods : 0.0;
+    bool pass = periods >= 1 && std::fabs(mean - 84.0) < 0.5;
+    printf("  %d periods before the edge, mean pitch %.2f (want 84)\n", periods, mean);
+    printf("Bass Flux T note starts on its Flux X pitch: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
+// Smoothing steps once per 24-sample chunk, so a 480-frame host (20 chunks, no partial chunk)
+// renders the same audio as a 24-frame host while the accent flare and cutoff move.
+static bool test_bass_flare_and_cutoff_same_audio_at_24_and_480_frames() {
+    printf("\n=== Test: Accent flare and cutoff moves render the same audio at 24 and 480 frames ===\n");
+    const int sizes[2] = {24, 480};
+    std::vector<float> renders[2];
+    for (int r = 0; r < 2; r++) {
+        const int n = sizes[r];
+        GraphUnit u;
+        OrpheusEngine* engine = make_bass_engine(u, 0.5f, 48);
+        BassSequencerState& seq = engine->bass_seq_state;
+        seq.accent_buffer[0] = 0.9f;                // accented, gated step
+        engine->bass_params.harmonics.store(0.8f);  // resonance makes cutoff moves audible
+        engine->clock_bpm.store(1.0f);              // no sequencer step fires
+        engine->clock_running.store(1);
+        for (int t = 0; t < 19200; t += n) {
+            if (t == 4800) engine->bass_params.timbre.store(0.8f);
+            if (t == 9600) seq.accent_buffer[0] = 0.0f;
+            if (t == 14400) engine->bass_params.timbre.store(0.3f);
+            unit_process_bass_voice(&u, engine, n, kBassSr);
+            const float* out = u.output_buffers[OPORT_OUT];
+            renders[r].insert(renders[r].end(), out, out + n);
+        }
+        orpheus_engine_destroy(engine);
+    }
+    float worst = 0.0f, peak = 0.0f;
+    for (size_t i = 0; i < renders[0].size(); i++) {
+        worst = std::max(worst, std::fabs(renders[0][i] - renders[1][i]));
+        peak = std::max(peak, std::fabs(renders[0][i]));
+    }
+    bool pass = peak > 0.01f && worst < 1e-5f;
+    printf("  peak %.4f  worst sample difference %.3g\n", peak, worst);
+    printf("Bass flare and cutoff same audio at 24 and 480 frames: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_bass_voice_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -711,5 +1038,12 @@ bool run_bass_voice_tests() {
     tally(test_bass_flux_t_gating());
     tally(test_bass_slide_portamento());
     tally(test_bass_vcf_click_detection());
+    tally(test_bass_slide_moves_within_a_block());
+    tally(test_bass_glide_time_constant());
+    tally(test_bass_long_slide_stays_finite());
+    tally(test_bass_accent_flare_time_constants());
+    tally(test_bass_timbre_smoothing_time_constant());
+    tally(test_bass_flux_t_note_starts_on_its_flux_x_pitch());
+    tally(test_bass_flare_and_cutoff_same_audio_at_24_and_480_frames());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
