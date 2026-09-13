@@ -95,10 +95,13 @@ inline TransFxRow trans_fx_row_from_wire(const float* fields) {
 
 // Stage every authored row on `edge` out of `section`. `bars_remaining` is the
 // section's full drawn length at entry, so offset 0 lands exactly on the flip.
+// `drop_elapsed` is for a mid-section re-stage, where `bars_remaining` is what is left:
+// a row whose countdown is already <= 0 has fired (or missed its moment) and is dropped.
 // Returns the number of pending slots written; the rest are reset.
 inline int stage_transition_fx(const TransFxRow* rows, int row_count,
                                int section, int edge, int bars_remaining,
-                               PendingTransFx* out, int max_out) {
+                               PendingTransFx* out, int max_out,
+                               bool drop_elapsed = false) {
     const float span = static_cast<float>(bars_remaining);
     int n = 0;
     for (int i = 0; i < row_count && n < max_out; i++) {
@@ -109,6 +112,7 @@ inline int stage_transition_fx(const TransFxRow* rows, int row_count,
         // (kTransFxEdgeEntry) is an arrival's row and must not leave with the section.
         if (row.edge != kTransFxEdgeAny && row.edge != edge) continue;
         float bars = span + row.offset_bars;
+        if (drop_elapsed && bars <= 0.0f) continue;
         if (bars < 0.0f) bars = 0.0f;
         if (bars > span + 1.0f) bars = span + 1.0f;
         out[n].type = row.type;

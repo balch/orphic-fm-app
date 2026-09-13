@@ -821,18 +821,22 @@ static void fire_transition_fx(OrpheusEngine* engine, PulsarState* state,
 }
 
 // Re-stage the pending list for the section that is now current and the edge it plans
-// to leave by. Called at vibe load and at every flip, so a stale edge's rows can never
-// survive into the next section.
-static void stage_transition_fx_for_planned_edge(PulsarState* state) {
+// to leave by. Called at vibe load, at every flip, and when a section request re-plans
+// mid-section, so a stale edge's rows can never survive into the next section.
+static void stage_transition_fx_for_planned_edge(PulsarState* state, bool after_request = false) {
     state->pending_fx_count = 0;
     if (!state->arrangement.active || state->trans_fx_count == 0) return;
     int edge = find_planned_edge_index(state->arrangement, state->section_state);
-    if (edge < 0) return;
+    if (edge < 0) {
+        // A request can plan a section no authored edge reaches; its exit rows still fire.
+        if (!after_request) return;
+        edge = kTransFxEdgeAny;
+    }
     state->pending_fx_count = stage_transition_fx(
         state->trans_fx, state->trans_fx_count,
         state->section_state.current_section, edge,
         state->section_state.bars_remaining,
-        state->pending_fx, kMaxPendingFx);
+        state->pending_fx, kMaxPendingFx, /*drop_elapsed*/ after_request);
 }
 
 // Fire and disarm every pending whose bar countdown has run out. after_flip rows are
@@ -3254,7 +3258,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                     const int sec_req = engine->pulsar_arrangement_section_request.exchange(
                         0, std::memory_order_relaxed);
-                    if (sec_req > 0) state->section_state.pending_section_request = sec_req - 1;
+                    // Re-plan now rather than at the boundary, so the ramp and the staged
+                    // effects follow the request. Rows whose moment passed stay fired.
+                    if (sec_req > 0 && apply_section_request(state->section_state,
+                                                             state->arrangement, sec_req - 1)) {
+                        stage_transition_fx_for_planned_edge(state, /*after_request*/ true);
+                    }
 
                     // Anomaly Engine: edge-detect the manual trigger counter and fire every
                     // anomaly this vibe DECLARES. A vibe with no declared anomaly ignores the

@@ -111,6 +111,27 @@ inline void plan_next_section(SectionState& state, const ArrangementParams& arr,
             : 0;
 }
 
+// A section request, applied the bar it arrives. Re-plans the edge the current section
+// leaves by, so the pre-roll ramp and staged transition effects aim at the requested
+// section rather than the one drawn at entry. Returns true when the plan changed.
+inline bool apply_section_request(SectionState& state, const ArrangementParams& arr, int request) {
+    if (request < 0 || request >= arr.section_count) return false;
+    state.pending_section_request = request;
+    if (request == state.next_section_planned) return false;
+    state.next_section_planned = request;
+    state.next_section_trans_bars =
+        find_edge_transition_bars(arr.sections[state.current_section], request);
+    // A ramp under way was blending toward the old destination. Drop it; the next
+    // advance_section() re-stages next_* from the requested section if that edge ramps.
+    state.transition_target   = -1;
+    state.transition_progress = 0.0f;
+    state.next_energy         = -1.0f;
+    state.next_complexity     = -1.0f;
+    state.next_space          = -1.0f;
+    state.next_mood           = -1.0f;
+    return true;
+}
+
 inline void init_section_state(SectionState& state, const ArrangementParams& arr, uint32_t& seed) {
     std::memset(&state, 0, sizeof(SectionState));
     state.transition_target = -1;

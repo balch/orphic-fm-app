@@ -122,6 +122,110 @@ static bool test_init_on_inactive_arrangement_clears_pending_request() {
     return ok;
 }
 
+// s0 runs 6 bars and plans s1 over a 3-bar ramp. Edge 1 reaches s2 at weight 0, so only a
+// request takes it. s1 and s2 carry distinct energy overrides so a staged destination shows.
+static ArrangementParams ramp_arrangement(int edge_to_s2_bars) {
+    ArrangementParams arr{};
+    arr.active = true;
+    arr.section_count = 3;
+    arr.intro_index = 0;
+    arr.outro_index = -1;
+    for (int s = 0; s < 3; s++) {
+        arr.sections[s].bars_min = 6;
+        arr.sections[s].bars_max = 6;
+        arr.sections[s].bar_step = 1;
+    }
+    arr.sections[0].transition_count = 2;
+    arr.sections[0].transitions[0] = SectionTransitionParam{1, 1.0f, 3};
+    arr.sections[0].transitions[1] = SectionTransitionParam{2, 0.0f, edge_to_s2_bars};
+    arr.sections[1].macro_overrides.energy = 0.2f;
+    arr.sections[2].macro_overrides.energy = 0.9f;
+    return arr;
+}
+
+static bool test_request_replans_edge_and_ramp() {
+    printf("\n=== Test: a request mid-ramp re-plans the edge and re-aims the ramp ===\n");
+    ArrangementParams arr = ramp_arrangement(2);
+    SectionState state{};
+    uint32_t seed = 42u;
+    init_section_state(state, arr, seed);
+    bool planned_s1 = state.next_section_planned == 1 && state.next_section_trans_bars == 3;
+
+    for (int i = 0; i < 4; i++) advance_section(state, arr, seed);  // 2 bars left: ramp to s1
+    bool ramping_to_s1 = state.transition_target == 1 && state.next_energy == 0.2f;
+
+    bool changed = apply_section_request(state, arr, 2);
+    bool replanned = changed && state.next_section_planned == 2
+        && state.next_section_trans_bars == 2 && state.pending_section_request == 2;
+    bool ramp_dropped = state.transition_target == -1 && state.next_energy == -1.0f
+        && state.transition_progress == 0.0f;
+
+    advance_section(state, arr, seed);  // 1 bar left, inside s2's 2-bar ramp
+    bool ramping_to_s2 = state.transition_target == 2 && state.next_energy == 0.9f;
+    advance_section(state, arr, seed);  // boundary
+    bool arrived = state.current_section == 2 && state.pending_section_request == -1;
+
+    bool ok = planned_s1 && ramping_to_s1 && replanned && ramp_dropped && ramping_to_s2 && arrived;
+    printf("  planned_s1=%d ramping_to_s1=%d replanned=%d ramp_dropped=%d ramping_to_s2=%d arrived=%d -- %s\n",
+           planned_s1, ramping_to_s1, replanned, ramp_dropped, ramping_to_s2, arrived,
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_request_without_an_edge_is_a_hard_cut() {
+    printf("\n=== Test: a request no authored edge reaches drops the ramp and hard-cuts ===\n");
+    ArrangementParams arr = ramp_arrangement(2);
+    arr.sections[0].transition_count = 1;  // no authored edge reaches s2
+    SectionState state{};
+    uint32_t seed = 42u;
+    init_section_state(state, arr, seed);
+    for (int i = 0; i < 4; i++) advance_section(state, arr, seed);
+
+    bool changed = apply_section_request(state, arr, 2);
+    bool hard_cut = changed && state.next_section_trans_bars == 0;
+    advance_section(state, arr, seed);
+    bool no_ramp = state.transition_target == -1 && state.next_energy == -1.0f;
+    advance_section(state, arr, seed);
+    bool arrived = state.current_section == 2;
+
+    bool ok = hard_cut && no_ramp && arrived;
+    printf("  hard_cut=%d no_ramp=%d arrived=%d -- %s\n", hard_cut, no_ramp, arrived,
+           ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_request_for_the_planned_section_leaves_the_ramp_alone() {
+    printf("\n=== Test: requesting the already-planned section changes nothing but pending ===\n");
+    ArrangementParams arr = ramp_arrangement(2);
+    SectionState state{};
+    uint32_t seed = 42u;
+    init_section_state(state, arr, seed);
+    for (int i = 0; i < 4; i++) advance_section(state, arr, seed);
+
+    bool changed = apply_section_request(state, arr, 1);
+    bool ok = !changed && state.pending_section_request == 1
+        && state.transition_target == 1 && state.next_energy == 0.2f;
+    printf("  changed=%d pending=%d target=%d -- %s\n", changed, state.pending_section_request,
+           state.transition_target, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_apply_rejects_an_out_of_range_request() {
+    printf("\n=== Test: apply_section_request rejects out-of-range indices ===\n");
+    ArrangementParams arr = ramp_arrangement(2);
+    SectionState state{};
+    uint32_t seed = 42u;
+    init_section_state(state, arr, seed);
+
+    bool high = apply_section_request(state, arr, 99);
+    bool low = apply_section_request(state, arr, -1);
+    bool ok = !high && !low && state.pending_section_request == -1
+        && state.next_section_planned == 1;
+    printf("  high=%d low=%d pending=%d planned=%d -- %s\n", high, low,
+           state.pending_section_request, state.next_section_planned, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 // 3-section hard-cut arrangement via real atomics: 0 and 1 only transition to each
 // other, so section 2 is reachable only by explicit request. Field layout mirrors
 // setup_jam_arrangement's section-0 pattern (test_pulsar_helpers.h).
@@ -231,6 +335,10 @@ bool run_pulsar_section_request_tests() {
     run(test_out_of_range_request_is_ignored);
     run(test_init_clears_pending_request);
     run(test_init_on_inactive_arrangement_clears_pending_request);
+    run(test_request_replans_edge_and_ramp);
+    run(test_request_without_an_edge_is_a_hard_cut);
+    run(test_request_for_the_planned_section_leaves_the_ramp_alone);
+    run(test_apply_rejects_an_out_of_range_request);
     run(test_section_request_integration_through_real_engine);
     printf("\n  Pulsar Section Request: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);

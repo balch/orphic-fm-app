@@ -976,6 +976,129 @@ static bool test_staging_offsets_and_filtering() {
     return ok;
 }
 
+// ── mid-section re-stage: elapsed rows drop, the wildcard edge stages exit rows only ──
+static bool test_restage_drops_elapsed_rows() {
+    printf("\n=== Test: a mid-section re-stage drops rows whose fire point has passed ===\n");
+    TransFxRow rows[3];
+    rows[0] = TransFxRow{0, kTransFxEdgeAny, TRANS_FX_TAPE_STOP, -2.0f,  40.0f, 0.0f, 0.0f};
+    rows[1] = TransFxRow{0, 0,               TRANS_FX_SCRATCH,    0.0f, 400.0f, 0.0f, 0.0f};
+    rows[2] = TransFxRow{0, 0,               TRANS_FX_TAPE_STOP,  1.0f, 200.0f, 0.0f, 0.0f};
+    PendingTransFx pending[kMaxPendingFx];
+    bool ok = true;
+
+    // Two bars left: the -2 exit row's countdown is 0, so it already fired.
+    int n = stage_transition_fx(rows, 3, 0, 0, 2, pending, kMaxPendingFx, /*drop_elapsed*/ true);
+    if (n != 2 || pending[0].type != TRANS_FX_SCRATCH || pending[0].bars_until_fire != 2.0f
+        || !pending[1].after_flip) {
+        printf("  FAIL: drop_elapsed with 2 bars left staged %d row(s), first type %d at %.1f\n",
+               n, pending[0].type, pending[0].bars_until_fire);
+        ok = false;
+    }
+    // Entry staging is unchanged: the same row clamps to 0 and still stages.
+    if (stage_transition_fx(rows, 3, 0, 0, 2, pending, kMaxPendingFx) != 3) {
+        printf("  FAIL: without drop_elapsed the clamped row must still stage\n");
+        ok = false;
+    }
+    // Three bars left: the exit row is still a bar away and survives.
+    if (stage_transition_fx(rows, 3, 0, 0, 3, pending, kMaxPendingFx, true) != 3
+        || pending[0].bars_until_fire != 1.0f) {
+        printf("  FAIL: a row still ahead was dropped\n");
+        ok = false;
+    }
+    // A request to a section no authored edge reaches stages with the wildcard: exit rows only.
+    n = stage_transition_fx(rows, 3, 0, kTransFxEdgeAny, 3, pending, kMaxPendingFx, true);
+    if (n != 1 || pending[0].type != TRANS_FX_TAPE_STOP) {
+        printf("  FAIL: wildcard edge staged %d row(s) (expected the exit row only)\n", n);
+        ok = false;
+    }
+    if (ok) printf("  PASS: elapsed rows drop, rows ahead survive, wildcard stages exit rows\n");
+    return ok;
+}
+
+// ── a section request re-stages onto the requested edge ──────────────────────
+static bool test_section_request_fires_the_requested_edges_row() {
+    printf("\n=== Test: a section request fires the requested edge's row at the flip ===\n");
+    OrpheusEngine* engine = make_trans_fx_engine();
+    // s0's edge 1 (-> s0) has weight 0, so only a request takes it. Tape stop, not
+    // scratch: an armed scratch freezes the pulsar clock.
+    write_trans_fx_row(engine, 0, /*section*/0, /*edge*/1, TRANS_FX_TAPE_STOP, /*offset*/0.0f, /*ms*/400.0f);
+    trigger_vibe_load(engine);
+
+    GraphUnit unit = make_trans_fx_unit();
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);  // allocates pulsar_state and loads
+    engine->pulsar_arrangement_section_request.store(1, std::memory_order_relaxed);  // section 0
+
+    bool armed_before_flip = false;
+    bool flipped = false;
+    bool armed_at_flip = false;
+    for (int i = 0; i < kMaxBlocks && !flipped; i++) {
+        const int before = engine->pulsar_state->section_state.bars_remaining;
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        // s0 -> s0 keeps current_section, so the flip shows as bars_remaining re-drawn upward.
+        flipped = engine->pulsar_state->section_state.bars_remaining > before;
+        if (flipped) armed_at_flip = engine->master_tape_stop_l.is_active();
+        else if (engine->master_tape_stop_l.is_active()) armed_before_flip = true;
+    }
+    const int section_after = engine->pulsar_state->section_state.current_section;
+
+    bool ok = true;
+    if (!flipped) { printf("  FAIL: section never flipped within %d blocks\n", kMaxBlocks); ok = false; }
+    if (armed_before_flip) { printf("  FAIL: tape stop armed before the flip\n"); ok = false; }
+    if (!armed_at_flip) { printf("  FAIL: the requested edge's row did not fire at the flip\n"); ok = false; }
+    if (section_after != 0) { printf("  FAIL: request not honoured, section %d\n", section_after); ok = false; }
+    if (ok) printf("  PASS: the request re-staged onto edge 1 and its row fired at the seam\n");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+// ── a late request does not re-fire an exit row that already fired ───────────
+static bool test_section_request_does_not_refire_an_elapsed_exit_row() {
+    printf("\n=== Test: a request on the last bar does not re-fire a -1 exit row ===\n");
+    OrpheusEngine* engine = make_trans_fx_engine();
+    // Exit row one bar before s0's flip, on whatever edge is taken. 40ms so it drains fast.
+    write_trans_fx_row(engine, 0, /*section*/0, kTransFxEdgeAny, TRANS_FX_TAPE_STOP, /*offset*/-1.0f, /*ms*/40.0f);
+    trigger_vibe_load(engine);
+
+    GraphUnit unit = make_trans_fx_unit();
+    bool fired_once = false;
+    for (int i = 0; i < kMaxBlocks && !fired_once; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        fired_once = engine->master_tape_stop_l.is_active();
+    }
+    const bool still_in_s0 = engine->pulsar_state->section_state.current_section == 0;
+
+    // Drain it the way the master chain does, without advancing the pulsar clock.
+    float drain[512];
+    for (int i = 0; i < 8; i++) {
+        std::memset(drain, 0, sizeof(drain));
+        engine->master_tape_stop_l.process(drain, 512);
+    }
+    const bool drained = !engine->master_tape_stop_l.is_active();
+
+    // Request s0 (edge 1, not the drawn s1), so the plan changes and the rows re-stage.
+    engine->pulsar_arrangement_section_request.store(1, std::memory_order_relaxed);
+    bool flipped = false;
+    bool rearmed_at_flip = false;
+    for (int i = 0; i < kMaxBlocks && !flipped; i++) {
+        const int before = engine->pulsar_state->section_state.bars_remaining;
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        flipped = engine->pulsar_state->section_state.bars_remaining > before;
+        if (flipped) rearmed_at_flip = engine->master_tape_stop_l.is_active();
+    }
+
+    bool ok = true;
+    if (!fired_once) { printf("  FAIL: exit row never fired\n"); ok = false; }
+    if (!still_in_s0) { printf("  FAIL: exit row fired after leaving s0\n"); ok = false; }
+    if (!drained) { printf("  FAIL: tape stop did not drain\n"); ok = false; }
+    if (!flipped) { printf("  FAIL: section never flipped within %d blocks\n", kMaxBlocks); ok = false; }
+    if (rearmed_at_flip) { printf("  FAIL: the elapsed exit row fired a second time at the flip\n"); ok = false; }
+    if (ok) printf("  PASS: the exit row fired once; the re-stage dropped it\n");
+
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 bool run_pulsar_transition_fx_tests() {
     printf("\n=== Pulsar Transition FX Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -1001,6 +1124,9 @@ bool run_pulsar_transition_fx_tests() {
     if (test_entry_row_does_not_fire_at_song_start()) suite_pass++; else suite_fail++;
     if (test_exit_edge_and_entry_rows_all_fire_at_one_flip()) suite_pass++; else suite_fail++;
     if (test_entry_row_positive_offset_fires_one_bar_in()) suite_pass++; else suite_fail++;
+    if (test_restage_drops_elapsed_rows()) suite_pass++; else suite_fail++;
+    if (test_section_request_fires_the_requested_edges_row()) suite_pass++; else suite_fail++;
+    if (test_section_request_does_not_refire_an_elapsed_exit_row()) suite_pass++; else suite_fail++;
 
     stmlib::Random::Seed(saved_random);
     TEST_SUITE_RETURN(suite_pass, suite_fail);
