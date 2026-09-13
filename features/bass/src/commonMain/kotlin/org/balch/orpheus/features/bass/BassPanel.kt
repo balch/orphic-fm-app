@@ -73,220 +73,252 @@ fun BassPanel(
             SignalTrace(data = outVizFlow, color = bassColors.panelColor.copy(alpha = 0.4f))
         },
     ) {
-        // ── Row 1: Source & Sequencer ─────────────────────────────────
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // Engine dropdown
-            EnumDropdown(
-                label = "ENGINE",
-                selectedDisplay = state.engine.displayName,
-                entries = BassEngine.entries,
-                displayName = { it.displayName },
-                onSelected = actions.setEngine,
-                color = bassColors.panelColor,
-                labelColor = bassColors.panelColor.copy(alpha = 0.7f),
-            )
+        BassSourceAndSequencerRow(state, actions, bassColors)
+        BassClockAndSequencerControlsRow(state, actions, bassColors)
+        BassSoundAndOutputRow(state, actions, bassColors)
+    }
+}
 
-            // Scale dropdown
-            EnumDropdown(
-                label = "SCALE",
-                selectedDisplay = state.scale.displayName,
-                entries = BassScale.entries,
-                displayName = { it.displayName },
-                onSelected = actions.setScale,
-                color = bassColors.panelColor,
-                labelColor = bassColors.panelColor.copy(alpha = 0.7f),
-            )
+/**
+ * Row 1: Source & Sequencer — engine, scale, and root note dropdowns.
+ */
+@Composable
+private fun BassSourceAndSequencerRow(
+    state: BassUiState,
+    actions: BassPanelActions,
+    bassColors: BassColors,
+) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Engine dropdown
+        EnumDropdown(
+            label = "ENGINE",
+            selectedDisplay = state.engine.displayName,
+            entries = BassEngine.entries,
+            displayName = { it.displayName },
+            onSelected = actions.setEngine,
+            color = bassColors.panelColor,
+            labelColor = bassColors.panelColor.copy(alpha = 0.7f),
+        )
 
-            // Root note dropdown — bass-friendly notes across 2 octaves
-            EnumDropdown(
-                label = "ROOT",
-                selectedDisplay = midiNoteToName(state.rootNote),
-                entries = bassRootNotes,
-                displayName = { midiNoteToName(it) },
-                onSelected = { actions.setRootNote(it) },
-                color = bassColors.panelColor,
-                labelColor = bassColors.panelColor.copy(alpha = 0.7f),
-                menuWidth = 112.dp,
-            )
-        }
+        // Scale dropdown
+        EnumDropdown(
+            label = "SCALE",
+            selectedDisplay = state.scale.displayName,
+            entries = BassScale.entries,
+            displayName = { it.displayName },
+            onSelected = actions.setScale,
+            color = bassColors.panelColor,
+            labelColor = bassColors.panelColor.copy(alpha = 0.7f),
+        )
 
-        // ── Row 2: Clock & Sequencer Controls ────────────────────────
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            // Clock division knob — discrete snap to enum values
-            RotaryKnob(
-                value = state.clockDivision.ordinal.toFloat() / (ClockDivision.entries.size - 1).toFloat(),
-                onValueChange = { normalized ->
-                    val index = (normalized * (ClockDivision.entries.size - 1)).roundToInt()
-                        .coerceIn(0, ClockDivision.entries.size - 1)
-                    actions.setClockDivision(ClockDivision.entries[index])
-                },
-                label = "CLOCK",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_clock_division",
-                valueFormatter = { state.clockDivision.displayName },
-            )
+        // Root note dropdown — bass-friendly notes across 2 octaves
+        EnumDropdown(
+            label = "ROOT",
+            selectedDisplay = midiNoteToName(state.rootNote),
+            entries = bassRootNotes,
+            displayName = { midiNoteToName(it) },
+            onSelected = { actions.setRootNote(it) },
+            color = bassColors.panelColor,
+            labelColor = bassColors.panelColor.copy(alpha = 0.7f),
+            menuWidth = 112.dp,
+        )
+    }
+}
 
-            // Step count knob — discrete snap to 4, 8, 12, 16
-            RotaryKnob(
-                value = stepCountPresets.indexOf(state.stepCount).coerceAtLeast(0).toFloat() / (stepCountPresets.size - 1).toFloat(),
-                onValueChange = { normalized ->
-                    val index = (normalized * (stepCountPresets.size - 1)).roundToInt()
-                        .coerceIn(0, stepCountPresets.size - 1)
-                    actions.setStepCount(stepCountPresets[index])
-                },
-                label = "STEPS",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_step_count",
-                valueFormatter = { state.stepCount.toString() },
-            )
+/**
+ * Row 2: Clock & Sequencer Controls — clock division, step count, jitter,
+ * accent, LFO mix, and mutation knobs.
+ */
+@Composable
+private fun BassClockAndSequencerControlsRow(
+    state: BassUiState,
+    actions: BassPanelActions,
+    bassColors: BassColors,
+) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Clock division knob — discrete snap to enum values
+        RotaryKnob(
+            value = state.clockDivision.ordinal.toFloat() / (ClockDivision.entries.size - 1).toFloat(),
+            onValueChange = { normalized ->
+                val index = (normalized * (ClockDivision.entries.size - 1)).roundToInt()
+                    .coerceIn(0, ClockDivision.entries.size - 1)
+                actions.setClockDivision(ClockDivision.entries[index])
+            },
+            label = "CLOCK",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_clock_division",
+            valueFormatter = { state.clockDivision.displayName },
+        )
 
-            RotaryKnob(
-                value = state.jitter,
-                onValueChange = actions.setJitter,
-                label = "JITTER",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_jitter",
-            )
+        // Step count knob — discrete snap to 4, 8, 12, 16
+        RotaryKnob(
+            value = stepCountPresets.indexOf(state.stepCount).coerceAtLeast(0).toFloat() / (stepCountPresets.size - 1).toFloat(),
+            onValueChange = { normalized ->
+                val index = (normalized * (stepCountPresets.size - 1)).roundToInt()
+                    .coerceIn(0, stepCountPresets.size - 1)
+                actions.setStepCount(stepCountPresets[index])
+            },
+            label = "STEPS",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_step_count",
+            valueFormatter = { state.stepCount.toString() },
+        )
 
-            RotaryKnob(
-                value = state.accentAmount,
-                onValueChange = actions.setAccentAmount,
-                label = "ACCENT",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_accent_amount",
-            )
+        RotaryKnob(
+            value = state.jitter,
+            onValueChange = actions.setJitter,
+            label = "JITTER",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_jitter",
+        )
 
-            RotaryKnob(
-                value = state.lfoMix,
-                onValueChange = actions.setLfoMix,
-                label = "LFO",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_lfo_mix",
-            )
+        RotaryKnob(
+            value = state.accentAmount,
+            onValueChange = actions.setAccentAmount,
+            label = "ACCENT",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_accent_amount",
+        )
 
-            // Mutation knob
-            RotaryKnob(
-                value = state.mutation,
-                onValueChange = actions.setMutation,
-                label = "MUTATE",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_mutation",
-            )
-        }
+        RotaryKnob(
+            value = state.lfoMix,
+            onValueChange = actions.setLfoMix,
+            label = "LFO",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_lfo_mix",
+        )
 
-        // ── Row 3: Sound + Output ──────────────────────────────────────
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            RotaryKnob(
-                value = state.cutoff,
-                onValueChange = actions.setCutoff,
-                label = "CUTOFF",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_cutoff",
-            )
-            RotaryKnob(
-                value = state.resonance,
-                onValueChange = actions.setResonance,
-                label = "RESO",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_resonance",
-            )
-            RotaryKnob(
-                value = state.envelope,
-                onValueChange = actions.setEnvelope,
-                label = "ENV",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_envelope",
-            )
-            RotaryKnob(
-                value = state.overdrive,
-                onValueChange = actions.setOverdrive,
-                label = "DRIVE",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_overdrive",
-            )
-            RotaryKnob(
-                value = state.compressor,
-                onValueChange = actions.setCompressor,
-                label = "COMP",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_compressor",
-            )
-            RotaryKnob(
-                value = state.fxSend,
-                onValueChange = actions.setFxSend,
-                label = "FX",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_fx_send",
-            )
-            RotaryKnob(
-                value = state.mix,
-                onValueChange = actions.setMix,
-                label = "MIX",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_mix",
-            )
-        }
+        // Mutation knob
+        RotaryKnob(
+            value = state.mutation,
+            onValueChange = actions.setMutation,
+            label = "MUTATE",
+            size = 38.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_mutation",
+        )
+    }
+}
+
+/**
+ * Row 3: Sound + Output — filter, envelope, drive, compressor, fx send, and mix knobs.
+ */
+@Composable
+private fun BassSoundAndOutputRow(
+    state: BassUiState,
+    actions: BassPanelActions,
+    bassColors: BassColors,
+) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        RotaryKnob(
+            value = state.cutoff,
+            onValueChange = actions.setCutoff,
+            label = "CUTOFF",
+            size = 38.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_cutoff",
+        )
+        RotaryKnob(
+            value = state.resonance,
+            onValueChange = actions.setResonance,
+            label = "RESO",
+            size = 38.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_resonance",
+        )
+        RotaryKnob(
+            value = state.envelope,
+            onValueChange = actions.setEnvelope,
+            label = "ENV",
+            size = 38.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_envelope",
+        )
+        RotaryKnob(
+            value = state.overdrive,
+            onValueChange = actions.setOverdrive,
+            label = "DRIVE",
+            size = 38.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_overdrive",
+        )
+        RotaryKnob(
+            value = state.compressor,
+            onValueChange = actions.setCompressor,
+            label = "COMP",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_compressor",
+        )
+        RotaryKnob(
+            value = state.fxSend,
+            onValueChange = actions.setFxSend,
+            label = "FX",
+            size = 30.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_fx_send",
+        )
+        RotaryKnob(
+            value = state.mix,
+            onValueChange = actions.setMix,
+            label = "MIX",
+            size = 38.dp,
+            trackColor = bassColors.knobTrackColor,
+            progressColor = bassColors.knobProgressColor,
+            knobColor = bassColors.knobColor,
+            labelColor = bassColors.labelColor,
+            controlId = "bass_mix",
+        )
     }
 }
 
