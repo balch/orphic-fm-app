@@ -3,7 +3,6 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -12,6 +11,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -48,7 +48,7 @@ class SpectrumViz(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val bands by engine.spectrumFlow.collectAsState()
+        val bands by engine.spectrumFlow.collectAsStateWithLifecycle()
         val n = bands.size
         val ballistics = remember(n) { SpectrumBallistics(n.coerceAtLeast(1)) }
 

@@ -27,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +46,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -268,8 +268,8 @@ fun DjAppScreen(
                             fillHeight = fill,
                         )
                         EndsTab -> {
-                            val songEndingEnabled by pulsarFeature.actions.songEndingEnabled.collectAsState()
-                            val transitionSpec by pulsarFeature.actions.transitionSpec.collectAsState()
+                            val songEndingEnabled by pulsarFeature.actions.songEndingEnabled.collectAsStateWithLifecycle()
+                            val transitionSpec by pulsarFeature.actions.transitionSpec.collectAsStateWithLifecycle()
                             EndsPanel(
                                 spec = transitionSpec,
                                 enabled = songEndingEnabled,
@@ -574,7 +574,7 @@ internal fun VizDropdown(
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
-    val fullState by vizFeature.stateFlow.collectAsState()
+    val fullState by vizFeature.stateFlow.collectAsStateWithLifecycle()
     val vizName by remember { derivedStateOf { fullState.selectedViz.name } }
     val isRandom by remember { derivedStateOf { fullState.isRandomVizMode } }
     val visualizations by remember { derivedStateOf { fullState.visualizations } }

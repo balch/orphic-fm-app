@@ -18,7 +18,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.midi.MidiFeature
@@ -60,8 +60,8 @@ fun VoiceGroupSection(
     onToggle: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val voiceState by voiceFeature.stateFlow.collectAsState()
-    val midiState by midiFeature.stateFlow.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
+    val midiState by midiFeature.stateFlow.collectAsStateWithLifecycle()
     val effects = LocalLiquidEffects.current
 
     val voiceActions = voiceFeature.actions.toVoiceActions()

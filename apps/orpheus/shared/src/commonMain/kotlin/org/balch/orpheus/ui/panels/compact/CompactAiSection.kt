@@ -5,11 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsPanelActions
 import org.balch.orpheus.features.ai.AiOptionsUiState
@@ -41,8 +41,8 @@ fun CompactAiSection(
     chatFeature: ChatFeature = ChatViewModel.feature(),
     onShowRepl: () -> Unit = {}
 ) {
-    val aiOptionsState by aiFeature.stateFlow.collectAsState()
-    val chatState by chatFeature.stateFlow.collectAsState()
+    val aiOptionsState by aiFeature.stateFlow.collectAsStateWithLifecycle()
+    val chatState by chatFeature.stateFlow.collectAsStateWithLifecycle()
 
     CompactAiSectionLayout(
         modifier = modifier,

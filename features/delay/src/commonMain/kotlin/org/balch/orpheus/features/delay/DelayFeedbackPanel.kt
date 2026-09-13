@@ -5,12 +5,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
@@ -35,7 +35,7 @@ fun DelayFeedbackPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
-    val uiState by feature.stateFlow.collectAsState()
+    val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
 
     CollapsibleColumnPanel(

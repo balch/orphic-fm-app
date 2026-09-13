@@ -22,7 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
@@ -173,10 +173,10 @@ fun DjTvBottomBar(
     // partially-faded TvFocusRegionHolder.alpha without a real holder+coroutine driving it.
     previewRegionFocusAlpha: Float = 1f,
 ) {
-    val timerState by timerFeature.stateFlow.collectAsState()
-    val songEndingEnabled by pulsarFeature.actions.songEndingEnabled.collectAsState()
-    val transitionSpec by pulsarFeature.actions.transitionSpec.collectAsState()
-    val outroArmed by pulsarFeature.actions.outroArmed.collectAsState()
+    val timerState by timerFeature.stateFlow.collectAsStateWithLifecycle()
+    val songEndingEnabled by pulsarFeature.actions.songEndingEnabled.collectAsStateWithLifecycle()
+    val transitionSpec by pulsarFeature.actions.transitionSpec.collectAsStateWithLifecycle()
+    val outroArmed by pulsarFeature.actions.outroArmed.collectAsStateWithLifecycle()
     // Exactly PulsarPanel's own ENDING pill expression (see the block gated behind
     // showEndingControl) — same source state, same expression, so the two labels never disagree.
     val endsValue = if (songEndingEnabled) transitionSpec.style.name else "PLAYS"

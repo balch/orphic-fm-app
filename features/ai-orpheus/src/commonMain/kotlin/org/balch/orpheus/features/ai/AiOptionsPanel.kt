@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.features.ai.widgets.AiButton
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
@@ -34,7 +34,7 @@ fun AiOptionsPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
-    val uiState by feature.stateFlow.collectAsState()
+    val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
 
     CollapsibleColumnPanel(

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.features.distortion.DistortionFeature
@@ -49,7 +49,7 @@ fun CompactPortraitHeaderPanel(
     effects: VisualizationLiquidEffects = VisualizationLiquidEffects(),
     modifier: Modifier = Modifier
 ) {
-    val state by distortionFeature.stateFlow.collectAsState()
+    val state by distortionFeature.stateFlow.collectAsStateWithLifecycle()
     val peakLevel = state.peak
     Row(
         modifier = modifier

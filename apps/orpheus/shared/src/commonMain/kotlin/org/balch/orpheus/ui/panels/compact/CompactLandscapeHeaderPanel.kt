@@ -20,7 +20,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsFeature
@@ -56,14 +56,14 @@ fun CompactLandscapeHeaderPanel(
     effects: VisualizationLiquidEffects = VisualizationLiquidEffects(),
     modifier: Modifier = Modifier
 ) {
-    val presetState by presetFeature.stateFlow.collectAsState()
+    val presetState by presetFeature.stateFlow.collectAsStateWithLifecycle()
     val loadedPresetState = presetState as? PresetUiState.Loaded
     val presetActions = presetFeature.actions
 
-    val vizState by vizFeature.stateFlow.collectAsState()
+    val vizState by vizFeature.stateFlow.collectAsStateWithLifecycle()
     val vizActions = vizFeature.actions
 
-    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
     val voiceActions = voiceFeature.actions
 
     Row(

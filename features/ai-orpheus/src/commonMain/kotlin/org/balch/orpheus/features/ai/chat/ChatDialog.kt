@@ -11,12 +11,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.balch.orpheus.core.ai.AiProvider
@@ -56,11 +56,11 @@ fun ChatDialog(
     onSizeChange: (Float, Float) -> Unit,
     onClose: () -> Unit = {},
 ) {
-    val chatState by chatFeature.stateFlow.collectAsState()
+    val chatState by chatFeature.stateFlow.collectAsStateWithLifecycle()
     val messages = chatState.messages
     val isLoading = chatState.isLoading
 
-    val aiState by aiFeature.stateFlow.collectAsState()
+    val aiState by aiFeature.stateFlow.collectAsStateWithLifecycle()
     val isDroneActive = aiState.isDroneActive
     val isSoloActive = aiState.isSoloActive
     val isDashboardMode = isDroneActive || isSoloActive

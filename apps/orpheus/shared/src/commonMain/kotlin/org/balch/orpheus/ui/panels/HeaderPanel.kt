@@ -10,12 +10,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.features.FeaturePanel
 
 /**
@@ -30,7 +30,7 @@ fun HeaderPanel(
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
-    val uiState by headerFeature.stateFlow.collectAsState()
+    val uiState by headerFeature.stateFlow.collectAsStateWithLifecycle()
     val scrollState = rememberScrollState()
 
     Row(

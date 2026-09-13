@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +29,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.delay
 import org.balch.orpheus.core.features.LocalSynthFeatures
@@ -99,7 +99,7 @@ fun CompactLandscapeScreen(
         )
 
         // Expanded Sequencer Screen Overlay
-        val sequencerState by sequencerFeature.stateFlow.collectAsState()
+        val sequencerState by sequencerFeature.stateFlow.collectAsStateWithLifecycle()
         val sequencerActions = sequencerFeature.actions
         if (sequencerState.isExpanded) {
             Dialog(
@@ -146,7 +146,7 @@ private fun CompactLandscapeLayout(
     var presetDropdownExpanded by remember { mutableStateOf(false) }
     var vizDropdownExpanded by remember { mutableStateOf(false) }
 
-    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
     val voiceActions = voiceFeature.actions
 
     Column(

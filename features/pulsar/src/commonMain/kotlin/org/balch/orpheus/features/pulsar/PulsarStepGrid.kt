@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -168,7 +168,7 @@ fun PulsarStepGrid(
     // in the composition phase — every flow emission would otherwise recompose
     // the entire grid (8 audio-buffer-rate flows ≫ 60Hz). Reads happen inside
     // the waveform Canvas's drawScope below, which invalidates only the draw.
-    val trackWaveformStates = trackVizFlows.map { it.collectAsState() }
+    val trackWaveformStates = trackVizFlows.map { it.collectAsStateWithLifecycle() }
 
     // The only composition-phase readers of the viz data: the frame loop's gate and the glass
     // layers. Each takes exactly the field it needs through derivedStateOf, so the body

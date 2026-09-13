@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -20,6 +19,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.feature
@@ -58,7 +58,7 @@ fun DesktopSynthScreen(
     val midiFeature: MidiFeature = registry.feature<MidiFeature>()
     val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeFeature>()
     val panels = remember { headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen) }
-    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
     val rightQuad = voiceState.selectedRightQuad
     val leftPanel = voiceState.selectedLeftPanel
 
@@ -117,7 +117,7 @@ fun DesktopSynthScreen(
                             modifier = Modifier.weight(1f),
                         )
                         LeftPanelMode.BENDER_STRINGS -> {
-                            val externalBends by mediaPipeFeature.stringBends.collectAsState()
+                            val externalBends by mediaPipeFeature.stringBends.collectAsStateWithLifecycle()
                             DesktopBenderStringsSection(
                                 voiceState = voiceState,
                                 actions = voiceFeature.actions,

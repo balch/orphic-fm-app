@@ -15,7 +15,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +28,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.plugin.symbols.EvoSymbol
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
@@ -46,7 +46,7 @@ fun EvoPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
-    val uiState by evoFeature.stateFlow.collectAsState()
+    val uiState by evoFeature.stateFlow.collectAsStateWithLifecycle()
     // Use the selected strategy's color for accents
     val accentColor = if (uiState.isEnabled) uiState.selectedStrategy.color else Color.Gray
 

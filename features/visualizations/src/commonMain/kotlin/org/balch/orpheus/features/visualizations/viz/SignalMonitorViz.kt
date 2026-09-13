@@ -3,7 +3,6 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -12,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -106,30 +106,30 @@ class SignalMonitorViz(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val lfoData by engine.lfoVizFlow.collectAsState()
-        val carrierData by engine.warpsCarrierVizFlow.collectAsState()
-        val modData by engine.warpsModVizFlow.collectAsState()
-        val outData by engine.warpsOutVizFlow.collectAsState()
-        val delayInData by engine.delayInVizFlow.collectAsState()
-        val delayFbData by engine.delayFbVizFlow.collectAsState()
-        val delayOutData by engine.delayOutVizFlow.collectAsState()
-        val reverbInData by engine.reverbInVizFlow.collectAsState()
-        val reverbOutData by engine.reverbOutVizFlow.collectAsState()
-        val fluxData by engine.fluxCvVizFlow.collectAsState()
-        val resoInData by engine.resoInVizFlow.collectAsState()
-        val resoOutData by engine.resoOutVizFlow.collectAsState()
-        val drumOutData by engine.drumOutVizFlow.collectAsState()
-        val grainsInData by engine.grainsInVizFlow.collectAsState()
-        val grainsOutData by engine.grainsOutVizFlow.collectAsState()
-        val bassOutData by engine.bassOutVizFlow.collectAsState()
-        val hornInData by engine.hornInVizFlow.collectAsState()
-        val hornOutData by engine.hornOutVizFlow.collectAsState()
-        val djOutData by engine.djOutVizFlow.collectAsState()
-        val masterOutData by engine.masterOutVizFlow.collectAsState()
-        val tidesCh0Data by engine.tidesCh0VizFlow.collectAsState()
-        val tidesCh1Data by engine.tidesCh1VizFlow.collectAsState()
-        val tidesCh2Data by engine.tidesCh2VizFlow.collectAsState()
-        val tidesCh3Data by engine.tidesCh3VizFlow.collectAsState()
+        val lfoData by engine.lfoVizFlow.collectAsStateWithLifecycle()
+        val carrierData by engine.warpsCarrierVizFlow.collectAsStateWithLifecycle()
+        val modData by engine.warpsModVizFlow.collectAsStateWithLifecycle()
+        val outData by engine.warpsOutVizFlow.collectAsStateWithLifecycle()
+        val delayInData by engine.delayInVizFlow.collectAsStateWithLifecycle()
+        val delayFbData by engine.delayFbVizFlow.collectAsStateWithLifecycle()
+        val delayOutData by engine.delayOutVizFlow.collectAsStateWithLifecycle()
+        val reverbInData by engine.reverbInVizFlow.collectAsStateWithLifecycle()
+        val reverbOutData by engine.reverbOutVizFlow.collectAsStateWithLifecycle()
+        val fluxData by engine.fluxCvVizFlow.collectAsStateWithLifecycle()
+        val resoInData by engine.resoInVizFlow.collectAsStateWithLifecycle()
+        val resoOutData by engine.resoOutVizFlow.collectAsStateWithLifecycle()
+        val drumOutData by engine.drumOutVizFlow.collectAsStateWithLifecycle()
+        val grainsInData by engine.grainsInVizFlow.collectAsStateWithLifecycle()
+        val grainsOutData by engine.grainsOutVizFlow.collectAsStateWithLifecycle()
+        val bassOutData by engine.bassOutVizFlow.collectAsStateWithLifecycle()
+        val hornInData by engine.hornInVizFlow.collectAsStateWithLifecycle()
+        val hornOutData by engine.hornOutVizFlow.collectAsStateWithLifecycle()
+        val djOutData by engine.djOutVizFlow.collectAsStateWithLifecycle()
+        val masterOutData by engine.masterOutVizFlow.collectAsStateWithLifecycle()
+        val tidesCh0Data by engine.tidesCh0VizFlow.collectAsStateWithLifecycle()
+        val tidesCh1Data by engine.tidesCh1VizFlow.collectAsStateWithLifecycle()
+        val tidesCh2Data by engine.tidesCh2VizFlow.collectAsStateWithLifecycle()
+        val tidesCh3Data by engine.tidesCh3VizFlow.collectAsStateWithLifecycle()
 
         val allData = listOf(
             lfoData, carrierData, modData, outData,

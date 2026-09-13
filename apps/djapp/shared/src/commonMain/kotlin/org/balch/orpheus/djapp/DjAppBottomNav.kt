@@ -18,13 +18,13 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaul
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerStatus
@@ -77,8 +77,8 @@ fun DjAppNavScaffold(
     val layoutType = if (usesRail) NavigationSuiteType.NavigationRail
                      else NavigationSuiteType.NavigationBar
 
-    val pulsarState by pulsarFeature.stateFlow.collectAsState()
-    val timerState by timerFeature.stateFlow.collectAsState()
+    val pulsarState by pulsarFeature.stateFlow.collectAsStateWithLifecycle()
+    val timerState by timerFeature.stateFlow.collectAsStateWithLifecycle()
     // Insert play/pause in the center for the bottom bar, at the end for the rail
     val playPauseIndex = if (usesRail) tabs.size else tabs.size / 2
 

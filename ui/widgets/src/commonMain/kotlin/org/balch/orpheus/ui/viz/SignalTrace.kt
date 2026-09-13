@@ -3,7 +3,6 @@ package org.balch.orpheus.ui.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -11,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -56,7 +56,7 @@ fun SignalTrace(
     val path = remember { Path() }
     val enabled = LocalSignalVizEnabled.current
     val glow = LocalSignalVizGlow.current
-    val samples by data.collectAsState()
+    val samples by data.collectAsStateWithLifecycle()
 
     Canvas(modifier = modifier.fillMaxSize()) {
         if (!enabled || samples.isEmpty()) return@Canvas

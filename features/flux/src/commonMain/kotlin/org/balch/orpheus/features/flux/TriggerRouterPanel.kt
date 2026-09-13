@@ -21,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.bass.BassFeature
 import org.balch.orpheus.features.bass.BassViewModel
@@ -52,9 +52,9 @@ fun TriggerRouterPanel(
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit
 ) {
-    val drumState by drumFeature.stateFlow.collectAsState()
-    val voiceState by voiceFeature.stateFlow.collectAsState()
-    val bassState by bassFeature.stateFlow.collectAsState()
+    val drumState by drumFeature.stateFlow.collectAsStateWithLifecycle()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
+    val bassState by bassFeature.stateFlow.collectAsStateWithLifecycle()
 
     val drumActions = drumFeature.actions
     val voiceActions = voiceFeature.actions
