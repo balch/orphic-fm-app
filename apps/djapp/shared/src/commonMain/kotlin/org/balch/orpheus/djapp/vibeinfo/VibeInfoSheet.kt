@@ -1,8 +1,11 @@
 package org.balch.orpheus.djapp.vibeinfo
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -39,6 +45,8 @@ import kotlinx.coroutines.flow.map
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
+import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -367,19 +375,41 @@ private fun SectionChip(section: VibeInfoSection, onClick: () -> Unit) {
         section.canQueue     -> OrpheusColors.onSurfaceDark.copy(alpha = 0.70f)
         else                 -> OrpheusColors.onSurfaceDark.copy(alpha = 0.30f)
     }
+    // Focus stays live in every state (unlike an enabled=false clickable, which drops it) so a
+    // focused chip that becomes now-playing or gets outro-locked never throws D-pad focus out
+    // of the panel; the click itself is what no-ops when the section can't be queued.
+    val interactionSource = remember { MutableInteractionSource() }
+    val liveFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused = LocalTvFocusChrome.current && liveFocused
     Text(
         text = section.name,
         fontSize = 11.sp,
         fontWeight = if (section.isNowPlaying) FontWeight.SemiBold else FontWeight.Normal,
         color = textColor,
         modifier = Modifier
+            .then(
+                if (isFocused) Modifier.raisedAccentSurface(accent = OrpheusColors.neonCyan, shape = shape)
+                else Modifier
+            )
             .clip(shape)
             .background(bgColor)
             .then(
                 if (section.isQueued) Modifier.border(1.dp, OrpheusColors.neonCyan.copy(alpha = 0.6f), shape)
                 else Modifier
             )
-            .clickable(enabled = section.canQueue, onClickLabel = "Play next", onClick = onClick)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClickLabel = "Play next",
+                onClick = { if (section.canQueue) onClick() },
+            )
+            .semantics {
+                if (!section.canQueue) disabled()
+                when {
+                    section.isNowPlaying -> stateDescription = "Playing"
+                    section.isQueued -> stateDescription = "Queued"
+                }
+            }
             .padding(horizontal = 8.dp, vertical = 4.dp),
     )
 }

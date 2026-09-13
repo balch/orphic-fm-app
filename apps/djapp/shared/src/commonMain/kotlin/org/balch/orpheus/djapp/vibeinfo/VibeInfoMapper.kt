@@ -7,6 +7,7 @@ import org.balch.orpheus.features.pulsar.PULSAR_SCALE_NAMES
 import org.balch.orpheus.features.pulsar.PULSAR_TRACK_NAMES
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.playback.SectionQueue
 
 /**
  * Minimum peak audio level for a track to be considered "playing". Shared with
@@ -46,7 +47,7 @@ fun mapVibeInfo(
             name = section.name,
             isNowPlaying = isNowPlaying,
             isQueued = index == queuedSectionIndex,
-            canQueue = !isNowPlaying && !outroArmed,
+            canQueue = SectionQueue.canQueue(index, arrangement.sectionIndex, outroArmed),
         )
     } ?: emptyList()
 

@@ -5,7 +5,7 @@ data class VibeInfoSection(
     val isNowPlaying: Boolean,
     /** Queued to play when the current section ends. */
     val isQueued: Boolean,
-    /** Tapping queues it. Mirrors SectionQueue.request: not the playing section, not while the outro is armed. */
+    /** Tapping queues it. See SectionQueue.canQueue: not the playing section, not while the outro is armed. */
     val canQueue: Boolean,
 )
 
