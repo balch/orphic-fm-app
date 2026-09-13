@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
@@ -43,9 +43,9 @@ fun CenterControlSection(
     beatsFeature: DrumBeatsFeature,
     modifier: Modifier = Modifier,
 ) {
-    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
     val actions = voiceFeature.actions
-    val beatsState by beatsFeature.stateFlow.collectAsState()
+    val beatsState by beatsFeature.stateFlow.collectAsStateWithLifecycle()
     val beatsActions = beatsFeature.actions
     val effects = LocalLiquidEffects.current
     val liquidState = LocalLiquidState.current

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -25,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
@@ -287,8 +287,8 @@ fun DuoVoiceBox(
 fun DuoVoiceBoxPreview() {
     val voiceFeature = VoiceViewModel.previewFeature()
     val midiFeature = MidiViewModel.previewFeature()
-    val voiceState by voiceFeature.stateFlow.collectAsState()
-    val midiState by midiFeature.stateFlow.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
+    val midiState by midiFeature.stateFlow.collectAsStateWithLifecycle()
     val voiceActions = voiceFeature.actions.toVoiceActions()
     val midiActions = midiFeature.actions.toMidiActions()
 

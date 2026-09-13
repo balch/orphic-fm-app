@@ -39,7 +39,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -161,11 +161,11 @@ fun DjPanel(
     previewFaderOverride: FaderPreviewOverride? = null,
 ) {
     val djColors = remember { DjColors() }
-    val state by feature.stateFlow.collectAsState()
+    val state by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
-    val vizA by vizFlowA.collectAsState()
-    val vizB by vizFlowB.collectAsState()
-    val beatPhase by beatPhaseFlow.collectAsState()
+    val vizA by vizFlowA.collectAsStateWithLifecycle()
+    val vizB by vizFlowB.collectAsStateWithLifecycle()
+    val beatPhase by beatPhaseFlow.collectAsStateWithLifecycle()
 
     // Beat length measured from phase wraps. There is no BPM on this panel, and the
     // auto-scratch needs a subdivision to land on; a wrap-to-wrap interval gives one without

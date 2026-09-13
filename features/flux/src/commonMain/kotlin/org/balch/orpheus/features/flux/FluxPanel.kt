@@ -6,12 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
@@ -60,7 +60,7 @@ fun FluxPanel(
             SignalTrace(data = cvVizFlow, color = OrpheusColors.metallicBlueLight)
         }
     ) {
-        val state by flux.stateFlow.collectAsState()
+        val state by flux.stateFlow.collectAsStateWithLifecycle()
         val actions = flux.actions
 
         // Row 1: All switches — T-section left, X-section right

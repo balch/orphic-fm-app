@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,7 +95,7 @@ fun PulsarPanel(
     // without expanding this panel. Everywhere else it stays here.
     showEndingControl: Boolean = true,
 ) {
-    val vizData by vizFlow.collectAsState()
+    val vizData by vizFlow.collectAsStateWithLifecycle()
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "PULSE",
@@ -107,8 +107,8 @@ fun PulsarPanel(
         showCollapsedHeader = showCollapsedHeader,
         fillHeight = fillHeight,
     ) {
-        val state by pulsar.stateFlow.collectAsState()
-        val arrangementState by pulsar.arrangementStateFlow.collectAsState()
+        val state by pulsar.stateFlow.collectAsStateWithLifecycle()
+        val arrangementState by pulsar.arrangementStateFlow.collectAsStateWithLifecycle()
         val actions = pulsar.actions
 
         // Gated on TV hardware, not LargeScreen: a tablet or fullscreen desktop is LargeScreen
@@ -128,7 +128,7 @@ fun PulsarPanel(
                 // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
                 // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
                 // dips below 1 and deepens the tint, breathing back as the mix returns.
-                val anomalyArmed by actions.anomalyArmed.collectAsState()
+                val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
                 EnumDropdown(
                     label = "VIBE",
                     selectedDisplay = state.vibe.name,
@@ -185,10 +185,10 @@ fun PulsarPanel(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            val activeTransition by actions.activeTransition.collectAsState()
-            val finalSectionIdx by actions.finalSectionIndex.collectAsState()
-            val songEndingOn by actions.songEndingEnabled.collectAsState()
-            val resolvedStyle by actions.resolvedTransitionStyle.collectAsState()
+            val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
+            val finalSectionIdx by actions.finalSectionIndex.collectAsStateWithLifecycle()
+            val songEndingOn by actions.songEndingEnabled.collectAsStateWithLifecycle()
+            val resolvedStyle by actions.resolvedTransitionStyle.collectAsStateWithLifecycle()
             PulsarStepGrid(
                 vizData = vizData,
                 trackVizFlows = trackVizFlows,
@@ -352,9 +352,9 @@ fun PulsarPanel(
             //
             // Gated rather than removed so the row reflows with one fewer child on TV.
             if (showEndingControl) {
-                val songEndingEnabled by actions.songEndingEnabled.collectAsState()
-                val transitionSpec by actions.transitionSpec.collectAsState()
-                val outroArmed by actions.outroArmed.collectAsState()
+                val songEndingEnabled by actions.songEndingEnabled.collectAsStateWithLifecycle()
+                val transitionSpec by actions.transitionSpec.collectAsStateWithLifecycle()
+                val outroArmed by actions.outroArmed.collectAsStateWithLifecycle()
                 // Shows the picked mode, so RANDOM stays RANDOM. The resolved substyle is what
                 // actually fires, and it shows up in the step grid's final-section suffix.
                 val pillLabel = if (songEndingEnabled) transitionSpec.style.name else "PLAYS"
@@ -392,7 +392,7 @@ fun PulsarPanel(
 
         // ModeOne (every vibe on its name-hash seed, for A/B listening): a long press on the COMPLEXITY
         // label toggles it, and the label pulses while it is on.
-        val modeOne by actions.modeOne.collectAsState()
+        val modeOne by actions.modeOne.collectAsStateWithLifecycle()
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Bottom,

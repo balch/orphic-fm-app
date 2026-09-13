@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +22,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.delay
@@ -139,7 +139,7 @@ fun CompactPortraitLayout(
         }
     }
 
-    val vizState by vizFeature.stateFlow.collectAsState()
+    val vizState by vizFeature.stateFlow.collectAsStateWithLifecycle()
 
     Box(
         modifier = modifier
@@ -217,7 +217,7 @@ fun CompactPortraitLayout(
                                     )
                                 }
                                 CompactBottomPanelType.PADS -> {
-                                    val voiceState by voiceFeature.stateFlow.collectAsState()
+                                    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
                                     CompactPortraitVoicePads(
                                         voiceState = voiceState,
                                         actions = voiceFeature.actions,
@@ -227,8 +227,8 @@ fun CompactPortraitLayout(
                                     )
                                 }
                                 CompactBottomPanelType.STRINGS -> {
-                                    val voiceState by voiceFeature.stateFlow.collectAsState()
-                                    val externalBends by mediaPipeFeature.stringBends.collectAsState()
+                                    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
+                                    val externalBends by mediaPipeFeature.stringBends.collectAsStateWithLifecycle()
                                     CompactStringPanel(
                                         voiceState = voiceState,
                                         actions = voiceFeature.actions,

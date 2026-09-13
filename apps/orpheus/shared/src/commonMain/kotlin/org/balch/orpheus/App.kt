@@ -6,11 +6,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.liquefiable
@@ -48,7 +48,7 @@ fun App(
 
         CompositionLocalProvider(LocalSynthFeatures provides registry) {
             val vizFeature: VizFeature = registry.feature<VizFeature>()
-            val vizState by vizFeature.stateFlow.collectAsState()
+            val vizState by vizFeature.stateFlow.collectAsStateWithLifecycle()
             val liquidState = rememberLiquidState()
 
             // Use the selected visualization's liquid effects
@@ -60,7 +60,7 @@ fun App(
             // Get AI feature for chat dialog state
             val aiFeature: AiOptionsFeature = registry.feature<AiOptionsFeature>()
             val timerFeature: TimerFeature = registry.feature<TimerFeature>()
-            val aiState by aiFeature.stateFlow.collectAsState()
+            val aiState by aiFeature.stateFlow.collectAsStateWithLifecycle()
             val showChatDialog = aiState.showChatDialog
             val dialogPosition = aiState.dialogPosition
             val dialogSize = aiState.dialogSize

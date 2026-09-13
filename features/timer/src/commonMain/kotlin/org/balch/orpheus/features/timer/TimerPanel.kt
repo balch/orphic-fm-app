@@ -19,7 +19,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -31,6 +30,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.features.timer.TimerLimits.MAX_HOURS
 import org.balch.orpheus.features.timer.TimerLimits.MAX_MINUTES_AT_CAP_HOUR
 import org.balch.orpheus.features.timer.TimerLimits.MAX_MINUTES_NORMAL
@@ -62,7 +62,7 @@ fun TimerPanel(
     // real D-pad. Every production call site leaves this null.
     previewFocusedButton: TimerTransportButtonId? = null,
 ) {
-    val state by feature.stateFlow.collectAsState()
+    val state by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
 
     val isIdle = state.status == TimerStatus.IDLE || state.status == TimerStatus.FINISHED

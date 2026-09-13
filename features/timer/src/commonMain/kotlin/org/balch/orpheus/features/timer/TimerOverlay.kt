@@ -23,7 +23,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.dialogs.DraggableDialog
@@ -47,7 +47,7 @@ fun TimerOverlay(
     modifier: Modifier = Modifier,
     liquidState: LiquidState,
 ) {
-    val state by feature.stateFlow.collectAsState()
+    val state by feature.stateFlow.collectAsStateWithLifecycle()
 
     if (!state.showOverlay) return
 
@@ -91,7 +91,7 @@ private fun TimerDraggableDialog(
     modifier: Modifier = Modifier,
     liquidState: LiquidState,
 ) {
-    val state by feature.stateFlow.collectAsState()
+    val state by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
 
     val glowColor = resolveGlowColor(state.status, state.remainingTime)
@@ -203,7 +203,7 @@ fun TimerFullscreen(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val state by feature.stateFlow.collectAsState()
+    val state by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
 
     val glowColor = resolveGlowColor(state.status, state.remainingTime)

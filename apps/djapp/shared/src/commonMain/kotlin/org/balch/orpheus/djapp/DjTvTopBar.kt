@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,6 +39,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -129,7 +129,7 @@ fun DjTvTopBar(
     // partially-faded TvFocusRegionHolder.alpha without a real holder+coroutine driving it.
     previewRegionFocusAlpha: Float = 1f,
 ) {
-    val pulsarState by pulsarFeature.stateFlow.collectAsState()
+    val pulsarState by pulsarFeature.stateFlow.collectAsStateWithLifecycle()
     val effects = LocalLiquidEffects.current
 
     val playPauseFocusRequester = remember { FocusRequester() }
@@ -237,7 +237,7 @@ enum class TvTopBarButtonId { PLAY_PAUSE, VIBE_PICKER, VIZ_PICKER }
  */
 @Composable
 private fun TvVibePicker(pulsarFeature: PulsarFeature, previewFocused: Boolean) {
-    val state by pulsarFeature.stateFlow.collectAsState()
+    val state by pulsarFeature.stateFlow.collectAsStateWithLifecycle()
     val vibeList = remember { pulsarFeature.vibeList }
     val effects = LocalLiquidEffects.current
     TvInlinePicker(
@@ -262,7 +262,7 @@ private fun TvVibePicker(pulsarFeature: PulsarFeature, previewFocused: Boolean) 
  */
 @Composable
 private fun TvVizPicker(vizFeature: VizFeature, previewFocused: Boolean) {
-    val state by vizFeature.stateFlow.collectAsState()
+    val state by vizFeature.stateFlow.collectAsStateWithLifecycle()
     val effects = LocalLiquidEffects.current
     val entries = remember(state.visualizations) {
         listOf(VizPickerEntry.Random) + state.visualizations.map(VizPickerEntry::Item)

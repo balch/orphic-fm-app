@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -20,6 +19,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.gestures.GestureMode
 import org.balch.orpheus.features.mediapipe.shader.CameraEffectCanvas
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -54,7 +54,7 @@ fun AslMaestroPanel(
         expandedTitle = "Maestro",
         showCollapsedHeader = showCollapsedHeader,
     ) {
-        val state by feature.stateFlow.collectAsState()
+        val state by feature.stateFlow.collectAsStateWithLifecycle()
         val actions = feature.actions
 
         // Auto-start camera when switching to CAMERA mode via permission flow

@@ -4,12 +4,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.diamondedge.logging.logging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,9 +73,9 @@ fun SynthScreen(
 
     val registry = LocalSynthFeatures.current
     val midiFeature: MidiFeature = registry.feature<MidiFeature>()
-    val midiState by midiFeature.stateFlow.collectAsState()
+    val midiState by midiFeature.stateFlow.collectAsStateWithLifecycle()
 
-    val highlightedControls by controlHighlightEventBus.highlightedControls.collectAsState()
+    val highlightedControls by controlHighlightEventBus.highlightedControls.collectAsStateWithLifecycle()
 
     HighlightProvider(highlightedControlIds = highlightedControls) {
         LearnModeProvider(

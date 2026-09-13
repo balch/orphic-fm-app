@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.liquefiable
@@ -49,7 +49,7 @@ fun DjApp(
             val liquidState = rememberLiquidState()
             val dialogLiquidState = rememberLiquidState()
             val vizFeature: VizFeature = registry.feature<VizFeature>()
-            val vizState by vizFeature.stateFlow.collectAsState()
+            val vizState by vizFeature.stateFlow.collectAsStateWithLifecycle()
             val liquidEffects = vizState.liquidEffects
 
             // Start audio engine and enable viz.

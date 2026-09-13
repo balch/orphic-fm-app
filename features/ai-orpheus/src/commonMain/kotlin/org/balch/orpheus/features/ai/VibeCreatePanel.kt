@@ -16,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.features.pulsar.models.Vibe
@@ -72,7 +72,7 @@ fun VibeCreatePanel(
     onDialogActiveChange: (Boolean) -> Unit = {},
     showCollapsedHeader: Boolean = true,
 ) {
-    val uiState by feature.stateFlow.collectAsState()
+    val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
 
     CollapsibleColumnPanel(

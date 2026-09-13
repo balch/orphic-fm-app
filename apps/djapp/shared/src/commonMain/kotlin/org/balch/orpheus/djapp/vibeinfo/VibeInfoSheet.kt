@@ -20,7 +20,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -33,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
@@ -83,9 +83,9 @@ private fun rememberVibeInfoModel(
     pulsar: PulsarFeature,
     vizFlow: StateFlow<PulsarVizData>,
 ): VibeInfoUiModel {
-    val uiState by pulsar.stateFlow.collectAsState()
-    val arrangement by pulsar.arrangementStateFlow.collectAsState()
-    val viz by vizFlow.collectAsState()
+    val uiState by pulsar.stateFlow.collectAsStateWithLifecycle()
+    val arrangement by pulsar.arrangementStateFlow.collectAsStateWithLifecycle()
+    val viz by vizFlow.collectAsStateWithLifecycle()
 
     // The C++ engine re-rolls the active engine per audio block in the 0.4–0.6
     // crossfade zone, so viz.activeEngines flickers at mid-energy. Stabilize it
@@ -209,7 +209,7 @@ private fun rememberStableViz(viz: PulsarVizData): PulsarVizData {
 
     // Advance the hold counters once per POLL, not once per recomposition. The
     // viz StateFlow conflates by structural equality, so each distinct object
-    // reference collectAsState observes is a genuinely new sample; recompositions
+    // reference collectAsStateWithLifecycle observes is a genuinely new sample; recompositions
     // driven by other state (e.g. the energy knob) reuse the same viz object.
     // Guarding on reference identity keeps the ~400ms (HOLD_FRAMES) hysteresis
     // tied to real polls, so it can't collapse and reintroduce label flicker.

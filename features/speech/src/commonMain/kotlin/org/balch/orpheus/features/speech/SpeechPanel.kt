@@ -38,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +72,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -92,7 +92,7 @@ fun SpeechPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     onTextFieldFocusChange: (Boolean) -> Unit = {},
 ) {
-    val uiState by feature.stateFlow.collectAsState()
+    val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
     val color = OrpheusColors.speechRose
 
