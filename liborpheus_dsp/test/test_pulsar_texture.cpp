@@ -241,7 +241,7 @@ static bool test_soloist_on_texture_slot_escapes_the_notch() {
 // A melodic track that carries the vibe's lick is a foreground line wherever it sits, not a
 // texture layer. Fire Sky's riff double on track 6 read ~26 dB under the same voice on
 // track 4 at energy 0.54 because the texture notch keyed on the index alone.
-static double render_lick_track(int track, float energy) {
+static double render_lick_track(int track, float energy, bool chordal = false) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
     unit.type = UNIT_PULSAR; unit.enabled = true;
@@ -254,8 +254,14 @@ static double render_lick_track(int track, float energy) {
     engine->pulsar_track_engine_edm[track].store(9, std::memory_order_relaxed);
     engine->pulsar_track_engine_space[track].store(9, std::memory_order_relaxed);
     engine->pulsar_track_volume[track].store(0.6f, std::memory_order_relaxed);
-    engine->pulsar_track_role[track].store(1, std::memory_order_relaxed);
-    engine->pulsar_track_lick_mode[track].store(2, std::memory_order_relaxed);  // FILL
+    if (chordal) {
+        engine->pulsar_track_role[track].store(2, std::memory_order_relaxed);
+        engine->pulsar_track_comping_style[track].store(2, std::memory_order_relaxed);  // ROCK
+        engine->pulsar_track_lick_mode[track].store(0, std::memory_order_relaxed);
+    } else {
+        engine->pulsar_track_role[track].store(1, std::memory_order_relaxed);
+        engine->pulsar_track_lick_mode[track].store(2, std::memory_order_relaxed);  // FILL
+    }
     engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_seed.store(0x5EED, std::memory_order_relaxed);
     stmlib::Random::Seed(0x5EED);
@@ -293,6 +299,20 @@ static bool test_lick_track_on_texture_slot_escapes_the_notch() {
     printf("    rms t5@0.5=%.6f t5@0.65=%.6f t4@0.5=%.6f (%.1f dB under t4; want t5@0.5 >= 0.5x t5@0.65) -- %s\n",
            notch, clear, lead, 20.0 * std::log10(lead > 0 ? notch / lead : 1e-9),
            pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// Comping is accompaniment, not texture: Fire Sky's organ on track 5 read 2 against 7 on the
+// same 6 dB-per-digit scale between energy 0.54 and 0.7 for no authored reason.
+static bool test_chordal_track_on_texture_slot_escapes_the_notch() {
+    printf("\n  A chordal comping track on a texture slot escapes the energy notch\n");
+    double notch = render_lick_track(5, 0.5f, true);
+    double clear = render_lick_track(5, 0.65f, true);
+    bool audible = clear > 1e-4;
+    bool lifted = notch >= clear * 0.5;
+    bool pass = audible && lifted;
+    printf("    rms t5@0.5=%.6f t5@0.65=%.6f (want t5@0.5 >= 0.5x t5@0.65) -- %s\n",
+           notch, clear, pass ? "PASS" : "FAIL");
     return pass;
 }
 
@@ -760,6 +780,7 @@ bool run_pulsar_texture_tests() {
     if (test_soloist_on_texture_slot_escapes_the_notch()) pass++; else fail++;
     if (test_soloist_on_fx_slot_fires()) pass++; else fail++;
     if (test_lick_track_on_texture_slot_escapes_the_notch()) pass++; else fail++;
+    if (test_chordal_track_on_texture_slot_escapes_the_notch()) pass++; else fail++;
 
     // ── Summary ──
     printf("\n  Pulsar Texture: %d passed, %d failed\n", pass, fail);

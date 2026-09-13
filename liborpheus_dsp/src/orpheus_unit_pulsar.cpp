@@ -3147,9 +3147,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float track_volume = ts.volume * clamp01(mod_volume);
         // Energy-aware volume shaping. A soloing melodic track blends out of the
         // texture notch by its smoothed solo lift, so a lead on 5-7 is heard. A melodic
-        // track carrying the vibe's lick is a foreground line all the time, not only
-        // while it solos, so it sits fully lifted: a riff double on 6 must not land
-        // 26 dB under the lead on 4 at mid energy.
+        // track carrying the vibe's lick and a chordal comping track are foreground all
+        // the time, not only while soloing, so they sit fully lifted: a riff double on 6
+        // or an organ on 5 must not land 26 dB under the lead on 4 at mid energy. The
+        // notch is left for what it was written for: percussive hits and lick-less
+        // melodic pads and drones.
         if (t >= 5) {
             float curve = texture_energy_curve(energy);
             if (ts.role != TrackRole::PERCUSSIVE) {
@@ -3157,7 +3159,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 const bool lick_line = ts.role == TrackRole::MELODIC
                     && static_cast<LickMode>(engine->pulsar_track_lick_mode[t].load(
                            std::memory_order_relaxed)) != LickMode::NONE;
-                if (lick_line) lift = 1.0f;
+                if (lick_line || ts.role == TrackRole::CHORDAL) lift = 1.0f;
                 curve += (1.0f - curve) * lift;
             }
             track_volume *= curve;
