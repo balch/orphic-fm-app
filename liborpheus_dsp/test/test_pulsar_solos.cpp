@@ -763,6 +763,104 @@ static bool test_lickbuilder_bass_lead_stays_in_its_register() {
     return pass;
 }
 
+// Bell Tolls' dub drones everything FIXED and its chorus runs a LickBuilder with a ROOT_ONLY
+// bass. On the Mode One seed the chorus solo picked the Bassist at the seam because the
+// section boundary started the solo BEFORE restoring each track's chord follow, so the bass
+// still read the dub's FIXED and looked able to carry a line. The chord-follow restore has to
+// land before the solo picks anyone.
+static bool test_seam_solo_sees_the_new_sections_chord_follow() {
+    printf("\n=== Test: a section-seam solo picks its lead from the NEW section's chord follow ===\n");
+    const int kBass = 3, kLead = 4;
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR; unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.9f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->pulsar_track_chord_follow[kBass].store(static_cast<int>(ChordFollowMode::ROOT_ONLY), std::memory_order_relaxed);
+    engine->pulsar_track_chord_follow[kLead].store(static_cast<int>(ChordFollowMode::FOLLOW), std::memory_order_relaxed);
+    engine->pulsar_lick[0] = {0, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[1] = {2, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[2] = {4, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick[3] = {1, 0.5f, 0.8f, -1.0f};
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    push_lickbuilder_band_arrangement(engine, kLead);
+    // The per-track section chord-follow atomics default to 0, which the loader reads as
+    // an override to FOLLOW; the app pushes -1 for "unset", so do the same here.
+    for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
+        engine->pulsar_section_track_chord_follow[i].store(-1, std::memory_order_relaxed);
+    // Three sections: 0 = 1-bar NONE, 1 = 1-bar NONE that drones FIXED section-wide (Bell
+    // Tolls' dub), 2 = the helper's LickBuilder, moved up one slot. The FIXED seam has to
+    // come right before the solo seam: the section-level chord follow is applied at seams,
+    // not at load, so a FIXED section 0 never reaches the bass.
+    {
+        constexpr int kStride = kSectionDataFields;
+        for (int f = 0; f < kStride; f++) {
+            float v = engine->pulsar_section_data[1 * kStride + f].load(std::memory_order_relaxed);
+            engine->pulsar_section_data[2 * kStride + f].store(v, std::memory_order_relaxed);
+            float v0 = engine->pulsar_section_data[0 * kStride + f].load(std::memory_order_relaxed);
+            engine->pulsar_section_data[1 * kStride + f].store(v0, std::memory_order_relaxed);
+        }
+        engine->pulsar_section_data[1 * kStride + 20].store(
+            static_cast<float>(static_cast<int>(ChordFollowMode::FIXED)), std::memory_order_relaxed);
+        engine->pulsar_arrangement_section_count.store(3, std::memory_order_relaxed);
+        for (int i = 0; i < 8 * 8 * 3; i++) engine->pulsar_section_transitions[i].store(0.0f, std::memory_order_relaxed);
+        engine->pulsar_section_transitions[0 * 24 + 0].store(1.0f, std::memory_order_relaxed);  // s0 -> s1
+        engine->pulsar_section_transitions[0 * 24 + 1].store(1.0f, std::memory_order_relaxed);
+        engine->pulsar_section_transitions[1 * 24 + 0].store(2.0f, std::memory_order_relaxed);  // s1 -> s2
+        engine->pulsar_section_transitions[1 * 24 + 1].store(1.0f, std::memory_order_relaxed);
+        engine->pulsar_section_transitions[2 * 24 + 0].store(2.0f, std::memory_order_relaxed);  // s2 -> s2
+        engine->pulsar_section_transitions[2 * 24 + 1].store(1.0f, std::memory_order_relaxed);
+        engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+    }
+    // Three members: drums (0), bass (1), lead (2). Every handoff row points at the bass.
+    engine->pulsar_band_member_count.store(3, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 1].store(static_cast<float>(kBass), std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 9].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 10].store(0.8f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[12 + 11].store(0.9f, std::memory_order_relaxed);  // creativity: tempt the roll
+    engine->pulsar_band_member_data[24 + 0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[24 + 1].store(static_cast<float>(kLead), std::memory_order_relaxed);
+    engine->pulsar_band_member_data[24 + 9].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[24 + 10].store(0.8f, std::memory_order_relaxed);
+    engine->pulsar_band_member_data[24 + 11].store(0.5f, std::memory_order_relaxed);
+    for (int i = 0; i < 64; i++) engine->pulsar_band_handoff_matrix[i].store(0.0f, std::memory_order_relaxed);
+    for (int m = 0; m < 3; m++) {
+        engine->pulsar_band_handoff_matrix[m * 3 + 1].store(0.9f, std::memory_order_relaxed);
+        engine->pulsar_band_handoff_matrix[m * 3 + 2].store(0.1f, std::memory_order_relaxed);
+    }
+    engine->pulsar_band_bars_per_lead_min.store(2, std::memory_order_relaxed);
+    engine->pulsar_band_bars_per_lead_max.store(3, std::memory_order_relaxed);
+    engine->pulsar_arrangement_generation.fetch_add(1, std::memory_order_release);
+
+    int bass_led = 0, solo_bars = 0, seeds_run = 0;
+    for (uint32_t seed = 1; seed <= 12; seed++) {
+        engine->pulsar_seed.store(seed * 131u, std::memory_order_relaxed);
+        stmlib::Random::Seed(seed << 16);
+        trigger_vibe_load(engine);
+        engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+        int last_loop = -1, bars = 0;
+        for (int i = 0; i < 8000 && bars < 20; i++) {
+            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            PulsarState* ps = engine->pulsar_state; if (!ps) continue;
+            if (ps->loop_count == last_loop) continue;
+            last_loop = ps->loop_count;
+            if (ps->section_state.current_section != 2 || !ps->band_solo_state.active) continue;
+            bars++; solo_bars++;
+            if (ps->band_solo_state.lead_member == 1) bass_led++;
+        }
+        seeds_run++;
+    }
+    orpheus_engine_destroy(engine);
+    bool pass = seeds_run == 12 && solo_bars > 0 && bass_led == 0;
+    printf("  seeds=%d solo bars=%d bass led=%d (expect 0) -- %s\n", seeds_run, solo_bars, bass_led, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // ── SOLO-3: positive density modifier makes the leading track busier ──
 //
 // Counts fired step-triggers on a fully-gated melodic track at a fixed seed,
@@ -1503,6 +1601,7 @@ bool run_pulsar_solos_tests() {
     tally(test_jam_ornament_density_builds());
     tally(test_jam_no_lick_line_unchanged());
     tally(test_jam_notes_respect_track_note_range());
+    tally(test_seam_solo_sees_the_new_sections_chord_follow());
     printf("\nPulsar solos tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

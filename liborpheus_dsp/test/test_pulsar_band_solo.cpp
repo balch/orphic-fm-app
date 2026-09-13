@@ -1446,6 +1446,66 @@ static bool test_break_is_a_deep_duck_that_lands() {
     return pass;
 }
 
+// A member whose melodic tracks are all ROOT_ONLY cannot carry a lick line: the render
+// collapses every note to the chord root, so a Bassist "leading" a LickBuilder plays the
+// hook's rhythm as a root pulse under the real lead. Bell Tolls' chorus did exactly that on
+// its Mode One seed. Such a member must never be picked, at solo start or at a handoff.
+static bool test_root_only_member_never_leads_a_lick_line() {
+    printf("\n=== Test: a ROOT_ONLY-only member never leads a LickBuilder or Jam ===\n");
+
+    BandSoloConfigParam config{};
+    config.probability = 1.0f;
+    config.member_count = 4;
+    config.bars_per_lead_min = 2;
+    config.bars_per_lead_max = 4;
+    config.members[0].tracks[0] = 0; config.members[0].tracks[1] = 1; config.members[0].tracks[2] = 2;
+    config.members[0].track_count = 3; config.members[0].always_active = true;
+    config.members[1].tracks[0] = 3; config.members[1].track_count = 1;   // bass, ROOT_ONLY
+    config.members[1].creativity = 0.9f;                                  // tempt the roll
+    config.members[2].tracks[0] = 4; config.members[2].track_count = 1;   // lead, FOLLOW
+    config.members[3].tracks[0] = 5; config.members[3].tracks[1] = 6;
+    config.members[3].track_count = 2;                                    // keys, CHORDAL
+    // Every handoff row points hard at the bass.
+    for (int m = 0; m < 4; m++)
+        for (int n = 0; n < 4; n++)
+            config.handoff_matrix[m * kMaxBandMembers + n] = (n == 1) ? 0.9f : 0.05f;
+
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    for (int t = 0; t < 3; t++) tracks[t].role = TrackRole::PERCUSSIVE;
+    tracks[3].role = TrackRole::MELODIC; tracks[3].chord_follow = ChordFollowMode::ROOT_ONLY;
+    tracks[4].role = TrackRole::MELODIC; tracks[4].chord_follow = ChordFollowMode::FOLLOW;
+    tracks[5].role = TrackRole::CHORDAL; tracks[6].role = TrackRole::CHORDAL;
+
+    const SoloModeId modes[] = { SoloModeId::LICK_BUILDER, SoloModeId::JAM };
+    const char* names[] = { "LickBuilder", "Jam" };
+    bool ok = true;
+    for (int mi = 0; mi < 2; mi++) {
+        SectionParam section{};
+        section.solo_mode = modes[mi];
+        section.solo_probability = 1.0f;
+        int bass_led = 0, starts = 0, lead_led = 0;
+        for (uint32_t s = 1; s <= 300; s++) {
+            BandSoloState state{};
+            uint32_t seed = s * 7919u;
+            start_band_solo(state, config, section, tracks, seed);
+            if (!state.active) continue;
+            starts++;
+            if (state.lead_member == 1) bass_led++;
+            if (state.lead_member == 2) lead_led++;
+            for (int bar = 0; bar < 24; bar++) {
+                advance_band_solo(state, config, section, tracks, seed);
+                if (state.lead_member == 1) { bass_led++; break; }
+            }
+        }
+        bool mode_ok = starts > 0 && bass_led == 0 && lead_led > 0;
+        printf("  %s: starts=%d bass led=%d (expect 0) lead led=%d (expect >0) -- %s\n",
+               names[mi], starts, bass_led, lead_led, mode_ok ? "OK" : "FAIL");
+        ok = ok && mode_ok;
+    }
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_band_solo_tests() {
     printf("\n========== PULSAR BAND SOLO TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -1480,6 +1540,7 @@ bool run_pulsar_band_solo_tests() {
     tally(test_long_fill_expiry_hands_the_groove_back());
     tally(test_drum_lead_end_to_end());
     tally(test_break_is_a_deep_duck_that_lands());
+    tally(test_root_only_member_never_leads_a_lick_line());
     printf("\nPulsar band solo tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

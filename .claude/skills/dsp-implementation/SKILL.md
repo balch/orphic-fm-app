@@ -214,7 +214,14 @@ inline float smooth_coeff(float sample_rate) {
 
 // Applied per-sample in process function:
 engine->tides_smooth_mix += coeff * (target - engine->tides_smooth_mix);
+
+// Stepped once per BLOCK? Scale by the frames advanced, or the time constant
+// becomes block_frames x tau (2.56 s for a 5ms coefficient at 512 frames):
+float c = block_smooth_coeff(sample_rate, num_frames, tau_seconds);
 ```
+
+A smoother read by several units (e.g. `smooth_coupling_depth`) must step once per block in
+`orpheus_graph_process`, not in each unit, or its rate depends on how many units run.
 
 ## Source Buffer Registration (Warps Routing)
 

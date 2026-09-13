@@ -222,7 +222,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     }
 
     // ── Smoothing coefficient for this block ──────────────────
-    float sc = smooth_coeff(sr);
+    float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
 
     // ── Vibrato modulation ───────────────────────────────────
     // Block-midpoint from dedicated vibrato buffer (Hz domain, matches JSyn)
@@ -234,9 +234,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Voice coupling: partner envelope → pitch modulation ──
     float coupling_hz = 0.0f;
     {
-        float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
-        engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
-        float coupling = engine->smooth_coupling_depth;
+        float coupling = engine->smooth_coupling_depth;  // smoothed in orpheus_graph_process
         if (coupling > 0.001f) {
             int partner = (idx % 2 == 0) ? idx + 1 : idx - 1;
             if (partner >= 0 && partner < kNumVoices) {
@@ -822,17 +820,14 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     int engineA = vpA.engine_index.load(std::memory_order_relaxed);
     int engineB = vpB.engine_index.load(std::memory_order_relaxed);
     if (engineA >= 0 || engineB >= 0) {
-        // Pre-smooth coupling/FM/mod once per block, then save+restore around
+        // Pre-smooth FM/mod once per block, then save+restore around
         // the two unit_process_plaits calls to prevent double-smoothing.
-        float sc = smooth_coeff(sr);
-        float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
-        engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
+        float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
         float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
         engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
         float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
         engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
 
-        float saved_coupling = engine->smooth_coupling_depth;
         float saved_fm = engine->smooth_fm_depth[duo];
         float saved_mod = engine->smooth_mod_depth[duo];
 
@@ -854,7 +849,6 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_A);
             std::memcpy(outA, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
 
-            engine->smooth_coupling_depth = saved_coupling;
             engine->smooth_fm_depth[duo] = saved_fm;
             engine->smooth_mod_depth[duo] = saved_mod;
 
@@ -866,7 +860,6 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_B);
             std::memcpy(outB, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
 
-            engine->smooth_coupling_depth = saved_coupling;
             engine->smooth_fm_depth[duo] = saved_fm;
             engine->smooth_mod_depth[duo] = saved_mod;
 
@@ -893,7 +886,6 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             unit_process_plaits(&tmp, engine, num_frames, sr);
             std::memcpy(e0_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
 
-            engine->smooth_coupling_depth = saved_coupling;
             engine->smooth_fm_depth[duo] = saved_fm;
             engine->smooth_mod_depth[duo] = saved_mod;
 
@@ -905,7 +897,6 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_plaits);
             std::memcpy(pl_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
 
-            engine->smooth_coupling_depth = saved_coupling;
             engine->smooth_fm_depth[duo] = saved_fm;
             engine->smooth_mod_depth[duo] = saved_mod;
         }
@@ -914,14 +905,12 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     }
 
     // ── Block-rate setup ──────────────────────────────────────────
-    float sc = smooth_coeff(sr);
+    float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
 
     // Vibrato: read from dedicated sine oscillator buffer (computed in HyperLFO unit)
     // vibrato_output_buffer already contains sine(rate) * depth * 20 Hz
 
-    // Coupling depth (shared, smoothed)
-    float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
-    engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
+    // Coupling depth (shared, smoothed in orpheus_graph_process)
     float coupling = engine->smooth_coupling_depth;
 
     // FM mod source + depth (per-duo, smoothed)

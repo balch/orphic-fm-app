@@ -3445,6 +3445,23 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             reload_vibe_tension(engine, state);
                         }
 
+                        // Chord-follow override (per-track wins over section-level; -1 = restore
+                        // default). Restored FIRST, ahead of jam_carried and the section's solo
+                        // start below: a solo picks its lead by which members can carry a line,
+                        // and a ROOT_ONLY bass still wearing the previous section's FIXED or
+                        // FOLLOW would pass that check and then render the hook as a root pulse.
+                        for (int t = 0; t < kNumPulsarTracks; t++) {
+                            TrackRole r = state->tracks[t].role;
+                            if (r != TrackRole::MELODIC && r != TrackRole::CHORDAL) continue;
+                            int per_track = sec.track_chord_follow_override[t];
+                            ChordFollowMode target = (per_track >= 0)
+                                ? static_cast<ChordFollowMode>(per_track)
+                                : (sec.chord_follow_override >= 0)
+                                    ? static_cast<ChordFollowMode>(sec.chord_follow_override)
+                                    : state->tracks[t].default_chord_follow;
+                            state->tracks[t].chord_follow = target;
+                        }
+
                         // jam_carried (full explanation below, by the if/else chain that
                         // consumes it) is computed here, ahead of apply_section_densities,
                         // solely so a drum lead in flight can hand its groove back (next
@@ -3590,19 +3607,6 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                     ? static_cast<SectionInversionId>(sec.comping_inversion_override)
                                     : state->tracks[t].default_section_inversion;
                             state->tracks[t].section_inversion = target;
-                        }
-
-                        // Chord-follow override (per-track wins over section-level; -1 = restore default)
-                        for (int t = 0; t < kNumPulsarTracks; t++) {
-                            TrackRole r = state->tracks[t].role;
-                            if (r != TrackRole::MELODIC && r != TrackRole::CHORDAL) continue;
-                            int per_track = sec.track_chord_follow_override[t];
-                            ChordFollowMode target = (per_track >= 0)
-                                ? static_cast<ChordFollowMode>(per_track)
-                                : (sec.chord_follow_override >= 0)
-                                    ? static_cast<ChordFollowMode>(sec.chord_follow_override)
-                                    : state->tracks[t].default_chord_follow;
-                            state->tracks[t].chord_follow = target;
                         }
 
                         // Arp-mode override (per-track only — no section-level equivalent; -1 = restore default)
