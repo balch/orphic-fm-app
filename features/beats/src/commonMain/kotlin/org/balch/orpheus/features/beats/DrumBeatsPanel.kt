@@ -48,6 +48,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.Learnable
+import org.balch.orpheus.ui.widgets.LearnModeState
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
@@ -113,66 +114,9 @@ fun DrumBeatsPanel(
                         contentAlignment = Alignment.Center
                     ) {
                         if (outputMode == DrumBeatsGenerator.OutputMode.DRUMS) {
-                            // X/Y Pad
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit, learnState.isActive) {
-                                        if (learnState.isActive) return@pointerInput
-                                        detectTapGestures { offset ->
-                                            actions.setX(offset.x / size.width)
-                                            actions.setY(offset.y / size.height)
-                                        }
-                                    }
-                                    .pointerInput(Unit, learnState.isActive) {
-                                        if (learnState.isActive) return@pointerInput
-                                        detectDragGestures { change, _ ->
-                                            actions.setX(change.position.x / size.width)
-                                            actions.setY(change.position.y / size.height)
-                                        }
-                                    }
-                            ) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    // Grid lines
-                                    for (i in 1..4) {
-                                        val pos = i * size.width / 5
-                                        drawLine(Color.White.copy(alpha = 0.1f), Offset(pos, 0f), Offset(pos, size.height))
-                                        drawLine(Color.White.copy(alpha = 0.1f), Offset(0f, pos), Offset(size.width, pos))
-                                    }
-
-                                    // Crosshair
-                                    drawCircle(
-                                        color = OrpheusColors.seahawksGreen,
-                                        radius = 6.dp.toPx(),
-                                        center = Offset(state.x * size.width, state.y * size.height)
-                                    )
-                                }
-                            }
+                            DrumsXYPad(state, actions, learnState)
                         } else {
-                            // Euclidean Lengths
-                            Column(
-                                verticalArrangement = Arrangement.SpaceEvenly,
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                val colors = listOf(OrpheusColors.seahawksGreen, OrpheusColors.seahawksGrey, Color.White)
-                                state.euclideanLengths.forEachIndexed { index, len ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                         Text("L${index+1}", style = MaterialTheme.typography.labelSmall, color = colors[index])
-                                         RotaryKnob(
-                                            value = len / 32f,
-                                            onValueChange = { actions.setEuclideanLength(index, (it * 32).toInt()) },
-                                            size = 24.dp,
-                                            progressColor = colors[index],
-                                            controlId = "beats_euclid_len_$index"
-                                         )
-                                         Text("$len", style = MaterialTheme.typography.labelSmall, color = Color.White)
-                                    }
-                                }
-                            }
+                            EuclideanLengthsDisplay(state, actions)
                         }
                     }
                 }
@@ -182,146 +126,242 @@ fun DrumBeatsPanel(
                     modifier = Modifier.fillMaxHeight(),
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // Row 1: BD, SD, HH
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                         KnobControlTopLabel(
-                            modifier = Modifier.padding(top = 4.dp),
-                            label = "BD",
-                            value = state.densities[0],
-                            onValueChange = { actions.setDensity(0, it) },
-                            color = OrpheusColors.seahawksGreen,
-                            controlId = "beats_bd_density"
-                        )
-                        KnobControlTopLabel(
-                            modifier = Modifier.padding(top = 42.dp),
-                            label = "\u221E\u221E", // infinity,
-                            labelStyle = MaterialTheme.typography.labelMedium,
-                            value = state.randomness,
-                            onValueChange = { actions.setRandomness(it) },
-                            color = OrpheusColors.seahawksGreen,
-                            controlId = "beats_randomness"
-                        )
-                        KnobControlTopLabel(
-                            modifier = Modifier.padding(top = 4.dp),
-                            label = "SD",
-                            value = state.densities[1],
-                            onValueChange = { actions.setDensity(1, it) },
-                            color = OrpheusColors.seahawksGrey,
-                            controlId = "beats_sd_density"
-                        )
-                        KnobControlTopLabel(
-                            modifier = Modifier.padding(top = 42.dp),
-                            label = "\u2053",
-                            labelStyle = MaterialTheme.typography.labelMedium,
-                            value = state.swing,
-                            onValueChange = { actions.setSwing(it) },
-                            color = OrpheusColors.seahawksGreen,
-                            controlId = "beats_swing"
-                        )
-                        KnobControlTopLabel(
-                            modifier = Modifier.padding(top = 4.dp),
-                            label = "HH",
-                            value = state.densities[2],
-                            onValueChange = { actions.setDensity(2, it) },
-                            color = Color.White,
-                            controlId = "beats_hh_density"
-                        )
-                    }
-
-                    // Row 3: Transport (Start/Stop, Tap Tempo)
-                    Row(
-                        modifier = Modifier.padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // RUN/STOP
-                        Learnable(controlId = "beats_run") {
-                            IconButton(
-                                onClick = { actions.setRunning(!state.isRunning) },
-                                modifier = Modifier
-                                    .width(46.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .height(25.dp)
-                                    .background(
-                                        if (state.isRunning) OrpheusColors.seahawksGreen else Color.White.copy(alpha = 0.2f)
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = if (state.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                    contentDescription = if (state.isRunning) "Stop" else "Start",
-                                    tint = if (state.isRunning) Color.Black else Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-
-                        }
-
-                        // BPM Control
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start,
-                        ) {
-                            HorizontalMiniSlider(
-                                trackWidth = 70,
-                                value = ((state.bpm - 40) / 200).coerceIn(0f, 1f),
-                                onValueChange = { frac ->
-                                    actions.setBpm(40f + (frac * 200f))
-                                },
-                                color = OrpheusColors.seahawksGreen,
-                                controlId = "beats_bpm"
-                            )
-                        }
-
-                        HorizontalMiniSlider(
-                            trackWidth = 70,
-                            value = state.mix,
-                            onValueChange = { actions.setMix(it) },
-                            color = OrpheusColors.seahawksGreen,
-                            controlId = "beats_mix"
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            modifier = Modifier.width(46.dp),
-                            textAlign = TextAlign.Center,
-                            text = if (state.isRunning) "Stop" else "Play",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = OrpheusColors.seahawksGreen,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                        )
-
-                        Text(
-                            modifier = Modifier.width(78.dp),
-                            textAlign = TextAlign.Center,
-                            text = "${state.bpm.toInt()}bmp",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = OrpheusColors.seahawksGreen,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                        )
-
-                        Text(
-                            modifier = Modifier.width(85.dp),
-                            textAlign = TextAlign.Center,
-                            text = "Mix",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = OrpheusColors.seahawksGreen,
-                            fontSize = 12.sp,
-                        )
-
-
-                    }
+                    DensityKnobsRow(state, actions)
+                    TransportControls(state, actions)
                 }
             }
         }
+    }
+}
+
+/**
+ * X/Y pad visualization for Drums mode: drag or tap to morph the pattern,
+ * with a crosshair marking the current coordinate over a reference grid.
+ */
+@Composable
+private fun DrumsXYPad(
+    state: BeatsUiState,
+    actions: DrumBeatsPanelActions,
+    learnState: LearnModeState,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit, learnState.isActive) {
+                if (learnState.isActive) return@pointerInput
+                detectTapGestures { offset ->
+                    actions.setX(offset.x / size.width)
+                    actions.setY(offset.y / size.height)
+                }
+            }
+            .pointerInput(Unit, learnState.isActive) {
+                if (learnState.isActive) return@pointerInput
+                detectDragGestures { change, _ ->
+                    actions.setX(change.position.x / size.width)
+                    actions.setY(change.position.y / size.height)
+                }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // Grid lines
+            for (i in 1..4) {
+                val pos = i * size.width / 5
+                drawLine(Color.White.copy(alpha = 0.1f), Offset(pos, 0f), Offset(pos, size.height))
+                drawLine(Color.White.copy(alpha = 0.1f), Offset(0f, pos), Offset(size.width, pos))
+            }
+
+            // Crosshair
+            drawCircle(
+                color = OrpheusColors.seahawksGreen,
+                radius = 6.dp.toPx(),
+                center = Offset(state.x * size.width, state.y * size.height)
+            )
+        }
+    }
+}
+
+/**
+ * Euclidean lengths visualization: per-voice step-length knob (L1-L3) for Euclidean mode.
+ */
+@Composable
+private fun EuclideanLengthsDisplay(
+    state: BeatsUiState,
+    actions: DrumBeatsPanelActions,
+) {
+    Column(
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        val colors = listOf(OrpheusColors.seahawksGreen, OrpheusColors.seahawksGrey, Color.White)
+        state.euclideanLengths.forEachIndexed { index, len ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                 Text("L${index+1}", style = MaterialTheme.typography.labelSmall, color = colors[index])
+                 RotaryKnob(
+                    value = len / 32f,
+                    onValueChange = { actions.setEuclideanLength(index, (it * 32).toInt()) },
+                    size = 24.dp,
+                    progressColor = colors[index],
+                    controlId = "beats_euclid_len_$index"
+                 )
+                 Text("$len", style = MaterialTheme.typography.labelSmall, color = Color.White)
+            }
+        }
+    }
+}
+
+/**
+ * Row of density/character knobs: BD, randomness, SD, swing, HH.
+ */
+@Composable
+private fun DensityKnobsRow(
+    state: BeatsUiState,
+    actions: DrumBeatsPanelActions,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+         KnobControlTopLabel(
+            modifier = Modifier.padding(top = 4.dp),
+            label = "BD",
+            value = state.densities[0],
+            onValueChange = { actions.setDensity(0, it) },
+            color = OrpheusColors.seahawksGreen,
+            controlId = "beats_bd_density"
+        )
+        KnobControlTopLabel(
+            modifier = Modifier.padding(top = 42.dp),
+            label = "\u221E\u221E", // infinity,
+            labelStyle = MaterialTheme.typography.labelMedium,
+            value = state.randomness,
+            onValueChange = { actions.setRandomness(it) },
+            color = OrpheusColors.seahawksGreen,
+            controlId = "beats_randomness"
+        )
+        KnobControlTopLabel(
+            modifier = Modifier.padding(top = 4.dp),
+            label = "SD",
+            value = state.densities[1],
+            onValueChange = { actions.setDensity(1, it) },
+            color = OrpheusColors.seahawksGrey,
+            controlId = "beats_sd_density"
+        )
+        KnobControlTopLabel(
+            modifier = Modifier.padding(top = 42.dp),
+            label = "\u2053",
+            labelStyle = MaterialTheme.typography.labelMedium,
+            value = state.swing,
+            onValueChange = { actions.setSwing(it) },
+            color = OrpheusColors.seahawksGreen,
+            controlId = "beats_swing"
+        )
+        KnobControlTopLabel(
+            modifier = Modifier.padding(top = 4.dp),
+            label = "HH",
+            value = state.densities[2],
+            onValueChange = { actions.setDensity(2, it) },
+            color = Color.White,
+            controlId = "beats_hh_density"
+        )
+    }
+}
+
+/**
+ * Transport row (run/stop, BPM, mix) with its caption labels beneath.
+ */
+@Composable
+private fun TransportControls(
+    state: BeatsUiState,
+    actions: DrumBeatsPanelActions,
+) {
+    Row(
+        modifier = Modifier.padding(top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // RUN/STOP
+        Learnable(controlId = "beats_run") {
+            IconButton(
+                onClick = { actions.setRunning(!state.isRunning) },
+                modifier = Modifier
+                    .width(46.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .height(25.dp)
+                    .background(
+                        if (state.isRunning) OrpheusColors.seahawksGreen else Color.White.copy(alpha = 0.2f)
+                    )
+            ) {
+                Icon(
+                    imageVector = if (state.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                    contentDescription = if (state.isRunning) "Stop" else "Start",
+                    tint = if (state.isRunning) Color.Black else Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+        }
+
+        // BPM Control
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            HorizontalMiniSlider(
+                trackWidth = 70,
+                value = ((state.bpm - 40) / 200).coerceIn(0f, 1f),
+                onValueChange = { frac ->
+                    actions.setBpm(40f + (frac * 200f))
+                },
+                color = OrpheusColors.seahawksGreen,
+                controlId = "beats_bpm"
+            )
+        }
+
+        HorizontalMiniSlider(
+            trackWidth = 70,
+            value = state.mix,
+            onValueChange = { actions.setMix(it) },
+            color = OrpheusColors.seahawksGreen,
+            controlId = "beats_mix"
+        )
+    }
+
+    Row(
+        modifier = Modifier.padding(top = 8.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            modifier = Modifier.width(46.dp),
+            textAlign = TextAlign.Center,
+            text = if (state.isRunning) "Stop" else "Play",
+            style = MaterialTheme.typography.labelSmall.proportional(),
+            color = OrpheusColors.seahawksGreen,
+            fontSize = 12.sp,
+            maxLines = 1,
+        )
+
+        Text(
+            modifier = Modifier.width(78.dp),
+            textAlign = TextAlign.Center,
+            text = "${state.bpm.toInt()}bmp",
+            style = MaterialTheme.typography.labelSmall.proportional(),
+            color = OrpheusColors.seahawksGreen,
+            fontSize = 12.sp,
+            maxLines = 1,
+        )
+
+        Text(
+            modifier = Modifier.width(85.dp),
+            textAlign = TextAlign.Center,
+            text = "Mix",
+            style = MaterialTheme.typography.labelSmall.proportional(),
+            color = OrpheusColors.seahawksGreen,
+            fontSize = 12.sp,
+        )
     }
 }
 
