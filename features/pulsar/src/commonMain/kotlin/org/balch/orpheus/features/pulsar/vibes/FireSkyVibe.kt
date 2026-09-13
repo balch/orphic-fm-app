@@ -601,11 +601,11 @@ private class FireSkyVibeBase(
                     delaySend = 0.14f,
                     glideRate = 0.0f,         // no slur — every riff note distinct
                     lpgMode = LpgMode.PLUCK,  // picked attack per note
-                    // Long ring: a 1-beat note falls ~6 dB before the next pick, 8ths hold
-                    // level. 0.5 read as too picked once a pluck became one bloom per note
-                    // (2.0.5 re-plucked every 16th by accident); SUSTAINED lost the pick.
+                    // The riff's 8th-note pulse IS this pluck decaying inside each note: at
+                    // 60 BPM 2.0.5 fell ~24 dB per 8th (0.5 matches it), 0.95 and SUSTAINED
+                    // go flat and the vibe loses its drive. 0.6 keeps the pulse ~6 dB softer.
                     // Not clamped: >1 rings longer still, 1.3 is flat.
-                    lpgDecay = 0.95f,
+                    lpgDecay = 0.60f,
                     lpgColour = 0.55f,
                 ).let { lead ->
                     TrackVoice(
