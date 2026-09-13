@@ -389,6 +389,13 @@ private class FireSkyVibeBase(
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = null,
+                // Organ and double sit 12 dB under their authored volume here. Until the
+                // texture-notch fix (tracks 5-7 were cut to 0.05 across energy 0.45..0.55)
+                // the verse at 0.54 had them near silent; this keeps them back, not out.
+                trackOverrides = mapOf(
+                    5 to TrackSectionOverride(volume = 0.125f),
+                    6 to TrackSectionOverride(volume = 0.13f),
+                ),
             ),
             // 3: chorus — fuller, driving peak. Lead PEDALS FIXED so the bVII/IV moves
             //    read as a hammering hook, not an octave-fold lurch. Tighter pump progression.
@@ -440,7 +447,8 @@ private class FireSkyVibeBase(
                 ),
                 soloMode = SoloMode.Jam(probability = 0.85f),
                 trackOverrides = mapOf(
-                    6 to TrackSectionOverride(density = 0.40f),  // double thins while the lead jams
+                    5 to TrackSectionOverride(volume = 0.125f),  // 12 dB back, as in the verse
+                    6 to TrackSectionOverride(density = 0.40f, volume = 0.13f),  // double thins while the lead jams
                 ),
             ),
             // 6: breakdown — stripped to bass + drums + organ. Locked to 4 bars =
