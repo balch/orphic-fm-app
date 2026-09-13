@@ -32,8 +32,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.foundation.focusable
@@ -141,11 +141,6 @@ internal fun RotaryKnobDial(
     indicatorColor: Color = OrpheusColors.neonCyan,
     isLearning: Boolean = false,
     enabled: Boolean = true,
-    // Fires after a still press of the platform long-press timeout. Any drag cancels it, and
-    // the drag handler is untouched either way. Null (the default) means no long press.
-    onLongPress: (() -> Unit)? = null,
-    // A pulsing halo outside the dial, for a mode the knob is the switch for (see drawKnobGlow).
-    pulseGlow: Boolean = false,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // null (the default, used by every real call site) means "use live focus state" below.
     previewFocused: Boolean? = null,
@@ -153,7 +148,6 @@ internal fun RotaryKnobDial(
 ) {
     val sensitivity = 200f
     val currentOnValueChange by rememberUpdatedState(onValueChange)
-    val currentOnLongPress by rememberUpdatedState(onLongPress)
     var liveFocused by remember { mutableStateOf(false) }
     // D-pad left/right is also how focus moves, so a knob may only consume those keys once
     // the user has explicitly entered adjust mode with select. Otherwise focus is trapped:
@@ -183,30 +177,11 @@ internal fun RotaryKnobDial(
     } else {
         null
     }
-    // Same deferred-read discipline as adjustPulseAlphaState: the draw lambda owns the read.
-    val glowPulseState: State<Float>? = if (pulseGlow) {
-        val transition = rememberInfiniteTransition(label = "knobGlowPulse")
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(700), repeatMode = RepeatMode.Reverse),
-            label = "knobGlowPulse",
-        )
-    } else {
-        null
-    }
 
     Box(modifier = modifier.size(size)) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                // Outside the drag handler below, so the drag consumes movement first and a
-                // pending long press sees the consumed change and cancels. A still press
-                // reaches the long-press timeout with nothing consumed.
-                .pointerInput(onLongPress != null, isLearning, enabled) {
-                    if (onLongPress == null || isLearning || !enabled) return@pointerInput
-                    detectTapGestures(onLongPress = { currentOnLongPress?.invoke() })
-                }
                 // D-pad and arrow keys drive the knob by value steps. Focusable comes after
                 // onKeyEvent so the handler is in the chain for the node that takes focus.
                 .onFocusChanged {
@@ -323,12 +298,6 @@ internal fun RotaryKnobDial(
                     center = center,
                     style = Stroke(width = strokeWidth * (if (isAdjusting) 0.9f else 0.45f)),
                 )
-            }
-
-            // Mode glow, under the dial. .value read here so the pulse invalidates only this
-            // draw pass (see glowPulseState above).
-            glowPulseState?.let { pulse ->
-                drawKnobGlow(center, radius, strokeWidth, indicatorColor, pulse.value)
             }
 
             // Track Groove (Shadow)
@@ -451,56 +420,77 @@ internal fun RotaryKnobDial(
     }
 }
 
+/** How far the label grows at the top of its pulse, as a scale factor on the drawn text. */
+private const val LabelPulseScale = 0.18f
+
 /**
- * The pulsing halo a knob wears while it is the switch for an active mode (Pulsar's One Mode
- * on the COMPLEXITY knob). `pulse` breathes 0..1 and back every 700 ms; `radius` is the dial's
- * arc radius and `strokeWidth` its arc width, so everything here scales with the knob size.
- * Two layers: a soft radial wash that fades out past the dial, and a crisp ring just outside
- * the arc that carries the beat. EYE-TUNE: the alphas, the ring offset and the wash reach are
- * the knobs to turn.
+ * The knob's label. When [onLongPress] is set the label owns the mode switch, so the dial's
+ * pointer stays drag-only: a still touch of the long-press timeout fires it, and on TV the
+ * label takes D-pad focus and a select press fires it. While [pulse] is true the text breathes
+ * between [color] and [pulseColor] and grows by [LabelPulseScale] every 700 ms. The size pulse
+ * is a graphicsLayer scale, not a font size, so the knob column never relayouts. Its own
+ * composable so the pulse recomposes this Text alone, not the whole knob.
  */
-private fun DrawScope.drawKnobGlow(
-    center: Offset,
-    radius: Float,
-    strokeWidth: Float,
+@Composable
+private fun KnobLabel(
+    text: String,
+    style: TextStyle,
     color: Color,
-    pulse: Float,
+    pulseColor: Color,
+    pulse: Boolean,
+    onLongPress: (() -> Unit)?,
 ) {
-    // The ring is a stroke centred on ringRadius; its inner edge sits just past the arc's own
-    // glow, so a thicker ring grows outward rather than into the dial.
-    val ringWidth = strokeWidth * 0.8f
-    val ringRadius = radius + strokeWidth * 1.15f
-    val ringOuter = ringRadius + ringWidth / 2f
-    val ringInner = ringRadius - ringWidth / 2f
-    val washRadius = ringRadius + strokeWidth * 2.2f
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(
-                color.copy(alpha = 0.10f + 0.30f * pulse),
-                color.copy(alpha = 0.05f + 0.10f * pulse),
-                Color.Transparent,
-            ),
-            center = center,
-            radius = washRadius,
-        ),
-        radius = washRadius,
-        center = center,
-    )
-    // Lit on the inner edge, falling to a dark rim on the outer edge: a radial gradient that
-    // spans exactly the stroke, so the ring reads as a raised lip rather than a flat band.
-    val rim = lerp(color, Color.Black, 0.75f)
-    drawCircle(
-        brush = Brush.radialGradient(
-            colorStops = arrayOf(
-                (ringInner / ringOuter) to color.copy(alpha = 0.35f + 0.60f * pulse),
-                1f to rim.copy(alpha = 0.55f + 0.40f * pulse),
-            ),
-            center = center,
-            radius = ringOuter,
-        ),
-        radius = ringRadius,
-        center = center,
-        style = Stroke(width = ringWidth),
+    val currentOnLongPress by rememberUpdatedState(onLongPress)
+    var focused by remember { mutableStateOf(false) }
+    // State, not `by`: the draw-phase graphicsLayer lambda reads .value itself, so the scale
+    // never recomposes anything. Only the colour read below recomposes this Text.
+    val pulseState: State<Float>? = if (pulse) {
+        val transition = rememberInfiniteTransition(label = "knobLabelPulse")
+        transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(700), repeatMode = RepeatMode.Reverse),
+            label = "knobLabelPulse",
+        )
+    } else {
+        null
+    }
+    val shown = when {
+        pulseState != null -> lerp(color, pulseColor, pulseState.value)
+        focused -> pulseColor
+        else -> color
+    }
+    Text(
+        text = text,
+        style = style,
+        color = shown,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier
+            .graphicsLayer {
+                val s = 1f + LabelPulseScale * (pulseState?.value ?: 0f)
+                scaleX = s
+                scaleY = s
+            }
+            .pointerInput(onLongPress != null) {
+                if (onLongPress == null) return@pointerInput
+                detectTapGestures(onLongPress = { currentOnLongPress?.invoke() })
+            }
+            // TV: the label is a focus stop only when it has something to fire, so the other
+            // knob labels don't double every D-pad hop. Select fires on key UP, once, so a
+            // held remote button's key repeat can't toggle the mode back and forth.
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEvent { event ->
+                if (onLongPress == null || event.type != KeyEventType.KeyUp) return@onKeyEvent false
+                when (event.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        currentOnLongPress?.invoke()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .focusable(enabled = onLongPress != null),
     )
 }
 
@@ -564,9 +554,11 @@ typealias KnobValueFormatter = (Float) -> String
  * Supports vertical drag interaction for precision.
  *
  * @param controlId Optional ID for MIDI learn mode. If provided, this knob can be selected for CC mapping.
- * @param onLongPress Fires after a still press of the platform long-press timeout; a drag never
- *   fires it. Null (the default) leaves the knob drag-only.
- * @param pulseGlow Draws a pulsing halo around the dial while true, for a mode this knob switches.
+ * @param onLongPress Fires after a still press of the label for the platform long-press timeout,
+ *   or a select press while the label holds D-pad focus. The dial itself stays drag-only.
+ *   Null (the default) means no long press and the label is not focusable.
+ * @param pulseLabel Pulses the label's colour toward [indicatorColor] and its size while true,
+ *   for a mode this knob switches.
  */
 @Composable
 fun RotaryKnob(
@@ -588,7 +580,7 @@ fun RotaryKnob(
         ((value * 100).roundToInt() / 100.0).toString()
     },
     onLongPress: (() -> Unit)? = null,
-    pulseGlow: Boolean = false,
+    pulseLabel: Boolean = false,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // Every production call site leaves this null and gets live focus behavior.
     previewFocused: Boolean? = null,
@@ -622,20 +614,19 @@ fun RotaryKnob(
             indicatorColor = indicatorColor,
             isLearning = isLearning,
             enabled = enabled,
-            onLongPress = onLongPress,
-            pulseGlow = pulseGlow,
             previewFocused = previewFocused,
             previewAdjusting = previewAdjusting,
         )
 
         if (label != null) {
             Spacer(modifier = Modifier.height(2.dp))
-            Text(
+            KnobLabel(
                 text = label,
                 style = labelStyle,
                 color = labelColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1
+                pulseColor = indicatorColor,
+                pulse = pulseLabel,
+                onLongPress = if (enabled && !isLearning) onLongPress else null,
             )
         }
 
@@ -651,9 +642,9 @@ fun RotaryKnob(
     }
 }
 
-@Preview(name = "Mode glow (One Mode on the Pulsar COMPLEXITY knob)")
+@Preview(name = "Mode pulse (Mode One on the Pulsar COMPLEXITY label)")
 @Composable
-private fun RotaryKnobPulseGlowPreview() {
+private fun RotaryKnobPulseLabelPreview() {
     OrpheusTheme {
         RotaryKnob(
             label = "COMPLEXITY",
@@ -662,7 +653,7 @@ private fun RotaryKnobPulseGlowPreview() {
             size = 48.dp,
             progressColor = OrpheusColors.cosmicPurple,
             valueFormatter = null,
-            pulseGlow = true,
+            pulseLabel = true,
         )
     }
 }
