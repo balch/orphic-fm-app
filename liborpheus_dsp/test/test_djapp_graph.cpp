@@ -1116,6 +1116,67 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
     return delay_ok && reverb_ok && differs;
 }
 
+// ── Test 18: Pulsar reverb room morphs on a 300ms time constant, any block size ──
+// A vibe switch writes size/damping/brightness mid-transition while the old tail still rings.
+
+static bool test_djapp_pulsar_reverb_room_smoothing() {
+    printf("\n=== Test: Pulsar reverb room settles on a 300ms time constant ===\n");
+    constexpr float kSr = 48000.0f, kTau = 0.300f, kTol = 0.005f;
+    constexpr int kOneTauFrames = 14336, kSettleFrames = 71680;  // ~1 and ~5 tau, whole blocks below
+    const float ideal_one = 1.0f - std::exp(-static_cast<float>(kOneTauFrames) / (kTau * kSr));
+    const float ideal_settle = 1.0f - std::exp(-static_cast<float>(kSettleFrames) / (kTau * kSr));
+    const char* uri = "org.balch.orpheus.plugins.pulsar";
+
+    bool all_pass = true;
+    for (int nb : {64, 128, 512}) {
+        OrpheusEngine* engine = orpheus_engine_create(kSr);
+        if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+        const float start[3] = {engine->smooth_pulsar_reverb_time,
+                                engine->smooth_pulsar_reverb_damping,
+                                engine->smooth_pulsar_reverb_diffusion};
+        // The ports PulsarFeature.applyVibe writes for VibeEffects
+        orpheus_engine_set_port(engine, uri, "pulsar_reverb_size", 0.95f);
+        orpheus_engine_set_port(engine, uri, "pulsar_reverb_damping", 0.9f);
+        orpheus_engine_set_port(engine, uri, "pulsar_reverb_brightness", 0.0f);
+        const float target[3] = {engine->pulsar_reverb_time.load(),
+                                 1.0f - 0.95f * engine->pulsar_reverb_damping.load(),
+                                 engine->pulsar_reverb_diffusion.load()};
+        bool routed = true;
+        for (int p = 0; p < 3; p++) routed &= std::fabs(target[p] - start[p]) > 0.05f;
+        if (!routed) {
+            printf("  FAIL: reverb ports did not reach the engine\n");
+            orpheus_engine_destroy(engine);
+            return false;
+        }
+
+        auto progress = [&](float frac[3]) {
+            const float now[3] = {engine->smooth_pulsar_reverb_time,
+                                  engine->smooth_pulsar_reverb_damping,
+                                  engine->smooth_pulsar_reverb_diffusion};
+            for (int p = 0; p < 3; p++) frac[p] = (now[p] - start[p]) / (target[p] - start[p]);
+        };
+
+        std::vector<float> buf(nb * 2, 0.0f);
+        float one[3], settle[3];
+        int frames = 0;
+        for (; frames < kOneTauFrames; frames += nb) orpheus_engine_process(engine, buf.data(), nb);
+        progress(one);
+        for (; frames < kSettleFrames; frames += nb) orpheus_engine_process(engine, buf.data(), nb);
+        progress(settle);
+
+        bool ok = true;
+        for (int p = 0; p < 3; p++)
+            ok &= std::fabs(one[p] - ideal_one) < kTol && std::fabs(settle[p] - ideal_settle) < kTol;
+        printf("  block %3d: 1 tau size %.3f damp %.3f diff %.3f (ideal %.3f), 5 tau %.3f %.3f %.3f (ideal %.3f) %s\n",
+               nb, one[0], one[1], one[2], ideal_one, settle[0], settle[1], settle[2], ideal_settle,
+               ok ? "PASS" : "FAIL");
+        all_pass &= ok;
+        orpheus_engine_destroy(engine);
+    }
+    return all_pass;
+}
+
 // ── Suite runner ────────────────────────────────────────────────────
 
 bool run_djapp_graph_tests() {
@@ -1139,6 +1200,7 @@ bool run_djapp_graph_tests() {
     tally(test_djapp_pulsar_effects_independent());
     tally(test_djapp_pulsar_zero_sends());
     tally(test_djapp_pulsar_delay_vs_reverb());
+    tally(test_djapp_pulsar_reverb_room_smoothing());
     printf("\nDJ App graph tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
