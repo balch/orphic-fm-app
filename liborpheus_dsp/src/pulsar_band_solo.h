@@ -44,21 +44,26 @@ inline constexpr float kBreakBassDensityDuck = -0.5f;
 
 // ── Select initial lead member (weighted random, prefer non-always-active) ──
 
-// True if member m owns at least one MELODIC track — i.e. it can host a JAM solo
-// LINE. A chordal-only or percussion-only member cannot (generate_jam_solo_line would
-// no-op into a dead solo), so it must not be chosen as a JAM lead.
+// True if member m owns at least one MELODIC track that can carry a line — i.e. it can
+// host a JAM or LickBuilder solo LINE. A chordal-only or percussion-only member cannot
+// (generate_jam_solo_line would no-op into a dead solo), and neither can a member whose
+// melodic tracks are all ROOT_ONLY: the render collapses every note to the chord root,
+// so a ROOT_ONLY bass "leading" plays the hook's rhythm as a root pulse under the real
+// lead (Bell Tolls' chorus on its Mode One seed). Must not be chosen as a lead.
 inline bool member_can_lead_solo(const BandSoloConfigParam& config, int m,
                                  const PulsarTrackState* tracks, int num_tracks) {
     if (m < 0 || m >= config.member_count) return false;
     const BandMemberParam& mem = config.members[m];
     for (int ti = 0; ti < mem.track_count; ti++) {
         int rt = mem.tracks[ti];
-        if (rt >= 0 && rt < num_tracks && tracks[rt].role == TrackRole::MELODIC) return true;
+        if (rt >= 0 && rt < num_tracks && tracks[rt].role == TrackRole::MELODIC &&
+            tracks[rt].chord_follow != ChordFollowMode::ROOT_ONLY) return true;
     }
     return false;
 }
 
-// Fill out[member] with JAM solo eligibility (non-drum AND owns a melodic track).
+// Fill out[member] with solo-line eligibility (non-drum AND owns a melodic track that
+// can carry a line). Used by JAM and LickBuilder alike.
 // Returns out, or nullptr when no member qualifies — the caller then passes nullptr
 // and keeps the unfiltered selection rather than deadlocking on an empty candidate set.
 inline const bool* build_solo_eligibility(const BandSoloConfigParam& config,
@@ -152,7 +157,12 @@ inline int select_next_lead(
             weights[i] = base * (0.05f + 0.95f * (1.0f - recency));
             total += weights[i];
         }
-        if (total <= 0.0f) {  // degenerate (e.g. all always-active): allow any non-self
+        if (total <= 0.0f) {
+            // Nobody else may host the line (the current lead is the only eligible
+            // member): it keeps leading. Handing to an ineligible member here would put
+            // the hook on a ROOT_ONLY bass or a chordal pad, the case the filter exists for.
+            if (eligible) return from;
+            // Degenerate (e.g. all always-active): allow any non-self.
             for (int i = 0; i < config.member_count; i++) {
                 if (i == from) continue;
                 weights[i] = 1.0f;
@@ -343,9 +353,10 @@ inline void start_band_solo(
 
     // JAM solos render an improvised melodic LINE, so the lead must own a melodic
     // track; a chordal-only member would no-op into a dead solo. Filter it out.
-    bool jam_elig[kMaxBandMembers];
-    const bool* elig = (section.solo_mode == SoloModeId::JAM)
-        ? build_solo_eligibility(config, tracks, num_tracks, jam_elig) : nullptr;
+    bool line_elig[kMaxBandMembers];
+    const bool* elig = (section.solo_mode == SoloModeId::JAM ||
+                        section.solo_mode == SoloModeId::LICK_BUILDER)
+        ? build_solo_eligibility(config, tracks, num_tracks, line_elig) : nullptr;
     state.lead_member = select_initial_lead(config, seed, elig);
 
     // LongFill uses section bars, LickBuilder/Jam uses band's barsPerLead
@@ -454,9 +465,10 @@ inline void advance_band_solo(
 
     // JAM leads must own a melodic track (a chordal-only member would no-op into a
     // dead solo). Compute eligibility once and apply it to both lead selections below.
-    bool jam_elig[kMaxBandMembers];
-    const bool* elig = (section.solo_mode == SoloModeId::JAM)
-        ? build_solo_eligibility(config, tracks, num_tracks, jam_elig) : nullptr;
+    bool line_elig[kMaxBandMembers];
+    const bool* elig = (section.solo_mode == SoloModeId::JAM ||
+                        section.solo_mode == SoloModeId::LICK_BUILDER)
+        ? build_solo_eligibility(config, tracks, num_tracks, line_elig) : nullptr;
 
     // Drop expired pull-ins
     for (int m = 0; m < config.member_count; m++) {

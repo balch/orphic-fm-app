@@ -1,5 +1,6 @@
 #include "orpheus_graph.h"
 #include "orpheus_units.h"
+#include "orpheus_units_common.h"
 #include "orpheus_engine.h"
 #include "orpheus_turntable.h"
 #include <cstdlib>
@@ -381,6 +382,13 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         float fx_target = engine->bass_fx_send.load(std::memory_order_relaxed);
         engine->bass_smooth_fx_send += sc * (fx_target - engine->bass_smooth_fx_send);
         if (engine->bass_smooth_fx_send < 0.0001f) engine->bass_smooth_fx_send = 0.0f;
+    }
+
+    // Coupling is one global depth read by every voice unit, so it steps once per block here.
+    {
+        float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
+        engine->smooth_coupling_depth += block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds)
+                                         * (cp_target - engine->smooth_coupling_depth);
     }
 
     // Turntable duck gains: attenuate dry source paths when DJ faders are up.
