@@ -172,7 +172,7 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
 - **`reverbBrightness`** (default `0.5`): Dark (0.3) for deep/brooding, bright (0.7+) for airy/shimmery.
 - **`delayFeedback`** (default `null` = use vibe-level): Per-voice override.
 - **`glideRate`** (default `0.0`): Portamento. 0 = instant, 0.3 = smooth, 0.6+ = very slow.
-- **`lpgMode`** (default `ENGINE_DEFAULT`): Vactrol LPG mode — `BYPASS` (raw), `SUSTAINED` (gate-following), `PLUCK` (asymmetric bloom), or `ENGINE_DEFAULT` (consult per-engine table). Set explicitly per voice when EDM/Space want different envelope behavior (e.g. `PLUCK` for a WSH bass on EDM, `BYPASS` for a STR drone on Space).
+- **`lpgMode`** (default `ENGINE_DEFAULT`): Vactrol LPG mode — `BYPASS` (raw), `SUSTAINED` (gate-following), `PLUCK` (asymmetric bloom), `PLUCK_REPEAT` (PLUCK that re-picks a held note on every hold step: a 1-beat lick note becomes four 16th picks, the double-picked riff), or `ENGINE_DEFAULT` (consult per-engine table). Set explicitly per voice when EDM/Space want different envelope behavior (e.g. `PLUCK` for a WSH bass on EDM, `BYPASS` for a STR drone on Space).
 - **`lpgDecay` / `lpgColour`** (default `0.5`): Vactrol decay length and HF bleed.
 
 #### `OrpheusEngineId.OSC` — the panel oscillator with FM

@@ -54,5 +54,11 @@ enum class LpgMode(val id: Int) {
     /** Vactrol bloom on note-on, asymmetric decay regardless of gate length. */
     PLUCK(2),
     /** Sentinel — resolved to per-engine default in C++. */
-    ENGINE_DEFAULT(3);
+    ENGINE_DEFAULT(3),
+    /**
+     * [PLUCK] whose held notes are re-picked on every step of the hold chain, so a
+     * 1-beat lick note is four 16th picks. The double-picked riff 2.0.5 produced by
+     * accident when its gate timer dropped between hold steps; opt in per voice.
+     */
+    PLUCK_REPEAT(4);
 }

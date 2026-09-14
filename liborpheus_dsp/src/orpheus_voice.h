@@ -93,6 +93,10 @@ static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
 //   LPG_PLUCK          — fast vactrol bloom on note-on, asymmetric decay (the
 //                        "pluck" character — what makes a low-tom out of a sine)
 //   LPG_ENGINE_DEFAULT — sentinel: resolve to kOrpheusLpgDefault[engine_index]
+//   LPG_PLUCK_REPEAT   — PLUCK whose held notes are re-picked on every hold
+//                        step by the Pulsar sequencer (a 1-beat riff note is
+//                        four 16th picks). The vactrol itself is PLUCK; only
+//                        Pulsar's hold path reads the difference.
 //
 // The default of LPG_BYPASS in Render() means existing call sites that don't
 // pass a mode get exactly the prior behavior.
@@ -101,6 +105,7 @@ enum LpgMode : int {
     LPG_SUSTAINED = 1,
     LPG_PLUCK = 2,
     LPG_ENGINE_DEFAULT = 3,
+    LPG_PLUCK_REPEAT = 4,
 };
 
 // Per-engine LPG default. When a caller passes LPG_ENGINE_DEFAULT, this table
@@ -177,7 +182,7 @@ struct OrpheusLpg {
                 stmlib::SemitonesToRatio(-72.0f * lpg_decay + 12.0f * lpg_colour) -
                 short_decay;
 
-            if (mode == LPG_PLUCK) {
+            if (mode == LPG_PLUCK || mode == LPG_PLUCK_REPEAT) {
                 // Only the chunk carrying the note-on re-triggers the bloom;
                 // after that the asymmetric decay runs regardless of gate.
                 if (rise) envelope.Trigger();
@@ -443,7 +448,7 @@ struct OrpheusVoice {
                     stmlib::SemitonesToRatio(-72.0f * lpg_decay + 12.0f * lpg_colour) -
                     short_decay;
 
-                if (lpg_mode == LPG_PLUCK) {
+                if (lpg_mode == LPG_PLUCK || lpg_mode == LPG_PLUCK_REPEAT) {
                     // PING: trigger a vactrol bloom on rising edge, then let
                     // the asymmetric decay carry it down regardless of gate.
                     if (rising_edge) lpg_envelope_.Trigger();

@@ -2399,6 +2399,17 @@ static void resolve_breathe_block(PulsarState* state, float sample_rate) {
 
 // ── Main process function ────────────────────────────────────────────
 
+// The LPG mode this block renders with: the EDM slot's while the EDM engine is
+// active, the SPACE slot's otherwise. ts.engine_index is chosen per block by the
+// energy threshold (EDM above 0.6, SPACE below 0.4); comparing against the EDM
+// engine also covers edm == spa, where both slots hold the same mode anyway.
+// Shared by the render and by the hold path, which reads it for PLUCK_REPEAT.
+static inline int active_track_lpg_mode(const OrpheusEngine* engine,
+                                        const PulsarTrackState& ts, int t) {
+    const int edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+    return (ts.engine_index == edm) ? ts.lpg_mode : ts.lpg_mode_space;
+}
+
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate) {
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
 
@@ -4350,6 +4361,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     float base_gate = static_cast<float>(step.duration * samples_per_step);
                     ts.gate_timer = std::max(base_gate + drunk, base_gate * 0.25f);
                     ts.voice_active = true;
+                    // PLUCK_REPEAT re-picks the held note on every step: the same
+                    // note-on the trigger path raises, on the boundary sample, with
+                    // the head's pitch and velocity. 2.0.5 did this by accident for
+                    // every mode when its gate timer underran between hold steps
+                    // (7819cbd05 stopped that: Tides re-attacked, PLUCK re-bloomed);
+                    // this keeps the double-picked riff for the tracks that ask.
+                    if (active_track_lpg_mode(engine, ts, t) == LPG_PLUCK_REPEAT) {
+                        ts.trigger_offset = step_boundary_samples[b];
+                        ts.pending_retrig = true;
+                    }
                     // Continue or end hold chain based on this step's hold flag
                     ts.in_hold = step.hold;
                 } else {
@@ -5065,17 +5086,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         // ── Render voice ──
-        // Pick lpg_mode based on which engine slot is currently active.
-        // ts.engine_index is set per-block by the energy threshold above —
-        // EDM slot above 0.6, SPACE slot below 0.4. The compare-against-edm
-        // here means SPACE slot's mode applies whenever engine_index isn't
-        // the EDM engine (covers both SPACE-active and the "edm == spa"
-        // single-engine case, which still uses lpg_mode since they match).
-        const int active_edm_engine =
-            engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
-        const int active_lpg_mode = (ts.engine_index == active_edm_engine)
-            ? ts.lpg_mode
-            : ts.lpg_mode_space;
+        // The active slot's LPG mode; see active_track_lpg_mode for the slot rule.
+        const int active_lpg_mode = active_track_lpg_mode(engine, ts, t);
         // Braids range (100..199) → MacroOscillator wrapper.
         // Otherwise → OrpheusVoice (Plaits engines + LPG).
         // Braids' MacroOscillator silently clamps unknown indices to its last

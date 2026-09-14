@@ -951,6 +951,121 @@ static bool test_pulsar_voice_lpg_blooms_on_every_note_on_under_a_held_gate() {
     return ok;
 }
 
+struct RepickCounts {
+    int retrigs = 0;       // blocks where the sequencer raised a note-on
+    int hold_repicks = 0;  // ...of which landed on a hold continuation
+    int blooms = 0;        // vactrol gain jumping up, read off the LPG envelope
+};
+
+// The two-note phrase (2.0 + 1.5 beats over an 8-beat loop, 12 hold steps per
+// cycle) at 80 BPM on track 0. engine_id -1 is the OSC branch (ts.osc_lpg),
+// 9 is WSH through OrpheusVoice, the Fire Sky lead's path. A retrig on a block
+// whose previous step said "the next step continues me" is a hold re-pick.
+static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    make_osc_unit(unit);
+    setup_osc_track0(engine);
+    engine->pulsar_track_engine_edm[0].store(engine_id, std::memory_order_relaxed);
+    engine->pulsar_track_engine_space[0].store(engine_id, std::memory_order_relaxed);
+    engine->pulsar_track_volume[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_volume_space[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);       // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);  // FILL
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);       // AD
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_min.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[0].energy_density_max.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode[0].store(lpg_mode, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode_space[0].store(lpg_mode, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_decay_space[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour[0].store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_colour_space[0].store(0.5f, std::memory_order_relaxed);
+
+    engine->pulsar_lick[0].scale_degree = 2;
+    engine->pulsar_lick[0].duration = 2.0f;
+    engine->pulsar_lick[0].velocity = 0.95f;
+    engine->pulsar_lick[0].glide_rate = -1.0f;
+    engine->pulsar_lick[1].scale_degree = 0;
+    engine->pulsar_lick[1].duration = 1.5f;
+    engine->pulsar_lick[1].velocity = 0.85f;
+    engine->pulsar_lick[1].glide_rate = -1.0f;
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(2, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(80.0f, std::memory_order_relaxed);
+
+    RepickCounts c;
+    const int kBlocks = 1200;  // 12.8 s, a little over two cycles
+    float prev_gain = 0.0f;
+    bool was_in_hold = false;
+    for (int i = 0; i < kBlocks; i++) {
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+        const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
+        if (ts.pending_retrig) {
+            c.retrigs++;
+            if (was_in_hold) c.hold_repicks++;
+        }
+        was_in_hold = ts.in_hold;
+        const float g = (engine_id < 0) ? ts.osc_lpg.envelope.gain()
+                                        : ts.voice.lpg_envelope_.gain();
+        if (g > prev_gain * 1.5f && g > 0.05f) c.blooms++;
+        prev_gain = g;
+    }
+    orpheus_engine_destroy(engine);
+    return c;
+}
+
+// 2.0.5 re-picked every held lick note on each hold step by accident (the gate
+// timer underran between steps, 7819cbd05), and Fire Sky's double-picked riff
+// was that accident. LPG_PLUCK_REPEAT is the deliberate version: the hold path
+// raises the same note-on the trigger path does, so the vactrol blooms per step,
+// on both voice paths. Plain PLUCK keeps one bloom per note.
+static bool test_pulsar_lpg_pluck_repeat_repicks_every_hold_step() {
+    printf("\n=== Test: LPG_PLUCK_REPEAT re-picks a held note on every hold step ===\n");
+    const RepickCounts plaits = run_repick_fixture(9, LPG_PLUCK_REPEAT);
+    const RepickCounts osc = run_repick_fixture(-1, LPG_PLUCK_REPEAT);
+    const RepickCounts control = run_repick_fixture(9, LPG_PLUCK);
+    printf("  WSH  PLUCK_REPEAT: note-ons=%d hold re-picks=%d blooms=%d\n",
+           plaits.retrigs, plaits.hold_repicks, plaits.blooms);
+    printf("  OSC  PLUCK_REPEAT: note-ons=%d hold re-picks=%d blooms=%d\n",
+           osc.retrigs, osc.hold_repicks, osc.blooms);
+    printf("  WSH  PLUCK       : note-ons=%d hold re-picks=%d blooms=%d\n",
+           control.retrigs, control.hold_repicks, control.blooms);
+
+    bool ok = true;
+    if (control.retrigs < 3) {
+        printf("  FAIL: fixture fired almost no notes (%d) - not a real test\n", control.retrigs);
+        ok = false;
+    }
+    if (control.hold_repicks != 0) {
+        printf("  FAIL: plain PLUCK re-picked %d hold steps\n", control.hold_repicks);
+        ok = false;
+    }
+    // 12 hold steps per cycle, two cycles rendered: a handful would be block
+    // alignment, not the mode.
+    const RepickCounts* runs[2] = { &plaits, &osc };
+    const char* names[2] = { "WSH", "OSC" };
+    for (int r = 0; r < 2; r++) {
+        if (runs[r]->hold_repicks < 16) {
+            printf("  FAIL: %s re-picked only %d hold steps\n", names[r], runs[r]->hold_repicks);
+            ok = false;
+        }
+        if (runs[r]->blooms < runs[r]->retrigs) {
+            printf("  FAIL: %s: %d of %d note-ons arrived without a bloom\n",
+                   names[r], runs[r]->retrigs - runs[r]->blooms, runs[r]->retrigs);
+            ok = false;
+        }
+    }
+    printf("PLUCK_REPEAT re-picks holds: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 // The playback energy_density roll is the generator's second gate: the first is the
 // TrackVoice density that decides which steps get written. An authored lick is not a
 // generated pattern — its steps ARE the part, and hitProbability is the channel a vibe
@@ -1152,6 +1267,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_lick_hit_probability_is_lifted_by_tension()) suite_pass++; else suite_fail++;
     if (test_pulsar_lick_heads_skip_the_energy_density_roll()) suite_pass++; else suite_fail++;
     if (test_pulsar_voice_lpg_blooms_on_every_note_on_under_a_held_gate()) suite_pass++; else suite_fail++;
+    if (test_pulsar_lpg_pluck_repeat_repicks_every_hold_step()) suite_pass++; else suite_fail++;
     if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
     if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
