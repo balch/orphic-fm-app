@@ -105,138 +105,150 @@ fun CompactStringPanel(
 
     Row(modifier = panelModifier) {
         // Left controls column
-        Column(
-            modifier = Modifier
-                .width(80.dp)
-                .fillMaxHeight()
-                .padding(end = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly
-        ) {
-            // Quad 0 Pitch
-            RotaryKnob(
-                value = voiceState.quadGroupPitches.getOrElse(0) { 0.5f },
-                onValueChange = { actions.setQuadPitch(0, it) },
-                label = "PITCH",
-                controlId = VoiceSymbol.quadPitch(0).controlId.key,
-                size = 40.dp,
-                progressColor = OrpheusColors.neonMagenta
-            )
-            // Quad 0 Hold
-            RotaryKnob(
-                value = voiceState.quadGroupHolds.getOrElse(0) { 0f },
-                onValueChange = { actions.setQuadHold(0, it) },
-                label = "HOLD",
-                controlId = VoiceSymbol.quadHold(0).controlId.key,
-                size = 40.dp,
-                progressColor = OrpheusColors.warmGlow
-            )
-        }
+        QuadPitchHoldColumn(
+            voiceState = voiceState,
+            actions = actions,
+            quadIndex = 0,
+            pitchColor = OrpheusColors.neonMagenta,
+            modifier = Modifier.padding(end = 8.dp)
+        )
 
         // Center: Strummable strings with slide bar overlay
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-        ) {
-            // Track slide bar position with animation support
-            val slideBarAnim = remember { Animatable(0f) }
-            val coroutineScope = rememberCoroutineScope()
-            
-            // PERSISTENT STRING POSITIONS
-            val stringCentersState = rememberSaveable(saver = Saver(
-                save = { it.value },
-                restore = { mutableStateOf(it) }
-            )) {
-                // Default positions: Spread out to prevent overlap (0.2, 0.4, 0.6, 0.8)
-                mutableStateOf(listOf(0.20f, 0.40f, 0.60f, 0.80f))
-            }
-            var stringCenters by stringCentersState
-            
-            // Strings canvas (full area, behind slide bar)
-            BenderStringsCanvas(
-                colors = stringColors,
-                voiceStates = voiceState.voiceStates,
-                stringCenters = stringCenters,
-                externalStringBends = externalStringBends,
-                onStringPositionsChanged = { newPositions -> stringCenters = newPositions },
-                slideBarPosition = { slideBarAnim.value },
-                onStringStart = { stringIndex, bendAmount, voiceMix ->
-                    // First touch - just start bending (no voice triggering)
-                    actions.setStringBend(stringIndex, bendAmount, voiceMix)
-                },
-                onStringBendChange = { stringIndex, bendAmount, voiceMix ->
-                    // Continue bending
-                    actions.setStringBend(stringIndex, bendAmount, voiceMix)
-                },
-                onStringBendRelease = { stringIndex ->
-                    // Release bend (no voice release)
-                    actions.releaseStringBend(stringIndex)
-                },
-                onStringTap = { stringIndex, voiceMix ->
-                    // Tap triggers a small bend that springs back (no voice pulse)
-                    actions.setStringBend(stringIndex, 0.3f, voiceMix)
-                    actions.releaseStringBend(stringIndex)
-                },
-                onSlideChange = { yPos, xPos ->
-                    // Snap animation to finger position immediately
-                    coroutineScope.launch {
-                        slideBarAnim.snapTo(yPos)
-                    }
-                    actions.setSlideBar(yPos, xPos)
-                },
-                onSlideRelease = {
-                    // Animate back to top (0.0) on release
-                    coroutineScope.launch {
-                        slideBarAnim.animateTo(
-                            targetValue = 0f,
-                            animationSpec = androidx.compose.animation.core.spring(
-                                dampingRatio = 0.6f,
-                                stiffness = 300f
-                            )
-                        )
-                        // Ensure engine knows we returned to 0
-                        actions.setSlideBar(0f, 0.5f)
-                        actions.releaseSlideBar()
-                    }
-                }
-            )
-        }
+        StrummableStringsArea(
+            voiceState = voiceState,
+            actions = actions,
+            externalStringBends = externalStringBends,
+            stringColors = stringColors,
+            modifier = Modifier.weight(1f)
+        )
 
 
         // Right controls column
-        Column(
-            modifier = Modifier
-                .width(80.dp)
-                .fillMaxHeight()
-                .padding(start = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly
-        ) {
-            // Quad 1 Pitch
-            RotaryKnob(
-                value = voiceState.quadGroupPitches.getOrElse(1) { 0.5f },
-                onValueChange = { actions.setQuadPitch(1, it) },
-                label = "PITCH",
-                controlId = VoiceSymbol.quadPitch(1).controlId.key,
-                size = 40.dp,
-                progressColor = OrpheusColors.synthGreen
-            )
-            // Quad 1 Hold
-            RotaryKnob(
-                value = voiceState.quadGroupHolds.getOrElse(1) { 0f },
-                onValueChange = { actions.setQuadHold(1, it) },
-                label = "HOLD",
-                controlId = VoiceSymbol.quadHold(1).controlId.key,
-                size = 40.dp,
-                progressColor = OrpheusColors.warmGlow
-            )
-        }
+        QuadPitchHoldColumn(
+            voiceState = voiceState,
+            actions = actions,
+            quadIndex = 1,
+            pitchColor = OrpheusColors.synthGreen,
+            modifier = Modifier.padding(start = 8.dp)
+        )
     }
 }
 
+/**
+ * One quad's pitch and hold knobs, mirrored for the left (quad 0) and right (quad 1) columns.
+ */
+@Composable
+private fun QuadPitchHoldColumn(
+    voiceState: VoiceUiState,
+    actions: VoicePanelActions,
+    quadIndex: Int,
+    pitchColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = Modifier
+            .width(80.dp)
+            .fillMaxHeight()
+            .then(modifier),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceEvenly
+    ) {
+        RotaryKnob(
+            value = voiceState.quadGroupPitches.getOrElse(quadIndex) { 0.5f },
+            onValueChange = { actions.setQuadPitch(quadIndex, it) },
+            label = "PITCH",
+            controlId = VoiceSymbol.quadPitch(quadIndex).controlId.key,
+            size = 40.dp,
+            progressColor = pitchColor
+        )
+        RotaryKnob(
+            value = voiceState.quadGroupHolds.getOrElse(quadIndex) { 0f },
+            onValueChange = { actions.setQuadHold(quadIndex, it) },
+            label = "HOLD",
+            controlId = VoiceSymbol.quadHold(quadIndex).controlId.key,
+            size = 40.dp,
+            progressColor = OrpheusColors.warmGlow
+        )
+    }
+}
 
+/**
+ * Center strummable strings area: persists string center positions, drives the slide-bar
+ * spring-back animation, and wires string/slide gestures from [BenderStringsCanvas] to [actions].
+ */
+@Composable
+private fun StrummableStringsArea(
+    voiceState: VoiceUiState,
+    actions: VoicePanelActions,
+    externalStringBends: List<Float>,
+    stringColors: List<Color>,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxHeight()) {
+        // Track slide bar position with animation support
+        val slideBarAnim = remember { Animatable(0f) }
+        val coroutineScope = rememberCoroutineScope()
 
+        // PERSISTENT STRING POSITIONS
+        val stringCentersState = rememberSaveable(saver = Saver(
+            save = { it.value },
+            restore = { mutableStateOf(it) }
+        )) {
+            // Default positions: Spread out to prevent overlap (0.2, 0.4, 0.6, 0.8)
+            mutableStateOf(listOf(0.20f, 0.40f, 0.60f, 0.80f))
+        }
+        var stringCenters by stringCentersState
+
+        // Strings canvas (full area, behind slide bar)
+        BenderStringsCanvas(
+            colors = stringColors,
+            voiceStates = voiceState.voiceStates,
+            stringCenters = stringCenters,
+            externalStringBends = externalStringBends,
+            onStringPositionsChanged = { newPositions -> stringCenters = newPositions },
+            slideBarPosition = { slideBarAnim.value },
+            onStringStart = { stringIndex, bendAmount, voiceMix ->
+                // First touch - just start bending (no voice triggering)
+                actions.setStringBend(stringIndex, bendAmount, voiceMix)
+            },
+            onStringBendChange = { stringIndex, bendAmount, voiceMix ->
+                // Continue bending
+                actions.setStringBend(stringIndex, bendAmount, voiceMix)
+            },
+            onStringBendRelease = { stringIndex ->
+                // Release bend (no voice release)
+                actions.releaseStringBend(stringIndex)
+            },
+            onStringTap = { stringIndex, voiceMix ->
+                // Tap triggers a small bend that springs back (no voice pulse)
+                actions.setStringBend(stringIndex, 0.3f, voiceMix)
+                actions.releaseStringBend(stringIndex)
+            },
+            onSlideChange = { yPos, xPos ->
+                // Snap animation to finger position immediately
+                coroutineScope.launch {
+                    slideBarAnim.snapTo(yPos)
+                }
+                actions.setSlideBar(yPos, xPos)
+            },
+            onSlideRelease = {
+                // Animate back to top (0.0) on release
+                coroutineScope.launch {
+                    slideBarAnim.animateTo(
+                        targetValue = 0f,
+                        animationSpec = androidx.compose.animation.core.spring(
+                            dampingRatio = 0.6f,
+                            stiffness = 300f
+                        )
+                    )
+                    // Ensure engine knows we returned to 0
+                    actions.setSlideBar(0f, 0.5f)
+                    actions.releaseSlideBar()
+                }
+            }
+        )
+    }
+}
 
 
 /**

@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,8 +41,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
+import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -131,102 +135,22 @@ fun PulsarPanel(
         // not, so TV loses them. Skipping composition rather than hiding matters on TV, where
         // this is the heaviest panel.
         if (!LocalTelevisionHardware.current) {
-            // Deliberately one line that never wraps. A Row measures each child against what the
-            // earlier ones left over, so the only thing that can squeeze the rest is VIBE, whose
-            // value length is unbounded. VibeValueMaxWidth caps it, which keeps the row's total
-            // inside a phone's width without anything having to reflow.
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                val vibeList = remember { pulsar.vibeList }
-                // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
-                // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
-                // dips below 1 and deepens the tint, breathing back as the mix returns.
-                val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
-                EnumDropdown(
-                    label = "VIBE",
-                    selectedDisplay = state.vibe.name,
-                    entries = vibeList,
-                    displayName = { it.name },
-                    onSelected = { actions.setVibe(it) },
-                    color = OrpheusColors.cosmicPurple,
-                    onLongPress = actions.onTriggerAnomaly,
-                    highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
-                    valueMaxWidth = VibeValueMaxWidth,
-                    // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
-                    menuWidth = 200.dp,
-                )
-
-                EnumDropdown(
-                    label = "ROOT",
-                    selectedDisplay = PULSAR_NOTE_NAMES[state.rootNote],
-                    entries = PULSAR_NOTE_INDICES,
-                    displayName = { PULSAR_NOTE_NAMES[it] },
-                    onSelected = actions.setRootNote,
-                    color = OrpheusColors.cosmicPurple,
-                    // M3's own DropdownMenu floor, so short note names look as they always did.
-                    menuWidth = 112.dp,
-                )
-
-                EnumDropdown(
-                    label = "SCALE",
-                    selectedDisplay = PULSAR_SCALE_NAMES[state.scaleIndex],
-                    entries = PULSAR_SCALE_INDICES,
-                    displayName = { PULSAR_SCALE_NAMES[it] },
-                    onSelected = actions.setScale,
-                    color = OrpheusColors.cosmicPurple,
-                    menuWidth = 140.dp,
-                )
-
-                // A menu rather than a tap-to-cycle: three modes is few enough to cycle but too
-                // many to read off a chip that only ever shows one of them, and the chip is the
-                // first thing a narrow row ellipsizes.
-                EnumDropdown(
-                    label = "ENV",
-                    selectedDisplay = PULSAR_ENVELOPE_NAMES.getOrElse(state.envelopeMode) {
-                        PULSAR_ENVELOPE_NAMES[0]
-                    },
-                    entries = PULSAR_ENVELOPE_INDICES,
-                    displayName = { PULSAR_ENVELOPE_NAMES[it] },
-                    onSelected = actions.setEnvelopeMode,
-                    color = OrpheusColors.cosmicPurple,
-                    menuWidth = 112.dp,
-                )
-            }
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
-            val finalSectionIdx by actions.finalSectionIndex.collectAsStateWithLifecycle()
-            val songEndingOn by actions.songEndingEnabled.collectAsStateWithLifecycle()
-            val resolvedStyle by actions.resolvedTransitionStyle.collectAsStateWithLifecycle()
-            PulsarStepGrid(
-                vizData = vizState,
-                trackVizFlows = trackVizFlows,
-                energy = state.energy,
-                space = state.space,
-                complexity = state.complexity,
-                mood = state.mood,
-                selectedTrack = state.selectedTrack,
-                onTrackSelected = actions.selectTrack,
-                arrangementState = arrangementState,
-                arrangement = state.vibe.arrangement,
-                activeTransition = activeTransition,
-                finalSectionIndex = finalSectionIdx,
-                // RANDOM is already pre-rolled to a concrete substyle here, so the suffix
-                // never reads "verse 3/8, RANDOM".
-                pendingTransition = if (songEndingOn) resolvedStyle else null,
-                modifier = Modifier
-                    .width(360.dp)
-                    .height(120.dp)
-                    .alpha(.8f)
-                ,
+            val vibeList = remember { pulsar.vibeList }
+            PulsarSelectorRow(
+                state = state,
+                actions = actions,
+                vibeList = vibeList,
+                voidGain = voidGain,
             )
         }
+
+        PulsarStepGridSection(
+            vizState = vizState,
+            trackVizFlows = trackVizFlows,
+            state = state,
+            actions = actions,
+            arrangementState = arrangementState,
+        )
 
         // Voice detail strip. Auto-dismisses after 10s idle, suppressed while a picker is open.
         AnimatedVisibility(
@@ -244,122 +168,36 @@ fun PulsarPanel(
                     actions.selectTrack(null)
                 }
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Animated mute toggle on track name
-                val isMuted = state.trackMuted[selected]
-                val animatedAlpha by animateFloatAsState(
-                    targetValue = if (isMuted) 0.35f else 1.0f,
-                    animationSpec = tween(200),
-                )
-                val animatedScale by animateFloatAsState(
-                    targetValue = if (isMuted) 0.9f else 1.05f,
-                    animationSpec = tween(200),
-                )
-                val animatedElevation by animateDpAsState(
-                    targetValue = if (isMuted) 0.dp else 4.dp,
-                    animationSpec = tween(200),
-                )
-
-                Surface(
-                    onClick = { actions.toggleTrackMute(selected) },
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (isMuted) Color.Transparent
-                            else TrackColors[selected].copy(alpha = 0.15f),
-                    shadowElevation = animatedElevation,
-                    modifier = Modifier
-                        .graphicsLayer {
-                            scaleX = animatedScale
-                            scaleY = animatedScale
-                            alpha = animatedAlpha
-                        },
-                ) {
-                    Text(
-                        text = PULSAR_TRACK_NAMES[selected],
-                        color = TrackColors[selected],
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-
-                Text(
-                    text = "HI",
-                    color = OrpheusColors.cosmicPurple.copy(alpha = 0.5f),
-                    fontSize = 9.sp,
-                )
-                EnginePickerButton(
-                    currentEngine = edmEngine,
-                    onEngineChange = { actions.setTrackEngineEdm(selected, it) },
-                    color = OrpheusColors.cosmicPurple,
-                    label = pulsarEngineLabel(edmEngine),
-                    config = PULSAR_TRACK_PICKERS[selected],
-                    v2Config = PULSAR_V2_PICKER,
-                    v3Config = PULSAR_V3_PICKER,
-                    v4Config = PULSAR_V4_PICKER,
-                    size = 36.dp,
-                    onExpandedChange = { pickerOpen = it },
-                )
-
-                Text(
-                    text = "LO",
-                    color = OrpheusColors.cosmicPurple.copy(alpha = 0.5f),
-                    fontSize = 9.sp,
-                )
-                EnginePickerButton(
-                    currentEngine = spaceEngine,
-                    onEngineChange = { actions.setTrackEngineSpace(selected, it) },
-                    color = OrpheusColors.cosmicPurple,
-                    label = pulsarEngineLabel(spaceEngine),
-                    config = PULSAR_TRACK_PICKERS[selected],
-                    v2Config = PULSAR_V2_PICKER,
-                    v3Config = PULSAR_V3_PICKER,
-                    v4Config = PULSAR_V4_PICKER,
-                    size = 36.dp,
-                    onExpandedChange = { pickerOpen = it },
-                )
-            }
+            // Animated mute toggle on track name
+            val isMuted = state.trackMuted[selected]
+            val animatedAlpha by animateFloatAsState(
+                targetValue = if (isMuted) 0.35f else 1.0f,
+                animationSpec = tween(200),
+            )
+            val animatedScale by animateFloatAsState(
+                targetValue = if (isMuted) 0.9f else 1.05f,
+                animationSpec = tween(200),
+            )
+            val animatedElevation by animateDpAsState(
+                targetValue = if (isMuted) 0.dp else 4.dp,
+                animationSpec = tween(200),
+            )
+            PulsarVoiceDetailStrip(
+                selected = selected,
+                state = state,
+                actions = actions,
+                animatedAlpha = animatedAlpha,
+                animatedScale = animatedScale,
+                animatedElevation = animatedElevation,
+                onPickerExpandedChange = { pickerOpen = it },
+            )
         }
 
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            HorizontalRotaryKnob(
-                value = state.percMix,
-                onValueChange = actions.setPercMix,
-                label = "PERC",
-                controlId = PulsarSymbol.PERC_MIX.controlId.key,
-                size = 28.dp,
-                progressColor = OrpheusColors.cosmicPurple.lighten(),
-                labelSide = LabelSide.START,
-                valueFormatter = null,
-            )
-
-            HorizontalRotaryKnob(
-                value = state.bpm,
-                onValueChange = actions.setBpm,
-                label = "BPM",
-                controlId = PulsarSymbol.BPM.controlId.key,
-                range = 40f..300f,
-                size = 36.dp,
-                progressColor = OrpheusColors.cosmicPurple.lighten(),
-                labelSide = LabelSide.START,
-                valueFormatter = { "${it.toInt()}" },
-            )
-
-            HorizontalRotaryKnob(
-                value = state.deep,
-                onValueChange = actions.setDeep,
-                label = "DEEP",
-                controlId = PulsarSymbol.DEEP.controlId.key,
-                size = 28.dp,
-                progressColor = OrpheusColors.cosmicPurple.lighten(),
-                labelSide = LabelSide.START,
-                valueFormatter = null,
-            )
+            PulsarTransportKnobs(state = state, actions = actions)
 
             // Shows the active transition style when auto-end is on, PLAYS when off. Tap opens
             // the settings sheet. Long press arms the outro now, skipping the playing-time and
@@ -380,28 +218,15 @@ fun PulsarPanel(
                     OrpheusColors.darkVoid.copy(alpha = 0.6f)
                 }
 
-                // Needs the floor: the label swings between PLAYS and whichever style is picked,
-                // and without it the row's width moves with it.
-                LabeledDropdown(
-                    label = "ENDING",
-                    onClick = { showTransitionSheet = true },
-                    onLongClick = { actions.onArmOutro() },
-                    background = pillBg,
-                    minWidth = DropdownCycleMinWidth,
-                ) {
-                    DropdownValueText(text = pillLabel, color = OrpheusColors.cosmicPurple)
-                }
-
-                if (showTransitionSheet) {
-                    TransitionSettingsSheet(
-                        spec = transitionSpec,
-                        enabled = songEndingEnabled,
-                        onDismiss = { showTransitionSheet = false },
-                        onSetEnabled = actions.onSetSongEndingEnabled,
-                        onStyleChange = actions.onSetTransitionStyle,
-                        onHandoffMsChange = actions.onSetTransitionHandoffMs,
-                    )
-                }
+                PulsarEndingControl(
+                    actions = actions,
+                    transitionSpec = transitionSpec,
+                    songEndingEnabled = songEndingEnabled,
+                    pillLabel = pillLabel,
+                    pillBg = pillBg,
+                    showTransitionSheet = showTransitionSheet,
+                    onShowTransitionSheetChange = { showTransitionSheet = it },
+                )
             }
         }
 
@@ -413,56 +238,350 @@ fun PulsarPanel(
             verticalAlignment = Alignment.Bottom,
             modifier = Modifier.padding(top = 8.dp),
         ) {
-            RotaryKnob(
-                value = state.energy,
-                onValueChange = actions.setEnergy,
-                label = "ENERGY",
-                controlId = PulsarSymbol.ENERGY.controlId.key,
-                size = 48.dp,
-                progressColor = OrpheusColors.cosmicPurple,
-                valueFormatter = null,
-            )
-            RotaryKnob(
-                value = state.complexity,
-                onValueChange = actions.setComplexity,
-                label = "COMPLEXITY",
-                controlId = PulsarSymbol.COMPLEXITY.controlId.key,
-                size = 48.dp,
-                progressColor = OrpheusColors.cosmicPurple,
-                valueFormatter = null,
-                onLongPress = actions.onToggleModeOne,
-                pulseLabel = modeOne,
-            )
-            RotaryKnob(
-                value = state.mood,
-                onValueChange = actions.setMood,
-                label = "MOOD",
-                controlId = PulsarSymbol.MOOD.controlId.key,
-                size = 48.dp,
-                progressColor = OrpheusColors.cosmicPurple,
-                valueFormatter = null,
-            )
-            RotaryKnob(
-                value = state.space,
-                onValueChange = actions.setSpace,
-                label = "SPACE",
-                controlId = PulsarSymbol.SPACE.controlId.key,
-                size = 48.dp,
-                progressColor = OrpheusColors.cosmicPurple,
-                valueFormatter = null,
-            )
-            RotaryKnob(
-                value = state.mix,
-                onValueChange = actions.setMix,
-                label = "MIX",
-                controlId = PulsarSymbol.MIX.controlId.key,
-                size = 32.dp,
-                progressColor = OrpheusColors.cosmicPurple,
-                valueFormatter = null,
-            )
+            PulsarMacroKnobRow(state = state, actions = actions, modeOne = modeOne)
         }
 
     }
+}
+
+/**
+ * VIBE/ROOT/SCALE/ENV dropdown row. Deliberately one line that never wraps: a Row measures each
+ * child against what the earlier ones left over, so the only thing that can squeeze the rest is
+ * VIBE, whose value length is unbounded. [VibeValueMaxWidth] caps it, which keeps the row's total
+ * inside a phone's width without anything having to reflow.
+ */
+@Composable
+private fun PulsarSelectorRow(
+    state: PulsarUiState,
+    actions: PulsarPanelActions,
+    vibeList: List<Vibe>,
+    voidGain: Float,
+) {
+    // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
+    // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
+    // dips below 1 and deepens the tint, breathing back as the mix returns.
+    val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        EnumDropdown(
+            label = "VIBE",
+            selectedDisplay = state.vibe.name,
+            entries = vibeList,
+            displayName = { it.name },
+            onSelected = { actions.setVibe(it) },
+            color = OrpheusColors.cosmicPurple,
+            onLongPress = actions.onTriggerAnomaly,
+            highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
+            valueMaxWidth = VibeValueMaxWidth,
+            // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
+            menuWidth = 200.dp,
+        )
+
+        EnumDropdown(
+            label = "ROOT",
+            selectedDisplay = PULSAR_NOTE_NAMES[state.rootNote],
+            entries = PULSAR_NOTE_INDICES,
+            displayName = { PULSAR_NOTE_NAMES[it] },
+            onSelected = actions.setRootNote,
+            color = OrpheusColors.cosmicPurple,
+            // M3's own DropdownMenu floor, so short note names look as they always did.
+            menuWidth = 112.dp,
+        )
+
+        EnumDropdown(
+            label = "SCALE",
+            selectedDisplay = PULSAR_SCALE_NAMES[state.scaleIndex],
+            entries = PULSAR_SCALE_INDICES,
+            displayName = { PULSAR_SCALE_NAMES[it] },
+            onSelected = actions.setScale,
+            color = OrpheusColors.cosmicPurple,
+            menuWidth = 140.dp,
+        )
+
+        // A menu rather than a tap-to-cycle: three modes is few enough to cycle but too
+        // many to read off a chip that only ever shows one of them, and the chip is the
+        // first thing a narrow row ellipsizes.
+        EnumDropdown(
+            label = "ENV",
+            selectedDisplay = PULSAR_ENVELOPE_NAMES.getOrElse(state.envelopeMode) {
+                PULSAR_ENVELOPE_NAMES[0]
+            },
+            entries = PULSAR_ENVELOPE_INDICES,
+            displayName = { PULSAR_ENVELOPE_NAMES[it] },
+            onSelected = actions.setEnvelopeMode,
+            color = OrpheusColors.cosmicPurple,
+            menuWidth = 112.dp,
+        )
+    }
+}
+
+/**
+ * The step grid row: canvas visualization of all 8 tracks, driven by the viz flow and the
+ * arrangement/transition state needed for its final-section suffix.
+ */
+@Composable
+private fun PulsarStepGridSection(
+    vizState: State<PulsarVizData>,
+    trackVizFlows: List<StateFlow<FloatArray>>,
+    state: PulsarUiState,
+    actions: PulsarPanelActions,
+    arrangementState: PulsarArrangementState,
+) {
+    val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
+    val finalSectionIndex by actions.finalSectionIndex.collectAsStateWithLifecycle()
+    val songEndingOn by actions.songEndingEnabled.collectAsStateWithLifecycle()
+    val resolvedStyle by actions.resolvedTransitionStyle.collectAsStateWithLifecycle()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        PulsarStepGrid(
+            vizData = vizState,
+            trackVizFlows = trackVizFlows,
+            energy = state.energy,
+            space = state.space,
+            complexity = state.complexity,
+            mood = state.mood,
+            selectedTrack = state.selectedTrack,
+            onTrackSelected = actions.selectTrack,
+            arrangementState = arrangementState,
+            arrangement = state.vibe.arrangement,
+            activeTransition = activeTransition,
+            finalSectionIndex = finalSectionIndex,
+            // RANDOM is already pre-rolled to a concrete substyle here, so the suffix
+            // never reads "verse 3/8, RANDOM".
+            pendingTransition = if (songEndingOn) resolvedStyle else null,
+            modifier = Modifier
+                .width(360.dp)
+                .height(120.dp)
+                .alpha(.8f)
+            ,
+        )
+    }
+}
+
+/**
+ * Selected-track detail strip: an animated mute toggle on the track name, plus the EDM/Space
+ * engine picker pair. Shown only while [selected] is non-null in the caller's `AnimatedVisibility`.
+ */
+@Composable
+private fun PulsarVoiceDetailStrip(
+    selected: Int,
+    state: PulsarUiState,
+    actions: PulsarPanelActions,
+    animatedAlpha: Float,
+    animatedScale: Float,
+    animatedElevation: Dp,
+    onPickerExpandedChange: (Boolean) -> Unit,
+) {
+    val isMuted = state.trackMuted[selected]
+    val edmEngine = state.trackEnginesEdm[selected]
+    val spaceEngine = state.trackEnginesSpace[selected]
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = { actions.toggleTrackMute(selected) },
+            shape = RoundedCornerShape(6.dp),
+            color = if (isMuted) Color.Transparent
+                    else TrackColors[selected].copy(alpha = 0.15f),
+            shadowElevation = animatedElevation,
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = animatedScale
+                    scaleY = animatedScale
+                    alpha = animatedAlpha
+                },
+        ) {
+            Text(
+                text = PULSAR_TRACK_NAMES[selected],
+                color = TrackColors[selected],
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+
+        Text(
+            text = "HI",
+            color = OrpheusColors.cosmicPurple.copy(alpha = 0.5f),
+            fontSize = 9.sp,
+        )
+        EnginePickerButton(
+            currentEngine = edmEngine,
+            onEngineChange = { actions.setTrackEngineEdm(selected, it) },
+            color = OrpheusColors.cosmicPurple,
+            label = pulsarEngineLabel(edmEngine),
+            config = PULSAR_TRACK_PICKERS[selected],
+            v2Config = PULSAR_V2_PICKER,
+            v3Config = PULSAR_V3_PICKER,
+            v4Config = PULSAR_V4_PICKER,
+            size = 36.dp,
+            onExpandedChange = onPickerExpandedChange,
+        )
+
+        Text(
+            text = "LO",
+            color = OrpheusColors.cosmicPurple.copy(alpha = 0.5f),
+            fontSize = 9.sp,
+        )
+        EnginePickerButton(
+            currentEngine = spaceEngine,
+            onEngineChange = { actions.setTrackEngineSpace(selected, it) },
+            color = OrpheusColors.cosmicPurple,
+            label = pulsarEngineLabel(spaceEngine),
+            config = PULSAR_TRACK_PICKERS[selected],
+            v2Config = PULSAR_V2_PICKER,
+            v3Config = PULSAR_V3_PICKER,
+            v4Config = PULSAR_V4_PICKER,
+            size = 36.dp,
+            onExpandedChange = onPickerExpandedChange,
+        )
+    }
+}
+
+/**
+ * PERC/BPM/DEEP transport knobs. Always visible, unlike the ENDING control beside them.
+ */
+@Composable
+private fun PulsarTransportKnobs(
+    state: PulsarUiState,
+    actions: PulsarPanelActions,
+) {
+    HorizontalRotaryKnob(
+        value = state.percMix,
+        onValueChange = actions.setPercMix,
+        label = "PERC",
+        controlId = PulsarSymbol.PERC_MIX.controlId.key,
+        size = 28.dp,
+        progressColor = OrpheusColors.cosmicPurple.lighten(),
+        labelSide = LabelSide.START,
+        valueFormatter = null,
+    )
+
+    HorizontalRotaryKnob(
+        value = state.bpm,
+        onValueChange = actions.setBpm,
+        label = "BPM",
+        controlId = PulsarSymbol.BPM.controlId.key,
+        range = 40f..300f,
+        size = 36.dp,
+        progressColor = OrpheusColors.cosmicPurple.lighten(),
+        labelSide = LabelSide.START,
+        valueFormatter = { "${it.toInt()}" },
+    )
+
+    HorizontalRotaryKnob(
+        value = state.deep,
+        onValueChange = actions.setDeep,
+        label = "DEEP",
+        controlId = PulsarSymbol.DEEP.controlId.key,
+        size = 28.dp,
+        progressColor = OrpheusColors.cosmicPurple.lighten(),
+        labelSide = LabelSide.START,
+        valueFormatter = null,
+    )
+}
+
+/**
+ * ENDING pill: shows the active transition style (or PLAYS when auto-end is off), opens the
+ * transition settings sheet on tap. Long press is wired directly to `actions.onArmOutro`.
+ */
+@Composable
+private fun PulsarEndingControl(
+    actions: PulsarPanelActions,
+    transitionSpec: TransitionSpec,
+    songEndingEnabled: Boolean,
+    pillLabel: String,
+    pillBg: Color,
+    showTransitionSheet: Boolean,
+    onShowTransitionSheetChange: (Boolean) -> Unit,
+) {
+    // Needs the floor: the label swings between PLAYS and whichever style is picked,
+    // and without it the row's width moves with it.
+    LabeledDropdown(
+        label = "ENDING",
+        onClick = { onShowTransitionSheetChange(true) },
+        onLongClick = { actions.onArmOutro() },
+        background = pillBg,
+        minWidth = DropdownCycleMinWidth,
+    ) {
+        DropdownValueText(text = pillLabel, color = OrpheusColors.cosmicPurple)
+    }
+
+    if (showTransitionSheet) {
+        TransitionSettingsSheet(
+            spec = transitionSpec,
+            enabled = songEndingEnabled,
+            onDismiss = { onShowTransitionSheetChange(false) },
+            onSetEnabled = actions.onSetSongEndingEnabled,
+            onStyleChange = actions.onSetTransitionStyle,
+            onHandoffMsChange = actions.onSetTransitionHandoffMs,
+        )
+    }
+}
+
+/**
+ * ENERGY/COMPLEXITY/MOOD/SPACE/MIX macro knob row. A long press on COMPLEXITY toggles Mode One
+ * (name-hash seed A/B), which [modeOne] reflects as a pulsing label.
+ */
+@Composable
+private fun PulsarMacroKnobRow(
+    state: PulsarUiState,
+    actions: PulsarPanelActions,
+    modeOne: Boolean,
+) {
+    RotaryKnob(
+        value = state.energy,
+        onValueChange = actions.setEnergy,
+        label = "ENERGY",
+        controlId = PulsarSymbol.ENERGY.controlId.key,
+        size = 48.dp,
+        progressColor = OrpheusColors.cosmicPurple,
+        valueFormatter = null,
+    )
+    RotaryKnob(
+        value = state.complexity,
+        onValueChange = actions.setComplexity,
+        label = "COMPLEXITY",
+        controlId = PulsarSymbol.COMPLEXITY.controlId.key,
+        size = 48.dp,
+        progressColor = OrpheusColors.cosmicPurple,
+        valueFormatter = null,
+        onLongPress = actions.onToggleModeOne,
+        pulseLabel = modeOne,
+    )
+    RotaryKnob(
+        value = state.mood,
+        onValueChange = actions.setMood,
+        label = "MOOD",
+        controlId = PulsarSymbol.MOOD.controlId.key,
+        size = 48.dp,
+        progressColor = OrpheusColors.cosmicPurple,
+        valueFormatter = null,
+    )
+    RotaryKnob(
+        value = state.space,
+        onValueChange = actions.setSpace,
+        label = "SPACE",
+        controlId = PulsarSymbol.SPACE.controlId.key,
+        size = 48.dp,
+        progressColor = OrpheusColors.cosmicPurple,
+        valueFormatter = null,
+    )
+    RotaryKnob(
+        value = state.mix,
+        onValueChange = actions.setMix,
+        label = "MIX",
+        controlId = PulsarSymbol.MIX.controlId.key,
+        size = 32.dp,
+        progressColor = OrpheusColors.cosmicPurple,
+        valueFormatter = null,
+    )
 }
 
 @Suppress("StateFlowValueCalledInComposition")

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,10 +53,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -64,6 +67,7 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -234,253 +238,309 @@ fun LiveCodePanel(
 
                 val effects = LocalLiquidEffects.current
                 val liquidState = LocalLiquidState.current
-                // Header Row: Compact Controls & Status
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Play/Pause Toggle Button
-                    Row(
-                        modifier = Modifier
-                            .padding(start = 4.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                if (uiState.isPlaying) OrpheusColors.synthGreen.copy(alpha = 0.3f)
-                                else OrpheusColors.softPurple.copy(alpha = 0.6f)
-                            )
-                            .clickable {
-                                if (uiState.isPlaying) actions.stop() else actions.execute()
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = if (uiState.isPlaying) "▐▐" else "▶",
-                            color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
-                            fontSize = 10.sp
-                        )
-                        Text(
-                            text = if (uiState.isPlaying) "Stop" else "Play",
-                            color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
 
-                    Text(
-                        text = "C:${uiState.currentCycle}",
-                        fontSize = 9.sp,
-                        color = if (uiState.isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                TransportHeaderRow(uiState = uiState, actions = actions)
 
-                    Spacer(modifier = Modifier.weight(1f))
+                BpmVolumeControlsRow(uiState = uiState, actions = actions)
 
-                    ExamplesDropdown(
-                        modifier = Modifier.padding(end = 8.dp),
-                        selectedExample = uiState.selectedExample,
-                        onLoadExample = actions.loadExample
-                    )
-                }
-
-                // BPM and Volume Controls Row
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    // BPM Control
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            text = "BPM",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = Color.White,
-                            fontSize = 9.sp
-                        )
-
-                        HorizontalMiniSlider(
-                            trackWidth = 80,
-                            value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
-                            onValueChange = { frac ->
-                                actions.setBpm(40 + (frac * 200).toDouble())
-                            },
-                            color = OrpheusColors.neonCyan
-                        )
-                        Text(
-                            text = "${uiState.bpm.toInt()}",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = OrpheusColors.neonCyan,
-                            fontSize = 9.sp,
-                            maxLines = 1,
-                        )
-                    }
-
-                    // REPL Volume Control
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text(
-                            text = "VOL",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = Color.White,
-                            fontSize = 9.sp
-                        )
-
-                        HorizontalMiniSlider(
-                            trackWidth = 60,
-                            value = (uiState.replVolume / 1.5f).coerceIn(0f, 1f),  // 0-150% range
-                            onValueChange = { frac ->
-                                actions.setReplVolume(frac * 1.5f)  // 0.0 to 1.5
-                            },
-                            color = OrpheusColors.warmGlow
-                        )
-                        Text(
-                            text = "${(uiState.replVolume * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall.proportional(),
-                            color = OrpheusColors.warmGlow,
-                            fontSize = 9.sp,
-                            maxLines = 1,
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-
-                // Keyboard shortcut hints
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "\u2318\u23ce Run block  \u21e7\u23ce Run line  \u2318\u232b Delete line",
-                        fontSize = 8.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        maxLines = 1
-                    )
-                }
-
-                // Code editor with AI loading overlay
-                Card(
-                    modifier = Modifier.fillMaxSize()
-                        .padding(4.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(2.dp, OrpheusColors.neonCyan.copy(alpha = 0.12f))
-                ) {
-                    BasicTextField(
-                        value = uiState.code,
-                        onValueChange = { if (!uiState.isAiGenerating) actions.setCode(it) },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), // Set action to Send
-                        keyboardActions = KeyboardActions(
-                            onSend = { actions.executeBlock() }
-                        ),
-                        readOnly = uiState.isAiGenerating, // Allow editing while playing for true live coding
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .liquidVizEffects(
-                                liquidState = liquidState,
-                                scope = effects.bottom,
-                                frostAmount = effects.frostLarge.dp,
-                                color = OrpheusColors.deepSpaceBlue,
-                                tintAlpha = .6f,
-                            )
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState())
-                            .onKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown) {
-                                    when {
-                                        (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Enter -> {
-                                            actions.executeBlock()
-                                            true
-                                        }
-
-                                        event.isShiftPressed && event.key == Key.Enter -> {
-                                            actions.executeLine()
-                                            true
-                                        }
-
-                                        (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Backspace -> {
-                                            actions.deleteLine()
-                                            actions.executeBlock()
-                                            true
-                                        }
-
-                                        else -> false
-                                    }
-                                } else false
-                            },
-                        textStyle = TextStyle(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = OrpheusColors.neonCyan, // Default text color
-                            lineHeight = 15.sp
-                        ),
-                        visualTransformation = syntaxHighlighter,
-                        cursorBrush = SolidColor(OrpheusColors.neonCyan),
-                        decorationBox = { innerTextField ->
-                            Box {
-                                if (uiState.code.text.isEmpty() && !uiState.isAiGenerating) {
-                                    Text(
-                                        text = "d1 $ note \"c3 e3 g3\"\nd2 $ s \"bd sn hh\"",
-                                        style = TextStyle(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 11.sp,
-                                            color = OrpheusColors.neonCyan.copy(alpha = 0.25f)
-                                        )
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        }
-                    )
-                }
+                CodeEditorSection(
+                    uiState = uiState,
+                    actions = actions,
+                    syntaxHighlighter = syntaxHighlighter,
+                    effects = effects,
+                    liquidState = liquidState,
+                )
             }
-
             // AI Loading Overlay
             if (uiState.isAiGenerating) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(OrpheusColors.tidalBackground.copy(alpha = 0.85f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            color = OrpheusColors.warmGlow,
-                            strokeWidth = 2.dp
-                        )
-                        Text(
-                            text = "AI generating...",
-                            style = MaterialTheme.typography.bodySmall.proportional(),
-                            color = OrpheusColors.warmGlow,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
+                AiGeneratingOverlay()
             }
 
             // Error display (inside the main panel)
-            if (uiState.error != null) {
-                Text(
-                    text = "⚠ ${uiState.error}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = OrpheusColors.warmGlow,
-                    maxLines = 2,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                )
+            uiState.error?.let { error ->
+                ErrorOverlay(error)
             }
         }
 
     }
+}
+
+/**
+ * Header row: play/pause toggle, current cycle counter, and examples dropdown.
+ */
+@Composable
+private fun TransportHeaderRow(
+    uiState: LiveCodeUiState,
+    actions: LiveCodePanelActions,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Play/Pause Toggle Button
+        Row(
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(
+                    if (uiState.isPlaying) OrpheusColors.synthGreen.copy(alpha = 0.3f)
+                    else OrpheusColors.softPurple.copy(alpha = 0.6f)
+                )
+                .clickable {
+                    if (uiState.isPlaying) actions.stop() else actions.execute()
+                }
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = if (uiState.isPlaying) "▐▐" else "▶",
+                color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
+                fontSize = 10.sp
+            )
+            Text(
+                text = if (uiState.isPlaying) "Stop" else "Play",
+                color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Text(
+            text = "C:${uiState.currentCycle}",
+            fontSize = 9.sp,
+            color = if (uiState.isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        ExamplesDropdown(
+            modifier = Modifier.padding(end = 8.dp),
+            selectedExample = uiState.selectedExample,
+            onLoadExample = actions.loadExample
+        )
+    }
+}
+
+/**
+ * BPM and REPL volume mini-slider controls row.
+ */
+@Composable
+private fun BpmVolumeControlsRow(
+    uiState: LiveCodeUiState,
+    actions: LiveCodePanelActions,
+) {
+    Row(
+        modifier = Modifier.padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // BPM Control
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "BPM",
+                style = MaterialTheme.typography.labelSmall.proportional(),
+                color = Color.White,
+                fontSize = 9.sp
+            )
+
+            HorizontalMiniSlider(
+                trackWidth = 80,
+                value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
+                onValueChange = { frac ->
+                    actions.setBpm(40 + (frac * 200).toDouble())
+                },
+                color = OrpheusColors.neonCyan
+            )
+            Text(
+                text = "${uiState.bpm.toInt()}",
+                style = MaterialTheme.typography.labelSmall.proportional(),
+                color = OrpheusColors.neonCyan,
+                fontSize = 9.sp,
+                maxLines = 1,
+            )
+        }
+
+        // REPL Volume Control
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = "VOL",
+                style = MaterialTheme.typography.labelSmall.proportional(),
+                color = Color.White,
+                fontSize = 9.sp
+            )
+
+            HorizontalMiniSlider(
+                trackWidth = 60,
+                value = (uiState.replVolume / 1.5f).coerceIn(0f, 1f),  // 0-150% range
+                onValueChange = { frac ->
+                    actions.setReplVolume(frac * 1.5f)  // 0.0 to 1.5
+                },
+                color = OrpheusColors.warmGlow
+            )
+            Text(
+                text = "${(uiState.replVolume * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall.proportional(),
+                color = OrpheusColors.warmGlow,
+                fontSize = 9.sp,
+                maxLines = 1,
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
+/**
+ * Keyboard shortcut hints plus the Tidal code editor text field.
+ */
+@Composable
+private fun CodeEditorSection(
+    uiState: LiveCodeUiState,
+    actions: LiveCodePanelActions,
+    syntaxHighlighter: VisualTransformation,
+    effects: VisualizationLiquidEffects,
+    liquidState: LiquidState?,
+) {
+    // Keyboard shortcut hints
+    Row(
+        modifier = Modifier.padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "⌘⏎ Run block  ⇧⏎ Run line  ⌘⌫ Delete line",
+            fontSize = 8.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            maxLines = 1
+        )
+    }
+
+    // Code editor with AI loading overlay
+    Card(
+        modifier = Modifier.fillMaxSize()
+            .padding(4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(2.dp, OrpheusColors.neonCyan.copy(alpha = 0.12f))
+    ) {
+        BasicTextField(
+            value = uiState.code,
+            onValueChange = { if (!uiState.isAiGenerating) actions.setCode(it) },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), // Set action to Send
+            keyboardActions = KeyboardActions(
+                onSend = { actions.executeBlock() }
+            ),
+            readOnly = uiState.isAiGenerating, // Allow editing while playing for true live coding
+            modifier = Modifier
+                .fillMaxSize()
+                .liquidVizEffects(
+                    liquidState = liquidState,
+                    scope = effects.bottom,
+                    frostAmount = effects.frostLarge.dp,
+                    color = OrpheusColors.deepSpaceBlue,
+                    tintAlpha = .6f,
+                )
+                .padding(12.dp)
+                .verticalScroll(rememberScrollState())
+                .onKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown) {
+                        when {
+                            (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Enter -> {
+                                actions.executeBlock()
+                                true
+                            }
+
+                            event.isShiftPressed && event.key == Key.Enter -> {
+                                actions.executeLine()
+                                true
+                            }
+
+                            (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Backspace -> {
+                                actions.deleteLine()
+                                actions.executeBlock()
+                                true
+                            }
+
+                            else -> false
+                        }
+                    } else false
+                },
+            textStyle = TextStyle(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp,
+                color = OrpheusColors.neonCyan, // Default text color
+                lineHeight = 15.sp
+            ),
+            visualTransformation = syntaxHighlighter,
+            cursorBrush = SolidColor(OrpheusColors.neonCyan),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (uiState.code.text.isEmpty() && !uiState.isAiGenerating) {
+                        Text(
+                            text = "d1 $ note \"c3 e3 g3\"\nd2 $ s \"bd sn hh\"",
+                            style = TextStyle(
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = OrpheusColors.neonCyan.copy(alpha = 0.25f)
+                            )
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Full-panel overlay shown while AI-generated code is loading.
+ */
+@Composable
+private fun AiGeneratingOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(OrpheusColors.tidalBackground.copy(alpha = 0.85f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(32.dp),
+                color = OrpheusColors.warmGlow,
+                strokeWidth = 2.dp
+            )
+            Text(
+                text = "AI generating...",
+                style = MaterialTheme.typography.bodySmall.proportional(),
+                color = OrpheusColors.warmGlow,
+                fontSize = 11.sp
+            )
+        }
+    }
+}
+
+/**
+ * Bottom-aligned error message overlay.
+ */
+@Composable
+private fun BoxScope.ErrorOverlay(error: String) {
+    Text(
+        text = "⚠ $error",
+        style = MaterialTheme.typography.labelLarge,
+        color = OrpheusColors.warmGlow,
+        maxLines = 2,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    )
 }
 
 

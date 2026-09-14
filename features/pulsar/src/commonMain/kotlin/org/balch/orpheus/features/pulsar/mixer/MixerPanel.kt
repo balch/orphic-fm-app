@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -108,6 +109,47 @@ fun MixerPanel(
     // reads as continuous motion rather than dipping to 0 between updates.
     val smoothedPeak = remember { mutableFloatStateOf(0f) }
 
+    MeterDecayEffect(
+        feature = feature,
+        trackVizFlows = trackVizFlows,
+        decayedLevels = decayedLevels,
+        smoothedPeak = smoothedPeak,
+    )
+
+    CollapsibleColumnPanel(
+        title = "MIX",
+        color = OrpheusColors.mixerMasterPurple,
+        expandedTitle = if (showExpandedTitle) "Mix Bridge" else null,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
+        initialExpanded = true,
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader,
+        fillHeight = fillHeight,
+    ) {
+        MixerStripsRow(
+            uiState = uiState,
+            actions = actions,
+            decayedLevels = decayedLevels,
+            smoothedPeak = smoothedPeak,
+        )
+    }
+}
+
+/**
+ * Frame-clocked meter-decay loop: attacks per-group peak levels toward the
+ * latest track buffers and exponentially decays them (and the DIST peak)
+ * between updates, so meters read as continuous motion instead of snapping
+ * between the engine's ~5Hz updates. Writes into [decayedLevels] and
+ * [smoothedPeak], which [MixerStripsRow] reads to drive its fader glow.
+ */
+@Composable
+private fun MeterDecayEffect(
+    feature: MixerFeature,
+    trackVizFlows: List<StateFlow<FloatArray>>,
+    decayedLevels: Array<MutableFloatState>,
+    smoothedPeak: MutableFloatState,
+) {
     LaunchedEffect(trackVizFlows) {
         // Frame-clocked meter loop. withFrameNanos suspends until the Compose
         // choreographer requests a frame, so we only update when the screen is
@@ -182,54 +224,55 @@ fun MixerPanel(
             }
         }
     }
+}
 
-    CollapsibleColumnPanel(
-        title = "MIX",
-        color = OrpheusColors.mixerMasterPurple,
-        expandedTitle = if (showExpandedTitle) "Mix Bridge" else null,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange,
-        initialExpanded = true,
-        modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader,
-        fillHeight = fillHeight,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                // Stable per-band onGainChange lambdas — capturing only `actions`
-                // and the band's MixerGroup constant. Without this, fresh lambdas
-                // are allocated on every recomposition (4 per recomp), defeating
-                // GroupStrip's ability to skip recompositions.
-                val onPercChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.PERC, v) } }
-                val onBassChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.BASS, v) } }
-                val onKeysChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.KEYS, v) } }
-                val onFxChange   = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.FX,   v) } }
-                val onChange = arrayOf(onPercChange, onBassChange, onKeysChange, onFxChange)
+/**
+ * PERC/BASS/KEYS/FX + DIST channel strips in a single row. Reads live meter
+ * levels from [decayedLevels]/[smoothedPeak] (driven by [MeterDecayEffect])
+ * and writes gain changes back through [actions].
+ */
+@Composable
+private fun MixerStripsRow(
+    uiState: MixerUiState,
+    actions: MixerPanelActions,
+    decayedLevels: Array<MutableFloatState>,
+    smoothedPeak: MutableFloatState,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            // Stable per-band onGainChange lambdas — capturing only `actions`
+            // and the band's MixerGroup constant. Without this, fresh lambdas
+            // are allocated on every recomposition (4 per recomp), defeating
+            // GroupStrip's ability to skip recompositions.
+            val onPercChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.PERC, v) } }
+            val onBassChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.BASS, v) } }
+            val onKeysChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.KEYS, v) } }
+            val onFxChange   = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.FX,   v) } }
+            val onChange = arrayOf(onPercChange, onBassChange, onKeysChange, onFxChange)
 
-                for (idx in 0 until GROUP_COUNT) {
-                    val accent = GROUP_ACCENTS[idx]
-                    val linearLevel = decayedLevels[idx].floatValue
-                    val displayFraction = levelToDisplayFraction(linearLevel)
-                    val gain = uiState.groupGains.getOrElse(idx) { 1f }
-                    val muted = uiState.groupMuted.getOrElse(idx) { false }
-                    GroupStrip(
-                        accent = accent,
-                        gain = gain,
-                        meterLevel = displayFraction,
-                        muted = muted,
-                        onGainChange = onChange[idx],
-                    )
-                }
-                DistStrip(
-                    drive = uiState.drive,
-                    peak = smoothedPeak.floatValue,
-                    onDriveChange = actions.setDrive,
+            for (idx in 0 until GROUP_COUNT) {
+                val accent = GROUP_ACCENTS[idx]
+                val linearLevel = decayedLevels[idx].floatValue
+                val displayFraction = levelToDisplayFraction(linearLevel)
+                val gain = uiState.groupGains.getOrElse(idx) { 1f }
+                val muted = uiState.groupMuted.getOrElse(idx) { false }
+                GroupStrip(
+                    accent = accent,
+                    gain = gain,
+                    meterLevel = displayFraction,
+                    muted = muted,
+                    onGainChange = onChange[idx],
                 )
             }
+            DistStrip(
+                drive = uiState.drive,
+                peak = smoothedPeak.floatValue,
+                onDriveChange = actions.setDrive,
+            )
         }
     }
 }

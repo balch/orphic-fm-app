@@ -103,158 +103,175 @@ fun HornPanel(
             SignalTrace(data = wooferPhaseVizFlow, color = CrimsonWoofer)    // woofer rotor phase (slow sawtooth)
         }
     ) {
-        // ── Physics-based rotor animation ──────────────────────────────────
-        // Each rotor has a current velocity (deg/sec) that accelerates/decelerates
-        // toward a target velocity with realistic inertia. Angle accumulates each
-        // frame based on current velocity × dt.
-        //
-        // State + frame loop live INSIDE the content lambda so they only exist
-        // while the panel is expanded. Collapsed → loop stops → CPU saved.
-        // The state is held as MutableFloatState (not delegated `by`) so we
-        // pass the State *reference* into children — the Canvas reads
-        // .floatValue inside drawScope, which only invalidates the draw phase
-        // and never recomposes this composable.
+        RotorAnimationDisplay(uiState = uiState)
 
-        val hornAngle = remember { mutableFloatStateOf(0f) }
-        val wooferAngle = remember { mutableFloatStateOf(0f) }
-        val hornVelocity = remember { mutableFloatStateOf(0f) }
-        val wooferVelocity = remember { mutableFloatStateOf(0f) }
+        HornControlsRow(uiState = uiState, actions = actions)
+    }
+}
 
-        val hornTargetDps = if (uiState.brake) 0f
-            else lerp(MIN_HORN_DEG_PER_SEC, MAX_HORN_DEG_PER_SEC, uiState.speed)
-        val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
-        val wooferTargetDps = hornTargetDps / ratioFactor
+/**
+ * Physics-based dual-rotor animation: horn (fast) and woofer (slow) rotors accelerate
+ * or decelerate toward speed/ratio/brake-derived targets with realistic inertia, driving
+ * the two Canvas animations below.
+ *
+ * State + frame loop live here, inside the panel's expanded content, so they only exist
+ * while the panel is expanded. Collapsed → this isn't composed → loop stops → CPU saved.
+ * The state is held as MutableFloatState (not delegated `by`) so we pass the State
+ * *reference* into children — the Canvas reads .floatValue inside drawScope, which only
+ * invalidates the draw phase and never recomposes this composable.
+ */
+@Composable
+private fun RotorAnimationDisplay(
+    uiState: HornUiState,
+    modifier: Modifier = Modifier,
+) {
+    val hornAngle = remember { mutableFloatStateOf(0f) }
+    val wooferAngle = remember { mutableFloatStateOf(0f) }
+    val hornVelocity = remember { mutableFloatStateOf(0f) }
+    val wooferVelocity = remember { mutableFloatStateOf(0f) }
 
-        // rememberUpdatedState so the long-running LaunchedEffect always sees
-        // the latest knob-derived targets without restarting the loop.
-        val currentHornTarget by rememberUpdatedState(hornTargetDps)
-        val currentWooferTarget by rememberUpdatedState(wooferTargetDps)
+    val hornTargetDps = if (uiState.brake) 0f
+        else lerp(MIN_HORN_DEG_PER_SEC, MAX_HORN_DEG_PER_SEC, uiState.speed)
+    val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
+    val wooferTargetDps = hornTargetDps / ratioFactor
 
-        LaunchedEffect(Unit) {
-            var lastNanos = 0L
-            while (true) {
-                withFrameNanos { frameNanos ->
-                    if (lastNanos == 0L) { lastNanos = frameNanos; return@withFrameNanos }
-                    val dt = (frameNanos - lastNanos) / 1_000_000_000f
-                    lastNanos = frameNanos
+    // rememberUpdatedState so the long-running LaunchedEffect always sees
+    // the latest knob-derived targets without restarting the loop.
+    val currentHornTarget by rememberUpdatedState(hornTargetDps)
+    val currentWooferTarget by rememberUpdatedState(wooferTargetDps)
 
-                    val hornTarget = currentHornTarget
-                    val wooferTarget = currentWooferTarget
-                    val hv = hornVelocity.floatValue
-                    val wv = wooferVelocity.floatValue
+    LaunchedEffect(Unit) {
+        var lastNanos = 0L
+        while (true) {
+            withFrameNanos { frameNanos ->
+                if (lastNanos == 0L) { lastNanos = frameNanos; return@withFrameNanos }
+                val dt = (frameNanos - lastNanos) / 1_000_000_000f
+                lastNanos = frameNanos
 
-                    // Fully at rest — nothing to compute, no state to update.
-                    if (hv == 0f && wv == 0f && hornTarget == 0f && wooferTarget == 0f) {
-                        return@withFrameNanos
-                    }
+                val hornTarget = currentHornTarget
+                val wooferTarget = currentWooferTarget
+                val hv = hornVelocity.floatValue
+                val wv = wooferVelocity.floatValue
 
-                    val hornTau = if (hornTarget > hv) RAMP_UP_TAU else RAMP_DOWN_TAU
-                    val wooferTau = if (wooferTarget > wv) RAMP_UP_TAU else RAMP_DOWN_TAU
-                    val hornAlpha = 1f - kotlin.math.exp(-dt / hornTau)
-                    val wooferAlpha = 1f - kotlin.math.exp(-dt / wooferTau)
-
-                    var newHv = hv + hornAlpha * (hornTarget - hv)
-                    var newWv = wv + wooferAlpha * (wooferTarget - wv)
-                    if (newHv < 0.5f && hornTarget == 0f) newHv = 0f
-                    if (newWv < 0.5f && wooferTarget == 0f) newWv = 0f
-                    hornVelocity.floatValue = newHv
-                    wooferVelocity.floatValue = newWv
-
-                    hornAngle.floatValue = (hornAngle.floatValue + newHv * dt) % 360f
-                    wooferAngle.floatValue = (wooferAngle.floatValue + newWv * dt) % 360f
+                // Fully at rest — nothing to compute, no state to update.
+                if (hv == 0f && wv == 0f && hornTarget == 0f && wooferTarget == 0f) {
+                    return@withFrameNanos
                 }
+
+                val hornTau = if (hornTarget > hv) RAMP_UP_TAU else RAMP_DOWN_TAU
+                val wooferTau = if (wooferTarget > wv) RAMP_UP_TAU else RAMP_DOWN_TAU
+                val hornAlpha = 1f - kotlin.math.exp(-dt / hornTau)
+                val wooferAlpha = 1f - kotlin.math.exp(-dt / wooferTau)
+
+                var newHv = hv + hornAlpha * (hornTarget - hv)
+                var newWv = wv + wooferAlpha * (wooferTarget - wv)
+                if (newHv < 0.5f && hornTarget == 0f) newHv = 0f
+                if (newWv < 0.5f && wooferTarget == 0f) newWv = 0f
+                hornVelocity.floatValue = newHv
+                wooferVelocity.floatValue = newWv
+
+                hornAngle.floatValue = (hornAngle.floatValue + newHv * dt) % 360f
+                wooferAngle.floatValue = (wooferAngle.floatValue + newWv * dt) % 360f
             }
         }
+    }
 
-        // Dual rotor animation area — fixed width, centered
-        Row(
+    // Dual rotor animation area — fixed width, centered
+    Row(
+        modifier = modifier
+            .widthIn(max = 420.dp)
+            .height(160.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(CrimsonBg.copy(alpha = 0.4f))
+            .border(1.dp, CrimsonBorder, RoundedCornerShape(8.dp)),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ConcentricRingsAnimation(
+            hornAngleState = hornAngle,
+            wooferAngleState = wooferAngle,
+            speed = uiState.speed,
             modifier = Modifier
-                .widthIn(max = 420.dp)
-                .height(160.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(CrimsonBg.copy(alpha = 0.4f))
-                .border(1.dp, CrimsonBorder, RoundedCornerShape(8.dp)),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ConcentricRingsAnimation(
-                hornAngleState = hornAngle,
-                wooferAngleState = wooferAngle,
-                speed = uiState.speed,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(8.dp),
-            )
-            CabinetCrossSectionAnimation(
-                hornAngleState = hornAngle,
-                wooferAngleState = wooferAngle,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(8.dp),
-            )
-        }
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(8.dp),
+        )
+        CabinetCrossSectionAnimation(
+            hornAngleState = hornAngle,
+            wooferAngleState = wooferAngle,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(8.dp),
+        )
+    }
+}
 
-        // All controls in one row
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RotaryKnob(
-                value = uiState.speed,
-                onValueChange = actions.setSpeed,
-                label = "SPEED",
-                controlId = HornSymbol.SPEED.controlId.key,
-                size = 38.dp,
-                trackColor = CrimsonBg,
-                progressColor = CrimsonHorn,
-                knobColor = CrimsonKnob,
-                labelColor = CrimsonHorn,
-                valueFormatter = null,
-            )
-            RotaryKnob(
-                value = uiState.ratio,
-                onValueChange = actions.setRatio,
-                label = "RATIO",
-                controlId = HornSymbol.RATIO.controlId.key,
-                size = 38.dp,
-                trackColor = CrimsonBg,
-                progressColor = CrimsonHorn,
-                knobColor = CrimsonKnob,
-                labelColor = CrimsonHorn,
-                valueFormatter = null,
-            )
-            RotaryKnob(
-                value = uiState.depth,
-                onValueChange = actions.setDepth,
-                label = "DEPTH",
-                controlId = HornSymbol.DEPTH.controlId.key,
-                size = 38.dp,
-                trackColor = CrimsonBg,
-                progressColor = CrimsonHorn,
-                knobColor = CrimsonKnob,
-                labelColor = CrimsonHorn,
-                valueFormatter = null,
-            )
-            RotaryKnob(
-                value = uiState.mix,
-                onValueChange = actions.setMix,
-                label = "MIX",
-                controlId = HornSymbol.MIX.controlId.key,
-                size = 38.dp,
-                trackColor = CrimsonBg,
-                progressColor = CrimsonHorn,
-                knobColor = CrimsonKnob,
-                labelColor = CrimsonHorn,
-                valueFormatter = null,
-            )
+/**
+ * SPEED/RATIO/DEPTH/MIX knob bank plus the BRAKE toggle, in one row.
+ */
+@Composable
+private fun HornControlsRow(
+    uiState: HornUiState,
+    actions: HornPanelActions,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RotaryKnob(
+            value = uiState.speed,
+            onValueChange = actions.setSpeed,
+            label = "SPEED",
+            controlId = HornSymbol.SPEED.controlId.key,
+            size = 38.dp,
+            trackColor = CrimsonBg,
+            progressColor = CrimsonHorn,
+            knobColor = CrimsonKnob,
+            labelColor = CrimsonHorn,
+            valueFormatter = null,
+        )
+        RotaryKnob(
+            value = uiState.ratio,
+            onValueChange = actions.setRatio,
+            label = "RATIO",
+            controlId = HornSymbol.RATIO.controlId.key,
+            size = 38.dp,
+            trackColor = CrimsonBg,
+            progressColor = CrimsonHorn,
+            knobColor = CrimsonKnob,
+            labelColor = CrimsonHorn,
+            valueFormatter = null,
+        )
+        RotaryKnob(
+            value = uiState.depth,
+            onValueChange = actions.setDepth,
+            label = "DEPTH",
+            controlId = HornSymbol.DEPTH.controlId.key,
+            size = 38.dp,
+            trackColor = CrimsonBg,
+            progressColor = CrimsonHorn,
+            knobColor = CrimsonKnob,
+            labelColor = CrimsonHorn,
+            valueFormatter = null,
+        )
+        RotaryKnob(
+            value = uiState.mix,
+            onValueChange = actions.setMix,
+            label = "MIX",
+            controlId = HornSymbol.MIX.controlId.key,
+            size = 38.dp,
+            trackColor = CrimsonBg,
+            progressColor = CrimsonHorn,
+            knobColor = CrimsonKnob,
+            labelColor = CrimsonHorn,
+            valueFormatter = null,
+        )
 
-            BrakeToggle(
-                engaged = uiState.brake,
-                onToggle = actions.setBrake,
-            )
-        }
+        BrakeToggle(
+            engaged = uiState.brake,
+            onToggle = actions.setBrake,
+        )
     }
 }
 

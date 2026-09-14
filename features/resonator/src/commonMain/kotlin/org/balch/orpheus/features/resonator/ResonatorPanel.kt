@@ -88,145 +88,173 @@ fun ResonatorPanel(
             SignalTrace(data = outVizFlow, color = OrpheusColors.lakersGold)
         }
     ) {
-        // Combined Enable/Mode selector Row
-        val segColors = SegmentedButtonDefaults.colors(
-            activeContainerColor = RingsPanelColor,
-            activeContentColor = OrpheusColors.lakersPurple,
-            inactiveContentColor = OrpheusColors.lakersGold,
-            inactiveContainerColor = OrpheusColors.lakersPurpleDark
-        )
-        Learnable(
-            controlId = "resonator_mode",
-            modifier = Modifier.padding(horizontal = 8.dp)
+        ModeSelectorRow(state, actions)
+        KnobRow(state, actions)
+        DrumSynthMixRow(state, actions)
+    }
+}
+
+/**
+ * Combined enable/mode segmented button row (Bar / String / Sitar).
+ */
+@Composable
+private fun ModeSelectorRow(
+    state: ResonatorUiState,
+    actions: ResonatorPanelActions,
+) {
+    val segColors = SegmentedButtonDefaults.colors(
+        activeContainerColor = RingsPanelColor,
+        activeContentColor = OrpheusColors.lakersPurple,
+        inactiveContentColor = OrpheusColors.lakersGold,
+        inactiveContainerColor = OrpheusColors.lakersPurpleDark
+    )
+    Learnable(
+        controlId = "resonator_mode",
+        modifier = Modifier.padding(horizontal = 8.dp)
+    ) {
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth().height(32.dp),
         ) {
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth().height(32.dp),
-            ) {
-                ResonatorMode.entries.forEachIndexed { index, mode ->
-                    SegmentedButton(
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = ResonatorMode.entries.size),
-                        onClick = { actions.setMode(mode) },
-                        selected = state.mode == mode,
-                        colors = segColors,
-                        icon = {}
-                    ) {
-                        Text(
-                            text = mode.displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1
-                        )
-                    }
+            ResonatorMode.entries.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = ResonatorMode.entries.size),
+                    onClick = { actions.setMode(mode) },
+                    selected = state.mode == mode,
+                    colors = segColors,
+                    icon = {}
+                ) {
+                    Text(
+                        text = mode.displayName,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
                 }
             }
         }
+    }
+}
 
-        // Knobs row
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+/**
+ * STRUCT / BRIGHT / DAMP / POS / MIX rotary knob bank.
+ */
+@Composable
+private fun KnobRow(
+    state: ResonatorUiState,
+    actions: ResonatorPanelActions,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        val knobTrackColor = OrpheusColors.lakersPurpleDark
+        val knobProgressColor = RingsPanelColor
+        val knobColor = OrpheusColors.lakersGold
+        val labelColor = RingsPanelColor
+
+        RotaryKnob(
+            state.structure,
+            actions.setStructure,
+            label = "STRUCT",
+            size = 40.dp,
+            trackColor = knobTrackColor,
+            progressColor = knobProgressColor,
+            knobColor = knobColor,
+            labelColor = labelColor,
+            controlId = "resonator_structure"
+        )
+        RotaryKnob(
+            state.brightness,
+            actions.setBrightness,
+            label = "BRIGHT",
+            size = 40.dp,
+            trackColor = knobTrackColor,
+            progressColor = knobProgressColor,
+            knobColor = knobColor,
+            labelColor = labelColor,
+            controlId = "resonator_brightness"
+        )
+        RotaryKnob(
+            state.damping,
+            actions.setDamping,
+            label = "DAMP",
+            size = 40.dp,
+            trackColor = knobTrackColor,
+            progressColor = knobProgressColor,
+            knobColor = knobColor,
+            labelColor = labelColor,
+            controlId = "resonator_damping"
+        )
+        RotaryKnob(
+            state.position,
+            actions.setPosition,
+            label = "POS",
+            size = 40.dp,
+            trackColor = knobTrackColor,
+            progressColor = knobProgressColor,
+            knobColor = knobColor,
+            labelColor = labelColor,
+            controlId = "resonator_position"
+        )
+        RotaryKnob(
+            state.mix,
+            actions.setMix,
+            label = "MIX",
+            size = 40.dp,
+            trackColor = knobTrackColor,
+            progressColor = knobProgressColor,
+            knobColor = knobColor,
+            labelColor = labelColor,
+            controlId = "resonator_mix"
+        )
+    }
+}
+
+/**
+ * DRM/SYN target mix fader flanked by labels, plus the snap-back toggle.
+ */
+@Composable
+private fun DrumSynthMixRow(
+    state: ResonatorUiState,
+    actions: ResonatorPanelActions,
+) {
+    Row(
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "DRM",
+            fontSize = 10.sp,
+            color = RingsPanelColor,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(end = 8.dp)
+        )
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val knobTrackColor = OrpheusColors.lakersPurpleDark
-            val knobProgressColor = RingsPanelColor
-            val knobColor = OrpheusColors.lakersGold
-            val labelColor = RingsPanelColor
+            HorizontalTargetMixFader(
+                value = state.targetMix,
+                onValueChange = actions.setTargetMix,
+                snapBack = state.snapBack,
+                accentColor = RingsPanelColor,
+                controlId = "resonator_target_mix"
+            )
 
-            RotaryKnob(
-                state.structure,
-                actions.setStructure,
-                label = "STRUCT",
-                size = 40.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "resonator_structure"
-            )
-            RotaryKnob(
-                state.brightness,
-                actions.setBrightness,
-                label = "BRIGHT",
-                size = 40.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "resonator_brightness"
-            )
-            RotaryKnob(
-                state.damping,
-                actions.setDamping,
-                label = "DAMP",
-                size = 40.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "resonator_damping"
-            )
-            RotaryKnob(
-                state.position,
-                actions.setPosition,
-                label = "POS",
-                size = 40.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "resonator_position"
-            )
-            RotaryKnob(
-                state.mix,
-                actions.setMix,
-                label = "MIX",
-                size = 40.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "resonator_mix"
+            SnapBackButton(
+                enabled = state.snapBack,
+                onClick = { actions.setSnapBack(!state.snapBack) },
+                accentColor = RingsPanelColor,
+                controlId = "resonator_snap_back"
             )
         }
 
-        // Target mix fader section
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                "DRM",
-                fontSize = 10.sp,
-                color = RingsPanelColor,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(end = 8.dp)
-            )
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                HorizontalTargetMixFader(
-                    value = state.targetMix,
-                    onValueChange = actions.setTargetMix,
-                    snapBack = state.snapBack,
-                    accentColor = RingsPanelColor,
-                    controlId = "resonator_target_mix"
-                )
-
-                SnapBackButton(
-                    enabled = state.snapBack,
-                    onClick = { actions.setSnapBack(!state.snapBack) },
-                    accentColor = RingsPanelColor,
-                    controlId = "resonator_snap_back"
-                )
-            }
-
-            Text(
-                "SYN",
-                fontSize = 10.sp,
-                color = RingsPanelColor,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
+        Text(
+            "SYN",
+            fontSize = 10.sp,
+            color = RingsPanelColor,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 8.dp)
+        )
     }
 }
 

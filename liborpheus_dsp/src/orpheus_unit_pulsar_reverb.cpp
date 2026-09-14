@@ -26,8 +26,8 @@ void unit_process_pulsar_reverb(GraphUnit* u, OrpheusEngine* engine,
     float* in_l = engine->pulsar_reverb_send_l;
     float* in_r = engine->pulsar_reverb_send_r;
 
-    // Load and smooth parameters (~5ms ramp to avoid clicks from knob changes
-    // propagating through the reverb's feedback loop)
+    // Amount smooths per sample (~5ms). The room (time/damping/diffusion) morphs over ~300ms:
+    // a vibe switch writes it mid-transition while the old tail still rings.
     float amount_target = engine->pulsar_reverb_amount.load(std::memory_order_relaxed);
     float time_target   = engine->pulsar_reverb_time.load(std::memory_order_relaxed);
     float diff_target   = engine->pulsar_reverb_diffusion.load(std::memory_order_relaxed);
@@ -39,9 +39,11 @@ void unit_process_pulsar_reverb(GraphUnit* u, OrpheusEngine* engine,
     float damp_target = 1.0f - 0.95f * damp_raw;  // DAMP 0→1.0, DAMP 1→0.05
 
     float rv_coeff = smooth_coeff(sample_rate);
-    engine->smooth_pulsar_reverb_time      += rv_coeff * (time_target - engine->smooth_pulsar_reverb_time);
-    engine->smooth_pulsar_reverb_damping   += rv_coeff * (damp_target - engine->smooth_pulsar_reverb_damping);
-    engine->smooth_pulsar_reverb_diffusion += rv_coeff * (diff_target - engine->smooth_pulsar_reverb_diffusion);
+    constexpr float kRoomSmoothSeconds = 0.300f;
+    const float room_coeff = block_smooth_coeff(sample_rate, num_frames, kRoomSmoothSeconds);
+    engine->smooth_pulsar_reverb_time      += room_coeff * (time_target - engine->smooth_pulsar_reverb_time);
+    engine->smooth_pulsar_reverb_damping   += room_coeff * (damp_target - engine->smooth_pulsar_reverb_damping);
+    engine->smooth_pulsar_reverb_diffusion += room_coeff * (diff_target - engine->smooth_pulsar_reverb_diffusion);
 
     const float krt  = engine->smooth_pulsar_reverb_time;
     const float klp  = engine->smooth_pulsar_reverb_damping;

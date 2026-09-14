@@ -29,10 +29,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
+import org.balch.orpheus.features.visualizations.VizPanelActions
+import org.balch.orpheus.features.visualizations.VizUiState
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
@@ -83,139 +86,23 @@ fun CompactLandscapeHeaderPanel(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Patch dropdown
-            ExposedDropdownMenuBox(
+            PresetDropdown(
+                loadedPresetState = loadedPresetState,
+                presetActions = presetActions,
                 expanded = presetDropdownExpanded,
-                onExpandedChange = onPresetDropdownExpandedChange
-            ) {
-                Box(
-                    modifier = Modifier
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                        .width(140.dp)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .then(
-                            if (liquidState != null) {
-                                Modifier.liquidVizEffects(
-                                    liquidState = liquidState,
-                                    scope = effects.top,
-                                    frostAmount = 4.dp,
-                                    color = OrpheusColors.panelSurface,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                            } else Modifier.background(OrpheusColors.panelSurface)
-                        )
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                        .clickable { onPresetDropdownExpandedChange(!presetDropdownExpanded) }
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = loadedPresetState?.selectedPreset?.name ?: "Init Patch",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = presetDropdownExpanded)
-                    }
-                }
-                ExposedDropdownMenu(
-                    expanded = presetDropdownExpanded,
-                    onDismissRequest = { onPresetDropdownExpandedChange(false) },
-                    modifier = (if (liquidState != null) {
-                        Modifier.liquidVizEffects(
-                            liquidState = liquidState,
-                            scope = effects.top,
-                            frostAmount = 8.dp,
-                            color = OrpheusColors.panelSurface,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                    } else Modifier.background(OrpheusColors.panelSurface)).background(OrpheusColors.panelSurface)
-                ) {
-                    loadedPresetState?.presets?.forEach { preset ->
-                        DropdownMenuItem(
-                            text = { Text(preset.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
-                            onClick = {
-                                presetActions.applyPreset(preset)
-                                onPresetDropdownExpandedChange(false)
-                            }
-                        )
-                    }
-                }
-            }
+                onExpandedChange = onPresetDropdownExpandedChange,
+                liquidState = liquidState,
+                effects = effects,
+            )
 
-            // Viz dropdown
-            ExposedDropdownMenuBox(
+            VizDropdown(
+                vizState = vizState,
+                vizActions = vizActions,
                 expanded = vizDropdownExpanded,
-                onExpandedChange = onVizDropdownExpandedChange
-            ) {
-                Box(
-                    modifier = Modifier
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                        .width(140.dp)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .then(
-                            if (liquidState != null) {
-                                Modifier.liquidVizEffects(
-                                    liquidState = liquidState,
-                                    scope = effects.top,
-                                    frostAmount = 4.dp,
-                                    color = OrpheusColors.panelSurface,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                            } else Modifier.background(OrpheusColors.panelSurface)
-                        )
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                        .clickable { onVizDropdownExpandedChange(!vizDropdownExpanded) }
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = vizState.selectedViz.name,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = vizDropdownExpanded)
-                    }
-                }
-                ExposedDropdownMenu(
-                    expanded = vizDropdownExpanded,
-                    onDismissRequest = { onVizDropdownExpandedChange(false) },
-                    modifier = (if (liquidState != null) {
-                        Modifier.liquidVizEffects(
-                            liquidState = liquidState,
-                            scope = effects.top,
-                            frostAmount = 8.dp,
-                            color = OrpheusColors.panelSurface,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                    } else Modifier.background(OrpheusColors.panelSurface)).background(OrpheusColors.panelSurface)
-                ) {
-                    vizState.visualizations.forEach { viz ->
-                        DropdownMenuItem(
-                            text = { Text(viz.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
-                            onClick = {
-                                vizActions.onSelectViz(viz)
-                                onVizDropdownExpandedChange(false)
-                            }
-                        )
-                    }
-                }
-            }
+                onExpandedChange = onVizDropdownExpandedChange,
+                liquidState = liquidState,
+                effects = effects,
+            )
 
             PeakLed(level = voiceState.peakLevel)
             
@@ -226,6 +113,166 @@ fun CompactLandscapeHeaderPanel(
                     range = 0f..1f,
                     size = 36.dp,
                     progressColor = OrpheusColors.neonCyan
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Preset/patch selector dropdown: shows the active preset name and lists all presets to switch to.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PresetDropdown(
+    loadedPresetState: PresetUiState.Loaded?,
+    presetActions: PresetPanelActions,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    liquidState: LiquidState?,
+    effects: VisualizationLiquidEffects,
+) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange
+    ) {
+        Box(
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .width(140.dp)
+                .height(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (liquidState != null) {
+                        Modifier.liquidVizEffects(
+                            liquidState = liquidState,
+                            scope = effects.top,
+                            frostAmount = 4.dp,
+                            color = OrpheusColors.panelSurface,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else Modifier.background(OrpheusColors.panelSurface)
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .clickable { onExpandedChange(!expanded) }
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = loadedPresetState?.selectedPreset?.name ?: "Init Patch",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.9f),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
+        }
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) },
+            modifier = (if (liquidState != null) {
+                Modifier.liquidVizEffects(
+                    liquidState = liquidState,
+                    scope = effects.top,
+                    frostAmount = 8.dp,
+                    color = OrpheusColors.panelSurface,
+                    shape = RoundedCornerShape(8.dp)
+                )
+            } else Modifier.background(OrpheusColors.panelSurface)).background(OrpheusColors.panelSurface)
+        ) {
+            loadedPresetState?.presets?.forEach { preset ->
+                DropdownMenuItem(
+                    text = { Text(preset.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
+                    onClick = {
+                        presetActions.applyPreset(preset)
+                        onExpandedChange(false)
+                    }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Visualization selector dropdown: shows the active viz name and lists all visualizations to switch to.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VizDropdown(
+    vizState: VizUiState,
+    vizActions: VizPanelActions,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    liquidState: LiquidState?,
+    effects: VisualizationLiquidEffects,
+) {
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = onExpandedChange
+    ) {
+        Box(
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .width(140.dp)
+                .height(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (liquidState != null) {
+                        Modifier.liquidVizEffects(
+                            liquidState = liquidState,
+                            scope = effects.top,
+                            frostAmount = 4.dp,
+                            color = OrpheusColors.panelSurface,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else Modifier.background(OrpheusColors.panelSurface)
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .clickable { onExpandedChange(!expanded) }
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = vizState.selectedViz.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.9f),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
+        }
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandedChange(false) },
+            modifier = (if (liquidState != null) {
+                Modifier.liquidVizEffects(
+                    liquidState = liquidState,
+                    scope = effects.top,
+                    frostAmount = 8.dp,
+                    color = OrpheusColors.panelSurface,
+                    shape = RoundedCornerShape(8.dp)
+                )
+            } else Modifier.background(OrpheusColors.panelSurface)).background(OrpheusColors.panelSurface)
+        ) {
+            vizState.visualizations.forEach { viz ->
+                DropdownMenuItem(
+                    text = { Text(viz.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
+                    onClick = {
+                        vizActions.onSelectViz(viz)
+                        onExpandedChange(false)
+                    }
                 )
             }
         }

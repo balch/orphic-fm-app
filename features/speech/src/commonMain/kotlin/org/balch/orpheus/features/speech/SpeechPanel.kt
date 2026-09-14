@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -478,164 +479,226 @@ private fun SpeechReadout(
         }
 
         // Layer 1: Orpheus avatar - always visible, adjusts per phase
-        val avatarAlpha by animateFloatAsState(
-            targetValue = when (phase) {
-                ReadoutPhase.PLAY_BUTTON -> 0.7f + glowPulse * 0.15f
-                ReadoutPhase.GENERATING -> 0.2f
-                ReadoutPhase.SPEAKING -> 0.15f
-                ReadoutPhase.DONE_HOLD -> 0.12f * doneHoldDim.value
-            },
-            animationSpec = tween(600),
-            label = "avatarAlpha"
-        )
-        val avatarSize by animateFloatAsState(
-            targetValue = when (phase) {
-                ReadoutPhase.PLAY_BUTTON -> 80f
-                else -> 72f
-            },
-            animationSpec = tween(500, easing = FastOutSlowInEasing),
-            label = "avatarSize"
-        )
-        Image(
-            painter = painterResource(OrpheusAssets.avatar),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(
-                color = color.copy(alpha = 0.35f),
-                blendMode = BlendMode.Multiply,
-            ),
-            modifier = Modifier
-                .size(avatarSize.dp)
-                .clip(CircleShape)
-                .alpha(avatarAlpha),
-        )
+        ReadoutAvatar(phase = phase, glowPulse = glowPulse, dimFactor = doneHoldDim.value, color = color)
 
         // Layer 2: Generating animation
         if (dotsAlpha > 0.01f) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.alpha(dotsAlpha)
-            ) {
-                // Wave dots
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    for (i in 0 until 5) {
-                        val dotPhase = sin(wavePhase + i * 0.8f)
-                        val dotAlpha = 0.4f + 0.6f * ((dotPhase + 1f) / 2f)
-                        val dotSize = (4f + 2f * ((dotPhase + 1f) / 2f)).dp
-                        Box(
-                            modifier = Modifier
-                                .graphicsLayer {
-                                    translationY = -dotPhase * 8.dp.toPx()
-                                }
-                                .size(dotSize)
-                                .alpha(dotAlpha)
-                                .clip(CircleShape)
-                                .background(color)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "synthesizing",
-                    color = color.copy(alpha = 0.5f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                )
-            }
+            GeneratingDotsIndicator(dotsAlpha = dotsAlpha, wavePhase = wavePhase, color = color)
         }
 
         // Layer 3: Speaking text with word-by-word reveal
         if (textAlpha > 0.01f && words.isNotEmpty()) {
-            val dimFactor = doneHoldDim.value
-
-            val annotatedText = buildAnnotatedString {
-                words.forEachIndexed { index, word ->
-                    val isRevealed = index < revealedWordCount
-                    val isCurrent = index == revealedWordCount - 1 &&
-                        phase == ReadoutPhase.SPEAKING
-
-                    val wordAlpha = when {
-                        isCurrent -> wordPulse * dimFactor
-                        isRevealed -> 0.55f * dimFactor
-                        else -> 0.06f // ghost text - barely visible upcoming words
-                    }
-
-                    val weight = when {
-                        isCurrent -> FontWeight.ExtraBold
-                        isRevealed -> FontWeight.Medium
-                        else -> FontWeight.Normal
-                    }
-
-                    val size = when {
-                        isCurrent -> 14.sp
-                        isRevealed -> 12.sp
-                        else -> 11.sp
-                    }
-
-                    withStyle(
-                        SpanStyle(
-                            color = color.copy(alpha = wordAlpha * textAlpha),
-                            fontWeight = weight,
-                            fontSize = size,
-                        )
-                    ) {
-                        append(word)
-                    }
-                    if (index < words.lastIndex) append(" ")
-                }
-            }
-
-            val scrollState = rememberScrollState()
-            // Auto-scroll to keep the current word visible
-            LaunchedEffect(revealedWordCount, words.size) {
-                if (words.isNotEmpty() && scrollState.maxValue > 0) {
-                    val progress = revealedWordCount.toFloat() / words.size
-                    scrollState.animateScrollTo(
-                        (scrollState.maxValue * progress).toInt()
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = annotatedText,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState)
-                        .alpha(textAlpha),
-                )
-            }
+            SpeakingWordsReveal(
+                words = words,
+                revealedWordCount = revealedWordCount,
+                phase = phase,
+                wordPulse = wordPulse,
+                dimFactor = doneHoldDim.value,
+                textAlpha = textAlpha,
+                color = color,
+            )
         }
 
         // Spacebar trigger toggle in bottom-right corner
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .size(22.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(
-                    if (spacebarTrigger) color.copy(alpha = 0.3f)
-                    else OrpheusColors.blackHoleBackground.copy(alpha = 0.6f)
-                )
-                .clickable(onClick = onSpacebarToggle),
-            contentAlignment = Alignment.Center
+        SpacebarToggle(spacebarTrigger = spacebarTrigger, color = color, onToggle = onSpacebarToggle)
+    }
+}
+
+/**
+ * The pulsing Orpheus avatar shown behind the readout content \u2014 always
+ * visible, but dimmed and shrunk once speech starts.
+ */
+@Composable
+private fun ReadoutAvatar(
+    phase: ReadoutPhase,
+    glowPulse: Float,
+    dimFactor: Float,
+    color: Color,
+) {
+    val avatarAlpha by animateFloatAsState(
+        targetValue = when (phase) {
+            ReadoutPhase.PLAY_BUTTON -> 0.7f + glowPulse * 0.15f
+            ReadoutPhase.GENERATING -> 0.2f
+            ReadoutPhase.SPEAKING -> 0.15f
+            ReadoutPhase.DONE_HOLD -> 0.12f * dimFactor
+        },
+        animationSpec = tween(600),
+        label = "avatarAlpha"
+    )
+    val avatarSize by animateFloatAsState(
+        targetValue = when (phase) {
+            ReadoutPhase.PLAY_BUTTON -> 80f
+            else -> 72f
+        },
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "avatarSize"
+    )
+    Image(
+        painter = painterResource(OrpheusAssets.avatar),
+        contentDescription = null,
+        colorFilter = ColorFilter.tint(
+            color = color.copy(alpha = 0.35f),
+            blendMode = BlendMode.Multiply,
+        ),
+        modifier = Modifier
+            .size(avatarSize.dp)
+            .clip(CircleShape)
+            .alpha(avatarAlpha),
+    )
+}
+
+/**
+ * Wave-dot activity indicator with a "synthesizing" label, shown while
+ * speech audio is being generated.
+ */
+@Composable
+private fun GeneratingDotsIndicator(
+    dotsAlpha: Float,
+    wavePhase: Float,
+    color: Color,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.alpha(dotsAlpha)
+    ) {
+        // Wave dots
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.height(32.dp)
         ) {
-            Text(
-                text = "\u2423",
-                color = if (spacebarTrigger) color else color.copy(alpha = 0.3f),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
+            for (i in 0 until 5) {
+                val dotPhase = sin(wavePhase + i * 0.8f)
+                val dotAlpha = 0.4f + 0.6f * ((dotPhase + 1f) / 2f)
+                val dotSize = (4f + 2f * ((dotPhase + 1f) / 2f)).dp
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            translationY = -dotPhase * 8.dp.toPx()
+                        }
+                        .size(dotSize)
+                        .alpha(dotAlpha)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "synthesizing",
+            color = color.copy(alpha = 0.5f),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 1.sp,
+        )
+    }
+}
+
+/**
+ * Word-by-word reveal of [words] as speech plays, auto-scrolling to keep
+ * the current word visible.
+ */
+@Composable
+private fun SpeakingWordsReveal(
+    words: List<String>,
+    revealedWordCount: Int,
+    phase: ReadoutPhase,
+    wordPulse: Float,
+    dimFactor: Float,
+    textAlpha: Float,
+    color: Color,
+) {
+    val annotatedText = buildAnnotatedString {
+        words.forEachIndexed { index, word ->
+            val isRevealed = index < revealedWordCount
+            val isCurrent = index == revealedWordCount - 1 &&
+                phase == ReadoutPhase.SPEAKING
+
+            val wordAlpha = when {
+                isCurrent -> wordPulse * dimFactor
+                isRevealed -> 0.55f * dimFactor
+                else -> 0.06f // ghost text - barely visible upcoming words
+            }
+
+            val weight = when {
+                isCurrent -> FontWeight.ExtraBold
+                isRevealed -> FontWeight.Medium
+                else -> FontWeight.Normal
+            }
+
+            val size = when {
+                isCurrent -> 14.sp
+                isRevealed -> 12.sp
+                else -> 11.sp
+            }
+
+            withStyle(
+                SpanStyle(
+                    color = color.copy(alpha = wordAlpha * textAlpha),
+                    fontWeight = weight,
+                    fontSize = size,
+                )
+            ) {
+                append(word)
+            }
+            if (index < words.lastIndex) append(" ")
+        }
+    }
+
+    val scrollState = rememberScrollState()
+    // Auto-scroll to keep the current word visible
+    LaunchedEffect(revealedWordCount, words.size) {
+        if (words.isNotEmpty() && scrollState.maxValue > 0) {
+            val progress = revealedWordCount.toFloat() / words.size
+            scrollState.animateScrollTo(
+                (scrollState.maxValue * progress).toInt()
             )
         }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = annotatedText,
+            textAlign = TextAlign.Center,
+            lineHeight = 18.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .alpha(textAlpha),
+        )
+    }
+}
+
+/**
+ * Small toggle in the readout's corner for enabling spacebar-triggered speech.
+ */
+@Composable
+private fun BoxScope.SpacebarToggle(
+    spacebarTrigger: Boolean,
+    color: Color,
+    onToggle: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .size(22.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(
+                if (spacebarTrigger) color.copy(alpha = 0.3f)
+                else OrpheusColors.blackHoleBackground.copy(alpha = 0.6f)
+            )
+            .clickable(onClick = onToggle),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "\u2423",
+            color = if (spacebarTrigger) color else color.copy(alpha = 0.3f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

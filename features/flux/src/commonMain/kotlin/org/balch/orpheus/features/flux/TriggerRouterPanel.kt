@@ -35,7 +35,11 @@ import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.bass.BassFeature
 import org.balch.orpheus.features.bass.BassViewModel
 import org.balch.orpheus.features.drum.DrumFeature
+import org.balch.orpheus.features.drum.DrumPanelActions
+import org.balch.orpheus.features.drum.DrumUiState
 import org.balch.orpheus.features.drum.DrumViewModel
+import org.balch.orpheus.features.voice.VoicePanelActions
+import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -77,121 +81,13 @@ fun TriggerRouterPanel(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().height(24.dp)
-            ) {
-                Spacer(Modifier.width(70.dp)) // Label + Preview space
-                
-                // X Headers (Pitch/CV)
-                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf("X1", "X2", "X3").forEach { 
-                        Text(it, style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.warmGlow, fontSize = 10.sp) 
-                    }
-                }
-                
-                // Divider placeholder
-                Spacer(Modifier.width(17.dp)) 
+            TriggerMatrixHeader()
 
-                // T Headers (Trigger)
-                Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf("T1", "T2", "T3").forEach {
-                        Text(it, style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.electricBlue, fontSize = 10.sp)
-                    }
-                }
-
-                // Y Header (Timbre)
-                Spacer(Modifier.width(8.dp))
-                Text("Y", style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.synthGreen, fontSize = 10.sp)
-            }
-
-            // BD
-            TriggerMatrixRow(
-                label = "BD",
-                color = OrpheusColors.neonMagenta,
-                isActive = drumState.isBdActive,
-                selectedX = getDrumXSelection(drumState.bdPitchSource),
-                selectedT = getDrumTSelection(drumState.bdTriggerSource),
-                onXSelect = { handleDrumXSelect(it, drumState.bdPitchSource, drumActions.setBdPitchSource) },
-                onTSelect = { handleDrumTSelect(it, drumState.bdTriggerSource, drumActions.setBdTriggerSource) }
-            )
-
-            // SD
-            TriggerMatrixRow(
-                label = "SD",
-                color = OrpheusColors.neonMagenta,
-                isActive = drumState.isSdActive,
-                selectedX = getDrumXSelection(drumState.sdPitchSource),
-                selectedT = getDrumTSelection(drumState.sdTriggerSource),
-                onXSelect = { handleDrumXSelect(it, drumState.sdPitchSource, drumActions.setSdPitchSource) },
-                onTSelect = { handleDrumTSelect(it, drumState.sdTriggerSource, drumActions.setSdTriggerSource) }
-            )
-
-            // HH
-            TriggerMatrixRow(
-                label = "HH",
-                color = OrpheusColors.neonMagenta,
-                isActive = drumState.isHhActive,
-                selectedX = getDrumXSelection(drumState.hhPitchSource),
-                selectedT = getDrumTSelection(drumState.hhTriggerSource),
-                onXSelect = { handleDrumXSelect(it, drumState.hhPitchSource, drumActions.setHhPitchSource) },
-                onTSelect = { handleDrumTSelect(it, drumState.hhTriggerSource, drumActions.setHhTriggerSource) }
-            )
+            DrumTriggerRows(state = drumState, actions = drumActions)
 
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.1f))) // Separator
-            
-            // Voice Quads
-            // Q1 (Voices 0..3)
-            TriggerMatrixRow(
-                label = "Q1",
-                color = OrpheusColors.synthGreen,
-                isActive = voiceState.voiceStates.take(4).any { it.pulse },
-                selectedX = voiceState.quadPitchSources.getOrElse(0) { 0 },
-                selectedT = voiceState.quadTriggerSources.getOrElse(0) { 0 },
-                onXSelect = { idx -> 
-                    val current = voiceState.quadPitchSources.getOrElse(0) { 0 }
-                    voiceActions.setQuadPitchSource(0, if (current == idx) 0 else idx)
-                },
-                onTSelect = { idx ->
-                    val current = voiceState.quadTriggerSources.getOrElse(0) { 0 }
-                    voiceActions.setQuadTriggerSource(0, if (current == idx) 0 else idx)
-                }
-            )
 
-            // Q2 (Voices 4..7)
-            TriggerMatrixRow(
-                label = "Q2",
-                color = OrpheusColors.synthGreen,
-                isActive = voiceState.voiceStates.drop(4).take(4).any { it.pulse },
-                selectedX = voiceState.quadPitchSources.getOrElse(1) { 0 },
-                selectedT = voiceState.quadTriggerSources.getOrElse(1) { 0 },
-                onXSelect = { idx -> 
-                    val current = voiceState.quadPitchSources.getOrElse(1) { 0 }
-                    voiceActions.setQuadPitchSource(1, if (current == idx) 0 else idx)
-                },
-                onTSelect = { idx ->
-                    val current = voiceState.quadTriggerSources.getOrElse(1) { 0 }
-                    voiceActions.setQuadTriggerSource(1, if (current == idx) 0 else idx)
-                }
-            )
-
-            // Q3 (Voices 8..11)
-            TriggerMatrixRow(
-                label = "Q3",
-                color = OrpheusColors.synthGreen,
-                isActive = voiceState.voiceStates.drop(8).take(4).any { it.pulse },
-                selectedX = voiceState.quadPitchSources.getOrElse(2) { 0 },
-                selectedT = voiceState.quadTriggerSources.getOrElse(2) { 0 },
-                onXSelect = { idx ->
-                    val current = voiceState.quadPitchSources.getOrElse(2) { 0 }
-                    voiceActions.setQuadPitchSource(2, if (current == idx) 0 else idx)
-                },
-                onTSelect = { idx ->
-                    val current = voiceState.quadTriggerSources.getOrElse(2) { 0 }
-                    voiceActions.setQuadTriggerSource(2, if (current == idx) 0 else idx)
-                }
-            )
+            VoiceQuadTriggerRows(state = voiceState, actions = voiceActions)
 
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.1f)))
 
@@ -217,6 +113,142 @@ fun TriggerRouterPanel(
             )
         }
     }
+}
+
+/**
+ * Column header row: X1-X3 (pitch), T1-T3 (trigger), Y (timbre) labels above the matrix.
+ */
+@Composable
+private fun TriggerMatrixHeader() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().height(24.dp)
+    ) {
+        Spacer(Modifier.width(70.dp)) // Label + Preview space
+
+        // X Headers (Pitch/CV)
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
+            listOf("X1", "X2", "X3").forEach {
+                Text(it, style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.warmGlow, fontSize = 10.sp)
+            }
+        }
+
+        // Divider placeholder
+        Spacer(Modifier.width(17.dp))
+
+        // T Headers (Trigger)
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
+            listOf("T1", "T2", "T3").forEach {
+                Text(it, style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.electricBlue, fontSize = 10.sp)
+            }
+        }
+
+        // Y Header (Timbre)
+        Spacer(Modifier.width(8.dp))
+        Text("Y", style = MaterialTheme.typography.labelSmall.proportional(), color = OrpheusColors.synthGreen, fontSize = 10.sp)
+    }
+}
+
+/**
+ * BD/SD/HH drum trigger rows: pitch (X) and trigger (T) source selection per drum.
+ */
+@Composable
+private fun DrumTriggerRows(
+    state: DrumUiState,
+    actions: DrumPanelActions,
+) {
+    // BD
+    TriggerMatrixRow(
+        label = "BD",
+        color = OrpheusColors.neonMagenta,
+        isActive = state.isBdActive,
+        selectedX = getDrumXSelection(state.bdPitchSource),
+        selectedT = getDrumTSelection(state.bdTriggerSource),
+        onXSelect = { handleDrumXSelect(it, state.bdPitchSource, actions.setBdPitchSource) },
+        onTSelect = { handleDrumTSelect(it, state.bdTriggerSource, actions.setBdTriggerSource) }
+    )
+
+    // SD
+    TriggerMatrixRow(
+        label = "SD",
+        color = OrpheusColors.neonMagenta,
+        isActive = state.isSdActive,
+        selectedX = getDrumXSelection(state.sdPitchSource),
+        selectedT = getDrumTSelection(state.sdTriggerSource),
+        onXSelect = { handleDrumXSelect(it, state.sdPitchSource, actions.setSdPitchSource) },
+        onTSelect = { handleDrumTSelect(it, state.sdTriggerSource, actions.setSdTriggerSource) }
+    )
+
+    // HH
+    TriggerMatrixRow(
+        label = "HH",
+        color = OrpheusColors.neonMagenta,
+        isActive = state.isHhActive,
+        selectedX = getDrumXSelection(state.hhPitchSource),
+        selectedT = getDrumTSelection(state.hhTriggerSource),
+        onXSelect = { handleDrumXSelect(it, state.hhPitchSource, actions.setHhPitchSource) },
+        onTSelect = { handleDrumTSelect(it, state.hhTriggerSource, actions.setHhTriggerSource) }
+    )
+}
+
+/**
+ * Q1/Q2/Q3 voice-quad trigger rows: pitch (X) and trigger (T) source selection per quad of 4 voices.
+ */
+@Composable
+private fun VoiceQuadTriggerRows(
+    state: VoiceUiState,
+    actions: VoicePanelActions,
+) {
+    // Q1 (Voices 0..3)
+    TriggerMatrixRow(
+        label = "Q1",
+        color = OrpheusColors.synthGreen,
+        isActive = state.voiceStates.take(4).any { it.pulse },
+        selectedX = state.quadPitchSources.getOrElse(0) { 0 },
+        selectedT = state.quadTriggerSources.getOrElse(0) { 0 },
+        onXSelect = { idx ->
+            val current = state.quadPitchSources.getOrElse(0) { 0 }
+            actions.setQuadPitchSource(0, if (current == idx) 0 else idx)
+        },
+        onTSelect = { idx ->
+            val current = state.quadTriggerSources.getOrElse(0) { 0 }
+            actions.setQuadTriggerSource(0, if (current == idx) 0 else idx)
+        }
+    )
+
+    // Q2 (Voices 4..7)
+    TriggerMatrixRow(
+        label = "Q2",
+        color = OrpheusColors.synthGreen,
+        isActive = state.voiceStates.drop(4).take(4).any { it.pulse },
+        selectedX = state.quadPitchSources.getOrElse(1) { 0 },
+        selectedT = state.quadTriggerSources.getOrElse(1) { 0 },
+        onXSelect = { idx ->
+            val current = state.quadPitchSources.getOrElse(1) { 0 }
+            actions.setQuadPitchSource(1, if (current == idx) 0 else idx)
+        },
+        onTSelect = { idx ->
+            val current = state.quadTriggerSources.getOrElse(1) { 0 }
+            actions.setQuadTriggerSource(1, if (current == idx) 0 else idx)
+        }
+    )
+
+    // Q3 (Voices 8..11)
+    TriggerMatrixRow(
+        label = "Q3",
+        color = OrpheusColors.synthGreen,
+        isActive = state.voiceStates.drop(8).take(4).any { it.pulse },
+        selectedX = state.quadPitchSources.getOrElse(2) { 0 },
+        selectedT = state.quadTriggerSources.getOrElse(2) { 0 },
+        onXSelect = { idx ->
+            val current = state.quadPitchSources.getOrElse(2) { 0 }
+            actions.setQuadPitchSource(2, if (current == idx) 0 else idx)
+        },
+        onTSelect = { idx ->
+            val current = state.quadTriggerSources.getOrElse(2) { 0 }
+            actions.setQuadTriggerSource(2, if (current == idx) 0 else idx)
+        }
+    )
 }
 
 // Helper to determine active X selection for drums (0=None, 1..3=X1..X3)

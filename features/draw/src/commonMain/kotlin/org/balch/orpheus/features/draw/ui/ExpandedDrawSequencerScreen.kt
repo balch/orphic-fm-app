@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.draw.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,6 +66,7 @@ fun ExpandedDrawSequencerScreen(
     val actions = sequencerFeature.actions
     val state = uiState.sequencer
     val activeParameter = uiState.activeParameter
+    val scrollState = rememberScrollState()
 
     val shape = RoundedCornerShape(16.dp)
     val accentColor = OrpheusColors.neonCyan
@@ -81,69 +83,11 @@ fun ExpandedDrawSequencerScreen(
         // ═══════════════════════════════════════════════════════════
         // HEADER: Title Left | X and Check Right
         // ═══════════════════════════════════════════════════════════
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Title (Left)
-            Text(
-                text = "Tweak Seq",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = accentColor
-            )
-
-            // Buttons (Right)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Cancel button (X)
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(OrpheusColors.seqDarkRed)
-                        .border(1.dp, OrpheusColors.seqRed.copy(alpha = 0.5f), CircleShape)
-                        .clickable {
-                            actions.onCancel()
-                            onDismiss(false)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "✕",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OrpheusColors.seqRed,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                // Save button (Check)
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(OrpheusColors.seqDarkGreen)
-                        .border(1.dp, OrpheusColors.seqGreen.copy(alpha = 0.5f), CircleShape)
-                        .clickable {
-                            actions.onSave()
-                            onDismiss(true)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "✓",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OrpheusColors.seqGreen,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
+        DrawSequencerHeader(
+            accentColor = accentColor,
+            actions = actions,
+            onDismiss = onDismiss
+        )
 
         // ═══════════════════════════════════════════════════════════
         // MAIN CONTENT: Controls Left | Canvas Right
@@ -162,194 +106,323 @@ fun ExpandedDrawSequencerScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // 1. Parameter List
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF0A0A12))
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        text = "Parameters",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                     Column(
-                         verticalArrangement = Arrangement.spacedBy(2.dp),
-                         modifier = Modifier.verticalScroll(rememberScrollState())
-                     ) {
-                         DrawSequencerParameter.entries.forEach { param ->
-                             val isIncluded = param in state.config.selectedParameters
-                             val isSelected = activeParameter == param
-                             val hasPath = state.paths[param]?.points?.isNotEmpty() == true
-                             
-                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(if (isSelected) param.color.copy(alpha = 0.2f) else Color.Transparent)
-                                    .clickable {
-                                        if (isIncluded) {
-                                            actions.onSelectActiveParameter(param)
-                                        } else {
-                                            if (state.config.selectedParameters.size < DrawSequencerParameter.MAX_SELECTED) {
-                                                actions.onAddParameter(param)
-                                                actions.onSelectActiveParameter(param)
-                                            }
-                                        }
-                                    }
-                                    .padding(vertical = 6.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                             ) {
-                                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                      // Checkbox
-                                      Box(
-                                          modifier = Modifier
-                                              .size(16.dp)
-                                              .clip(RoundedCornerShape(3.dp))
-                                              .background(if (isIncluded) param.color else Color.Transparent)
-                                              .border(1.dp, param.color, RoundedCornerShape(3.dp))
-                                              .clickable {
-                                                  if (isIncluded) {
-                                                      actions.onRemoveParameter(param)
-                                                      actions.onClearPath(param)
-                                                  }
-                                                  else if (state.config.selectedParameters.size < DrawSequencerParameter.MAX_SELECTED) {
-                                                       actions.onAddParameter(param)
-                                                       actions.onSelectActiveParameter(param)
-                                                   }
-                                              },
-                                          contentAlignment = Alignment.Center
-                                      ) {
-                                          if (isIncluded) {
-                                              Text("✓", fontSize = 10.sp, color = Color.Black)
-                                          }
-                                      }
-                                      
-                                      Spacer(modifier = Modifier.width(8.dp))
-                                      
-                                      Column {
-                                          Text(
-                                              text = param.label,
-                                              fontSize = 12.sp,
-                                              color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
-                                              fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                              maxLines = 1
-                                          )
-                                          // Small Category Label
-                                          Text(
-                                              text = param.category,
-                                              fontSize = 9.sp,
-                                              color = if (isIncluded) param.color.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.2f),
-                                              lineHeight = 10.sp
-                                          )
-                                      }
-                                  }
-
-                                  // Clear button inside item
-                                  if (isIncluded && hasPath) {
-                                      Box(
-                                          modifier = Modifier
-                                              .size(16.dp)
-                                              .clip(CircleShape)
-                                              .background(Color.White.copy(alpha = 0.1f))
-                                              .clickable { actions.onClearPath(param) },
-                                          contentAlignment = Alignment.Center
-                                      ) {
-                                          Canvas(modifier = Modifier.size(8.dp)) {
-                                              val strokeWidth = 1.dp.toPx()
-                                              val color = Color.White.copy(alpha = 0.7f)
-                                              drawLine(
-                                                  color = color,
-                                                  start = Offset(0f, 0f),
-                                                  end = Offset(size.width, size.height),
-                                                  strokeWidth = strokeWidth
-                                              )
-                                              drawLine(
-                                                  color = color,
-                                                  start = Offset(size.width, 0f),
-                                                  end = Offset(0f, size.height),
-                                                  strokeWidth = strokeWidth
-                                              )
-                                          }
-                                      }
-                                  }
-                             }
-                         }
-                     }
-                }
+                ParameterListPanel(
+                    state = state,
+                    activeParameter = activeParameter,
+                    actions = actions,
+                    scrollState = scrollState,
+                    modifier = Modifier.weight(1f)
+                )
 
                 // 2. Compact Duration Slider (Bottom)
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Duration",
-                            fontSize = 10.sp,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                        Text(
-                            text = "${state.config.durationSeconds.toInt()}s",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor
-                        )
-                    }
-                    CompactSecondsSlider(
-                        valueSeconds = state.config.durationSeconds,
-                        onValueChange = { actions.onSetDuration(it) },
-                        color = accentColor,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                DurationSliderSection(
+                    state = state,
+                    actions = actions,
+                    accentColor = accentColor
+                )
             }
 
             // ─── RIGHT COLUMN: Canvas ───
+            DrawingCanvasSection(
+                state = state,
+                activeParameter = activeParameter,
+                actions = actions,
+                accentColor = accentColor,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/**
+ * Header row: screen title on the left, cancel (X) and save (check) buttons on the right.
+ */
+@Composable
+private fun DrawSequencerHeader(
+    accentColor: Color,
+    actions: DrawSequencerPanelActions,
+    onDismiss: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Title (Left)
+        Text(
+            text = "Tweak Seq",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = accentColor
+        )
+
+        // Buttons (Right)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Cancel button (X)
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black)
-                    .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(OrpheusColors.seqDarkRed)
+                    .border(1.dp, OrpheusColors.seqRed.copy(alpha = 0.5f), CircleShape)
+                    .clickable {
+                        actions.onCancel()
+                        onDismiss(false)
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                if (activeParameter != null) {
-                     SequencerDrawingCanvas(
-                        paths = state.paths,
-                        activeParameter = activeParameter,
-                        currentPosition = state.currentPosition,
-                        onPathStarted = { actions.onStartPath(activeParameter, it) },
-                        onPointAdded = { actions.onAddPoint(activeParameter, it) },
-                        onPointsRemovedAfter = { actions.onRemovePointsAfter(activeParameter, it) },
-                        onPathCompleted = { actions.onCompletePath(activeParameter, it) },
-                        enabled = true,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    
-                    Text(
-                        text = "Editing: ${activeParameter.label}",
-                        color = activeParameter.color.copy(alpha = 0.5f),
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(12.dp)
-                    )
-                } else {
-                    Text(
-                        text = "Select a parameter to draw",
-                        color = Color.White.copy(alpha = 0.3f),
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                Text(
+                    text = "✕",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OrpheusColors.seqRed,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // Save button (Check)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(OrpheusColors.seqDarkGreen)
+                    .border(1.dp, OrpheusColors.seqGreen.copy(alpha = 0.5f), CircleShape)
+                    .clickable {
+                        actions.onSave()
+                        onDismiss(true)
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✓",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OrpheusColors.seqGreen,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Scrollable "Parameters" list: include/select a parameter, see its category,
+ * and clear its drawn path.
+ */
+@Composable
+private fun ParameterListPanel(
+    state: DrawSequencerState,
+    activeParameter: DrawSequencerParameter?,
+    actions: DrawSequencerPanelActions,
+    scrollState: ScrollState,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF0A0A12))
+            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            .padding(8.dp)
+    ) {
+        Text(
+            text = "Parameters",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.verticalScroll(scrollState)
+        ) {
+            DrawSequencerParameter.entries.forEach { param ->
+                val isIncluded = param in state.config.selectedParameters
+                val isSelected = activeParameter == param
+                val hasPath = state.paths[param]?.points?.isNotEmpty() == true
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isSelected) param.color.copy(alpha = 0.2f) else Color.Transparent)
+                        .clickable {
+                            if (isIncluded) {
+                                actions.onSelectActiveParameter(param)
+                            } else {
+                                if (state.config.selectedParameters.size < DrawSequencerParameter.MAX_SELECTED) {
+                                    actions.onAddParameter(param)
+                                    actions.onSelectActiveParameter(param)
+                                }
+                            }
+                        }
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        // Checkbox
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(if (isIncluded) param.color else Color.Transparent)
+                                .border(1.dp, param.color, RoundedCornerShape(3.dp))
+                                .clickable {
+                                    if (isIncluded) {
+                                        actions.onRemoveParameter(param)
+                                        actions.onClearPath(param)
+                                    }
+                                    else if (state.config.selectedParameters.size < DrawSequencerParameter.MAX_SELECTED) {
+                                         actions.onAddParameter(param)
+                                         actions.onSelectActiveParameter(param)
+                                     }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isIncluded) {
+                                Text("✓", fontSize = 10.sp, color = Color.Black)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Column {
+                            Text(
+                                text = param.label,
+                                fontSize = 12.sp,
+                                color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1
+                            )
+                            // Small Category Label
+                            Text(
+                                text = param.category,
+                                fontSize = 9.sp,
+                                color = if (isIncluded) param.color.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.2f),
+                                lineHeight = 10.sp
+                            )
+                        }
+                    }
+
+                    // Clear button inside item
+                    if (isIncluded && hasPath) {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.1f))
+                                .clickable { actions.onClearPath(param) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.size(8.dp)) {
+                                val strokeWidth = 1.dp.toPx()
+                                val color = Color.White.copy(alpha = 0.7f)
+                                drawLine(
+                                    color = color,
+                                    start = Offset(0f, 0f),
+                                    end = Offset(size.width, size.height),
+                                    strokeWidth = strokeWidth
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(size.width, 0f),
+                                    end = Offset(0f, size.height),
+                                    strokeWidth = strokeWidth
+                                )
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Duration label plus the compact seconds slider shown beneath the parameter list.
+ */
+@Composable
+private fun DurationSliderSection(
+    state: DrawSequencerState,
+    actions: DrawSequencerPanelActions,
+    accentColor: Color,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Duration",
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.5f)
+            )
+            Text(
+                text = "${state.config.durationSeconds.toInt()}s",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = accentColor
+            )
+        }
+        CompactSecondsSlider(
+            valueSeconds = state.config.durationSeconds,
+            onValueChange = { actions.onSetDuration(it) },
+            color = accentColor,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/**
+ * Drawing canvas for the active parameter, or a placeholder prompt when none is selected.
+ */
+@Composable
+private fun DrawingCanvasSection(
+    state: DrawSequencerState,
+    activeParameter: DrawSequencerParameter?,
+    actions: DrawSequencerPanelActions,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black)
+            .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+    ) {
+        if (activeParameter != null) {
+             SequencerDrawingCanvas(
+                paths = state.paths,
+                activeParameter = activeParameter,
+                currentPosition = state.currentPosition,
+                onPathStarted = { actions.onStartPath(activeParameter, it) },
+                onPointAdded = { actions.onAddPoint(activeParameter, it) },
+                onPointsRemovedAfter = { actions.onRemovePointsAfter(activeParameter, it) },
+                onPathCompleted = { actions.onCompletePath(activeParameter, it) },
+                enabled = true,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Text(
+                text = "Editing: ${activeParameter.label}",
+                color = activeParameter.color.copy(alpha = 0.5f),
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+            )
+        } else {
+            Text(
+                text = "Select a parameter to draw",
+                color = Color.White.copy(alpha = 0.3f),
+                modifier = Modifier.align(Alignment.Center)
+            )
         }
     }
 }
@@ -368,7 +441,7 @@ private fun ExpandedTweakSequencerScreenPreview() {
             ),
             isComplete = true
         )
-    
+
         // We can use the PREVIEW mapper from the ViewModel
         // but here we manually construct one to show the path data which is specific to this preview
         val previewState = DrawSequencerUiState(
@@ -391,7 +464,7 @@ private fun ExpandedTweakSequencerScreenPreview() {
             ),
             activeParameter = DrawSequencerParameter.LFO_FREQ_A
         )
-    
+
         val previewActions = DrawSequencerPanelActions(
             onPlay = {}, onPause = {}, onStop = {}, onTogglePlayPause = {},
             onStartPath = { _, _ -> }, onAddPoint = { _, _ -> }, onRemovePointsAfter = { _, _ -> },
