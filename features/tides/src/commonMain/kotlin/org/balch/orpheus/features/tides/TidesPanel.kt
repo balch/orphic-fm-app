@@ -91,131 +91,159 @@ fun TidesPanel(
             SignalTrace(data = vizCh0Flow, color = OrpheusColors.neonOrange, alpha = 0.25f)
         },
     ) {
-        // Row 1: Selector buttons
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ValueCycleButton(
-                value = state.rampMode,
-                values = RampModeNames.indices.toList(),
-                onValueChange = actions.setRampMode,
-                labelProvider = { RampModeNames[it] },
-                label = "MODE",
-                color = OrpheusColors.neonOrange
-            )
+        TidesSelectorRow(state, actions)
+        TidesPrimaryKnobRow(state, actions)
+        TidesSecondaryKnobRow(state, actions)
+    }
+}
 
-            ValueCycleButton(
-                value = state.outputMode,
-                values = OutputModeNames.indices.toList(),
-                onValueChange = actions.setOutputMode,
-                labelProvider = { OutputModeNames[it] },
-                label = "OUT",
-                color = OrpheusColors.neonOrange
-            )
+/**
+ * Row 1: Selector buttons — ramp mode, output mode, range, gate source, clock source.
+ */
+@Composable
+private fun TidesSelectorRow(
+    state: TidesUiState,
+    actions: TidesPanelActions,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ValueCycleButton(
+            value = state.rampMode,
+            values = RampModeNames.indices.toList(),
+            onValueChange = actions.setRampMode,
+            labelProvider = { RampModeNames[it] },
+            label = "MODE",
+            color = OrpheusColors.neonOrange
+        )
 
-            ValueCycleButton(
-                value = state.range,
-                values = RangeNames.indices.toList(),
-                onValueChange = actions.setRange,
-                labelProvider = { RangeNames[it] },
-                label = "RANGE",
-                color = OrpheusColors.neonOrange
-            )
+        ValueCycleButton(
+            value = state.outputMode,
+            values = OutputModeNames.indices.toList(),
+            onValueChange = actions.setOutputMode,
+            labelProvider = { OutputModeNames[it] },
+            label = "OUT",
+            color = OrpheusColors.neonOrange
+        )
 
-            Spacer(modifier = Modifier.width(8.dp))
+        ValueCycleButton(
+            value = state.range,
+            values = RangeNames.indices.toList(),
+            onValueChange = actions.setRange,
+            labelProvider = { RangeNames[it] },
+            label = "RANGE",
+            color = OrpheusColors.neonOrange
+        )
 
-            ValueCycleButton(
-                value = state.gateSource,
-                values = GateSourceNames.indices.toList(),
-                onValueChange = actions.setGateSource,
-                labelProvider = { GateSourceNames[it] },
-                label = "GATE",
-                color = OrpheusColors.neonOrange
-            )
+        Spacer(modifier = Modifier.width(8.dp))
 
-            ValueCycleButton(
-                value = state.clockSource,
-                values = ClockSourceNames.indices.toList(),
-                onValueChange = actions.setClockSource,
-                labelProvider = { ClockSourceNames[it] },
-                label = "CLK",
-                color = OrpheusColors.neonOrange
-            )
-        }
+        ValueCycleButton(
+            value = state.gateSource,
+            values = GateSourceNames.indices.toList(),
+            onValueChange = actions.setGateSource,
+            labelProvider = { GateSourceNames[it] },
+            label = "GATE",
+            color = OrpheusColors.neonOrange
+        )
 
-        // Row 2: Primary knobs
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            RotaryKnob(
-                value = state.frequency,
-                onValueChange = actions.setFrequency,
-                label = "FREQ",
-                controlId = TidesSymbol.FREQUENCY.controlId.key,
-                size = 56.dp,
-                progressColor = OrpheusColors.neonOrange
-            )
-            RotaryKnob(
-                value = state.slope,
-                onValueChange = actions.setSlope,
-                label = "SLOPE",
-                controlId = TidesSymbol.SLOPE.controlId.key,
-                size = 52.dp,
-                progressColor = OrpheusColors.neonOrange,
-                valueFormatter = ::tidesSlopeName
-            )
-            RotaryKnob(
-                value = state.shape,
-                onValueChange = actions.setShape,
-                label = "SHAPE",
-                controlId = TidesSymbol.SHAPE.controlId.key,
-                size = 52.dp,
-                progressColor = OrpheusColors.neonOrange,
-                valueFormatter = ::tidesShapeName
-            )
-            RotaryKnob(
-                value = state.smoothness,
-                onValueChange = actions.setSmoothness,
-                label = "SMOOTH",
-                controlId = TidesSymbol.SMOOTHNESS.controlId.key,
-                size = 52.dp,
-                progressColor = OrpheusColors.neonOrange,
-                valueFormatter = ::tidesSmoothName
-            )
-        }
+        ValueCycleButton(
+            value = state.clockSource,
+            values = ClockSourceNames.indices.toList(),
+            onValueChange = actions.setClockSource,
+            labelProvider = { ClockSourceNames[it] },
+            label = "CLK",
+            color = OrpheusColors.neonOrange
+        )
+    }
+}
 
-        // Row 3: Secondary knobs
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            RotaryKnob(
-                value = state.shift,
-                onValueChange = actions.setShift,
-                label = "SHIFT",
-                controlId = TidesSymbol.SHIFT.controlId.key,
-                size = 44.dp,
-                progressColor = OrpheusColors.neonOrange
-            )
-            RotaryKnob(
-                value = state.clockOffset,
-                onValueChange = actions.setClockOffset,
-                label = "CLK OFS",
-                controlId = TidesSymbol.CLOCK_OFFSET.controlId.key,
-                size = 44.dp,
-                progressColor = OrpheusColors.neonOrange
-            )
-            RotaryKnob(
-                value = state.mix,
-                onValueChange = actions.setMix,
-                label = "MIX",
-                controlId = TidesSymbol.MIX.controlId.key,
-                size = 44.dp,
-                progressColor = OrpheusColors.neonOrange
-            )
-        }
+/**
+ * Row 2: Primary knobs — frequency, slope, shape, smoothness.
+ */
+@Composable
+private fun TidesPrimaryKnobRow(
+    state: TidesUiState,
+    actions: TidesPanelActions,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        RotaryKnob(
+            value = state.frequency,
+            onValueChange = actions.setFrequency,
+            label = "FREQ",
+            controlId = TidesSymbol.FREQUENCY.controlId.key,
+            size = 56.dp,
+            progressColor = OrpheusColors.neonOrange
+        )
+        RotaryKnob(
+            value = state.slope,
+            onValueChange = actions.setSlope,
+            label = "SLOPE",
+            controlId = TidesSymbol.SLOPE.controlId.key,
+            size = 52.dp,
+            progressColor = OrpheusColors.neonOrange,
+            valueFormatter = ::tidesSlopeName
+        )
+        RotaryKnob(
+            value = state.shape,
+            onValueChange = actions.setShape,
+            label = "SHAPE",
+            controlId = TidesSymbol.SHAPE.controlId.key,
+            size = 52.dp,
+            progressColor = OrpheusColors.neonOrange,
+            valueFormatter = ::tidesShapeName
+        )
+        RotaryKnob(
+            value = state.smoothness,
+            onValueChange = actions.setSmoothness,
+            label = "SMOOTH",
+            controlId = TidesSymbol.SMOOTHNESS.controlId.key,
+            size = 52.dp,
+            progressColor = OrpheusColors.neonOrange,
+            valueFormatter = ::tidesSmoothName
+        )
+    }
+}
+
+/**
+ * Row 3: Secondary knobs — shift, clock offset, mix.
+ */
+@Composable
+private fun TidesSecondaryKnobRow(
+    state: TidesUiState,
+    actions: TidesPanelActions,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        RotaryKnob(
+            value = state.shift,
+            onValueChange = actions.setShift,
+            label = "SHIFT",
+            controlId = TidesSymbol.SHIFT.controlId.key,
+            size = 44.dp,
+            progressColor = OrpheusColors.neonOrange
+        )
+        RotaryKnob(
+            value = state.clockOffset,
+            onValueChange = actions.setClockOffset,
+            label = "CLK OFS",
+            controlId = TidesSymbol.CLOCK_OFFSET.controlId.key,
+            size = 44.dp,
+            progressColor = OrpheusColors.neonOrange
+        )
+        RotaryKnob(
+            value = state.mix,
+            onValueChange = actions.setMix,
+            label = "MIX",
+            controlId = TidesSymbol.MIX.controlId.key,
+            size = 44.dp,
+            progressColor = OrpheusColors.neonOrange
+        )
     }
 }
 
