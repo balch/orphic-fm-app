@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -164,18 +163,13 @@ fun DjAppScreen(
         }
     }
 
-    BoxWithConstraints(
+    DjLayoutModeBox(
         // Edge-to-edge on purpose: no inset padding, so the UI and the VizBackground behind it
         // fill into the display cutout instead of letterboxing below the notch (system bars are
         // hidden in MainActivity; DjAppHeaderRow's own SpaceBetween clears a center punch-hole).
         modifier = modifier
             .fillMaxSize(),
-    ) {
-        val layoutMode = determineLayoutMode(
-            maxWidth,
-            maxHeight,
-            LocalTvModeAllowed.current,
-        )
+    ) { layoutMode ->
         val isLandscape = layoutMode != DjLayoutMode.Portrait
         val isLargeScreen = layoutMode == DjLayoutMode.LargeScreen
 

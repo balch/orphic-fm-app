@@ -1,7 +1,18 @@
 package org.balch.orpheus.djapp
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /**
@@ -42,4 +53,28 @@ fun determineLayoutMode(
         DjLayoutMode.LargeScreen
     width > height -> DjLayoutMode.Landscape
     else -> DjLayoutMode.Portrait
+}
+
+/**
+ * Hands [content] the [DjLayoutMode] for the space this box fills; [modifier] must size the box.
+ * The mode comes from the previous frame's measured size and so changes in composition. Decided
+ * mid-layout (a BoxWithConstraints), a mode change disposes sheet dialogs inside the layout pass,
+ * and the desktop scene then lays out the dead layer: "RootNodeOwner is already disposed".
+ */
+@Composable
+fun DjLayoutModeBox(
+    modifier: Modifier = Modifier,
+    tvModeAllowed: Boolean = LocalTvModeAllowed.current,
+    content: @Composable BoxScope.(DjLayoutMode) -> Unit,
+) {
+    var measured by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    Box(modifier.onSizeChanged { measured = it }) {
+        // Nothing to lay out until the first measure reports a size.
+        if (measured != IntSize.Zero) {
+            val width = with(density) { measured.width.toDp() }
+            val height = with(density) { measured.height.toDp() }
+            content(determineLayoutMode(width, height, tvModeAllowed))
+        }
+    }
 }
