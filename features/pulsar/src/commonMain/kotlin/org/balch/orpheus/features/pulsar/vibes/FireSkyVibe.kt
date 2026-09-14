@@ -597,9 +597,11 @@ private class FireSkyVibeBase(
                     )
                 },
                 // Track 4 — Lead (WSH grit / VA on space), THE riff, LickMode.Fill.
-                // The gritty WSH lead stands in for the distorted guitar; PLUCK LPG gives
-                // every riff note the picked, articulated attack. FOLLOW so it transposes
-                // like a real blues figure; intro/chorus/outro pin it FIXED (see sections).
+                // The gritty WSH lead stands in for the distorted guitar; PLUCK_REPEAT
+                // re-picks every held 16th, so the 8th- and quarter-note riff notes are
+                // double-picked (the 2.0.5 sound, which came from a gate-timer accident).
+                // FOLLOW so it transposes like a real blues figure; intro/chorus/outro pin
+                // it FIXED (see sections).
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
                     volume = 0.58f,
@@ -608,7 +610,7 @@ private class FireSkyVibeBase(
                     reverbSend = 0.16f,
                     delaySend = 0.14f,
                     glideRate = 0.0f,         // no slur — every riff note distinct
-                    lpgMode = LpgMode.PLUCK,  // picked attack per note
+                    lpgMode = LpgMode.PLUCK_REPEAT,  // picked attack on every 16th of a held note
                     // Not clamped: >1 rings longer still, 1.3 is flat.
                     lpgDecay = 0.6f,
                     lpgColour = 0.7f,
@@ -684,8 +686,8 @@ private class FireSkyVibeBase(
                 // fourths below (lickDegreeOffset = -2 in the blues hexatonic: an exact fourth
                 // under every riff note except the b5, where the in-scale third substitutes).
                 // noteRange G2..C4 sits one octave under the lead's D3..A4, so the octave pin
-                // folds this track's render into the lower register (see class KDoc). PLUCK LPG
-                // keeps the doubled notes picked and distinct; volume sits under the lead.
+                // folds this track's render into the lower register (see class KDoc). PLUCK_REPEAT
+                // double-picks the held notes with the lead; volume sits under the lead.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
                     volume = 0.52f,
@@ -698,7 +700,7 @@ private class FireSkyVibeBase(
                     reverbSend = 0.12f,
                     delaySend = 0.08f,
                     reverbBrightness = 0.45f,
-                    lpgMode = LpgMode.PLUCK,
+                    lpgMode = LpgMode.PLUCK_REPEAT,
                     lpgDecay = 0.40f,
                 ).let { double ->
                     TrackVoice(
