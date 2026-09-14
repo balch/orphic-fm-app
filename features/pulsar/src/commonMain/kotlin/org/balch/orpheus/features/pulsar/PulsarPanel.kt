@@ -233,14 +233,7 @@ fun PulsarPanel(
         // ModeOne (every vibe on its name-hash seed, for A/B listening): a long press on the COMPLEXITY
         // label toggles it, and the label pulses while it is on.
         val modeOne by actions.modeOne.collectAsStateWithLifecycle()
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.padding(top = 8.dp),
-        ) {
-            PulsarMacroKnobRow(state = state, actions = actions, modeOne = modeOne)
-        }
-
+        PulsarMacroKnobRow(state = state, actions = actions, modeOne = modeOne)
     }
 }
 
@@ -535,53 +528,59 @@ private fun PulsarMacroKnobRow(
     actions: PulsarPanelActions,
     modeOne: Boolean,
 ) {
-    RotaryKnob(
-        value = state.energy,
-        onValueChange = actions.setEnergy,
-        label = "ENERGY",
-        controlId = PulsarSymbol.ENERGY.controlId.key,
-        size = 48.dp,
-        progressColor = OrpheusColors.cosmicPurple,
-        valueFormatter = null,
-    )
-    RotaryKnob(
-        value = state.complexity,
-        onValueChange = actions.setComplexity,
-        label = "COMPLEXITY",
-        controlId = PulsarSymbol.COMPLEXITY.controlId.key,
-        size = 48.dp,
-        progressColor = OrpheusColors.cosmicPurple,
-        valueFormatter = null,
-        onLongPress = actions.onToggleModeOne,
-        pulseLabel = modeOne,
-    )
-    RotaryKnob(
-        value = state.mood,
-        onValueChange = actions.setMood,
-        label = "MOOD",
-        controlId = PulsarSymbol.MOOD.controlId.key,
-        size = 48.dp,
-        progressColor = OrpheusColors.cosmicPurple,
-        valueFormatter = null,
-    )
-    RotaryKnob(
-        value = state.space,
-        onValueChange = actions.setSpace,
-        label = "SPACE",
-        controlId = PulsarSymbol.SPACE.controlId.key,
-        size = 48.dp,
-        progressColor = OrpheusColors.cosmicPurple,
-        valueFormatter = null,
-    )
-    RotaryKnob(
-        value = state.mix,
-        onValueChange = actions.setMix,
-        label = "MIX",
-        controlId = PulsarSymbol.MIX.controlId.key,
-        size = 32.dp,
-        progressColor = OrpheusColors.cosmicPurple,
-        valueFormatter = null,
-    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.Bottom,
+        modifier = Modifier.padding(top = 8.dp),
+    ) {
+        RotaryKnob(
+            value = state.energy,
+            onValueChange = actions.setEnergy,
+            label = "ENERGY",
+            controlId = PulsarSymbol.ENERGY.controlId.key,
+            size = 48.dp,
+            progressColor = OrpheusColors.cosmicPurple,
+            valueFormatter = null,
+        )
+        RotaryKnob(
+            value = state.complexity,
+            onValueChange = actions.setComplexity,
+            label = "COMPLEXITY",
+            controlId = PulsarSymbol.COMPLEXITY.controlId.key,
+            size = 48.dp,
+            progressColor = OrpheusColors.cosmicPurple,
+            valueFormatter = null,
+            onLongPress = actions.onToggleModeOne,
+            pulseLabel = modeOne,
+        )
+        RotaryKnob(
+            value = state.mood,
+            onValueChange = actions.setMood,
+            label = "MOOD",
+            controlId = PulsarSymbol.MOOD.controlId.key,
+            size = 48.dp,
+            progressColor = OrpheusColors.cosmicPurple,
+            valueFormatter = null,
+        )
+        RotaryKnob(
+            value = state.space,
+            onValueChange = actions.setSpace,
+            label = "SPACE",
+            controlId = PulsarSymbol.SPACE.controlId.key,
+            size = 48.dp,
+            progressColor = OrpheusColors.cosmicPurple,
+            valueFormatter = null,
+        )
+        RotaryKnob(
+            value = state.mix,
+            onValueChange = actions.setMix,
+            label = "MIX",
+            controlId = PulsarSymbol.MIX.controlId.key,
+            size = 32.dp,
+            progressColor = OrpheusColors.cosmicPurple,
+            valueFormatter = null,
+        )
+    }
 }
 
 @Suppress("StateFlowValueCalledInComposition")

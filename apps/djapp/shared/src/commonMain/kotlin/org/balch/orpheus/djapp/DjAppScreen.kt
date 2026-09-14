@@ -335,7 +335,7 @@ fun DjAppScreen(
                 timerFeature = timerFeature,
                 onTogglePlayback = onTogglePlayback,
                 dockablePanels = dockablePanels,
-                dockedPanels = dockedPanels,
+                dockedPanels = dockedPanels.orEmpty(),
                 activeSheet = activeSheet,
                 tabs = tabs,
                 onToggleDocked = toggleDocked,
@@ -503,7 +503,7 @@ private fun DjAppTvChrome(
     timerFeature: TimerFeature,
     onTogglePlayback: () -> Unit,
     dockablePanels: List<DjRoute>,
-    dockedPanels: List<DjRoute>?,
+    dockedPanels: List<DjRoute>,
     activeSheet: DjRoute?,
     tabs: List<DjRoute>,
     onToggleDocked: (DjRoute) -> Unit,
@@ -556,7 +556,7 @@ private fun DjAppTvChrome(
                 // activeSheet.
                 panels = bottomBarPanels(dockablePanels) + tabs.filter { it.opensAsSheet },
                 isDocked = { route ->
-                    if (route in dockablePanels) route in dockedPanels.orEmpty()
+                    if (route in dockablePanels) route in dockedPanels
                     else route == activeSheet
                 },
                 onToggle = { route ->
