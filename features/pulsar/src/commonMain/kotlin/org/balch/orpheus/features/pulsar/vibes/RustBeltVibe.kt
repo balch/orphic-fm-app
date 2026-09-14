@@ -664,7 +664,7 @@ class RustBeltVibe : VibeProvider {
                 // in the chorus.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX3,
-                    volume = 0.36f,
+                    volume = 0.26f,
                     harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
                     holdProbability = 0.72f,  // sustained bed
                     holdLengthMin = 2,
