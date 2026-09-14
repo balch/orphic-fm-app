@@ -611,9 +611,11 @@ private class FireSkyVibeBase(
                     delaySend = 0.14f,
                     glideRate = 0.0f,         // no slur — every riff note distinct
                     lpgMode = LpgMode.PLUCK_REPEAT,  // picked attack on every 16th of a held note
+                    // 2.0.5's values. The 0.6 / 0.7 pass was tuned to fake the 16th pulse
+                    // with one bloom per note; with real re-picks the shorter ring is right.
                     // Not clamped: >1 rings longer still, 1.3 is flat.
-                    lpgDecay = 0.6f,
-                    lpgColour = 0.7f,
+                    lpgDecay = 0.50f,
+                    lpgColour = 0.55f,
                 ).let { lead ->
                     TrackVoice(
                         engineEdm = lead,
