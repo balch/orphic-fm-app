@@ -2988,6 +2988,89 @@ static bool test_live_lick_octave_jump_is_one_scale() {
     return pass;
 }
 
+// A section's lpgMode override swaps the track's LPG mode for that section only: section 1
+// turns a plain-PLUCK lick into triplet re-picks, and section 0 plays single-picked before
+// and after it. Retrigs are counted per section visit, so bar units do not matter.
+static bool test_section_lpg_mode_override_applies_for_its_section_only() {
+    printf("\n=== Test: a section lpgMode override applies for its section only ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool seeded = true;
+    for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
+        seeded = seeded && engine->pulsar_section_track_lpg_mode[i].load(std::memory_order_relaxed) == -1;
+
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    pin_pulsar_rngs(engine);
+    solo_track(engine, 0);
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    push_two_section_ab_arrangement(engine, 2);
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+
+    engine->pulsar_track_engine_edm[0].store(-1, std::memory_order_relaxed);   // OSC
+    engine->pulsar_track_engine_space[0].store(-1, std::memory_order_relaxed);
+    engine->pulsar_track_role[0].store(1, std::memory_order_relaxed);          // MELODIC
+    engine->pulsar_track_lick_mode[0].store(2, std::memory_order_relaxed);     // FILL
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);          // AD leaves pending_retrig readable
+    engine->pulsar_track_density_override[0].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode[0].store(LPG_PLUCK, std::memory_order_relaxed);
+    engine->pulsar_track_lpg_mode_space[0].store(LPG_PLUCK, std::memory_order_relaxed);
+    engine->pulsar_section_track_lpg_mode[1 * kNumPulsarTracks + 0]
+        .store(LPG_PLUCK_REPEAT_TRIPLET, std::memory_order_relaxed);
+
+    // A 16th, then 2.0- and 1.5-beat notes: held notes the triplet grid can re-pick.
+    engine->pulsar_lick[0] = {4, 0.25f, 0.9f, -1.0f};
+    engine->pulsar_lick[1] = {2, 2.0f, 0.9f, -1.0f};
+    engine->pulsar_lick[2] = {0, 1.5f, 0.9f, -1.0f};
+    engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(3, std::memory_order_relaxed);
+
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(80.0f, std::memory_order_relaxed);
+
+    // Visits in order: section 0, 1, 0, 1. retrigs[v] = note-ons plus re-picks in visit v.
+    int retrigs[4] = {};
+    int visit = -1, last_section = -1;
+    for (int i = 0; i < 8000 && visit < 4; i++) {
+        unit_process_pulsar(&unit, engine, 512, 48000.0f);
+        const PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        const int section = ps->section_state.current_section;
+        if (section != last_section) { visit++; last_section = section; }
+        if (visit >= 0 && visit < 4 && ps->tracks[0].pending_retrig) retrigs[visit]++;
+    }
+    orpheus_engine_destroy(engine);
+
+    printf("  retrigs per visit [s0 s1 s0 s1] = [%d %d %d %d], unpushed slots are -1: %d\n",
+           retrigs[0], retrigs[1], retrigs[2], retrigs[3], seeded);
+    bool ok = true;
+    if (!seeded) {
+        printf("  FAIL: an unpushed section slot is not -1, so it would force BYPASS\n");
+        ok = false;
+    }
+    if (retrigs[0] == 0 || retrigs[2] == 0) {
+        printf("  FAIL: section 0 fired no notes - not a real test\n");
+        ok = false;
+    }
+    if (retrigs[1] < 3 * retrigs[0] || retrigs[3] < 3 * retrigs[2]) {
+        printf("  FAIL: the triplet section did not re-pick its held notes\n");
+        ok = false;
+    }
+    if (std::abs(retrigs[2] - retrigs[0]) > 1) {
+        printf("  FAIL: section 0 changed after the override section (%d then %d)\n",
+               retrigs[0], retrigs[2]);
+        ok = false;
+    }
+    printf("Section lpgMode override: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -3032,6 +3115,7 @@ bool run_pulsar_sections_tests() {
     tally(test_drum_span_progress_lands_the_climax_on_the_last_bar());
     tally(test_live_lick_octave_jump_is_one_scale());
     tally(test_choose_lick_octave_minimizes_leap());
+    tally(test_section_lpg_mode_override_applies_for_its_section_only());
     tally(test_choose_lick_octave_no_prior_soloist());
     tally(test_choose_lick_octave_clamps_to_range());
     tally(test_solo_fire_boost_never_saturates());

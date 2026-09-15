@@ -2008,6 +2008,11 @@ class PulsarViewModel(
                     PluginControlId(PULSAR_URI, "section_track_chord_follow_$baseIdx"),
                     IntValue(o?.chordFollow?.ordinal ?: -1)
                 )
+                // LpgMode id; -1 = no override, since 0 is BYPASS.
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_lpg_mode_$baseIdx"),
+                    IntValue(o?.lpgMode?.id ?: -1)
+                )
                 // Density is a float and 0 is meaningful ("track out"), so the no-override
                 // sentinel is -1, not 0. The engine resolves this against the vibe's base
                 // density at the boundary and regenerates the tracks that changed.

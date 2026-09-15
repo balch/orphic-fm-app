@@ -39,6 +39,7 @@ import org.balch.orpheus.features.pulsar.models.ChordStep
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
@@ -619,6 +620,30 @@ class PulsarSectionProgressionPushTest {
             assertEquals(0f, floatPort("track_6_delay_send_space"))
             assertEquals(0f, floatPort("track_6_reverb_send_space"))
         }
+
+    /**
+     * A section's lpgMode rides the per-track bank as the enum id. An unauthored slot must
+     * push -1, not 0: 0 is BYPASS, which would switch the vactrol off on every track.
+     */
+    @Test
+    fun `section lpgMode override reaches the controller with a -1 default`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(name = "verse", barsMin = 4, barsMax = 4),
+                Section(
+                    name = "rise", barsMin = 4, barsMax = 4,
+                    trackOverrides = mapOf(6 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_TRIPLET)),
+                ),
+            ),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(LpgMode.PLUCK_REPEAT_TRIPLET.id, intPort("section_track_lpg_mode_${1 * 8 + 6}"))
+        assertEquals(-1, intPort("section_track_lpg_mode_${0 * 8 + 6}"), "the verse declares no override")
+        assertEquals(-1, intPort("section_track_lpg_mode_${1 * 8 + 4}"), "track 4 declares no override")
+    }
 
     /**
      * The `track_ducking_$i` bank's declared flag is the whole reason an unauthored track

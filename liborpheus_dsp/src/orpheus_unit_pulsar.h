@@ -402,6 +402,7 @@ struct PulsarTrackState {
     // lpg_mode applies on the EDM engine slot; lpg_mode_space on the SPACE slot.
     int lpg_mode = 3;          // LPG_ENGINE_DEFAULT
     int lpg_mode_space = 3;    // LPG_ENGINE_DEFAULT (Kotlin pushes lpgModeSpace ?: lpgMode)
+    int section_lpg_mode = -1; // the active section's override, both slots; -1 = none
     float lpg_decay = 0.5f;
     float lpg_colour = 0.5f;
 
@@ -734,6 +735,7 @@ struct SectionParam {
     int track_inversion_override[kNumPulsarTracks]     = {-1, -1, -1, -1, -1, -1, -1, -1};
     int track_arp_mode_override[kNumPulsarTracks]      = {-1, -1, -1, -1, -1, -1, -1, -1};
     int track_chord_follow_override[kNumPulsarTracks]  = {-1, -1, -1, -1, -1, -1, -1, -1};
+    int track_lpg_mode_override[kNumPulsarTracks]      = {-1, -1, -1, -1, -1, -1, -1, -1};  // LpgMode id
     // Per-track density for this section. Negative = no override (use the vibe's base
     // density); 0 means the track is OUT. Resolved through resolve_section_densities() so
     // load, section entry and the déjà-vu reset can never disagree on a track's density.

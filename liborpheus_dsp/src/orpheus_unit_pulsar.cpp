@@ -1598,6 +1598,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.swing_offset = 0.0;
         ts.repick_live = false;
         ts.beat_origin = ts.head_origin = 0.0;
+        ts.section_lpg_mode = -1;
         ts.tides_env.Init();
         ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
         ts.tides_env_level = 0.0f;
@@ -1750,6 +1751,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     sec.track_inversion_override[t]     = engine->pulsar_section_track_inversion[tbase + t].load(std::memory_order_relaxed);
                     sec.track_arp_mode_override[t]      = engine->pulsar_section_track_arp_mode[tbase + t].load(std::memory_order_relaxed);
                     sec.track_chord_follow_override[t]  = engine->pulsar_section_track_chord_follow[tbase + t].load(std::memory_order_relaxed);
+                    sec.track_lpg_mode_override[t]      = engine->pulsar_section_track_lpg_mode[tbase + t].load(std::memory_order_relaxed);
                     sec.track_density_override[t]       = engine->pulsar_section_track_density[tbase + t].load(std::memory_order_relaxed);
                     // Breathe: 0 bars = off. Negative bars would invert the modulo in
                     // breathe_phase, and floor/span are 0-1 controls, so both are pinned
@@ -1956,6 +1958,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 int cd0 = state->chord_state.progression[state->chord_state.chord_index];
                 for (int t = 0; t < kNumPulsarTracks; t++) {
                     PulsarTrackState& ts = state->tracks[t];
+                    ts.section_lpg_mode = sec.track_lpg_mode_override[t];
                     if (ts.role == TrackRole::CHORDAL) {
                         int cs_ovr = sec.track_comping_style_override[t];
                         if (cs_ovr >= 0) {
@@ -2408,6 +2411,7 @@ static void resolve_breathe_block(PulsarState* state, float sample_rate) {
 // Shared by the render and by the hold path, which reads it for PLUCK_REPEAT.
 static inline int active_track_lpg_mode(const OrpheusEngine* engine,
                                         const PulsarTrackState& ts, int t) {
+    if (ts.section_lpg_mode >= 0) return ts.section_lpg_mode;  // a section override covers both slots
     const int edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
     return (ts.engine_index == edm) ? ts.lpg_mode : ts.lpg_mode_space;
 }
@@ -2495,6 +2499,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.swing_offset = 0.0;
             ts.repick_live = false;
             ts.beat_origin = ts.head_origin = 0.0;
+            ts.section_lpg_mode = -1;
             ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
             ts.tides_env_level = 0.0f;
             ts.envelope_profile = ENV_PROFILE_RHYTHM;
@@ -3503,6 +3508,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // leak forward into a section with no override of its own.
                             reload_vibe_tension(engine, state);
                         }
+
+                        // LPG mode override: the new section's value, or -1 to hand back the track's own.
+                        for (int t = 0; t < kNumPulsarTracks; t++)
+                            state->tracks[t].section_lpg_mode = sec.track_lpg_mode_override[t];
 
                         // Chord-follow override (per-track wins over section-level; -1 = restore
                         // default). Restored FIRST, ahead of jam_carried and the section's solo

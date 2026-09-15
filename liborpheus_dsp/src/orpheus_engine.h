@@ -1078,6 +1078,9 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_section_track_inversion[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<int>   pulsar_section_track_arp_mode[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<int>   pulsar_section_track_chord_follow[kMaxSections * kNumPulsarTracks] = {};
+    // LpgMode id for the section, -1 = no override. Seeded to -1 in orpheus_engine_create,
+    // since 0 is LPG_BYPASS and would switch every track's vactrol off.
+    std::atomic<int>   pulsar_section_track_lpg_mode[kMaxSections * kNumPulsarTracks] = {};
     // Per-section per-track density. Unlike the four above this is a float and 0 is a
     // MEANINGFUL value ("track out"), so the no-override sentinel is any negative number.
     // Density is a pattern-GENERATION input, so a change here regenerates the affected

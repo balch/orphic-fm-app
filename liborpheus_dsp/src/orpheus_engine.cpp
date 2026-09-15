@@ -26,6 +26,9 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // slot would read as "silence this track". Seed the negative no-override sentinel.
     for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
         engine->pulsar_section_track_density[i].store(-1.0f, std::memory_order_relaxed);
+    // Same for the section LPG mode: 0 is LPG_BYPASS, which would switch vactrols off.
+    for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
+        engine->pulsar_section_track_lpg_mode[i].store(-1, std::memory_order_relaxed);
 
     // Same reasoning for the lick pool's hit probabilities: 0 means "fires only at peak
     // tension", so a zero-init slot would silence a pool lick that never authored one.

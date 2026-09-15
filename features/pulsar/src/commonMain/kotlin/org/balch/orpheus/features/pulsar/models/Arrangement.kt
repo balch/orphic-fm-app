@@ -95,6 +95,9 @@ data class SectionTransition(
  *   force arpeggiation, `NEVER` for block stabs, `AUTO` for engine-default.
  * @param chordFollow Override chord-follow mode for melodic and chordal tracks.
  *   e.g. flip a bass from `ROOT_ONLY` (verse pedal) to `FOLLOW` (chorus walks).
+ * @param lpgMode Override the vactrol LPG mode on both engine slots, e.g. a guitar that
+ *   sustains in the verse and picks `PLUCK_REPEAT_TRIPLET` in the jam. The track's own mode
+ *   returns on exit; the switch lands on the boundary, so a note held across it changes mid-note.
  * @param breatheBars Cycle period for the volume/timbre "breathe" modulation, in loop-units.
  *   0 = off. Starts at the top on section entry and descends first, then repeats; snaps back
  *   to unity on section exit.
@@ -117,6 +120,7 @@ data class TrackSectionOverride(
     val sectionInversion: SectionInversion? = null,
     val arpMode: ArpMode? = null,
     val chordFollow: ChordFollow? = null,
+    val lpgMode: LpgMode? = null,
     val breatheBars: Int = 0,
     val breatheFloor: Float = 0f,
     val breatheTimbreSpan: Float = 0f,
