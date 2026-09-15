@@ -961,13 +961,31 @@ struct RepickCounts {
     std::vector<long long> retrig_at;  // sample time of every note-on and re-pick
 };
 
+struct RepickNote {
+    int8_t degree;  // negative = rest
+    float beats;
+    float velocity;
+};
+
 // A 16th on the beat, then 2.0- and 1.5-beat notes that both start on the "e"
-// (steps 1 and 9; 12 hold steps per 8-beat cycle) at 80 BPM on track 0. engine_id
-// -1 is the OSC branch (ts.osc_lpg), 9 is WSH through OrpheusVoice, the Fire Sky
-// lead's path. A retrig on a block whose previous step said "the next step
-// continues me" is a hold re-pick. A swing >= 0 makes the clock rigid: that swing
-// exactly, and energy 1 so the elastic tempo cannot drift.
-static RepickCounts run_repick_fixture(int engine_id, int lpg_mode, float swing = -1.0f) {
+// (steps 1 and 9; 12 hold steps per 8-beat cycle).
+static constexpr RepickNote kHeadsOnTheE[] = {{4, 0.25f, 0.9f}, {2, 2.0f, 0.95f}, {0, 1.5f, 0.85f}};
+static constexpr int kHeadsOnTheECount = static_cast<int>(sizeof(kHeadsOnTheE) / sizeof(kHeadsOnTheE[0]));
+// Four 1.5-beat notes, each starting on the "&" after an 8th rest.
+static constexpr RepickNote kHeadsOnTheAnd[] = {
+    {-1, 0.5f, 0.0f}, {2, 1.5f, 0.9f}, {-1, 0.5f, 0.0f}, {4, 1.5f, 0.9f},
+    {-1, 0.5f, 0.0f}, {2, 1.5f, 0.9f}, {-1, 0.5f, 0.0f}, {4, 1.5f, 0.9f},
+};
+static constexpr int kHeadsOnTheAndCount = static_cast<int>(sizeof(kHeadsOnTheAnd) / sizeof(kHeadsOnTheAnd[0]));
+
+// An 8-beat lick loop on track 0. engine_id -1 is the OSC branch (ts.osc_lpg), 9 is WSH
+// through OrpheusVoice, the Fire Sky lead's path. A retrig on a block whose previous step
+// said "the next step continues me" is a hold re-pick. A swing >= 0 makes the clock rigid:
+// that swing exactly, and energy 1 so the elastic tempo cannot drift.
+static RepickCounts run_repick_fixture(int engine_id, int lpg_mode, float swing = -1.0f,
+                                       float bpm = 80.0f,
+                                       const RepickNote* notes = kHeadsOnTheE,
+                                       int note_count = kHeadsOnTheECount, int blocks = 1200) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit;
     make_osc_unit(unit);
@@ -996,31 +1014,24 @@ static RepickCounts run_repick_fixture(int engine_id, int lpg_mode, float swing 
         engine->pulsar_track_macros[0].complexity_swing_max.store(0.0f, std::memory_order_relaxed);
     }
 
-    engine->pulsar_lick[0].scale_degree = 4;
-    engine->pulsar_lick[0].duration = 0.25f;
-    engine->pulsar_lick[0].velocity = 0.9f;
-    engine->pulsar_lick[0].glide_rate = -1.0f;
-    engine->pulsar_lick[1].scale_degree = 2;
-    engine->pulsar_lick[1].duration = 2.0f;
-    engine->pulsar_lick[1].velocity = 0.95f;
-    engine->pulsar_lick[1].glide_rate = -1.0f;
-    engine->pulsar_lick[2].scale_degree = 0;
-    engine->pulsar_lick[2].duration = 1.5f;
-    engine->pulsar_lick[2].velocity = 0.85f;
-    engine->pulsar_lick[2].glide_rate = -1.0f;
+    for (int n = 0; n < note_count; n++) {
+        engine->pulsar_lick[n].scale_degree = notes[n].degree;
+        engine->pulsar_lick[n].duration = notes[n].beats;
+        engine->pulsar_lick[n].velocity = notes[n].velocity;
+        engine->pulsar_lick[n].glide_rate = -1.0f;
+    }
     engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
     engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
-    engine->pulsar_lick_length.store(3, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(note_count, std::memory_order_relaxed);
 
     trigger_vibe_load(engine);
-    engine->clock_bpm.store(80.0f, std::memory_order_relaxed);
+    engine->clock_bpm.store(bpm, std::memory_order_relaxed);
 
     RepickCounts c;
-    const int kBlocks = 1200;  // 12.8 s, a little over two cycles
     float prev_gain = 0.0f;
     bool was_in_hold = false;
-    for (int i = 0; i < kBlocks; i++) {
+    for (int i = 0; i < blocks; i++) {  // 1200 blocks at 80 BPM is a little over two cycles
         unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
         const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
         if (ts.pending_retrig) {
@@ -1178,6 +1189,36 @@ static bool test_pulsar_lpg_pluck_repeat_triplet_lands_on_beat_thirds() {
         ok &= swing_ok;
     }
     printf("PLUCK_REPEAT_TRIPLET lands on beat thirds: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// A note starting on the "&" is exactly 2/3 of a 16th ahead of the beat's second third,
+// so whether that third picks must not come down to sample rounding at a fractional step
+// length. A skipped third shows as a 2-step gap from the note-on to the downbeat re-pick.
+static bool test_pulsar_lpg_pluck_repeat_triplet_picks_the_third_after_an_and_note() {
+    printf("\n=== Test: PLUCK_REPEAT_TRIPLET picks the third after a note on the \"&\" ===\n");
+    const float bpms[] = {97.0f, 101.0f, 103.0f, 107.0f, 113.0f, 131.0f};
+    bool ok = true;
+    for (float bpm : bpms) {
+        const RepickCounts c = run_repick_fixture(-1, LPG_PLUCK_REPEAT_TRIPLET, 0.0f, bpm,
+                                                  kHeadsOnTheAnd, kHeadsOnTheAndCount, 900);
+        const double samples_per_step = 720000.0 / bpm;  // 48 kHz, 4 steps per beat
+        int skipped = 0;
+        for (size_t i = 1; i < c.retrig_at.size(); i++) {
+            const double steps = (c.retrig_at[i] - c.retrig_at[i - 1]) / samples_per_step;
+            if (steps > 1.9 && steps < 2.1) skipped++;
+        }
+        printf("  %5.1f BPM: %zu picks, %d thirds skipped\n", bpm, c.retrig_at.size(), skipped);
+        if (c.retrig_at.size() < 20) {
+            printf("  FAIL: %.1f BPM fired almost nothing - not a real test\n", bpm);
+            ok = false;
+        }
+        if (skipped != 0) {
+            printf("  FAIL: %.1f BPM skipped %d thirds after a note on the \"&\"\n", bpm, skipped);
+            ok = false;
+        }
+    }
+    printf("PLUCK_REPEAT_TRIPLET third after an \"&\" note: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -1385,6 +1426,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_lpg_pluck_repeat_repicks_every_hold_step()) suite_pass++; else suite_fail++;
     if (test_pulsar_lpg_pluck_repeat_grids_follow_the_beat()) suite_pass++; else suite_fail++;
     if (test_pulsar_lpg_pluck_repeat_triplet_lands_on_beat_thirds()) suite_pass++; else suite_fail++;
+    if (test_pulsar_lpg_pluck_repeat_triplet_picks_the_third_after_an_and_note()) suite_pass++; else suite_fail++;
     if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
     if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);

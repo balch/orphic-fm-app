@@ -2425,9 +2425,10 @@ static inline bool pluck_repeat_fires(int lpg_mode, int beat_pos) {
     }
 }
 
-// A triplet re-pick must land this far after its note's head, or a head on the "e"
-// flams against the first third. Half a triplet; tune by ear.
-static constexpr double kTripletRepickMinGapSteps = 2.0 / 3.0;
+// A triplet re-pick must land this far after its note's head, or a head on the "e" flams
+// against the first third (1/3 of a 16th later). Half a 16th keeps the third 2/3 after a
+// head on the "&" clear of sample rounding.
+static constexpr double kTripletRepickMinGapSteps = 0.5;
 
 // Re-picks a held note at the beat thirds that fall in [seg_start, seg_end) of this
 // block. A swung pair still totals two 16ths, so the thirds ignore swing.
