@@ -60,5 +60,12 @@ enum class LpgMode(val id: Int) {
      * 1-beat lick note is four 16th picks. The double-picked riff 2.0.5 produced by
      * accident when its gate timer dropped between hold steps; opt in per voice.
      */
-    PLUCK_REPEAT(4);
+    PLUCK_REPEAT(4),
+    /**
+     * [PLUCK_REPEAT] on the 8th grid: held notes re-pick on the beat and the "&". Grids
+     * follow the beat, not the note, and a note's first pick always plays.
+     */
+    PLUCK_REPEAT_8TH(5),
+    /** [PLUCK_REPEAT] on the off-beat 8ths only: held notes re-pick on the "&". */
+    PLUCK_REPEAT_8TH_OFF(6);
 }

@@ -97,6 +97,8 @@ static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
 //                        step by the Pulsar sequencer (a 1-beat riff note is
 //                        four 16th picks). The vactrol itself is PLUCK; only
 //                        Pulsar's hold path reads the difference.
+//   LPG_PLUCK_REPEAT_8TH / _8TH_OFF — the same re-pick on the beat and the "&",
+//                        or on the "&" only.
 //
 // The default of LPG_BYPASS in Render() means existing call sites that don't
 // pass a mode get exactly the prior behavior.
@@ -106,7 +108,15 @@ enum LpgMode : int {
     LPG_PLUCK = 2,
     LPG_ENGINE_DEFAULT = 3,
     LPG_PLUCK_REPEAT = 4,
+    LPG_PLUCK_REPEAT_8TH = 5,
+    LPG_PLUCK_REPEAT_8TH_OFF = 6,
 };
+
+// Every re-pick mode is a PLUCK vactrol; only Pulsar's hold path tells them apart.
+static inline bool lpg_is_pluck(int mode) {
+    return mode == LPG_PLUCK || mode == LPG_PLUCK_REPEAT ||
+           mode == LPG_PLUCK_REPEAT_8TH || mode == LPG_PLUCK_REPEAT_8TH_OFF;
+}
 
 // Per-engine LPG default. When a caller passes LPG_ENGINE_DEFAULT, this table
 // is consulted. Choices are tuned for Pulsar usage where the engine is asked
@@ -182,7 +192,7 @@ struct OrpheusLpg {
                 stmlib::SemitonesToRatio(-72.0f * lpg_decay + 12.0f * lpg_colour) -
                 short_decay;
 
-            if (mode == LPG_PLUCK || mode == LPG_PLUCK_REPEAT) {
+            if (lpg_is_pluck(mode)) {
                 // Only the chunk carrying the note-on re-triggers the bloom;
                 // after that the asymmetric decay runs regardless of gate.
                 if (rise) envelope.Trigger();
@@ -448,7 +458,7 @@ struct OrpheusVoice {
                     stmlib::SemitonesToRatio(-72.0f * lpg_decay + 12.0f * lpg_colour) -
                     short_decay;
 
-                if (lpg_mode == LPG_PLUCK || lpg_mode == LPG_PLUCK_REPEAT) {
+                if (lpg_is_pluck(lpg_mode)) {
                     // PING: trigger a vactrol bloom on rising edge, then let
                     // the asymmetric decay carry it down regardless of gate.
                     if (rising_edge) lpg_envelope_.Trigger();

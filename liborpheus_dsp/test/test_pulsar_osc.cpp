@@ -955,12 +955,14 @@ struct RepickCounts {
     int retrigs = 0;       // blocks where the sequencer raised a note-on
     int hold_repicks = 0;  // ...of which landed on a hold continuation
     int blooms = 0;        // vactrol gain jumping up, read off the LPG envelope
+    int by_beat_pos[4] = {};  // hold re-picks by playhead % 4: beat, e, &, a
 };
 
-// The two-note phrase (2.0 + 1.5 beats over an 8-beat loop, 12 hold steps per
-// cycle) at 80 BPM on track 0. engine_id -1 is the OSC branch (ts.osc_lpg),
-// 9 is WSH through OrpheusVoice, the Fire Sky lead's path. A retrig on a block
-// whose previous step said "the next step continues me" is a hold re-pick.
+// A 16th on the beat, then 2.0- and 1.5-beat notes that both start on the "e"
+// (steps 1 and 9; 12 hold steps per 8-beat cycle) at 80 BPM on track 0. engine_id
+// -1 is the OSC branch (ts.osc_lpg), 9 is WSH through OrpheusVoice, the Fire Sky
+// lead's path. A retrig on a block whose previous step said "the next step
+// continues me" is a hold re-pick.
 static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit;
@@ -984,18 +986,22 @@ static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
     engine->pulsar_track_lpg_colour[0].store(0.5f, std::memory_order_relaxed);
     engine->pulsar_track_lpg_colour_space[0].store(0.5f, std::memory_order_relaxed);
 
-    engine->pulsar_lick[0].scale_degree = 2;
-    engine->pulsar_lick[0].duration = 2.0f;
-    engine->pulsar_lick[0].velocity = 0.95f;
+    engine->pulsar_lick[0].scale_degree = 4;
+    engine->pulsar_lick[0].duration = 0.25f;
+    engine->pulsar_lick[0].velocity = 0.9f;
     engine->pulsar_lick[0].glide_rate = -1.0f;
-    engine->pulsar_lick[1].scale_degree = 0;
-    engine->pulsar_lick[1].duration = 1.5f;
-    engine->pulsar_lick[1].velocity = 0.85f;
+    engine->pulsar_lick[1].scale_degree = 2;
+    engine->pulsar_lick[1].duration = 2.0f;
+    engine->pulsar_lick[1].velocity = 0.95f;
     engine->pulsar_lick[1].glide_rate = -1.0f;
+    engine->pulsar_lick[2].scale_degree = 0;
+    engine->pulsar_lick[2].duration = 1.5f;
+    engine->pulsar_lick[2].velocity = 0.85f;
+    engine->pulsar_lick[2].glide_rate = -1.0f;
     engine->pulsar_lick_loop_length.store(8, std::memory_order_relaxed);
     engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_lick_octave.store(-1, std::memory_order_relaxed);
-    engine->pulsar_lick_length.store(2, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(3, std::memory_order_relaxed);
 
     trigger_vibe_load(engine);
     engine->clock_bpm.store(80.0f, std::memory_order_relaxed);
@@ -1009,7 +1015,10 @@ static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
         const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
         if (ts.pending_retrig) {
             c.retrigs++;
-            if (was_in_hold) c.hold_repicks++;
+            if (was_in_hold) {
+                c.hold_repicks++;
+                c.by_beat_pos[ts.playhead % 4]++;
+            }
         }
         was_in_hold = ts.in_hold;
         const float g = (engine_id < 0) ? ts.osc_lpg.envelope.gain()
@@ -1063,6 +1072,45 @@ static bool test_pulsar_lpg_pluck_repeat_repicks_every_hold_step() {
         }
     }
     printf("PLUCK_REPEAT re-picks holds: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// The grids follow the beat, not the note. Both long notes start on the "e", so an
+// 8th counted from the note-on would land on the "e" and "a" instead.
+static bool test_pulsar_lpg_pluck_repeat_grids_follow_the_beat() {
+    printf("\n=== Test: PLUCK_REPEAT grids re-pick held notes on their beat positions ===\n");
+    struct Grid { int mode; const char* name; bool picks[4]; };  // beat, e, &, a
+    const Grid grids[] = {
+        { LPG_PLUCK_REPEAT,         "16th",    { true,  true,  true, true  } },
+        { LPG_PLUCK_REPEAT_8TH,     "8th",     { true,  false, true, false } },
+        { LPG_PLUCK_REPEAT_8TH_OFF, "8th-off", { false, false, true, false } },
+    };
+    const int engine_ids[2] = { 9, -1 };
+    bool ok = true;
+    for (const Grid& g : grids) {
+        for (int engine_id : engine_ids) {
+            const RepickCounts c = run_repick_fixture(engine_id, g.mode);
+            const char* voice = (engine_id < 0) ? "OSC" : "WSH";
+            printf("  %-7s %s: hold re-picks [beat e & a] = [%d %d %d %d], blooms=%d of %d note-ons\n",
+                   g.name, voice, c.by_beat_pos[0], c.by_beat_pos[1], c.by_beat_pos[2],
+                   c.by_beat_pos[3], c.blooms, c.retrigs);
+            for (int p = 0; p < 4; p++) {
+                // Two cycles put at least 4 re-picks on every position a grid selects.
+                const bool wrong = g.picks[p] ? (c.by_beat_pos[p] < 4) : (c.by_beat_pos[p] != 0);
+                if (wrong) {
+                    printf("  FAIL: %s %s re-picked %d times at beat position %d\n",
+                           g.name, voice, c.by_beat_pos[p], p);
+                    ok = false;
+                }
+            }
+            if (c.blooms < c.retrigs) {
+                printf("  FAIL: %s %s: %d of %d note-ons arrived without a bloom\n",
+                       g.name, voice, c.retrigs - c.blooms, c.retrigs);
+                ok = false;
+            }
+        }
+    }
+    printf("PLUCK_REPEAT grids follow the beat: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -1268,6 +1316,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_lick_heads_skip_the_energy_density_roll()) suite_pass++; else suite_fail++;
     if (test_pulsar_voice_lpg_blooms_on_every_note_on_under_a_held_gate()) suite_pass++; else suite_fail++;
     if (test_pulsar_lpg_pluck_repeat_repicks_every_hold_step()) suite_pass++; else suite_fail++;
+    if (test_pulsar_lpg_pluck_repeat_grids_follow_the_beat()) suite_pass++; else suite_fail++;
     if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
     if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);

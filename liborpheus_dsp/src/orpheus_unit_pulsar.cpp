@@ -2410,6 +2410,17 @@ static inline int active_track_lpg_mode(const OrpheusEngine* engine,
     return (ts.engine_index == edm) ? ts.lpg_mode : ts.lpg_mode_space;
 }
 
+// Whether a held note re-picks on a hold step at this beat position (playhead % 4:
+// 0 = beat, 1 = e, 2 = &, 3 = a). Note heads always pick; this only picks the holds.
+static inline bool pluck_repeat_fires(int lpg_mode, int beat_pos) {
+    switch (lpg_mode) {
+        case LPG_PLUCK_REPEAT:         return true;
+        case LPG_PLUCK_REPEAT_8TH:     return beat_pos == 0 || beat_pos == 2;
+        case LPG_PLUCK_REPEAT_8TH_OFF: return beat_pos == 2;
+        default:                       return false;
+    }
+}
+
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate) {
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
 
@@ -4361,13 +4372,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     float base_gate = static_cast<float>(step.duration * samples_per_step);
                     ts.gate_timer = std::max(base_gate + drunk, base_gate * 0.25f);
                     ts.voice_active = true;
-                    // PLUCK_REPEAT re-picks the held note on every step: the same
-                    // note-on the trigger path raises, on the boundary sample, with
-                    // the head's pitch and velocity. 2.0.5 did this by accident for
+                    // PLUCK_REPEAT re-picks the held note on the steps its grid selects:
+                    // the same note-on the trigger path raises, on the boundary sample,
+                    // with the head's pitch and velocity. 2.0.5 did this by accident for
                     // every mode when its gate timer underran between hold steps
                     // (7819cbd05 stopped that: Tides re-attacked, PLUCK re-bloomed);
                     // this keeps the double-picked riff for the tracks that ask.
-                    if (active_track_lpg_mode(engine, ts, t) == LPG_PLUCK_REPEAT) {
+                    if (pluck_repeat_fires(active_track_lpg_mode(engine, ts, t), ts.playhead % 4)) {
                         ts.trigger_offset = step_boundary_samples[b];
                         ts.pending_retrig = true;
                     }
@@ -5162,9 +5173,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // gate_timer is decremented at block rate, so a held note whose step
             // boundary falls inside a block drops voice_active for that block and
             // the hold continuation raises it again; treating those as note-ons
-            // re-blooms the LPG several times per note. pending_retrig is set only
-            // by the normal trigger path (never by the hold path) and is still
-            // intact here — the Tides envelope below is what consumes it.
+            // re-blooms the LPG several times per note. pending_retrig is set by the
+            // trigger path and by a PLUCK_REPEAT re-pick, and is still intact here —
+            // the Tides envelope below is what consumes it.
             const bool osc_note_on = ts.pending_retrig;
 
             if (trig_off > 0) {
@@ -5223,7 +5234,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // The onset segment carries the note-on itself: the voice's gate edge
             // cannot see it when lick notes run back to back and the gate never
             // falls, and PLUCK only blooms on an edge. Same contract as osc_note_on
-            // above; the hold path never sets pending_retrig, so holds do not bloom.
+            // above; a hold blooms only when a PLUCK_REPEAT grid re-picks it.
             ts.voice.Render(
                 ts.engine_index,
                 gate_for_render,
