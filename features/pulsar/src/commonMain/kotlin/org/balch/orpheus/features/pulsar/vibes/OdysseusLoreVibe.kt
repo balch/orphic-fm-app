@@ -18,6 +18,7 @@ import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickSource
 import org.balch.orpheus.features.pulsar.models.LickStep
+import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -309,6 +310,9 @@ class OdysseusLoreVibe : VibeProvider {
                 //
                 // Stays dry on purpose: a third wah against the lead's quarter-note pedal and the
                 // bass's slow one would be mud. Give it its own wahParams if you want that.
+                //
+                // Rise, vamp and peak switch it to PLUCK_REPEAT_TRIPLET, so the verse keeps this
+                // sustained tone and the jam gets triplet picks.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH, volume = 0.6f,
                     noteRangeLow = 57, noteRangeHigh = 79,
@@ -431,6 +435,10 @@ class OdysseusLoreVibe : VibeProvider {
                             energy = 1.2f, complexity = 1.15f, space = 0.9f, mood = 1.05f,
                         ),
                         soloMode = SoloMode.LickBuilder(probability = 0.95f, mutationRate = 0.5f),
+                        // The second guitar picks its held notes in triplets from here through the peak.
+                        trackOverrides = mapOf(
+                            6 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_TRIPLET),
+                        ),
                         transitions = listOf(SectionTransition(3, 1f, transitionBars = 2)),
                     ),
                     // 3 VAMP — the harmony freezes on i (Dm) while the bass keeps the
@@ -449,6 +457,9 @@ class OdysseusLoreVibe : VibeProvider {
                             energy = 1.25f, complexity = 1.3f, space = 1.1f, mood = 1.1f,
                         ),
                         soloMode = SoloMode.LickBuilder(probability = 0.95f, mutationRate = 0.6f),
+                        trackOverrides = mapOf(
+                            6 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_TRIPLET),
+                        ),
                         transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
                     ),
                     // 4 PEAK — free improv over the vamp: SoloMode.Jam generates a
@@ -477,6 +488,9 @@ class OdysseusLoreVibe : VibeProvider {
                             volume = 0.35f,
                             timing = 0.15f,
                             spurtChance = 0.2f,
+                        ),
+                        trackOverrides = mapOf(
+                            6 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_TRIPLET),
                         ),
                         // Hard cut home: the biggest bar slams into the slow verse.
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 0)),
