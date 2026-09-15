@@ -97,8 +97,9 @@ static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
 //                        step by the Pulsar sequencer (a 1-beat riff note is
 //                        four 16th picks). The vactrol itself is PLUCK; only
 //                        Pulsar's hold path reads the difference.
-//   LPG_PLUCK_REPEAT_8TH / _8TH_OFF / _TRIPLET — the same re-pick on the beat
-//                        and the "&", on the "&" only, or on 8th-note triplets.
+//   LPG_PLUCK_REPEAT_8TH / _8TH_OFF / _TRIPLET / _16TH_OFF — the same re-pick on
+//                        the beat and the "&", on the "&" only, on 8th-note
+//                        triplets, or on the "e" and "a" only.
 //
 // The default of LPG_BYPASS in Render() means existing call sites that don't
 // pass a mode get exactly the prior behavior.
@@ -111,13 +112,14 @@ enum LpgMode : int {
     LPG_PLUCK_REPEAT_8TH = 5,
     LPG_PLUCK_REPEAT_8TH_OFF = 6,
     LPG_PLUCK_REPEAT_TRIPLET = 7,
+    LPG_PLUCK_REPEAT_16TH_OFF = 8,
 };
 
 // Every re-pick mode is a PLUCK vactrol; only Pulsar's hold path tells them apart.
 static inline bool lpg_is_pluck(int mode) {
     return mode == LPG_PLUCK || mode == LPG_PLUCK_REPEAT ||
            mode == LPG_PLUCK_REPEAT_8TH || mode == LPG_PLUCK_REPEAT_8TH_OFF ||
-           mode == LPG_PLUCK_REPEAT_TRIPLET;
+           mode == LPG_PLUCK_REPEAT_TRIPLET || mode == LPG_PLUCK_REPEAT_16TH_OFF;
 }
 
 // Per-engine LPG default. When a caller passes LPG_ENGINE_DEFAULT, this table

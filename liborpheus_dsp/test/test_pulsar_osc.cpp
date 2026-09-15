@@ -1092,9 +1092,10 @@ static bool test_pulsar_lpg_pluck_repeat_grids_follow_the_beat() {
     printf("\n=== Test: PLUCK_REPEAT grids re-pick held notes on their beat positions ===\n");
     struct Grid { int mode; const char* name; bool picks[4]; };  // beat, e, &, a
     const Grid grids[] = {
-        { LPG_PLUCK_REPEAT,         "16th",    { true,  true,  true, true  } },
-        { LPG_PLUCK_REPEAT_8TH,     "8th",     { true,  false, true, false } },
-        { LPG_PLUCK_REPEAT_8TH_OFF, "8th-off", { false, false, true, false } },
+        { LPG_PLUCK_REPEAT,          "16th",     { true,  true,  true,  true  } },
+        { LPG_PLUCK_REPEAT_8TH,      "8th",      { true,  false, true,  false } },
+        { LPG_PLUCK_REPEAT_8TH_OFF,  "8th-off",  { false, false, true,  false } },
+        { LPG_PLUCK_REPEAT_16TH_OFF, "16th-off", { false, true,  false, true  } },
     };
     const int engine_ids[2] = { 9, -1 };
     bool ok = true;
@@ -1102,7 +1103,7 @@ static bool test_pulsar_lpg_pluck_repeat_grids_follow_the_beat() {
         for (int engine_id : engine_ids) {
             const RepickCounts c = run_repick_fixture(engine_id, g.mode);
             const char* voice = (engine_id < 0) ? "OSC" : "WSH";
-            printf("  %-7s %s: hold re-picks [beat e & a] = [%d %d %d %d], blooms=%d of %d note-ons\n",
+            printf("  %-8s %s: hold re-picks [beat e & a] = [%d %d %d %d], blooms=%d of %d note-ons\n",
                    g.name, voice, c.by_beat_pos[0], c.by_beat_pos[1], c.by_beat_pos[2],
                    c.by_beat_pos[3], c.blooms, c.retrigs);
             for (int p = 0; p < 4; p++) {

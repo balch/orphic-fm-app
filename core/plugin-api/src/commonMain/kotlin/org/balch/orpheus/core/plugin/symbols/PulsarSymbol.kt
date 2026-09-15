@@ -1084,7 +1084,7 @@ enum class PulsarSymbol(
 
     // Per-track LPG mode (applies on the EDM engine slot):
     //   int LpgMode (0=BYPASS, 1=SUSTAINED, 2=PLUCK, 3=ENGINE_DEFAULT, 4=PLUCK_REPEAT,
-    //   5=PLUCK_REPEAT_8TH, 6=PLUCK_REPEAT_8TH_OFF, 7=PLUCK_REPEAT_TRIPLET)
+    //   5=PLUCK_REPEAT_8TH, 6=PLUCK_REPEAT_8TH_OFF, 7=PLUCK_REPEAT_TRIPLET, 8=PLUCK_REPEAT_16TH_OFF)
     TRACK_0_LPG_MODE("track_0_lpg_mode"),
     TRACK_1_LPG_MODE("track_1_lpg_mode"),
     TRACK_2_LPG_MODE("track_2_lpg_mode"),

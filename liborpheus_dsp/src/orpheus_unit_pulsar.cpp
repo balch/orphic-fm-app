@@ -2416,11 +2416,12 @@ static inline int active_track_lpg_mode(const OrpheusEngine* engine,
 // 0 = beat, 1 = e, 2 = &, 3 = a). Note heads always pick; this only picks the holds.
 static inline bool pluck_repeat_fires(int lpg_mode, int beat_pos) {
     switch (lpg_mode) {
-        case LPG_PLUCK_REPEAT:         return true;
-        case LPG_PLUCK_REPEAT_8TH:     return beat_pos == 0 || beat_pos == 2;
-        case LPG_PLUCK_REPEAT_8TH_OFF: return beat_pos == 2;
-        case LPG_PLUCK_REPEAT_TRIPLET: return beat_pos == 0;  // the thirds: schedule_triplet_repick
-        default:                       return false;
+        case LPG_PLUCK_REPEAT:          return true;
+        case LPG_PLUCK_REPEAT_8TH:      return beat_pos == 0 || beat_pos == 2;
+        case LPG_PLUCK_REPEAT_8TH_OFF:  return beat_pos == 2;
+        case LPG_PLUCK_REPEAT_16TH_OFF: return beat_pos == 1 || beat_pos == 3;
+        case LPG_PLUCK_REPEAT_TRIPLET:  return beat_pos == 0;  // the thirds: schedule_triplet_repick
+        default:                        return false;
     }
 }
 
