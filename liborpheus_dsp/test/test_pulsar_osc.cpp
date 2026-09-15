@@ -8,7 +8,9 @@
 #include "../src/pulsar_pattern_gen.h"
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <vector>
 
 static constexpr int kBlockFrames = 512;
 
@@ -956,14 +958,16 @@ struct RepickCounts {
     int hold_repicks = 0;  // ...of which landed on a hold continuation
     int blooms = 0;        // vactrol gain jumping up, read off the LPG envelope
     int by_beat_pos[4] = {};  // hold re-picks by playhead % 4: beat, e, &, a
+    std::vector<long long> retrig_at;  // sample time of every note-on and re-pick
 };
 
 // A 16th on the beat, then 2.0- and 1.5-beat notes that both start on the "e"
 // (steps 1 and 9; 12 hold steps per 8-beat cycle) at 80 BPM on track 0. engine_id
 // -1 is the OSC branch (ts.osc_lpg), 9 is WSH through OrpheusVoice, the Fire Sky
 // lead's path. A retrig on a block whose previous step said "the next step
-// continues me" is a hold re-pick.
-static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
+// continues me" is a hold re-pick. A swing >= 0 makes the clock rigid: that swing
+// exactly, and energy 1 so the elastic tempo cannot drift.
+static RepickCounts run_repick_fixture(int engine_id, int lpg_mode, float swing = -1.0f) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit;
     make_osc_unit(unit);
@@ -985,6 +989,12 @@ static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
     engine->pulsar_track_lpg_decay_space[0].store(0.5f, std::memory_order_relaxed);
     engine->pulsar_track_lpg_colour[0].store(0.5f, std::memory_order_relaxed);
     engine->pulsar_track_lpg_colour_space[0].store(0.5f, std::memory_order_relaxed);
+    if (swing >= 0.0f) {
+        engine->pulsar_energy.store(1.0f, std::memory_order_relaxed);  // drift range is (1 - energy) * 5%
+        engine->pulsar_genre_swing.store(swing, std::memory_order_relaxed);
+        engine->pulsar_track_macros[0].complexity_swing_min.store(0.0f, std::memory_order_relaxed);
+        engine->pulsar_track_macros[0].complexity_swing_max.store(0.0f, std::memory_order_relaxed);
+    }
 
     engine->pulsar_lick[0].scale_degree = 4;
     engine->pulsar_lick[0].duration = 0.25f;
@@ -1015,6 +1025,7 @@ static RepickCounts run_repick_fixture(int engine_id, int lpg_mode) {
         const PulsarTrackState& ts = engine->pulsar_state->tracks[0];
         if (ts.pending_retrig) {
             c.retrigs++;
+            c.retrig_at.push_back(static_cast<long long>(i) * kBlockFrames + ts.trigger_offset);
             if (was_in_hold) {
                 c.hold_repicks++;
                 c.by_beat_pos[ts.playhead % 4]++;
@@ -1111,6 +1122,61 @@ static bool test_pulsar_lpg_pluck_repeat_grids_follow_the_beat() {
         }
     }
     printf("PLUCK_REPEAT grids follow the beat: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// PLUCK_REPEAT_TRIPLET re-picks a held note on the beat and a third and two thirds into
+// it. At 80 BPM a 16th is 9000 samples and a triplet 12000. Swing moves the heads on the
+// "e" but none of the thirds, and the thirds right after those heads (12000, 84000) are
+// too close to pick.
+static bool test_pulsar_lpg_pluck_repeat_triplet_lands_on_beat_thirds() {
+    printf("\n=== Test: PLUCK_REPEAT_TRIPLET re-picks on beat thirds, straight or swung ===\n");
+    static constexpr long long kCycle = 32 * 9000;
+    const float swings[2] = { 0.0f, 0.5f };
+    bool ok = true;
+    for (float swing : swings) {
+        const RepickCounts c = run_repick_fixture(9, LPG_PLUCK_REPEAT_TRIPLET, swing);
+        const long long e_shift = static_cast<long long>(swing * 0.5f * 9000.0f);
+        const long long expected[] = {
+            0, 9000 + e_shift, 81000 + e_shift,  // heads
+            24000, 36000, 48000, 60000, 72000,    // the 2-beat note
+            96000, 108000, 120000, 132000,        // the 1.5-beat note
+        };
+        const int n_expected = static_cast<int>(sizeof(expected) / sizeof(expected[0]));
+        bool seen[16] = {};
+        bool swing_ok = c.retrigs > 0;
+        const long long t0 = c.retrig_at.empty() ? 0 : c.retrig_at[0];
+        for (long long at : c.retrig_at) {
+            const long long pos = (at - t0) % kCycle;
+            int match = -1;
+            for (int k = 0; k < n_expected; k++) {
+                // Clock boundaries land a sample before the load downbeat's grid.
+                if (std::llabs(pos - expected[k]) <= 2 || std::llabs(pos - expected[k] - kCycle) <= 2)
+                    match = k;
+            }
+            if (match < 0) {
+                printf("  FAIL: swing %.1f: a pick at cycle sample %lld is neither a head nor a beat third\n",
+                       swing, pos);
+                swing_ok = false;
+            } else {
+                seen[match] = true;
+            }
+        }
+        for (int k = 0; k < n_expected; k++) {
+            if (!seen[k]) {
+                printf("  FAIL: swing %.1f: nothing picked at cycle sample %lld\n", swing, expected[k]);
+                swing_ok = false;
+            }
+        }
+        if (c.blooms < c.retrigs) {
+            printf("  FAIL: swing %.1f: %d of %d picks arrived without a bloom\n",
+                   swing, c.retrigs - c.blooms, c.retrigs);
+            swing_ok = false;
+        }
+        printf("  swing %.1f: %d picks, %d blooms\n", swing, c.retrigs, c.blooms);
+        ok &= swing_ok;
+    }
+    printf("PLUCK_REPEAT_TRIPLET lands on beat thirds: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -1317,6 +1383,7 @@ bool run_pulsar_osc_tests() {
     if (test_pulsar_voice_lpg_blooms_on_every_note_on_under_a_held_gate()) suite_pass++; else suite_fail++;
     if (test_pulsar_lpg_pluck_repeat_repicks_every_hold_step()) suite_pass++; else suite_fail++;
     if (test_pulsar_lpg_pluck_repeat_grids_follow_the_beat()) suite_pass++; else suite_fail++;
+    if (test_pulsar_lpg_pluck_repeat_triplet_lands_on_beat_thirds()) suite_pass++; else suite_fail++;
     if (test_pulsar_authored_channels_carry_hit_probability()) suite_pass++; else suite_fail++;
     if (test_pulsar_unpushed_pool_probability_defaults_to_firing()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);

@@ -1596,6 +1596,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.gate_timer = 0.0f;
         ts.voice_active = false;
         ts.swing_offset = 0.0;
+        ts.repick_live = false;
+        ts.beat_origin = ts.head_origin = 0.0;
         ts.tides_env.Init();
         ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
         ts.tides_env_level = 0.0f;
@@ -2417,7 +2419,28 @@ static inline bool pluck_repeat_fires(int lpg_mode, int beat_pos) {
         case LPG_PLUCK_REPEAT:         return true;
         case LPG_PLUCK_REPEAT_8TH:     return beat_pos == 0 || beat_pos == 2;
         case LPG_PLUCK_REPEAT_8TH_OFF: return beat_pos == 2;
+        case LPG_PLUCK_REPEAT_TRIPLET: return beat_pos == 0;  // the thirds: schedule_triplet_repick
         default:                       return false;
+    }
+}
+
+// A triplet re-pick must land this far after its note's head, or a head on the "e"
+// flams against the first third. Half a triplet; tune by ear.
+static constexpr double kTripletRepickMinGapSteps = 2.0 / 3.0;
+
+// Re-picks a held note at the beat thirds that fall in [seg_start, seg_end) of this
+// block. A swung pair still totals two 16ths, so the thirds ignore swing.
+static inline void schedule_triplet_repick(PulsarTrackState& ts, int seg_start, int seg_end,
+                                           double samples_per_step) {
+    if (!ts.repick_live || ts.pending_retrig) return;
+    const double third = samples_per_step * 4.0 / 3.0;
+    for (int k = 1; k <= 2; k++) {
+        const int at = static_cast<int>(std::floor(ts.beat_origin + k * third + 0.5));
+        if (at < seg_start || at >= seg_end) continue;
+        if (at - ts.head_origin < kTripletRepickMinGapSteps * samples_per_step) continue;
+        ts.trigger_offset = at;
+        ts.pending_retrig = true;
+        return;
     }
 }
 
@@ -2468,6 +2491,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.gate_timer = 0.0f;
             ts.voice_active = false;
             ts.swing_offset = 0.0;
+            ts.repick_live = false;
+            ts.beat_origin = ts.head_origin = 0.0;
             ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
             ts.tides_env_level = 0.0f;
             ts.envelope_profile = ENV_PROFILE_RHYTHM;
@@ -3226,6 +3251,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Process step boundaries for this track ──
         // Advance playhead at each step boundary.
         // Determine gate state for voice rendering.
+        int repick_seg_start = 0;  // the triplet clock checks one step segment at a time
         for (int b = 0; b < num_boundaries; b++) {
             int prev_playhead = ts.playhead;
             // Tension half-lick: a FILL lead loops only its first bar while active,
@@ -3236,6 +3262,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // only to seat the playhead on the new window and sound steps[0].
             const bool is_load_boundary = (b == load_boundary_index);
             pulsar_advance_playhead(ts, state->tension.half_lick);
+
+            // Close the triplet clock's segment for the step this boundary ends, then
+            // clear what the new step has to re-establish.
+            const int boundary_at = step_boundary_samples[b];
+            if (active_track_lpg_mode(engine, ts, t) == LPG_PLUCK_REPEAT_TRIPLET)
+                schedule_triplet_repick(ts, repick_seg_start, boundary_at, samples_per_step);
+            repick_seg_start = boundary_at;
+            ts.repick_live = false;
+            if (ts.playhead % 4 == 0) ts.beat_origin = boundary_at;
 
             // Advance chord progression on track 0 step boundaries. The load
             // boundary is not an elapsed 16th, so ticking it here would put the
@@ -4372,6 +4407,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     float base_gate = static_cast<float>(step.duration * samples_per_step);
                     ts.gate_timer = std::max(base_gate + drunk, base_gate * 0.25f);
                     ts.voice_active = true;
+                    ts.repick_live = true;
                     // PLUCK_REPEAT re-picks the held note on the steps its grid selects:
                     // the same note-on the trigger path raises, on the boundary sample,
                     // with the head's pitch and velocity. 2.0.5 did this by accident for
@@ -4708,6 +4744,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             ts.suppress_hold_tail = false;
                             // Start or continue a hold chain if this step has hold=true
                             ts.in_hold = step.hold;
+                            ts.repick_live = step.hold;
+                            ts.head_origin = step_boundary_samples[b];
                         } else {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
@@ -4722,10 +4760,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     float base_gate = static_cast<float>(samples_per_step);
                     ts.gate_timer = base_gate;
                     ts.voice_active = true;
+                    ts.repick_live = true;
                     ts.in_hold = false;  // Hold ends after bridging a rest
                 }
                 // else: normal rest — gate_timer continues decaying (no action needed)
             }
+        }
+
+        // The triplet clock's last segment runs to the block end; then its origins rebase
+        // onto the next block. A frozen timeline freezes them too.
+        if (!timeline_hold) {
+            if (active_track_lpg_mode(engine, ts, t) == LPG_PLUCK_REPEAT_TRIPLET)
+                schedule_triplet_repick(ts, repick_seg_start, num_frames, samples_per_step);
+            ts.beat_origin -= num_frames;
+            ts.head_origin -= num_frames;
         }
 
         // ── Wah-anomaly envelope: per-block bookkeeping (t == 0 only) ──

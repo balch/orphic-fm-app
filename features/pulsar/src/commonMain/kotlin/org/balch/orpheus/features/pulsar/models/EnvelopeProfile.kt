@@ -67,5 +67,10 @@ enum class LpgMode(val id: Int) {
      */
     PLUCK_REPEAT_8TH(5),
     /** [PLUCK_REPEAT] on the off-beat 8ths only: held notes re-pick on the "&". */
-    PLUCK_REPEAT_8TH_OFF(6);
+    PLUCK_REPEAT_8TH_OFF(6),
+    /**
+     * [PLUCK_REPEAT] on 8th-note triplets: held notes re-pick on the beat and a third and
+     * two thirds into it. A third that falls right after a note's first pick is skipped.
+     */
+    PLUCK_REPEAT_TRIPLET(7);
 }

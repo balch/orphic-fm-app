@@ -375,6 +375,12 @@ struct PulsarTrackState {
     bool gate_pre_boundary = false;
     bool pending_retrig = false;
 
+    // PLUCK_REPEAT_TRIPLET's sub-step clock. Origins are sample offsets from the
+    // current block start (negative = an earlier block).
+    double beat_origin = 0.0;
+    double head_origin = 0.0;
+    bool repick_live = false;  // the sounding step belongs to a note longer than one step
+
     // Velocity of the step that last FIRED, after complexity variation, the solo
     // volume duck and volume tension. The render reads this rather than the raw
     // step so those three reach the voice; a gated step that lost its density
