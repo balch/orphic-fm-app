@@ -187,11 +187,14 @@ fun DjTvBottomBar(
     val effects = LocalLiquidEffects.current
     val accent = effects.title.titleColor
 
-    // Region-focus border only, for now — see tvFocusRegionBorder's doc for the single-holder
-    // exclusivity guarantee and why reading it in the draw phase costs nothing per frame. The
-    // glass fill this bar could also carry is deliberately deferred: a real-device trace showed
-    // the UI thread already janking on every frame with a static Pulsar panel alone, so this pass
-    // adds only a drawn stroke, never a recompose/relayout on focus change.
+    // Region-focus border — see tvFocusRegionBorder's doc for the single-holder exclusivity
+    // guarantee and why reading it in the draw phase costs nothing per frame.
+    //
+    // The glass fill this bar could also carry is no longer deferred outright: DjAppScreen applies
+    // it through Modifier.tvBarGlass. The deferral's evidence was a real-device TELEVISION trace
+    // (the UI thread already janking on every frame with a static Pulsar panel alone), so the fill
+    // is gated off television hardware; the television still gets only this drawn stroke, never a
+    // recompose/relayout on focus change.
     val focusRegion = LocalTvFocusRegion.current
     val focusToken = remember { Any() }
     val barShape = RoundedCornerShape(8.dp)

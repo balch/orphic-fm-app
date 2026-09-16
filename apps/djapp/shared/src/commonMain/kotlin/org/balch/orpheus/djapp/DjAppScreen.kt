@@ -328,7 +328,12 @@ fun DjAppScreen(
         if (isLargeScreen) {
             // remember: the holder must survive recomposition or focus resets.
             val focusRegion = remember { TvFocusRegionHolder() }
+            // Read once and passed down: DjAppTvChrome needs it for LocalTelevisionHardware and
+            // the bar glass needs it for its own gate, and they must not disagree.
+            val tvHardware = isTelevisionHardware()
             DjAppTvChrome(
+                tvHardware = tvHardware,
+                barGlass = shouldShowTvBarGlass(layoutMode, tvHardware),
                 focusRegion = focusRegion,
                 vizFeature = vizFeature,
                 pulsarFeature = pulsarFeature,
@@ -497,6 +502,8 @@ private fun DjAppOverlaySheets(
  */
 @Composable
 private fun DjAppTvChrome(
+    tvHardware: Boolean,
+    barGlass: Boolean,
     focusRegion: TvFocusRegionHolder,
     vizFeature: VizFeature,
     pulsarFeature: PulsarFeature,
@@ -513,7 +520,7 @@ private fun DjAppTvChrome(
     CompositionLocalProvider(
         LocalTvFocusChrome provides true,
         LocalTvFocusRegion provides focusRegion,
-        LocalTelevisionHardware provides isTelevisionHardware(),
+        LocalTelevisionHardware provides tvHardware,
     ) {
         // Renders nothing — owns only the idle-fade coroutine. Kept as its own composable
         // (not inlined here) so recomposing it on every key event never re-invokes the
@@ -539,12 +546,16 @@ private fun DjAppTvChrome(
                 pulsarFeature = pulsarFeature,
                 onTogglePlayback = onTogglePlayback,
                 // The bar's top/left/right edges are all physical screen edges here.
-                modifier = Modifier.windowInsetsPadding(
-                    platformSafeAreaInsets().only(
-                        WindowInsetsSides.Top + WindowInsetsSides.Start +
-                            WindowInsetsSides.End
-                    )
-                ),
+                // tvBarGlass goes OUTSIDE the inset padding on purpose: the fill should run to
+                // the physical edge and let only the content sit inside the safe area.
+                modifier = Modifier
+                    .tvBarGlass(barGlass)
+                    .windowInsetsPadding(
+                        platformSafeAreaInsets().only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Start +
+                                WindowInsetsSides.End
+                        )
+                    ),
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) { stage() }
             DjTvBottomBar(
@@ -568,13 +579,16 @@ private fun DjAppTvChrome(
                 },
                 timerFeature = timerFeature,
                 pulsarFeature = pulsarFeature,
-                // Bottom/left/right edges are all physical screen edges here.
-                modifier = Modifier.windowInsetsPadding(
-                    platformSafeAreaInsets().only(
-                        WindowInsetsSides.Bottom + WindowInsetsSides.Start +
-                            WindowInsetsSides.End
-                    )
-                ),
+                // Bottom/left/right edges are all physical screen edges here. Same ordering as
+                // the top bar: glass to the bezel, content inside the safe area.
+                modifier = Modifier
+                    .tvBarGlass(barGlass)
+                    .windowInsetsPadding(
+                        platformSafeAreaInsets().only(
+                            WindowInsetsSides.Bottom + WindowInsetsSides.Start +
+                                WindowInsetsSides.End
+                        )
+                    ),
             )
         }
     }

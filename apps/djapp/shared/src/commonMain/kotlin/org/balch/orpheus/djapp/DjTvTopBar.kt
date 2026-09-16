@@ -137,12 +137,15 @@ fun DjTvTopBar(
     // every recomposition — stealing focus back on every recompose would make the remote unusable.
     LaunchedEffect(Unit) { playPauseFocusRequester.requestFocus() }
 
-    // Region-focus border only, for now — see tvFocusRegionBorder's doc for why the holder+token
-    // pattern keeps at most one container's border visible, and why reading it in the draw phase
-    // costs nothing on frames where focus hasn't moved. The glass fill this bar could also carry
-    // (matching CollapsibleColumnPanel's panelGlassChrome) is deliberately deferred: a real-device
-    // trace showed the UI thread, not the GPU, is already the bottleneck here, so this pass adds
-    // only a drawn stroke and nothing that recomposes or relayouts on focus change.
+    // Region-focus border — see tvFocusRegionBorder's doc for why the holder+token pattern keeps
+    // at most one container's border visible, and why reading it in the draw phase costs nothing
+    // on frames where focus hasn't moved.
+    //
+    // The glass fill this bar could also carry is no longer deferred outright: DjAppScreen applies
+    // it through Modifier.tvBarGlass, which is CollapsibleColumnPanel's own panelGlassChrome. The
+    // deferral's evidence was a real-device TELEVISION trace (UI thread, not GPU, already the
+    // bottleneck), so the fill is gated off television hardware and the television still gets only
+    // this drawn stroke — nothing that recomposes or relayouts on focus change.
     //
     // Color follows the selected visualization (effects.title.titleColor), same as every other
     // element in this bar and DjTvBottomBar's own region border — a fixed neonCyan here would
