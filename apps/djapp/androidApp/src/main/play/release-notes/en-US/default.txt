@@ -1,6 +1,6 @@
-Storms, solos, and a new vibe to show it off.
+Plucks that re-pick, sections you can queue.
 
-• Android TV support with enhanced full-screen support (on tablets too).
-• Rust Belt vibe demonstrates the engine's new capabilities.
-• Lightning strikes, thunderclaps, and rain add to the ambiance.
-• Teaching the band how to jam with brand new solo mechanics.
+• Held notes now re-pick on 8th, triplet and off-16th grids.
+• Tap a section in vibe info to play it next.
+• Mode One pins each vibe to a seed for A/B builds.
+• Smoother vibe switches: bass, reverb and duo settle without zipper noise.
