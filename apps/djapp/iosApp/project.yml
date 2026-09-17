@@ -41,6 +41,14 @@ targets:
         UILaunchScreen: {}
         CADisableMinimumFrameDurationOnPhone: true
         ITSAppUsesNonExemptEncryption: false
+        # Required once linked against the iOS 27 SDK: without it UIKit traps on launch.
+        # One scene only, since every window would share the single process-level graph.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).SceneDelegate"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app
@@ -138,6 +146,14 @@ targets:
         UILaunchScreen: {}
         CADisableMinimumFrameDurationOnPhone: true
         ITSAppUsesNonExemptEncryption: false
+        # Required once linked against the iOS 27 SDK: without it UIKit traps on launch.
+        # One scene only, since every window would share the single process-level graph.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).SceneDelegate"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app.ai
