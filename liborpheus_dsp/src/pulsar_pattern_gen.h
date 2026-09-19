@@ -56,6 +56,17 @@ inline PulsarStep make_step(uint8_t note, float velocity, bool gate, float durat
     return s;
 }
 
+// The step a ghost takes its pitch from: the nearest gated, non-ghost step before `s`,
+// wrapping around the pattern, or -1 when nothing is written. Generators clear empty steps
+// to note 0, so a ghost that kept its own note sounded MIDI 0 folded up to the engine floor.
+inline int ghost_pitch_source(const PulsarStep* steps, int step_count, int s) {
+    for (int k = 1; k < step_count; k++) {
+        const int j = (s - k + step_count) % step_count;
+        if (steps[j].gate && !steps[j].ghost) return j;
+    }
+    return -1;
+}
+
 // pattern_rand / pattern_rand01 live in pulsar_rng.h (included above).
 
 // ---------------------------------------------------------------------------

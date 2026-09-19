@@ -36,6 +36,9 @@ struct PulsarStep {
     bool gate;         // step active
     float duration;    // gate length as fraction of step (0.0-1.0)
     bool hold;         // if true, extend gate into next step (no retrigger)
+    // Switched on by mutation rather than written by a generator, so it never lends its
+    // pitch to another ghost (ghost_pitch_source). Sits in hold's padding; defaulted for `= {}`.
+    bool ghost = false;
     float glide_rate;  // -1 = use track default; >= 0 = per-step override (set by lick)
     // Carried from the lick onto the note's HEAD step only, like glide_rate. Rolled
     // at trigger time so the outcome varies per repeat and reads live tension.

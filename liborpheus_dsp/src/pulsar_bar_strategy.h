@@ -34,10 +34,22 @@ inline void bar_strategy_mutate(
         // Ghost note activation on inactive steps
         if (!bar2[i].gate) {
             if (pattern_rand01(seed) < complexity * 0.15f) {
-                bar2[i].gate = true;
-                bar2[i].velocity = 0.25f + pattern_rand01(seed) * 0.15f;
-                bar2[i].duration = 0.15f + pattern_rand01(seed) * 0.1f;
-                // Keep existing note (or 0 for percussion)
+                const float velocity = 0.25f + pattern_rand01(seed) * 0.15f;
+                const float duration = 0.15f + pattern_rand01(seed) * 0.1f;
+                // Melodic ghosts borrow the nearest written pitch across both bars, since an
+                // empty step holds note 0; with nothing written there is no ghost. Drums keep theirs.
+                const int src = (track_index >= 3)
+                    ? ghost_pitch_source(steps, bar1_len * 2, bar1_len + i) : -1;
+                if (track_index < 3 || src >= 0) {
+                    bar2[i].gate = true;
+                    bar2[i].ghost = true;
+                    bar2[i].velocity = velocity;
+                    bar2[i].duration = duration;
+                    if (src >= 0) {
+                        bar2[i].note = steps[src].note;
+                        bar2[i].raw_note = steps[src].raw_note;
+                    }
+                }
             }
             continue;
         }

@@ -541,6 +541,7 @@ bool run_pulsar_marshalling_tests();
 bool run_pulsar_start_tests();
 bool run_pulsar_bass_line_tests();
 bool run_pulsar_lick_offset_tests();
+bool run_pulsar_ghost_pitch_tests();
 bool run_pulsar_outro_request_tests();
 bool run_oboe_buffer_tests();
 bool run_pulsar_texture_tests();

@@ -274,6 +274,9 @@ static double cap4_avg_active_gates_for_budget(float probe_var_max) {
     // identical across the two calls; only complexity_var_max differs.
     engine->pulsar_track_role[kProbe].store(1, std::memory_order_relaxed);  // MELODIC
     engine->pulsar_genre_density[kProbe].store(0.15f, std::memory_order_relaxed);
+    // The generator reads the per-track override, whose atomic defaults to 0: an empty
+    // pattern. Ghosts borrow a written pitch, so the probe needs a few written notes.
+    engine->pulsar_track_density_override[kProbe].store(0.15f, std::memory_order_relaxed);
     engine->pulsar_track_macros[kProbe].complexity_var_min.store(0.0f, std::memory_order_relaxed);
     engine->pulsar_track_macros[kProbe].complexity_var_max.store(probe_var_max, std::memory_order_relaxed);
     engine->pulsar_step_count.store(16, std::memory_order_relaxed);

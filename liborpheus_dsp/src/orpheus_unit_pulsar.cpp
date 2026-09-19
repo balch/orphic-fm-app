@@ -291,10 +291,17 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                 if (ts.role == TrackRole::PERCUSSIVE) continue;
                 float ghost_prob = track_var * 0.08f;  // up to 8% chance per step
                 if (roll < ghost_prob) {
-                    step.gate = true;
-                    step.velocity = 0.15f + roll * 0.15f / std::max(ghost_prob, 0.001f);
-                    step.duration = 0.2f;
-                    // Keep existing note (from preset)
+                    // An empty step holds note 0, so the ghost borrows the nearest written
+                    // pitch. A pattern with nothing written stays silent.
+                    const int src = ghost_pitch_source(ts.steps, ts.step_count, s);
+                    if (src >= 0) {
+                        step.gate = true;
+                        step.ghost = true;
+                        step.note = ts.steps[src].note;
+                        step.raw_note = ts.steps[src].raw_note;
+                        step.velocity = 0.15f + roll * 0.15f / std::max(ghost_prob, 0.001f);
+                        step.duration = 0.2f;
+                    }
                 }
                 continue;
             }
