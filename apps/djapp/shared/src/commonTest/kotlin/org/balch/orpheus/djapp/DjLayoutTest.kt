@@ -76,4 +76,21 @@ class DjLayoutTest {
         assertFalse(DjLayout.Landscape.showsPair())
         assertFalse(DjLayout.LargeScreen.showsPair())
     }
+
+    @Test
+    fun aSlotWithRoomKeepsTheFullGrid() {
+        assertEquals(120.dp, pulsarGridHeightFor(slot = 350.dp, full = 120.dp))
+        assertEquals(120.dp, pulsarGridHeightFor(slot = 500.dp, full = 120.dp))
+    }
+
+    @Test
+    fun closedDuoSlotTakesItsShortfallOffTheGrid() {
+        // 60% of the 512dp column under the header: 43dp short of a clean panel.
+        assertEquals(77.dp, pulsarGridHeightFor(slot = 307.dp, full = 120.dp))
+    }
+
+    @Test
+    fun theGridNeverShrinksPastItsMinimum() {
+        assertEquals(PulsarGridMinHeight, pulsarGridHeightFor(slot = 200.dp, full = 120.dp))
+    }
 }

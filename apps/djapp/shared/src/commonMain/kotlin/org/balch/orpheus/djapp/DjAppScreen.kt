@@ -28,6 +28,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +43,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -69,6 +72,7 @@ import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarGridHeight
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.mixer.MixerPanel
@@ -487,15 +491,26 @@ private fun DjAppMainContent(
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 )
+                // The slot's height comes from its weight, not its content, so reading it back
+                // (previous frame, as DjLayoutBox does) cannot feed a layout loop.
+                var pulsarSlotPx by remember { mutableIntStateOf(0) }
+                val density = LocalDensity.current
+                val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
+                    pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
+                }
                 PulsarPanel(
                     pulsar = pulsarFeature,
                     vizFlow = synthEngine.pulsarVizFlow,
                     trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                    modifier = Modifier.weight(.6f).fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(.6f)
+                        .fillMaxWidth()
+                        .onSizeChanged { pulsarSlotPx = it.height },
                     isExpanded = true,
                     onExpandedChange = {},
                     showCollapsedHeader = false,
                     showExpandedTitle = false,
+                    gridHeight = gridHeight,
                 )
                 lowerPanels(Modifier.weight(.4f).fillMaxWidth())
             }

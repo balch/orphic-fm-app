@@ -36,6 +36,7 @@ import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarGridHeight
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarViewModel
@@ -457,6 +458,129 @@ class DjLayoutRenderHarness {
             }
         }
         println("[render-harness] wrote tabletop PNGs to ${outDir.absolutePath}")
+    }
+
+    /**
+     * Pulsar alone at a closed iPhone Duo's width (466dp) over a sweep of heights, to find the
+     * smallest height whose bottom knob labels stay inside the panel.
+     */
+    @Test
+    fun renderPulsarCompactSweep() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        listOf(290, 305, 320, 335, 350).forEach { height ->
+            runCatching {
+                val scene = ImageComposeScene(466, height, Density(1f)) {
+                    OrpheusTheme {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            PulsarPanel(
+                                pulsar = PulsarViewModel.previewFeature(),
+                                vizFlow = emptyPulsarVizFlow,
+                                trackVizFlows = emptyTrackVizFlows,
+                                modifier = Modifier.fillMaxSize(),
+                                isExpanded = true,
+                                onExpandedChange = {},
+                                showCollapsedHeader = false,
+                                showExpandedTitle = false,
+                            )
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "pulsar-compact-$height.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] pulsar compact $height skipped: $it")
+            }
+        }
+    }
+
+    /** Mix and Horn alone at 466dp wide over a sweep of heights: the lower panel's own minimum. */
+    @Test
+    fun renderLowerPanelCompactSweep() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        for (route in listOf(MixTab, HornTab)) for (height in listOf(160, 175, 190, 205, 220)) {
+            runCatching {
+                val scene = ImageComposeScene(466, height, Density(1f)) {
+                    OrpheusTheme {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            PreviewRoutePanel(route, Modifier.fillMaxSize())
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "lower-${route.label}-$height.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] lower ${route.label} $height skipped: $it")
+            }
+        }
+    }
+
+    /**
+     * The whole portrait screen at a closed iPhone Duo's size, once per lower panel. 466x644dp is
+     * the 678pt display less the 34pt home-indicator inset the harness cannot supply.
+     */
+    @Test
+    fun renderDuoClosedScreen() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        listOf(DjTab, MixTab, HornTab, TimerTab).forEach { route ->
+            runCatching {
+                val scene = ImageComposeScene(466, 644, Density(1f)) {
+                    OrpheusTheme {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            DjAppNavScaffold(
+                                isSelected = { it == route },
+                                onItemClick = {},
+                                layout = DjLayout.Portrait,
+                                pulsarFeature = PulsarViewModel.previewFeature(),
+                                timerFeature = TimerViewModel.previewFeature(),
+                                onTogglePlayback = {},
+                            ) {
+                                Column(Modifier.fillMaxSize()) {
+                                    DjAppHeaderRow(
+                                        vizFeature = VizViewModel.previewFeature(),
+                                        onInfoClick = {},
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    )
+                                    PulsarPanel(
+                                        pulsar = PulsarViewModel.previewFeature(),
+                                        vizFlow = emptyPulsarVizFlow,
+                                        trackVizFlows = emptyTrackVizFlows,
+                                        modifier = Modifier.weight(.6f).fillMaxWidth(),
+                                        isExpanded = true,
+                                        onExpandedChange = {},
+                                        showCollapsedHeader = false,
+                                        showExpandedTitle = false,
+                                        // 644dp less the 80dp nav and 52dp header, at 60%.
+                                        gridHeight = pulsarGridHeightFor(307.dp, PulsarGridHeight),
+                                    )
+                                    PreviewRoutePanel(route, Modifier.weight(.4f).fillMaxWidth())
+                                }
+                            }
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "duo-closed-${route.label}.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] duo closed ${route.label} skipped: $it")
+            }
+        }
     }
 
     /**

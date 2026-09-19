@@ -37,6 +37,23 @@ val PortraitPairMinWidth: Dp = 700.dp
  */
 val PortraitPairMinHeight: Dp = 700.dp
 
+/**
+ * Smallest portrait Pulsar slot that fits the full step grid. Set by rendering at a closed iPhone
+ * Duo's 466dp width (`renderPulsarCompactSweep`): the knob labels clip at 320dp, touch the panel
+ * edge at 335dp and clear it at 350dp.
+ */
+val PulsarFullGridSlotHeight: Dp = 350.dp
+
+/** Under this the 8 track rows stop reading as rows; a shorter slot clips instead. */
+val PulsarGridMinHeight: Dp = 64.dp
+
+/**
+ * The step grid's height for a portrait Pulsar [slot]: every dp the slot is short of
+ * [PulsarFullGridSlotHeight] comes off the grid, the one part of the panel that can give.
+ */
+fun pulsarGridHeightFor(slot: Dp, full: Dp): Dp =
+    (full - (PulsarFullGridSlotHeight - slot).coerceAtLeast(0.dp)).coerceAtLeast(PulsarGridMinHeight)
+
 /** Every screen arrangement. Switch on it with no `else`, so a new one is a compile error. */
 sealed interface DjLayout {
     /** Header, Pulsar, one nav-selected panel, bottom nav. */

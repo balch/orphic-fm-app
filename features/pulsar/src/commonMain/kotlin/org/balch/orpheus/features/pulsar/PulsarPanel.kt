@@ -101,6 +101,8 @@ fun PulsarPanel(
     // TV docks ENDING as its own bottom-bar button (DjTvBottomBar's "Ends") so it stays reachable
     // without expanding this panel. Everywhere else it stays here.
     showEndingControl: Boolean = true,
+    // A host with a short slot (closed iPhone Duo) passes less so the knob labels stay inside.
+    gridHeight: Dp = PulsarGridHeight,
 ) {
     // Held as State, not unwrapped: the flow emits every 16ms during playback, and the grid
     // reads it in its draw phase. The one field this panel reads in composition goes through
@@ -150,6 +152,7 @@ fun PulsarPanel(
             state = state,
             actions = actions,
             arrangementState = arrangementState,
+            gridHeight = gridHeight,
         )
 
         // Voice detail strip. Auto-dismisses after 10s idle, suppressed while a picker is open.
@@ -310,6 +313,9 @@ private fun PulsarSelectorRow(
     }
 }
 
+/** The step grid's height wherever the panel has room for it. */
+val PulsarGridHeight: Dp = 120.dp
+
 /**
  * The step grid row: canvas visualization of all 8 tracks, driven by the viz flow and the
  * arrangement/transition state needed for its final-section suffix.
@@ -321,6 +327,7 @@ private fun PulsarStepGridSection(
     state: PulsarUiState,
     actions: PulsarPanelActions,
     arrangementState: PulsarArrangementState,
+    gridHeight: Dp,
 ) {
     val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
     val finalSectionIndex by actions.finalSectionIndex.collectAsStateWithLifecycle()
@@ -348,7 +355,7 @@ private fun PulsarStepGridSection(
             pendingTransition = if (songEndingOn) resolvedStyle else null,
             modifier = Modifier
                 .width(360.dp)
-                .height(120.dp)
+                .height(gridHeight)
                 .alpha(.8f)
             ,
         )
