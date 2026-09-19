@@ -54,6 +54,9 @@ class DesktopDspBridge {
             val tempDir = java.io.File(System.getProperty("java.io.tmpdir"), "orpheus-native")
             tempDir.mkdirs()
             val tempFile = java.io.File(tempDir, libName)
+            // Unlink first so the write gets a new inode. Overwriting in place changes pages
+            // another running instance has mapped, and macOS kills both for a bad signature.
+            tempFile.delete()
 
             stream.use { input ->
                 tempFile.outputStream().use { output ->
