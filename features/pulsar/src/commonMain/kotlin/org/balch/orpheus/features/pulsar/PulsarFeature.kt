@@ -12,7 +12,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,6 +58,7 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.core.tts.TtsGenerator
 import org.balch.orpheus.features.pulsar.anonmalies.CrossfadeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
@@ -88,6 +91,7 @@ import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SoloBehavior
 import org.balch.orpheus.features.pulsar.models.SoloMarkovConfig
 import org.balch.orpheus.features.pulsar.models.SoloMode
+import org.balch.orpheus.features.pulsar.models.SpeechCue
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
 import org.balch.orpheus.features.pulsar.models.TapeStopEffect
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
@@ -96,6 +100,7 @@ import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.TransitionEffect
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VibeSpeech
 import org.balch.orpheus.features.pulsar.models.WahParams
 import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
@@ -391,6 +396,30 @@ internal object TransitionFxWire {
 }
 
 /**
+ * Wire format for the `speech_cue_data_$i` bank. Mirrors `kMaxSpeechCueRows` and
+ * `kSpeechCueRowFields` in `liborpheus_dsp/src/pulsar_speech.h`, pinned by `PulsarSectionLimitsTest`.
+ * Row: [section, phrase + 1, beat (-1 = loop end), alignEnd, everyLoops, loopPhase, chance, level];
+ * phrase + 1 so an all-zero padding row reads as unauthored.
+ */
+internal object SpeechCueWire {
+    const val ROW_FIELDS = 8
+    const val MAX_ROWS = 24
+    const val BANK_SIZE = ROW_FIELDS * MAX_ROWS
+    const val BEAT_LOOP_END = -1f
+
+    fun rowFor(section: Int, cue: SpeechCue): FloatArray = floatArrayOf(
+        section.toFloat(),
+        (cue.phrase + 1).toFloat(),
+        cue.beat ?: BEAT_LOOP_END,
+        if (cue.alignEnd) 1f else 0f,
+        cue.everyLoops.toFloat(),
+        cue.loopPhase.toFloat(),
+        cue.chance,
+        cue.level,
+    )
+}
+
+/**
  * ViewModel for the Pulsar beat machine panel.
  *
  * Bridges PulsarSymbol controls to the C++ engine via SynthController,
@@ -406,12 +435,12 @@ internal object TransitionFxWire {
 @ContributesBinding(FeatureScope::class, binding = binding<PulsarFeature>())
 class PulsarViewModel(
     private val synthController: SynthController,
-    synthEngine: SynthEngine,
+    private val synthEngine: SynthEngine,
     private val pulsarSession: PulsarSession,
     private val globalTempo: GlobalTempo,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val presetLoader: PresetLoader,
-    dispatcherProvider: DispatcherProvider,
+    private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
     vibeProviders: Set<VibeProvider>,
     // Default keeps direct test construction terse; in the app graph the real
@@ -423,6 +452,7 @@ class PulsarViewModel(
     // VibeCatalogPolicyProvider binding always wins (android debuggable-flag -> WIP, desktop
     // -Pcatalog level default live, iOS debug binary -> WIP, wasm live).
     vibeCatalogPolicy: VibeCatalogPolicy = VibeCatalogPolicy(),
+    private val ttsGenerator: TtsGenerator = NoSpeechTtsGenerator,
     private val playbackMode: PulsarPlaybackMode,
     private val songEndingPreferences: SongEndingPreferences,
     private val transitionPreferences: TransitionPreferences,
@@ -487,6 +517,44 @@ class PulsarViewModel(
     // One Mode (PulsarPanelActions.modeOne). A plain flow, not a PulsarUiState field: the
     // state blob is persisted, and this must not outlive the session.
     private val _modeOne = MutableStateFlow(false)
+    private var speechClipJob: Job? = null
+    // True once a vibe with speech has used the clip bank, so later vibes clear it once.
+    private var speechSlotsDirty = false
+
+    private fun loadSpeechClips(vibe: Vibe) {
+        speechClipJob?.cancel()
+        speechClipJob = null
+        val speech = vibe.speech
+        if (speechSlotsDirty || speech != null) {
+            repeat(VibeSpeech.MAX_PHRASES) { synthEngine.loadPulsarClip(it, FloatArray(0), 0) }
+            speechSlotsDirty = false
+        }
+        if (speech == null) return
+        if (!ttsGenerator.isAvailable) {
+            log.info { "Speech: ${vibe.name} has ${speech.phrases.size} phrases; TTS is unavailable here" }
+            return
+        }
+        speechSlotsDirty = true
+        speechClipJob = scope.launch(dispatcherProvider.io) {
+            speech.phrases.forEachIndexed { slot, text ->
+                val clip = try {
+                    ttsGenerator.generate(text, speech.voice, speech.wordsPerMinute)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    log.warn(e) { "Speech: phrase $slot of ${vibe.name} failed to generate" }
+                    null
+                }
+                if (clip != null) {
+                    // Cancellation can resolve generate() normally; don't load a stale clip.
+                    currentCoroutineContext().ensureActive()
+                    synthEngine.loadPulsarClip(slot, clip.samples, clip.sampleRate)
+                }
+            }
+            log.info { "Speech: ${vibe.name} loaded ${speech.phrases.size} phrase clips" }
+        }
+    }
+
     private val energyId = synthController.controlFlow(PulsarSymbol.ENERGY.controlId)
     private val complexityId = synthController.controlFlow(PulsarSymbol.COMPLEXITY.controlId)
     private val spaceId = synthController.controlFlow(PulsarSymbol.SPACE.controlId)
@@ -1718,6 +1786,9 @@ class PulsarViewModel(
         // Push arrangement data (MUST be before vibe generation increment)
         pushArrangement(vibe)
 
+        // Clears last vibe's clips before load_vibe can plan a cue against them.
+        loadSpeechClips(vibe)
+
         // Opening section's per-track overrides, synchronously and BEFORE the generation bump:
         // load_vibe snapshots pulsar_track_envelope into track_solo_behavior and never refreshes
         // it, so writing after the bump races that snapshot. The flow collector cannot cover this
@@ -1883,6 +1954,17 @@ class PulsarViewModel(
         }
     }
 
+    // Zero-filled every apply: the bank has no count, so a previous vibe's rows would fire.
+    private fun pushSpeechCueBank(rows: List<FloatArray>) {
+        val data = FloatArray(SpeechCueWire.BANK_SIZE)
+        rows.take(SpeechCueWire.MAX_ROWS).forEachIndexed { r, row ->
+            row.copyInto(data, r * SpeechCueWire.ROW_FIELDS)
+        }
+        data.forEachIndexed { i, v ->
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "speech_cue_data_$i"), FloatValue(v))
+        }
+    }
+
     private fun pushArrangement(vibe: Vibe) {
         val arr = vibe.arrangement
         if (arr == null) {
@@ -1892,6 +1974,7 @@ class PulsarViewModel(
             // No sections means no edges to stage — zero the bank so a PREVIOUS vibe's
             // rows can't linger (see pushTransFxBank's doc comment above).
             pushTransFxBank(emptyList())
+            pushSpeechCueBank(emptyList())
             log.debug { "Arrangement: inactive (vibe=${vibe.name})" }
             return
         }
@@ -1914,6 +1997,7 @@ class PulsarViewModel(
         // Trans-fx bank accumulator: flattened across every section/edge below, written
         // once after the loop (see kMaxTransFxRows in pulsar_transition_fx.h).
         val transFxRows = ArrayList<FloatArray>(TransitionFxWire.MAX_ROWS)
+        val speechRows = ArrayList<FloatArray>(SpeechCueWire.MAX_ROWS)
 
         // Section data (Arrangement.SECTION_DATA_FIELDS floats per section)
         arr.sections.forEachIndexed { s, section ->
@@ -1923,6 +2007,7 @@ class PulsarViewModel(
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_data_${base + field}"), FloatValue(v)
                 )
+            section.speech.forEach { speechRows.add(SpeechCueWire.rowFor(s, it)) }
             // Must match C++ load_vibe() unpack order exactly:
             // [0]=bars_min, [1]=bars_max, [2]=bar_step (1 = any value in
             //   [bars_min, bars_max]; 2 = odd-or-even-only stride), [3]=recency_decay,
@@ -2182,6 +2267,7 @@ class PulsarViewModel(
         // Trans-fx bank: flatten the accumulated rows and zero-fill the rest so a vibe
         // reload doesn't carry stale rows from a previous vibe.
         pushTransFxBank(transFxRows)
+        pushSpeechCueBank(speechRows)
 
         // Band solo config
         val bandConfig = vibe.band

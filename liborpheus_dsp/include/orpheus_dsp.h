@@ -148,6 +148,10 @@ void orpheus_engine_play_tts(OrpheusEngine* engine);
 void orpheus_engine_stop_tts(OrpheusEngine* engine);
 int  orpheus_engine_is_tts_playing(OrpheusEngine* engine);
 
+// Vibe speech clip for the Pulsar unit's clip player, slot 0..3. count <= 0 clears the slot.
+void orpheus_engine_load_pulsar_clip(OrpheusEngine* engine, int slot,
+                                     const float* samples, int count, int sample_rate);
+
 // ── DJ Turntable visualization (polled at ~30fps from UI thread) ──
 // Returns 128 downsampled waveform samples + 1 playhead position (129 floats).
 // Thread-safe: uses double-buffered snapshot.

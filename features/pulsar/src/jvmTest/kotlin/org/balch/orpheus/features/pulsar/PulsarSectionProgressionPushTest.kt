@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.pulsar
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -10,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.audio.FadeCurve
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
@@ -32,6 +35,8 @@ import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.core.tts.TtsAudioResult
+import org.balch.orpheus.core.tts.TtsGenerator
 import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -53,6 +58,7 @@ import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.SectionWeather
+import org.balch.orpheus.features.pulsar.models.SpeechCue
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
 import org.balch.orpheus.features.pulsar.models.TapeStopEffect
 import org.balch.orpheus.features.pulsar.models.TrackRole
@@ -60,6 +66,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VibeSpeech
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -84,11 +91,12 @@ class PulsarSectionProgressionPushTest {
     private val ports = mutableMapOf<String, PortValue>()
     private val arrangementFlow =
         MutableStateFlow<PulsarArrangementState?>(ARRANGEMENT_STATE_UNKNOWN)
+    private lateinit var engine: PushTestSynthEngine
 
     @BeforeTest fun setUp() { Dispatchers.setMain(testDispatcher) }
     @AfterTest fun tearDown() { Dispatchers.resetMain() }
 
-    private fun makeViewModel(vibe: Vibe): PulsarViewModel {
+    private fun makeViewModel(vibe: Vibe, ttsGenerator: TtsGenerator = NoSpeechTtsGenerator): PulsarViewModel {
         val controller = SynthController().apply {
             setDelegates(
                 setter = { id, value ->
@@ -100,7 +108,7 @@ class PulsarSectionProgressionPushTest {
         }
         val tempo = GlobalTempo(PushTestAudioEngine())
         val portRegistry = PortRegistry(emptySet())
-        val engine = PushTestSynthEngine(arrangementFlow)
+        engine = PushTestSynthEngine(arrangementFlow)
         val appScope = makeAppCoroutineScope(testDispatcher)
         return PulsarViewModel(
             synthController = controller,
@@ -112,6 +120,7 @@ class PulsarSectionProgressionPushTest {
             dispatcherProvider = PushTestDispatchers(testDispatcher),
             scope = FeatureCoroutineScope(),
             vibeProviders = setOf(PushTestVibeProvider(vibe)),
+            ttsGenerator = ttsGenerator,
             playbackMode = PulsarPlaybackMode.EXPLICIT,
             songEndingPreferences = StubSongEndingPreferences(),
             transitionPreferences = StubTransitionPreferences(),
@@ -732,6 +741,131 @@ class PulsarSectionProgressionPushTest {
             assertEquals(0f, floatPort("section_data_${1 * stride + field}"), "section 1 street field $field")
         }
     }
+
+    @Test
+    fun `speech cues reach the cue bank and the rest is zero padding`() = runTest(testDispatcher) {
+        val cue = SpeechCue(
+            phrase = 1, beat = 3f, alignEnd = false, everyLoops = 2, loopPhase = 1, chance = 0.5f, level = 0.7f,
+        )
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(name = "quiet", barsMin = 2, barsMax = 2, transitions = listOf(SectionTransition(1, 1f))),
+                Section(
+                    name = "talk", barsMin = 2, barsMax = 2, speech = listOf(cue),
+                    transitions = listOf(SectionTransition(0, 1f)),
+                ),
+            ),
+            speech = VibeSpeech(phrases = listOf("one", "two")),
+        )
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        // [section, phrase + 1, beat, alignEnd, everyLoops, loopPhase, chance, level]
+        val expected = listOf(1f, 2f, 3f, 0f, 2f, 1f, 0.5f, 0.7f)
+        expected.forEachIndexed { i, v -> assertEquals(v, floatPort("speech_cue_data_$i"), "row 0 field $i") }
+        for (i in SpeechCueWire.ROW_FIELDS until SpeechCueWire.BANK_SIZE) {
+            assertEquals(0f, floatPort("speech_cue_data_$i"), "speech_cue_data_$i should be zero padding")
+        }
+    }
+
+    @Test
+    fun `a null beat marshals as the loop-end sentinel`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(Section(name = "talk", barsMin = 2, barsMax = 2, speech = listOf(SpeechCue(phrase = 0)))),
+            speech = VibeSpeech(phrases = listOf("hi")),
+        )
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+        assertEquals(SpeechCueWire.BEAT_LOOP_END, floatPort("speech_cue_data_2"))
+        assertEquals(1f, floatPort("speech_cue_data_3"), "alignEnd defaults on")
+    }
+
+    @Test
+    fun `a vibe without speech zero-fills the cue bank`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(sections = listOf(Section(name = "plain", barsMin = 4, barsMax = 4)))
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+        for (i in 0 until SpeechCueWire.BANK_SIZE) {
+            assertEquals(0f, floatPort("speech_cue_data_$i"), "speech_cue_data_$i")
+        }
+    }
+
+    @Test
+    fun `a vibe with speech clears every slot then loads each phrase into its slot`() = runTest(testDispatcher) {
+        val tts = FakeTtsGenerator(samples = FloatArray(10) { 0.1f }, sampleRate = 44100)
+        val vibe = pushTestVibe(
+            sections = listOf(Section(name = "talk", barsMin = 2, barsMax = 2)),
+            speech = VibeSpeech(phrases = listOf("one", "two")),
+        )
+        makeViewModel(vibe, tts).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        // The ViewModel re-applies the vibe once graphReady resolves (boot sequence),
+        // so the bank sees two full clear passes before the loads in this harness.
+        // Assert the shape: full clear passes, then the loads, not an exact count.
+        val fullClearPass = List(VibeSpeech.MAX_PHRASES) { ClipLoad(it, 0, 0) }
+        val loads = engine.clipLoads.takeLast(2)
+        val clears = engine.clipLoads.dropLast(2)
+        assertTrue(clears.isNotEmpty(), "the bank must be cleared before any phrase loads")
+        assertTrue(
+            clears.chunked(VibeSpeech.MAX_PHRASES).all { it == fullClearPass },
+            "clears must land as whole slot passes: $clears",
+        )
+        assertEquals(listOf(ClipLoad(0, 10, 44100), ClipLoad(1, 10, 44100)), loads)
+        assertEquals(listOf("one", "two"), tts.requested)
+    }
+
+    @Test
+    fun `a vibe without speech never touches the clip bank`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(sections = listOf(Section(name = "plain", barsMin = 2, barsMax = 2)))
+        makeViewModel(vibe, FakeTtsGenerator(FloatArray(10), 44100)).actions.setVibe(vibe)
+        advanceUntilIdle()
+        assertTrue(engine.clipLoads.isEmpty())
+    }
+
+    @Test
+    fun `speech with no TTS available clears the slots and loads nothing`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(Section(name = "talk", barsMin = 2, barsMax = 2)),
+            speech = VibeSpeech(phrases = listOf("one")),
+        )
+        makeViewModel(vibe).actions.setVibe(vibe)   // NoSpeechTtsGenerator
+        advanceUntilIdle()
+
+        // See the comment above: the boot-time re-apply means two full clear passes here too.
+        val fullClearPass = List(VibeSpeech.MAX_PHRASES) { ClipLoad(it, 0, 0) }
+        assertTrue(engine.clipLoads.isNotEmpty(), "the bank must be cleared")
+        assertTrue(
+            engine.clipLoads.chunked(VibeSpeech.MAX_PHRASES).all { it == fullClearPass },
+            "every entry must be a clear, in whole slot passes, with nothing loaded: ${engine.clipLoads}",
+        )
+    }
+
+    @Test
+    fun `a cancelled phrase job cannot load into the next vibe's bank`() = runTest(testDispatcher) {
+        val gated = GatedTtsGenerator(samples = FloatArray(10) { 0.1f }, sampleRate = 44100)
+        val speechVibe = pushTestVibe(
+            sections = listOf(Section(name = "talk", barsMin = 2, barsMax = 2)),
+            speech = VibeSpeech(phrases = listOf("one")),
+        )
+        val viewModel = makeViewModel(speechVibe, gated)
+        viewModel.actions.setVibe(speechVibe)
+        advanceUntilIdle()
+        assertEquals(listOf("one"), gated.requested, "generation must have reached the gate")
+
+        // Switching to a vibe with no speech cancels the old job and clears every slot.
+        val plainVibe = pushTestVibe(sections = listOf(Section(name = "plain", barsMin = 2, barsMax = 2)))
+        viewModel.actions.setVibe(plainVibe)
+        val clearedAt = engine.clipLoads.size
+
+        gated.release()
+        advanceUntilIdle()
+
+        assertTrue(
+            engine.clipLoads.drop(clearedAt).none { it.size > 0 },
+            "no load with samples may land after the second vibe's clear pass: ${engine.clipLoads}",
+        )
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
@@ -741,6 +875,7 @@ private fun pushTestVibe(
     anomalies: List<Anomaly> = emptyList(),
     duckingProfiles: Map<Int, DuckingProfile> = emptyMap(),
     lickRotation: LickRotation? = null,
+    speech: VibeSpeech? = null,
 ): Vibe = Vibe(
     name = "Section Push Test",
     bpm = 120f,
@@ -762,6 +897,7 @@ private fun pushTestVibe(
     arrangement = Arrangement(sections = sections),
     anomalies = anomalies,
     lickRotation = lickRotation,
+    speech = speech,
 )
 
 /** A vibe with `arrangement = null` (its default) — exercises pushArrangement's early return. */
@@ -786,6 +922,33 @@ private fun noArrangementTestVibe(): Vibe = Vibe(
 
 private class PushTestVibeProvider(override val vibe: Vibe) : VibeProvider {
     override val name: String get() = vibe.name
+}
+
+private data class ClipLoad(val slot: Int, val size: Int, val sampleRate: Int)
+
+private class FakeTtsGenerator(private val samples: FloatArray, private val sampleRate: Int) : TtsGenerator {
+    val requested = mutableListOf<String>()
+    override val isAvailable: Boolean = true
+    override suspend fun generate(text: String, voice: String?, speakingRate: Int?): TtsAudioResult {
+        requested += text
+        return TtsAudioResult(samples, sampleRate)
+    }
+    override suspend fun listVoices(): List<String> = emptyList()
+}
+
+/** Blocks generate() behind a gate shielded by NonCancellable, so it returns a clip
+ *  normally even after its own job was cancelled -- reproducing a stale-load race. */
+private class GatedTtsGenerator(private val samples: FloatArray, private val sampleRate: Int) : TtsGenerator {
+    private val gate = CompletableDeferred<Unit>()
+    val requested = mutableListOf<String>()
+    override val isAvailable: Boolean = true
+    override suspend fun generate(text: String, voice: String?, speakingRate: Int?): TtsAudioResult {
+        requested += text
+        withContext(NonCancellable) { gate.await() }
+        return TtsAudioResult(samples, sampleRate)
+    }
+    override suspend fun listVoices(): List<String> = emptyList()
+    fun release() = gate.complete(Unit)
 }
 
 private class PushTestAudioEngine : AudioEngine {
@@ -921,6 +1084,10 @@ private class PushTestSynthEngine(
     override fun playTts() = Unit
     override fun stopTts() = Unit
     override fun isTtsPlaying(): Boolean = false
+    val clipLoads = mutableListOf<ClipLoad>()
+    override fun loadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) {
+        clipLoads += ClipLoad(slot, samples.size, sampleRate)
+    }
     override fun setLooperRecord(recording: Boolean) = Unit
     override fun setLooperPlay(playing: Boolean) = Unit
     override fun setLooperOverdub(overdub: Boolean) = Unit

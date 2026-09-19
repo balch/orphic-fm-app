@@ -104,6 +104,19 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativePlayTts() = bridge.nativePlayTts()
     override fun nativeStopTts() = bridge.nativeStopTts()
     override fun nativeIsTtsPlaying(): Int = bridge.nativeIsTtsPlaying()
+    // Guarded: the DJ app can launch against a dylib built before this symbol existed.
+    // Warn once per instance instead of flooding the log on every clip load.
+    private var loggedMissingLoadPulsarClip = false
+    override fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) {
+        try {
+            bridge.nativeLoadPulsarClip(slot, samples, sampleRate)
+        } catch (e: UnsatisfiedLinkError) {
+            if (!loggedMissingLoadPulsarClip) {
+                loggedMissingLoadPulsarClip = true
+                log.warn { "nativeLoadPulsarClip missing from the native library; rebuild it (${e.message})" }
+            }
+        }
+    }
     override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int =
         bridge.nativeGetViz(channel, outBuf, lastReadPos)
     override fun nativeGetSpectrum(bands: FloatArray): Int = bridge.nativeGetSpectrum(bands)

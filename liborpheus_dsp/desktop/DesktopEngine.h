@@ -60,6 +60,7 @@ public:
     void  playTts();
     void  stopTts();
     int   isTtsPlaying();
+    void  loadPulsarClip(int slot, const float* samples, int count, int sampleRate);
 
     void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void  getPulsarActiveEngines(int* out);

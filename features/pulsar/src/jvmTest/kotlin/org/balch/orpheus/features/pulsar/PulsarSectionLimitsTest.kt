@@ -5,6 +5,8 @@ import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.NotatedScore
+import org.balch.orpheus.features.pulsar.models.SpeechCue
+import org.balch.orpheus.features.pulsar.models.VibeSpeech
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,6 +32,7 @@ class PulsarSectionLimitsTest {
     private val pulsarHeader = File("../../liborpheus_dsp/src/orpheus_unit_pulsar.h")
     private val transFxHeader = File("../../liborpheus_dsp/src/pulsar_transition_fx.h")
     private val scoreClockHeader = File("../../liborpheus_dsp/src/pulsar_score_clock.h")
+    private val speechHeader = File("../../liborpheus_dsp/src/pulsar_speech.h")
 
     private fun constant(source: File, name: String): Int {
         assertTrue(source.exists(), "missing C++ source ${source.absolutePath}")
@@ -221,6 +224,26 @@ class PulsarSectionLimitsTest {
             NotatedScore.PPQ,
             "NotatedScore.PPQ must equal kScorePpq in pulsar_score_clock.h. A mismatch " +
                 "silently misplaces every event in every score rather than failing.",
+        )
+    }
+
+    @Test
+    fun `speech cue wire matches pulsar_speech_h`() {
+        assertEquals(constant(speechHeader, "kSpeechCueRowFields"), SpeechCueWire.ROW_FIELDS)
+        assertEquals(constant(speechHeader, "kMaxSpeechCueRows"), SpeechCueWire.MAX_ROWS)
+        assertEquals(constant(speechHeader, "kMaxSpeechCueRows"), SpeechCue.MAX_ROWS)
+        assertEquals(constant(speechHeader, "kMaxSpeechClips"), VibeSpeech.MAX_PHRASES)
+    }
+
+    @Test
+    fun `kMaxPendingSpeechStarts has headroom over SpeechCue MAX_PER_SECTION`() {
+        assertEquals(
+            2 * SpeechCue.MAX_PER_SECTION,
+            constant(speechHeader, "kMaxPendingSpeechStarts"),
+            "kMaxPendingSpeechStarts must stay double SpeechCue.MAX_PER_SECTION: a start-" +
+                "aligned loop-end cue, or one pushed past the wrap, can still be pending " +
+                "when the next cycle plans its own full section of cues, so a queue sized " +
+                "to the per-section cap exactly can drop a cue and its forced kick.",
         )
     }
 }

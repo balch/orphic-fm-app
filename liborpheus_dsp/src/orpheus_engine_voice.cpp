@@ -251,6 +251,23 @@ void orpheus_engine_load_tts_audio(OrpheusEngine* engine,
     engine->tts_buffer_length.store(clamped, std::memory_order_release);
 }
 
+void orpheus_engine_load_pulsar_clip(OrpheusEngine* engine, int slot,
+                                     const float* samples, int count, int sample_rate) {
+    if (!engine || slot < 0 || slot >= kMaxSpeechClips) return;
+    // Unpublish first so the audio thread never schedules a slot mid-copy.
+    engine->speech_clip_length[slot].store(0, std::memory_order_release);
+    if (!samples || count <= 0) return;
+    if (!engine->speech_clip_buffer) {
+        engine->speech_clip_buffer = new float[kMaxSpeechClips * kMaxSpeechClipFrames]();
+    }
+    const int clamped = count > kMaxSpeechClipFrames ? kMaxSpeechClipFrames : count;
+    std::memcpy(engine->speech_clip_buffer + slot * kMaxSpeechClipFrames, samples,
+                clamped * sizeof(float));
+    engine->speech_clip_source_rate[slot].store(sample_rate > 0 ? sample_rate : 48000,
+                                                std::memory_order_relaxed);
+    engine->speech_clip_length[slot].store(clamped, std::memory_order_release);
+}
+
 void orpheus_engine_play_tts(OrpheusEngine* engine) {
     if (!engine) return;
     engine->tts_trigger.store(1, std::memory_order_relaxed);

@@ -66,6 +66,7 @@ class OboeAudioBridge : NativeDspBridge {
     external override fun nativePlayTts()
     external override fun nativeStopTts()
     external override fun nativeIsTtsPlaying(): Int
+    external override fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int)
     external override fun nativeGetPulsarViz(
         gatesOut: BooleanArray,
         velocitiesOut: FloatArray,

@@ -188,6 +188,9 @@ void DesktopEngine::clearAutomation(int target, int voiceIndex) {
 void DesktopEngine::loadTtsAudio(const float* samples, int count, int sampleRate) {
     if (dsp_engine_) orpheus_engine_load_tts_audio(dsp_engine_, samples, count, sampleRate);
 }
+void DesktopEngine::loadPulsarClip(int slot, const float* samples, int count, int sampleRate) {
+    if (dsp_engine_) orpheus_engine_load_pulsar_clip(dsp_engine_, slot, samples, count, sampleRate);
+}
 void DesktopEngine::playTts() {
     if (dsp_engine_) orpheus_engine_play_tts(dsp_engine_);
 }

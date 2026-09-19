@@ -352,6 +352,12 @@ interface SynthEngine {
     fun stopTts()
     fun isTtsPlaying(): Boolean
 
+    /**
+     * Load a vibe phrase into Pulsar's clip bank, slot 0-3. Empty samples clear the slot.
+     * Default no-op for engines without a clip bank.
+     */
+    fun loadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) {}
+
     // Looper
     fun setLooperRecord(recording: Boolean)
     fun setLooperPlay(playing: Boolean)

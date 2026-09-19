@@ -202,6 +202,7 @@ void orpheus_engine_destroy(OrpheusEngine* engine) {
         delete[] engine->looper_buffer_l;
         delete[] engine->looper_buffer_r;
         delete[] engine->tts_buffer;
+        delete[] engine->speech_clip_buffer;
         delete[] engine->tts_delay_buffer;
         delete engine->pulsar_state;
         delete engine;

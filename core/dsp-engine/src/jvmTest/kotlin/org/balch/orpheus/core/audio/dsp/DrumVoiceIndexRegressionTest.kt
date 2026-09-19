@@ -179,6 +179,7 @@ class DrumVoiceIndexRegressionTest {
         override fun nativePlayTts() {}
         override fun nativeStopTts() {}
         override fun nativeIsTtsPlaying(): Int = 0
+        override fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) {}
         override fun nativeGetPulsarViz(
             gatesOut: BooleanArray,
             velocitiesOut: FloatArray,

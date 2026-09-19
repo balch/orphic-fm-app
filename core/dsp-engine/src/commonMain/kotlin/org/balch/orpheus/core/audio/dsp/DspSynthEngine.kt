@@ -607,6 +607,8 @@ class DspSynthEngine(
     override fun playTts() = pluginProvider.ttsPlugin.play()
     override fun stopTts() = pluginProvider.ttsPlugin.stopPlayback()
     override fun isTtsPlaying(): Boolean = pluginProvider.ttsPlugin.isPlaying()
+    override fun loadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) =
+        pluginProvider.ttsPlugin.loadPulsarClip(slot, samples, sampleRate)
 
     // Looper delegations
     override fun setLooperRecord(recording: Boolean) = pluginProvider.looperPlugin.setRecording(recording)

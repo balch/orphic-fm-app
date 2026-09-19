@@ -50,6 +50,11 @@ interface NativeDspBridge {
     fun nativePlayTts()
     fun nativeStopTts()
     fun nativeIsTtsPlaying(): Int
+    /**
+     * Pulsar speech clip, slot 0-3; empty samples clear it. Deliberately abstract: a default body
+     * let Android and iOS drop every clip silently. Platforms with no TTS override it as a no-op.
+     */
+    fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int)
     fun nativeGetPulsarViz(
         gatesOut: BooleanArray,
         velocitiesOut: FloatArray,

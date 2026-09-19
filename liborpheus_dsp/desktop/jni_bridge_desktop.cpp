@@ -276,6 +276,18 @@ JNI_FN(nativeLoadTtsAudio)(JNIEnv *env, jobject thiz,
 }
 
 JNIEXPORT void JNICALL
+JNI_FN(nativeLoadPulsarClip)(JNIEnv *env, jobject thiz, jint slot, jfloatArray jsamples, jint sampleRate) {
+    jint count = env->GetArrayLength(jsamples);
+    if (count <= 0) {   // an empty array clears the slot
+        sEngine.loadPulsarClip(slot, nullptr, 0, sampleRate);
+        return;
+    }
+    jfloat* samples = env->GetFloatArrayElements(jsamples, nullptr);
+    sEngine.loadPulsarClip(slot, samples, count, sampleRate);
+    env->ReleaseFloatArrayElements(jsamples, samples, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
 JNI_FN(nativePlayTts)(JNIEnv *env, jobject thiz) {
     sEngine.playTts();
 }

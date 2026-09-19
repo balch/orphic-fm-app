@@ -5,6 +5,7 @@ import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionWeather
+import org.balch.orpheus.features.pulsar.models.SpeechCue
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
 import org.balch.orpheus.features.pulsar.models.TapeStopEffect
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
@@ -192,5 +193,25 @@ class PulsarMarshalStrideTest {
         assertFailsWith<IllegalArgumentException> { SectionStreet(footsteps = 1.2f) }
         assertFailsWith<IllegalArgumentException> { SectionStreet(footstepEcho = -0.1f) }
         assertFailsWith<IllegalArgumentException> { SectionStreet(train = 2f) }
+    }
+
+    // --- speech_cue_data_$i: 24 rows x 8 fields ---
+
+    @Test
+    fun speechCueWireRowShapeMatchesBankSize() {
+        assertEquals(8, SpeechCueWire.ROW_FIELDS)
+        assertEquals(24, SpeechCueWire.MAX_ROWS)
+        assertEquals(SpeechCueWire.ROW_FIELDS * SpeechCueWire.MAX_ROWS, SpeechCueWire.BANK_SIZE)
+        assertEquals(SpeechCue.MAX_ROWS, SpeechCueWire.MAX_ROWS)
+    }
+
+    @Test
+    fun speechCueFieldOrderMatchesRowMarshal() {
+        // rowFor reads these by name, not position; pin the set so a new field fails here first.
+        val descriptor = SpeechCue.serializer().descriptor
+        assertEquals(
+            listOf("phrase", "beat", "alignEnd", "everyLoops", "loopPhase", "chance", "level"),
+            (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },
+        )
     }
 }

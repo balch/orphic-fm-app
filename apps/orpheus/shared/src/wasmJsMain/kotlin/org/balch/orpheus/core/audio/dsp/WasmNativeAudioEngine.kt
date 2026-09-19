@@ -188,6 +188,7 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeStopTts() = jsSendStopTtsCmd()
 
     override fun nativeIsTtsPlaying(): Int = jsGetTtsPlaying()
+    override fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) { /* WASM: no TTS generator, so no clips */ }
     override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
     override fun nativeGetSpectrum(bands: FloatArray): Int = 0
     override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) { /* WASM: not yet implemented */ }

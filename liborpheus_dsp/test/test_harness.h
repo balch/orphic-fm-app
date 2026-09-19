@@ -578,6 +578,7 @@ bool run_graph_swap_tests();
 bool run_osc_tests();
 bool run_pulsar_osc_tests();
 bool run_pulsar_lick_growth_tests();
+bool run_pulsar_speech_tests();
 bool run_pulsar_street_tests();
 bool run_pulsar_str_lick_tests();
 

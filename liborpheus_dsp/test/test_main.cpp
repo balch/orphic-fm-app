@@ -122,6 +122,7 @@ static TestSuite suites[] = {
     {"osc",             run_osc_tests,             true},
     {"pulsar_osc",      run_pulsar_osc_tests,      true},
     {"pulsar_lick_growth", run_pulsar_lick_growth_tests, true},
+    {"pulsar_speech",   run_pulsar_speech_tests,   true},
     {"pulsar_street",   run_pulsar_street_tests,   true},
     {"pulsar_str_lick", run_pulsar_str_lick_tests, true},
 

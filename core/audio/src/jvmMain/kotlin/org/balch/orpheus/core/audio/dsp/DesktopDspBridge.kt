@@ -111,6 +111,7 @@ class DesktopDspBridge {
     external fun nativePlayTts()
     external fun nativeStopTts()
     external fun nativeIsTtsPlaying(): Int
+    external fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int)
     external fun nativeGetPulsarViz(
         gatesOut: BooleanArray,
         velocitiesOut: FloatArray,

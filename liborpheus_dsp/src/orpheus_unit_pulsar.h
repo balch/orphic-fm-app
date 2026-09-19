@@ -8,6 +8,7 @@
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
 #include "pulsar_street.h"
+#include "pulsar_speech.h"
 #include "orpheus_wah_core.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
@@ -1169,6 +1170,15 @@ struct PulsarState {
     // Street voice (footsteps and a steam train) — the pulsar's 10th voice. Same
     // per-section bed model as storm, re-Init'd per vibe load.
     street::StreetVoice street_voice;
+
+    // Vibe speech (pulsar_speech.h): cues unpacked at load, planned at each loop-cycle start.
+    SpeechCueRow speech_cues[kMaxSpeechCueRows];
+    int speech_cue_count = 0;
+    speech::ClipPlayer speech_player;
+    uint32_t speech_seed = 0x5BEEC4u;
+    int speech_kick_wraps = 0;       // 1 = the next wrap's downbeat ends a phrase
+    bool speech_kick_now = false;    // force track 0's step 0 at this wrap
+    int speech_kicks_forced = 0;     // downbeats a phrase has forced; read by tests
 
     // Void Anomaly (dispatched by the Anomaly Engine)
     VoidConfig void_config;

@@ -71,6 +71,10 @@ static constexpr float kStreetFootDelaySend = 0.25f;
 static constexpr float kStreetTrainReverbSend = 0.35f;
 static constexpr float kStreetTrainDelaySend = 0.10f;
 
+// Fixed sends for vibe speech, so a phrase sits in the vibe's room. EAR-TUNE.
+static constexpr float kSpeechReverbSend = 0.25f;
+static constexpr float kSpeechDelaySend  = 0.15f;
+
 // StormAnomaly rumble floor, as a fraction of the authored strike intensity. Half was
 // picked to sit under a default 0.7 intensity as a clearly-present roll without
 // swamping a section that authored its own bed.
@@ -910,6 +914,35 @@ static int fire_and_carry_entry_transition_fx(OrpheusEngine* engine, PulsarState
                            entry[i].p2, sample_rate);
     }
     return carried;
+}
+
+// Plan the current section's cues for the loop-cycle whose first boundary is
+// `boundary_frame` in this block. `cycle` counts loop-cycles since the section began.
+static void plan_speech_cues(OrpheusEngine* engine, PulsarState* state, int cycle,
+                             int boundary_frame, double samples_per_step) {
+    const int sec = state->section_state.current_section;
+    const int step_count = state->tracks[0].step_count;
+    const float engine_rate = engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f;
+    for (int i = 0; i < state->speech_cue_count; i++) {
+        const SpeechCueRow& row = state->speech_cues[i];
+        if (row.section != sec || !speech_cue_eligible(row, cycle)) continue;
+        // Every eligible cue rolls, so a chance of 1 never shifts another cue's stream.
+        const float roll = pattern_rand01(state->speech_seed);
+        if (row.chance < 1.0f && roll >= row.chance) continue;
+        if (row.phrase >= kMaxSpeechClips) continue;
+        // Acquire the length FIRST: it pairs with the release store that publishes a
+        // clip's data, so only after this load can the buffer pointer be read safely.
+        const int len = engine->speech_clip_length[row.phrase].load(std::memory_order_acquire);
+        if (len < 2 || !engine->speech_clip_buffer) continue;
+        const int src = engine->speech_clip_source_rate[row.phrase].load(std::memory_order_relaxed);
+        const double clip_frames = len * static_cast<double>(engine_rate) / (src > 0 ? src : 48000);
+        const double start = speech_cue_start_frame(row, step_count, samples_per_step, clip_frames);
+        const bool scheduled = state->speech_player.Schedule(
+            engine->speech_clip_buffer + row.phrase * kMaxSpeechClipFrames,
+            len, src, engine_rate, row.level,
+            boundary_frame + static_cast<long>(start + 0.5));
+        if (scheduled && speech_cue_ends_on_downbeat(row, step_count)) state->speech_kick_wraps = 1;
+    }
 }
 
 // One elapsed bar for the carried rows, firing whichever have arrived. Runs on EVERY
@@ -2269,6 +2302,23 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->post_flip_fx_count = 0;
     stage_transition_fx_for_planned_edge(state);
 
+    // Vibe speech cues. The wire carries no count; phrase < 0 marks padding rows.
+    state->speech_cue_count = 0;
+    for (int r = 0; r < kMaxSpeechCueRows; r++) {
+        float fields[kSpeechCueRowFields];
+        for (int f = 0; f < kSpeechCueRowFields; f++)
+            fields[f] = engine->pulsar_speech_cue_data[r * kSpeechCueRowFields + f].load(std::memory_order_relaxed);
+        const SpeechCueRow row = speech_cue_row_from_wire(fields);
+        if (row.phrase < 0) continue;
+        state->speech_cues[state->speech_cue_count++] = row;
+    }
+    state->speech_player.Init(engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f);
+    state->speech_seed = base_seed ^ 0x5BEEC4u;
+    if (state->speech_seed == 0) state->speech_seed = 0x5BEEC4u;   // xorshift needs nonzero
+    state->speech_kick_wraps = 0;
+    state->speech_kick_now = false;
+    state->speech_kicks_forced = 0;
+
     // The opening section whistles too, if it is a train section.
     if (state->arrangement.active) {
         const int cur = state->section_state.current_section;
@@ -3310,6 +3360,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // only to seat the playhead on the new window and sound steps[0].
             const bool is_load_boundary = (b == load_boundary_index);
             pulsar_advance_playhead(ts, state->tension.half_lick);
+            // The opening section's first cycle has no wrap to plan from, so it is
+            // planned here, at the vibe-load boundary itself.
+            if (t == 0 && is_load_boundary && state->arrangement.active) {
+                plan_speech_cues(engine, state, 0, step_boundary_samples[b], samples_per_step);
+            }
             if (t == 0 && t0_boundary_count < kMaxStepBoundaries) t0_boundary_step[t0_boundary_count++] = ts.playhead;
 
             // Close the triplet clock's segment for the step this boundary ends, then
@@ -3334,6 +3389,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // boundary as a bar would drift them against the chord clock.
             if (ts.playhead == 0 && prev_playhead > 0 && t == 0 && !is_load_boundary) {
                 mutate_patterns(state, complexity, engine);
+
+                // A phrase planned at the previous wrap ends on THIS downbeat.
+                state->speech_kick_now = state->speech_kick_wraps > 0;
+                state->speech_kick_wraps = 0;
 
                 // ── StormAnomaly window: one bar of the drawn length has elapsed ──
                 // Outside the arrangement guard below so a window can never outlive an
@@ -3486,6 +3545,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     int staged_target = state->section_state.next_section_planned;
                     bool section_changed = advance_section(
                         state->section_state, state->arrangement, state->mutation_seed);
+
+                    // bars_remaining is refreshed on a flip, so this is 0 for a section's
+                    // first cycle; cycle counts loop-cycles since it began.
+                    plan_speech_cues(engine, state,
+                                     state->section_state.bars_total - state->section_state.bars_remaining,
+                                     step_boundary_samples[b], samples_per_step);
 
                     // Rows a previous flip carried forward (positive offsets) count down
                     // here, before the block below can hand this flip's own carries over.
@@ -4564,7 +4629,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // the reachable fire_prob ceiling (0.95 percussive, 0.985 at
                         // energy 0.95), so without this the bass (t3) and t2/t4 lost the
                         // downbeat on EVERY vibe load below energy 0.99 — deterministically.
-                        bool fires = prob_roll < fire_prob || energy >= 0.99f || is_load_boundary;
+                        bool fires = prob_roll < fire_prob || energy >= 0.99f || is_load_boundary
+                            || (t == 0 && ts.playhead == 0 && state->speech_kick_now);
 
                         // TEXTURE/FX at low energy: always fire so hold chains work
                         if (t >= 5 && energy < 0.4f) fires = true;
@@ -4595,6 +4661,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             const float hroll =
                                 static_cast<float>(hh & 0xFFFF) / 65535.0f;
                             if (hroll >= p_eff) fires = false;
+                        }
+
+                        if (t == 0 && ts.playhead == 0 && state->speech_kick_now) {
+                            state->speech_kick_now = false;
+                            // Only a real fire counts, so deleting the force term above
+                            // shows up here as a lower count, not just a consumed flag.
+                            if (fires) state->speech_kicks_forced++;
                         }
 
                         if (fires) {
@@ -5749,6 +5822,24 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 engine->pulsar_reverb_send_l[i] += fl * foot_rev + tl * kStreetTrainReverbSend;
                 engine->pulsar_reverb_send_r[i] += fr * foot_rev + tr * kStreetTrainReverbSend;
             }
+        }
+    }
+
+    // ── Vibe speech ─────────────────────────────────────────────────────
+    // After the street block, into the stereo mix ahead of the output HPF, under the
+    // Void duck, with fixed sends so a phrase sits in the vibe's room.
+    if (state->speech_player.active()) {
+        float speech_buf[kMaxFrames];
+        std::memset(speech_buf, 0, num_frames * sizeof(float));
+        state->speech_player.Render(speech_buf, num_frames);
+        for (int i = 0; i < num_frames; i++) {
+            const float s = speech_buf[i] * void_gain_buf[i];
+            out_l[i] += s;
+            out_r[i] += s;
+            engine->pulsar_delay_send_l[i]  += s * kSpeechDelaySend;
+            engine->pulsar_delay_send_r[i]  += s * kSpeechDelaySend;
+            engine->pulsar_reverb_send_l[i] += s * kSpeechReverbSend;
+            engine->pulsar_reverb_send_r[i] += s * kSpeechReverbSend;
         }
     }
 

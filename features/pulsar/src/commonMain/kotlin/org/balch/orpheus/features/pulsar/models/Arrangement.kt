@@ -244,6 +244,8 @@ data class Section(
     /** Pin this section's lick to a [LickRotation.pool] slot. Null = rotate as usual.
      *  Scores use this to give each section its own theme. */
     val lickIndex: Int? = null,
+    /** Phrases this section speaks inside its loop-cycles; they need [Vibe.speech]. */
+    val speech: List<SpeechCue> = emptyList(),
     /** Footsteps and train under this section (slots 27-30). Null = no street. */
     val street: SectionStreet? = null,
 ) {
@@ -277,6 +279,9 @@ data class Section(
         require(exitEffects.size + worstEdge <= TransitionEffect.MAX_PER_FLIP) {
             "Section.exitEffects (${exitEffects.size}) + its busiest edge's effects ($worstEdge) " +
                 "exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
+        }
+        require(speech.size <= SpeechCue.MAX_PER_SECTION) {
+            "Section.speech size ${speech.size} exceeds MAX_PER_SECTION=${SpeechCue.MAX_PER_SECTION}"
         }
     }
 }
@@ -348,6 +353,11 @@ data class Arrangement(
                         "exceeds MAX_PER_FLIP=${TransitionEffect.MAX_PER_FLIP}"
                 }
             }
+        }
+        // Every cue crosses as one row of a fixed bank; C++ reads no count, so fail here.
+        val cueCount = sections.sumOf { it.speech.size }
+        require(cueCount <= SpeechCue.MAX_ROWS) {
+            "Arrangement has $cueCount speech cues; the wire carries SpeechCue.MAX_ROWS=${SpeechCue.MAX_ROWS}"
         }
     }
 

@@ -128,6 +128,7 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param anomalies Rare dramatic events (see [Anomaly]) the Anomaly Engine may fire — e.g. a
  *   [VoidAnomaly] drop-to-silence or a [LickAnomaly] original-riff swap. Empty = none; the vibe
  *   then ignores the manual anomaly trigger. At most one anomaly of each concrete type.
+ * @param speech Phrases the vibe can speak. Required as soon as any [Section] declares [Section.speech].
  */
 @Serializable
 data class Vibe(
@@ -162,6 +163,7 @@ data class Vibe(
     val effects: VibeEffects = VibeEffects(),
     val lickWah: WahParams? = null,
     val anomalies: List<Anomaly> = emptyList(),
+    val speech: VibeSpeech? = null,
 ) {
     init {
         require(tracks.size == 8) {
@@ -249,6 +251,22 @@ data class Vibe(
         }.map { it.index }
         require(orphanWah.isEmpty()) {
             "track(s) $orphanWah set wahParams but wahLick = false — the params would never run"
+        }
+        // Speech cues index the vibe's phrases, and a beat past the loop's end never arrives.
+        val cues = arrangement?.sections?.flatMap { it.speech } ?: emptyList()
+        require(cues.isEmpty() || speech != null) { "Section.speech cues require Vibe.speech" }
+        speech?.let { sp ->
+            cues.forEach { cue ->
+                require(cue.phrase < sp.phrases.size) {
+                    "SpeechCue.phrase ${cue.phrase} has no phrase; Vibe.speech has ${sp.phrases.size}"
+                }
+            }
+        }
+        val loopBeats = stepCount / 4f
+        cues.forEach { cue ->
+            require(cue.beat == null || cue.beat <= loopBeats) {
+                "SpeechCue.beat ${cue.beat} is past the loop's end ($loopBeats beats at stepCount $stepCount)"
+            }
         }
     }
 }

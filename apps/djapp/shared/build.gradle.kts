@@ -39,6 +39,7 @@ kotlin {
             api(project(":core:dsp-engine"))
             api(project(":core:features"))
             api(project(":core:foundation"))
+            api(project(":core:tts"))
             api(project(":core:plugins:pulsar"))
             api(project(":core:plugins:dj"))
             api(project(":core:plugins:app"))

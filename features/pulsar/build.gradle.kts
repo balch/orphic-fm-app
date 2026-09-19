@@ -16,6 +16,7 @@ tasks.named<Test>("jvmTest") {
         file("../../liborpheus_dsp/src/orpheus_engine.h"),
         file("../../liborpheus_dsp/src/orpheus_unit_pulsar.h"),
         file("../../liborpheus_dsp/src/pulsar_score_clock.h"),
+        file("../../liborpheus_dsp/src/pulsar_speech.h"),
     )
         .withPropertyName("cppSectionLimitsHeaders")
         .withPathSensitivity(PathSensitivity.NAME_ONLY)
@@ -94,6 +95,7 @@ kotlin {
         commonMain.dependencies {
             implementation(projects.core.audio)
             implementation(projects.core.pluginApi)
+            implementation(projects.core.tts)
             implementation(libs.kotlinx.datetime)
         }
         // kotlin("test") comes from the orpheus.kmp.compose convention plugin.

@@ -1286,6 +1286,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < kTransFxBankSize)
                 engine->pulsar_trans_fx_data[idx].store(value, std::memory_order_relaxed);
         }
+        else if (std::strncmp(symbol, "speech_cue_data_", 16) == 0) {
+            int idx = std::atoi(symbol + 16);
+            if (idx >= 0 && idx < kSpeechCueBankSize)
+                engine->pulsar_speech_cue_data[idx].store(value, std::memory_order_relaxed);
+        }
         else if (std::strcmp(symbol, "anomaly_request") == 0)
             engine->pulsar_anomaly_request.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strncmp(symbol, "section_track_comping_", 22) == 0) {

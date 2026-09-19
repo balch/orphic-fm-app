@@ -36,6 +36,7 @@ import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
 import orpheus_dsp.orpheus_engine_is_tts_playing
 import orpheus_dsp.orpheus_engine_load_patch
+import orpheus_dsp.orpheus_engine_load_pulsar_clip
 import orpheus_dsp.orpheus_engine_load_tts_audio
 import orpheus_dsp.orpheus_engine_master_fade
 import orpheus_dsp.orpheus_engine_master_filter
@@ -1308,6 +1309,19 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                     samples.size,
                     sampleRate
                 )
+            }
+        }
+    }
+
+    override fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) {
+        withEngine { eng ->
+            // An empty array clears the slot, and addressOf(0) would throw on it.
+            if (samples.isEmpty()) {
+                orpheus_engine_load_pulsar_clip(eng, slot, null, 0, sampleRate)
+            } else {
+                samples.usePinned { pinned ->
+                    orpheus_engine_load_pulsar_clip(eng, slot, pinned.addressOf(0), samples.size, sampleRate)
+                }
             }
         }
     }

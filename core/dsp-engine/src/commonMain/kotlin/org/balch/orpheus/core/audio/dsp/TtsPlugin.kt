@@ -119,6 +119,10 @@ class TtsPlugin(
         (audioEngine as NativeDspBridge).nativeLoadTtsAudio(samples, sampleRate)
     }
 
+    fun loadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) {
+        (audioEngine as NativeDspBridge).nativeLoadPulsarClip(slot, samples, sampleRate)
+    }
+
     fun play() {
         (audioEngine as NativeDspBridge).nativePlayTts()
     }

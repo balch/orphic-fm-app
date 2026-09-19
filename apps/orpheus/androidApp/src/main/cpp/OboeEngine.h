@@ -62,6 +62,7 @@ public:
     void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);
     void clearAutomation(int target, int voiceIndex);
     void loadTtsAudio(const float* samples, int count, int sampleRate);
+    void loadPulsarClip(int slot, const float* samples, int count, int sampleRate);
     void playTts();
     void stopTts();
     int  isTtsPlaying();

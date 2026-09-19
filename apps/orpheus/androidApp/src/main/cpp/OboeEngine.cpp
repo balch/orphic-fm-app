@@ -281,6 +281,9 @@ void OboeEngine::clearAutomation(int target, int voiceIndex) {
 void OboeEngine::loadTtsAudio(const float* samples, int count, int sampleRate) {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_load_tts_audio(e, samples, count, sampleRate);
 }
+void OboeEngine::loadPulsarClip(int slot, const float* samples, int count, int sampleRate) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_load_pulsar_clip(e, slot, samples, count, sampleRate);
+}
 void OboeEngine::playTts() {
     if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_play_tts(e);
 }

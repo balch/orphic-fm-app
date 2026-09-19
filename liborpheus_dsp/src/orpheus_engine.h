@@ -5,6 +5,7 @@
 #include "osc_core.h"
 #include "pulsar_limits.h"
 #include "pulsar_transition_fx.h"
+#include "pulsar_speech.h"
 #include "orpheus_graph.h"
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
@@ -649,6 +650,13 @@ struct OrpheusEngine {
     std::atomic<int>   tts_playing{0};  // 0=stopped, 1=playing
     std::atomic<int>   tts_trigger{0};  // 1=start from beginning
 
+    // ── Pulsar speech clips ──────────────────────────
+    // Kotlin loads a vibe's generated phrases; the Pulsar unit's clip player reads them.
+    // Same publish handshake as tts_buffer: length 0, copy, then publish the length.
+    float* speech_clip_buffer{nullptr};   // kMaxSpeechClips * kMaxSpeechClipFrames, first load
+    std::atomic<int> speech_clip_length[kMaxSpeechClips] = {};
+    std::atomic<int> speech_clip_source_rate[kMaxSpeechClips] = {};
+
     // TTS speech effects (phaser → feedback delay → Schroeder reverb)
     std::atomic<float> tts_phaser{0.0f};
     std::atomic<float> tts_feedback{0.0f};
@@ -1058,6 +1066,8 @@ struct OrpheusEngine {
     // Writers must zero unused rows on every apply: the loader scans all kMaxTransFxRows
     // rows with no count field.
     std::atomic<float> pulsar_trans_fx_data[kTransFxBankSize] = {};
+    // Vibe speech cues, 8 floats per row (pulsar_speech.h). Zero rows are padding.
+    std::atomic<float> pulsar_speech_cue_data[kSpeechCueBankSize] = {};
     // Per-track lick-wah insert config bank. [0] = track opt-in bitmask (bit t set => track t
     // filters its rendered audio through its OWN WahVoice, voiced by its OWN params). Then
     // kLickWahFields floats per track at 1 + t * kLickWahFields, in orpheus::WahParams
