@@ -388,6 +388,52 @@ static bool test_ghost_rolls_follow_the_seed() {
     return pass;
 }
 
+// ── CAP-6: velocity jitter is independent of the fire roll ──
+//
+// The jitter used to reuse the fire gate's own roll. A note only fires when that roll
+// is under fire_prob, so at fire_prob 0.5 every fired note got a NEGATIVE offset: half
+// the range was unreachable and sparse sections skewed quiet. The jitter now draws its
+// own bits, swings both ways, and keeps half of the old quiet bias on purpose.
+static bool test_velocity_jitter_independent_of_fire_roll() {
+    printf("\n=== Test: CAP-6 velocity jitter is independent of the fire roll ===\n");
+    constexpr float kFireProb = 0.5f, kVar = 1.0f;
+    const float old_mean = -(1.0f - kFireProb) * 0.2f * kVar;   // -0.10
+
+    double sum = 0, sum_r = 0, sum_rr = 0, sum_j = 0, sum_jj = 0, sum_rj = 0, forced_sum = 0;
+    float max_off = -1.0f, min_off = 1.0f;
+    int n = 0, forced_n = 0;
+    for (int loop = 0; loop < 400; loop++)
+        for (int t = 0; t < 8; t++)
+            for (int s = 0; s < 16; s++) {
+                const uint32_t h = step_hash(s, t, loop, 0xC0FFEEu);
+                const float roll = static_cast<float>(h & 0xFFFF) / 65535.0f;
+                forced_sum += fire_velocity_jitter(h, kVar, kFireProb, false);
+                forced_n++;
+                if (roll >= kFireProb) continue;                 // did not fire
+                const float j = fire_velocity_jitter(h, kVar, kFireProb, true);
+                sum += j; n++;
+                sum_r += roll; sum_rr += roll * roll; sum_j += j; sum_jj += j * j; sum_rj += roll * j;
+                max_off = std::max(max_off, j); min_off = std::min(min_off, j);
+            }
+    const double mean = sum / n, forced_mean = forced_sum / forced_n;
+    const double cov = sum_rj / n - (sum_r / n) * (sum_j / n);
+    const double corr = cov / std::sqrt((sum_rr / n - (sum_r / n) * (sum_r / n)) *
+                                        (sum_jj / n - (sum_j / n) * (sum_j / n)));
+
+    printf("  fired n=%d mean=%.4f (old %.4f) range=[%.3f, %.3f] corr(roll,jitter)=%.4f forced_mean=%.4f\n",
+           n, mean, old_mean, min_off, max_off, corr, forced_mean);
+
+    const bool swings_both_ways = max_off > 0.1f && min_off < -0.1f;
+    const bool a_tad_louder = mean > old_mean + 0.03 && mean < -0.02;   // about half the old dip
+    const bool independent = std::fabs(corr) < 0.05;
+    const bool forced_unbiased = std::fabs(forced_mean) < 0.01;
+    bool pass = swings_both_ways && a_tad_louder && independent && forced_unbiased;
+    printf("  both_ways=%d tad_louder=%d independent=%d forced_unbiased=%d\n",
+           swings_both_ways, a_tad_louder, independent, forced_unbiased);
+    printf("  CAP-6: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_pulsar_complexity_cap_tests() {
     printf("\n========== PULSAR COMPLEXITY CAP TESTS ==========\n");
     int pass = 0, fail = 0;
@@ -397,6 +443,7 @@ bool run_pulsar_complexity_cap_tests() {
     if (test_dejavu_reset_floor_at_least_8())                  pass++; else fail++;
     if (test_rhythm_budget_lower_variation_than_wild())        pass++; else fail++;
     if (test_ghost_rolls_follow_the_seed())                    pass++; else fail++;
+    if (test_velocity_jitter_independent_of_fire_roll())       pass++; else fail++;
 
     printf("\nComplexity-cap tests: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);

@@ -4629,8 +4629,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // The vibe-load downbeat always fires. Its roll is salted per
                         // load like any other, so without this a load would drop the
                         // bass or lead downbeat whenever that roll landed above fire_prob.
-                        bool fires = prob_roll < fire_prob || energy >= 0.99f || is_load_boundary
-                            || (t == 0 && ts.playhead == 0 && state->speech_kick_now);
+                        // Every path that fires the step whatever the roll says; the lick
+                        // and low-energy FX overrides below belong to it too.
+                        const bool forced_fire = energy >= 0.99f || is_load_boundary
+                            || (t == 0 && ts.playhead == 0 && state->speech_kick_now)
+                            || (t >= 5 && energy < 0.4f) || step.from_lick;
+                        bool fires = prob_roll < fire_prob || forced_fire;
 
                         // TEXTURE/FX at low energy: always fire so hold chains work
                         if (t >= 5 && energy < 0.4f) fires = true;
@@ -4674,10 +4678,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // Apply velocity variation from complexity
                             float vel = step.velocity;
                             if (variation_amt > 0.001f) {
-                                uint32_t vh = step_hash(ts.playhead, t, state->loop_count, state->step_salt);
-                                float var_offset = (static_cast<float>(vh & 0xFFFF) / 65535.0f - 0.5f)
-                                                  * 2.0f * variation_amt * 0.2f;
-                                vel = clamp01(vel + var_offset);
+                                // A hit that fired on the roll alone keeps part of the old
+                                // quiet skew; a forced one (lick, downbeat, low-energy FX)
+                                // never had it.
+                                const bool roll_gated = prob_roll < fire_prob && !forced_fire;
+                                vel = clamp01(vel + fire_velocity_jitter(
+                                    prob_hash, variation_amt, std::min(1.0f, fire_prob), roll_gated));
                             }
 
                             // Apply solo volume modifier (smoothed to crossfade at handoff)

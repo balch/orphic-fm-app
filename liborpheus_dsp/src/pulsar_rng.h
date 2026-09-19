@@ -25,6 +25,22 @@ inline bool duck_passes(int playhead, int track, int loop, float density_mod,
     return roll <= gate;
 }
 
+// Share of the old quiet skew a roll-gated hit keeps: 1 = as quiet as it used to be,
+// 0 = unbiased (loudest). Tuned by ear.
+inline constexpr float kJitterQuietBias = 0.5f;
+
+// Per-hit velocity jitter for a step that fired. `h` is the step's fire-gate hash; the
+// gate reads its low 16 bits, so the jitter takes the high 16. It used to reuse the low
+// ones, and since a hit only fires on a low roll, every roll-gated hit came out quieter
+// by (1 - fire_prob) * 0.2 * variation_amt on average and never louder.
+inline float fire_velocity_jitter(uint32_t h, float variation_amt, float fire_prob,
+                                  bool roll_gated) {
+    const float r = static_cast<float>((h >> 16) & 0xFFFF) / 65535.0f;
+    const float bias = roll_gated
+        ? -(1.0f - fire_prob) * 0.2f * variation_amt * kJitterQuietBias : 0.0f;
+    return (r - 0.5f) * 2.0f * variation_amt * 0.2f + bias;
+}
+
 // xorshift32 PRNG — deterministic from seed. Canonical home; pattern_gen and
 // pulsar_void both consume these.
 inline uint32_t pattern_rand(uint32_t& seed) {
