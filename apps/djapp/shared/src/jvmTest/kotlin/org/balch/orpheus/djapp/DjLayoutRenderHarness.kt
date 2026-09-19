@@ -138,7 +138,7 @@ class DjLayoutRenderHarness {
 
     /**
      * Renders the whole TV screen — top bar, dock, bottom bar — at 1280x720dp, the canvas
-     * [tvDensityScale] widens a real 960x540dp television to. Catches anything the dock-only
+     * [largeScreenDensityScale] widens a real 960x540dp television to. Catches anything the dock-only
      * harnesses above can't: bar/dock overlap, insets landing on the wrong edge, bottom-bar
      * item order. Wrapped in `LocalTvFocusChrome` AND `LocalTelevisionHardware provides true`,
      * exactly as DjAppScreen provides them on real TV hardware, so this also renders the real
@@ -195,6 +195,69 @@ class DjLayoutRenderHarness {
             }
         }
         println("[render-harness] wrote full-screen PNGs to ${outDir.absolutePath}")
+    }
+
+    /**
+     * The Galaxy Z Fold inner display, held sideways, after [largeScreenDensityScale] widens it.
+     * Measured on an attached SM-F976U: 2256x2504px at density 480, so landscape is 834.7x752dp
+     * natively and 1280x1153dp once scaled by 0.652.
+     *
+     * Distinct from [renderFullTvScreen] in the one dimension that matters: it is 1153dp TALL
+     * against a television's 720dp. The dock stacks each edge column from the top, so a canvas
+     * this tall is where vertical gaps between docked panels show up. A 720dp render cannot
+     * catch that.
+     */
+    @Test
+    fun renderFoldInnerLandscape() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        val allPanels = largeScreenPanels()
+        listOf(3, 7).forEach { count ->
+            runCatching {
+                val docked = allPanels.take(count)
+                val dockedSet = docked.toSet()
+                val scene = ImageComposeScene(1280, 1153, Density(1f)) {
+                    OrpheusTheme {
+                        CompositionLocalProvider(
+                            // A foldable is not television hardware, so the bars carry the panel
+                            // glass (see shouldShowTvBarGlass) exactly as they do on desktop.
+                            LocalTvFocusChrome provides false,
+                            LocalTelevisionHardware provides false,
+                        ) {
+                            Column(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                                DjTvTopBar(
+                                    vizFeature = VizViewModel.previewFeature(),
+                                    pulsarFeature = PulsarViewModel.previewFeature(),
+                                    onTogglePlayback = {},
+                                )
+                                Box(Modifier.weight(1f).fillMaxWidth()) {
+                                    DjPanelDock(
+                                        panels = docked,
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) { route, mod -> PreviewRoutePanel(route, mod) }
+                                }
+                                DjTvBottomBar(
+                                    panels = bottomBarPanels(allPanels),
+                                    isDocked = { it in dockedSet },
+                                    onToggle = {},
+                                    timerFeature = TimerViewModel.previewFeature(),
+                                    pulsarFeature = PulsarViewModel.previewFeature(),
+                                )
+                            }
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "fold-1280x1153-$count.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] fold landscape count=$count skipped: $it")
+            }
+        }
+        println("[render-harness] wrote fold PNGs to ${outDir.absolutePath}")
     }
 
     /**

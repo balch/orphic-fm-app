@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjApp
 import org.balch.orpheus.djapp.startDjAudio
-import org.balch.orpheus.djapp.tvDensityScale
+import org.balch.orpheus.djapp.largeScreenCanvasScale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,13 +60,15 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // TV widens the dp canvas so the fixed-width dock panels fit (see tvDensityScale).
-            // tvScale is 1f off television hardware, so this is inert on phones and tablets.
+            // TVs and tablet-class screens in landscape widen the dp canvas so the
+            // fixed-width dock panels fit (see largeScreenCanvasScale). It returns 1f on phones,
+            // on folded cover displays and in portrait, so this is inert everywhere else.
             // fontScale passes through untouched, keeping the user's own text-size setting.
-            val tvScale = tvDensityScale()
+            val canvasScale = largeScreenCanvasScale()
             val baseDensity = LocalDensity.current
             CompositionLocalProvider(
-                LocalDensity provides Density(baseDensity.density * tvScale, baseDensity.fontScale),
+                LocalDensity provides
+                    Density(baseDensity.density * canvasScale, baseDensity.fontScale),
             ) {
                 DjApp(
                     graph = graph,

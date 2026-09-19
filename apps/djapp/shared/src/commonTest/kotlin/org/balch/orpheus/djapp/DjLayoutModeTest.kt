@@ -18,14 +18,14 @@ class DjLayoutModeTest {
 
     @Test
     fun widenedTvCanvasStaysLargeScreen() {
-        // tvDensityScale widens the canvas to TvDesignWidthDp so the fixed-width dock panels fit.
+        // largeScreenDensityScale widens the canvas to LargeScreenDesignWidthDp so the fixed-width dock panels fit.
         // The widened reading must still clear the LargeScreen thresholds, or the dock vanishes.
         assertEquals(DjLayoutMode.LargeScreen, determineLayoutMode(1280.dp, 720.dp))
     }
 
     @Test
     fun narrowingTheCanvasWouldCostTvMode() {
-        // Documents why tvDensityScale must stay below 1f. Scaling density UP shrinks the measured
+        // Documents why largeScreenDensityScale must stay below 1f. Scaling density UP shrinks the measured
         // canvas (fixed pixels / larger density = fewer dp), dropping it under LargeScreenMinWidth
         // and silently taking the TV dock with it.
         assertNotEquals(DjLayoutMode.LargeScreen, determineLayoutMode(720.dp, 405.dp))

@@ -24,28 +24,26 @@ fun Context.isTelevision(): Boolean {
 }
 
 /**
- * Design canvas width the TV chrome is authored against. Android TV reports 1080p as 960x540dp,
- * which is too tight for the dock: the panels have fixed content widths and do not reflow, so at
- * 960dp the gain label breaks to one letter per line and the right-hand knob clips. Widening the
- * canvas hands them the room instead. Verified on a Chromecast with Google TV by sweeping
- * `adb shell wm density`: 960dp clips, 1097dp still breaks GAIN, 1280dp renders everything.
+ * Density multiplier that widens the dp canvas so the dock's fixed-width panels fit. Callers
+ * fold this into [androidx.compose.ui.unit.Density.density] and never into fontScale, which
+ * would compound the user's own accessibility text-size setting.
  *
- * Raising this makes the UI physically smaller and fits more; lowering it does the reverse.
- */
-private const val TvDesignWidthDp = 1280f
-
-/**
- * Density multiplier that widens the dp canvas on TV hardware. Callers fold this into
- * [androidx.compose.ui.unit.Density.density] and never into fontScale, which would compound the
- * user's own accessibility text-size setting. Returns 1f — a no-op — off television hardware.
+ * All policy lives in the shared [largeScreenDensityScale]; this only reads the platform
+ * configuration and hands it over. [LocalConfiguration] reports the SYSTEM configuration, which
+ * a `CompositionLocalProvider(LocalDensity ...)` above does not alter, so feeding the result
+ * back into the density creates no loop.
  *
- * Scaling below 1f grows the reported canvas, so the [DjLayoutMode] LargeScreen thresholds stay
- * satisfied with room to spare. A scale above 1f would shrink it toward that cliff instead.
+ * Raising [LargeScreenDesignWidthDp] makes the UI physically smaller and fits more; lowering it
+ * does the reverse.
  */
 @Composable
-fun tvDensityScale(): Float {
-    val context = LocalContext.current
-    if (!context.isTelevision()) return 1f
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    return screenWidthDp / TvDesignWidthDp
+fun largeScreenCanvasScale(): Float {
+    val isTv = LocalContext.current.isTelevision()
+    val configuration = LocalConfiguration.current
+    return largeScreenDensityScale(
+        widthDp = configuration.screenWidthDp.toFloat(),
+        heightDp = configuration.screenHeightDp.toFloat(),
+        smallestWidthDp = configuration.smallestScreenWidthDp,
+        isTelevision = isTv,
+    )
 }
