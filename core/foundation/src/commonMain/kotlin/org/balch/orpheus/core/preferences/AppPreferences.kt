@@ -33,6 +33,13 @@ data class AppPreferences(
      * user deliberately docked nothing, which is the valid visualizer-only state.
      */
     val largeScreenPanels: List<String>? = null,
+    /**
+     * DJ wide-portrait bottom pair, by route label, oldest first. Kept apart from
+     * [largeScreenPanels] on purpose: the pair holds two and evicts, so sharing one list would
+     * let a portrait eviction silently undock a panel from the landscape dock. Null means never
+     * configured; an empty list is the valid visualizer-only state.
+     */
+    val portraitPairPanels: List<String>? = null,
     /** Serialized effect UI states for DJ app cross-session persistence. */
     val lastTimerJson: String? = null,
     val lastReverbJson: String? = null,

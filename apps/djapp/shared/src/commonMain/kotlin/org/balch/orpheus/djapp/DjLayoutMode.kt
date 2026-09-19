@@ -56,7 +56,28 @@ fun determineLayoutMode(
 }
 
 /**
- * Hands [content] the [DjLayoutMode] for the space this box fills; [modifier] must size the box.
+ * Minimum portrait width for two panels side by side under Pulsar. Set by rendering, not by
+ * reasoning: Timer's flip clock is fixed-width and pushes its edge knobs out of a narrow panel.
+ * Swept in `renderPortraitPair`, a Mix + Timer pair clips at 660dp, fits with zero margin at 680dp
+ * and fits cleanly at 700dp. 700 rather than 680 because the app passes the user's fontScale
+ * through, so a panel with no margin at default text size clips at the first larger setting.
+ *
+ * A Galaxy Z Fold held upright and unfolded measures 752dp and clears this comfortably; phones
+ * (360-412dp) stay well below.
+ */
+val PortraitPairMinWidth: Dp = 700.dp
+
+/**
+ * Whether portrait has room for the bottom pair. Deliberately a separate flag rather than a new
+ * [DjLayoutMode]: callers test `layoutMode != DjLayoutMode.Portrait` to mean "landscape", so a
+ * new member would silently land wide portrait in the rail and the two-column landscape layout.
+ */
+fun fitsPortraitPair(mode: DjLayoutMode, width: Dp): Boolean =
+    mode == DjLayoutMode.Portrait && width >= PortraitPairMinWidth
+
+/**
+ * Hands [content] the [DjLayoutMode] for the space this box fills, and whether portrait has room
+ * for the bottom pair (see [fitsPortraitPair]); [modifier] must size the box.
  * The mode comes from the previous frame's measured size and so changes in composition. Decided
  * mid-layout (a BoxWithConstraints), a mode change disposes sheet dialogs inside the layout pass,
  * and the desktop scene then lays out the dead layer: "RootNodeOwner is already disposed".
@@ -65,7 +86,7 @@ fun determineLayoutMode(
 fun DjLayoutModeBox(
     modifier: Modifier = Modifier,
     tvModeAllowed: Boolean = LocalTvModeAllowed.current,
-    content: @Composable BoxScope.(DjLayoutMode) -> Unit,
+    content: @Composable BoxScope.(mode: DjLayoutMode, portraitPair: Boolean) -> Unit,
 ) {
     var measured by remember { mutableStateOf(IntSize.Zero) }
     val density = LocalDensity.current
@@ -74,7 +95,8 @@ fun DjLayoutModeBox(
         if (measured != IntSize.Zero) {
             val width = with(density) { measured.width.toDp() }
             val height = with(density) { measured.height.toDp() }
-            content(determineLayoutMode(width, height, tvModeAllowed))
+            val mode = determineLayoutMode(width, height, tvModeAllowed)
+            content(mode, fitsPortraitPair(mode, width))
         }
     }
 }

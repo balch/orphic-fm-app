@@ -28,6 +28,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -141,9 +142,9 @@ fun DjAppScreen(
     val dockablePanels = remember(tabs) { largeScreenPanels(tabs) }
 
     val toggleDocked: (DjRoute) -> Unit = { route ->
-        val current = dockedPanels.orEmpty()
-        // Appending on enable is what makes toggle order the slot order.
-        val next = if (route in current) current - route else current + route
+        // Unbounded: the dock never evicts. togglePanel's append is what makes toggle order the
+        // slot order.
+        val next = togglePanel(dockedPanels.orEmpty(), route)
         dockedPanels = next
         scope.launch {
             appPreferencesRepository.update {
@@ -164,13 +165,38 @@ fun DjAppScreen(
         }
     }
 
+    // The wide-portrait bottom pair. Its own list rather than dockedPanels: the pair holds two
+    // and evicts the oldest, and a shared list would let that eviction undock a landscape panel.
+    var pairPanels by remember { mutableStateOf<List<DjRoute>?>(null) }
+    val pairablePanels = remember(tabs) { portraitPairPanels(tabs) }
+
+    val togglePair: (DjRoute) -> Unit = { route ->
+        val next = togglePanel(pairPanels.orEmpty(), route, capacity = PortraitPairCapacity)
+        pairPanels = next
+        scope.launch {
+            appPreferencesRepository.update {
+                it.copy(portraitPairPanels = next.map(DjRoute::label))
+            }
+        }
+    }
+
+    LaunchedEffect(pairablePanels) {
+        val byLabel = pairablePanels.associateBy { it.label }
+        val saved = appPreferencesRepository.load().portraitPairPanels
+        // Same guard as the dock: a tap during this suspend already claimed the value.
+        if (pairPanels == null) {
+            pairPanels = saved?.mapNotNull { byLabel[it] }?.take(PortraitPairCapacity)
+                ?: DefaultPortraitPair.filter { it in pairablePanels }
+        }
+    }
+
     DjLayoutModeBox(
         // Edge-to-edge on purpose: no inset padding, so the UI and the VizBackground behind it
         // fill into the display cutout instead of letterboxing below the notch (system bars are
         // hidden in MainActivity; DjAppHeaderRow's own SpaceBetween clears a center punch-hole).
         modifier = modifier
             .fillMaxSize(),
-    ) { layoutMode ->
+    ) { layoutMode, portraitPair ->
         val isLandscape = layoutMode != DjLayoutMode.Portrait
         val isLargeScreen = layoutMode == DjLayoutMode.LargeScreen
 
@@ -305,11 +331,16 @@ fun DjAppScreen(
             DjAppMainContent(
                 isLargeScreen = isLargeScreen,
                 isLandscape = isLandscape,
+                portraitPair = portraitPair,
                 dockedPanels = dockedPanels.orEmpty(),
+                pairPanels = pairPanels.orEmpty(),
                 pulsarFeature = pulsarFeature,
                 synthEngine = synthEngine,
                 vizFeature = vizFeature,
-                onShowVibeInfo = { activeSheet = VibeInfoTab },
+                // With room for a pair, Info earns a slot instead of covering the screen.
+                onShowVibeInfo = {
+                    if (portraitPair) togglePair(VibeInfoTab) else activeSheet = VibeInfoTab
+                },
                 routePanel = routePanel,
                 navContent = navContent,
             )
@@ -352,6 +383,8 @@ fun DjAppScreen(
                 isSelected = { route ->
                     when {
                         route.opensAsSheet -> route == activeSheet
+                        // Both halves of the pair light up, the way docked panels do on TV.
+                        portraitPair -> route in pairPanels.orEmpty()
                         else -> route == currentRoute
                     }
                 },
@@ -360,6 +393,8 @@ fun DjAppScreen(
                         // Toggle: tapping the active sheet's nav item closes it, otherwise open
                         // (replacing whatever sheet was open).
                         route.opensAsSheet -> activeSheet = if (activeSheet == route) null else route
+                        // Pair mode: the nav is a toggle bar, not single-select navigation.
+                        portraitPair -> togglePair(route)
                         route != currentRoute -> {
                             backStack.clear()
                             backStack.add(route)
@@ -387,7 +422,9 @@ fun DjAppScreen(
 private fun DjAppMainContent(
     isLargeScreen: Boolean,
     isLandscape: Boolean,
+    portraitPair: Boolean,
     dockedPanels: List<DjRoute>,
+    pairPanels: List<DjRoute>,
     pulsarFeature: PulsarFeature,
     synthEngine: SynthEngine,
     vizFeature: VizFeature,
@@ -452,7 +489,37 @@ private fun DjAppMainContent(
                 showCollapsedHeader = false,
                 showExpandedTitle = false,
             )
-            navContent(Modifier.weight(.4f).fillMaxWidth())
+            if (portraitPair) {
+                PortraitPanelPair(
+                    panels = pairPanels,
+                    routePanel = routePanel,
+                    modifier = Modifier.weight(.4f).fillMaxWidth(),
+                )
+            } else {
+                navContent(Modifier.weight(.4f).fillMaxWidth())
+            }
+        }
+    }
+}
+
+/**
+ * Up to [PortraitPairCapacity] panels side by side, in the order the user chose them. One panel
+ * takes the full width; none leaves the row empty so the visualization shows through, the same
+ * as an empty dock.
+ */
+@Composable
+private fun PortraitPanelPair(
+    panels: List<DjRoute>,
+    routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        panels.forEach { route ->
+            // Keyed by route: after an eviction the survivor slides from the right slot to the
+            // left, and without a key it would inherit the evicted panel's remembered state.
+            key(route) {
+                routePanel(route, Modifier.weight(1f).fillMaxHeight(), false)
+            }
         }
     }
 }

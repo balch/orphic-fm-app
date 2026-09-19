@@ -261,6 +261,55 @@ class DjLayoutRenderHarness {
     }
 
     /**
+     * The wide-portrait pair row at two widths: 752dp, the Z Fold held upright (SM-F976U, 2256px
+     * at density 3.0), and [PortraitPairMinWidth], the narrowest width that gets a pair. Rendering
+     * the constant itself rather than a copy of its value means raising or lowering it is always
+     * re-checked against real panels. Height 283dp is the pair's measured share of the Fold's
+     * portrait screen.
+     *
+     * Pairs are chosen for risk, not variety: Mix carries the GAIN label that historically broke
+     * first when a panel ran narrow, and DJ and Timer carry the widest fixed-size content.
+     */
+    @Test
+    fun renderPortraitPair() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        val pairs = listOf(
+            listOf(DjTab, MixTab),
+            listOf(MixTab, TimerTab),
+            listOf(HornTab, VibeInfoTab),
+        )
+        listOf(752, PortraitPairMinWidth.value.toInt()).forEach { width ->
+            pairs.forEach { pair ->
+                runCatching {
+                    val scene = ImageComposeScene(width, 283, Density(1f)) {
+                        OrpheusTheme {
+                            Row(
+                                Modifier.fillMaxSize().background(Color(0xFF14141F)),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                pair.forEach { route ->
+                                    PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
+                                }
+                            }
+                        }
+                    }
+                    val names = pair.joinToString("-") { it.label.replace(" ", "") }
+                    try {
+                        File(outDir, "pair-${width}-$names.png")
+                            .writeBytes(scene.render().encodeToData()!!.bytes)
+                    } finally {
+                        scene.close()
+                    }
+                }.onFailure {
+                    if (it is IllegalStateException) throw it
+                    println("[render-harness] pair width=$width $pair skipped: $it")
+                }
+            }
+        }
+        println("[render-harness] wrote pair PNGs to ${outDir.absolutePath}")
+    }
+
+    /**
      * Renders [DjTvBottomBar] and [DjTvTopBar] with one item forced focused, against both a
      * flat dark ground and [busyVizBackdrop], so the raised-plate focus treatment can be judged
      * against the same conditions a real television sees (bright, busy visualization behind

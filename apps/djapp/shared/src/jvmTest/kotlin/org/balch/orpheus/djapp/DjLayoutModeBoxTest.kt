@@ -23,7 +23,7 @@ class DjLayoutModeBoxTest {
     fun `a dialog dropped by a layout mode change does not crash the scene`() {
         var lastMode: DjLayoutMode? = null
         val scene = ImageComposeScene(width = 360, height = 780, density = Density(1f)) {
-            DjLayoutModeBox(Modifier.fillMaxSize(), tvModeAllowed = true) { mode ->
+            DjLayoutModeBox(Modifier.fillMaxSize(), tvModeAllowed = true) { mode, _ ->
                 lastMode = mode
                 if (mode != DjLayoutMode.LargeScreen) {
                     Dialog(onDismissRequest = {}) { Box(Modifier.size(40.dp)) }
