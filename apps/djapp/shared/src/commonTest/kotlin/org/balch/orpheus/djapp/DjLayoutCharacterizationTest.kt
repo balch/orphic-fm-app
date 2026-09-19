@@ -19,7 +19,8 @@ internal val LayoutCharacterization: List<LayoutCase> = listOf(
     LayoutCase("phone landscape", 892f, 412f, true, "Landscape"),
     LayoutCase("fold cover", 360f, 840f, true, "Portrait"),
     LayoutCase("fold inner upright", 752f, 834.667f, true, "PortraitPair"),
-    LayoutCase("fold inner sideways, unscaled", 834.667f, 752f, true, "Landscape"),
+    // Never seen in production: the density scale docks it. Tall enough for the pair, so it stacks.
+    LayoutCase("fold inner sideways, unscaled", 834.667f, 752f, true, "PortraitPair"),
     LayoutCase("fold inner sideways, scaled", 1280f, 1153f, true, "LargeScreen"),
     LayoutCase("fold flex-panel top half", 835f, 376f, true, "Landscape"),
     LayoutCase("tv 1080p", 960f, 540f, true, "LargeScreen"),
@@ -27,7 +28,8 @@ internal val LayoutCharacterization: List<LayoutCase> = listOf(
     LayoutCase("pixel tablet landscape", 1280f, 800f, true, "LargeScreen"),
     LayoutCase("pixel tablet portrait", 800f, 1280f, true, "PortraitPair"),
     LayoutCase("ipad 13 portrait", 1032f, 1376f, true, "LargeScreen"),
-    LayoutCase("desktop window", 1200f, 800f, false, "Landscape"),
+    // Desktop no longer refuses the dock; a host that did would get the pair stack, not landscape.
+    LayoutCase("desktop window, dock refused", 1200f, 800f, false, "PortraitPair"),
     LayoutCase("desktop fullscreen", 1512f, 982f, true, "LargeScreen"),
     LayoutCase("dock width just under", 899f, 600f, true, "Landscape"),
     LayoutCase("dock width exact", 900f, 600f, true, "LargeScreen"),

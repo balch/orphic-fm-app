@@ -30,6 +30,13 @@ val LargeScreenMinHeight: Dp = 500.dp
  */
 val PortraitPairMinWidth: Dp = 700.dp
 
+/**
+ * Minimum height for the pair stack in a window wider than it is tall. Set by rendering the whole
+ * screen at 766dp wide: the macro knob labels clip at 660dp, touch the panel edge at 680dp and
+ * clear it at 700dp. Under this a wide window takes the landscape layout.
+ */
+val PortraitPairMinHeight: Dp = 700.dp
+
 /** Every screen arrangement. Switch on it with no `else`, so a new one is a compile error. */
 sealed interface DjLayout {
     /** Header, Pulsar, one nav-selected panel, bottom nav. */
@@ -49,14 +56,16 @@ sealed interface DjLayout {
 }
 
 /**
- * Whether the host allows TV mode at all. Desktop sets this from the window's fullscreen state,
- * so a merely wide window keeps the landscape layout. Every other platform leaves it true.
+ * Whether the host allows TV mode at all. No host overrides it today: desktop once tied it to
+ * fullscreen, and now any window big enough gets the dock.
  */
 val LocalTvModeAllowed = compositionLocalOf { true }
 
 /**
  * The only place layout precedence lives. A hinge decides alone; otherwise the dock wins when
- * allowed and big enough, orientation picks landscape or portrait, and wide portrait gets a pair.
+ * allowed and big enough, a wide window still tall enough for the pair stacks it (a desktop
+ * window under the dock leaves landscape's half-width Pulsar column clipping and half empty),
+ * orientation picks landscape or portrait, and wide portrait gets a pair.
  */
 fun resolveLayout(
     width: Dp,
@@ -67,7 +76,8 @@ fun resolveLayout(
     hinge != null -> DjLayout.Tabletop(hinge, pair = width >= PortraitPairMinWidth)
     tvModeAllowed && width >= LargeScreenMinWidth && height >= LargeScreenMinHeight ->
         DjLayout.LargeScreen
-    width > height -> DjLayout.Landscape
+    width > height && (width < PortraitPairMinWidth || height < PortraitPairMinHeight) ->
+        DjLayout.Landscape
     width >= PortraitPairMinWidth -> DjLayout.PortraitPair
     else -> DjLayout.Portrait
 }

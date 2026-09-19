@@ -314,6 +314,73 @@ class DjLayoutRenderHarness {
      * display sideways at native density, crease at 376dp. The sweep moves the crease to find the
      * smallest half that still renders cleanly, which is what [TabletopMinHalfHeight] must be.
      */
+    /**
+     * The whole portrait-pair screen at desktop window sizes, as it runs (header, Pulsar at .6,
+     * pair at .4, real bottom nav). The height sweep finds the shortest window that still shows
+     * the macro knob labels, which is what [PortraitPairMinHeight] must be.
+     */
+    @Test
+    fun renderPortraitPairScreen() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        val panels = listOf(DjTab, MixTab)
+        listOf(660, 680, 700, 720, 740, 760).forEach { height ->
+            runCatching {
+                val scene = ImageComposeScene(766, height, Density(1f)) {
+                    OrpheusTheme {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            DjAppNavScaffold(
+                                isSelected = { it in panels },
+                                onItemClick = {},
+                                layout = DjLayout.PortraitPair,
+                                pulsarFeature = PulsarViewModel.previewFeature(),
+                                timerFeature = TimerViewModel.previewFeature(),
+                                onTogglePlayback = {},
+                            ) {
+                                Column(Modifier.fillMaxSize()) {
+                                    DjAppHeaderRow(
+                                        vizFeature = VizViewModel.previewFeature(),
+                                        onInfoClick = {},
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    )
+                                    PulsarPanel(
+                                        pulsar = PulsarViewModel.previewFeature(),
+                                        vizFlow = emptyPulsarVizFlow,
+                                        trackVizFlows = emptyTrackVizFlows,
+                                        modifier = Modifier.weight(.6f).fillMaxWidth(),
+                                        isExpanded = true,
+                                        onExpandedChange = {},
+                                        showCollapsedHeader = false,
+                                        showExpandedTitle = false,
+                                    )
+                                    Row(
+                                        Modifier.weight(.4f).fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        panels.forEach { route ->
+                                            PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "pair-screen-766x$height.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] pair screen height=$height skipped: $it")
+            }
+        }
+        println("[render-harness] wrote pair screen PNGs to ${outDir.absolutePath}")
+    }
+
     @Test
     fun renderTabletop() {
         val outDir = File("build/djapp-render").apply { mkdirs() }

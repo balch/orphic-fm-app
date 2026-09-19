@@ -51,6 +51,11 @@ class DjLayoutTest {
         assertEquals(DjLayout.Portrait, resolveLayout(680.dp, 900.dp))
         assertEquals(DjLayout.Portrait, resolveLayout(699.dp, 900.dp))
         assertEquals(DjLayout.PortraitPair, resolveLayout(700.dp, 900.dp))
+        // A near-square desktop window under the dock stacks the pair rather than landscape.
+        assertEquals(DjLayout.PortraitPair, resolveLayout(766.dp, 750.dp, tvModeAllowed = false))
+        assertEquals(DjLayout.PortraitPair, resolveLayout(766.dp, PortraitPairMinHeight))
+        assertEquals(DjLayout.Landscape, resolveLayout(766.dp, PortraitPairMinHeight - 1.dp))
+        assertEquals(DjLayout.Landscape, resolveLayout(699.dp, 690.dp))
     }
 
     @Test

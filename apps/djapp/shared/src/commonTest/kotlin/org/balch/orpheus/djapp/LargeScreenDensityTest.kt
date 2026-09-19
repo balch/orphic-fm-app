@@ -3,6 +3,7 @@ package org.balch.orpheus.djapp
 import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -67,9 +68,9 @@ class LargeScreenDensityTest {
     @Test
     fun unscaledFoldLandscapeWouldNotDock() {
         // Documents the bug this change fixes: 834.7dp falls 65dp short of LargeScreenMinWidth,
-        // which is why the device showed the two-column landscape layout instead of the dock.
-        assertEquals(
-            DjLayout.Landscape,
+        // which is why the device showed a phone layout instead of the dock.
+        assertNotEquals(
+            DjLayout.LargeScreen,
             resolveLayout(foldInnerLongDp.dp, foldInnerShortDp.dp),
         )
     }
@@ -134,6 +135,20 @@ class LargeScreenDensityTest {
         assertEquals(
             1f,
             largeScreenDensityScale(767f, 700f, smallestWidthDp = 700, isTelevision = false),
+        )
+    }
+
+    @Test
+    fun theDesktopFloorSitsAt896dpOfWindowWidth() {
+        // 0.7 x 1280 = 896. A desktop window under that keeps the landscape layout.
+        assertEquals(
+            0.7f,
+            largeScreenDensityScale(896f, 700f, smallestWidthDp = 700, isTelevision = false, minScale = DesktopMinimumDensityScale),
+            absoluteTolerance = 0.001f,
+        )
+        assertEquals(
+            1f,
+            largeScreenDensityScale(895f, 700f, smallestWidthDp = 700, isTelevision = false, minScale = DesktopMinimumDensityScale),
         )
     }
 

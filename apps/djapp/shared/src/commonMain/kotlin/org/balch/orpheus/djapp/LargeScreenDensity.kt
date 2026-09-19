@@ -45,6 +45,7 @@ fun largeScreenDensityScale(
     smallestWidthDp: Int,
     isTelevision: Boolean,
     tabletop: Boolean = false,
+    minScale: Float = MinimumDensityScale,
 ): Float {
     // Tabletop keeps native size: the flat half is where fingers are.
     if (tabletop) return 1f
@@ -60,7 +61,7 @@ fun largeScreenDensityScale(
     // Already at or above the design width: leave the canvas exactly as the platform reports it.
     if (raw >= 1f) return 1f
 
-    return clampDensityScale(raw)
+    return clampDensityScale(raw, minScale)
 }
 
 /**
@@ -76,7 +77,13 @@ fun largeScreenDensityScale(
  * or above that widens to the full design canvas; anything narrower would have to shrink past
  * the point where the controls stay hittable.
  */
-private const val MinimumDensityScale = 0.6f
+const val MinimumDensityScale = 0.6f
+
+/**
+ * Desktop's floor. A window is resized freely and has no touch targets to protect, but a dock
+ * shrunk below this reads as a miniature: 0.7 x 1280 = 896dp of window before the dock appears.
+ */
+const val DesktopMinimumDensityScale = 0.7f
 
 /**
  * Applies [MinimumDensityScale], abandoning the scale entirely rather than half-applying it.
@@ -89,7 +96,8 @@ private const val MinimumDensityScale = 0.6f
  * a broken screen.
  *
  * @param scale the unclamped scale, always in (0f, 1f).
+ * @param minScale the floor: [MinimumDensityScale], or [DesktopMinimumDensityScale] on desktop.
  * @return [scale] when it clears the floor, otherwise 1f.
  */
-internal fun clampDensityScale(scale: Float): Float =
-    if (scale >= MinimumDensityScale) scale else 1f
+internal fun clampDensityScale(scale: Float, minScale: Float = MinimumDensityScale): Float =
+    if (scale >= minScale) scale else 1f
