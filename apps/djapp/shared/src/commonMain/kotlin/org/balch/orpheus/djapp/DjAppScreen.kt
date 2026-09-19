@@ -490,6 +490,9 @@ private fun DjAppMainContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 4.dp),
+                    // A closed iPhone Duo has its camera in a top corner behind a side inset and
+                    // no top inset, which would leave the viz picker under the lens.
+                    insetSides = WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
                 )
                 // The slot's height comes from its weight, not its content, so reading it back
                 // (previous frame, as DjLayoutBox does) cannot feed a layout loop.
@@ -741,6 +744,8 @@ internal fun DjAppHeaderRow(
     onInfoClick: () -> Unit,
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = 8.dp,
+    // Insets are position-blind, so only a header spanning the full window width adds the sides.
+    insetSides: WindowInsetsSides = WindowInsetsSides.Top,
 ) {
     val effects = LocalLiquidEffects.current
 
@@ -749,7 +754,7 @@ internal fun DjAppHeaderRow(
         // area) — resolves to zero on Android/desktop, so edge-to-edge stays unchanged there.
         // VizBackground behind this still fills the cutout; only this foreground chrome is inset.
         modifier = modifier
-            .windowInsetsPadding(platformSafeAreaInsets().only(WindowInsetsSides.Top))
+            .windowInsetsPadding(platformSafeAreaInsets().only(insetSides))
             .fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
