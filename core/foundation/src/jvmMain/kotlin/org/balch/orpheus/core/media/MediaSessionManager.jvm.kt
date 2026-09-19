@@ -72,6 +72,15 @@ actual class MediaSessionManager {
     internal var focusGrantOverride: Boolean = true
     internal var userPausedCount: Int = 0
 
+    // Recorded for PlaybackControllerTest; macOS Now Playing progress is not wired.
+    internal var lastProgress: PlaybackProgress? = null
+    internal var progressPushCount: Int = 0
+
+    actual fun updateProgress(progress: PlaybackProgress?) {
+        lastProgress = progress
+        progressPushCount++
+    }
+
     actual fun requestPlaybackFocus(): Boolean = focusGrantOverride
 
     actual fun notifyUserPaused() {

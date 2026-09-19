@@ -18,6 +18,7 @@ import org.balch.orpheus.core.engagement.EngagementAction
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.media.PlaybackProgress
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,6 +30,7 @@ private class FakeMetadata(
 ) : MetadataProducer {
     override val titleFlow = MutableStateFlow(title)
     override val subtitleFlow = MutableStateFlow(subtitle)
+    override val progressFlow = MutableStateFlow<PlaybackProgress?>(null)
 }
 
 private class FakeOverlay(initial: String? = null) : OverlaySubtitleProducer {
@@ -464,5 +466,22 @@ class PlaybackControllerTest {
             muteCalls.isEmpty(),
             "no mute transition should occur — we were already Paused",
         )
+    }
+
+    @Test fun `progress reaches the media session`() = runTest {
+        val metadata = FakeMetadata()
+        val built = build(metadata = metadata)
+        metadata.progressFlow.value = PlaybackProgress(positionMs = 1_000, durationMs = 8_000)
+        assertEquals(PlaybackProgress(1_000, 8_000), built.msm.lastProgress)
+    }
+
+    @Test fun `activation re-pushes the current progress`() = runTest {
+        // Android drops updates while inactive, so activation must replay the latest one.
+        val metadata = FakeMetadata()
+        val built = build(metadata = metadata)
+        metadata.progressFlow.value = PlaybackProgress(positionMs = 1_000, durationMs = 8_000)
+        val before = built.msm.progressPushCount
+        built.ssm.setPulsarActive(true)
+        assertEquals(before + 1, built.msm.progressPushCount)
     }
 }

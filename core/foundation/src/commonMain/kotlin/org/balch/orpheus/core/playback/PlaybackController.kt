@@ -208,6 +208,7 @@ class PlaybackController(
                     // actual. Idempotent on platforms whose actuals already
                     // cache + replay (iOS / JVM).
                     pushMetadata(metadataSnapshotFlow.value)
+                    mediaSessionManager.updateProgress(metadataProducer.progressFlow.value)
                     // If a system command (Bluetooth, headset, Pulsar/Timer) needs
                     // us active while we're Stopped, transition to Playing so audio
                     // starts. EXCEPTION: a bare AUTO_BROWSER bind means a MediaBrowser
@@ -233,6 +234,11 @@ class PlaybackController(
         // operator is needed here.
         scope.launch {
             metadataSnapshotFlow.collect { snapshot -> pushMetadata(snapshot) }
+        }
+        // Its own channel, so a position update never rebuilds the metadata. A duration change
+        // still re-sends the artwork on Android, which is why the producer holds it steady.
+        scope.launch {
+            metadataProducer.progressFlow.collect { mediaSessionManager.updateProgress(it) }
         }
         // Output-device-loss etiquette (Apple convention): when the active
         // route's device vanishes — Bluetooth speaker powered off — pause

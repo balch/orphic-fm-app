@@ -159,6 +159,9 @@ actual class MediaSessionManager {
         this.handler = handler
     }
 
+    // Now Playing progress on iOS is deferred.
+    actual fun updateProgress(progress: PlaybackProgress?) {}
+
     // iOS handles audio focus / interruption through AVAudioSession at the
     // app-bridge layer — these hooks are no-ops here.
     actual fun requestPlaybackFocus(): Boolean = true

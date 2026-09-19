@@ -202,6 +202,13 @@ actual class MediaSessionManager(
         }
     }
 
+    actual fun updateProgress(progress: PlaybackProgress?) {
+        mainHandler.post {
+            if (!isActive) return@post
+            synthPlayer?.updateProgress(progress)
+        }
+    }
+
     // ── AudioFocusController.Listener ──────────────────────────────
 
     // Called on the main looper (the AudioFocusController registers its OS focus

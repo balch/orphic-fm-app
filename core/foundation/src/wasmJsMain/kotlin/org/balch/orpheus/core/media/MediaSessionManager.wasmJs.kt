@@ -96,6 +96,8 @@ actual class MediaSessionManager {
         }
     }
 
+    actual fun updateProgress(progress: PlaybackProgress?) {}
+
     private fun setupMediaSession() {
         // Set initial metadata
         jsSetupInitialMetadata()

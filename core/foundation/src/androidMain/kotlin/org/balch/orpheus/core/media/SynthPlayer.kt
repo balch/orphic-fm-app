@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import androidx.media3.common.C
 import androidx.media3.common.DeviceInfo
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -31,6 +32,11 @@ class SynthPlayer(
     private var playing = false
     private var currentMetadata = MediaMetadata.EMPTY
     private var currentMediaItem = MediaItem.EMPTY
+
+    // Seek-bar state. Position alone leaves the timeline untouched; the duration is part of it, so
+    // a new one makes Media3 re-send the metadata and artwork, and the producer holds it steady.
+    private var durationUs: Long = C.TIME_UNSET
+    private var position: PositionSupplier = PositionSupplier.getConstant(0L)
 
     var onSkipNext: (() -> Unit)? = null
     var onSkipPrevious: (() -> Unit)? = null
@@ -99,11 +105,14 @@ class SynthPlayer(
             .setDeviceInfo(currentDeviceInfo())
             .setDeviceVolume(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
             .setIsDeviceMuted(audioManager.isStreamMute(AudioManager.STREAM_MUSIC))
+            .setContentPositionMs(position)
             .setPlaylist(
                 listOf(
                     MediaItemData.Builder(currentMediaItem.mediaId.ifEmpty { "synth" })
                         .setMediaItem(currentMediaItem)
                         .setMediaMetadata(currentMetadata)
+                        // A timeline field: changing it re-sends the metadata, artwork included.
+                        .setDurationUs(durationUs)
                         .build()
                 )
             )
@@ -112,7 +121,7 @@ class SynthPlayer(
     }
 
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
-        playing = playWhenReady
+        setPlaying(playWhenReady)
         // External command (notification / Bluetooth / Auto) — drive the app's
         // PlaybackController. Self-pushes never reach here (see updatePlayState).
         onSetPlayWhenReady?.invoke(playWhenReady)
@@ -120,7 +129,7 @@ class SynthPlayer(
     }
 
     override fun handleStop(): ListenableFuture<*> {
-        playing = false
+        setPlaying(false)
         onStop?.invoke()
         return Futures.immediateVoidFuture()
     }
@@ -183,7 +192,7 @@ class SynthPlayer(
 
     fun updatePlayState(isPlaying: Boolean) {
         handler.post {
-            playing = isPlaying
+            setPlaying(isPlaying)
             invalidateState()
         }
     }
@@ -209,6 +218,29 @@ class SynthPlayer(
             invalidateState()
         }
     }
+
+    /**
+     * Anchors the seek bar; extrapolated at 1x while playing so it moves between anchors. Builds no
+     * MediaItem, but a new duration is a timeline change that re-sends the metadata and artwork.
+     */
+    fun updateProgress(progress: PlaybackProgress?) {
+        handler.post {
+            durationUs = progress?.let { it.durationMs * 1_000 } ?: C.TIME_UNSET
+            position = anchorAt(progress?.positionMs ?: 0L)
+            invalidateState()
+        }
+    }
+
+    // Re-anchors at the current position so pausing freezes the bar and resuming moves it on.
+    private fun setPlaying(isPlaying: Boolean) {
+        val now = position.get()
+        playing = isPlaying
+        position = anchorAt(now)
+    }
+
+    private fun anchorAt(positionMs: Long): PositionSupplier =
+        if (playing) PositionSupplier.getExtrapolating(positionMs, 1f)
+        else PositionSupplier.getConstant(positionMs)
 
     companion object {
         // Best-effort device-volume sync. These are undocumented framework

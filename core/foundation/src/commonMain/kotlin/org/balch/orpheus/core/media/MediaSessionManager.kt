@@ -32,6 +32,13 @@ expect class MediaSessionManager {
     fun updateMetadata(metadata: PlaybackMetadata)
 
     /**
+     * Update the system seek bar. Separate from [updateMetadata], which rebuilds the media item.
+     * A position-only update touches nothing else, but on Android a new duration is a timeline
+     * change that re-sends the metadata and artwork, so producers keep the duration steady.
+     */
+    fun updateProgress(progress: PlaybackProgress?)
+
+    /**
      * Set the handler for media button actions (play/pause/stop).
      */
     fun setActionHandler(handler: MediaSessionActionHandler)
