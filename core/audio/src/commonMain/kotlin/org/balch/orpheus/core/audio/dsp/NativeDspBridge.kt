@@ -78,7 +78,8 @@ interface NativeDspBridge {
     /**
      * Register a callback fired when the active audio output route's device
      * disappears (e.g. a Bluetooth speaker powering off — iOS route change
-     * reason `oldDeviceUnavailable`). Feeds the auto-pause etiquette in
+     * reason `oldDeviceUnavailable`, Android `ACTION_AUDIO_BECOMING_NOISY`).
+     * Feeds the auto-pause etiquette in
      * PlaybackController via DspSynthEngine's AudioRouteMonitor flow.
      *
      * Runs on whatever thread the platform delivers route events on (iOS:
@@ -86,7 +87,7 @@ interface NativeDspBridge {
      * handler hops to before doing any work); consumers must not block.
      *
      * Default: no-op. Platforms without route-loss awareness (current
-     * desktop/wasm/Android) don't need to override.
+     * desktop/wasm) don't need to override.
      */
     fun setOnAudioRouteLostCallback(callback: (() -> Unit)?) {}
 }

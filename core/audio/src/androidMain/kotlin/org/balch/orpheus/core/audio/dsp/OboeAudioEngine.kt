@@ -1,5 +1,11 @@
 package org.balch.orpheus.core.audio.dsp
 
+import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioManager
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
@@ -15,11 +21,38 @@ import dev.zacsweers.metro.binding
 @ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
 @Inject
 class OboeAudioEngine(
-    private val bridge: OboeAudioBridge
+    private val bridge: OboeAudioBridge,
+    private val application: Application,
 ) : AudioEngine, NativeDspBridge by bridge {
+
+    private var routeLostCallback: (() -> Unit)? = null
+
+    // The system sends this just before audio falls back to the built-in speaker
+    // (BT speaker off, headphones unplugged), never when a device connects.
+    private val becomingNoisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+            log.info { "Audio becoming noisy: output device lost" }
+            routeLostCallback?.invoke()
+        }
+    }
 
     init {
         log.info { "OboeAudioEngine created (C++ DSP)" }
+    }
+
+    override fun setOnAudioRouteLostCallback(callback: (() -> Unit)?) {
+        val wasRegistered = routeLostCallback != null
+        routeLostCallback = callback
+        if (callback != null && !wasRegistered) {
+            application.registerReceiver(
+                becomingNoisyReceiver,
+                IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),
+                Context.RECEIVER_NOT_EXPORTED,
+            )
+        } else if (callback == null && wasRegistered) {
+            runCatching { application.unregisterReceiver(becomingNoisyReceiver) }
+        }
     }
 
     override fun start() {
