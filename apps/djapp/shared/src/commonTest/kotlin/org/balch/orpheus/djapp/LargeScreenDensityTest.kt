@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  *
  * The three surfaces one folding device presents, and the layout each must produce:
  *   cover display        360 x 840dp    -> Portrait   (phone)
- *   inner, upright       752 x 834.7dp  -> Portrait   (mobile view)
+ *   inner, upright       752 x 834.7dp  -> PortraitPair (mobile view, two panels)
  *   inner, sideways      834.7 x 752dp  -> LargeScreen (dock)
  */
 class LargeScreenDensityTest {
@@ -43,7 +43,7 @@ class LargeScreenDensityTest {
         val height = (foldInnerShortDp / scale).dp
 
         assertEquals(1280f, width.value, absoluteTolerance = 0.5f)
-        assertEquals(DjLayoutMode.LargeScreen, determineLayoutMode(width, height))
+        assertEquals(DjLayout.LargeScreen, resolveLayout(width, height))
     }
 
     @Test
@@ -57,9 +57,10 @@ class LargeScreenDensityTest {
             isTelevision = false,
         )
         assertEquals(1f, scale)
+        // Upright keeps native density; at 752dp that is the two-panel portrait, not the dock.
         assertEquals(
-            DjLayoutMode.Portrait,
-            determineLayoutMode((foldInnerShortDp / scale).dp, (foldInnerLongDp / scale).dp),
+            DjLayout.PortraitPair,
+            resolveLayout((foldInnerShortDp / scale).dp, (foldInnerLongDp / scale).dp),
         )
     }
 
@@ -68,8 +69,8 @@ class LargeScreenDensityTest {
         // Documents the bug this change fixes: 834.7dp falls 65dp short of LargeScreenMinWidth,
         // which is why the device showed the two-column landscape layout instead of the dock.
         assertEquals(
-            DjLayoutMode.Landscape,
-            determineLayoutMode(foldInnerLongDp.dp, foldInnerShortDp.dp),
+            DjLayout.Landscape,
+            resolveLayout(foldInnerLongDp.dp, foldInnerShortDp.dp),
         )
     }
 
@@ -153,5 +154,17 @@ class LargeScreenDensityTest {
         val scale = largeScreenDensityScale(960f, 540f, smallestWidthDp = 540, isTelevision = true)
         assertEquals(0.75f, scale, absoluteTolerance = 0.001f)
         assertEquals(1280f, 960f / scale, absoluteTolerance = 0.5f)
+    }
+
+    @Test
+    fun tabletopKeepsNativeDensity() {
+        // Sideways scales to 0.652; half-folded, the flat half is the touch surface, so no scale.
+        assertEquals(
+            1f,
+            largeScreenDensityScale(
+                foldInnerLongDp, foldInnerShortDp, foldInnerSmallestWidthDp,
+                isTelevision = false, tabletop = true,
+            ),
+        )
     }
 }

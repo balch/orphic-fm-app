@@ -58,14 +58,14 @@ internal val NavIndicatorColor = OrpheusColors.neonCyan.copy(alpha = NavIndicato
  * Includes a centered Play/Pause button that toggles global audio mute.
  *
  * Selection is expressed as [isSelected] rather than a current route so the same scaffold
- * serves both models: portrait and landscape pass a single-route equality check, while TV
- * mode passes a membership test over the docked panels.
+ * serves both models: single-panel layouts pass a route equality check, while the pair
+ * layouts pass a membership test over the pair. TV mode has its own bars and never gets here.
  */
 @Composable
 fun DjAppNavScaffold(
     isSelected: (DjRoute) -> Boolean,
     onItemClick: (DjRoute) -> Unit,
-    layoutMode: DjLayoutMode,
+    layout: DjLayout,
     pulsarFeature: PulsarFeature,
     timerFeature: TimerFeature,
     onTogglePlayback: () -> Unit,
@@ -73,7 +73,7 @@ fun DjAppNavScaffold(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val usesRail = layoutMode != DjLayoutMode.Portrait
+    val usesRail = layout.usesLandscapeChrome()
     val layoutType = if (usesRail) NavigationSuiteType.NavigationRail
                      else NavigationSuiteType.NavigationBar
 

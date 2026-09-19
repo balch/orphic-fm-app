@@ -67,8 +67,8 @@ data object VibeInfoTab : DjRoute {
 }
 
 /**
- * Pulsar's route. Only listed in the rail in [DjLayoutMode.LargeScreen] — the other two
- * layouts render Pulsar unconditionally, so it is not a destination they can navigate to.
+ * Pulsar's route. Only listed in the rail in [DjLayout.LargeScreen] — every other layout
+ * renders Pulsar unconditionally, so it is not a destination they can navigate to.
  */
 @Serializable
 data object PulsarTab : DjRoute {

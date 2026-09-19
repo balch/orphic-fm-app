@@ -17,27 +17,27 @@ import kotlin.test.assertEquals
  * layer. Dropped inside a layout pass, the scene still lays out the disposed layer and throws
  * "RootNodeOwner is already disposed"; the mode has to change in composition instead.
  */
-class DjLayoutModeBoxTest {
+class DjLayoutBoxTest {
 
     @Test
     fun `a dialog dropped by a layout mode change does not crash the scene`() {
-        var lastMode: DjLayoutMode? = null
+        var lastLayout: DjLayout? = null
         val scene = ImageComposeScene(width = 360, height = 780, density = Density(1f)) {
-            DjLayoutModeBox(Modifier.fillMaxSize(), tvModeAllowed = true) { mode, _ ->
-                lastMode = mode
-                if (mode != DjLayoutMode.LargeScreen) {
+            DjLayoutBox(Modifier.fillMaxSize(), tvModeAllowed = true) { layout ->
+                lastLayout = layout
+                if (layout != DjLayout.LargeScreen) {
                     Dialog(onDismissRequest = {}) { Box(Modifier.size(40.dp)) }
                 }
             }
         }
         try {
             repeat(3) { scene.render() }
-            assertEquals(DjLayoutMode.Portrait, lastMode, "sanity: a phone-sized window starts in portrait")
+            assertEquals(DjLayout.Portrait, lastLayout, "sanity: a phone-sized window starts in portrait")
 
             scene.constraints = Constraints.fixed(1920, 1080)
             repeat(3) { scene.render() }
 
-            assertEquals(DjLayoutMode.LargeScreen, lastMode, "a fullscreen-sized window must reach the TV layout")
+            assertEquals(DjLayout.LargeScreen, lastLayout, "a fullscreen-sized window must reach the TV layout")
         } finally {
             scene.close()
         }

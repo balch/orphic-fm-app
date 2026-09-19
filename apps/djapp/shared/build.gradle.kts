@@ -30,6 +30,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.window)
             implementation(libs.play.review)
             implementation(libs.play.review.ktx)
         }

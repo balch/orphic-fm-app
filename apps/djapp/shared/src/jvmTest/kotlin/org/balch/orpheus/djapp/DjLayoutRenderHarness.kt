@@ -310,6 +310,89 @@ class DjLayoutRenderHarness {
     }
 
     /**
+     * The Fold in tabletop as it runs, real bottom nav included: 835x752dp is the SM-F976U inner
+     * display sideways at native density, crease at 376dp. The sweep moves the crease to find the
+     * smallest half that still renders cleanly, which is what [TabletopMinHalfHeight] must be.
+     */
+    @Test
+    fun renderTabletop() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        val cases = buildList {
+            add(TabletopCase("fold-dj-mix", 835, 752, 376, listOf(DjTab, MixTab)))
+            add(TabletopCase("fold-mix-timer", 835, 752, 376, listOf(MixTab, TimerTab)))
+            add(TabletopCase("flip-timer", 411, 1005, 502, listOf(TimerTab)))
+            listOf(240, 280, 320, 330, 340, 360).forEach { half ->
+                add(TabletopCase("sweep-flat$half", 835, 752, 752 - half, listOf(MixTab, TimerTab)))
+                add(TabletopCase("sweep-top$half", 835, 752, half, listOf(MixTab, TimerTab)))
+            }
+        }
+        cases.forEach { case ->
+            runCatching {
+                val hinge = Hinge(case.crease, case.crease)
+                val scene = ImageComposeScene(case.width, case.height, Density(1f)) {
+                    OrpheusTheme {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            DjAppNavScaffold(
+                                isSelected = { it in case.panels },
+                                onItemClick = {},
+                                layout = DjLayout.Tabletop(hinge, pair = case.panels.size > 1),
+                                pulsarFeature = PulsarViewModel.previewFeature(),
+                                timerFeature = TimerViewModel.previewFeature(),
+                                onTogglePlayback = {},
+                            ) {
+                                DjTabletopLayout(
+                                    hinge = hinge,
+                                    top = { mod ->
+                                        PulsarPanel(
+                                            pulsar = PulsarViewModel.previewFeature(),
+                                            vizFlow = emptyPulsarVizFlow,
+                                            trackVizFlows = emptyTrackVizFlows,
+                                            modifier = mod,
+                                            isExpanded = true,
+                                            onExpandedChange = {},
+                                            showCollapsedHeader = false,
+                                            showExpandedTitle = false,
+                                        )
+                                    },
+                                    bottom = { mod ->
+                                        Column(mod) {
+                                            DjAppHeaderRow(
+                                                vizFeature = VizViewModel.previewFeature(),
+                                                onInfoClick = {},
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                            )
+                                            Row(
+                                                Modifier.weight(1f).fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                case.panels.forEach { route ->
+                                                    PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
+                                                }
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "tabletop-${case.name}.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] tabletop ${case.name} skipped: $it")
+            }
+        }
+        println("[render-harness] wrote tabletop PNGs to ${outDir.absolutePath}")
+    }
+
+    /**
      * Renders [DjTvBottomBar] and [DjTvTopBar] with one item forced focused, against both a
      * flat dark ground and [busyVizBackdrop], so the raised-plate focus treatment can be judged
      * against the same conditions a real television sees (bright, busy visualization behind
@@ -1203,6 +1286,15 @@ class DjLayoutRenderHarness {
         }
     }
 }
+
+/** A tabletop screen to render: [crease] is the hinge's y in dp (the scene renders at density 1). */
+private data class TabletopCase(
+    val name: String,
+    val width: Int,
+    val height: Int,
+    val crease: Int,
+    val panels: List<DjRoute>,
+)
 
 private val emptyVizFlow = MutableStateFlow(FloatArray(0))
 private val emptyPulsarVizFlow = MutableStateFlow(PulsarVizData())

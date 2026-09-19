@@ -190,16 +190,13 @@ fun DjAppScreen(
         }
     }
 
-    DjLayoutModeBox(
+    DjLayoutBox(
         // Edge-to-edge on purpose: no inset padding, so the UI and the VizBackground behind it
         // fill into the display cutout instead of letterboxing below the notch (system bars are
         // hidden in MainActivity; DjAppHeaderRow's own SpaceBetween clears a center punch-hole).
         modifier = modifier
             .fillMaxSize(),
-    ) { layoutMode, portraitPair ->
-        val isLandscape = layoutMode != DjLayoutMode.Portrait
-        val isLargeScreen = layoutMode == DjLayoutMode.LargeScreen
-
+    ) { layout ->
         // The stage is identical in every layout; only the navigation around it differs.
         val stage: @Composable () -> Unit = {
             // One renderer per route, shared by the nav destinations and the TV dock, so a
@@ -329,9 +326,7 @@ fun DjAppScreen(
             }
 
             DjAppMainContent(
-                isLargeScreen = isLargeScreen,
-                isLandscape = isLandscape,
-                portraitPair = portraitPair,
+                layout = layout,
                 dockedPanels = dockedPanels.orEmpty(),
                 pairPanels = pairPanels.orEmpty(),
                 pulsarFeature = pulsarFeature,
@@ -339,7 +334,7 @@ fun DjAppScreen(
                 vizFeature = vizFeature,
                 // With room for a pair, Info earns a slot instead of covering the screen.
                 onShowVibeInfo = {
-                    if (portraitPair) togglePair(VibeInfoTab) else activeSheet = VibeInfoTab
+                    if (layout.showsPair()) togglePair(VibeInfoTab) else activeSheet = VibeInfoTab
                 },
                 routePanel = routePanel,
                 navContent = navContent,
@@ -347,8 +342,7 @@ fun DjAppScreen(
 
             DjAppOverlaySheets(
                 activeSheet = activeSheet,
-                isLargeScreen = isLargeScreen,
-                isLandscape = isLandscape,
+                layout = layout,
                 pulsarFeature = pulsarFeature,
                 synthEngine = synthEngine,
                 tabContributions = tabContributions,
@@ -356,73 +350,71 @@ fun DjAppScreen(
             )
         }
 
-        if (isLargeScreen) {
-            // remember: the holder must survive recomposition or focus resets.
-            val focusRegion = remember { TvFocusRegionHolder() }
-            // Read once and passed down: DjAppTvChrome needs it for LocalTelevisionHardware and
-            // the bar glass needs it for its own gate, and they must not disagree.
-            val tvHardware = isTelevisionHardware()
-            DjAppTvChrome(
-                tvHardware = tvHardware,
-                barGlass = shouldShowTvBarGlass(layoutMode, tvHardware),
-                focusRegion = focusRegion,
-                vizFeature = vizFeature,
-                pulsarFeature = pulsarFeature,
-                timerFeature = timerFeature,
-                onTogglePlayback = onTogglePlayback,
-                dockablePanels = dockablePanels,
-                dockedPanels = dockedPanels.orEmpty(),
-                activeSheet = activeSheet,
-                tabs = tabs,
-                onToggleDocked = toggleDocked,
-                onActiveSheetChange = { activeSheet = it },
-                stage = stage,
-            )
-        } else {
-            DjAppNavScaffold(
-                isSelected = { route ->
-                    when {
-                        route.opensAsSheet -> route == activeSheet
-                        // Both halves of the pair light up, the way docked panels do on TV.
-                        portraitPair -> route in pairPanels.orEmpty()
-                        else -> route == currentRoute
-                    }
-                },
-                onItemClick = { route ->
-                    when {
-                        // Toggle: tapping the active sheet's nav item closes it, otherwise open
-                        // (replacing whatever sheet was open).
-                        route.opensAsSheet -> activeSheet = if (activeSheet == route) null else route
-                        // Pair mode: the nav is a toggle bar, not single-select navigation.
-                        portraitPair -> togglePair(route)
-                        route != currentRoute -> {
-                            backStack.clear()
-                            backStack.add(route)
+        when (layout) {
+            DjLayout.LargeScreen -> {
+                // remember: the holder must survive recomposition or focus resets.
+                val focusRegion = remember { TvFocusRegionHolder() }
+                // Read once and passed down: DjAppTvChrome needs it for LocalTelevisionHardware and
+                // the bar glass needs it for its own gate, and they must not disagree.
+                val tvHardware = isTelevisionHardware()
+                DjAppTvChrome(
+                    tvHardware = tvHardware,
+                    barGlass = shouldShowTvBarGlass(layout, tvHardware),
+                    focusRegion = focusRegion,
+                    vizFeature = vizFeature,
+                    pulsarFeature = pulsarFeature,
+                    timerFeature = timerFeature,
+                    onTogglePlayback = onTogglePlayback,
+                    dockablePanels = dockablePanels,
+                    dockedPanels = dockedPanels.orEmpty(),
+                    activeSheet = activeSheet,
+                    tabs = tabs,
+                    onToggleDocked = toggleDocked,
+                    onActiveSheetChange = { activeSheet = it },
+                    stage = stage,
+                )
+            }
+            DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop -> {
+                DjAppNavScaffold(
+                    isSelected = { route ->
+                        when {
+                            route.opensAsSheet -> route == activeSheet
+                            // Both halves of the pair light up, the way docked panels do on TV.
+                            layout.showsPair() -> route in pairPanels.orEmpty()
+                            else -> route == currentRoute
                         }
-                    }
-                },
-                layoutMode = layoutMode,
-                pulsarFeature = pulsarFeature,
-                timerFeature = timerFeature,
-                onTogglePlayback = onTogglePlayback,
-                tabs = tabs,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                stage()
+                    },
+                    onItemClick = { route ->
+                        when {
+                            // Toggle: tapping the active sheet's nav item closes it, otherwise open
+                            // (replacing whatever sheet was open).
+                            route.opensAsSheet -> activeSheet = if (activeSheet == route) null else route
+                            // Pair layouts: the nav is a toggle bar, not single-select navigation.
+                            layout.showsPair() -> togglePair(route)
+                            route != currentRoute -> {
+                                backStack.clear()
+                                backStack.add(route)
+                            }
+                        }
+                    },
+                    layout = layout,
+                    pulsarFeature = pulsarFeature,
+                    timerFeature = timerFeature,
+                    onTogglePlayback = onTogglePlayback,
+                    tabs = tabs,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    stage()
+                }
             }
         }
     }
 }
 
-/**
- * Main content area: TV dock, landscape split (Pulsar left, nav right), or portrait stack
- * (header, Pulsar, nav) depending on [isLargeScreen] / [isLandscape].
- */
+/** The stage for each [DjLayout]; tabletop puts Pulsar above the hinge and everything else below. */
 @Composable
 private fun DjAppMainContent(
-    isLargeScreen: Boolean,
-    isLandscape: Boolean,
-    portraitPair: Boolean,
+    layout: DjLayout,
     dockedPanels: List<DjRoute>,
     pairPanels: List<DjRoute>,
     pulsarFeature: PulsarFeature,
@@ -432,72 +424,112 @@ private fun DjAppMainContent(
     routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit,
     navContent: @Composable (Modifier) -> Unit,
 ) {
-    if (isLargeScreen) {
-        // TV: the visualization owns the screen and panels dock around its edges.
-        // Nothing fills the centre, so the VizBackground sibling reads through.
-        DjPanelDock(
-            panels = dockedPanels,
-            modifier = Modifier.fillMaxSize(),
-        ) { route, panelModifier ->
-            routePanel(route, panelModifier, true)
+    // Below header and Pulsar: the pair when the layout has room, else the nav-selected panel.
+    val lowerPanels: @Composable (Modifier) -> Unit = { mod ->
+        if (layout.showsPair()) {
+            PortraitPanelPair(panels = pairPanels, routePanel = routePanel, modifier = mod)
+        } else {
+            navContent(mod)
         }
-    } else if (isLandscape) {
-        // Landscape: Header top, Pulsar left + nav content right
-        Row(modifier = Modifier.fillMaxWidth()) {
-            PulsarPanel(
-                modifier = Modifier.weight(.5f).fillMaxHeight(),
-                pulsar = pulsarFeature,
-                vizFlow = synthEngine.pulsarVizFlow,
-                trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
-                showExpandedTitle = false,
-            )
-            Column(
+    }
+    when (layout) {
+        DjLayout.LargeScreen -> {
+            // TV: the visualization owns the screen and panels dock around its edges.
+            // Nothing fills the centre, so the VizBackground sibling reads through.
+            DjPanelDock(
+                panels = dockedPanels,
+                modifier = Modifier.fillMaxSize(),
+            ) { route, panelModifier ->
+                routePanel(route, panelModifier, true)
+            }
+        }
+        DjLayout.Landscape -> {
+            // Landscape: Header top, Pulsar left + nav content right. The inset keeps Pulsar's top
+            // row clear of flex mode's status bar and is consumed, so the header does not pad twice.
+            Row(
                 modifier = Modifier
-                    .weight(.5f)
-                    .fillMaxHeight()
-                    .padding(top = 4.dp)) {
+                    .fillMaxWidth()
+                    .windowInsetsPadding(platformSafeAreaInsets().only(WindowInsetsSides.Top)),
+            ) {
+                PulsarPanel(
+                    modifier = Modifier.weight(.5f).fillMaxHeight(),
+                    pulsar = pulsarFeature,
+                    vizFlow = synthEngine.pulsarVizFlow,
+                    trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                    isExpanded = true,
+                    onExpandedChange = {},
+                    showCollapsedHeader = false,
+                    showExpandedTitle = false,
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(.5f)
+                        .fillMaxHeight()
+                        .padding(top = 4.dp)) {
+                    DjAppHeaderRow(
+                        vizFeature = vizFeature,
+                        onInfoClick = onShowVibeInfo,
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalPadding = 0.dp,
+                    )
+                    navContent(Modifier)
+                }
+            }
+        }
+        DjLayout.Portrait, DjLayout.PortraitPair -> {
+            // Portrait: Header, Pulsar top, panels bottom
+            Column(modifier = Modifier.fillMaxSize()) {
                 DjAppHeaderRow(
                     vizFeature = vizFeature,
                     onInfoClick = onShowVibeInfo,
                     modifier = Modifier
+                        .fillMaxWidth()
                         .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalPadding = 0.dp,
                 )
-                navContent(Modifier)
+                PulsarPanel(
+                    pulsar = pulsarFeature,
+                    vizFlow = synthEngine.pulsarVizFlow,
+                    trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                    modifier = Modifier.weight(.6f).fillMaxWidth(),
+                    isExpanded = true,
+                    onExpandedChange = {},
+                    showCollapsedHeader = false,
+                    showExpandedTitle = false,
+                )
+                lowerPanels(Modifier.weight(.4f).fillMaxWidth())
             }
         }
-    } else {
-        // Portrait: Header, Pulsar top, nav content bottom
-        Column(modifier = Modifier.fillMaxSize()) {
-            DjAppHeaderRow(
-                vizFeature = vizFeature,
-                onInfoClick = onShowVibeInfo,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+        is DjLayout.Tabletop -> {
+            // Pulsar alone fills the upright half. The header's title and viz picker are touch
+            // controls, so they sit on the flat half with the panels (render sweep: no room above).
+            DjTabletopLayout(
+                hinge = layout.hinge,
+                top = { mod ->
+                    PulsarPanel(
+                        pulsar = pulsarFeature,
+                        vizFlow = synthEngine.pulsarVizFlow,
+                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                        modifier = mod,
+                        isExpanded = true,
+                        onExpandedChange = {},
+                        showCollapsedHeader = false,
+                        showExpandedTitle = false,
+                    )
+                },
+                bottom = { mod ->
+                    Column(mod) {
+                        DjAppHeaderRow(
+                            vizFeature = vizFeature,
+                            onInfoClick = onShowVibeInfo,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                        lowerPanels(Modifier.weight(1f).fillMaxWidth())
+                    }
+                },
             )
-            PulsarPanel(
-                pulsar = pulsarFeature,
-                vizFlow = synthEngine.pulsarVizFlow,
-                trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                modifier = Modifier.weight(.6f).fillMaxWidth(),
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
-                showExpandedTitle = false,
-            )
-            if (portraitPair) {
-                PortraitPanelPair(
-                    panels = pairPanels,
-                    routePanel = routePanel,
-                    modifier = Modifier.weight(.4f).fillMaxWidth(),
-                )
-            } else {
-                navContent(Modifier.weight(.4f).fillMaxWidth())
-            }
         }
     }
 }
@@ -531,16 +563,21 @@ private fun PortraitPanelPair(
 @Composable
 private fun DjAppOverlaySheets(
     activeSheet: DjRoute?,
-    isLargeScreen: Boolean,
-    isLandscape: Boolean,
+    layout: DjLayout,
     pulsarFeature: PulsarFeature,
     synthEngine: SynthEngine,
     tabContributions: List<DjTabContribution>,
     onDismiss: () -> Unit,
 ) {
+    // The dock shows Vibe Info as a panel, and the pair layouts put it in the pair instead of
+    // setting activeSheet. The single-panel layouts open it as this sheet.
+    val vibeInfoIsSheet = when (layout) {
+        DjLayout.LargeScreen -> false
+        DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop -> true
+    }
     // VibeInfo is title-triggered, not a tab contribution, so it keeps its dedicated
     // composable — but shares the single activeSheet state.
-    if (activeSheet == VibeInfoTab && !isLargeScreen) {
+    if (activeSheet == VibeInfoTab && vibeInfoIsSheet) {
         VibeInfoSheet(
             pulsar = pulsarFeature,
             vizFlow = synthEngine.pulsarVizFlow,
@@ -555,7 +592,7 @@ private fun DjAppOverlaySheets(
             contribution.Content(
                 isOpen = activeSheet == contribution.route,
                 modifier = Modifier.fillMaxSize(),
-                isLandscape = isLandscape,
+                isLandscape = layout.usesLandscapeChrome(),
                 onDismiss = onDismiss,
             )
         }
@@ -684,7 +721,7 @@ private fun TvFocusIdleWatcher(holder: TvFocusRegionHolder) {
 }
 
 @Composable
-private fun DjAppHeaderRow(
+internal fun DjAppHeaderRow(
     vizFeature: VizFeature,
     onInfoClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -979,7 +1016,7 @@ private fun DjAppNavTimerRunningPreview() {
         DjAppNavScaffold(
             isSelected = { it == DjTab },
             onItemClick = {},
-            layoutMode = DjLayoutMode.Portrait,
+            layout = DjLayout.Portrait,
             pulsarFeature = PulsarViewModel.previewFeature(),
             timerFeature = runningTimer,
             onTogglePlayback = {},
@@ -1011,7 +1048,7 @@ private fun DjAppNavTimerPausedPreview() {
         DjAppNavScaffold(
             isSelected = { it == DjTab },
             onItemClick = {},
-            layoutMode = DjLayoutMode.Portrait,
+            layout = DjLayout.Portrait,
             pulsarFeature = PulsarViewModel.previewFeature(),
             timerFeature = pausedTimer,
             onTogglePlayback = {},

@@ -1,25 +1,40 @@
 package org.balch.orpheus.djapp
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import kotlin.math.roundToInt
 
 /**
- * Android hides the system bars in MainActivity and draws handheld chrome edge-to-edge into the
- * display cutout on purpose, so phones and tablets get zero inset here (side notches are handled
- * separately via [WindowInsets.displayCutout]). A physical television overscan-crops the outer
- * band of the picture instead of merely occluding it, so there this reserves [OverscanFraction]
- * of each edge — the same margin [DjPanelDock] already keeps clear of docked panels. The margin
- * is computed from real display pixels rather than dp, so it stays exactly 5% of the physical
- * screen whatever density is active in the tree.
+ * Zero on a phone or tablet in fullscreen (MainActivity hides the system bars). Multi-window, such
+ * as Samsung's flex panel, brings the bars back and this returns them; only chrome that pads by
+ * them stays clear. A television reserves [OverscanFraction] of each edge, in real pixels.
  */
 @Composable
 actual fun platformSafeAreaInsets(): WindowInsets {
     val context = LocalContext.current
-    if (!context.isTelevision()) return WindowInsets(0, 0, 0, 0)
-    val metrics = context.resources.displayMetrics
-    val insetX = (metrics.widthPixels * OverscanFraction).roundToInt()
-    val insetY = (metrics.heightPixels * OverscanFraction).roundToInt()
-    return WindowInsets(left = insetX, top = insetY, right = insetX, bottom = insetY)
+    if (context.isTelevision()) {
+        val metrics = context.resources.displayMetrics
+        val insetX = (metrics.widthPixels * OverscanFraction).roundToInt()
+        val insetY = (metrics.heightPixels * OverscanFraction).roundToInt()
+        return WindowInsets(left = insetX, top = insetY, right = insetX, bottom = insetY)
+    }
+    // The configuration changes whenever the window does, so this re-reads on entering flex mode.
+    val configuration = LocalConfiguration.current
+    val inMultiWindow = remember(context, configuration) {
+        context.findActivity()?.isInMultiWindowMode == true
+    }
+    return if (inMultiWindow) WindowInsets.systemBars else WindowInsets(0, 0, 0, 0)
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

@@ -15,7 +15,7 @@ private val TvBarShape = RoundedCornerShape(8.dp)
  * Whether the fullscreen/TV chrome bars carry a glass fill.
  *
  * Gated on television HARDWARE, not on the layout: a fullscreen desktop window and a real TV both
- * reach [DjLayoutMode.LargeScreen], but only one of them can afford it. Both bars carry a comment
+ * reach [DjLayout.LargeScreen], but only one of them can afford it. Both bars carry a comment
  * recording why the fill was deferred, and both cite the same evidence — a real-device trace where
  * the UI thread, not the GPU, was already the bottleneck. That evidence is about televisions, so
  * this turns the fill on everywhere else and leaves the television exactly as it was: a drawn
@@ -25,9 +25,12 @@ private val TvBarShape = RoundedCornerShape(8.dp)
  * returns true on exactly the device the trace came from.
  */
 fun shouldShowTvBarGlass(
-    layoutMode: DjLayoutMode,
+    layout: DjLayout,
     isTelevisionHardware: Boolean,
-): Boolean = layoutMode == DjLayoutMode.LargeScreen && !isTelevisionHardware
+): Boolean = when (layout) {
+    DjLayout.LargeScreen -> !isTelevisionHardware
+    DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop -> false
+}
 
 /**
  * The glass fill for a fullscreen chrome bar — deliberately [panelGlassChrome] and not a

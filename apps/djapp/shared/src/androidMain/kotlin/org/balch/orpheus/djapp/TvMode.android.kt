@@ -35,9 +35,11 @@ fun Context.isTelevision(): Boolean {
  *
  * Raising [LargeScreenDesignWidthDp] makes the UI physically smaller and fits more; lowering it
  * does the reverse.
+ *
+ * A tabletop [hinge] keeps native density (see [largeScreenDensityScale]).
  */
 @Composable
-fun largeScreenCanvasScale(): Float {
+fun largeScreenCanvasScale(hinge: Hinge?): Float {
     val isTv = LocalContext.current.isTelevision()
     val configuration = LocalConfiguration.current
     return largeScreenDensityScale(
@@ -45,5 +47,6 @@ fun largeScreenCanvasScale(): Float {
         heightDp = configuration.screenHeightDp.toFloat(),
         smallestWidthDp = configuration.smallestScreenWidthDp,
         isTelevision = isTv,
+        tabletop = hinge != null,
     )
 }

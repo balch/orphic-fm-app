@@ -18,6 +18,8 @@ import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjApp
 import org.balch.orpheus.djapp.startDjAudio
 import org.balch.orpheus.djapp.largeScreenCanvasScale
+import org.balch.orpheus.djapp.LocalHinge
+import org.balch.orpheus.djapp.rememberTabletopHinge
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,11 +66,14 @@ class MainActivity : ComponentActivity() {
             // fixed-width dock panels fit (see largeScreenCanvasScale). It returns 1f on phones,
             // on folded cover displays and in portrait, so this is inert everywhere else.
             // fontScale passes through untouched, keeping the user's own text-size setting.
-            val canvasScale = largeScreenCanvasScale()
+            // The fold is read first: tabletop switches the canvas scale off and picks the split.
+            val hinge = rememberTabletopHinge(this@MainActivity)
+            val canvasScale = largeScreenCanvasScale(hinge)
             val baseDensity = LocalDensity.current
             CompositionLocalProvider(
                 LocalDensity provides
                     Density(baseDensity.density * canvasScale, baseDensity.fontScale),
+                LocalHinge provides hinge,
             ) {
                 DjApp(
                     graph = graph,

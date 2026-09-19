@@ -22,7 +22,7 @@ const val TabletClassSmallestWidthDp = 600
  *
  * Scaling density *below* 1f grows the reported canvas (fixed pixels / smaller density = more
  * dp), which is what lets a screen that is physically large but dp-narrow reach both
- * [LargeScreenDesignWidthDp] and the [determineLayoutMode] thresholds.
+ * [LargeScreenDesignWidthDp] and the [resolveLayout] thresholds.
  *
  * **Landscape only.** A tablet-class screen held in portrait keeps its native density and so
  * keeps the phone layout: on a foldable the two orientations are meant to be two different
@@ -44,7 +44,11 @@ fun largeScreenDensityScale(
     heightDp: Float,
     smallestWidthDp: Int,
     isTelevision: Boolean,
+    tabletop: Boolean = false,
 ): Float {
+    // Tabletop keeps native size: the flat half is where fingers are.
+    if (tabletop) return 1f
+
     val eligible = isTelevision || smallestWidthDp >= TabletClassSmallestWidthDp
     if (!eligible) return 1f
 
