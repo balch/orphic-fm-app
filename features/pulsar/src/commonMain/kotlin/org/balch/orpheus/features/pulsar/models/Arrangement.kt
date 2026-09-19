@@ -313,7 +313,35 @@ data class Arrangement(
     @Serializable(with = IntRangeSerializer::class)
     val lengthSeconds: IntRange = 150..240,
     val transitionOut: TransitionSpec? = null,
+    val playOnce: Boolean = false,
 ) {
+    /**
+     * The edges the engine walks from [sectionIndex]: the authored [Section.transitions], or with
+     * [playOnce] one certain edge to the next section of the pass. An authored pass edge keeps its
+     * crossfade and effects; a new one takes the longest crossfade its section authors.
+     */
+    fun walkTransitions(sectionIndex: Int): List<SectionTransition> {
+        val source = sections[sectionIndex]
+        if (!playOnce) return source.transitions
+        val order = passOrder()
+        val next = order.getOrNull(order.indexOf(sectionIndex) + 1) ?: return emptyList()
+        val authored = source.transitions.firstOrNull { it.targetIndex == next }
+        return listOf(
+            authored?.copy(weight = 1f) ?: SectionTransition(
+                targetIndex = next,
+                weight = 1f,
+                transitionBars = source.transitions.maxOfOrNull { it.transitionBars } ?: 0,
+            ),
+        )
+    }
+
+    // Every section once: list order from the intro, wrapping, with the outro last.
+    private fun passOrder(): List<Int> {
+        val intro = introIndex ?: 0
+        val outro = outroIndex ?: return sections.indices.toList()
+        return sections.indices.map { (intro + it) % sections.size }.filter { it != outro } + outro
+    }
+
     val minVibeSeconds: Int get() = lengthSeconds.first
     val maxVibeSeconds: Int get() = lengthSeconds.last
 
@@ -338,12 +366,18 @@ data class Arrangement(
                 "Arrangement.outroIndex must be in 0..${sections.size - 1}, got $it"
             }
         }
+        if (playOnce) {
+            require(introIndex != null) { "Arrangement.playOnce needs an introIndex to start the pass from" }
+            require(outroIndex != null) { "Arrangement.playOnce needs an outroIndex to end the pass on" }
+        }
         // Three lists stage at one flip — the source's exitEffects, the taken edge's own
         // effects, and the DESTINATION's entryEffects. Section.init enforces the first two;
         // only the arrangement can see the third. C++ holds kMaxPendingFx and silently drops
-        // the rest, so this is what keeps that unreachable from authored data.
+        // the rest, so this is what keeps that unreachable from authored data. A play-once
+        // pass walks pairs nobody authored, so its edges are checked too.
         sections.forEachIndexed { s, source ->
-            source.transitions.forEach { edge ->
+            val edges = if (playOnce) source.transitions + walkTransitions(s) else source.transitions
+            edges.forEach { edge ->
                 val target = sections.getOrNull(edge.targetIndex) ?: return@forEach
                 val total = source.exitEffects.size + edge.effects.size + target.entryEffects.size
                 require(total <= TransitionEffect.MAX_PER_FLIP) {

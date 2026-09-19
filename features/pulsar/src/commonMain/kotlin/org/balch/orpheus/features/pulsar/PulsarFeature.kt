@@ -2002,6 +2002,8 @@ class PulsarViewModel(
         // Section data (Arrangement.SECTION_DATA_FIELDS floats per section)
         arr.sections.forEachIndexed { s, section ->
             val base = s * Arrangement.SECTION_DATA_FIELDS
+            // What the engine walks, which a play-once arrangement rewrites into its pass.
+            val walk = arr.walkTransitions(s)
             val mo = section.macroOverrides
             fun setSection(field: Int, v: Float) =
                 synthController.setPluginControl(
@@ -2019,7 +2021,7 @@ class PulsarViewModel(
             setSection(1, section.barsMax.toFloat())
             setSection(2, section.barStep.toFloat())
             setSection(3, section.recencyDecay)
-            setSection(4, section.transitions.size.toFloat())
+            setSection(4, walk.size.toFloat())
             setSection(5, mo?.energy ?: -1f)
             setSection(6, mo?.complexity ?: -1f)
             setSection(7, mo?.space ?: -1f)
@@ -2156,7 +2158,7 @@ class PulsarViewModel(
             // Transitions for this section (up to 8 edges × 3 floats per edge:
             // [target_index, weight, transition_bars]).
             val transBase = s * Arrangement.MAX_SECTION_TRANSITIONS * 3
-            section.transitions.forEachIndexed { t, tr ->
+            walk.forEachIndexed { t, tr ->
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 3}"),
                     FloatValue(tr.targetIndex.toFloat())

@@ -55,9 +55,25 @@ internal fun songTimingOf(
         stepCount = stepCount,
         bpm = bpm,
         bpmMultiplier = sections.getOrNull(sectionIndex)?.bpmMultiplier ?: 1f,
-        songSeconds = arrangement.lengthSeconds,
+        songSeconds = passSeconds(arrangement, stepCount, bpm) ?: arrangement.lengthSeconds,
         finalSectionIndex = finalSectionIndex,
     )
+}
+
+/**
+ * A play-once song lasts as long as its pass, not its authored range: every section once, each
+ * at its own tempo, from the shortest draw of every length to the longest. Null otherwise.
+ */
+private fun passSeconds(arrangement: Arrangement, stepCount: Int, bpm: Float): IntRange? {
+    if (!arrangement.playOnce) return null
+    var minMs = 0f
+    var maxMs = 0f
+    for (section in arrangement.sections) {
+        val cycleMs = seedMsPerCycle(stepCount, bpm, section.bpmMultiplier) ?: return null
+        minMs += section.barsMin * cycleMs
+        maxMs += section.barsMax * cycleMs
+    }
+    return (minMs / 1000f).toInt()..(maxMs / 1000f).toInt()
 }
 
 /**

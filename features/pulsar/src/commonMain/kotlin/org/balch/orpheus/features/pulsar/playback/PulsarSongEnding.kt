@@ -230,7 +230,8 @@ class PulsarSongEnding(
         // active arrangement; vibes without an arrangement never end.
         if (!_endingTriggered.value && preferences.enabledFlow.value) {
             val arr = vibe.arrangement
-            if (arr != null) {
+            // A play-once song ends when its pass does; the clock would cut the pass short.
+            if (arr != null && !arr.playOnce) {
                 val minS = arr.minVibeSeconds
                 val maxS = arr.maxVibeSeconds
                 val playingS = (playingMillisLive() / 1000L).toInt()
@@ -253,15 +254,16 @@ class PulsarSongEnding(
         //
         // Ignores enabledFlow: a structurally terminal section is a hard end of the
         // arrangement, not the optional timed auto-end, and detection alone cannot un-trap the
-        // engine. Gated on minVibeSeconds so an early walk doesn't cut the song short.
+        // engine. Gated on minVibeSeconds so an early walk doesn't cut the song short, except
+        // for a play-once pass, whose length is the song's.
         if (!_endingTriggered.value) {
             val arr = vibe.arrangement
             val outroIdx = arr?.outroIndex ?: -1
             val outroSection = arr?.sections?.getOrNull(outroIdx)
             val playingS = (playingMillisLive() / 1000L).toInt()
             if (outroIdx >= 0 && state.sectionIndex == outroIdx &&
-                outroSection != null && outroSection.transitions.isEmpty() &&
-                playingS >= arr.minVibeSeconds
+                outroSection != null && arr.walkTransitions(outroIdx).isEmpty() &&
+                (arr.playOnce || playingS >= arr.minVibeSeconds)
             ) {
                 log.info { "reached terminal outro section $outroIdx unarmed at ${playingS}s — auto-arming" }
                 triggerOutro()

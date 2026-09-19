@@ -659,6 +659,71 @@ class PulsarSectionProgressionPushTest {
         assertEquals(-1, intPort("section_track_lpg_mode_${1 * 8 + 4}"), "track 4 declares no override")
     }
 
+    /** The pass, not the authored graph, is what the engine walks: one edge per section. */
+    @Test
+    fun `a play-once arrangement pushes its single pass instead of the authored edges`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "intro", barsMin = 4, barsMax = 4,
+                    transitions = listOf(
+                        SectionTransition(targetIndex = 2, weight = 1f, transitionBars = 2),
+                        SectionTransition(targetIndex = 1, weight = 3f, transitionBars = 3),
+                    ),
+                ),
+                Section(
+                    name = "verse", barsMin = 4, barsMax = 4,
+                    transitions = listOf(SectionTransition(targetIndex = 0, weight = 1f, transitionBars = 2)),
+                ),
+                Section(name = "outro", barsMin = 4, barsMax = 4),
+            ),
+            outroIndex = 2,
+            playOnce = true,
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val fields = Arrangement.SECTION_DATA_FIELDS
+        val stride = Arrangement.MAX_SECTION_TRANSITIONS * 3
+        assertEquals(1f, floatPort("section_data_${0 * fields + 4}"), "intro walks one edge")
+        assertEquals(1f, floatPort("section_transitions_${0 * stride}"), "intro -> verse")
+        assertEquals(1f, floatPort("section_transitions_${0 * stride + 1}"), "certain")
+        assertEquals(3f, floatPort("section_transitions_${0 * stride + 2}"), "the authored 3-bar crossfade")
+        assertEquals(1f, floatPort("section_data_${1 * fields + 4}"), "verse walks one edge")
+        assertEquals(2f, floatPort("section_transitions_${1 * stride}"), "verse -> outro")
+        assertEquals(1f, floatPort("section_transitions_${1 * stride + 1}"), "certain")
+        assertEquals(2f, floatPort("section_transitions_${1 * stride + 2}"), "verse's longest crossfade")
+        assertEquals(0f, floatPort("section_data_${2 * fields + 4}"), "the outro ends the pass")
+    }
+
+    /** An effect on an authored edge must follow that edge to its index in the pass, or it never fires. */
+    @Test
+    fun `a play-once pass stages an authored edge's effects on its pass edge index`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "intro", barsMin = 4, barsMax = 4,
+                    transitions = listOf(
+                        SectionTransition(targetIndex = 2, weight = 1f),
+                        SectionTransition(targetIndex = 1, weight = 1f, effects = listOf(TapeStopEffect(ms = 650))),
+                    ),
+                ),
+                Section(name = "verse", barsMin = 4, barsMax = 4),
+                Section(name = "outro", barsMin = 4, barsMax = 4),
+            ),
+            outroIndex = 2,
+            playOnce = true,
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0f, floatPort("trans_fx_data_0"), "row 0 section: intro")
+        assertEquals(0f, floatPort("trans_fx_data_1"), "authored as edge 1, walked as edge 0")
+        assertEquals(TransitionFxWire.TYPE_TAPE_STOP.toFloat(), floatPort("trans_fx_data_2"))
+    }
+
     /**
      * The `track_ducking_$i` bank's declared flag is the whole reason an unauthored track
      * keeps ducking exactly as it always has: C++ reads slots 0-5 only when slot 6 is set.
@@ -876,6 +941,8 @@ private fun pushTestVibe(
     duckingProfiles: Map<Int, DuckingProfile> = emptyMap(),
     lickRotation: LickRotation? = null,
     speech: VibeSpeech? = null,
+    outroIndex: Int? = null,
+    playOnce: Boolean = false,
 ): Vibe = Vibe(
     name = "Section Push Test",
     bpm = 120f,
@@ -894,7 +961,7 @@ private fun pushTestVibe(
             duckingProfile = duckingProfiles[it],
         )
     },
-    arrangement = Arrangement(sections = sections),
+    arrangement = Arrangement(sections = sections, outroIndex = outroIndex, playOnce = playOnce),
     anomalies = anomalies,
     lickRotation = lickRotation,
     speech = speech,

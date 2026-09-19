@@ -417,6 +417,7 @@ Optional but recommended — adds a Markov section graph on top of the vibe.
   - `customProgression` / `chordsPerBar` / `bpmMultiplier`: per-section harmony plus a tempo multiplier (`0.5` = half-time breakdown, `2.0` = double-time burst).
 - `introIndex`: which section opens (default 0; `null` = random weighted start). `outroIndex`: which terminates (`null` = loops forever).
 - `lengthSeconds` (default `150..240`): the song's auto-end window; both bounds must be in `15..1800`.
+- `playOnce` (default `false`): play every section once, in list order from `introIndex` (wrapping), with `outroIndex` last, then hand off to the next vibe. Needs both `introIndex` and `outroIndex`. The engine walks one certain edge per section instead of the authored graph: an edge you authored keeps its `transitionBars` and effects, and a new one takes the longest crossfade its section authors. `lengthSeconds` no longer ends the song; the pass does. `StayAsleepVibe` is the example.
 - There are no arrangement presets — write the sections out. Copy the shape from a shipped vibe whose form you want; `RustBeltVibe` is a worked eight-section example.
 
 A typical 5-section arrangement: intro -> verse/groove -> chorus/peak -> solo -> breakdown -> outro. Use macroOverrides to distinguish (chorus: energy=1.3, complexity=1.3; breakdown: energy=0.4, space=1.5).

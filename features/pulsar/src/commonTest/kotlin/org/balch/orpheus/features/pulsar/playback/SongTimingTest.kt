@@ -42,6 +42,21 @@ class SongTimingTest {
     }
 
     @Test
+    fun aPlayOncePassIsItsOwnLengthNotTheAuthoredRange() {
+        // A cycle is 32 * 15000 / 120 = 4 s. Intro 2..4 cycles = 8..16 s; the half-time outro is
+        // 2 cycles of 8 s = 16 s. The pass runs 24..32 s, whatever lengthSeconds says.
+        val once = Arrangement(
+            sections = listOf(
+                Section(name = "Intro", barsMin = 2, barsMax = 4),
+                Section(name = "Outro", barsMin = 2, barsMax = 2, bpmMultiplier = 0.5f),
+            ),
+            introIndex = 0, outroIndex = 1, playOnce = true,
+            lengthSeconds = 150..240,
+        )
+        assertEquals(24..32, timingOf(once, sectionIndex = 0)?.songSeconds)
+    }
+
+    @Test
     fun theEstimateSitsThreeQuartersIntoTheAuthoredRange() {
         // 150 + 90 * 3 / 4 = 217s.
         val timing = timingOf(arrangement, sectionIndex = 0)!!

@@ -367,6 +367,81 @@ class PulsarSongEndingTest {
         job.cancel()
     }
 
+    // ─── Play-once: the authored single pass is the song's length ───────────────
+
+    @Test
+    fun `a play-once song never takes the timed auto-end`() = runTest {
+        val vibe = mkVibeWithOutro("Once", sectionCount = 3, outroIndex = 2, playOnce = true)
+        val harness = TestHarness(this, random = { _, _ -> 0f }, initialVibe = vibe)
+        harness.prefs.enabledFlow.value = true
+        harness.playbackController.play()
+        // Past the 300s maximum, where an ordinary song is forced to end mid-section.
+        advanceTimeBy(310_000L)
+
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 4, false, -1, 0)
+        runCurrent()
+
+        assertEquals(
+            false, harness.songEnding.endingTriggeredForTest,
+            "the pass decides when a play-once song ends, not the clock",
+        )
+    }
+
+    @Test
+    fun `a play-once song ends when its pass reaches the outro, before minVibeSeconds`() = runTest {
+        val vibe = mkVibeWithOutro("Once", sectionCount = 3, outroIndex = 2, playOnce = true)
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.playbackController.play()
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        // 30s in, far under the 150s minimum an ordinary terminal outro waits for.
+        advanceTimeBy(30_000L)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        runCurrent()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+
+        assertTrue(
+            collected.any { it is SongEndingEvent.SongEnded },
+            "a play-once song hands off as soon as its outro plays out",
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun `a play-once outro ends the song even when it authors edges of its own`() = runTest {
+        // The walk drops the outro's own edges, so it is terminal in play even though the
+        // authored section is not.
+        val vibe = mkVibeWithOutro(
+            "Once", sectionCount = 3, outroIndex = 2, playOnce = true,
+            outroTransitions = listOf(
+                org.balch.orpheus.features.pulsar.models.SectionTransition(targetIndex = 0, weight = 1f),
+            ),
+        )
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.playbackController.play()
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        advanceTimeBy(30_000L)
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        runCurrent()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+
+        assertTrue(collected.any { it is SongEndingEvent.SongEnded })
+        job.cancel()
+    }
+
     // ─── Invariant: RANDOM never resolves to a non-style ────────────────────────
     // "PLAYS" is NOT a TransitionStyle — it's only the pill's label when song-
     // ending is disabled. The RANDOM resolver picks from the safe styles, which
@@ -412,15 +487,22 @@ private fun mkVibeWithOutro(
     name: String,
     sectionCount: Int,
     outroIndex: Int,
+    playOnce: Boolean = false,
+    outroTransitions: List<org.balch.orpheus.features.pulsar.models.SectionTransition> = emptyList(),
 ): org.balch.orpheus.features.pulsar.models.Vibe {
     val base = mkMinimalVibe(name)
     val arr = requireNotNull(base.arrangement)
     return base.copy(
         arrangement = arr.copy(
             sections = List(sectionCount) {
-                org.balch.orpheus.features.pulsar.models.Section(name = "s$it")
+                org.balch.orpheus.features.pulsar.models.Section(
+                    name = "s$it",
+                    transitions = if (it == outroIndex) outroTransitions else emptyList(),
+                )
             },
+            introIndex = 0,
             outroIndex = outroIndex,
+            playOnce = playOnce,
         ),
     )
 }
