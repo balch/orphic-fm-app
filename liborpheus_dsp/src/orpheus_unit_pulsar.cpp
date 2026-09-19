@@ -5127,10 +5127,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             mod_morph = morph_val;
         }
 
-        // Truly self-enveloped engines: BD(21), SD(22), HH(23), DX(2-4).
-        // These have internal VCAs — keep gate high during holds.
-        // STR(19) and MOD(20) are NOT self-sustaining: they fire a brief excitation
-        // on trigger then decay. They need the external Tides envelope.
+        // Engines with internal VCAs keep their gate high during holds: BD(21), SD(22), HH(23),
+        // DX(2-4). STR(19) and MOD(20) strike once on the note-on and ignore a held gate.
         bool is_self_env = (ts.engine_index >= 21 && ts.engine_index <= 23)
                         || (ts.engine_index >= 2 && ts.engine_index <= 4);
         int gate_for_render = ts.voice_active ? 1 : 0;
@@ -5327,10 +5325,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         // ── Apply Tides envelope ──
-        // Self-enveloped engines bypass: 19-23 (String, Modal, BD, SD, HH), 2-4 (SixOp)
-        // Only BD(21), SD(22), HH(23), DX(2-4) are truly self-enveloped.
-        // STR(19) and MOD(20) need external envelope for sustain.
-        bool self_enveloped = (ts.engine_index >= 21 && ts.engine_index <= 23)
+        // Self-enveloped engines bypass: 19-23 (String, Modal, BD, SD, HH), 2-4 (SixOp).
+        // STR and MOD are struck: a note is all onset, so any attack here eats it (the DRONE
+        // swell by ~30 dB). Hardware Plaits and the synth voice path leave them unenveloped too.
+        bool self_enveloped = (ts.engine_index >= 19 && ts.engine_index <= 23)
                            || (ts.engine_index >= 2 && ts.engine_index <= 4);
 
         if (!self_enveloped) {

@@ -265,6 +265,9 @@ struct OrpheusVoice {
     // State for engine switching and trigger detection.
     int previous_engine_index_;
     bool trigger_state_;
+    // A note-on whose call only drained the remainder had no fresh block to strike, and a gate
+    // that never fell leaves no edge to find later. Held here for the next fresh block.
+    bool pending_retrigger_;
 
     // Anti-click: last output sample for retrigger crossfade.
     float last_sample_;
@@ -318,6 +321,7 @@ struct OrpheusVoice {
 
         previous_engine_index_ = -1;
         trigger_state_ = false;
+        pending_retrigger_ = false;
         remainder_count_ = 0;
         last_sample_ = 0.0f;
 
@@ -390,6 +394,9 @@ struct OrpheusVoice {
         }
 
         float gain = kOrpheusOutGain[engine_index];
+
+        retrigger = retrigger || pending_retrigger_;
+        pending_retrigger_ = false;
 
         // Render in fixed blocks of kOrpheusBlockSize (24), matching Kotlin.
         // Always render full blocks — SixOpEngine's staggered rendering uses
@@ -542,5 +549,7 @@ struct OrpheusVoice {
                 }
             }
         }
+        // The whole call came out of the remainder, so the note-on never reached the engine.
+        if (retrigger) pending_retrigger_ = true;
     }
 };
