@@ -56,7 +56,7 @@ import org.balch.orpheus.features.pulsar.models.chords
  *
  * ## The arc
  * The sections are places too: rain on the window as it wakes, an alley that echoes, a siren
- * in the chase, a far-off siren and rain again once awake.
+ * in the chase that fades as it runs, rain again once awake.
  *
  * Six sections that finally pay the climb off: intro / verse / build / drop / breakdown /
  * outro. The band arrives, lands the drop, and leaves. One edge out of build goes back to
@@ -277,9 +277,13 @@ class StayAsleepVibe : VibeProvider {
                     3 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_8TH_OFF),
                     4 to TrackSectionOverride(density = 0.90f, volume = 0.85f),
                     5 to TrackSectionOverride(density = 0.50f),
+                    // The wail, under the kit. Density 1 starts the hold on step 0, so every
+                    // cycle is the same two wails. Breathe sinks it from the second cycle:
+                    // 6 over this section's 4 cycles is 1.0 / 0.75 / 0.25 / 0, and never rises.
                     6 to TrackSectionOverride(
-                        density = 0.35f, volume = 0.1f, morph = 1.0f, reverbSend = 0.35f,
-                    ),  // the wail, under the kit now
+                        density = 1f, morph = 1.0f, reverbSend = 0.35f,
+                        breatheBars = 6, breatheFloor = 0f,
+                    ),
                     7 to TrackSectionOverride(volume = 0.10f),
                 ),
             ),
@@ -327,9 +331,9 @@ class StayAsleepVibe : VibeProvider {
                     2 to TrackSectionOverride(density = 0f),
                     4 to TrackSectionOverride(density = 0.25f, volume = 0.45f),
                     5 to TrackSectionOverride(density = 0f),
-                    6 to TrackSectionOverride(
-                        density = 0.20f, volume = 0f, morph = 0.80f, reverbSend = 0.80f,
-                    ),  // one far-off siren
+                    // Density 0, not volume 0: density mutes on the boundary sample, while a
+                    // volume override lands up to 200 ms late and lets the wail blip through.
+                    6 to TrackSectionOverride(density = 0f),
                     7 to TrackSectionOverride(volume = 0.30f),
                 ),
             ),
@@ -573,19 +577,26 @@ class StayAsleepVibe : VibeProvider {
                 // Track 6 — THE SIREN. OSC in free-run FM is a real frequency sweep of
                 // morph × 200 Hz at fmFreeHz, so one held note wails. Holds only exist on
                 // tracks 5-7, and the OSC gate stays high through a hold, so a wail spans it.
+                //
+                // Every note-on resets the sweep to phase 0, so the hold has to outlast the
+                // wail or each note is a cut-off partial sweep. One 32-step hold fills the
+                // 6 s cycle, and 1/3 Hz is exactly two wails in it, so the retrigger at the
+                // loop point lands where the sweep already is. Retune fmFreeHz with the BPM.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.OSC,
-                    volume = 0.45f,
-                    fmFreeHz = 0.3f,          // one slow wail every ~3.3 s
+                    // The chase's level lives here, not in a section override: volume
+                    // overrides land late, and the base is what plays until they do.
+                    volume = 0.10f,
+                    fmFreeHz = 1f / 3f,       // two wails per 32-step cycle at 80 BPM
                     fmShape = 0f,             // sine sweep
                     morph = 1f,               // full ±200 Hz; sections set their own depth
                     pinMorph = true,
                     timbre = 0.35f,           // mostly triangle, a little edge
                     pinTimbre = true,
                     modLfoDepth = 0f,
-                    holdProbability = 0.95f,
-                    holdLengthMin = 8,
-                    holdLengthMax = 16,
+                    holdProbability = 1f,
+                    holdLengthMin = 32,       // the whole cycle; the generator clips to stepCount
+                    holdLengthMax = 32,
                     // A full octave on purpose: the effect generator folds notes badly in
                     // narrower windows (pulsar_pattern_gen.h:516-517).
                     noteRangeLow = 72,
@@ -603,7 +614,8 @@ class StayAsleepVibe : VibeProvider {
                         density = 0f,         // out unless a section brings it in
                         envelopeProfile = EnvelopeProfile.DRONE,
                         macroMap = TrackMacroMap.MELODIC.copy(
-                            energyDensity = MacroTarget(0.9f, 1.0f),
+                            // The cycle is one note, so a lost fire roll drops a whole cycle.
+                            energyDensity = MacroTarget(1f, 1f),
                             moodHarmonics = MacroTarget(0.05f, 0.05f),  // no self-feedback grit
                             moodTimbre = MacroTarget(0f, 0f),           // opts out of tension evolution
                             complexityVariation = MacroTarget(0f, 0f),  // no growth: effect rests are note 0
