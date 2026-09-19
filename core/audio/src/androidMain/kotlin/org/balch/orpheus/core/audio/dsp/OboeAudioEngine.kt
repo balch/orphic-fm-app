@@ -14,8 +14,9 @@ import dev.zacsweers.metro.binding
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
 @Inject
-class OboeAudioEngine() : AudioEngine, NativeDspBridge {
-    private val bridge = OboeAudioBridge()
+class OboeAudioEngine(
+    private val bridge: OboeAudioBridge
+) : AudioEngine, NativeDspBridge by bridge {
 
     init {
         log.info { "OboeAudioEngine created (C++ DSP)" }
@@ -62,62 +63,6 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
     override fun setPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
     override fun getPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
     override fun triggerDrum(type: Int, accent: Float) = bridge.nativeTriggerDrum(type, accent)
-
-    /** Access the bridge for parameter control from SynthController delegates. */
-    val nativeBridgeImpl: OboeAudioBridge get() = bridge
-
-    // ── NativeDspBridge implementation ──────────────────────
-    override fun nativeSetVoiceGate(index: Int, active: Boolean) = bridge.nativeSetVoiceGate(index, active)
-    override fun nativeSetVoiceTune(index: Int, tune: Float) = bridge.nativeSetVoiceTune(index, tune)
-    override fun nativeSetVoiceEngine(index: Int, engineIndex: Int) = bridge.nativeSetVoiceEngine(index, engineIndex)
-    override fun nativeSetVoiceHarmonics(index: Int, value: Float) = bridge.nativeSetVoiceHarmonics(index, value)
-    override fun nativeSetVoiceTimbre(index: Int, value: Float) = bridge.nativeSetVoiceTimbre(index, value)
-    override fun nativeSetVoiceMorph(index: Int, value: Float) = bridge.nativeSetVoiceMorph(index, value)
-    override fun nativeSetVoiceDecay(index: Int, value: Float) = bridge.nativeSetVoiceDecay(index, value)
-    override fun nativeSetVoiceActive(index: Int, active: Boolean) = bridge.nativeSetVoiceActive(index, active)
-    override fun nativeSetVoiceHold(index: Int, level: Float) = bridge.nativeSetVoiceHold(index, level)
-    override fun nativeSetMasterVolume(value: Float) = bridge.nativeSetMasterVolume(value)
-    override fun nativeMasterFade(target: Float, samples: Int, curve: Int) =
-        bridge.nativeMasterFade(target, samples, curve)
-    override fun nativeMasterTapeStop(samples: Int) = bridge.nativeMasterTapeStop(samples)
-    override fun nativeMasterScratch(samples: Int) = bridge.nativeMasterScratch(samples)
-    override fun nativeMasterFilter(samples: Int) = bridge.nativeMasterFilter(samples)
-    override fun nativeMasterVolumeNow(): Float = bridge.nativeMasterVolumeNow()
-    override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
-    override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)
-    override fun nativeSetVibrato(value: Float) = bridge.nativeSetVibrato(value)
-    override fun nativeSetVibratoRate(value: Float) = bridge.nativeSetVibratoRate(value)
-    override fun nativeSetBend(value: Float) = bridge.nativeSetBend(value)
-    override fun nativeSetPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
-    override fun nativeGetPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
-    override fun nativeGetMonitor(out: FloatArray) = bridge.nativeGetMonitor(out)
-    override fun nativeGetXRunCount(): Int = bridge.nativeGetXRunCount()
-    override fun nativeTriggerDrum(drumIndex: Int, accent: Float) = bridge.nativeTriggerDrum(drumIndex, accent)
-    override fun nativeLoadGraph(data: ByteArray): Int = bridge.nativeLoadGraph(data)
-    override fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int) =
-        bridge.nativeSetAutomation(target, voiceIndex, times, values, count)
-    override fun nativeClearAutomation(target: Int, voiceIndex: Int) =
-        bridge.nativeClearAutomation(target, voiceIndex)
-    override fun nativeLoadTtsAudio(samples: FloatArray, sampleRate: Int) =
-        bridge.nativeLoadTtsAudio(samples, sampleRate)
-    override fun nativePlayTts() = bridge.nativePlayTts()
-    override fun nativeStopTts() = bridge.nativeStopTts()
-    override fun nativeIsTtsPlaying(): Int = bridge.nativeIsTtsPlaying()
-    override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int =
-        bridge.nativeGetViz(channel, outBuf, lastReadPos)
-    override fun nativeGetSpectrum(bands: FloatArray): Int = bridge.nativeGetSpectrum(bands)
-    override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) =
-        bridge.nativeGetTurntableViz(deck, outBuf)
-    override fun nativeGetPulsarViz(
-        gatesOut: BooleanArray, velocitiesOut: FloatArray,
-        playheadsOut: IntArray, stepCountsOut: IntArray,
-    ) = bridge.nativeGetPulsarViz(gatesOut, velocitiesOut, playheadsOut, stepCountsOut)
-    override fun nativeGetPulsarActiveEngines(out: IntArray) = bridge.nativeGetPulsarActiveEngines(out)
-    override fun nativeGetPulsarArrangement(out: IntArray) = bridge.nativeGetPulsarArrangement(out)
-
-    override fun setOnEngineRecreatedCallback(callback: (() -> Unit)?) {
-        bridge.nativeSetEngineRecreatedCallback(callback?.let { Runnable(it) })
-    }
 
     companion object {
         private val log = logging("OboeAudioEngine")
