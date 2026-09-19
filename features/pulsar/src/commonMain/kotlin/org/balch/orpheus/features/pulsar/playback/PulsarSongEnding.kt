@@ -148,6 +148,9 @@ class PulsarSongEnding(
                 onArrangementTick(state)
             }
         }
+        scope.launch {
+            _finalSectionIndex.collect { pulsarSession.updateFinalSectionIndex(it) }
+        }
         // Pre-roll the transition style so the UI and PulsarSongAdvancer show the same pick,
         // never "RANDOM". Keyed on vibe NAME, not the play-through (per-song state resets via
         // onVibeApplied): the pick belongs to the vibe, so an engine recreation must not re-roll it.

@@ -8,18 +8,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.media.PlaybackProgress
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import orpheus.features.pulsar.generated.resources.Res
+import kotlin.time.TimeSource
 
 /**
  * Pulsar-as-primary-metadata: title is the current vibe name, subtitle the album title. Used
@@ -55,6 +58,13 @@ class PulsarMetadataProducer(
     override val titleFlow: StateFlow<String> = _title.asStateFlow()
     override val subtitleFlow: StateFlow<String> = _subtitle.asStateFlow()
     override val artworkPngFlow: StateFlow<ByteArray?> = _artwork.asStateFlow()
+
+    private val _progress = MutableStateFlow<PlaybackProgress?>(null)
+    override val progressFlow: StateFlow<PlaybackProgress?> = _progress.asStateFlow()
+
+    // Monotonic, so a wall-clock change cannot read as a huge or negative loop-cycle.
+    private val clockOrigin = TimeSource.Monotonic.markNow()
+    private val progressTracker = SongProgressTracker { clockOrigin.elapsedNow().inWholeMilliseconds }
 
     private val log = com.diamondedge.logging.logging("PulsarMetadataProducer")
     // Contention is theoretical today (one collector), but the lock keeps the read-test/
@@ -108,6 +118,19 @@ class PulsarMetadataProducer(
             pulsarSession.vibeFlow.filterNotNull().collectLatest { vibe ->
                 _artwork.value = renderArtworkBytes(vibe)
             }
+        }
+        // StateFlow drops the equal values the 5Hz arrangement stream produces between cycles.
+        scope.launch(dispatcherProvider.default) {
+            combine(
+                pulsarSession.arrangementStateFlow,
+                pulsarSession.vibeFlow,
+                pulsarSession.finalSectionIndexFlow,
+            ) { state, vibe, finalSection ->
+                progressTracker.update(
+                    state,
+                    vibe?.let { songTimingOf(it.name, it.stepCount, it.bpm, it.arrangement, state.sectionIndex, finalSection) },
+                )
+            }.collect { _progress.value = it }
         }
     }
 }

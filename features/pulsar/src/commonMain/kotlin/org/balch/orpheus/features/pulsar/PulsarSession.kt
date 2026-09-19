@@ -54,6 +54,17 @@ class PulsarSession(
     private val _arrangementState = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
     val arrangementStateFlow: StateFlow<PulsarArrangementState> = _arrangementState.asStateFlow()
 
+    // Mirrored from PulsarSongEnding, which the metadata producer cannot inject: it sits behind
+    // PlaybackController, which depends on the producer.
+    private val _finalSectionIndex = MutableStateFlow(-1)
+    /** The section the song ends in once the ending is armed, else -1. */
+    val finalSectionIndexFlow: StateFlow<Int> = _finalSectionIndex.asStateFlow()
+
+    /** Called by `PulsarSongEnding` whenever its final section changes. */
+    fun updateFinalSectionIndex(index: Int) {
+        _finalSectionIndex.value = index
+    }
+
     init {
         // Always-on enrichment of the C++ arrangement state, moved here from PulsarViewModel.
         // Runs without a UI subscription so the ViewModel's section-BPM collectors and AppScope

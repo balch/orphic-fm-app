@@ -501,14 +501,7 @@ fun PulsarStepGrid(
                     } else {
                         val currentBar = (arrangementState?.barsElapsed ?: 0) + 1
                         val barText = "$currentBar/${arrangementState?.barsTotal ?: 0}"
-                        val soloText = if (arrangementState != null && arrangementState.soloActive && arrangementState.soloTrack >= 0) {
-                            val name = if (arrangementState.bandSolo) {
-                                arrangementState.bandMemberNames.getOrElse(arrangementState.soloTrack) { "?" }
-                            } else {
-                                PULSAR_TRACK_NAMES.getOrElse(arrangementState.soloTrack) { "?" }
-                            }
-                            " \u25b8 $name"
-                        } else ""
+                        val soloText = arrangementState?.soloistName()?.let { " \u25b8 $it" } ?: ""
                         pushStyle(SpanStyle(color = base))
                         append("$sectionName $barText$soloText")
                         pop()
