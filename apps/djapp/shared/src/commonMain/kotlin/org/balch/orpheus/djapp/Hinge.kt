@@ -3,6 +3,7 @@ package org.balch.orpheus.djapp
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /**
  * A horizontal fold, in window pixels as the platform reports it. Converted to dp where it is used,
@@ -11,7 +12,7 @@ import androidx.compose.ui.unit.dp
  */
 data class Hinge(val topPx: Int, val bottomPx: Int)
 
-/** The tabletop hinge, provided only by Android's MainActivity; null everywhere else. */
+/** The tabletop hinge, provided by Android's MainActivity and the iOS host; null everywhere else. */
 val LocalHinge = compositionLocalOf<Hinge?> { null }
 
 /**
@@ -46,3 +47,24 @@ fun tabletopHingeOf(
     )
     return if (usable) Hinge(topPx, bottomPx) else null
 }
+
+/**
+ * [tabletopHingeOf] for a platform that reports the fold in points (iOS reserved regions). Only
+ * divisions are reported, so the fold always separates; it is horizontal when wider than tall.
+ */
+fun tabletopHingeOfPoints(
+    active: Boolean,
+    topPt: Double,
+    bottomPt: Double,
+    widthPt: Double,
+    viewHeightPt: Double,
+    scale: Double,
+): Hinge? = tabletopHingeOf(
+    halfOpened = active,
+    horizontal = widthPt > bottomPt - topPt,
+    separating = true,
+    topPx = (topPt * scale).roundToInt(),
+    bottomPx = (bottomPt * scale).roundToInt(),
+    windowHeightPx = (viewHeightPt * scale).roundToInt(),
+    density = scale.toFloat(),
+)

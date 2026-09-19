@@ -1,5 +1,6 @@
 package org.balch.orpheus.djapp
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.ComposeUIViewController
 import org.balch.orpheus.core.playback.PlaybackState
@@ -22,13 +23,16 @@ fun MainViewController() = ComposeUIViewController {
         }
     }
 
-    DjApp(
-        graph = graph,
-        onTogglePlayback = {
-            val controller = graph.playbackController
-            if (controller.state.value == PlaybackState.Playing) controller.pause()
-            else controller.play()
-        },
-        startAudio = { DjAppHost.startAudio() },
-    )
+    // Null until the Swift host reports a half-open fold (see IosFold).
+    CompositionLocalProvider(LocalHinge provides IosFold.hinge) {
+        DjApp(
+            graph = graph,
+            onTogglePlayback = {
+                val controller = graph.playbackController
+                if (controller.state.value == PlaybackState.Playing) controller.pause()
+                else controller.play()
+            },
+            startAudio = { DjAppHost.startAudio() },
+        )
+    }
 }

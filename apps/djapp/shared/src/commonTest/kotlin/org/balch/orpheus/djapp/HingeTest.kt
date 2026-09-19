@@ -59,6 +59,29 @@ class HingeTest {
         assertFalse(splitsIntoUsableHalves(min - 1.dp, min - 1.dp, min * 2))
     }
 
+    // Point-based folds (iOS). No device numbers exist yet: an 800pt-tall view at scale 3 with a
+    // 20pt fold band across a 600pt-wide view stands in until the real geometry is known.
+    @Test
+    fun pointsScaleToPixels() {
+        assertEquals(Hinge(1170, 1230), tabletopHingeOfPoints(true, 390.0, 410.0, 600.0, 800.0, 3.0))
+    }
+
+    @Test
+    fun inactivePointFoldIsNotAHinge() {
+        assertNull(tabletopHingeOfPoints(false, 390.0, 410.0, 600.0, 800.0, 3.0))
+    }
+
+    @Test
+    fun pointFoldTallerThanWideIsBookPosture() {
+        assertNull(tabletopHingeOfPoints(true, 0.0, 800.0, 20.0, 800.0, 3.0))
+    }
+
+    @Test
+    fun pointFoldLeavingATooSmallHalfIsRejected() {
+        // 300pt above the fold is under the 330dp minimum.
+        assertNull(tabletopHingeOfPoints(true, 300.0, 320.0, 600.0, 800.0, 3.0))
+    }
+
     @Test
     fun foldHalvesClearTheMinimum() {
         // 1128px / 3 = 376dp a side. The minimum must stay below this or the Fold loses tabletop.
