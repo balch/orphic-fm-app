@@ -64,6 +64,16 @@ object MacOsNowPlaying {
         }
     }
 
+    /** Seek-bar position and length. Pass null to clear the bar. */
+    fun updateProgress(progress: PlaybackProgress?) {
+        if (!isAvailable) return
+        try {
+            nativeUpdateProgress(progress?.positionMs ?: 0L, progress?.durationMs ?: 0L)
+        } catch (_: UnsatisfiedLinkError) {
+            // Silently ignore if native not loaded
+        }
+    }
+
     fun teardown() {
         if (!isAvailable) return
         try {
@@ -78,5 +88,6 @@ object MacOsNowPlaying {
     @JvmStatic private external fun nativeUpdateMetadata(title: String, artist: String)
     @JvmStatic private external fun nativeUpdatePlaybackState(isPlaying: Boolean)
     @JvmStatic private external fun nativeUpdateArtwork(pngBytes: ByteArray?)
+    @JvmStatic private external fun nativeUpdateProgress(positionMs: Long, durationMs: Long)
     @JvmStatic private external fun nativeTeardown()
 }

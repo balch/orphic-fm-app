@@ -45,6 +45,9 @@ JNI_FN(nativeSetup)(JNIEnv *env, jclass clazz, jobject callback) {
     }
     sCallbackRef = env->NewGlobalRef(callback);
 
+    // Called from the AWT thread; the command center wants the AppKit main
+    // thread, and enabled flags set elsewhere left ⏮/⏭ drawn dimmed.
+    dispatch_async(dispatch_get_main_queue(), ^{
     MPRemoteCommandCenter *cc = [MPRemoteCommandCenter sharedCommandCenter];
 
     [cc.playCommand addTargetWithHandler:makeCallbackBlock("onPlay")];
@@ -76,8 +79,26 @@ JNI_FN(nativeSetup)(JNIEnv *env, jclass clazz, jobject callback) {
     cc.togglePlayPauseCommand.enabled = YES;
     cc.nextTrackCommand.enabled = YES;
     cc.previousTrackCommand.enabled = YES;
-    cc.skipForwardCommand.enabled = YES;
-    cc.skipBackwardCommand.enabled = YES;
+    // Left disabled: with a duration published, macOS prefers the seek-style
+    // skip buttons when both are enabled and renders them, not next/previous.
+    cc.skipForwardCommand.enabled = NO;
+    cc.skipBackwardCommand.enabled = NO;
+    // Same for the seek and scrub commands, which are enabled by default and
+    // put a "10" seek icon in place of next track once a duration exists.
+    cc.seekForwardCommand.enabled = NO;
+    cc.seekBackwardCommand.enabled = NO;
+    cc.changePlaybackPositionCommand.enabled = NO;
+
+    // Music, not a podcast: the media type also steers which buttons show.
+    MPNowPlayingInfoCenter *center = [MPNowPlayingInfoCenter defaultCenter];
+    NSMutableDictionary *info = [(center.nowPlayingInfo ?: @{}) mutableCopy];
+    info[MPNowPlayingInfoPropertyMediaType] = @(MPNowPlayingInfoMediaTypeAudio);
+    info[MPMediaItemPropertyMediaType] = @(MPMediaTypeMusic);
+    // A vibe always has a previous and a next: a queue with room on both sides.
+    info[MPNowPlayingInfoPropertyPlaybackQueueCount] = @(3);
+    info[MPNowPlayingInfoPropertyPlaybackQueueIndex] = @(1);
+    center.nowPlayingInfo = info;
+    });
 }
 
 JNIEXPORT void JNICALL
@@ -95,6 +116,23 @@ JNI_FN(nativeUpdateMetadata)(JNIEnv *env, jclass clazz, jstring jTitle, jstring 
     NSMutableDictionary *info = [(center.nowPlayingInfo ?: @{}) mutableCopy];
     info[MPMediaItemPropertyTitle] = title;
     info[MPMediaItemPropertyArtist] = artist;
+    center.nowPlayingInfo = info;
+}
+
+// Seek-bar progress. macOS extrapolates elapsed time from this anchor at the
+// playback rate, so one push per loop-cycle keeps the bar moving. A duration
+// of 0 or less clears both keys (no arrangement: no seek bar).
+JNIEXPORT void JNICALL
+JNI_FN(nativeUpdateProgress)(JNIEnv *env, jclass clazz, jlong positionMs, jlong durationMs) {
+    MPNowPlayingInfoCenter *center = [MPNowPlayingInfoCenter defaultCenter];
+    NSMutableDictionary *info = [(center.nowPlayingInfo ?: @{}) mutableCopy];
+    if (durationMs <= 0) {
+        [info removeObjectForKey:MPMediaItemPropertyPlaybackDuration];
+        [info removeObjectForKey:MPNowPlayingInfoPropertyElapsedPlaybackTime];
+    } else {
+        info[MPMediaItemPropertyPlaybackDuration] = @(durationMs / 1000.0);
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(positionMs / 1000.0);
+    }
     center.nowPlayingInfo = info;
 }
 
