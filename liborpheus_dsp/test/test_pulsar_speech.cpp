@@ -362,7 +362,9 @@ static bool test_loop_end_phrase_forces_the_kick() {
         orpheus_engine_destroy(control);
     }
 
-    int forced[2] = {-1, -1};
+    // Tempo drift is seed-dependent, so a fixed render holds 25 or 26 wraps. Compare the
+    // forced count to the wraps this run actually saw, not to a nominal 25.
+    int forced[2] = {-1, -1}, wraps[2] = {-1, -1};
     for (int c = 0; c < 2; c++) {
         OrpheusEngine* engine = make_speech_engine(16);
         const std::vector<float> clip = sine_clip(12000, 1000.0f);
@@ -376,11 +378,12 @@ static bool test_loop_end_phrase_forces_the_kick() {
         unit.type = UNIT_PULSAR; unit.enabled = true;
         render_out(engine, &unit, 4900);                          // just past the 25th wrap
         forced[c] = engine->pulsar_state ? engine->pulsar_state->speech_kicks_forced : -1;
+        wraps[c] = engine->pulsar_state ? engine->pulsar_state->loop_count : -1;
         orpheus_engine_destroy(engine);
     }
-    const bool ok = control_misses >= 1 && forced[0] == 25 && forced[1] == 0;
-    printf("  control misses=%d/25 end-aligned forced=%d start-aligned forced=%d -- %s\n",
-           control_misses, forced[0], forced[1], ok ? "PASS" : "FAIL");
+    const bool ok = control_misses >= 1 && wraps[0] >= 25 && forced[0] == wraps[0] && forced[1] == 0;
+    printf("  control misses=%d/25 end-aligned forced=%d of %d wraps start-aligned forced=%d -- %s\n",
+           control_misses, forced[0], wraps[0], forced[1], ok ? "PASS" : "FAIL");
     return ok;
 }
 
