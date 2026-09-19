@@ -52,7 +52,25 @@ val PulsarGridMinHeight: Dp = 64.dp
  * [PulsarFullGridSlotHeight] comes off the grid, the one part of the panel that can give.
  */
 fun pulsarGridHeightFor(slot: Dp, full: Dp): Dp =
-    (full - (PulsarFullGridSlotHeight - slot).coerceAtLeast(0.dp)).coerceAtLeast(PulsarGridMinHeight)
+    flexHeightFor(slot, PulsarFullGridSlotHeight, full, PulsarGridMinHeight)
+
+/**
+ * Smallest slot that fits Horn's full rotor display. Set by rendering at 466dp wide
+ * (`renderLowerPanelCompactSweep`): the knob row clips at 220dp, touches the panel edge at
+ * 235dp and clears it at 250dp.
+ */
+val HornFullDisplaySlotHeight: Dp = 250.dp
+
+/** Under this the two rotor drawings stop reading; a shorter slot clips instead. */
+val HornDisplayMinHeight: Dp = 88.dp
+
+/** Horn's rotor display height for [slot], by the same rule as [pulsarGridHeightFor]. */
+fun hornDisplayHeightFor(slot: Dp, full: Dp): Dp =
+    flexHeightFor(slot, HornFullDisplaySlotHeight, full, HornDisplayMinHeight)
+
+/** [full] less whatever [slot] is short of [fullSlot], never under [min]. */
+private fun flexHeightFor(slot: Dp, fullSlot: Dp, full: Dp, min: Dp): Dp =
+    (full - (fullSlot - slot).coerceAtLeast(0.dp)).coerceAtLeast(min)
 
 /** Every screen arrangement. Switch on it with no `else`, so a new one is a compile error. */
 sealed interface DjLayout {

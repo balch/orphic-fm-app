@@ -32,6 +32,7 @@ import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjViewModel
+import org.balch.orpheus.features.horn.HornDisplayHeight
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
@@ -502,7 +503,7 @@ class DjLayoutRenderHarness {
     @Test
     fun renderLowerPanelCompactSweep() {
         val outDir = File("build/djapp-render").apply { mkdirs() }
-        for (route in listOf(MixTab, HornTab)) for (height in listOf(160, 175, 190, 205, 220)) {
+        for (route in listOf(MixTab, HornTab)) for (height in listOf(160, 175, 190, 205, 220, 235, 250, 265)) {
             runCatching {
                 val scene = ImageComposeScene(466, height, Density(1f)) {
                     OrpheusTheme {
@@ -564,7 +565,20 @@ class DjLayoutRenderHarness {
                                         // 644dp less the 80dp nav and 52dp header, at 60%.
                                         gridHeight = pulsarGridHeightFor(307.dp, PulsarGridHeight),
                                     )
-                                    PreviewRoutePanel(route, Modifier.weight(.4f).fillMaxWidth())
+                                    if (route == HornTab) {
+                                        // The 40% slot is 205dp: Horn's display takes the shortfall.
+                                        HornPanel(
+                                            feature = HornViewModel.previewFeature(),
+                                            modifier = Modifier.weight(.4f).fillMaxWidth(),
+                                            isExpanded = true,
+                                            onExpandedChange = {},
+                                            showCollapsedHeader = false,
+                                            showExpandedTitle = false,
+                                            displayHeight = hornDisplayHeightFor(205.dp, HornDisplayHeight),
+                                        )
+                                    } else {
+                                        PreviewRoutePanel(route, Modifier.weight(.4f).fillMaxWidth())
+                                    }
                                 }
                             }
                         }

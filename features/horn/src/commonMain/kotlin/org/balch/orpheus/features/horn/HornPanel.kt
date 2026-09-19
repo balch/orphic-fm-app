@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,6 +70,9 @@ private const val LESLIE_RATIO = 8f
 private const val RAMP_UP_TAU = 1.0f    // ~1s to reach target speed
 private const val RAMP_DOWN_TAU = 3.0f  // ~3s to coast to stop (brake feel)
 
+/** The rotor display's height wherever the panel has room for it. */
+val HornDisplayHeight: Dp = 160.dp
+
 @Composable
 fun HornPanel(
     feature: HornFeature = HornViewModel.feature(),
@@ -82,6 +86,8 @@ fun HornPanel(
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
     fillHeight: Boolean = true,
+    // A host with a short slot (closed iPhone Duo) passes less so the knob row stays inside.
+    displayHeight: Dp = HornDisplayHeight,
 ) {
     val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
@@ -103,7 +109,7 @@ fun HornPanel(
             SignalTrace(data = wooferPhaseVizFlow, color = CrimsonWoofer)    // woofer rotor phase (slow sawtooth)
         }
     ) {
-        RotorAnimationDisplay(uiState = uiState)
+        RotorAnimationDisplay(uiState = uiState, height = displayHeight)
 
         HornControlsRow(uiState = uiState, actions = actions)
     }
@@ -123,6 +129,7 @@ fun HornPanel(
 @Composable
 private fun RotorAnimationDisplay(
     uiState: HornUiState,
+    height: Dp,
     modifier: Modifier = Modifier,
 ) {
     val hornAngle = remember { mutableFloatStateOf(0f) }
@@ -180,7 +187,7 @@ private fun RotorAnimationDisplay(
     Row(
         modifier = modifier
             .widthIn(max = 420.dp)
-            .height(160.dp)
+            .height(height)
             .clip(RoundedCornerShape(8.dp))
             .background(CrimsonBg.copy(alpha = 0.4f))
             .border(1.dp, CrimsonBorder, RoundedCornerShape(8.dp)),

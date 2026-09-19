@@ -93,4 +93,20 @@ class DjLayoutTest {
     fun theGridNeverShrinksPastItsMinimum() {
         assertEquals(PulsarGridMinHeight, pulsarGridHeightFor(slot = 200.dp, full = 120.dp))
     }
+
+    @Test
+    fun hornKeepsItsFullDisplayWithRoom() {
+        assertEquals(160.dp, hornDisplayHeightFor(slot = 250.dp, full = 160.dp))
+    }
+
+    @Test
+    fun closedDuoLowerSlotTakesItsShortfallOffHornsDisplay() {
+        // 40% of the 512dp column: 45dp short of a clean Horn panel.
+        assertEquals(115.dp, hornDisplayHeightFor(slot = 205.dp, full = 160.dp))
+    }
+
+    @Test
+    fun hornsDisplayNeverShrinksPastItsMinimum() {
+        assertEquals(HornDisplayMinHeight, hornDisplayHeightFor(slot = 120.dp, full = 160.dp))
+    }
 }

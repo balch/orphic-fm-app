@@ -68,6 +68,7 @@ import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjViewModel
+import org.balch.orpheus.features.horn.HornDisplayHeight
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
@@ -271,18 +272,28 @@ fun DjAppScreen(
                             fillHeight = fill,
                             )
                         }
-                        HornTab -> HornPanel(
-                            inVizFlow = synthEngine.hornInVizFlow,
-                            outVizFlow = synthEngine.hornOutVizFlow,
-                            hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
-                            wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
-                            modifier = panelModifier,
-                            isExpanded = true,
-                            onExpandedChange = {},
-                            showCollapsedHeader = false,
-                            showExpandedTitle = showTitle,
-                            fillHeight = fill,
-                        )
+                        HornTab -> {
+                            // Only a filled slot is read back: its height comes from the layout,
+                            // not the content. A docked panel wraps its content and keeps 160dp.
+                            var slotPx by remember { mutableIntStateOf(0) }
+                            val density = LocalDensity.current
+                            val displayHeight = if (!fill || slotPx == 0) HornDisplayHeight else {
+                                hornDisplayHeightFor(with(density) { slotPx.toDp() }, HornDisplayHeight)
+                            }
+                            HornPanel(
+                                inVizFlow = synthEngine.hornInVizFlow,
+                                outVizFlow = synthEngine.hornOutVizFlow,
+                                hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
+                                wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
+                                modifier = panelModifier.onSizeChanged { slotPx = it.height },
+                                isExpanded = true,
+                                onExpandedChange = {},
+                                showCollapsedHeader = false,
+                                showExpandedTitle = showTitle,
+                                fillHeight = fill,
+                                displayHeight = displayHeight,
+                            )
+                        }
                         VibeInfoTab -> VibeInfoPanel(
                             pulsar = pulsarFeature,
                             vizFlow = synthEngine.pulsarVizFlow,
