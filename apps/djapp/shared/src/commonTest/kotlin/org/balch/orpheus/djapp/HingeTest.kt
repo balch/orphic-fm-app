@@ -59,27 +59,28 @@ class HingeTest {
         assertFalse(splitsIntoUsableHalves(min - 1.dp, min - 1.dp, min * 2))
     }
 
-    // Point-based folds (iOS). No device numbers exist yet: an 800pt-tall view at scale 3 with a
-    // 20pt fold band across a 600pt-wide view stands in until the real geometry is known.
+    // iPhone Duo inner display in portrait, measured on the iOS 27.1 simulator: 669x951pt at
+    // scale 3. The division frame is a 40pt band, two 20pt margins around a zero-height crease.
     @Test
-    fun pointsScaleToPixels() {
-        assertEquals(Hinge(1170, 1230), tabletopHingeOfPoints(true, 390.0, 410.0, 600.0, 800.0, 3.0))
+    fun duoTabletopIsAHinge() {
+        assertEquals(Hinge(1367, 1487), tabletopHingeOfPoints(true, 455.5, 495.5, 669.0, 951.0, 3.0))
     }
 
     @Test
-    fun inactivePointFoldIsNotAHinge() {
-        assertNull(tabletopHingeOfPoints(false, 390.0, 410.0, 600.0, 800.0, 3.0))
+    fun duoOpenedFlatIsNotAHinge() {
+        // Fully open still reports the division, inactive.
+        assertNull(tabletopHingeOfPoints(false, 455.5, 495.5, 669.0, 951.0, 3.0))
     }
 
     @Test
     fun pointFoldTallerThanWideIsBookPosture() {
-        assertNull(tabletopHingeOfPoints(true, 0.0, 800.0, 20.0, 800.0, 3.0))
+        assertNull(tabletopHingeOfPoints(true, 0.0, 951.0, 40.0, 951.0, 3.0))
     }
 
     @Test
     fun pointFoldLeavingATooSmallHalfIsRejected() {
         // 300pt above the fold is under the 330dp minimum.
-        assertNull(tabletopHingeOfPoints(true, 300.0, 320.0, 600.0, 800.0, 3.0))
+        assertNull(tabletopHingeOfPoints(true, 300.0, 340.0, 669.0, 951.0, 3.0))
     }
 
     @Test

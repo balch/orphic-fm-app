@@ -33,6 +33,8 @@ final class FoldHostViewController: UIViewController {
             IosFold.shared.clear()
             return
         }
+        // The frame includes Apple's margins (20pt each side of a zero-height crease on Duo),
+        // which is the band interactive content should stay out of, so it is passed as is.
         IosFold.shared.report(
             active: fold.isActive,
             topPt: fold.frame.minY,
