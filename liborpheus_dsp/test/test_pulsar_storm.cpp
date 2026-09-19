@@ -550,7 +550,7 @@ static bool test_generators_deterministic_under_seed() {
         constexpr int kN = 48000 / 2;
         std::vector<float> l(kN, 0.f), r(kN, 0.f);
         for (int off = 0; off < kN; off += 512)
-            v.Process(l.data() + off, r.data() + off, 512);
+            v.Process(l.data() + off, r.data() + off, std::min(512, kN - off));
         return l;
     };
     auto sa = strike(42u), sb = strike(42u), sc = strike(43u);
@@ -570,7 +570,7 @@ static bool test_strike_burst_spacing_sub_block() {
     v.trigger_strike(1.0f, 0.0f);
     constexpr int N = 48000;                                 // 1 s
     std::vector<float> l(N, 0.f), r(N, 0.f);
-    for (int off = 0; off < N; off += 512) v.Process(l.data() + off, r.data() + off, 512);
+    for (int off = 0; off < N; off += 512) v.Process(l.data() + off, r.data() + off, std::min(512, N - off));
     // Onset detection: envelope jumps of >0.15 within 1 ms, at most one per 20 ms. The
     // refractory window is what keeps the crackle's rips inside a hit (a few ms apart,
     // by design) from counting as hits of their own; the authored gaps are 32 ms and up.
@@ -972,7 +972,7 @@ static bool test_clap_tails_lengthen_down_the_staircase() {
     g.trigger(1.0f, 0.0f);
     constexpr int kN = 48000;
     std::vector<float> l(kN, 0.f), r(kN, 0.f);
-    for (int off = 0; off < kN; off += 512) g.Process(l.data() + off, r.data() + off, 512);
+    for (int off = 0; off < kN; off += 512) g.Process(l.data() + off, r.data() + off, std::min(512, kN - off));
     float pk = 0.f;
     for (float s : l) pk = std::max(pk, std::fabs(s));
     float last_ms = 0.f;
@@ -1006,7 +1006,7 @@ static bool test_clap_snap_leads_the_crack() {
         g.debug_set_snap_scale(snap_scale);
         g.trigger(1.0f, distance);
         std::vector<float> l(kN, 0.f), r(kN, 0.f);
-        for (int off = 0; off < kN; off += 512) g.Process(l.data() + off, r.data() + off, 512);
+        for (int off = 0; off < kN; off += 512) g.Process(l.data() + off, r.data() + off, std::min(512, kN - off));
         return l;
     };
     const std::vector<float> with = render(0.0f, 1.0f), without = render(0.0f, 0.0f);
@@ -1083,7 +1083,7 @@ static bool test_clap_crackle_tears_the_envelope() {
     g.trigger(1.0f, 0.0f);
     constexpr int kN = 48000 / 2;
     std::vector<float> l(kN, 0.f), r(kN, 0.f);
-    for (int off = 0; off < kN; off += 512) g.Process(l.data() + off, r.data() + off, 512);
+    for (int off = 0; off < kN; off += 512) g.Process(l.data() + off, r.data() + off, std::min(512, kN - off));
     const int last = storm::kClapCount - 1;
     const int win = 48;                                                 // 1 ms
     const int lo = (int)((storm::kClapSpacingMs[last] + 10.0f) * 48.0f);
@@ -1232,7 +1232,7 @@ static bool test_strike_far_distance_drops_claps() {
     storm::StormVoice v; v.Init(3u, 48000.0f);
     v.trigger_strike(1.0f, 0.95f);
     std::vector<float> l(9600, 0.f), r(9600, 0.f);          // first 200 ms
-    for (int off = 0; off < 9600; off += 512) v.Process(l.data() + off, r.data() + off, 512);
+    for (int off = 0; off < 9600; off += 512) v.Process(l.data() + off, r.data() + off, std::min(512, 9600 - off));
     int zc = 0; float pk = 0.f;
     for (int i = 1; i < 9600; i++) {
         if ((l[i-1] >= 0.f) != (l[i] >= 0.f)) zc++;
