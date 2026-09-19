@@ -89,6 +89,18 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->marbles_xy_generator.LoadScale(1, chromatic);
     }
 
+    // Grids has no seed port, so its perturbation RNG stirs from the clock here. The
+    // counter keeps two engines created inside the same microsecond apart.
+    {
+        static std::atomic<uint32_t> engines_created{0};
+        const uint32_t now_us = static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        engine->grids_rng_state =
+            (now_us ^ (engines_created.fetch_add(1, std::memory_order_relaxed) * 0x9E3779B9u))
+            * 2654435761u;
+    }
+
     // Initialize Frames PolyLFO
     engine->poly_lfo.Init();
 

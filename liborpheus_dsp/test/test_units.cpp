@@ -35,6 +35,19 @@ static bool test_clock() {
 }
 
 #ifdef ORPHEUS_WITH_GRIDS
+// The randomness perturbation must not replay the same stream every launch.
+static bool test_grids_rng_seeded_per_engine() {
+    printf("\n=== Test: Grids perturbation RNG is seeded per engine ===\n");
+    OrpheusEngine* a = orpheus_engine_create(48000.0f);
+    OrpheusEngine* b = orpheus_engine_create(48000.0f);
+    const uint32_t sa = a->grids_rng_state, sb = b->grids_rng_state;
+    orpheus_engine_destroy(a);
+    orpheus_engine_destroy(b);
+    bool pass = sa != sb && sa != 12345u && sb != 12345u;
+    printf("  a=%08x b=%08x -- %s\n", sa, sb, pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 static bool test_grids() {
     printf("\n=== Test: Grids drum triggers ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
@@ -497,6 +510,7 @@ bool run_unit_tests() {
     tally(test_clock());
 #ifdef ORPHEUS_WITH_GRIDS
     tally(test_grids());
+    tally(test_grids_rng_seeded_per_engine());
 #endif
     tally(test_marbles());
     tally(test_marbles_y_output());
