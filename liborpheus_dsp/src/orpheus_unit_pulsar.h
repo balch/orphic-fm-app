@@ -1100,6 +1100,7 @@ struct PulsarState {
 
     // Lick pool (Fire Sky .5f); copied from engine atomics on vibe load.
     int lick_pool_count = 0;                 // 0 = disabled (single-lick path)
+    bool lick_carry_growth = false;   // LickRotation.carryGrowth: ghosts survive a figure swap
     PulsarLickStep lick_pool[kMaxLickPool][kMaxLickSteps];
     int lick_pool_len[kMaxLickPool] = {};
     int lick_pool_loop[kMaxLickPool] = {};

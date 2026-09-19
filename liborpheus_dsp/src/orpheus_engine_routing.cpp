@@ -1097,6 +1097,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_lick_anomaly_index = static_cast<int>(value);
         else if (std::strcmp(symbol, "lick_anomaly_chance") == 0)
             engine->pulsar_lick_anomaly_chance = value;
+        else if (std::strcmp(symbol, "lick_carry_growth") == 0)
+            engine->pulsar_lick_carry_growth = value;
         else if (std::strcmp(symbol, "lick_pool_count") == 0)
             engine->pulsar_lick_pool_count.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strncmp(symbol, "bass_line_data_", 15) == 0) {

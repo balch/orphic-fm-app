@@ -1640,9 +1640,15 @@ class PulsarViewModel(
                 PluginControlId(PULSAR_URI, "lick_anomaly_index"), FloatValue(anomalyIndex.toFloat()))
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "lick_anomaly_chance"), FloatValue(la?.chance ?: 0f))
+            // Before lick_pool_count: that write is the release fence load_vibe waits on.
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_carry_growth"),
+                FloatValue(if (vibe.lickRotation?.carryGrowth == true) 1f else 0f))
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "lick_pool_count"), FloatValue(poolPart.size.toFloat()))
         } else {
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "lick_carry_growth"), FloatValue(0f))
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "lick_pool_count"), FloatValue(0f))
         }

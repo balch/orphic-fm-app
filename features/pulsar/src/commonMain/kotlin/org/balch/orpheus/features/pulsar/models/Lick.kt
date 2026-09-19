@@ -110,6 +110,11 @@ sealed class LickMode {
 @Serializable
 data class LickRotation(
     val pool: List<Lick>,
+    /**
+     * Ghost notes the Complexity knob grows on a lick track survive the figure swap at a
+     * section change, and take their pitch from the figure. False keeps today's wipe-on-swap.
+     */
+    val carryGrowth: Boolean = false,
 ) {
     init {
         require(pool.isNotEmpty()) { "LickRotation.pool must not be empty" }

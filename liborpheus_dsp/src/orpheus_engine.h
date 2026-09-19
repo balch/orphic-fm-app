@@ -953,6 +953,7 @@ struct OrpheusEngine {
     int   pulsar_lick_pool_len[kMaxLickPool]  = {};
     int   pulsar_lick_pool_loop[kMaxLickPool] = {};
     float pulsar_lick_anomaly_chance = 0.0f;   // 0 = no anomaly
+    float pulsar_lick_carry_growth = 0.0f;   // LickRotation.carryGrowth; > 0.5 = on
     int   pulsar_lick_anomaly_index  = -1;     // bank slot of anomaly lick, or -1
     std::atomic<int> pulsar_lick_pool_count{0}; // # rotation members; 0 = disabled (release fence)
 

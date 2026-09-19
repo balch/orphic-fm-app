@@ -39,6 +39,9 @@ import org.balch.orpheus.features.pulsar.models.ChordStep
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.Lick
+import org.balch.orpheus.features.pulsar.models.LickRotation
+import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
@@ -683,6 +686,25 @@ class PulsarSectionProgressionPushTest {
             assertEquals(0f, duck(t, 6), "track $t authored no profile, so it must not be declared")
         }
     }
+
+    @Test
+    fun `lickRotation carryGrowth pushes 1 and its absence pushes 0`() = runTest(testDispatcher) {
+        val pool = listOf(Lick(steps = listOf(LickStep(scaleDegree = 0, duration = 1f)), loopLength = 4))
+        val sections = listOf(Section(name = "only", barsMin = 2, barsMax = 2))
+
+        val carrying = pushTestVibe(
+            sections = sections,
+            lickRotation = LickRotation(pool = pool, carryGrowth = true),
+        )
+        makeViewModel(carrying).actions.setVibe(carrying)
+        advanceUntilIdle()
+        assertEquals(1f, floatPort("lick_carry_growth"))
+
+        val plain = pushTestVibe(sections = sections)
+        makeViewModel(plain).actions.setVibe(plain)
+        advanceUntilIdle()
+        assertEquals(0f, floatPort("lick_carry_growth"), "no rotation pool pushes carry off")
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
@@ -691,6 +713,7 @@ private fun pushTestVibe(
     sections: List<Section>,
     anomalies: List<Anomaly> = emptyList(),
     duckingProfiles: Map<Int, DuckingProfile> = emptyMap(),
+    lickRotation: LickRotation? = null,
 ): Vibe = Vibe(
     name = "Section Push Test",
     bpm = 120f,
@@ -711,6 +734,7 @@ private fun pushTestVibe(
     },
     arrangement = Arrangement(sections = sections),
     anomalies = anomalies,
+    lickRotation = lickRotation,
 )
 
 /** A vibe with `arrangement = null` (its default) — exercises pushArrangement's early return. */

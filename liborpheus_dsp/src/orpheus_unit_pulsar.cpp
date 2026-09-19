@@ -17,6 +17,7 @@
 #include "pulsar_breathe.h"
 #include "pulsar_score_clock.h"
 #include "pulsar_score_sched.h"
+#include "pulsar_lick_growth.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -951,7 +952,8 @@ static void apply_pool_lick(PulsarState* state, int idx) {
 // Re-render all FILL/Squash melodic tracks from state->lick — used after a rotation or
 // anomaly swap. Mirrors the déjà-vu render loop (orpheus_unit_pulsar.cpp:2414-2435):
 // derives root/scale/note-range/step-count from the live engine atomics.
-static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, uint32_t seed) {
+static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, uint32_t seed,
+                                   bool carry_ghosts) {
     if (state->lick_length <= 0 && state->bass_line_length <= 0) return;
     int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
     if (si < 0) si = 0;
@@ -974,11 +976,15 @@ static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, ui
         if (ch.length <= 0) continue;
         float ch_mut = state->in_spurt
             ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+        PulsarStep before[kMaxPulsarSteps];
+        const int before_count = std::min(rts.step_count, kMaxPulsarSteps);
+        if (carry_ghosts) std::memcpy(before, rts.steps, sizeof(PulsarStep) * before_count);
         render_lick_into_track(rts, rt, ch.lick, ch.length,
                                ch_mut, root, scale, seed,
                                rts.bar_strategy, step_count_cfg, ch.octave,
                                rg_lo, rg_hi, ch.loop_length,
                                engine->pulsar_track_lick_degree_offset[rt].load(std::memory_order_relaxed));
+        if (carry_ghosts) lick_growth::carry_ghosts(before, before_count, rts.steps, rts.step_count);
     }
 }
 
@@ -1280,6 +1286,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     int pool_count = engine->pulsar_lick_pool_count.load(std::memory_order_acquire);
     if (pool_count > kMaxLickPool) pool_count = kMaxLickPool;
     state->lick_pool_count = pool_count;
+    state->lick_carry_growth = engine->pulsar_lick_carry_growth > 0.5f;
     if (pool_count > 0) {
         state->lick_anomaly_index  = engine->pulsar_lick_anomaly_index;
         state->lick_anomaly_chance = engine->pulsar_lick_anomaly_chance;
@@ -1956,7 +1963,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     state->active_rotation_index = sec.lick_index;
                     state->current_lick_index = sec.lick_index;
                     apply_pool_lick(state, sec.lick_index);
-                    regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u);
+                    regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u, false);
                 }
 
                 // Apply per-track section overrides for the initial section so
@@ -3836,7 +3843,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (desired != state->current_lick_index) {
                             apply_pool_lick(state, desired);
                             state->current_lick_index = desired;
-                            regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u);
+                            regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u,
+                                                   state->lick_carry_growth);
                         }
                     }
 
