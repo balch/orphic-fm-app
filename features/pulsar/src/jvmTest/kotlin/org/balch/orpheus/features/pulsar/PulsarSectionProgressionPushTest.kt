@@ -48,7 +48,9 @@ import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
+import org.balch.orpheus.features.pulsar.models.FootstepPace
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
@@ -704,6 +706,31 @@ class PulsarSectionProgressionPushTest {
         makeViewModel(plain).actions.setVibe(plain)
         advanceUntilIdle()
         assertEquals(0f, floatPort("lick_carry_growth"), "no rotation pool pushes carry off")
+    }
+
+    @Test
+    fun `section street reaches slots 27 to 30 and an absent street is all zero`() = runTest(testDispatcher) {
+        val street = SectionStreet(footsteps = 0.6f, pace = FootstepPace.RUN, footstepEcho = 0.2f, train = 0.7f)
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "chase", barsMin = 2, barsMax = 2, street = street,
+                    transitions = listOf(SectionTransition(1, 1f)),
+                ),
+                Section(name = "home", barsMin = 2, barsMax = 2, transitions = listOf(SectionTransition(0, 1f))),
+            ),
+        )
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        assertEquals(0.6f, floatPort("section_data_${0 * stride + 27}"))
+        assertEquals(1f, floatPort("section_data_${0 * stride + 28}"), "RUN marshals as 1")
+        assertEquals(0.2f, floatPort("section_data_${0 * stride + 29}"))
+        assertEquals(0.7f, floatPort("section_data_${0 * stride + 30}"))
+        for (field in 27..30) {
+            assertEquals(0f, floatPort("section_data_${1 * stride + field}"), "section 1 street field $field")
+        }
     }
 }
 

@@ -3,12 +3,14 @@ package org.balch.orpheus.features.pulsar
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
+import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
 import org.balch.orpheus.features.pulsar.models.TapeStopEffect
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * Pins the wire row width / arity / slot order for the four storm-weather banks
@@ -170,5 +172,25 @@ class PulsarMarshalStrideTest {
             "breathe fields must be the trailing three on TrackSectionOverride, matching " +
                 "the doc comment's \"trailing slots\" contract",
         )
+    }
+
+    // --- pulsar_section_data slots 27-30: SectionStreet ---
+
+    @Test
+    fun sectionStreetFieldOrderMatchesStreetSlotMarshal() {
+        // footsteps(27), pace(28), footstepEcho(29), train(30), appended after the pinned lick.
+        // A new field goes after train: inserting one would reassign every slot after it.
+        val descriptor = SectionStreet.serializer().descriptor
+        assertEquals(
+            listOf("footsteps", "pace", "footstepEcho", "train"),
+            (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },
+        )
+    }
+
+    @Test
+    fun sectionStreetRejectsLevelsOutsideZeroToOne() {
+        assertFailsWith<IllegalArgumentException> { SectionStreet(footsteps = 1.2f) }
+        assertFailsWith<IllegalArgumentException> { SectionStreet(footstepEcho = -0.1f) }
+        assertFailsWith<IllegalArgumentException> { SectionStreet(train = 2f) }
     }
 }

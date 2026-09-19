@@ -65,6 +65,12 @@ static inline int engine_note_floor(int engine_index) {
 static constexpr float kStormReverbSend = 0.45f;
 static constexpr float kStormDelaySend  = 0.15f;
 
+// Street voice sends. Footsteps scale theirs by the section's echo; the train's are fixed. EAR-TUNE.
+static constexpr float kStreetFootReverbSend = 0.60f;
+static constexpr float kStreetFootDelaySend = 0.25f;
+static constexpr float kStreetTrainReverbSend = 0.35f;
+static constexpr float kStreetTrainDelaySend = 0.10f;
+
 // StormAnomaly rumble floor, as a fraction of the authored strike intensity. Half was
 // picked to sit under a default 0.7 intensity as a clearly-present roll without
 // swamping a section that authored its own bed.
@@ -1757,6 +1763,12 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.weather.rain_level    = W(25);
             }
 
+            // Slots 27-30: SectionStreet.
+            sec.street.footsteps = clamp01(engine->pulsar_section_data[base + 27].load(std::memory_order_relaxed));
+            sec.street.run = engine->pulsar_section_data[base + 28].load(std::memory_order_relaxed) > 0.5f;
+            sec.street.echo = clamp01(engine->pulsar_section_data[base + 29].load(std::memory_order_relaxed));
+            sec.street.train = clamp01(engine->pulsar_section_data[base + 30].load(std::memory_order_relaxed));
+
             // Per-track section overrides; -1 = no override (per-track wins over section-level)
             {
                 int tbase = s * kNumPulsarTracks;
@@ -2107,6 +2119,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->storm_voice.Init(base_seed,
                             engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f);
 
+    // Street voice: footsteps and a steam train. Same seed/re-Init story as storm.
+    state->street_voice.Init(base_seed ^ 0x57EE7u,
+                             engine->sample_rate > 0.0f ? engine->sample_rate : 48000.0f);
+
     // Wah Anomaly config bank. Order mirrors the Kotlin marshal in PulsarViewModel:
     // [0]=prob [1]=durMin [2]=durMax [3]=rateDivision [4]=depth [5]=resonanceQ
     // [6]=centerHz [7]=sweepOctaves [8]=wet [9]=declared flag. Loaded unconditionally,
@@ -2252,6 +2268,13 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     }
     state->post_flip_fx_count = 0;
     stage_transition_fx_for_planned_edge(state);
+
+    // The opening section whistles too, if it is a train section.
+    if (state->arrangement.active) {
+        const int cur = state->section_state.current_section;
+        if (cur >= 0 && cur < state->arrangement.section_count)
+            state->street_voice.OnSectionEntry(state->arrangement.sections[cur].street.train);
+    }
 
     // Per-track lick-wah insert bank. Order mirrors the Kotlin marshal in PulsarViewModel:
     // [0]=track opt-in bitmask [1]=rateDivision [2]=depth [3]=resonanceQ [4]=centerHz
@@ -2919,6 +2942,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     int step_boundary_samples[kMaxStepBoundaries];
     int num_boundaries = 0;
 
+    // Track 0's playhead at each boundary, recorded in the track loop for the street voice.
+    int t0_boundary_step[kMaxStepBoundaries];
+    int t0_boundary_count = 0;
+
     // Use track 0's playhead parity to determine global swing phase
     // (all tracks advance together on the same clock)
     bool step_is_odd = (state->tracks[0].playhead % 2) != 0;
@@ -3283,6 +3310,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // only to seat the playhead on the new window and sound steps[0].
             const bool is_load_boundary = (b == load_boundary_index);
             pulsar_advance_playhead(ts, state->tension.half_lick);
+            if (t == 0 && t0_boundary_count < kMaxStepBoundaries) t0_boundary_step[t0_boundary_count++] = ts.playhead;
 
             // Close the triplet clock's segment for the step this boundary ends, then
             // clear what the new step has to re-establish.
@@ -3477,6 +3505,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     if (section_changed) {
                         int cur_sec = state->section_state.current_section;
                         const SectionParam& sec = state->arrangement.sections[cur_sec];
+                        state->street_voice.OnSectionEntry(sec.street.train);
 
                         // Generic transition effects: fire whatever the taken edge still has
                         // armed (offset 0 lands here; negative offsets already fired at an
@@ -5661,6 +5690,64 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 storm.DarkenSend(sl, sr, &dark_l, &dark_r);
                 engine->pulsar_reverb_send_l[i] += dark_l * kStormReverbSend;
                 engine->pulsar_reverb_send_r[i] += dark_r * kStormReverbSend;
+            }
+        }
+    }
+
+    // ── Street voice: footsteps and train (pulsar_street.h) ─────────────────────
+    // The weather's bed model: the active section's street lerps toward the staged destination
+    // on the macro pre-roll. Footsteps ride track 0's boundaries recorded in the track loop.
+    {
+        street::StreetVoice& street = state->street_voice;
+        float foot = 0.0f, echo = 0.0f, train = 0.0f, train_progress = 0.0f;
+        bool run = false;
+        if (state->arrangement.active) {
+            const ArrangementParams& arr = state->arrangement;
+            const SectionState& ss = state->section_state;
+            const int cur = ss.current_section;
+            if (cur >= 0 && cur < arr.section_count) {
+                const SectionStreetParam& s = arr.sections[cur].street;
+                foot = s.footsteps; echo = s.echo; train = s.train; run = s.run;
+                const PulsarTrackState& t0 = state->tracks[0];
+                const float bar_phase = t0.step_count > 0
+                    ? static_cast<float>(t0.playhead) / static_cast<float>(t0.step_count) : 0.0f;
+                if (ss.bars_total > 0) {
+                    train_progress = (static_cast<float>(ss.bars_total - ss.bars_remaining) + bar_phase)
+                                     / static_cast<float>(ss.bars_total);
+                }
+                const int dst = ss.transition_target;
+                if (dst >= 0 && dst < arr.section_count) {
+                    const SectionStreetParam& d = arr.sections[dst].street;
+                    foot += (d.footsteps - foot) * progress;
+                    echo += (d.echo - echo) * progress;
+                    // A train that only exists in the destination arrives close and slow.
+                    if (s.train <= 0.0f && d.train > 0.0f) train_progress = 0.0f;
+                    train += (d.train - train) * progress;
+                }
+            }
+        }
+        street.set_bed(foot, run, train, train_progress);
+        for (int k = 0; k < t0_boundary_count; k++)
+            street.OnStepBoundary(step_boundary_samples[k], t0_boundary_step[k]);
+        if (!street.idle()) {
+            float foot_l[kMaxFrames], foot_r[kMaxFrames], train_l[kMaxFrames], train_r[kMaxFrames];
+            std::memset(foot_l, 0, num_frames * sizeof(float));
+            std::memset(foot_r, 0, num_frames * sizeof(float));
+            std::memset(train_l, 0, num_frames * sizeof(float));
+            std::memset(train_r, 0, num_frames * sizeof(float));
+            street.Process(foot_l, foot_r, train_l, train_r, num_frames);
+            const float foot_rev = kStreetFootReverbSend * echo;
+            const float foot_dly = kStreetFootDelaySend * echo;
+            for (int i = 0; i < num_frames; i++) {
+                const float g = void_gain_buf[i];
+                const float fl = foot_l[i] * g, fr = foot_r[i] * g;
+                const float tl = train_l[i] * g, tr = train_r[i] * g;
+                out_l[i] += fl + tl;
+                out_r[i] += fr + tr;
+                engine->pulsar_delay_send_l[i]  += fl * foot_dly + tl * kStreetTrainDelaySend;
+                engine->pulsar_delay_send_r[i]  += fr * foot_dly + tr * kStreetTrainDelaySend;
+                engine->pulsar_reverb_send_l[i] += fl * foot_rev + tl * kStreetTrainReverbSend;
+                engine->pulsar_reverb_send_r[i] += fr * foot_rev + tr * kStreetTrainReverbSend;
             }
         }
     }

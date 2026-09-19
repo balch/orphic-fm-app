@@ -7,6 +7,7 @@
 #include "pulsar_osc.h"
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
+#include "pulsar_street.h"
 #include "orpheus_wah_core.h"
 #include "tides2/poly_slope_generator.h"
 #include "stmlib/dsp/dsp.h"
@@ -708,6 +709,14 @@ struct SectionWeatherParam {
     float rain_level = 0.0f;
 };
 
+// Slots 27-30: SectionStreet. All zero when a section declares none, which renders nothing.
+struct SectionStreetParam {
+    float footsteps = 0.0f;
+    bool run = false;
+    float echo = 0.0f;
+    float train = 0.0f;
+};
+
 struct SectionParam {
     int bars_min = 4, bars_max = 8;
     // Step within [bars_min, bars_max] when picking a random length. 1 = any
@@ -770,6 +779,8 @@ struct SectionParam {
     // Weather bed for this section (slots 21-24). Blended toward the staged
     // destination's during a transition pre-roll, exactly like the macros.
     SectionWeatherParam weather;
+    // Street bed (slots 27-30), blended toward the staged destination like the weather.
+    SectionStreetParam street;
 };
 
 struct ArrangementParams {
@@ -1154,6 +1165,10 @@ struct PulsarState {
     // the send buses, scaled by the same void gain the tracks get. Re-Init'd per vibe
     // load, which is also what clears any bed or strike still in flight.
     storm::StormVoice storm_voice;
+
+    // Street voice (footsteps and a steam train) — the pulsar's 10th voice. Same
+    // per-section bed model as storm, re-Init'd per vibe load.
+    street::StreetVoice street_voice;
 
     // Void Anomaly (dispatched by the Anomaly Engine)
     VoidConfig void_config;

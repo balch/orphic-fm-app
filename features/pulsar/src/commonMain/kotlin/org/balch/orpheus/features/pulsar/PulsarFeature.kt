@@ -71,6 +71,7 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
+import org.balch.orpheus.features.pulsar.models.FootstepPace
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
@@ -1990,6 +1991,13 @@ class PulsarViewModel(
             setSection(25, weather?.rainLevel ?: 0f)
             // [26]=lick_index+1 (0 = no override; the port array is zero-initialised)
             setSection(26, ((section.lickIndex ?: -1) + 1).toFloat())
+
+            // Slots 27-30: SectionStreet, appended after the pinned lick. Absent = all zero.
+            val street = section.street
+            setSection(27, street?.footsteps ?: 0f)
+            setSection(28, if (street?.pace == FootstepPace.RUN) 1f else 0f)
+            setSection(29, street?.footstepEcho ?: 0f)
+            setSection(30, street?.train ?: 0f)
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.
