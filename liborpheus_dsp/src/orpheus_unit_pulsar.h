@@ -1091,6 +1091,7 @@ struct PulsarState {
     // Mutation state — patterns evolve over time
     uint32_t seed_counter;      // incremented each scene load for varied seeds
     uint32_t mutation_seed;     // PRNG state for pattern mutation
+    uint32_t step_salt = 0;     // per-load salt for the stateless step_hash rolls
     int loop_count;             // how many full loops completed
     int loops_since_reset;      // loops since last déjà vu reset
 

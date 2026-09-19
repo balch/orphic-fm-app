@@ -313,6 +313,81 @@ static bool test_rhythm_budget_lower_variation_than_wild() {
     return pass;
 }
 
+// ── CAP-5: the per-step rolls follow the vibe seed ──
+//
+// The probe track is rewritten to the same single note on every seed, so the only
+// thing that can move its runtime ghosts is the seed. Their placement has to replay
+// for a pinned seed and move for a different one. Before the salt, step_hash ignored the
+// seed and every load of every vibe ghosted the same steps on the same bars.
+static std::vector<uint64_t> cap5_ghost_masks_for_seed(int64_t seed) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit = make_pulsar_unit();
+    constexpr int kProbe = 5;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.6f, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_space.store(0.5f, std::memory_order_relaxed);
+    engine->pulsar_mood.store(0.5f, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    setup_role_aware_macros(engine);
+
+    engine->pulsar_track_role[kProbe].store(1, std::memory_order_relaxed);  // MELODIC
+    engine->pulsar_genre_density[kProbe].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[kProbe].complexity_var_min.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_track_macros[kProbe].complexity_var_max.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_step_count.store(16, std::memory_order_relaxed);
+    engine->pulsar_seed.store(seed, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    // 7 bars stays inside the first deja-vu window (interval 8 at complexity 1.0).
+    std::vector<uint64_t> masks;
+    advance_bars(engine, unit, 7, [&](PulsarState* ps) {
+        PulsarTrackState& probe = ps->tracks[kProbe];
+        if (masks.empty()) {
+            // A ghost borrows the nearest written pitch, so an empty row never ghosts.
+            // One identical note on every seed leaves the salt as the only variable.
+            for (int s = 0; s < probe.step_count; s++) probe.steps[s] = PulsarStep{};
+            probe.steps[0].gate = true;
+            probe.steps[0].note = probe.steps[0].raw_note = 60;
+            probe.steps[0].velocity = 0.8f;
+            probe.steps[0].duration = 0.5f;
+        }
+        uint64_t m = 0;
+        for (int s = 0; s < probe.step_count; s++)
+            if (probe.steps[s].ghost) m |= (1ull << s);
+        masks.push_back(m);
+    });
+
+    orpheus_engine_destroy(engine);
+    return masks;
+}
+
+static bool test_ghost_rolls_follow_the_seed() {
+    printf("\n=== Test: CAP-5 ghost placement follows the vibe seed ===\n");
+
+    auto a1 = cap5_ghost_masks_for_seed(0x00C0FFEE);
+    auto a2 = cap5_ghost_masks_for_seed(0x00C0FFEE);
+    auto b  = cap5_ghost_masks_for_seed(0x00BEEF01);
+
+    bool any_ghost = false;
+    for (uint64_t m : a1) if (m) any_ghost = true;
+    for (size_t i = 0; i < a1.size(); i++)
+        printf("  bar %zu: seedA=%04llx seedB=%04llx\n", i,
+               (unsigned long long)a1[i], (unsigned long long)(i < b.size() ? b[i] : 0));
+
+    bool reproducible = (a1 == a2);
+    bool seed_moves_ghosts = (a1 != b);
+    printf("  ghosts present=%d pinned seed replays=%d different seed differs=%d\n",
+           any_ghost, reproducible, seed_moves_ghosts);
+
+    bool pass = any_ghost && reproducible && seed_moves_ghosts;
+    printf("  CAP-5: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_pulsar_complexity_cap_tests() {
     printf("\n========== PULSAR COMPLEXITY CAP TESTS ==========\n");
     int pass = 0, fail = 0;
@@ -321,6 +396,7 @@ bool run_pulsar_complexity_cap_tests() {
     if (test_no_step_count_mutation_at_0_8())                  pass++; else fail++;
     if (test_dejavu_reset_floor_at_least_8())                  pass++; else fail++;
     if (test_rhythm_budget_lower_variation_than_wild())        pass++; else fail++;
+    if (test_ghost_rolls_follow_the_seed())                    pass++; else fail++;
 
     printf("\nComplexity-cap tests: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);

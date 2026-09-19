@@ -339,9 +339,13 @@ static bool test_loop_end_phrase_forces_the_kick() {
     // Control: guards this test's premise. No cue pushed, so speech_kick_now never fires;
     // track 0's downbeat runs on step_hash's deterministic roll alone (pulsar_rng.h, not a
     // carried RNG stream) -- the same sequence the cued runs below see.
+    // The step rolls follow the seed, and about one seed in four never misses inside 25
+    // wraps. This one does; re-pick it if the control below reports zero misses.
+    constexpr uint32_t kKickSeed = 0xBEAF;
     int control_misses = 0;
     {
         OrpheusEngine* control = make_speech_engine(16);
+        pin_pulsar_rngs(control, kKickSeed);
         trigger_vibe_load(control);
         GraphUnit control_unit; std::memset(&control_unit, 0, sizeof(control_unit));
         control_unit.type = UNIT_PULSAR; control_unit.enabled = true;
@@ -366,6 +370,7 @@ static bool test_loop_end_phrase_forces_the_kick() {
         const float align_end = (c == 0) ? 1.0f : 0.0f;
         const float row[kSpeechCueRowFields] = {0.0f, 1.0f, -1.0f, align_end, 1.0f, 0.0f, 1.0f, 1.0f};
         push_cue_row(engine, 0, row);
+        pin_pulsar_rngs(engine, kKickSeed);
         trigger_vibe_load(engine);
         GraphUnit unit; std::memset(&unit, 0, sizeof(unit));
         unit.type = UNIT_PULSAR; unit.enabled = true;

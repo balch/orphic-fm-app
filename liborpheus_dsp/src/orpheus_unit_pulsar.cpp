@@ -289,7 +289,7 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
 
         for (int s = 0; s < ts.step_count; s++) {
             PulsarStep& step = ts.steps[s];
-            uint32_t h = step_hash(s, t, state->loop_count);
+            uint32_t h = step_hash(s, t, state->loop_count, state->step_salt);
             float roll = static_cast<float>(h & 0xFFFF) / 65535.0f;
 
             // Ghost notes: activate inactive steps with low velocity.
@@ -391,7 +391,7 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                 PulsarStep& step = ts.steps[s];
                 if (!step.gate) continue;
 
-                uint32_t h = step_hash(s, t, state->loop_count);
+                uint32_t h = step_hash(s, t, state->loop_count, state->step_salt);
                 float roll = static_cast<float>(h & 0xFFFF) / 65535.0f;
                 if (roll >= mutate_prob) {
                     // Not mutating this step — but still track the degree for contour
@@ -466,7 +466,8 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
         std::memcpy(ts.steps, ts.chordal_base, sizeof(PulsarStep) * ts.step_count);
 
         uint32_t seed = static_cast<uint32_t>(state->loop_count * 0x9E3779B9u)
-                      ^ static_cast<uint32_t>(t * 2654435761u);
+                      ^ static_cast<uint32_t>(t * 2654435761u)
+                      ^ state->step_salt;
 
         // ── Fills first (replaces whole bar) ──
         bool fill_fired = false;
@@ -1252,6 +1253,9 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // arrangement begins biased by whatever mid-render mutation state the
     // previous vibe left behind.
     state->mutation_seed = base_seed;
+    // Salt for the stateless step_hash rolls (ghosts, drift, fire gate, jitter). Derived
+    // from base_seed alone so a pinned seed still replays exactly (SEED-1).
+    state->step_salt = base_seed ^ 0x51E9A17Du;
 
     // Void RNG and lick-select RNG (the pool rotation and lick anomaly). Both are
     // salted apart from the pattern seed and from each other. On the random path they
@@ -3264,7 +3268,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Both bounds must be authored — with only a low, hi stays at the sentinel and the
             // sweep runs toward -1, going dull at peak tension.
             if (!ts.pin_timbre && state->tension.evo_timbre_prob > 0.001f) {
-                uint32_t rng = step_hash(ts.playhead, t + 13, state->loop_count);
+                uint32_t rng = step_hash(ts.playhead, t + 13, state->loop_count, state->step_salt);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_timbre_prob) {
                     const bool authored = state->tension.evo_timbre_low >= 0.0f
                                        && state->tension.evo_timbre_high >= 0.0f;
@@ -3277,7 +3281,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Morph sweep (only when not pinned, only if BOTH bounds are authored)
             if (!ts.pin_morph && state->tension.evo_morph_low >= 0.0f
                 && state->tension.evo_morph_high >= 0.0f && state->tension.evo_morph_prob > 0.001f) {
-                uint32_t rng = step_hash(ts.playhead, t + 17, state->loop_count);
+                uint32_t rng = step_hash(ts.playhead, t + 17, state->loop_count, state->step_salt);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_morph_prob) {
                     float lo = state->tension.evo_morph_low;
                     float hi = state->tension.evo_morph_high;
@@ -3288,7 +3292,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Harmonics nudge (only when not pinned, only if BOTH bounds are authored)
             if (!ts.pin_harmonics && state->tension.evo_harm_low >= 0.0f
                 && state->tension.evo_harm_high >= 0.0f && state->tension.evo_harm_prob > 0.001f) {
-                uint32_t rng = step_hash(ts.playhead, t + 23, state->loop_count);
+                uint32_t rng = step_hash(ts.playhead, t + 23, state->loop_count, state->step_salt);
                 if ((rng & 0xFFFF) / 65535.0f < state->tension.evo_harm_prob) {
                     float lo = state->tension.evo_harm_low;
                     float hi = state->tension.evo_harm_high;
@@ -4572,7 +4576,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             ? handoff_fill_duck(ts.solo_density_mod_current, ts.solo_fill_mod)
                             : ts.solo_density_mod_current;
                         if (duck_mod < 0.0f &&
-                            !duck_passes(ts.playhead, t, state->loop_count, duck_mod)) {
+                            !duck_passes(ts.playhead, t, state->loop_count, duck_mod, state->step_salt)) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
                             ts.suppress_hold_tail = step.hold;
@@ -4620,15 +4624,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                     ts.solo_density_mod_current,
                                                     ts.solo_fill_mod);
 
-                        uint32_t prob_hash = step_hash(ts.playhead, t, state->loop_count);
+                        uint32_t prob_hash = step_hash(ts.playhead, t, state->loop_count, state->step_salt);
                         float prob_roll = static_cast<float>(prob_hash & 0xFFFF) / 65535.0f;
-                        // The vibe-load downbeat always fires. load_vibe zeroes both
-                        // playhead and loop_count, so step_hash(0, t, 0) collapses to
-                        // t * 104729 — a per-track CONSTANT, independent of seed, vibe
-                        // and pattern. Its rolls (t2=0.988, t3=0.997, t4=0.977) sit above
-                        // the reachable fire_prob ceiling (0.95 percussive, 0.985 at
-                        // energy 0.95), so without this the bass (t3) and t2/t4 lost the
-                        // downbeat on EVERY vibe load below energy 0.99 — deterministically.
+                        // The vibe-load downbeat always fires. Its roll is salted per
+                        // load like any other, so without this a load would drop the
+                        // bass or lead downbeat whenever that roll landed above fire_prob.
                         bool fires = prob_roll < fire_prob || energy >= 0.99f || is_load_boundary
                             || (t == 0 && ts.playhead == 0 && state->speech_kick_now);
 
@@ -4656,7 +4656,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 step.hit_probability +
                                 (1.0f - step.hit_probability) * state->tension_intensity;
                             const uint32_t hh =
-                                step_hash(ts.playhead, t, state->loop_count) * 2654435761u
+                                step_hash(ts.playhead, t, state->loop_count, state->step_salt) * 2654435761u
                                 + 0x9E3779B9u;
                             const float hroll =
                                 static_cast<float>(hh & 0xFFFF) / 65535.0f;
@@ -4674,7 +4674,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // Apply velocity variation from complexity
                             float vel = step.velocity;
                             if (variation_amt > 0.001f) {
-                                uint32_t vh = step_hash(ts.playhead, t, state->loop_count);
+                                uint32_t vh = step_hash(ts.playhead, t, state->loop_count, state->step_salt);
                                 float var_offset = (static_cast<float>(vh & 0xFFFF) / 65535.0f - 0.5f)
                                                   * 2.0f * variation_amt * 0.2f;
                                 vel = clamp01(vel + var_offset);
@@ -4758,7 +4758,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // Octave shift at extreme intensities
                             if (state->tension.octave_shift) {
                                 float intensity = state->tension_intensity;
-                                uint32_t rng = step_hash(ts.playhead, t, state->loop_count + 997);
+                                uint32_t rng = step_hash(ts.playhead, t, state->loop_count + 997, state->step_salt);
                                 float r = (rng & 0xFFFF) / 65535.0f;
                                 if (intensity > 0.8f && r < 0.3f) {
                                     midi_note += 12;
@@ -4775,7 +4775,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // Chromatic passing tones
                             float chrom_prob = state->tension.chromatic_passing * state->tension_intensity;
                             if (chrom_prob > 0.001f) {
-                                uint32_t rng = step_hash(ts.playhead, t + 7, state->loop_count);
+                                uint32_t rng = step_hash(ts.playhead, t + 7, state->loop_count, state->step_salt);
                                 float r = (rng & 0xFFFF) / 65535.0f;
                                 if (r < chrom_prob) {
                                     midi_note += (rng & 0x10000) ? 1 : -1;
@@ -4801,7 +4801,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                     const PulsarScale& arp_sc = kPulsarScales[arp_si];
 
                                     uint32_t seed = static_cast<uint32_t>(
-                                        state->loop_count * 0x9E3779B9u) ^ static_cast<uint32_t>(t);
+                                        state->loop_count * 0x9E3779B9u) ^ static_cast<uint32_t>(t)
+                                        ^ state->step_salt;
                                     // 2 notes by default — less blippy than triad arps. Note this
                                     // is root + 3rd, not root + 5th: voicing_count 2 takes
                                     // intervals[0..1] = {root, 3rd}; the 5th needs a count of 3.
