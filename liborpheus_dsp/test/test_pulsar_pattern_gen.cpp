@@ -348,6 +348,91 @@ static bool test_blues_scale_renders_flat_five() {
     return ok;
 }
 
+// ── Effect-pattern note-range fold (tracks 5-7) ──────────────────────
+
+static constexpr uint8_t kRootE = 4;
+static constexpr uint8_t kRootC = 0;
+
+static int semitones_outside(int note, int lo, int hi) {
+    if (note < lo) return lo - note;
+    if (note > hi) return note - hi;
+    return 0;
+}
+
+// Runs generate_effect_pattern over 64 seeds x tracks 5-7 x {plain, hold-heavy} and
+// hands every gated note to `visit`. Density 0.9 keeps nearly every step gated.
+template <typename Visit>
+static void sweep_effect_notes(uint8_t root, const PulsarScale& scale,
+                               int lo, int hi, Visit visit) {
+    PulsarGenreProfile genre = {};
+    for (int i = 0; i < 8; i++) genre.base_density[i] = 0.9f;
+    genre.note_range_low = 36;
+    genre.note_range_high = 72;
+    const float kHoldProbs[2] = {0.0f, 0.9f};
+    for (uint32_t s = 0; s < 64; s++) {
+        for (int track = 5; track <= 7; track++) {
+            for (float hold : kHoldProbs) {
+                PulsarStep steps[kMaxPulsarSteps] = {};
+                uint32_t seed = s * 7919u + 1u;
+                generate_effect_pattern(steps, 32, track, genre, root, scale, 0, seed,
+                                        hold, 2, 8, 0.9f, lo, hi, 0);
+                for (int i = 0; i < 32; i++) {
+                    if (steps[i].gate) visit(i, static_cast<int>(steps[i].note));
+                }
+            }
+        }
+    }
+}
+
+// The reported case: E blues in a 76-79 window. A, Bb, B and D have no octave inside
+// it, and the legacy fold dropped them to 69-74 instead of keeping them near the window.
+static bool test_effect_narrow_window_stays_in_range() {
+    printf("\n  Test: effect pattern keeps every note inside a 76-79 window (E blues)\n");
+    int hist[128] = {};
+    int gated = 0, outside = 0, worst = 0;
+    sweep_effect_notes(kRootE, kPulsarScales[13], 76, 79, [&](int, int note) {
+        gated++;
+        hist[note]++;
+        int d = semitones_outside(note, 76, 79);
+        if (d > 0) outside++;
+        if (d > worst) worst = d;
+    });
+    printf("    notes:");
+    for (int n = 0; n < 128; n++) if (hist[n]) printf(" %d(x%d)", n, hist[n]);
+    printf("\n");
+    bool ok = gated > 0 && outside == 0;
+    printf("    gated=%d outside=%d worst=%d semis -- %s\n",
+           gated, outside, worst, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// Every pitch class has an octave inside a window of 12+ semitones, so the fold never
+// has to choose and the notes must match the legacy fold exactly. C blues puts C at both
+// 72 and 84, the one pitch class with two in-range octaves. Hashes captured before the fix.
+static bool test_effect_wide_window_unchanged() {
+    printf("\n  Test: effect pattern in a 72-84 window matches the legacy fold\n");
+    struct Case { const char* name; uint8_t root; uint64_t expected; };
+    const Case kCases[2] = {
+        {"E blues", kRootE, 0xf28607cd1b9f0234ull},
+        {"C blues", kRootC, 0xa62634752f92d734ull},
+    };
+    bool ok = true;
+    for (const Case& c : kCases) {
+        uint64_t h = 1469598103934665603ull;  // FNV-1a offset basis
+        int outside = 0;
+        sweep_effect_notes(c.root, kPulsarScales[13], 72, 84, [&](int step, int note) {
+            h = (h ^ static_cast<uint64_t>(step)) * 1099511628211ull;
+            h = (h ^ static_cast<uint64_t>(note)) * 1099511628211ull;
+            if (semitones_outside(note, 72, 84) > 0) outside++;
+        });
+        bool case_ok = h == c.expected && outside == 0;
+        printf("    %s: hash=0x%016llxull outside=%d -- %s\n", c.name,
+               static_cast<unsigned long long>(h), outside, case_ok ? "PASS" : "FAIL");
+        ok = ok && case_ok;
+    }
+    return ok;
+}
+
 bool run_pulsar_pattern_gen_tests() {
     printf("\n=== Pulsar Pattern Gen Tests ===\n");
     int pass = 0, fail = 0;
@@ -362,6 +447,8 @@ bool run_pulsar_pattern_gen_tests() {
     test_loop_length_equals_lick_length()   ? pass++ : fail++;
     test_dust_groove_scenario()             ? pass++ : fail++;
     test_blues_scale_renders_flat_five()    ? pass++ : fail++;
+    test_effect_narrow_window_stays_in_range() ? pass++ : fail++;
+    test_effect_wide_window_unchanged()     ? pass++ : fail++;
 
     printf("\n  Results: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);

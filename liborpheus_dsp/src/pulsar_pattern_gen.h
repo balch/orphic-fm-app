@@ -512,9 +512,17 @@ inline void generate_effect_pattern(
             if (pattern_rand01(seed) < octave_prob) note += 12;
             if (pattern_rand01(seed) < octave_prob) note -= 12;
 
-            // Clamp to range
+            // Fold into the range. A window narrower than an octave leaves some pitch
+            // classes with no octave inside it, and folding down then lands under the
+            // window, so those take the nearer edge instead of sounding up to 11
+            // semitones below it.
             while (note < eff_range_low) note += 12;
             while (note > eff_range_high) note -= 12;
+            if (note < eff_range_low) {
+                const int up = note + 12 - eff_range_high;   // how far above, folded back up
+                const int down = eff_range_low - note;       // how far below, as folded
+                note = (up <= down) ? eff_range_high : eff_range_low;
+            }
 
             float vel = 0.3f + pattern_rand01(seed) * 0.4f;
             float dur = dur_min + pattern_rand01(seed) * (dur_max - dur_min);
