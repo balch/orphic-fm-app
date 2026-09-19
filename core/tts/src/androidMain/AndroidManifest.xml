@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        API 30+ hides other packages by default. Without this, AndroidTtsGenerator's
+        queryIntentServices finds nothing and TTS reports itself unavailable on a device that
+        has a perfectly good engine installed. Declared here so every app taking :core:tts
+        inherits it through manifest merging.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+</manifest>

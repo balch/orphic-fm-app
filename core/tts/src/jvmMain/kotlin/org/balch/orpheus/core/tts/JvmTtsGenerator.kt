@@ -23,37 +23,33 @@ class JvmTtsGenerator(
     override val isAvailable: Boolean =
         System.getProperty("os.name")?.contains("Mac", ignoreCase = true) == true
 
-    private var cachedVoices: List<String>? = null
+    private var installed: List<String>? = null
+
+    /** Every voice `say` can use. Blocking, so call it from the io dispatcher. */
+    private fun installedVoices(): List<String> {
+        installed?.let { return it }
+        return try {
+            val process = ProcessBuilder("say", "-v", "?")
+                .redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().readText()
+            val completed = process.waitFor(10, TimeUnit.SECONDS)
+            if (!completed || process.exitValue() != 0) {
+                log.warn { "say -v ? failed" }
+                emptyList()
+            } else {
+                parseSayVoices(output).also { installed = it }
+            }
+        } catch (e: Exception) {
+            log.warn { "Failed to list voices: ${e.message}" }
+            emptyList()
+        }
+    }
 
     override suspend fun listVoices(): List<String> {
         if (!isAvailable) return emptyList()
-        cachedVoices?.let { return it }
 
         return withContext(dispatcherProvider.io) {
-            try {
-                val process = ProcessBuilder("say", "-v", "?")
-                    .redirectErrorStream(true).start()
-                val output = process.inputStream.bufferedReader().readText()
-                val completed = process.waitFor(10, TimeUnit.SECONDS)
-                if (!completed || process.exitValue() != 0) {
-                    log.warn { "say -v ? failed" }
-                    return@withContext emptyList()
-                }
-                // Each line: "VoiceName     language  # description"
-                val allVoices = output.lines()
-                    .filter { it.isNotBlank() }
-                    .mapNotNull { line ->
-                        line.trim().split("\\s+".toRegex()).firstOrNull()
-                    }
-                    .distinct()
-                val voices = curateVoices(allVoices)
-                cachedVoices = voices
-                log.d { "Found ${voices.size} TTS voices" }
-                voices
-            } catch (e: Exception) {
-                log.warn { "Failed to list voices: ${e.message}" }
-                emptyList()
-            }
+            curateVoices(installedVoices()).also { log.d { "Found ${it.size} TTS voices" } }
         }
     }
 
@@ -82,6 +78,32 @@ class JvmTtsGenerator(
             "Moira",        // Irish female
             "Tessa",        // South African female
         )
+
+        // "Flo (English (UK))  en_GB    # Hello! My name is Flo." Names hold spaces and parentheses,
+        // so the name is everything before the last token ahead of the '#'.
+        private val SAY_VOICE_LINE = Regex("""^(.+?)\s+\S+\s+#""")
+
+        internal fun parseSayVoices(output: String): List<String> =
+            output.lines()
+                .mapNotNull { SAY_VOICE_LINE.find(it.trim())?.groupValues?.get(1) }
+                .distinct()
+
+        /**
+         * The `say -v` name to pass, or null for the system voice. The alias's list goes first so an
+         * enhanced download beats the compact one. An uninstalled name is dropped rather than passed,
+         * because `say` ignores it, speaks in the system voice and still exits 0.
+         */
+        internal fun resolveSayVoice(
+            requested: String?,
+            installed: Collection<String>,
+            table: List<VoiceAlias> = VoiceAliases.table,
+        ): String? {
+            if (requested.isNullOrBlank()) return null
+            VoiceAliases.resolve(requested, table)?.macVoices
+                ?.firstOrNull { it in installed }
+                ?.let { return it }
+            return requested.takeIf { it in installed }
+        }
     }
 
     private fun curateVoices(allVoices: List<String>): List<String> {
@@ -107,8 +129,9 @@ class JvmTtsGenerator(
                     "say", "-o", tmpFile.absolutePath,
                     "--file-format=WAVE", "--data-format=LEI16@44100"
                 )
-                if (voice != null) {
-                    cmd.addAll(listOf("-v", voice))
+                val sayVoice = resolveSayVoice(voice, installedVoices())
+                if (sayVoice != null) {
+                    cmd.addAll(listOf("-v", sayVoice))
                 }
                 if (speakingRate != null) {
                     cmd.addAll(listOf("-r", speakingRate.toString()))
@@ -139,7 +162,10 @@ class JvmTtsGenerator(
                     samples[i] = sample16 / 32768f
                 }
 
-                log.info { "Generated TTS: ${samples.size} samples (${samples.size / 44100f}s), voice=$voice, rate=$speakingRate" }
+                log.info {
+                    "Generated TTS: ${samples.size} samples (${samples.size / 44100f}s), " +
+                        "voice=$voice -> ${sayVoice ?: "system default"}, rate=$speakingRate"
+                }
                 TtsAudioResult(samples, 44100)
             } catch (e: Exception) {
                 log.warn { "TTS generation failed: ${e.message}" }
