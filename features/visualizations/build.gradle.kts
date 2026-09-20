@@ -31,6 +31,7 @@ kotlin {
 
         commonMain.dependencies {
              // Core deps provided by convention
+             implementation(libs.kotlinx.atomicfu)
         }
         jvmTest.dependencies {
             implementation(libs.kotlin.test)
