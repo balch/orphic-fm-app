@@ -211,8 +211,9 @@ class FaceMorphViz(
         private const val TIME_WRAP_S = 3600f
 
         // The broadcast is small ticker text over a CRT picture, so no refraction bends it
-        // (refraction/curve 0 disables the liquid effect). Frost matches the app's default so
-        // panel labels read over the bright mono picture; the panels fade away when idle anyway.
+        // (refraction/curve 0 disables the liquid effect). The glass is this thin because the
+        // panels fade away when idle. The DJ app's dock never fades them, so it raises these
+        // values itself (see dockLiquidEffects).
         private val FLAT_SCOPE = VisualizationLiquidScope(saturation = 1f, contrast = 1f)
 
         private val Default = VisualizationLiquidEffects(

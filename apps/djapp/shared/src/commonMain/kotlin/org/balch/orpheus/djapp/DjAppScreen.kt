@@ -400,6 +400,7 @@ fun DjAppScreen(
                 DjAppTvChrome(
                     tvHardware = tvHardware,
                     barGlass = shouldShowTvBarGlass(layout, tvHardware),
+                    vizHidesPanelsWhenIdle = hidesPanelsWhenIdle,
                     focusRegion = focusRegion,
                     vizFeature = vizFeature,
                     pulsarFeature = pulsarFeature,
@@ -754,6 +755,7 @@ private fun DjAppOverlaySheets(
 private fun DjAppTvChrome(
     tvHardware: Boolean,
     barGlass: Boolean,
+    vizHidesPanelsWhenIdle: Boolean,
     focusRegion: TvFocusRegionHolder,
     vizFeature: VizFeature,
     pulsarFeature: PulsarFeature,
@@ -767,10 +769,16 @@ private fun DjAppTvChrome(
     onActiveSheetChange: (DjRoute?) -> Unit,
     stage: @Composable () -> Unit,
 ) {
+    // Re-provided here, above both bars and the stage, so the bars and every docked panel agree.
+    val ambientEffects = LocalLiquidEffects.current
+    val dockEffects = remember(ambientEffects, vizHidesPanelsWhenIdle) {
+        dockLiquidEffects(ambientEffects, vizHidesPanelsWhenIdle)
+    }
     CompositionLocalProvider(
         LocalTvFocusChrome provides true,
         LocalTvFocusRegion provides focusRegion,
         LocalTelevisionHardware provides tvHardware,
+        LocalLiquidEffects provides dockEffects,
     ) {
         // Renders nothing: it owns only the idle-fade coroutine. Kept as its own composable
         // (not inlined here) so recomposing it on every key event never re-invokes the
