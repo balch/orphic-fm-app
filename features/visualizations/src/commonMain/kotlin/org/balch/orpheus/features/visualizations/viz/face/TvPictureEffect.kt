@@ -132,7 +132,7 @@ fun Modifier.tvPictureEffect(glass: Rect, glitch: Float, mono: Float, time: Floa
     // No layer at all while idle: the pass costs nothing between hits and the picture is left
     // bit-for-bit as it was drawn. Belt and braces alongside MorphDirector's own snap-to-zero
     // (MorphDirector.VISIBLE_EPSILON): a decaying glitch must not keep this layer alive forever.
-    if (!isGlitchVisible(amount) || glass.width < 1f || glass.height < 1f || !renderer.isSupported()) {
+    if (!runsPicturePass(amount) || glass.width < 1f || glass.height < 1f || !renderer.isSupported()) {
         return this
     }
     val pass = renderer.effect(glass, amount, mono, time) ?: return this
@@ -159,3 +159,9 @@ internal const val GLITCH_QUANT_STEPS = 64
 
 internal fun quantiseGlitch(glitch: Float): Float =
     round(sanitizedGlitch(glitch) * GLITCH_QUANT_STEPS) / GLITCH_QUANT_STEPS
+
+/**
+ * Whether this frame gets the offscreen layer and its native filter at all. Judged on the
+ * quantised value, the one the shader is handed: the raw tail of a decay rounds to strength 0.
+ */
+internal fun runsPicturePass(amount: Float): Boolean = isGlitchVisible(quantiseGlitch(amount))

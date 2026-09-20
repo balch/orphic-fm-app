@@ -45,6 +45,18 @@ class TvPictureEffectTest {
         assertTrue(isGlitchVisible(1f))
     }
 
+    @Test fun `the pass runs exactly when the shader is handed a strength above zero`() {
+        // A layer whose shader gets strength 0 draws nothing and still costs a layer and a filter.
+        for (i in 0..4096) {
+            val x = i / 4096f
+            assertEquals(
+                quantiseGlitch(x) > 0f, runsPicturePass(x),
+                "glitch $x quantises to ${quantiseGlitch(x)}",
+            )
+        }
+        assertTrue(!runsPicturePass(Float.NaN))
+    }
+
     @Test fun `sanitizedGlitch clamps and rejects non-finite input`() {
         assertEquals(0f, sanitizedGlitch(Float.NaN))
         assertEquals(0f, sanitizedGlitch(Float.NEGATIVE_INFINITY))
