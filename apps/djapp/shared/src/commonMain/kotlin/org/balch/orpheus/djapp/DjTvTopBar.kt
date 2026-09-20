@@ -289,6 +289,8 @@ private fun TvVizPicker(vizFeature: VizFeature, previewFocused: Boolean) {
         },
         color = effects.title.titleColor.readableOnDark(),
         previewFocused = previewFocused,
+        // Locked to the song that owns this visualization: shown, never changeable.
+        locked = state.isVizLocked,
     )
 }
 

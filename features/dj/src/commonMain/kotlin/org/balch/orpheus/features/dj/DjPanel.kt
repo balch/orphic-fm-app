@@ -75,6 +75,8 @@ import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.KeepPanelsAwake
+import org.balch.orpheus.ui.viz.LocalPanelIdleFade
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.BenderFaderWidget
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -908,6 +910,11 @@ private fun SourceDropdown(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val shape = RoundedCornerShape(6.dp)
+
+    // This menu is a Material DropdownMenu rather than the shared EnumDropdown, so it does not
+    // inherit the shared menu's keep-awake: its popup has its own window and would not fade with
+    // the panel, leaving an open menu hanging over nothing after three idle seconds.
+    if (expanded) KeepPanelsAwake(LocalPanelIdleFade.current)
 
     Box(
         modifier = modifier

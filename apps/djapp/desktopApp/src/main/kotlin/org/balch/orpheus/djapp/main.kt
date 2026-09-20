@@ -7,6 +7,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
+import org.balch.orpheus.ui.viz.PanelKeyBridge
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
@@ -18,7 +19,13 @@ fun main() {
 
         val windowState = rememberWindowState(width = 360.dp, height = 780.dp)
 
+        // Compose delivers keys along the focus path, so on a window nobody has clicked yet the
+        // app's own root handler never sees one and no key would bring the faded panels back.
+        // The window hook sees every key regardless of focus, and runs the exact same rule.
+        val panelKeys = remember { PanelKeyBridge() }
+
         Window(
+            onPreviewKeyEvent = { panelKeys.onKeyEvent(it) },
             onCloseRequest = {
                 // Fade out audio before exiting to avoid crackles/pops.
                 // Set volume to 0, let the C++ smoother ramp down (~50ms),
@@ -42,6 +49,7 @@ fun main() {
                         else controller.play()
                     },
                     startAudio = { graph.startDjAudio() },
+                    panelKeys = panelKeys,
                 )
             }
         }

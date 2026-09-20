@@ -5,10 +5,17 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -29,8 +36,14 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.liquefiableVizEffects
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.LocalPanelIdleFade
 import org.balch.orpheus.ui.viz.LocalSignalVizEnabled
 import org.balch.orpheus.ui.viz.LocalSignalVizGlow
+import org.balch.orpheus.ui.viz.LocalVizStage
+import org.balch.orpheus.ui.viz.PanelIdleFade
+import org.balch.orpheus.ui.viz.PanelKeyBridge
+import org.balch.orpheus.ui.viz.VizStage
+import org.balch.orpheus.ui.viz.handlePanelKey
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
@@ -42,6 +55,12 @@ fun DjApp(
      * start audio outside the composition, so each platform passes its own.
      */
     startAudio: suspend () -> Unit,
+    /**
+     * A host window's key hook, if it has one. Desktop needs it: Compose routes keys along the
+     * focus path, so a window nobody has clicked yet never reaches the root observer below and
+     * no key would bring the faded panels back. Android, iOS and wasm leave it null.
+     */
+    panelKeys: PanelKeyBridge? = null,
     updateOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     CompositionLocalProvider(
@@ -102,6 +121,19 @@ fun DjApp(
             // fixed for the graph's lifetime.
             val tabContributions = remember(graph) { graph.djTabContributions.toList() }
 
+            // The stage (where the picture may go) and the panels' idle fade are shared between
+            // the visualization and the screen, so both are owned here, above the two of them.
+            val vizStage = remember { VizStage() }
+            val panelFade = remember { PanelIdleFade() }
+            val hidesPanelsWhenIdle = vizState.selectedViz.hidesPanelsWhenIdle
+
+            // The window hook and the root observer run the same rule, so a key behaves the same
+            // whichever path reaches it first.
+            DisposableEffect(panelKeys, panelFade, hidesPanelsWhenIdle) {
+                panelKeys?.connect { event -> panelFade.handlePanelKey(event, hidesPanelsWhenIdle) }
+                onDispose { panelKeys?.connect(null) }
+            }
+
             OrpheusTheme {
                 CompositionLocalProvider(
                     LocalLiquidState provides liquidState,
@@ -109,9 +141,15 @@ fun DjApp(
                     LocalLiquidEffects provides liquidEffects,
                     LocalSignalVizEnabled provides isSignalMonitor,
                     LocalSignalVizGlow provides (1f - vizState.knob2Value),
+                    LocalVizStage provides vizStage,
+                    LocalPanelIdleFade provides panelFade,
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // Outer liquefiable: source for the dialog lens — must
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .panelActivityObserver(panelFade, hidesPanelsWhenIdle),
+                    ) {
+                        // Outer liquefiable: source for the dialog lens. It must
                         // include both the viz AND the panels so dialogs see
                         // through everything.
                         Box(
@@ -121,7 +159,7 @@ fun DjApp(
                         ) {
                             // VizBackground is the source for the panel lenses
                             // (liquidState). It's a SIBLING of DjAppScreen, not
-                            // a parent — otherwise the panels would be inside
+                            // a parent, because otherwise the panels would be inside
                             // their own source and the glass effect collapses.
                             VizBackground(
                                 modifier = Modifier
@@ -136,6 +174,7 @@ fun DjApp(
                                 onTogglePlayback = onTogglePlayback,
                                 modifier = Modifier.fillMaxSize(),
                                 tabContributions = tabContributions,
+                                hidesPanelsWhenIdle = hidesPanelsWhenIdle,
                             )
                         }
 
@@ -147,3 +186,37 @@ fun DjApp(
         }
     }
 }
+
+/**
+ * Restarts the panels' idle countdown on deliberate input. The pointer observer runs in the
+ * Initial pass and never consumes, so no gesture changes meaning. The key observer defers to
+ * [handlePanelKey], which passes every key on except a confirm key pressed while the panels are
+ * not fully drawn: that one only wakes them, because activating an unseen control is worse than
+ * one press that moves nothing.
+ *
+ * The TV layout has its own key observer (DjAppScreen's LargeScreen branch) running the same
+ * rule; on a television there are no pointer events at all.
+ */
+internal fun Modifier.panelActivityObserver(fade: PanelIdleFade, enabled: Boolean): Modifier =
+    if (!enabled) this else this
+        .pointerInput(fade) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (event.isPanelActivity()) fade.notifyActivity()
+                }
+            }
+        }
+        .onPreviewKeyEvent { event -> fade.handlePanelKey(event) }
+
+/**
+ * What counts as the user doing something: a press, a scroll, and anything at all while a button
+ * or a finger is down, so a knob drag longer than the timeout holds the panels up for its whole
+ * length. Hovering does not count: the pointer crossing the window is not a decision, and the
+ * user asked for the panels to stay away until a click or a key.
+ *
+ * [PointerInputChange.previousPressed] is what catches the release that ends a drag: by then
+ * `pressed` is already false, and the release is the moment the countdown should start from.
+ */
+private fun PointerEvent.isPanelActivity(): Boolean =
+    type == PointerEventType.Scroll || changes.any { it.pressed || it.previousPressed }

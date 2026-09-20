@@ -17,14 +17,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -39,10 +44,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -101,6 +109,15 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.darken
 import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.theme.readableOnDark
+import org.balch.orpheus.ui.viz.KeepPanelsAwake
+import org.balch.orpheus.ui.viz.LocalPanelIdleFade
+import org.balch.orpheus.ui.viz.LocalVizStage
+import org.balch.orpheus.ui.viz.PanelIdleFadeWatcher
+import org.balch.orpheus.ui.viz.PanelWakeOverlay
+import org.balch.orpheus.ui.viz.VizStage
+import org.balch.orpheus.ui.viz.panelIdleFade
+import org.balch.orpheus.ui.viz.vizStage
+import org.balch.orpheus.ui.viz.vizStageChrome
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -113,6 +130,9 @@ fun DjAppScreen(
     onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
     tabContributions: List<DjTabContribution> = emptyList(),
+    // Passed in rather than collected here: DjApp already watches the viz state, and collecting
+    // it again would recompose this whole screen on every viz knob turn.
+    hidesPanelsWhenIdle: Boolean = false,
 ) {
     val djFeature = DjViewModel.feature()
     val pulsarFeature = PulsarViewModel.feature()
@@ -120,13 +140,13 @@ fun DjAppScreen(
     val mixerFeature = MixerViewModel.feature()
     val scope = rememberCoroutineScope()
 
-    // Nav3 back stack — single-level tab switching
+    // Nav3 back stack: single-level tab switching
     val backStack = remember { NavBackStack<DjRoute>(DjTab) }
     val currentRoute = backStack.lastOrNull() ?: DjTab
     val tabs = remember(tabContributions) { mergeTabContributions(djTabs, tabContributions) }
 
     // Single state for "which sheet is open" (a tab-sheet contribution's route, VibeInfoTab, or
-    // null) — one value replacing itself needs no separate "close the other sheet" bookkeeping.
+    // null): one value replacing itself needs no separate "close the other sheet" bookkeeping.
     // rememberSaveable: survives Android rotation so an in-flight AI generation stays visible
     // instead of the sheet closing mid-run while the agent keeps working unseen.
     val sheetRouteSaver = remember(tabs) {
@@ -202,6 +222,11 @@ fun DjAppScreen(
         modifier = modifier
             .fillMaxSize(),
     ) { layout ->
+        val panelFade = LocalPanelIdleFade.current
+        // One expression for the whole feature, read inside the layout box so a window crossing
+        // the dock threshold turns it off in the same composition that picks the new layout.
+        val fadeEnabled = fadesPanelsWhenIdle(layout, hidesPanelsWhenIdle, sheetOpen = activeSheet != null)
+        PanelIdleFadeWatcher(fade = panelFade, enabled = fadeEnabled)
         // The stage is identical in every layout; only the navigation around it differs.
         val stage: @Composable () -> Unit = {
             // One renderer per route, shared by the nav destinations and the TV dock, so a
@@ -423,12 +448,41 @@ fun DjAppScreen(
                 }
             }
         }
+
+        // Last child of the layout box, so it sits over whatever chrome that layout drew, and
+        // gated on the same expression as the fade: the frame that picks the dock is the frame
+        // that stops blocking input.
+        PanelWakeOverlay(fade = panelFade, stage = LocalVizStage.current, enabled = fadeEnabled)
     }
 }
 
-/** The stage for each [DjLayout]; tabletop puts Pulsar above the hinge and everything else below. */
+/**
+ * Whether the panels fade when the user goes quiet.
+ *
+ * The dock layout is out: there the bottom bar's toggles are what show and hide panels, and a
+ * fade would both argue with that and hide controls the user parked there deliberately. An open
+ * sheet lives in its own window and would not fade with the panels' alpha, so it stops the clock
+ * too; dropdown popups do the same through the holder's own modal count (see KeepPanelsAwake).
+ */
+internal fun fadesPanelsWhenIdle(
+    layout: DjLayout,
+    vizOptsIn: Boolean,
+    sheetOpen: Boolean,
+): Boolean = when (layout) {
+    DjLayout.LargeScreen -> false
+    DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop ->
+        vizOptsIn && !sheetOpen
+}
+
+/**
+ * The stage for each [DjLayout]; tabletop puts Pulsar above the hinge and everything else below.
+ *
+ * Internal rather than private so `DjAppMainContentWiringTest` can drive the real thing: the stage
+ * report and the idle fade are per-branch modifiers, and a test on a stand-in layout would pass
+ * with either of them deleted.
+ */
 @Composable
-private fun DjAppMainContent(
+internal fun DjAppMainContent(
     layout: DjLayout,
     dockedPanels: List<DjRoute>,
     pairPanels: List<DjRoute>,
@@ -439,6 +493,11 @@ private fun DjAppMainContent(
     routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit,
     navContent: @Composable (Modifier) -> Unit,
 ) {
+    // The container holding the content panels is both what the picture is sized against and
+    // what the idle fade applies to; the header and the nav are outside it in every layout.
+    val stage = LocalVizStage.current
+    val fade = LocalPanelIdleFade.current
+
     // Below header and Pulsar: the pair when the layout has room, else the nav-selected panel.
     val lowerPanels: @Composable (Modifier) -> Unit = { mod ->
         if (layout.showsPair()) {
@@ -450,10 +509,14 @@ private fun DjAppMainContent(
     when (layout) {
         DjLayout.LargeScreen -> {
             // TV: the visualization owns the screen and panels dock around its edges.
-            // Nothing fills the centre, so the VizBackground sibling reads through.
+            // Nothing fills the centre, so the VizBackground sibling reads through. The dock
+            // already fills exactly the band between the top and bottom bars, so it IS the stage.
             DjPanelDock(
                 panels = dockedPanels,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .vizStage(stage)
+                    .panelIdleFade(fade),
             ) { route, panelModifier ->
                 routePanel(route, panelModifier, true)
             }
@@ -461,13 +524,19 @@ private fun DjAppMainContent(
         DjLayout.Landscape -> {
             // Landscape: Header top, Pulsar left + nav content right. The inset keeps Pulsar's top
             // row clear of flex mode's status bar and is consumed, so the header does not pad twice.
+            //
+            // The header sits INSIDE this Row, so no single node is the stage: the tracker takes
+            // the Row and shaves off a strip as tall as the header. The fade goes on the two
+            // panels separately for the same reason, so it never reaches the header.
+            val landscapeStage = remember(stage) { LandscapeStageTracker(stage) }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(platformSafeAreaInsets().only(WindowInsetsSides.Top)),
+                    .windowInsetsPadding(platformSafeAreaInsets().only(WindowInsetsSides.Top))
+                    .onGloballyPositioned { landscapeStage.onContent(it.boundsInRoot()) },
             ) {
                 PulsarPanel(
-                    modifier = Modifier.weight(.5f).fillMaxHeight(),
+                    modifier = Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade),
                     pulsar = pulsarFeature,
                     vizFlow = synthEngine.pulsarVizFlow,
                     trackVizFlows = synthEngine.pulsarTrackVizFlows,
@@ -484,11 +553,13 @@ private fun DjAppMainContent(
                     DjAppHeaderRow(
                         vizFeature = vizFeature,
                         onInfoClick = onShowVibeInfo,
+                        // Reported first in the chain, so the rect covers the padding too.
                         modifier = Modifier
+                            .onGloballyPositioned { landscapeStage.onHeader(it.boundsInRoot()) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalPadding = 0.dp,
                     )
-                    navContent(Modifier)
+                    navContent(Modifier.panelIdleFade(fade))
                 }
             }
         }
@@ -505,41 +576,60 @@ private fun DjAppMainContent(
                     // no top inset, which would leave the viz picker under the lens.
                     insetSides = WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
                 )
-                // The slot's height comes from its weight, not its content, so reading it back
-                // (previous frame, as DjLayoutBox does) cannot feed a layout loop.
-                var pulsarSlotPx by remember { mutableIntStateOf(0) }
-                val density = LocalDensity.current
-                val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
-                    pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
-                }
-                PulsarPanel(
-                    pulsar = pulsarFeature,
-                    vizFlow = synthEngine.pulsarVizFlow,
-                    trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                // The panels' own container, so the picture knows where they are and the fade
+                // reaches them alone. weight(1f) takes exactly what the header leaves, and the
+                // .6/.4 split inside it is the same split as before.
+                Column(
                     modifier = Modifier
-                        .weight(.6f)
+                        .weight(1f)
                         .fillMaxWidth()
-                        .onSizeChanged { pulsarSlotPx = it.height },
-                    isExpanded = true,
-                    onExpandedChange = {},
-                    showCollapsedHeader = false,
-                    showExpandedTitle = false,
-                    gridHeight = gridHeight,
-                )
-                lowerPanels(Modifier.weight(.4f).fillMaxWidth())
+                        .vizStage(stage)
+                        .panelIdleFade(fade),
+                ) {
+                    // The slot's height comes from its weight, not its content, so reading it back
+                    // (previous frame, as DjLayoutBox does) cannot feed a layout loop.
+                    var pulsarSlotPx by remember { mutableIntStateOf(0) }
+                    val density = LocalDensity.current
+                    val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
+                        pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
+                    }
+                    PulsarPanel(
+                        pulsar = pulsarFeature,
+                        vizFlow = synthEngine.pulsarVizFlow,
+                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                        modifier = Modifier
+                            .weight(.6f)
+                            .fillMaxWidth()
+                            .onSizeChanged { pulsarSlotPx = it.height },
+                        isExpanded = true,
+                        onExpandedChange = {},
+                        showCollapsedHeader = false,
+                        showExpandedTitle = false,
+                        gridHeight = gridHeight,
+                    )
+                    lowerPanels(Modifier.weight(.4f).fillMaxWidth())
+                }
             }
         }
         is DjLayout.Tabletop -> {
             // Pulsar alone fills the upright half. The header's title and viz picker are touch
             // controls, so they sit on the flat half with the panels (render sweep: no room above).
+            //
+            // Its header is the one that sits INSIDE the reported stage, between the two halves,
+            // so it is reported separately and the wake overlay leaves it live. Cleared on the way
+            // out, or the next layout would keep a hole where this header used to be.
+            DisposableEffect(stage) { onDispose { stage?.reportChromeBand(null) } }
             DjTabletopLayout(
                 hinge = layout.hinge,
+                // The whole folded region is the stage: the hinge splits the panels, not the
+                // picture, and the set is happier spanning it than squeezed into one half.
+                modifier = Modifier.vizStage(stage),
                 top = { mod ->
                     PulsarPanel(
                         pulsar = pulsarFeature,
                         vizFlow = synthEngine.pulsarVizFlow,
                         trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                        modifier = mod,
+                        modifier = mod.panelIdleFade(fade),
                         isExpanded = true,
                         onExpandedChange = {},
                         showCollapsedHeader = false,
@@ -551,15 +641,42 @@ private fun DjAppMainContent(
                         DjAppHeaderRow(
                             vizFeature = vizFeature,
                             onInfoClick = onShowVibeInfo,
+                            // Reported first in the chain, so the live band covers the padding too.
                             modifier = Modifier
+                                .vizStageChrome(stage)
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         )
-                        lowerPanels(Modifier.weight(1f).fillMaxWidth())
+                        lowerPanels(Modifier.weight(1f).fillMaxWidth().panelIdleFade(fade))
                     }
                 },
             )
         }
+    }
+}
+
+/**
+ * Collects the landscape stage from two nodes: the content Row, and the header drawn inside it
+ * whose height comes off the top. Plain fields rather than state: both callbacks run in the same
+ * layout pass, so whichever fires second has both rects and reports the right one.
+ */
+internal class LandscapeStageTracker(private val stage: VizStage?) {
+    private var content: Rect? = null
+    private var headerBottom = 0f
+
+    fun onContent(rect: Rect) {
+        content = rect
+        push()
+    }
+
+    fun onHeader(rect: Rect) {
+        headerBottom = rect.bottom
+        push()
+    }
+
+    private fun push() {
+        val c = content ?: return
+        stage?.report(Rect(c.left, maxOf(c.top, headerBottom), c.right, c.bottom))
     }
 }
 
@@ -586,7 +703,7 @@ private fun PortraitPanelPair(
 }
 
 /**
- * Modal overlays layered on top of the main content: the Vibe Info sheet (phone/tablet only —
+ * Modal overlays layered on top of the main content: the Vibe Info sheet (phone and tablet only,
  * TV docks it as a panel instead) and any tab contributions that open as sheets (e.g. AI).
  */
 @Composable
@@ -605,7 +722,7 @@ private fun DjAppOverlaySheets(
         DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop -> true
     }
     // VibeInfo is title-triggered, not a tab contribution, so it keeps its dedicated
-    // composable — but shares the single activeSheet state.
+    // composable, but shares the single activeSheet state.
     if (activeSheet == VibeInfoTab && vibeInfoIsSheet) {
         VibeInfoSheet(
             pulsar = pulsarFeature,
@@ -615,7 +732,7 @@ private fun DjAppOverlaySheets(
     }
 
     // Contributions stay composed while closed (isOpen tracks activeSheet) so they can
-    // cancel in-flight work on close — see DjTabContribution.Content's kdoc.
+    // cancel in-flight work on close. See DjTabContribution.Content's kdoc.
     tabContributions.forEach { contribution ->
         if (contribution.route.opensAsSheet) {
             contribution.Content(
@@ -630,7 +747,7 @@ private fun DjAppOverlaySheets(
 
 /**
  * TV layout: top bar (global actions) + bottom bar (panel toggles) around the stage. Provides
- * the TV compositionLocals shared widgets and docked panels read — see each local's own kdoc
+ * the TV compositionLocals shared widgets and docked panels read. See each local's own kdoc
  * (LocalTvFocusChrome, LocalTvFocusRegion, LocalTelevisionHardware) for what it gates.
  */
 @Composable
@@ -655,22 +772,31 @@ private fun DjAppTvChrome(
         LocalTvFocusRegion provides focusRegion,
         LocalTelevisionHardware provides tvHardware,
     ) {
-        // Renders nothing — owns only the idle-fade coroutine. Kept as its own composable
+        // Renders nothing: it owns only the idle-fade coroutine. Kept as its own composable
         // (not inlined here) so recomposing it on every key event never re-invokes the
         // Column below, let alone Pulsar or any docked panel.
         TvFocusIdleWatcher(focusRegion)
 
+        val panelFade = LocalPanelIdleFade.current
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                // Tunnels through here before reaching whatever's focused — this ONLY
+                // Tunnels through here before reaching whatever's focused. This ONLY
                 // timestamps activity and always returns false, so it never consumes the
                 // event or otherwise changes behavior. Confirmed safe: nothing else in
                 // this tree uses onPreviewKeyEvent, and every D-pad adjust-mode handler
                 // (RotaryKnob, SegmentedAlgoKnob, BenderFaderWidget) uses onKeyEvent,
                 // which fires during the later bubbling phase exactly as before.
+                //
+                // The dock never fades (see fadesPanelsWhenIdle), so nothing here is ever
+                // swallowed: this always returns false. The fade is still told about the press,
+                // which only matters for a desktop window later resized below the dock threshold,
+                // so it does not arrive with a stale quiet clock and fade out at once.
                 .onPreviewKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown) focusRegion.notifyActivity()
+                    if (event.type == KeyEventType.KeyDown) {
+                        focusRegion.notifyActivity()
+                        panelFade?.notifyActivity()
+                    }
                     false
                 },
         ) {
@@ -694,7 +820,7 @@ private fun DjAppTvChrome(
             DjTvBottomBar(
                 // Sheet-only tab contributions (e.g. AI) have no dock slot of their own;
                 // appending them here is their only entry point on this layout. Branch on
-                // dockablePanels membership, NOT route.opensAsSheet — VibeInfoTab also has
+                // dockablePanels membership, NOT route.opensAsSheet: VibeInfoTab also has
                 // opensAsSheet=true (it governs only the phone/tablet path per its own
                 // kdoc) but IS in dockablePanels, so it must keep toggling the dock, not
                 // activeSheet.
@@ -730,13 +856,13 @@ private fun DjAppTvChrome(
 /**
  * Owns the TV region-focus idle-fade lifecycle for [holder]: one coroutine, restarted every time
  * [TvFocusRegionHolder.activityTick] changes (bumped by the TV layout root's onPreviewKeyEvent
- * above) — not a per-frame clock. This composable renders nothing and reads nothing else, so
+ * above), not a per-frame clock. This composable renders nothing and reads nothing else, so
  * recomposing it once per key event never re-invokes the Column, the stage, or any docked panel;
  * [TvFocusRegionHolder.alpha] is read back exclusively inside tvFocusRegionBorder's draw phase, so
  * the fade animation itself never recomposes anything either.
  *
  * snapTo(1f) on every restart, rather than animating back in, is deliberate: getting the border
- * back is more important than how it returns — a user pressing a direction must never wonder
+ * back is more important than how it returns: a user pressing a direction must never wonder
  * where focus went. Only the fade OUT after [TvFocusIdleTimeoutMs] of silence animates, over
  * [TvFocusFadeOutMs].
  */
@@ -762,7 +888,7 @@ internal fun DjAppHeaderRow(
 
     Row(
         // Clears the Dynamic Island (status bar hidden, but the Island still reserves top safe
-        // area) — resolves to zero on Android/desktop, so edge-to-edge stays unchanged there.
+        // area). Resolves to zero on Android and desktop, so edge-to-edge stays unchanged there.
         // VizBackground behind this still fills the cutout; only this foreground chrome is inset.
         modifier = modifier
             .windowInsetsPadding(platformSafeAreaInsets().only(insetSides))
@@ -778,7 +904,7 @@ internal fun DjAppHeaderRow(
             ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The title itself is the Vibe Info trigger (raised, tappable) — no separate Info button.
+            // The title itself is the Vibe Info trigger (raised, tappable): no separate Info button.
             AppTitleTreatment(
                 title = "Orphic DJ",
                 modifier = Modifier.height(32.dp),
@@ -809,8 +935,13 @@ internal fun VizDropdown(
     val vizName by remember { derivedStateOf { fullState.selectedViz.name } }
     val isRandom by remember { derivedStateOf { fullState.isRandomVizMode } }
     val visualizations by remember { derivedStateOf { fullState.visualizations } }
+    // Locked to the song that owns this visualization: the name still shows, nothing opens.
+    val isLocked by remember { derivedStateOf { fullState.isVizLocked } }
     val vizActions = vizFeature.actions
     var expanded by remember { mutableStateOf(false) }
+
+    // A popup does not fade with the panels, so while one is open they stay up.
+    if (expanded && !isLocked) KeepPanelsAwake(LocalPanelIdleFade.current)
 
     Box(modifier = modifier) {
         Box(
@@ -831,7 +962,7 @@ internal fun VizDropdown(
                     }
                 )
                 .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                .clickable { expanded = true }
+                .clickable(enabled = !isLocked) { expanded = true }
                 .padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -839,24 +970,35 @@ internal fun VizDropdown(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Same greyed name plus lock glyph, minus the caret, that VizPanel shows.
+                if (isLocked) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Locked to song",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(12.dp),
+                    )
+                }
                 Text(
                     text = "Viz: " + when {
                         isRandom -> "Random"
                         else -> vizName
                     },
                     style = textStyle,
-                    color = effects.title.titleColor.readableOnDark(),
+                    color = if (isLocked) Color.Gray else effects.title.titleColor.readableOnDark(),
                     maxLines = 1
                 )
-                Text(
-                    text = if (expanded) " ▲" else " ▼",
-                    style = textStyle,
-                    color = effects.title.titleColor.readableOnDark(),
-                )
+                if (!isLocked) {
+                    Text(
+                        text = if (expanded) " ▲" else " ▼",
+                        style = textStyle,
+                        color = effects.title.titleColor.readableOnDark(),
+                    )
+                }
             }
         }
         DropdownMenu(
-            expanded = expanded,
+            expanded = expanded && !isLocked,
             onDismissRequest = { expanded = false },
             modifier = Modifier.background(OrpheusColors.panelSurface),
         ) {
@@ -900,7 +1042,7 @@ private val emptyPulsarVizFlow = MutableStateFlow(PulsarVizData())
 private val emptyTrackVizFlows = List(8) { MutableStateFlow(FloatArray(0)) }
 
 /**
- * Previewable layout — portrait (Pulsar top, content bottom) or
+ * Previewable layout: portrait (Pulsar top, content bottom) or
  * landscape (Pulsar left, content right).
  */
 @Composable
