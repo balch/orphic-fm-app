@@ -179,19 +179,37 @@ worry — for an offline music app most answers are short.
 
 ### 6.4 Content ratings (IARC questionnaire)
 
-Click **Start questionnaire**. For a music-generation app:
+**As of v2.2.0, do NOT answer "No to all" — re-run this questionnaire, it's gone stale.**
+The "Stay Asleep" vibe added its own visualization (`FaceMorphViz`, `features/visualizations`):
+a photorealistic human face that morphs into a decaying/skull-like visage — sunken black eyes,
+exposed bone structure, bared teeth — periodically flashed **full-screen** on kick hits, staged
+as an old-TV broadcast with dystopian "OBEY" / "STAY ASLEEP" ticker text. Rendered and reviewed
+directly (`./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderHarness*'`,
+output in `features/visualizations/build/face-morph-render/`) — this is genuinely unsettling
+imagery, not a stylized or abstract effect, and it is answered honestly here rather than toned
+down. See [[project_face_morph_viz]].
+
+Click **Start questionnaire**:
 
 - Email: `orphic.fm.apps@gmail.com`
 - Category: `Music` *(generative-music tool — cleanest fit; the older docs
   suggested `Reference, news, or educational` but `Music` matches Play's
   primary category and avoids a re-questionnaire down the road)*
-- Violence / sexual content / language / drugs / gambling: **No** to all
+- Violence / scary or intense themes: describe the above (human-to-skull morph, full-screen
+  jump-style flashes) truthfully wherever the questionnaire asks about frightening/horror
+  content — do **not** answer "No" here anymore.
+- Sexual content / language / drugs / gambling: **No** to all (unaffected — nothing else in the
+  catalog touches these; see the vibe-catalog review below)
 - User-generated content: **No** *(users don't share content from the app)*
 - Personal info collection: **No** *(no telemetry, no accounts)*
 - Location collection: **No**
 - Digital purchases / IAPs: **No**
 
-Submit. You'll get a rating instantly (likely "Everyone" / PEGI 3 / ESRB E).
+Submit. Expect a rating **above** Everyone / PEGI 3 this time — plausibly a "Teen"-equivalent /
+PEGI 7-12 band depending on how Play's live questionnaire weighs a single mild-horror visual
+element. This is consistent with, not a change to, the existing **target audience 13+ / "appeals
+to children: No"** answer in §6.5 below — that was already deliberately not-for-young-children
+before this existed.
 
 ### 6.5 Target audience and content
 

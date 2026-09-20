@@ -83,7 +83,7 @@ confirm each in the Console before promoting to production:
 | **EU DSA trader-status declaration** | ⚠️ Confirm in Console | Since Feb 2025, every developer distributing to EU users must declare trader / non-trader status and verify developer identity. Apps without it are removed from EU. Set under Play Console → account-level settings. |
 | **Privacy policy URL live** | ✅ Verified | `https://orphic.fm/dj/privacy/` returns 200, public, accurately states no data collection (checked 2026-06-14). |
 | **Target API level** | ✅ Verified | `targetSdk = 37` (latest), `minSdk = 26` — within Google's "target within one year of latest release" rule. |
-| **Content rating (IARC)** | ⚠️ Confirm in Console | Music category, "No" to all sensitive-content questions → expect Everyone / PEGI 3. See `play-console-setup.md` §6.4. |
+| **Content rating (IARC)** | ⚠️ **Re-run for v2.2.0** | Stale: the "No to all" answer predates the Stay Asleep viz (human-to-skull morph, flashed full-screen on kicks). Must be re-submitted answering the fear/horror question honestly — expect above Everyone / PEGI 3. See `play-console-setup.md` §6.4. |
 | **Foreground-service declaration** | ⚠️ Confirm in Console | `FOREGROUND_SERVICE_MEDIA_PLAYBACK` requires a use-case justification on the Foreground services form. Copy is in `play-console-setup.md` §7. |
 
 ---
