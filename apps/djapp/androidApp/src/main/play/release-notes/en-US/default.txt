@@ -1,6 +1,6 @@
-A new vibe to fall asleep to, plus layouts for every screen.
+A new vibe and visualization paying homage to a classic, plus fold support.
 
-• Stay Asleep: a new vibe and visualization paying homage to a television classic.
+• Stay Asleep: a new vibe and visualization showing off all-new sound and visual effects.
 • Duo Panel lays two panels side by side on tablets and Android foldables.
 • Whole-song progress now shows on your lock screen and media notification.
 • New street sounds: sirens, footsteps, passing trains, and spoken phrases.
