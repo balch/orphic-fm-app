@@ -340,7 +340,7 @@ class StayAsleepVibe : VibeProvider {
     override val vibe: Vibe by lazy {
         Vibe(
             name = name,
-            album = Album.RIF,
+            album = Album.ANOMALIES,
             bpm = 80f,
             arrangement = Arrangement(
                 introIndex = 0,

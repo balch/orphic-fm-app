@@ -29,7 +29,7 @@ import kotlin.time.TimeSource
  * directly by DJApp; wrapped by OrpheusMetadataProducer in Orpheus.
  *
  * [artworkPngFlow] emits PNG album art per vibe: STEALTH renders procedurally via
- * [AlbumArtRenderer], RIF/ZERO_TO_ONE decode a static WebP and re-encode as PNG (older macOS
+ * [AlbumArtRenderer], RIF/ZERO_TO_ONE/ANOMALIES decode a static WebP and re-encode as PNG (older macOS
  * NSImage won't decode WebP).
  *
  * Art is cached per vibe name and the *same* ByteArray instance must be returned on a hit.
@@ -83,6 +83,7 @@ class PulsarMetadataProducer(
                     AlbumArtRenderer.render(seed = vibe.name.hashCode().toLong()).toPngBytes()
                 Album.RIF -> loadStaticArt("drawable/album_art_rif.webp")
                 Album.ZERO_TO_ONE -> loadStaticArt("drawable/album_art_021.webp")
+                Album.ANOMALIES -> loadStaticArt("drawable/album_art_anomalies.webp")
             }
         } catch (t: Throwable) {
             log.warn(t) { "Album art render failed for ${vibe.name}; emitting null artwork" }

@@ -429,7 +429,7 @@ class RustBeltVibe : VibeProvider {
     override val vibe: Vibe by lazy {
         Vibe(
             name = name,
-            album = Album.RIF,
+            album = Album.ANOMALIES,
             bpm = 87f,
             arrangement = Arrangement(
                 introIndex = 0,

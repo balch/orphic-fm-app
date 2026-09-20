@@ -17,6 +17,7 @@ enum class Album(val title: String) {
     STEALTH("Stealth"),
     RIF("RIF"),
     ZERO_TO_ONE("0-2-1"),
+    ANOMALIES("Anomalies"),
 }
 
 enum class RootNote(val noteIndex: Int) {

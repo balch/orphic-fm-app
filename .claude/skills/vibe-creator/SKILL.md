@@ -79,7 +79,7 @@ All of this is in the `models/` package (one file per type — see "Where vibes 
 | Field | Purpose | Decision rule |
 |---|---|---|
 | `name` | Vibe picker label | Short, evocative, **no trademarks**. Must equal `vibe.name`. |
-| `album` | Picker grouping | Optional, default `Album.STEALTH` (also `RIF`, `ZERO_TO_ONE`). |
+| `album` | Picker grouping | Optional, default `Album.STEALTH` (also `RIF`, `ZERO_TO_ONE`, `ANOMALIES`). |
 | `bpm` | Tempo | Match the reference's BPM (use a tap-tempo app if unsure). |
 | `envelopeType` | `AD` / `TIDES` / `BLEND` | `AD` for tight/EDM/techno, `TIDES` for ambient/drone/pad-heavy, `BLEND` for anything that spans a dynamic range. |
 | `rootNote` | Musical root | Use enharmonic equivalents where needed (`RootNote.G_SHARP` == Ab). |
@@ -597,7 +597,7 @@ class MyNewVibe : VibeProvider {
     override val vibe: Vibe by lazy {
         Vibe(
             name = name,
-            // album = Album.STEALTH,         // optional; default STEALTH (also RIF / ZERO_TO_ONE)
+            // album = Album.STEALTH,         // optional; default STEALTH (also RIF / ZERO_TO_ONE / ANOMALIES)
             bpm = 120f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.A,

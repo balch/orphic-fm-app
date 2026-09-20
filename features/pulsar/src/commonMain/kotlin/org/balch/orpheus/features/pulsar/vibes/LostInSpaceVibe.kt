@@ -58,7 +58,7 @@ public class LostInSpaceVibe : VibeProvider {
   override val vibe: Vibe by lazy {
     Vibe(
       name = "Lost In Space",
-      album = Album.STEALTH,
+      album = Album.ANOMALIES,
       tracks = listOf(
         TrackVoice(
           engineEdm = OrpheusEngine(
