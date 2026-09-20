@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -62,6 +63,8 @@ import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
+import org.balch.orpheus.ui.viz.KeepPanelsAwake
+import org.balch.orpheus.ui.viz.LocalPanelIdleFade
 
 // Metrics lifted from Material3's own Menu.kt so the lazy menu is visually indistinguishable
 // from the DropdownMenu it replaces. Only the *layout strategy* changed, not the look.
@@ -261,12 +264,14 @@ fun <T> EnumDropdown(
  * Not gated behind [org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome]: this composable is
  * TV-exclusive by construction (only the DJ app's TV top bar calls it), so the raised-on-focus
  * treatment is always appropriate here, unlike shared widgets such as `RotaryKnobDial`. Idle
- * state uses [org.balch.orpheus.ui.infrastructure.orpheusRaisedPlate] — the same opaque plate the
- * app title wears — so every element in the top bar reads as one family at idle; only the
+ * state uses [org.balch.orpheus.ui.infrastructure.orpheusRaisedPlate], the same opaque plate the
+ * app title wears, so every element in the top bar reads as one family at idle; only the
  * focused element's accent-tinted [raisedAccentSurface] shows which one holds the D-pad cursor.
  *
- * @param previewFocused preview/render-harness seam only — forces the focused visual without a
+ * @param previewFocused preview/render-harness seam only: forces the focused visual without a
  *   real D-pad. Every production call site leaves this false.
+ * @param locked shows the current value but never opens. The click target goes with it, which is
+ *   also what takes the control out of the D-pad's focus order rather than leaving a dead stop.
  */
 @Composable
 fun <T> TvInlinePicker(
@@ -280,13 +285,16 @@ fun <T> TvInlinePicker(
     menuWidth: Dp = 220.dp,
     menuMaxHeight: Dp = 400.dp,
     previewFocused: Boolean = false,
+    locked: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val liveFocused by interactionSource.collectIsFocusedAsState()
-    val isFocused = previewFocused || liveFocused
+    val isFocused = !locked && (previewFocused || liveFocused)
     val shape = RoundedCornerShape(8.dp)
     val effects = LocalLiquidEffects.current
+    // Greyed name plus a lock glyph, matching how VizPanel's own dropdown reads when frozen.
+    val valueColor = if (locked) Color.Gray else color
 
     val selectedIndex = remember(entries, selectedDisplay) {
         entries.indexOfFirst { displayName(it) == selectedDisplay }
@@ -308,6 +316,7 @@ fun <T> TvInlinePicker(
                     }
                 )
                 .clickable(
+                    enabled = !locked,
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
                     onClick = { expanded = true },
@@ -318,28 +327,28 @@ fun <T> TvInlinePicker(
         ) {
             Text(
                 text = "$label: ",
-                color = color.lighten(),
+                color = if (locked) Color.Gray else color.lighten(),
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp,
                 maxLines = 1,
             )
             Text(
                 text = selectedDisplay,
-                color = color,
+                color = valueColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = 19.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Icon(
-                imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = "Select $label",
-                tint = color,
+                imageVector = if (locked) Icons.Default.Lock else Icons.Default.ArrowDropDown,
+                contentDescription = if (locked) "$label locked to song" else "Select $label",
+                tint = valueColor,
                 modifier = Modifier.size(24.dp),
             )
         }
 
-        if (expanded) {
+        if (expanded && !locked) {
             EnumDropdownMenu(
                 entries = entries,
                 displayName = displayName,
@@ -368,6 +377,12 @@ private fun <T> EnumDropdownMenu(
     onSelected: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    // Every menu this app opens from a panel comes through here, so the keep-awake lives here
+    // rather than at each call site: a popup renders in its own window and would not fade with
+    // the panel's alpha, leaving a menu hanging over nothing. Null local (the Orpheus app,
+    // previews, render harnesses) is a no-op.
+    KeepPanelsAwake(LocalPanelIdleFade.current)
+
     val listState = rememberLazyListState()
     val selectedItemFocusRequester = remember { FocusRequester() }
     val gapPx = with(LocalDensity.current) { MenuAnchorGap.roundToPx() }
@@ -432,7 +447,7 @@ private fun <T> EnumDropdownMenu(
                         ) {
                             // Selection (current value) is the accent-colored label, unchanged
                             // from the old DropdownMenuItem. Focus (the D-pad cursor) is the
-                            // separate background wash above — the two can differ while browsing.
+                            // separate background wash above, and the two can differ while browsing.
                             Text(
                                 text = displayName(entry),
                                 style = MaterialTheme.typography.labelLarge,
@@ -558,7 +573,7 @@ private fun TvInlinePickerFocusedPreview() {
 
 /**
  * Idle plate under a non-default visualization palette (a stand-in orange/earthy palette, not
- * tied to any real viz file) — proves the picker's idle bevel/fill follow [LocalLiquidEffects]
+ * tied to any real viz file). Proves the picker's idle bevel/fill follow [LocalLiquidEffects]
  * instead of the old fixed cosmicPurple/neonCyan, while the VIBE picker's own text/icon color
  * deliberately stays put (see [org.balch.orpheus.djapp.DjTvTopBar]'s TvVizPicker doc for why).
  */

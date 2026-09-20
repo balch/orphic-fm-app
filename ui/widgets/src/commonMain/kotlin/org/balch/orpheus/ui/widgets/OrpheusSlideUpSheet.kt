@@ -21,13 +21,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.KeepPanelsAwake
+import org.balch.orpheus.ui.viz.LocalPanelIdleFade
 
 /**
  * Reusable bottom-sheet host for Orpheus slide-up panels. Wraps [ModalBottomSheet]
  * with the project's deep-purple surface, [CosmicDragHandle], and an optional
  * inactivity auto-dismiss timer.
  *
- * @param onDismiss Called when the sheet should close — either by user drag or
+ * @param onDismiss Called when the sheet should close, either by user drag or
  *   by the inactivity timer firing.
  * @param modifier Applied to the [ModalBottomSheet] container.
  * @param inactivityTimeoutMs If non-null, the sheet auto-dismisses after this
@@ -37,7 +39,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
  *   timer.
  * @param dragHandle Composable rendered as the sheet's drag handle. Defaults to
  *   [CosmicDragHandle].
- * @param content The sheet body. Receives a `kick` lambda — call it on every
+ * @param content The sheet body. Receives a `kick` lambda: call it on every
  *   user interaction to restart the inactivity timer.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +70,9 @@ fun OrpheusSlideUpSheet(
         }
     }
     val kick: () -> Unit = remember { { interactionTick++ } }
+    // A sheet has its own window, so it would not fade with the panel that opened it: without
+    // this the panel underneath goes after three seconds and the sheet hangs over nothing.
+    KeepPanelsAwake(LocalPanelIdleFade.current)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,

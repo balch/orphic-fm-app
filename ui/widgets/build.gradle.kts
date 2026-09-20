@@ -51,6 +51,8 @@ kotlin {
             // skiko natives a headless scene needs, as the app modules' jvmMain already does.
             implementation(libs.compose.ui.test)
             implementation(compose.desktop.currentOs)
+            // runTest's virtual clock: the panel idle fade is three seconds of waiting.
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
