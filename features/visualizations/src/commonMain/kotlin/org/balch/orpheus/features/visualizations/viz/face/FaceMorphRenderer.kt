@@ -36,20 +36,22 @@ expect class FaceMorphRenderer() {
     fun dispose()
 }
 
+/** [inputs] is read while drawing, so a new frame redraws the face without recomposing it. */
 @Composable
-expect fun FaceMorphCanvas(modifier: Modifier, inputs: FaceMorphInputs)
+expect fun FaceMorphCanvas(modifier: Modifier, inputs: () -> FaceMorphInputs)
 
 /**
  * No shader: a plain crossfade, fit (not cropped) and zoomed to match the shader path. Ghosts
  * mid-blend, which the shader exists to avoid.
  */
 @Composable
-internal fun FaceMorphFallback(modifier: Modifier, inputs: FaceMorphInputs) {
+internal fun FaceMorphFallback(modifier: Modifier, inputs: () -> FaceMorphInputs) {
     // The shader's grey has no equivalent here, so desaturate the images instead; without this
     // the fallback would keep showing colour while the rest of the broadcast has gone mono.
     val grey = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
-    val filter = if (inputs.mono > 0.5f) grey else null
     Canvas(modifier.fillMaxSize()) {
+        val inputs = inputs()
+        val filter = if (inputs.mono > 0.5f) grey else null
         // Fill first so the letterboxed area away from the zoomed image is dark, not transparent.
         drawRect(Color(0xFF0B0D0E))
         val scale = min(size.width / inputs.faceA.width, size.height / inputs.faceA.height) * FACE_ZOOM

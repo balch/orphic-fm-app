@@ -149,10 +149,11 @@ internal fun TvLayout.glassPath(): Path = Path().apply {
 }
 
 /**
- * Everything about the set that depends only on the layout and the glow colour: paths, brushes
- * and the grain and grille tables. Built once per layout so no frame allocates them.
+ * Everything about the set that depends only on the layout: paths, brushes and the grain and
+ * grille tables. Built once per layout so no frame allocates them. Both glows live here because
+ * a kick can flip colour and mono at 3 Hz, and a rebuild per flip would redo the scanline path.
  */
-internal class TvSetArt(val layout: TvLayout, window: Size, glowColour: Color) {
+internal class TvSetArt(val layout: TvLayout, window: Size, glowColour: Color, glowMono: Color) {
     private val ch = layout.cabinet.height
     private val cabinet = layout.cabinet
     private val screen = layout.screen
@@ -166,11 +167,14 @@ internal class TvSetArt(val layout: TvLayout, window: Size, glowColour: Color) {
     val cabinetRadius = CornerRadius(ch * 0.07f)
     val glassRadius = CornerRadius(screen.height * GLASS_CORNER)
 
-    val glow: Brush = Brush.radialGradient(
-        colors = listOf(glowColour, Color.Transparent),
-        center = screen.center,
-        radius = (maxOf(window.width, window.height) * 0.78f).coerceAtLeast(1f),
-    )
+    private val glowRadius = (maxOf(window.width, window.height) * 0.78f).coerceAtLeast(1f)
+    private val glowColourBrush: Brush =
+        Brush.radialGradient(listOf(glowColour, Color.Transparent), screen.center, glowRadius)
+    private val glowMonoBrush: Brush =
+        Brush.radialGradient(listOf(glowMono, Color.Transparent), screen.center, glowRadius)
+    fun glow(mono: Boolean): Brush = if (mono) glowMonoBrush else glowColourBrush
+
+    val bezelStroke = Stroke(width = ch * 0.012f)
     val cabinetBrush: Brush =
         Brush.verticalGradient(listOf(WalnutLight, WalnutDark), cabinet.top, cabinet.bottom)
     val bezelBrush: Brush =
@@ -205,6 +209,8 @@ internal class TvSetArt(val layout: TvLayout, window: Size, glowColour: Color) {
     val dialDiameter: Float = minOf(layout.controls.width * 0.74f, layout.controls.height * 0.19f)
     val dialTop: Offset = Offset(layout.controls.center.x, layout.controls.top + dialDiameter * 0.85f)
     val dialBottom: Offset = Offset(dialTop.x, dialTop.y + dialDiameter * 1.45f)
+    val dialTopBrush: Brush = dialBrush(dialTop, dialDiameter / 2f)
+    val dialBottomBrush: Brush = dialBrush(dialBottom, dialDiameter / 2f)
     val grille: List<Rect>
     val grillePitch: Float
     val lamp: Offset = Offset(layout.controls.center.x, layout.controls.bottom - dialDiameter * 0.28f)
@@ -281,22 +287,28 @@ internal class TvSetArt(val layout: TvLayout, window: Size, glowColour: Color) {
     }
 }
 
+private fun dialBrush(center: Offset, r: Float): Brush = Brush.linearGradient(
+    listOf(Chrome, Color(0xFF6A6259)),
+    start = Offset(center.x - r, center.y - r),
+    end = Offset(center.x + r, center.y + r),
+)
+
 @Composable
-internal fun rememberTvSetArt(layout: TvLayout, window: Size, glow: Color): TvSetArt =
-    remember(layout, window, glow) { TvSetArt(layout, window, glow) }
+internal fun rememberTvSetArt(layout: TvLayout, window: Size, glow: Color, glowMono: Color): TvSetArt =
+    remember(layout, window, glow, glowMono) { TvSetArt(layout, window, glow, glowMono) }
 
 /**
  * Everything around the picture: room glow, cabinet, controls and antenna. The glass overlay is
  * [drawGlassOverlay], which has to run after the picture instead of here.
  */
-internal fun DrawScope.drawTvSet(art: TvSetArt, level: Float, time: Float) {
+internal fun DrawScope.drawTvSet(art: TvSetArt, mono: Boolean, level: Float, time: Float) {
     val ch = art.layout.cabinet.height
     if (ch <= 1f) return
     val lit = if (level.isFinite()) level.coerceIn(0f, 1f) else 0f
     val clock = if (time.isFinite()) time else 0f
 
     // The only thing painted over the whole window; the host's void has to stay visible.
-    drawRect(art.glow, alpha = 0.10f + 0.12f * lit)
+    drawRect(art.glow(mono), alpha = 0.10f + 0.12f * lit)
 
     val c = art.layout.cabinet
     drawOval(
@@ -304,7 +316,10 @@ internal fun DrawScope.drawTvSet(art: TvSetArt, level: Float, time: Float) {
         topLeft = Offset(c.left - ch * 0.08f, c.bottom - ch * 0.02f),
         size = Size(c.width + ch * 0.16f, ch * 0.16f),
     )
-    art.feet.forEach { drawRoundRect(WalnutDark, it.topLeft, it.size, art.footRadius) }
+    for (i in art.feet.indices) {
+        val foot = art.feet[i]
+        drawRoundRect(WalnutDark, foot.topLeft, foot.size, art.footRadius)
+    }
     drawCabinet(art, ch)
     drawControls(art, ch, lit)
     drawRabbitEars(art, ch, lit, clock)
@@ -335,7 +350,7 @@ private fun DrawScope.drawCabinet(art: TvSetArt, ch: Float) {
     drawRoundRect(
         color = Color.Black.copy(alpha = 0.8f),
         topLeft = s.topLeft, size = s.size, cornerRadius = art.glassRadius,
-        style = Stroke(width = ch * 0.012f),
+        style = art.bezelStroke,
     )
 }
 
@@ -348,10 +363,11 @@ private fun DrawScope.drawControls(art: TvSetArt, ch: Float, level: Float) {
     )
 
     // The top dial is the channel selector; it drifts with the level so the set looks alive.
-    drawDial(art.dialTop, art.dialDiameter, -2.2f + level * 1.2f)
-    drawDial(art.dialBottom, art.dialDiameter, 0.9f)
+    drawDial(art.dialTop, art.dialDiameter, art.dialTopBrush, -2.2f + level * 1.2f)
+    drawDial(art.dialBottom, art.dialDiameter, art.dialBottomBrush, 0.9f)
 
-    art.grille.forEach { slot ->
+    for (i in art.grille.indices) {
+        val slot = art.grille[i]
         drawRoundRect(
             color = Color.Black.copy(alpha = 0.62f),
             topLeft = slot.topLeft, size = slot.size,
@@ -369,18 +385,11 @@ private fun DrawScope.drawControls(art: TvSetArt, ch: Float, level: Float) {
     drawCircle(Color(0xFFFFC46B), art.lampRadius, art.lamp)
 }
 
-private fun DrawScope.drawDial(center: Offset, diameter: Float, angle: Float) {
+private fun DrawScope.drawDial(center: Offset, diameter: Float, face: Brush, angle: Float) {
     val r = diameter / 2f
     if (r <= 0.5f) return
     drawCircle(ChromeDark, r, center)
-    drawCircle(
-        brush = Brush.linearGradient(
-            listOf(Chrome, Color(0xFF6A6259)),
-            start = Offset(center.x - r, center.y - r),
-            end = Offset(center.x + r, center.y + r),
-        ),
-        radius = r * 0.84f, center = center,
-    )
+    drawCircle(brush = face, radius = r * 0.84f, center = center)
     // Ticks read as a channel ring without needing numbers at this size.
     for (i in 0 until 12) {
         val a = i * (PI.toFloat() * 2f / 12f)

@@ -8,24 +8,27 @@ internal object NewsCopy {
     const val profileColour = "Congressman"
     const val profileMono = "OBEY"
 
+    /** One line each, top to bottom; the last is set smaller. */
+    val standBy = listOf("TECHNICAL", "DIFFICULTIES", "PLEASE STAND BY...")
+
     val headlines = listOf(
         "MARKETS HITS RECORD HIGH",
         "SCHOOL BOARD APPROVES BUDGET",
-        "RIVER ROAD SLOW AT THE BEND",
-        "INFLATION UNDER CONTROL",
+        "RECORD LOTTERY JACKPOT",
+        "FREEDOM",
         "LOCAL BAKERY TURNS FIFTY",
-        "COUNCIL DELAYS PARK VOTE",
         "CONGRESS PASSES BUDGET",
+        "GO VOTE",
         "MILD WEEKEND AHEAD",
     )
 
     val commands = listOf(
         "LOWER YOUR VOICE",
-        "ASK NOTHING",
-        "SHOP",
         "TRUST THE BROADCAST",
         "ACCEPT YOUR FATE",
+        "SHOP",
         "KEEP YOUR EYES DOWN",
+        "ASK NOTHING",
         "WATCH TV",
         "SCROLL ENDLESSLY",
     )

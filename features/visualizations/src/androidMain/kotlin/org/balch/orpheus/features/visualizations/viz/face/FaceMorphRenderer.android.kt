@@ -62,13 +62,13 @@ actual class FaceMorphRenderer {
 }
 
 @Composable
-actual fun FaceMorphCanvas(modifier: Modifier, inputs: FaceMorphInputs) {
+actual fun FaceMorphCanvas(modifier: Modifier, inputs: () -> FaceMorphInputs) {
     val renderer = remember { FaceMorphRenderer() }
     DisposableEffect(Unit) { onDispose { renderer.dispose() } }
 
     if (renderer.isSupported()) {
         Canvas(modifier.fillMaxSize()) {
-            renderer.brush(size.width, size.height, inputs)?.let { drawRect(brush = it) }
+            renderer.brush(size.width, size.height, inputs())?.let { drawRect(brush = it) }
         }
     } else {
         FaceMorphFallback(modifier, inputs)

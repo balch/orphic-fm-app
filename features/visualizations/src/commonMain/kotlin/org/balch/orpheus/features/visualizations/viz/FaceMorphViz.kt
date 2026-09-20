@@ -2,6 +2,7 @@ package org.balch.orpheus.features.visualizations.viz
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +23,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.playback.MetadataProducer
+import org.balch.orpheus.features.visualizations.viz.face.BroadcastFrame
 import org.balch.orpheus.features.visualizations.viz.face.FaceKeyframes
 import org.balch.orpheus.features.visualizations.viz.face.FaceMorphInputs
 import org.balch.orpheus.features.visualizations.viz.face.MorphDirector
@@ -30,6 +32,7 @@ import org.balch.orpheus.features.visualizations.viz.face.TurnOrigin
 import org.balch.orpheus.features.visualizations.viz.face.buildFaceBiasMap
 import org.balch.orpheus.features.visualizations.viz.face.drumLevel
 import org.balch.orpheus.features.visualizations.viz.face.signalScaled
+import org.balch.orpheus.features.visualizations.viz.face.standByAlpha
 import org.balch.orpheus.features.visualizations.viz.face.stageBlend
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
@@ -177,6 +180,8 @@ class FaceMorphViz(
                                 crt = signalScaled(frame.crt, signalKnob),
                                 glitch = signalScaled(frame.glitch, signalKnob),
                                 time = clock,
+                                // The overall turn, not blend.t: that restarts at every stage.
+                                standBy = standByAlpha(frame.morph, frame.energy, frame.mono),
                             )
                         }
                     } catch (e: CancellationException) {
@@ -191,17 +196,11 @@ class FaceMorphViz(
             }
         }
 
-        scene?.let { NewsBroadcastScene(modifier, it.face, it.level, it.crt, it.time, it.glitch) }
+        // The scene reads each frame while drawing. Only the first frame arriving is composition's
+        // business, so a 60 Hz state write redraws the set and recomposes nothing.
+        val ready by remember { derivedStateOf { scene != null } }
+        if (ready) NewsBroadcastScene(modifier) { checkNotNull(scene) }
     }
-
-    /** One frame of the whole broadcast: the story graphic plus what the set itself needs. */
-    private class BroadcastFrame(
-        val face: FaceMorphInputs,
-        val level: Float,
-        val crt: Float,
-        val glitch: Float,
-        val time: Float,
-    )
 
     // Public so the vibe carrying this name can be guard-tested against it from another module;
     // everything else in here stays private.

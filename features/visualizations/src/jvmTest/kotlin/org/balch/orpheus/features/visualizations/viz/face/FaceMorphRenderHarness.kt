@@ -59,7 +59,7 @@ class FaceMorphRenderHarness {
                 faces[blend.stage], faces[blend.stage + 1], bias, blend.t, flicker, glitch, 0.6f, 0f, 3f,
             )
             val scene = ImageComposeScene(width, height, Density(1f)) {
-                FaceMorphCanvas(Modifier.fillMaxSize(), inputs)
+                FaceMorphCanvas(Modifier.fillMaxSize()) { inputs }
             }
             try {
                 val bytes = scene.render().encodeToData()!!.bytes
@@ -126,10 +126,10 @@ class FaceMorphRenderHarness {
                 CompositionLocalProvider(LocalVizStage provides vizStage) {
                     // The host paints the void behind the set; stand in for it so the shot matches.
                     Box(Modifier.fillMaxSize().background(OrpheusColors.darkVoid)) {
-                        NewsBroadcastScene(
-                            Modifier.fillMaxSize(), face, level = 0.5f, crt = 0.5f,
-                            time = SCENE_TIME, glitch = shot.glitch,
+                        val frame = BroadcastFrame(
+                            face, level = 0.5f, crt = 0.5f, glitch = shot.glitch, time = SCENE_TIME,
                         )
+                        NewsBroadcastScene(Modifier.fillMaxSize()) { frame }
                         if (shot.chrome && shot.stage != null) {
                             ChromeBars(shot.stage, shot.h)
                         }

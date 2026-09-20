@@ -2,6 +2,8 @@ package org.balch.orpheus.features.visualizations.viz.face
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -122,21 +124,28 @@ expect class TvPictureRenderer() {
 /**
  * Tears and fringes everything drawn inside this layer. [glass] is the tube in the layer's own
  * pixels. Below Android 13, or if the shader will not compile, this is a no-op.
+ *
+ * The inputs are read in the layer block, so a decaying glitch re-runs that block and nothing
+ * else. Only the pass switching on or off reaches composition.
  */
 @Composable
-fun Modifier.tvPictureEffect(glass: Rect, glitch: Float, mono: Float, time: Float): Modifier {
+fun Modifier.tvPictureEffect(
+    glass: Rect,
+    glitch: () -> Float,
+    mono: () -> Float,
+    time: () -> Float,
+): Modifier {
     val renderer = remember { TvPictureRenderer() }
     DisposableEffect(renderer) { onDispose { renderer.dispose() } }
 
-    val amount = sanitizedGlitch(glitch)
     // No layer at all while idle: the pass costs nothing between hits and the picture is left
     // bit-for-bit as it was drawn. Belt and braces alongside MorphDirector's own snap-to-zero
     // (MorphDirector.VISIBLE_EPSILON): a decaying glitch must not keep this layer alive forever.
-    if (!runsPicturePass(amount) || glass.width < 1f || glass.height < 1f || !renderer.isSupported()) {
-        return this
+    val running by remember(glitch) { derivedStateOf { runsPicturePass(sanitizedGlitch(glitch())) } }
+    if (!running || glass.width < 1f || glass.height < 1f || !renderer.isSupported()) return this
+    return graphicsLayer {
+        renderEffect = renderer.effect(glass, sanitizedGlitch(glitch()), mono(), time())
     }
-    val pass = renderer.effect(glass, amount, mono, time) ?: return this
-    return graphicsLayer { renderEffect = pass }
 }
 
 /** Rate the torn row set is re-rolled at, in Hz. Photosensitivity bound, never raise it. */

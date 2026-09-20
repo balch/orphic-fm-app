@@ -10,6 +10,7 @@ import kotlin.math.min
  * @param glitch drum-hit chroma split and row tear
  * @param crt scanline strength
  * @param mono 0 = colour, 1 = black and white. Binary today, a Float so it can be eased later.
+ * @param energy the slow level follower, 0..1, before any knob scales it
  */
 data class MorphFrame(
     val morph: Float,
@@ -17,6 +18,7 @@ data class MorphFrame(
     val glitch: Float,
     val crt: Float,
     val mono: Float,
+    val energy: Float = 0f,
 )
 
 /**
@@ -29,6 +31,25 @@ internal fun ratchet(floor: Float, shaped: Float): Float =
 /** Same guard for the additive surge: a non-finite result contributes nothing this frame. */
 internal fun surged(base: Float, surge: Float): Float =
     (base + if (surge.isFinite()) surge else 0f).coerceIn(0f, 1f)
+
+/** How much faster full energy runs the stand-by card's fade: 0.6 is 1.6x. */
+internal const val STAND_BY_ENERGY_PUSH = 0.6f
+
+/**
+ * Opacity of the "technical difficulties" card over the empty chair. The card belongs to the
+ * colour broadcast: gone in any mono frame, and gone for good by [MorphDirector.MONO_PERMANENT].
+ */
+internal fun standByAlpha(morph: Float, energy: Float, mono: Float): Float {
+    if (mono > 0.5f) return 0f
+    val m = if (morph.isFinite()) morph.coerceIn(0f, 1f) else 1f
+    val e = if (energy.isFinite()) energy.coerceIn(0f, 1f) else 0f
+    if (m >= MorphDirector.MONO_PERMANENT) return 0f
+    // How far through the card's life the turn is: 0 at the start, 1 where mono latches.
+    val life = m / MorphDirector.MONO_PERMANENT
+    // Energy hastens the fade: a loud chorus pushes the card out early, and the next quiet
+    // verse lets some of it back. Still zero at life = 1 whatever the energy.
+    return (1f - life * (1f + STAND_BY_ENERGY_PUSH * e)).coerceIn(0f, 1f)
+}
 
 /** Turns song position and live levels into what the face shader draws. Not thread-safe. */
 class MorphDirector {
@@ -132,6 +153,7 @@ class MorphDirector {
             glitch = glitch,
             crt = CRT_BASE + (1f - CRT_BASE) * intensity,
             mono = if (monoLatched || monoHold > 0f) 1f else 0f,
+            energy = intensity,
         )
     }
 

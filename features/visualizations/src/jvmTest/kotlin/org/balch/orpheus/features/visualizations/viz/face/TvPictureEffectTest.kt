@@ -142,8 +142,10 @@ class TvPictureEffectTest {
      * the shader's hash, which keeps one copy of the roll instead of two that can drift apart.
      */
     @Test fun `a torn row lifts into a line over the flat backdrop`() {
-        val still = render { scene(0f, 0f) }
-        val torn = render { scene(0f, 1f) }
+        // The stand-by card hangs in this band, so it is faded out: its text sliding sideways
+        // would read as lift and this is about the shader's own.
+        val still = render { scene(0f, 0f, standBy = 0f) }
+        val torn = render { scene(0f, 1f, standBy = 0f) }
         val screen = tvLayout(Size(W.toFloat(), H.toFloat())).screen
         // A column band of plain studio backdrop: no bug, no story box, no desk edge, so a row
         // that only slid sideways would show nothing here at all.
@@ -242,7 +244,7 @@ class TvPictureEffectTest {
     }
 
     @Composable
-    private fun scene(mono: Float, glitch: Float) {
+    private fun scene(mono: Float, glitch: Float, standBy: Float = 1f) {
         val faces = FACES
         val blend = stageBlend(if (mono > 0.5f) 0.83f else 0.10f, faces.size)
         val face = FaceMorphInputs(
@@ -250,7 +252,8 @@ class TvPictureEffectTest {
             flicker = 0f, glitch = 0f, crt = 0f, mono = mono, time = TIME,
         )
         Box(Modifier.fillMaxSize().background(OrpheusColors.darkVoid)) {
-            NewsBroadcastScene(Modifier.fillMaxSize(), face, level = 0.5f, crt = 0.5f, time = TIME, glitch = glitch)
+            val frame = BroadcastFrame(face, level = 0.5f, crt = 0.5f, glitch = glitch, time = TIME, standBy = standBy)
+            NewsBroadcastScene(Modifier.fillMaxSize()) { frame }
         }
     }
 
