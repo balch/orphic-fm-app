@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMode
+import org.balch.orpheus.core.media.PlaybackProgress
 import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
@@ -76,9 +77,17 @@ class OrpheusMetadataProducer(
                 computeSubtitle(orpheusMode.value, pulsarMetadata.subtitleFlow.value),
             )
 
+    // Pulsar's title is always the vibe name, so it doubles as "the selected song" even while
+    // AI/Evo modes replace titleFlow with "Orpheus". Keeps song-exclusive features (e.g. a viz
+    // locked to one vibe) from unlocking just because an AI toggle changed the displayed title.
+    override val songFlow: StateFlow<String> = pulsarMetadata.titleFlow
+
     // Pass Pulsar's procedural artwork through unchanged. When AI / Evo modes
     // are active, we still surface Pulsar's vibe artwork — there isn't an
     // Orpheus-side image to advertise, and showing the underlying vibe gives
     // the listener visual continuity.
     override val artworkPngFlow: StateFlow<ByteArray?> = pulsarMetadata.artworkPngFlow
+
+    // The song keeps playing under AI and Evo modes, so its position is always Pulsar's.
+    override val progressFlow: StateFlow<PlaybackProgress?> = pulsarMetadata.progressFlow
 }

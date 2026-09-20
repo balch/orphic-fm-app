@@ -24,6 +24,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 
 private fun sampleVibe(
     name: String = "Test",
@@ -64,6 +65,7 @@ class OrpheusMetadataProducerTest {
         val ai: FakeAiFeature,
         val pulsarSession: PulsarSession,
         val mediaState: MediaSessionStateManager,
+        val pulsarMetadata: PulsarMetadataProducer,
     )
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -85,7 +87,7 @@ class OrpheusMetadataProducerTest {
         val aiFeature = FakeAiFeature(mode)
         val mediaState = MediaSessionStateManager(scope).apply { setEvoActive(evoActive) }
         val producer = OrpheusMetadataProducer(aiFeature, pulsarMetadata, mediaState, scope)
-        return Harness(producer, aiFeature, pulsarSession, mediaState)
+        return Harness(producer, aiFeature, pulsarSession, mediaState, pulsarMetadata)
     }
 
     @Test fun `AI active title is Orpheus`() = runTest {
@@ -132,5 +134,16 @@ class OrpheusMetadataProducerTest {
         h.mediaState.setEvoActive(true)
         assertEquals("Orpheus", h.producer.titleFlow.value)
         assertEquals(PlaybackMode.EVO.displayName, h.producer.subtitleFlow.value)
+    }
+
+    @Test fun `AI active songFlow still reports the vibe name, not Orpheus`() = runTest {
+        val h = build(mode = PlaybackMode.DRONE, vibeName = "SongExclusiveVibe")
+        assertEquals("Orpheus", h.producer.titleFlow.value)
+        assertEquals("SongExclusiveVibe", h.producer.songFlow.value)
+    }
+
+    @Test fun `song progress is Pulsar's, in every mode`() = runTest {
+        val h = build(mode = PlaybackMode.DRONE)
+        assertSame(h.pulsarMetadata.progressFlow, h.producer.progressFlow)
     }
 }

@@ -17,6 +17,13 @@ interface MetadataProducer {
     val subtitleFlow: StateFlow<String>
 
     /**
+     * Name of the selected song, whatever the now-playing card is showing. Defaults to the
+     * title; producers whose title can diverge from the selected song (e.g. an AI overlay) can
+     * override this to report the underlying song name instead.
+     */
+    val songFlow: StateFlow<String> get() = titleFlow
+
+    /**
      * PNG-encoded artwork for the now-playing surface (macOS Control Center,
      * Auto, lock screen, etc). Null = "no artwork to advertise" — the
      * controller will not push an artwork update. Producers that don't render
