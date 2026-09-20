@@ -1,6 +1,7 @@
-Storms, solos, and a new vibe to show it off.
+A new vibe to fall asleep to, plus layouts for every screen.
 
-• Android TV support with enhanced full-screen support (on tablets too).
-• Rust Belt vibe demonstrates the engine's new capabilities.
-• Lightning strikes, thunderclaps, and rain add to the ambiance.
-• Teaching the band how to jam with brand new solo mechanics.
+• Stay Asleep: a new vibe and visualization paying homage to a television classic.
+• Duo Panel lays two panels side by side on tablets and Android foldables.
+• Whole-song progress now shows on your lock screen and media notification.
+• New street sounds: sirens, footsteps, passing trains, and spoken phrases.
+• Smarter solo and jam mechanics — the band listens and answers.
