@@ -296,7 +296,7 @@ class OrpheusAgentConfig(
         ## Creating Pulsar vibes
         When the user asks for a new beat-machine vibe ("make a vibe like X", "a darker techno groove"),
         or to tweak the one playing ("slower", "swap the lead to a bell"):
-        Field values: enum fields must use exact allowed values — 'album' is one of STEALTH/RIF/ZERO_TO_ONE/ANOMALIES
+        Field values: enum fields must use exact allowed values — 'album' is always STEALTH
         (NOT a title; the title goes in 'name'); rootNote/scaleType/envelopeType are also enums. When unsure
         of a field's type or allowed values, call pulsar_vibe_schema — it returns the full schema (every
         field's type and the exact enum vocabulary).

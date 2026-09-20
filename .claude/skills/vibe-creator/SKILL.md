@@ -597,7 +597,7 @@ class MyNewVibe : VibeProvider {
     override val vibe: Vibe by lazy {
         Vibe(
             name = name,
-            // album = Album.STEALTH,         // optional; default STEALTH (also RIF / ZERO_TO_ONE / ANOMALIES)
+            // album = Album.STEALTH,
             bpm = 120f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.A,
