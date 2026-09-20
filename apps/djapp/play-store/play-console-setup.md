@@ -179,37 +179,32 @@ worry — for an offline music app most answers are short.
 
 ### 6.4 Content ratings (IARC questionnaire)
 
-**As of v2.2.0, do NOT answer "No to all" — re-run this questionnaire, it's gone stale.**
-The "Stay Asleep" vibe added its own visualization (`FaceMorphViz`, `features/visualizations`):
-a photorealistic human face that morphs into a decaying/skull-like visage — sunken black eyes,
-exposed bone structure, bared teeth — periodically flashed **full-screen** on kick hits, staged
-as an old-TV broadcast with dystopian "OBEY" / "STAY ASLEEP" ticker text. Rendered and reviewed
-directly (`./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderHarness*'`,
-output in `features/visualizations/build/face-morph-render/`) — this is genuinely unsettling
-imagery, not a stylized or abstract effect, and it is answered honestly here rather than toned
-down. See [[project_face_morph_viz]].
+Re-submitted 2026-09-20 for v2.2.x. The "Stay Asleep" vibe has its own visualization
+(`FaceMorphViz`): a photorealistic face that morphs into a skull-like visage inside an old-TV
+news inset, with "OBEY" / "STAY ASLEEP" captions. It is the only ratings-relevant content in the
+app, so the old "No to all" answers no longer hold. To see it without a device:
+`./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderHarness*'`.
 
-Click **Start questionnaire**:
+Policy > App content > Content ratings > **Start new questionnaire**. Sections unlock one at a
+time, and **Next** stays disabled until you click **Save** (a draft save).
 
 - Email: `orphic.fm.apps@gmail.com`
-- Category: `Music` *(generative-music tool — cleanest fit; the older docs
-  suggested `Reference, news, or educational` but `Music` matches Play's
-  primary category and avoids a re-questionnaire down the road)*
-- Violence / scary or intense themes: describe the above (human-to-skull morph, full-screen
-  jump-style flashes) truthfully wherever the questionnaire asks about frightening/horror
-  content — do **not** answer "No" here anymore.
-- Sexual content / language / drugs / gambling: **No** to all (unaffected — nothing else in the
-  catalog touches these; see the vibe-catalog review below)
-- User-generated content: **No** *(users don't share content from the app)*
-- Personal info collection: **No** *(no telemetry, no accounts)*
-- Location collection: **No**
-- Digital purchases / IAPs: **No**
+- Category: `All Other App Types` *(there is no Music category; the choices are Game, Social
+  networking, Communication, All Other)*
+- Downloaded App (ratings-relevant content in the package): **Yes**
+- Violence, Blood, or Gory Images: **No**
+- Fear: **Yes** > tick **Scary elements** only (not Horrifying: nobody is in danger and there
+  are no jump scares) > frequency **Rare** (one vibe in the catalog, and the user has to pick it)
+- Sexuality, Gambling, Language, Controlled Substance, Crude Humor: **No**
+- User Content Sharing, Online Content, Age-restricted products: **No**
+- Miscellaneous (location sharing, digital purchases, cash rewards, browser, news/education): **No**
 
-Submit. Expect a rating **above** Everyone / PEGI 3 this time — plausibly a "Teen"-equivalent /
-PEGI 7-12 band depending on how Play's live questionnaire weighs a single mild-horror visual
-element. This is consistent with, not a change to, the existing **target audience 13+ / "appeals
-to children: No"** answer in §6.5 below — that was already deliberately not-for-young-children
-before this existed.
+Result: ESRB **Everyone** (descriptor "Mild Fantasy Violence", ESRB's label for scary elements)
+and **7+ with a Fear descriptor** in the regions that use numeric ratings. This sits under the
+**target audience 13+ / "appeals to children: No"** answer in §6.5, which does not change.
+
+Apple's equivalent is `horrorOrFearThemes` = infrequent (9+). It can only be edited while an
+App Store version is in draft, so it is set during the next App Store submission.
 
 ### 6.5 Target audience and content
 
