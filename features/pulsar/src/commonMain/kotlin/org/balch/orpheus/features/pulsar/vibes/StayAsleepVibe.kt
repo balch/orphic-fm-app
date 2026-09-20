@@ -31,7 +31,6 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionTransition
-import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.SpeechCue
 import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TonalTension
@@ -294,18 +293,16 @@ class StayAsleepVibe : VibeProvider {
                 barsMin = 2, barsMax = 4,
                 lickIndex = 4,
                 macroOverrides = MacroOverrides(energy = 0.55f, space = 1.40f),
-                weather = SectionWeather(
-                    rain = 0.15f, rumble = 0f, strikeChance = 0f, distance = 0.5f, rainLevel = 0.40f,
-                ),
+                street = SectionStreet(train = .5f, footsteps = .2f),
                 transitions = listOf(
                     SectionTransition(targetIndex = 1, weight = 0.60f, transitionBars = 2),
                     SectionTransition(targetIndex = 2, weight = 0.40f, transitionBars = 2),
                 ),
                 trackOverrides = mapOf(
-                    0 to TrackSectionOverride(volume = 0.80f, morph = 0.88f, density = 0.20f),
-                    1 to TrackSectionOverride(density = 0f),
-                    2 to TrackSectionOverride(density = 0f),
-                    4 to TrackSectionOverride(density = 0f),
+                    0 to TrackSectionOverride(volume = 0.80f, morph = 0.88f, density = 0.25f),
+                    1 to TrackSectionOverride(volume = 0.50f ,morph = 0.68f, density = 0.1f),
+                    2 to TrackSectionOverride(volume = 0.50f, morph = 0.18f, density = 0.2f),
+                    4 to TrackSectionOverride(density = .1f, volume = 0.05f),
                     5 to TrackSectionOverride(density = 0.15f),
                     6 to TrackSectionOverride(density = 0f),
                     7 to TrackSectionOverride(volume = 0.25f),
@@ -326,8 +323,8 @@ class StayAsleepVibe : VibeProvider {
                 ),
                 macroOverrides = MacroOverrides(energy = 0.50f, space = 1.30f),
                 trackOverrides = mapOf(
-                    0 to TrackSectionOverride(volume = 0.70f, morph = 0.90f, density = 0.15f),
-                    1 to TrackSectionOverride(density = 0f),
+                    0 to TrackSectionOverride(volume = 0.80f, morph = 0.78f, density = 0.25f),
+                    1 to TrackSectionOverride(volume = 0.40f ,morph = 0.78f, density = 0.1f),
                     2 to TrackSectionOverride(density = 0f),
                     4 to TrackSectionOverride(density = 0.25f, volume = 0.45f),
                     5 to TrackSectionOverride(density = 0f),
