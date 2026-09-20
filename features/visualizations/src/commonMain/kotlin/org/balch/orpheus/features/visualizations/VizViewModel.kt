@@ -20,6 +20,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.features.visualizations.viz.OffViz
@@ -40,6 +41,8 @@ data class VizUiState(
     val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects,
     val signalVizEnabled: Boolean = false,
     val isRandomVizMode: Boolean = false,
+    /** True while [visualizations] and the selection are locked to a song-exclusive viz. */
+    val isVizLocked: Boolean = false,
 )
 
 data class VizPanelActions(
@@ -86,7 +89,8 @@ class VizViewModel(
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
-    private val scope: FeatureCoroutineScope
+    private val scope: FeatureCoroutineScope,
+    private val metadataProducer: MetadataProducer,
 ) : VizFeature {
 
     override val actions = VizPanelActions(
@@ -106,10 +110,21 @@ class VizViewModel(
     // Current selection
     private val _currentViz = MutableStateFlow(sortedVisualizations.first())
 
+    // The selected song (MetadataProducer.songFlow), tracked outside uiState so
+    // availableVisualizations() can be recomputed synchronously wherever it's needed.
+    private var currentSongTitle = ""
+
+    // Selection to restore once a song-exclusive lock releases. Only ever holds a
+    // non-exclusive viz; it is captured right before the exclusive viz becomes current.
+    private var vizBeforeLock: Visualization? = null
+
+    private fun availableVisualizations(): List<Visualization> =
+        sortedVisualizations.filter { it.exclusiveToSong == null || it.exclusiveToSong == currentSongTitle }
+
     private val _uiState = MutableStateFlow(
         VizUiState(
             selectedViz = sortedVisualizations.first(),
-            visualizations = sortedVisualizations,
+            visualizations = availableVisualizations(),
             showKnobs = sortedVisualizations.first().id != "off",
             liquidEffects = sortedVisualizations.first().liquidEffects
         )
@@ -118,11 +133,17 @@ class VizViewModel(
 
     init {
         // Activate initial visualization if it's not off (likely is off initially).
-        // Must run on main — Visualization internal state is owned by the main-thread frame loop.
+        // Must run on main: Visualization internal state is owned by the main-thread frame loop.
         if (_currentViz.value.id != "off") {
             scope.launch(dispatcherProvider.main) {
                 _currentViz.value.onActivate()
             }
+        }
+
+        // songFlow (not titleFlow): the selected vibe, immune to any title overlay (e.g.
+        // Orpheus's AI/Evo modes), so those can't fight the lock or unlock it by accident.
+        scope.launch(dispatcherProvider.main) {
+            metadataProducer.songFlow.collect { title -> onSongTitleChanged(title) }
         }
 
         scope.launch(dispatcherProvider.default) {
@@ -138,7 +159,19 @@ class VizViewModel(
             } else {
                 prefs.lastVizId?.let { id ->
                     sortedVisualizations.find { it.id == id }?.let { viz ->
-                        selectVisualization(viz, save = false)
+                        // A stored id can name a song-exclusive viz whose song isn't playing
+                        // (e.g. it was cleared while the app was closed); fall through to the
+                        // default selection instead of showing it unlocked.
+                        if (viz.exclusiveToSong == null) {
+                            // Hops to main because this races the songFlow collector (also
+                            // launched on main): if the lock engages first, vizBeforeLock is
+                            // a plain var that main also reads/writes on release, so the
+                            // decision of whether to select now or just remember this viz for
+                            // later has to happen on main too, not interleaved from default.
+                            scope.launch(dispatcherProvider.main) {
+                                restoreStoredViz(viz)
+                            }
+                        }
                     }
                 }
             }
@@ -166,21 +199,35 @@ class VizViewModel(
     /**
      * Select a new visualization by instance.
      * When [save] is true (explicit user pick), random mode is disabled.
+     * No-op while [VizUiState.isVizLocked]: the lock owns the selection until it releases.
      */
     fun selectVisualization(viz: Visualization, save: Boolean = true) {
+        if (_uiState.value.isVizLocked) return
+        performSelectVisualization(viz, save)
+    }
+
+    fun selectVisualization(viz: Visualization) {
+        selectVisualization(viz, save = true)
+    }
+
+    /** Unguarded selection, for the lock engage/release paths that own the lock themselves. */
+    private fun performSelectVisualization(viz: Visualization, save: Boolean) {
+        // A caller can hold a stale reference to a viz whose song has already moved on (e.g. a
+        // dropdown item composed a frame before the song changed and the lock released). Refuse
+        // it outright rather than trusting isVizLocked, which may already be false again.
+        if (viz.exclusiveToSong != null && viz.exclusiveToSong != currentSongTitle) return
+
         if (_currentViz.value == viz) {
             if (save && _uiState.value.isRandomVizMode) {
                 _uiState.update { it.copy(isRandomVizMode = false) }
                 scope.launch(dispatcherProvider.default) {
-                    appPreferencesRepository.update {
-                        it.copy(lastVizId = viz.id, randomVizMode = false)
-                    }
+                    appPreferencesRepository.update { it.copy(randomVizMode = false, lastVizId = persistedIdOf(viz)) }
                 }
             }
             return
         }
 
-        // Lifecycle mutations (onDeactivate/onActivate/setKnob) are confined to main —
+        // Lifecycle mutations (onDeactivate/onActivate/setKnob) are confined to main:
         // Visualization internal state is owned by the main-thread Compose frame loop.
         // Preference persistence is dispatched to default inside withContext to keep I/O
         // off the main thread.
@@ -208,30 +255,98 @@ class VizViewModel(
             if (save) {
                 _uiState.update { it.copy(isRandomVizMode = false) }
                 withContext(dispatcherProvider.default) {
-                    appPreferencesRepository.update {
-                        it.copy(lastVizId = viz.id, randomVizMode = false)
-                    }
+                    appPreferencesRepository.update { it.copy(randomVizMode = false, lastVizId = persistedIdOf(viz)) }
                 }
             }
         }
     }
 
-    fun selectVisualization(viz: Visualization) {
-        selectVisualization(viz, save = true)
-    }
+    /** A song-exclusive viz is never written to prefs: its id is meaningless without the song. */
+    private fun persistedIdOf(viz: Visualization): String? =
+        viz.id.takeIf { viz.exclusiveToSong == null }
 
     private fun setRandomMode(enabled: Boolean) {
         _uiState.update { it.copy(isRandomVizMode = enabled) }
         scope.launch(dispatcherProvider.default) {
             appPreferencesRepository.update { it.copy(randomVizMode = enabled) }
         }
-        if (enabled) selectRandomVisualization()
+        // Recorded above either way, so it takes effect once the lock releases; only the
+        // immediate pick is held back while locked.
+        if (enabled && !_uiState.value.isVizLocked) selectRandomVisualization()
     }
 
+    /** No-op while locked. Never picks a song-exclusive viz. */
     private fun selectRandomVisualization() {
-        val candidates = sortedVisualizations.filter { it.id != "off" && it != _currentViz.value }
-        val pick = candidates.randomOrNull() ?: sortedVisualizations.firstOrNull { it.id != "off" } ?: return
-        selectVisualization(pick, save = false)
+        if (_uiState.value.isVizLocked) return
+        val candidates = sortedVisualizations.filter {
+            it.id != "off" && it.exclusiveToSong == null && it != _currentViz.value
+        }
+        val pick = candidates.randomOrNull()
+            ?: sortedVisualizations.firstOrNull { it.id != "off" && it.exclusiveToSong == null }
+            ?: return
+        performSelectVisualization(pick, save = false)
+    }
+
+    /** Reacts to the selected song (from [MetadataProducer.songFlow]) changing. */
+    private fun onSongTitleChanged(title: String) {
+        currentSongTitle = title
+        val exclusiveViz = sortedVisualizations.firstOrNull { it.exclusiveToSong == title }
+        val locked = _uiState.value.isVizLocked
+        when {
+            exclusiveViz != null && !locked -> engageLock(exclusiveViz)
+            exclusiveViz == null && locked -> releaseLock()
+            exclusiveViz != null && locked && exclusiveViz != _currentViz.value ->
+                hopLock(exclusiveViz)
+            // Same song still selected (locked or not); nothing to do. Guards against
+            // re-running lifecycle calls when songFlow re-emits the same title.
+        }
+    }
+
+    /**
+     * Already locked, but the new song's exclusive viz differs from the current one (e.g.
+     * skipping straight from one locked song to another without an unlocked song in between).
+     * Hops directly to the new exclusive viz; [vizBeforeLock] is left untouched, since it still
+     * names the viz to restore once locking ends for good.
+     */
+    private fun hopLock(exclusiveViz: Visualization) {
+        _uiState.update { it.copy(visualizations = availableVisualizations()) }
+        performSelectVisualization(exclusiveViz, save = false)
+    }
+
+    private fun engageLock(exclusiveViz: Visualization) {
+        vizBeforeLock = _currentViz.value
+        _uiState.update { it.copy(isVizLocked = true, visualizations = availableVisualizations()) }
+        performSelectVisualization(exclusiveViz, save = false)
+    }
+
+    private fun releaseLock() {
+        val restoreTarget = vizBeforeLock?.takeIf { sortedVisualizations.contains(it) }
+            ?: sortedVisualizations.first()
+        vizBeforeLock = null
+        _uiState.update { it.copy(isVizLocked = false, visualizations = availableVisualizations()) }
+        if (_uiState.value.isRandomVizMode) {
+            selectRandomVisualization()
+        } else {
+            performSelectVisualization(restoreTarget, save = false)
+        }
+    }
+
+    /**
+     * Applies a viz restored from stored preferences at startup (the caller already checked it's
+     * a real, non-exclusive viz). If the lock is already held (the songFlow collector can win
+     * the startup race against preference loading), this viz becomes the restore target for when
+     * the lock releases instead of being silently dropped; the current (locked) selection and its
+     * lifecycle are left untouched. Must run on main: it reads/writes [vizBeforeLock] and
+     * [VizUiState.isVizLocked], both otherwise only touched from main (the songFlow collector and
+     * lock engage/release), so this call has to join that single-threaded queue rather than race
+     * it from the default-dispatched prefs load.
+     */
+    private fun restoreStoredViz(viz: Visualization) {
+        if (_uiState.value.isVizLocked) {
+            vizBeforeLock = viz
+        } else {
+            performSelectVisualization(viz, save = false)
+        }
     }
 
     fun onKnob1Change(value: Float) {
@@ -256,7 +371,8 @@ class VizViewModel(
             it.copy(
                 selectedViz = _currentViz.value,
                 showKnobs = _currentViz.value.id != "off",
-                liquidEffects = _currentViz.value.liquidEffects
+                liquidEffects = _currentViz.value.liquidEffects,
+                visualizations = availableVisualizations(),
             )
         }
     }

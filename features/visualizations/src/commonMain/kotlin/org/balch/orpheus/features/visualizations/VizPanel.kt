@@ -8,9 +8,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
+import org.balch.orpheus.features.visualizations.viz.OffViz
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
@@ -71,7 +76,7 @@ fun VizPanel(
                     .height(32.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
-                    .clickable { expanded = true }
+                    .clickable(enabled = !uiState.isVizLocked) { expanded = true }
                     .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -80,21 +85,32 @@ fun VizPanel(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    if (uiState.isVizLocked) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Locked to song",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    }
                     Text(
                         text = uiState.selectedViz.name,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
+                        color = if (uiState.isVizLocked) Color.Gray
+                            else if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
                     )
-                    Text(
-                        text = "▼",
-                        fontSize = 12.sp,
-                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
-                    )
+                    if (!uiState.isVizLocked) {
+                        Text(
+                            text = "▼",
+                            fontSize = 12.sp,
+                            color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
+                        )
+                    }
                 }
 
                 DropdownMenu(
-                    expanded = expanded,
+                    expanded = expanded && !uiState.isVizLocked,
                     onDismissRequest = { expanded = false },
                     modifier = Modifier.background(OrpheusColors.softPurple)
                 ) {
@@ -184,6 +200,24 @@ fun VizPanelPreview(
     LiquidPreviewContainerWithGradient(effects = effects) {
         VizPanel(
             feature = VizViewModel.previewFeature(),
+            isExpanded = true
+        )
+    }
+}
+
+@Preview(widthDp = 400, heightDp = 400, name = "Locked to song")
+@Composable
+fun VizPanelLockedPreview() {
+    LiquidPreviewContainerWithGradient(effects = VisualizationLiquidEffects.Default) {
+        VizPanel(
+            feature = VizViewModel.previewFeature(
+                state = VizUiState(
+                    selectedViz = OffViz(),
+                    visualizations = listOf(OffViz()),
+                    showKnobs = true,
+                    isVizLocked = true,
+                )
+            ),
             isExpanded = true
         )
     }

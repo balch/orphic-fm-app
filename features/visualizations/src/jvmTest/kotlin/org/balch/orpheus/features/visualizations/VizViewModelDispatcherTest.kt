@@ -12,9 +12,12 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.BaseAppPreferencesRepository
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
@@ -62,12 +65,26 @@ private class TrackingViz(
     @Composable override fun Content(modifier: Modifier) {}
 }
 
-private class FakePrefsRepo(
+/** Not private — shared with [VizViewModelExclusiveVizTest] in this package. */
+class FakePrefsRepo(
     prefs: AppPreferences = AppPreferences(randomVizMode = false)
 ) : BaseAppPreferencesRepository() {
-    private var stored = prefs
+    var stored = prefs
+        private set
     override suspend fun load() = stored
     override suspend fun save(preferences: AppPreferences) { stored = preferences }
+}
+
+/**
+ * Controllable [MetadataProducer] fake: [song] doubles as both title and song, since these
+ * dispatcher/exclusive-viz tests only care about [MetadataProducer.songFlow]. Not private —
+ * shared with [VizViewModelExclusiveVizTest] in this package.
+ */
+class FakeMetadataProducer(initialSong: String = "") : MetadataProducer {
+    val song = MutableStateFlow(initialSong)
+    override val titleFlow: StateFlow<String> = song
+    override val subtitleFlow: StateFlow<String> = MutableStateFlow("")
+    override val songFlow: StateFlow<String> = song
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -121,6 +138,7 @@ class VizViewModelDispatcherTest {
             synthController = SynthController(),
             dispatcherProvider = dispatcherProvider,
             scope = FeatureCoroutineScope(),
+            metadataProducer = FakeMetadataProducer(),
         )
     }
 
@@ -165,6 +183,7 @@ class VizViewModelDispatcherTest {
                 synthController = SynthController(),
                 dispatcherProvider = dispatcherProvider,
                 scope = FeatureCoroutineScope(),
+                metadataProducer = FakeMetadataProducer(),
             )
             advanceUntilIdle() // drain init
             log.clear()
