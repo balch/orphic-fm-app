@@ -37,6 +37,16 @@ class FaceMorphFrameTest {
         assertEquals(StageBlend(5, 1f), stageBlend(2f, 7))
     }
 
+    @Test fun `stageBlend cap holds the last pair short and leaves earlier stages alone`() {
+        assertEquals(StageBlend(5, 0.75f), stageBlend(1f, 7, lastStageCap = 0.75f))
+        assertEquals(StageBlend(3, 0f), stageBlend(0.5f, 7, lastStageCap = 0.75f))
+        assertEquals(StageBlend(0, 0.25f), stageBlend(1f, 2, lastStageCap = 0.25f))
+    }
+
+    @Test fun `stageBlend treats a non-finite cap as uncapped`() {
+        assertEquals(StageBlend(5, 1f), stageBlend(1f, 7, lastStageCap = Float.NaN))
+    }
+
     @Test fun `stageBlend requires at least two frames`() {
         assertFailsWith<IllegalArgumentException> { stageBlend(0.5f, 1) }
     }

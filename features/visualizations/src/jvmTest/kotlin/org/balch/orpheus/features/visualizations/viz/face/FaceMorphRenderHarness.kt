@@ -42,6 +42,28 @@ class FaceMorphRenderHarness {
     private val width = 1280
     private val height = 800
 
+    /** Where the final pair can be held: one shot per candidate [LAST_STAGE_CAP], plus the cap in use. */
+    @Test fun `render the last stage at candidate caps`() {
+        val faces = faceFiles().map { Image.makeFromEncoded(it.readBytes()).toComposeImageBitmap() }
+        val bias = buildLastStageBiasMap()
+        val dir = File("build/face-morph-render").apply { mkdirs() }
+        for (cap in listOf(0f, 0.15f, 0.3f, 0.45f, 0.6f, 0.75f, 1f, LAST_STAGE_CAP)) {
+            val blend = stageBlend(1f, faces.size, cap)
+            val inputs = FaceMorphInputs(
+                faces[blend.stage], faces[blend.stage + 1], bias, blend.t, 0f, 0f, 0.6f, 0f, 3f,
+            )
+            val scene = ImageComposeScene(height, height, Density(1f)) {
+                FaceMorphCanvas(Modifier.fillMaxSize()) { inputs }
+            }
+            try {
+                val name = if (cap == LAST_STAGE_CAP) "cap_in_use" else "cap_${(cap * 100).toInt().toString().padStart(3, '0')}"
+                File(dir, "$name.png").writeBytes(scene.render().encodeToData()!!.bytes)
+            } finally {
+                scene.close()
+            }
+        }
+    }
+
     @Test fun `render the morph at fixed points and verify it is not a black screen`() {
         val faces = faceFiles().map { Image.makeFromEncoded(it.readBytes()).toComposeImageBitmap() }
         val bias = buildFaceBiasMap()
@@ -91,6 +113,7 @@ class FaceMorphRenderHarness {
     @Test fun `render the broadcast scene in colour and black and white`() {
         val faces = faceFiles().map { Image.makeFromEncoded(it.readBytes()).toComposeImageBitmap() }
         val bias = buildFaceBiasMap()
+        val lastStageBias = buildLastStageBiasMap()
         val dir = File("build/face-morph-render").apply { mkdirs() }
         val shots = LinkedHashMap<String, PixelMap>()
 
@@ -99,6 +122,8 @@ class FaceMorphRenderHarness {
             SceneShot("mono_wide", 1280, 800, 0.83f, 1f),
             SceneShot("colour_tall", 420, 900, 0.37f, 0f),
             SceneShot("mono_tall", 420, 900, 1f, 1f),
+            // Where the song ends up: the turn held at LAST_STAGE_CAP, latched black and white.
+            SceneShot("end_wide", 1280, 800, 1f, 1f),
             // Same pixel window at Retina density: the picture must not change size with it.
             SceneShot("colour_wide_2x", 1280, 800, 0.10f, 0f, density = 2f),
             // The two shapes the DJ app actually reports: a phone with a header and a bottom
@@ -116,9 +141,11 @@ class FaceMorphRenderHarness {
             SceneShot("glitch_colour_wide", 1280, 800, 0.10f, 0f, glitch = 1f),
             SceneShot("glitch_mono_wide", 1280, 800, 0.83f, 1f, glitch = 1f),
         )) {
-            val blend = stageBlend(shot.morph, faces.size)
+            // Capped like the viz, so these are the frames the app can actually reach.
+            val blend = stageBlend(shot.morph, faces.size, LAST_STAGE_CAP)
+            val stageBias = if (blend.stage == faces.size - 2) lastStageBias else bias
             val face = FaceMorphInputs(
-                faces[blend.stage], faces[blend.stage + 1], bias, blend.t,
+                faces[blend.stage], faces[blend.stage + 1], stageBias, blend.t,
                 flicker = 0f, glitch = 0f, crt = 0f, mono = shot.mono, time = SCENE_TIME,
             )
             val vizStage = shot.stage?.let { VizStage().apply { report(it) } }

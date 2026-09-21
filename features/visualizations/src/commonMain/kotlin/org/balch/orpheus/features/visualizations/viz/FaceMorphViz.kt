@@ -26,10 +26,12 @@ import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.features.visualizations.viz.face.BroadcastFrame
 import org.balch.orpheus.features.visualizations.viz.face.FaceKeyframes
 import org.balch.orpheus.features.visualizations.viz.face.FaceMorphInputs
+import org.balch.orpheus.features.visualizations.viz.face.LAST_STAGE_CAP
 import org.balch.orpheus.features.visualizations.viz.face.MorphDirector
 import org.balch.orpheus.features.visualizations.viz.face.NewsBroadcastScene
 import org.balch.orpheus.features.visualizations.viz.face.TurnOrigin
 import org.balch.orpheus.features.visualizations.viz.face.buildFaceBiasMap
+import org.balch.orpheus.features.visualizations.viz.face.buildLastStageBiasMap
 import org.balch.orpheus.features.visualizations.viz.face.drumLevel
 import org.balch.orpheus.features.visualizations.viz.face.signalScaled
 import org.balch.orpheus.features.visualizations.viz.face.standByAlpha
@@ -74,6 +76,7 @@ class FaceMorphViz(
     private val director = MorphDirector()
     private val turnOrigin = TurnOrigin()
     private val bias by lazy { buildFaceBiasMap() }
+    private val lastStageBias by lazy { buildLastStageBiasMap() }
     private val log = logging("FaceMorphViz")
 
     @OptIn(ExperimentalResourceApi::class)
@@ -155,7 +158,7 @@ class FaceMorphViz(
                             drums = drumLevel(levels),
                             floorOffset = (decayKnob - 0.5f) * 0.6f,
                         )
-                        val blend = stageBlend(frame.morph, frameCount)
+                        val blend = stageBlend(frame.morph, frameCount, LAST_STAGE_CAP)
                         stage = blend.stage
                         // Until the wanted pair is decoded, keep drawing the previous one at its end.
                         val pair = keyframes.pair(blend.stage)
@@ -165,7 +168,9 @@ class FaceMorphViz(
                             val clock = shaderTime % TIME_WRAP_S
                             scene = BroadcastFrame(
                                 face = FaceMorphInputs(
-                                    faceA = pair.first, faceB = pair.second, bias = bias,
+                                    faceA = pair.first, faceB = pair.second,
+                                    // The final pair goes jaw-first so the capped turn keeps its eyes.
+                                    bias = if (blend.stage == frameCount - 2) lastStageBias else bias,
                                     t = blend.t,
                                     flicker = frame.flicker,
                                     // The tear and the fringe run over the whole tube now, so the

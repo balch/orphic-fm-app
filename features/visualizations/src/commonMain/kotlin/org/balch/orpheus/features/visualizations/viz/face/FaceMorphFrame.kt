@@ -2,6 +2,7 @@ package org.balch.orpheus.features.visualizations.viz.face
 
 import org.balch.orpheus.core.media.PlaybackProgress
 import kotlin.math.max
+import kotlin.math.min
 
 /** Song position when Pulsar has one, else a fixed four-minute turn from activation. */
 internal const val FALLBACK_TURN_S = 240f
@@ -9,11 +10,24 @@ internal const val FALLBACK_TURN_S = 240f
 /** Which keyframe pair to draw and how far between them. */
 internal data class StageBlend(val stage: Int, val t: Float)
 
-/** Requires [frameCount] >= 2. Non-finite or out-of-range [morph] is treated as clamped 0..1. */
-internal fun stageBlend(morph: Float, frameCount: Int): StageBlend {
+/**
+ * How far into the final keyframe pair the turn is allowed to go. The last keyframe is a bare
+ * skull; holding short of it leaves the face always arriving and never there. Paired with
+ * [buildLastStageBiasMap], which turns the jaw first and the eyes last: bone teeth show from
+ * about 0.45, the eyes hold to about 0.75, and only 1 empties the sockets.
+ * FaceMorphRenderHarness renders the candidates.
+ */
+internal const val LAST_STAGE_CAP = 0.65f
+
+/**
+ * Requires [frameCount] >= 2. Non-finite or out-of-range [morph] is treated as clamped 0..1.
+ * [lastStageCap] limits only the final pair, so every earlier stage still runs its full length.
+ */
+internal fun stageBlend(morph: Float, frameCount: Int, lastStageCap: Float = 1f): StageBlend {
     require(frameCount >= 2) { "need at least two keyframes, got $frameCount" }
     val safeMorph = (if (morph.isFinite()) morph else 0f).coerceIn(0f, 1f)
-    val position = safeMorph * (frameCount - 1)
+    val cap = (if (lastStageCap.isFinite()) lastStageCap else 1f).coerceIn(0f, 1f)
+    val position = min(safeMorph * (frameCount - 1), frameCount - 2 + cap)
     val stage = position.toInt().coerceAtMost(frameCount - 2)
     return StageBlend(stage, position - stage)
 }
