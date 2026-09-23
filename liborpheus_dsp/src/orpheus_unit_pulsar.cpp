@@ -1194,6 +1194,16 @@ static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
         if (ts.playhead >= ts.step_count) ts.playhead = 0;
         regenerated++;
     }
+
+    // Pinned hits, after the rebuilds so the mask is trimmed to each track's final
+    // step_count. Assigned for EVERY track, so a section without a pin clears the last one.
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        PulsarTrackState& ts = state->tracks[t];
+        uint64_t mask = (sec && ts.role == TrackRole::PERCUSSIVE) ? sec->track_hits[t] : 0;
+        const int sc = std::clamp(ts.step_count, 0, kMaxPulsarSteps);
+        if (sc < 64) mask &= (uint64_t{1} << sc) - 1;
+        ts.section_hits = mask;
+    }
     return regenerated;
 }
 
@@ -1656,6 +1666,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.repick_live = false;
         ts.beat_origin = ts.head_origin = 0.0;
         ts.section_lpg_mode = -1;
+        // Section render overrides are only re-set by apply_section_densities, which a
+        // vibe with no arrangement never calls, so the previous vibe's would stick.
+        ts.section_density_out = false;
+        ts.section_hits = 0;
         ts.tides_env.Init();
         ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
         ts.tides_env_level = 0.0f;
@@ -1825,6 +1839,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                         engine->pulsar_section_track_breathe_floor[tbase + t].load(std::memory_order_relaxed));
                     sec.track_breathe_timbre_span[t] = clamp01(
                         engine->pulsar_section_track_breathe_timbre_span[tbase + t].load(std::memory_order_relaxed));
+                    // Pinned hits: four 16-bit words, clamped before the cast so a bad
+                    // wire value (NaN included) cannot spill into a neighbouring word.
+                    uint64_t hits = 0;
+                    for (int w = 0; w < 4; w++) {
+                        float word = engine->pulsar_section_track_hits[(tbase + t) * 4 + w]
+                                         .load(std::memory_order_relaxed);
+                        if (!(word > 0.0f)) word = 0.0f;
+                        if (word > 65535.0f) word = 65535.0f;
+                        hits |= static_cast<uint64_t>(word) << (16 * w);
+                    }
+                    sec.track_hits[t] = hits;
                 }
             }
 
@@ -4502,7 +4527,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
 
             if (ts.playhead >= kMaxPulsarSteps) ts.playhead = 0;
-            const PulsarStep& step = ts.steps[ts.playhead];
+            PulsarStep pinned_scratch = {};
+            const PulsarStep& step = effective_step(ts, t, ts.playhead, pinned_scratch);
+            const bool pinned_hit = ts.section_hits != 0 && step.gate;
 
             if (step.gate) {
                 // Void Anomaly floor: mute new note-ons (sounding voices ring on).
@@ -4633,7 +4660,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // and low-energy FX overrides below belong to it too.
                         const bool forced_fire = energy >= 0.99f || is_load_boundary
                             || (t == 0 && ts.playhead == 0 && state->speech_kick_now)
-                            || (t >= 5 && energy < 0.4f) || step.from_lick;
+                            || (t >= 5 && energy < 0.4f) || step.from_lick
+                            // A section's pinned hit is authored, like a lick step.
+                            || pinned_hit;
                         bool fires = prob_roll < fire_prob || forced_fire;
 
                         // TEXTURE/FX at low energy: always fire so hold chains work
@@ -5024,7 +5053,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float note_for_render = ts.current_pitch;
         float accent_for_render = 0.8f;
         if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
-            const PulsarStep& step = ts.steps[ts.playhead];
+            PulsarStep pinned_scratch = {};
+            const PulsarStep& step = effective_step(ts, t, ts.playhead, pinned_scratch);
             if (step.gate) {
                 accent_for_render = ts.current_velocity;
             }
@@ -5943,9 +5973,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         viz.playheads[t] = ts.playhead;
         int sc = std::min(ts.step_count, kMaxPulsarSteps);
         viz.step_counts[t] = sc;
+        // Through effective_step so a pinned section shows its pin, not the hidden groove.
+        PulsarStep pinned_scratch = {};
         for (int s = 0; s < sc; s++) {
-            viz.step_gates[t][s] = ts.steps[s].gate;
-            viz.step_velocities[t][s] = ts.steps[s].velocity;
+            const PulsarStep& step = effective_step(ts, t, s, pinned_scratch);
+            viz.step_gates[t][s] = step.gate;
+            viz.step_velocities[t][s] = step.velocity;
         }
     }
     engine->pulsar_viz_version.fetch_add(1, std::memory_order_release);

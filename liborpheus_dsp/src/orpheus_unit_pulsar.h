@@ -460,6 +460,10 @@ struct PulsarTrackState {
     // CHORDAL and lick tracks whose generators ignore density entirely. Muting also
     // means leaving the section restores the original groove with no regeneration.
     bool section_density_out = false;
+    // The ACTIVE section's pinned-hit mask (bit k = step k). Non-zero replaces the pattern
+    // at render time: pinned steps fire a forced hit, the rest are rests. Like the flag
+    // above it leaves steps[] alone, so leaving the section restores the groove as-is.
+    uint64_t section_hits = 0;
 
     // Evolution state (persists across bars)
     bool evo_rhythmic = false;
@@ -754,6 +758,9 @@ struct SectionParam {
     // load, section entry and the déjà-vu reset can never disagree on a track's density.
     float track_density_override[kNumPulsarTracks] =
         {-1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f, -1.f};
+    // Per-track pinned hits for this section: bit k = step k fires, every other step
+    // rests. 0 = no pin. Honored on PERCUSSIVE tracks only (see apply_section_densities).
+    uint64_t track_hits[kNumPulsarTracks] = {};
     // Per-track breathe cycle for this section (see pulsar_breathe.h). bars 0 = the
     // track does not breathe here, which has to render EXACTLY unity — 0 is the
     // natural off for all three, so there is no sentinel to distinguish.

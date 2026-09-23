@@ -2907,6 +2907,133 @@ static bool test_section_density_regenerates_generative_pattern() {
     return ok;
 }
 
+// ── Section pinned hits ──────────────────────────────────────────────────────
+// Writes a 64-bit mask the way PulsarFeature.kt does: four 16-bit words per track.
+static void push_section_hits(OrpheusEngine* engine, int section, int track, uint64_t mask) {
+    for (int w = 0; w < 4; w++)
+        engine->pulsar_section_track_hits[(section * kNumPulsarTracks + track) * 4 + w]
+            .store(static_cast<float>((mask >> (16 * w)) & 0xFFFFu), std::memory_order_relaxed);
+}
+
+// A section pins the perc track (1) to step 0: it fires there once per loop-cycle and
+// nowhere else, even at low energy where the fire roll would drop some of those hits.
+// The next section, which pins nothing, gets the generated groove back. A pin on a
+// MELODIC track is ignored, and a vibe with no arrangement must not inherit a pin.
+static bool test_section_pinned_hits_replace_pattern_and_restore_on_exit() {
+    printf("\n=== Test: section pinned hits replace a perc pattern, exit restores it ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    pin_pulsar_rngs(engine);
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    engine->pulsar_complexity.store(0.0f, std::memory_order_relaxed);  // freeze mutation
+    constexpr float kEnergy = 0.1f;
+    engine->pulsar_energy.store(kEnergy, std::memory_order_relaxed);
+    engine->pulsar_envelope_mode.store(0, std::memory_order_relaxed);  // AD leaves pending_retrig readable
+    push_two_section_ab_arrangement(engine, 1);
+    // Section 0 runs long enough to meet cycles whose fire roll would drop the hit.
+    constexpr int kSection0Cycles = 40;
+    engine->pulsar_section_data[0].store(static_cast<float>(kSection0Cycles), std::memory_order_relaxed);
+    engine->pulsar_section_data[1].store(static_cast<float>(kSection0Cycles), std::memory_order_relaxed);
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+    // Bit 40 lies past the 32-step pattern and must be trimmed at the seam.
+    push_section_hits(engine, 0, 1, (uint64_t{1} << 0) | (uint64_t{1} << 40));
+    push_section_hits(engine, 0, 3, uint64_t{1} << 0);   // MELODIC: ignored
+    // Density 0 on track 2 for section 0, to check the no-arrangement reload clears it.
+    engine->pulsar_section_track_density[0 * kNumPulsarTracks + 2].store(0.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    // A pinned hit's fire roll without the force: percussive base 0.9 plus velocity boost.
+    const float kPinnedFireProb = 0.9f + 0.95f * (1.0f - 0.9f) * 0.5f;
+    constexpr int kFrames = 128;   // well under a 3000-sample step: at most one boundary per block
+
+    int cycles[2] = {}, fires_on_0[2] = {}, fires_off_0[2] = {}, fires_off_pattern[2] = {};
+    int would_drop = 0;
+    uint64_t hits_seen[2] = {~uint64_t{0}, ~uint64_t{0}};
+    uint64_t melodic_hits = 0;
+    bool viz_pin_ok = true, viz_groove_ok = true, viz_s1_checked = false;
+    int prev_playhead = -1, visit = -1, last_section = -1;
+    bool reentered_s0 = false;
+    PulsarState* ps = nullptr;
+    for (int i = 0; i < 200000 && !reentered_s0; i++) {
+        unit_process_pulsar(&unit, engine, kFrames, 48000.0f);
+        ps = engine->pulsar_state;
+        if (!ps) continue;
+        const int section = ps->section_state.current_section;
+        if (section != last_section) { visit++; last_section = section; }
+        if (visit >= 2) { reentered_s0 = true; break; }   // visits: s0, s1, then back to s0
+        const PulsarTrackState& ts = ps->tracks[1];
+        const int v = visit;
+        hits_seen[v] = ts.section_hits;
+        melodic_hits |= ps->tracks[3].section_hits;
+
+        if (ts.playhead == 0 && prev_playhead != 0) {
+            cycles[v]++;
+            const uint32_t h = step_hash(0, 1, ps->loop_count, ps->step_salt);
+            if (v == 0 && static_cast<float>(h & 0xFFFF) / 65535.0f >= kPinnedFireProb) would_drop++;
+        }
+        prev_playhead = ts.playhead;
+        if (ts.pending_retrig) {
+            if (ts.playhead == 0) fires_on_0[v]++; else fires_off_0[v]++;
+            if (!ts.steps[ts.playhead].gate && v == 1) fires_off_pattern[v]++;
+        }
+
+        // The grid shows what plays: the pin in section 0, the groove in section 1.
+        const auto& viz = engine->pulsar_viz;
+        for (int s = 0; s < viz.step_counts[1]; s++) {
+            if (v == 0 && viz.step_gates[1][s] != (s == 0)) viz_pin_ok = false;
+            if (v == 1 && viz.step_gates[1][s] != ts.steps[s].gate) viz_groove_ok = false;
+        }
+        if (v == 1) viz_s1_checked = true;
+    }
+
+    bool ok = true;
+    if (!reentered_s0) {
+        printf("  FAIL: never flipped s0 -> s1 -> s0, so the restore is untested\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+    printf("  s0: cycles=%d fires@0=%d fires elsewhere=%d rolls that would drop=%d mask=0x%llx\n",
+           cycles[0], fires_on_0[0], fires_off_0[0], would_drop,
+           static_cast<unsigned long long>(hits_seen[0]));
+    printf("  s1: cycles=%d fires@0=%d fires elsewhere=%d fires off-pattern=%d mask=0x%llx\n",
+           cycles[1], fires_on_0[1], fires_off_0[1], fires_off_pattern[1],
+           static_cast<unsigned long long>(hits_seen[1]));
+    if (hits_seen[0] != 1u) {
+        printf("  FAIL: s0 mask should be exactly bit 0 (bit 40 trimmed to 32 steps)\n"); ok = false; }
+    if (cycles[0] < 8 || fires_on_0[0] != cycles[0] || fires_off_0[0] != 0) {
+        printf("  FAIL: the pinned track must fire exactly once per cycle, on step 0\n"); ok = false; }
+    if (would_drop == 0) {
+        printf("  FAIL: no cycle's roll would have dropped the hit, so the force is untested\n"); ok = false; }
+    if (hits_seen[1] != 0 || fires_off_0[1] == 0 || fires_off_pattern[1] != 0) {
+        printf("  FAIL: section 1 did not play the generated groove\n"); ok = false; }
+    if (melodic_hits != 0) {
+        printf("  FAIL: a pin on a MELODIC track was honored\n"); ok = false; }
+    if (!viz_pin_ok || !viz_groove_ok || !viz_s1_checked) {
+        printf("  FAIL: grid viz pin=%d groove=%d\n", viz_pin_ok, viz_groove_ok); ok = false; }
+
+    // Back in section 0 (pin + track-out live), load a vibe with no arrangement.
+    const bool live_before = ps->tracks[1].section_hits != 0 && ps->tracks[2].section_density_out;
+    engine->pulsar_arrangement_active.store(0, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, kFrames, 48000.0f);
+    const bool cleared = ps->tracks[1].section_hits == 0 && !ps->tracks[2].section_density_out;
+    printf("  no-arrangement reload: overrides live before=%d, cleared after=%d\n",
+           live_before, cleared);
+    if (!live_before || !cleared) {
+        printf("  FAIL: a section override leaked into a vibe with no arrangement\n"); ok = false; }
+
+    printf("Section pinned hits: %s\n", ok ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
 // ── Authored progression anchor / drift must survive a section flip ──────────
 //
 // init_chord_progression clears anchor_bars and drift_range, and
@@ -3133,6 +3260,7 @@ bool run_pulsar_sections_tests() {
     tally(test_opening_section_overrides_apply_at_load());
     tally(test_section_density_zero_mutes_track_and_restores_on_exit());
     tally(test_section_density_regenerates_generative_pattern());
+    tally(test_section_pinned_hits_replace_pattern_and_restore_on_exit());
     printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

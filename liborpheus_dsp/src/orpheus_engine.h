@@ -1104,6 +1104,10 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_section_track_breathe_bars[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<float> pulsar_section_track_breathe_floor[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<float> pulsar_section_track_breathe_timbre_span[kMaxSections * kNumPulsarTracks] = {};
+    // Per-section per-track pinned hits: a 64-bit step mask as four 16-bit words, since a
+    // float carries integers exactly only to 2^24. Index (s * kNumPulsarTracks + t) * 4 + w,
+    // word w = mask bits [16w, 16w + 15]. All-zero = no pin, so it needs no sentinel.
+    std::atomic<float> pulsar_section_track_hits[kMaxSections * kNumPulsarTracks * 4] = {};
     // Every family above is indexed s * kNumPulsarTracks + t; PulsarFeature.kt builds
     // that index with a hardcoded stride of 8 (baseIdx = s * 8 + t).
     static_assert(kNumPulsarTracks == 8,

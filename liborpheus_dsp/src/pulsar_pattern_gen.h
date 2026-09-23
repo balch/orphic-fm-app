@@ -240,6 +240,35 @@ inline void generate_pattern_level(
     }
 }
 
+// ── Section pinned hits ──────────────────────────────────────────────
+// A section can pin a percussive track to exact steps (PulsarTrackState::section_hits).
+// The hit is the one generate_pattern_level writes for that track: its voice note at the
+// level-2 backbeat's velocity and length.
+
+inline uint8_t rhythm_voice_note(int track_index) {
+    return track_index == 0 ? 36 : (track_index == 1 ? 40 : 42);
+}
+
+static_assert(kMaxPulsarSteps <= 64, "section_hits is a 64-bit step mask");
+
+inline bool step_pinned(uint64_t mask, int step) {
+    return step >= 0 && step < kMaxPulsarSteps && ((mask >> step) & 1u) != 0;
+}
+
+inline PulsarStep pinned_hit_step(int track_index) {
+    return make_step(rhythm_voice_note(track_index), 0.95f, true, 0.35f);
+}
+
+// The step a track actually plays at `step`: steps[step], or under a pin the pinned hit
+// or a rest. `scratch` backs the substituted step, so the reference outlives the call.
+inline const PulsarStep& effective_step(const PulsarTrackState& ts, int track_index,
+                                        int step, PulsarStep& scratch) {
+    if (ts.section_hits == 0) return ts.steps[step];
+    scratch = step_pinned(ts.section_hits, step) ? pinned_hit_step(track_index)
+                                                 : make_step(0, 0.0f, false, 0.0f);
+    return scratch;
+}
+
 // Continuous rhythm density: maps rhythm_density (0.0-1.0) to a blend
 // between two adjacent discrete pattern levels.
 inline void generate_rhythm_pattern(
