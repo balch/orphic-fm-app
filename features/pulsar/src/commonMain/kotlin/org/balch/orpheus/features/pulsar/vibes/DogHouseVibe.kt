@@ -325,7 +325,7 @@ class DogHouseVibe : VibeProvider {
                 // Engines differ in id only; all knobs shared.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.75f,
+                    volume = 0.80f,
                     noteRangeLow = 33,
                     noteRangeHigh = 52,
                     reverbBrightness = 0.25f,
@@ -347,7 +347,7 @@ class DogHouseVibe : VibeProvider {
                 // a textural EDM↔Space crossfade. timbre/morph are macro-driven on both slots.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX,
-                    volume = 0.20f,
+                    volume = 0.10f,
                     harmonics = 0.551f,          // DX idx 17 "Insert 1" — base patch (ear-tuned)
                     harmonicsMacroRange = 0.10f, // mood knob walks ±~3 patches around base
                     // harmonicsMacroSource defaults to MOOD (matches pre-pin behavior)
@@ -365,10 +365,10 @@ class DogHouseVibe : VibeProvider {
                             reverbBrightness = 0.8f,
                             delayFeedback = .4f,
                             delaySend = .5f,
-                            volume = 0.34f,
+                            volume = 0.24f,
                         ),
                         pan = -0.25f,
-                        density = 0.30f,
+                        density = 0.20f,
                         role = TrackRole.Chordal(
                             comping = ChordComping(
                                 style = CompingStyle.BLUES_SHUFFLE,
@@ -399,7 +399,7 @@ class DogHouseVibe : VibeProvider {
                 // String pad: same engine on both sides
                 OrpheusEngine(
                     engineId = OrpheusEngineId.STR,
-                    volume = 0.30f,
+                    volume = 0.25f,
                     modLfoRate = 0.1f,
                     modLfoDepth = 0.7f,
                     modLfoShape = 0.4f,
@@ -457,7 +457,7 @@ class DogHouseVibe : VibeProvider {
                 // Modal/string wild card: engines differ in id only
                 OrpheusEngine(
                     engineId = OrpheusEngineId.MOD,
-                    volume = 0.20f,
+                    volume = 0.15f,
                     modLfoRate = 0.08f,
                     modLfoDepth = 0.5f,
                     modLfoShape = 0.6f,
