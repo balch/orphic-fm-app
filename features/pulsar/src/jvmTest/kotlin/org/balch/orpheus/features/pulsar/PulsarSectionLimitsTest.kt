@@ -6,6 +6,7 @@ import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.NotatedScore
 import org.balch.orpheus.features.pulsar.models.SpeechCue
+import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.VibeSpeech
 import java.io.File
 import kotlin.test.Test
@@ -100,6 +101,16 @@ class PulsarSectionLimitsTest {
             "LickRotation.MAX_LICK_POOL must equal OrpheusEngine::kMaxLickPool in orpheus_engine.h. " +
                 "A larger Kotlin cap does not fail loudly — extra lick-pool writes are silently " +
                 "dropped by the routing bounds check in orpheus_engine_routing.cpp.",
+        )
+    }
+
+    @Test
+    fun `MAX_HIT_STEPS matches kMaxPulsarSteps`() {
+        assertEquals(
+            constant(pulsarHeader, "kMaxPulsarSteps"),
+            TrackSectionOverride.MAX_HIT_STEPS,
+            "TrackSectionOverride.MAX_HIT_STEPS must equal kMaxPulsarSteps in orpheus_unit_pulsar.h. " +
+                "The pinned-hit mask is that wide, and a step past it never fires.",
         )
     }
 

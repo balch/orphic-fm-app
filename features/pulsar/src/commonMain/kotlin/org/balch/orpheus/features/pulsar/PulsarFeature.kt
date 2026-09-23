@@ -2136,6 +2136,16 @@ class PulsarViewModel(
                     PluginControlId(PULSAR_URI, "section_track_breathe_timbre_span_$baseIdx"),
                     FloatValue(o?.breatheTimbreSpan ?: 0f)
                 )
+                // Pinned hits: a 64-bit step mask as four 16-bit words (a float is exact only
+                // to 2^24). Word w holds steps 16w..16w+15; all zero = no pin.
+                val hitWords = IntArray(4)
+                o?.hits?.forEach { step -> hitWords[step / 16] = hitWords[step / 16] or (1 shl (step % 16)) }
+                for (w in 0 until 4) {
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "section_track_hits_${baseIdx * 4 + w}"),
+                        FloatValue(hitWords[w].toFloat())
+                    )
+                }
             }
 
             // Section-level exit and entry effects: ONE sentinel row each — EDGE_ANY covers

@@ -269,5 +269,18 @@ data class Vibe(
                 "SpeechCue.beat ${cue.beat} is past the loop's end ($loopBeats beats at stepCount $stepCount)"
             }
         }
+        // C++ honors pinned hits only on a Percussive track and only below stepCount, and
+        // drops anything else without a word, so both have to fail here.
+        arrangement?.sections?.forEachIndexed { s, section ->
+            section.trackOverrides?.forEach { (t, o) ->
+                val hits = o.hits ?: return@forEach
+                require(tracks.getOrNull(t)?.role is TrackRole.Percussive) {
+                    "Section $s '${section.name}' pins hits on track $t, which is not Percussive"
+                }
+                require(hits.all { it < stepCount }) {
+                    "Section $s '${section.name}' track $t hits $hits reach past stepCount $stepCount"
+                }
+            }
+        }
     }
 }

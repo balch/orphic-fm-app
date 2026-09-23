@@ -659,6 +659,35 @@ class PulsarSectionProgressionPushTest {
         assertEquals(-1, intPort("section_track_lpg_mode_${1 * 8 + 4}"), "track 4 declares no override")
     }
 
+    /** Pinned hits cross as four 16-bit words per track; word w holds steps 16w..16w+15. */
+    @Test
+    fun `section pinned hits reach the controller as four 16-bit mask words`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(name = "verse", barsMin = 4, barsMax = 4),
+                Section(
+                    name = "wakeup", barsMin = 4, barsMax = 4,
+                    trackOverrides = mapOf(1 to TrackSectionOverride(hits = listOf(0, 17, 63))),
+                ),
+            ),
+            stepCount = 64,
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        fun word(s: Int, t: Int, w: Int) = floatPort("section_track_hits_${(s * 8 + t) * 4 + w}")
+        assertEquals(0x0001.toFloat(), word(1, 1, 0), "step 0")
+        assertEquals(0x0002.toFloat(), word(1, 1, 1), "step 17")
+        assertEquals(0x0000.toFloat(), word(1, 1, 2), "no steps 32-47")
+        assertEquals(0x8000.toFloat(), word(1, 1, 3), "step 63")
+        // Every unpinned track of every section still writes all four words as zero.
+        for (s in 0 until 2) for (t in 0 until 8) for (w in 0 until 4) {
+            if (s == 1 && t == 1) continue
+            assertEquals(0f, word(s, t, w), "section $s track $t word $w")
+        }
+    }
+
     /** The pass, not the authored graph, is what the engine walks: one edge per section. */
     @Test
     fun `a play-once arrangement pushes its single pass instead of the authored edges`() = runTest(testDispatcher) {
@@ -943,8 +972,10 @@ private fun pushTestVibe(
     speech: VibeSpeech? = null,
     outroIndex: Int? = null,
     playOnce: Boolean = false,
+    stepCount: Int = 16,
 ): Vibe = Vibe(
     name = "Section Push Test",
+    stepCount = stepCount,
     bpm = 120f,
     rootNote = RootNote.C,
     scaleType = ScaleType.MINOR,

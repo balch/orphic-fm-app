@@ -98,6 +98,9 @@ data class SectionTransition(
  * @param lpgMode Override the vactrol LPG mode on both engine slots, e.g. a guitar that
  *   sustains in the verse and picks `PLUCK_REPEAT_TRIPLET` in the jam. The track's own mode
  *   returns on exit; the switch lands on the boundary, so a note held across it changes mid-note.
+ * @param hits Pin a `Percussive` track to these 0-based steps for the section: each fires a forced
+ *   hit and every other step rests. `listOf(0)` = one hit on the downbeat of each loop-cycle.
+ *   Null = the generated pattern. Every step must be below [Vibe.stepCount].
  * @param breatheBars Cycle period for the volume/timbre "breathe" modulation, in loop-units.
  *   0 = off. Starts at the top on section entry and descends first, then repeats; snaps back
  *   to unity on section exit.
@@ -121,6 +124,7 @@ data class TrackSectionOverride(
     val arpMode: ArpMode? = null,
     val chordFollow: ChordFollow? = null,
     val lpgMode: LpgMode? = null,
+    val hits: List<Int>? = null,
     val breatheBars: Int = 0,
     val breatheFloor: Float = 0f,
     val breatheTimbreSpan: Float = 0f,
@@ -133,6 +137,24 @@ data class TrackSectionOverride(
         require(breatheTimbreSpan in 0f..1f) {
             "TrackSectionOverride.breatheTimbreSpan must be 0..1, got $breatheTimbreSpan"
         }
+        hits?.let { h ->
+            // An empty list marshals to mask 0, which C++ reads as "no pin", not silence.
+            require(h.isNotEmpty()) {
+                "TrackSectionOverride.hits must be null or non-empty (density = 0f mutes the track)"
+            }
+            require(h.distinct().size == h.size) { "TrackSectionOverride.hits must be distinct, got $h" }
+            require(h.all { it in 0 until MAX_HIT_STEPS }) {
+                "TrackSectionOverride.hits must be 0..${MAX_HIT_STEPS - 1}, got $h"
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Width of the pinned-hit step mask. MUST equal `kMaxPulsarSteps` in
+         * `orpheus_unit_pulsar.h`; it crosses as four 16-bit words. `PulsarSectionLimitsTest` pins it.
+         */
+        const val MAX_HIT_STEPS = 64
     }
 }
 
