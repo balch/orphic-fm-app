@@ -202,7 +202,14 @@ class StayAsleepVibe : VibeProvider {
                         reverbSend = 0.55f,
                         delaySend = 0.20f,
                     ),
-                    1 to TrackSectionOverride(density = 0f),   // snare waits
+                    1 to TrackSectionOverride(
+                        volume = 0.25f,
+                        morph = 0.85f,
+                        density = .1f,
+                        reverbSend = 0.55f,
+                        delaySend = 0.20f,
+                        hits = listOf(1),          // 1 beat cycle, nothing else
+                    ),
                     2 to TrackSectionOverride(density = 0f),   // hat waits
                     4 to TrackSectionOverride(density = 0f),   // nothing answers yet
                     5 to TrackSectionOverride(density = 0f),   // rim waits
@@ -221,7 +228,7 @@ class StayAsleepVibe : VibeProvider {
                 ),
                 trackOverrides = mapOf(
                     0 to TrackSectionOverride(volume = 0.84f, morph = 0.72f, density = 0.35f),
-                    1 to TrackSectionOverride(density = 0.28f),
+                    1 to TrackSectionOverride(volume = 0.35f, morph = 0.62f, density = 0.15f),
                     2 to TrackSectionOverride(density = 0f),
                     4 to TrackSectionOverride(density = 0.50f, volume = 0.58f),
                     5 to TrackSectionOverride(density = 0f),
@@ -324,7 +331,13 @@ class StayAsleepVibe : VibeProvider {
                 macroOverrides = MacroOverrides(energy = 0.50f, space = 1.30f),
                 trackOverrides = mapOf(
                     0 to TrackSectionOverride(volume = 0.80f, morph = 0.78f, density = 0.25f),
-                    1 to TrackSectionOverride(volume = 0.40f ,morph = 0.78f, density = 0.1f),
+                    1 to TrackSectionOverride(
+                        volume = 0.25f,
+                        morph = 0.85f,
+                        reverbSend = 0.95f,
+                        delaySend = 0.60f,
+                        hits = listOf(1, 13, 31),
+                    ),
                     2 to TrackSectionOverride(density = 0f),
                     4 to TrackSectionOverride(density = 0.25f, volume = 0.45f),
                     5 to TrackSectionOverride(density = 0f),
