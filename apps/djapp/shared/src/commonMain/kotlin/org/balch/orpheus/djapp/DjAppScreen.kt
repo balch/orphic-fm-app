@@ -64,6 +64,8 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.audio.SynthEngine
@@ -75,6 +77,7 @@ import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.dj.DjPanel
+import org.balch.orpheus.features.dj.DjUiState
 import org.balch.orpheus.features.dj.DjViewModel
 import org.balch.orpheus.features.horn.HornDisplayHeight
 import org.balch.orpheus.features.horn.HornPanel
@@ -139,6 +142,11 @@ fun DjAppScreen(
     val timerFeature = TimerViewModel.feature()
     val mixerFeature = MixerViewModel.feature()
     val scope = rememberCoroutineScope()
+
+    // Mapped before collecting: DjUiState changes on every platter tick, and only this flips the fade.
+    val turntableUp by remember(djFeature) {
+        djFeature.stateFlow.map(::anyTurntableUp).distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = anyTurntableUp(djFeature.stateFlow.value))
 
     // Nav3 back stack: single-level tab switching
     val backStack = remember { NavBackStack<DjRoute>(DjTab) }
@@ -225,7 +233,12 @@ fun DjAppScreen(
         val panelFade = LocalPanelIdleFade.current
         // One expression for the whole feature, read inside the layout box so a window crossing
         // the dock threshold turns it off in the same composition that picks the new layout.
-        val fadeEnabled = fadesPanelsWhenIdle(layout, hidesPanelsWhenIdle, sheetOpen = activeSheet != null)
+        val fadeEnabled = fadesPanelsWhenIdle(
+            layout,
+            hidesPanelsWhenIdle,
+            sheetOpen = activeSheet != null,
+            turntableUp = turntableUp,
+        )
         PanelIdleFadeWatcher(fade = panelFade, enabled = fadeEnabled)
         // The stage is identical in every layout; only the navigation around it differs.
         val stage: @Composable () -> Unit = {
@@ -464,16 +477,21 @@ fun DjAppScreen(
  * fade would both argue with that and hide controls the user parked there deliberately. An open
  * sheet lives in its own window and would not fade with the panels' alpha, so it stops the clock
  * too; dropdown popups do the same through the holder's own modal count (see KeepPanelsAwake).
+ * A turntable fader left up means the user is mid-mix, so the deck stays in view.
  */
 internal fun fadesPanelsWhenIdle(
     layout: DjLayout,
     vizOptsIn: Boolean,
     sheetOpen: Boolean,
+    turntableUp: Boolean,
 ): Boolean = when (layout) {
     DjLayout.LargeScreen -> false
     DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop ->
-        vizOptsIn && !sheetOpen
+        vizOptsIn && !sheetOpen && !turntableUp
 }
+
+/** Either deck's level fader above the floor. */
+internal fun anyTurntableUp(state: DjUiState): Boolean = state.wetA > 0f || state.wetB > 0f
 
 /**
  * The stage for each [DjLayout]; tabletop puts Pulsar above the hinge and everything else below.

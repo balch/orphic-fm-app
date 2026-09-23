@@ -206,7 +206,12 @@ class DjAppMainContentWiringTest {
                             DjLayoutBox(Modifier.fillMaxSize()) { resolved ->
                                 layout = resolved
                                 val enabled =
-                                    fadesPanelsWhenIdle(resolved, vizOptsIn = true, sheetOpen = false)
+                                    fadesPanelsWhenIdle(
+                                        resolved,
+                                        vizOptsIn = true,
+                                        sheetOpen = false,
+                                        turntableUp = false,
+                                    )
                                 PanelIdleFadeWatcher(fade, enabled)
                                 host.Chrome(resolved) {
                                     host.MainContent(
