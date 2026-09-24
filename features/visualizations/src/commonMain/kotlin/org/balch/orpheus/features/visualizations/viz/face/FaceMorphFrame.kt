@@ -11,13 +11,11 @@ internal const val FALLBACK_TURN_S = 240f
 internal data class StageBlend(val stage: Int, val t: Float)
 
 /**
- * How far into the final keyframe pair the turn is allowed to go. The last keyframe is a bare
- * skull; holding short of it leaves the face always arriving and never there. Paired with
- * [buildLastStageBiasMap], which turns the jaw first and the eyes last: bone teeth show from
- * about 0.45, the eyes hold to about 0.75, and only 1 empties the sockets.
- * FaceMorphRenderHarness renders the candidates.
+ * How far into the final keyframe pair the turn is allowed to go; 1 shows the last keyframe whole.
+ * [buildLastStageBiasMap] turns the jaw first and the eyes last, so holding short of 1 ends on the
+ * new teeth while the eyes are still arriving. FaceMorphRenderHarness renders the candidates.
  */
-internal const val LAST_STAGE_CAP = 0.65f
+internal const val LAST_STAGE_CAP = 0.8f
 
 /**
  * Requires [frameCount] >= 2. Non-finite or out-of-range [morph] is treated as clamped 0..1.
