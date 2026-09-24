@@ -147,12 +147,12 @@ class StayAsleepVibe : VibeProvider {
     //     peaks at 0.64 here (innerBars 4, outerDepth 0.6) and snaps back to 0, so a 0.2 pickup
     //     climbs 20% -> 31% -> 48% -> 71% and starts over. A lost roll drops the whole note.
     private val lickPool = listOf(
-        generateMainLick(.1f, .1f, .1f, .1f),
-        generateMainLick(.2f, .2f, .2f, .3f),
-        generateMainLick(.4f, .2f, .2f, .5f),
-        generateMainLick(.5f, .5f, .5f, .6f),
-        generateMainLick(.6f, .5f, .5f, .7f),
-        generateMainLick(.7f, .5f, .5f, .8f),
+        generateMainLick(.7f, .6f, .1f, .1f),
+        generateMainLick(.2f, .5f, .2f, .3f),
+        generateMainLick(.5f, .2f, .2f, .5f),
+        generateMainLick(.6f, .5f, .5f, .6f),
+        generateMainLick(.7f, .5f, .5f, .7f),
+        generateMainLick(1f, .8f, .8f, .9f),
     )
 
     private val replyLick = Lick(
@@ -203,7 +203,7 @@ class StayAsleepVibe : VibeProvider {
                         delaySend = 0.20f,
                     ),
                     1 to TrackSectionOverride(
-                        volume = 0.25f,
+                        volume = 0.55f,
                         morph = 0.85f,
                         density = .1f,
                         reverbSend = 0.55f,
@@ -228,7 +228,7 @@ class StayAsleepVibe : VibeProvider {
                 ),
                 trackOverrides = mapOf(
                     0 to TrackSectionOverride(volume = 0.84f, morph = 0.72f, density = 0.35f),
-                    1 to TrackSectionOverride(volume = 0.35f, morph = 0.62f, density = 0.15f),
+                    1 to TrackSectionOverride(volume = 0.45f, morph = 0.62f, density = 0.25f),
                     2 to TrackSectionOverride(density = 0f),
                     4 to TrackSectionOverride(density = 0.50f, volume = 0.58f),
                     5 to TrackSectionOverride(density = 0f),
@@ -307,7 +307,7 @@ class StayAsleepVibe : VibeProvider {
                 ),
                 trackOverrides = mapOf(
                     0 to TrackSectionOverride(volume = 0.80f, morph = 0.88f, density = 0.25f),
-                    1 to TrackSectionOverride(volume = 0.50f ,morph = 0.68f, density = 0.1f),
+                    1 to TrackSectionOverride(volume = 0.50f ,morph = 0.68f, density = 0.15f),
                     2 to TrackSectionOverride(volume = 0.50f, morph = 0.18f, density = 0.2f),
                     4 to TrackSectionOverride(density = .1f, volume = 0.05f),
                     5 to TrackSectionOverride(density = 0.15f),
@@ -332,11 +332,11 @@ class StayAsleepVibe : VibeProvider {
                 trackOverrides = mapOf(
                     0 to TrackSectionOverride(volume = 0.80f, morph = 0.78f, density = 0.25f),
                     1 to TrackSectionOverride(
-                        volume = 0.25f,
+                        volume = 0.75f,
                         morph = 0.85f,
                         reverbSend = 0.95f,
                         delaySend = 0.60f,
-                        hits = listOf(1, 13, 31),
+                        hits = listOf(13, 28, 29),
                     ),
                     2 to TrackSectionOverride(density = 0f),
                     4 to TrackSectionOverride(density = 0.25f, volume = 0.45f),
