@@ -692,7 +692,7 @@ private class FireSkyVibeBase(
                 // PLUCK_REPEAT_16TH_OFF upticks the held notes with the lead; volume sits under it.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.52f,
+                    volume = 0.44f,
                     modLfoRate = 0.30f,
                     modLfoDepth = 0.15f,
                     modLfoShape = 0.3f,
