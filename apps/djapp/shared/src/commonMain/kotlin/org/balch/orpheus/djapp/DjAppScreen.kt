@@ -74,8 +74,6 @@ import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.djapp.variant.mergeTabContributions
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
-import org.balch.orpheus.features.distortion.DistortionPanel
-import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjUiState
 import org.balch.orpheus.features.dj.DjViewModel
@@ -89,8 +87,6 @@ import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.mixer.MixerPanel
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
-import org.balch.orpheus.features.reverb.ReverbPanel
-import org.balch.orpheus.features.reverb.ReverbViewModel
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerPanel
 import org.balch.orpheus.features.timer.TimerStatus
@@ -285,19 +281,7 @@ fun DjAppScreen(
                             showExpandedTitle = showTitle,
                             fillHeight = fill,
                         )
-                        // Docked, Mix is the mixer alone; the nav destination keeps the
-                        // reverb strip above it, where there is room for both.
                         MixTab -> Column(modifier = panelModifier) {
-                            if (!docked) ReverbPanel(
-                                inVizFlow = synthEngine.reverbInVizFlow,
-                                outVizFlow = synthEngine.reverbOutVizFlow,
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                isExpanded = true,
-                                onExpandedChange = {},
-                                showCollapsedHeader = false,
-                                showExpandedTitle = showTitle,
-                                fillHeight = fill,
-                            )
                             MixerPanel(
                                 feature = mixerFeature,
                                 trackVizFlows = synthEngine.pulsarTrackVizFlows,
@@ -307,7 +291,7 @@ fun DjAppScreen(
                                 onExpandedChange = {},
                                 showCollapsedHeader = false,
                                 showExpandedTitle = showTitle,
-                            fillHeight = fill,
+                                fillHeight = fill,
                             )
                         }
                         HornTab -> {
@@ -1144,24 +1128,14 @@ private fun DjTabPreview() {
 private fun MixTabPreview() {
     OrpheusTheme {
         DjAppPreviewLayout(selectedTab = MixTab) { mod ->
-            Column(modifier = mod) {
-                ReverbPanel(
-                    feature = ReverbViewModel.previewFeature(),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    isExpanded = true,
-                    onExpandedChange = {},
-                    showCollapsedHeader = false,
-                    showExpandedTitle = false,
-                )
-                DistortionPanel(
-                    feature = DistortionViewModel.previewFeature(),
-                    modifier = Modifier.fillMaxWidth(),
-                    isExpanded = true,
-                    onExpandedChange = {},
-                    showCollapsedHeader = false,
-                    showExpandedTitle = false,
-                )
-            }
+            MixerPanel(
+                feature = MixerViewModel.previewFeature(),
+                modifier = mod,
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
         }
     }
 }
@@ -1293,24 +1267,14 @@ private fun DjTabLandscapePreview() {
 private fun MixTabLandscapePreview() {
     OrpheusTheme {
         DjAppPreviewLayout(selectedTab = MixTab, landscape = true) { mod ->
-            Column(modifier = mod) {
-                ReverbPanel(
-                    feature = ReverbViewModel.previewFeature(),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    isExpanded = true,
-                    onExpandedChange = {},
-                    showCollapsedHeader = false,
-                    showExpandedTitle = false,
-                )
-                DistortionPanel(
-                    feature = DistortionViewModel.previewFeature(),
-                    modifier = Modifier.fillMaxWidth(),
-                    isExpanded = true,
-                    onExpandedChange = {},
-                    showCollapsedHeader = false,
-                    showExpandedTitle = false,
-                )
-            }
+            MixerPanel(
+                feature = MixerViewModel.previewFeature(),
+                modifier = mod,
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
         }
     }
 }
