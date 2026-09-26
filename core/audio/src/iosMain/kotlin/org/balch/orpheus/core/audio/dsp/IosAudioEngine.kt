@@ -12,16 +12,20 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.FloatVar
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.usePinned
+import orpheus_dsp.ORPHEUS_SCOPE_MAX_POINTS
 import orpheus_dsp.OrpheusMonitorData
 import orpheus_dsp.orpheus_engine_blocks_rendered
 import orpheus_dsp.orpheus_engine_clear_automation
@@ -31,6 +35,7 @@ import orpheus_dsp.orpheus_engine_get_monitor
 import orpheus_dsp.orpheus_engine_get_port
 import orpheus_dsp.orpheus_engine_get_pulsar_arrangement
 import orpheus_dsp.orpheus_engine_get_pulsar_viz
+import orpheus_dsp.orpheus_engine_get_scope
 import orpheus_dsp.orpheus_engine_get_spectrum
 import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
@@ -1246,6 +1251,20 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                 orpheus_engine_get_spectrum(eng, pinned.addressOf(0), bands.size)
             }
         } ?: 0
+    }
+
+    // The scope lands here and is copied out under engineLock: usePinned would allocate a wrapper
+    // on every 60 Hz tick. Lives as long as this app-scoped engine.
+    private val scopeLanding = nativeHeap.allocArray<FloatVar>(ORPHEUS_SCOPE_MAX_POINTS)
+
+    override fun nativeGetScope(out: FloatArray, windowMs: Float): Int {
+        val n = out.size
+        if (n <= 0 || n > ORPHEUS_SCOPE_MAX_POINTS) return -1
+        return withEngine { eng ->
+            val result = orpheus_engine_get_scope(eng, scopeLanding, n, windowMs)
+            if (result >= 0) for (i in 0 until n) out[i] = scopeLanding[i]
+            result
+        } ?: -1
     }
 
     @OptIn(ExperimentalForeignApi::class)

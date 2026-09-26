@@ -39,6 +39,7 @@ import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
+import org.balch.orpheus.core.plugin.viz.ScopeFrame
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.plugins.drum.DrumPlugin
@@ -150,6 +151,7 @@ class DspSynthEngine(
     override val tidesCh2VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh2VizFlow
     override val tidesCh3VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh3VizFlow
     override val spectrumFlow: StateFlow<FloatArray> get() = monitor.spectrumFlow
+    override val scopeFrame: ScopeFrame get() = monitor.scopeFrame
     override val pulsarVizFlow get() = monitor.pulsarVizFlow
     override val pulsarTrackVizFlows get() = monitor.pulsarTrackVizFlows
     override val pulsarArrangementStateFlow get() = monitor.arrangementStateFlow
@@ -532,6 +534,10 @@ class DspSynthEngine(
 
     override fun setSpectrumEnabled(enabled: Boolean) {
         monitor.setSpectrumEnabled(enabled, audioEngine.isRunning)
+    }
+
+    override fun setScopeEnabled(enabled: Boolean) {
+        monitor.setScopeEnabled(enabled)
     }
 
     override fun setTurntableVizEnabled(enabled: Boolean) {

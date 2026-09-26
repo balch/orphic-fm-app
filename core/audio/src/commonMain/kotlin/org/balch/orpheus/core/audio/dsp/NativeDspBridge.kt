@@ -41,6 +41,14 @@ interface NativeDspBridge {
     fun nativeGetXRunCount(): Int = 0
     fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     fun nativeGetSpectrum(bands: FloatArray): Int
+
+    /**
+     * Fills [out] with the latest [windowMs] of the master mix, one averaged point per element
+     * (at most 1024). Returns 1 when the window starts on a repeating rising zero crossing, 0 when
+     * no trigger was found (silence or noise; [out] holds the newest window), or -1 when nothing
+     * was read ([out] untouched). Must not allocate: the scope poll calls it at 60 Hz.
+     */
+    fun nativeGetScope(out: FloatArray, windowMs: Float): Int
     fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     fun nativeLoadGraph(data: ByteArray): Int

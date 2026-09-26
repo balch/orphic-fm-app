@@ -175,6 +175,9 @@ int DesktopEngine::getViz(int channel, float* outBuf, int maxSamples, int* lastR
 int DesktopEngine::getSpectrum(float* bands, int numBands) {
     return dsp_engine_ ? orpheus_engine_get_spectrum(dsp_engine_, bands, numBands) : 0;
 }
+int DesktopEngine::getScope(float* out, int numPoints, float windowMs) {
+    return dsp_engine_ ? orpheus_engine_get_scope(dsp_engine_, out, numPoints, windowMs) : -1;
+}
 void DesktopEngine::getTurntableViz(int deck, float* outBuf) {
     if (dsp_engine_) orpheus_engine_get_turntable_viz(dsp_engine_, deck, outBuf);
     else memset(outBuf, 0, 129 * sizeof(float));

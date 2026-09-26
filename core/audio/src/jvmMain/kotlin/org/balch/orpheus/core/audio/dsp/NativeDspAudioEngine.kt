@@ -120,6 +120,20 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int =
         bridge.nativeGetViz(channel, outBuf, lastReadPos)
     override fun nativeGetSpectrum(bands: FloatArray): Int = bridge.nativeGetSpectrum(bands)
+
+    // Guarded like nativeLoadPulsarClip, and remembered: a 60 Hz poll must not throw every tick.
+    @Volatile
+    private var scopeMissing = false
+    override fun nativeGetScope(out: FloatArray, windowMs: Float): Int {
+        if (scopeMissing) return -1
+        return try {
+            bridge.nativeGetScope(out, windowMs)
+        } catch (e: UnsatisfiedLinkError) {
+            scopeMissing = true
+            log.warn { "nativeGetScope missing from the native library; rebuild it (${e.message})" }
+            -1
+        }
+    }
     override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) =
         bridge.nativeGetTurntableViz(deck, outBuf)
     override fun nativeGetPulsarViz(

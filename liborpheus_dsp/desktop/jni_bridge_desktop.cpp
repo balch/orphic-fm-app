@@ -233,6 +233,17 @@ JNI_FN(nativeGetSpectrum)(JNIEnv *env, jobject thiz, jfloatArray bands) {
     return count;
 }
 
+// Reads into a stack buffer and copies out only on success: no pinning, no Java allocation.
+JNIEXPORT jint JNICALL
+JNI_FN(nativeGetScope)(JNIEnv *env, jobject thiz, jfloatArray out, jfloat windowMs) {
+    float points[ORPHEUS_SCOPE_MAX_POINTS];
+    const jsize n = env->GetArrayLength(out);
+    if (n <= 0 || n > ORPHEUS_SCOPE_MAX_POINTS) return -1;
+    const int result = sEngine.getScope(points, n, windowMs);
+    if (result >= 0) env->SetFloatArrayRegion(out, 0, n, points);
+    return result;
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(nativeGetTurntableViz)(JNIEnv *env, jobject thiz,
                                jint deck, jfloatArray outBuf) {

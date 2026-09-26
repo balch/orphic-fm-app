@@ -48,6 +48,8 @@ static TestSuite suites[] = {
     {"preset",          run_preset_tests,          true},
     {"viz",             run_viz_tests,             true},
     {"spectrum",        run_spectrum_tests,        true},
+    {"scope",           run_scope_tests,           true},
+    {"engine_slot",     run_engine_slot_tests,     true},
     {"fm-compare",      run_fm_compare_tests,      true},
     {"chain-compare",   run_chain_compare_tests,   false},
     {"bass",            run_bass_voice_tests,      true},

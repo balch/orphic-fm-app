@@ -16,6 +16,7 @@ import org.balch.orpheus.core.plugin.viz.PULSAR_MAX_STEPS
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.core.plugin.viz.ScopeFrame
 import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -59,6 +60,11 @@ class SynthEngineMonitor(
     // Spectrum analyzer flow (FFT band magnitudes; UI-only poll, gated like the signal scope)
     private val _spectrumFlow = MutableStateFlow(FloatArray(0))
     val spectrumFlow: StateFlow<FloatArray> = _spectrumFlow.asStateFlow()
+
+    // Triggered scope of the master mix. Not a flow: the poll fills one array in place and bumps
+    // a version, and the ring's frame loop reads it by value.
+    private val scopeBuffer = ScopeFrameBuffer(SCOPE_POINTS, SCOPE_WINDOW_MS)
+    val scopeFrame: ScopeFrame get() = scopeBuffer
 
     // Signal visualization flows (60fps oscilloscope data)
     private val _lfoVizFlow = MutableStateFlow(FloatArray(0))
@@ -155,6 +161,7 @@ class SynthEngineMonitor(
     private var pulsarVizJob: Job? = null
     private var arrangementPollJob: Job? = null
     private var spectrumJob: Job? = null
+    private var scopeJob: Job? = null
     var startRequested = false
 
     // Volatile for the lone cross-thread read in DspSynthEngine.start(); all
@@ -178,6 +185,9 @@ class SynthEngineMonitor(
 
     /** Turntable viz was requested by UI (survives a background pause/resume). */
     private var turntableVizRequested = false
+
+    /** Scope was requested by UI (survives a background pause/resume and an engine restart). */
+    private var scopeRequested = false
 
     // Reusable IntArray(1) for JNI read position — avoids allocation per channel per poll
     private val vizReadPosBuf = IntArray(1)
@@ -247,6 +257,7 @@ class SynthEngineMonitor(
             if (vizRequested) launchVizPoll()
             if (turntableVizRequested) launchTurntableVizPoll()
             if (spectrumRequested) launchSpectrumPoll()
+            if (scopeRequested) launchScopePoll()
         }
     }
 
@@ -277,6 +288,7 @@ class SynthEngineMonitor(
                 // after stopMonitoring() would poll a stopped engine.
                 if (turntableVizRequested) launchTurntableVizPoll()
                 if (spectrumRequested) launchSpectrumPoll()
+                if (scopeRequested) launchScopePoll()
             }
         } else {
             log.info { "UI hidden — pausing UI polls (audio + arrangement poll keep running)" }
@@ -290,6 +302,8 @@ class SynthEngineMonitor(
             turntableVizJob = null
             spectrumJob?.cancel()
             spectrumJob = null
+            scopeJob?.cancel()
+            scopeJob = null
         }
     }
 
@@ -491,6 +505,8 @@ class SynthEngineMonitor(
         monitoringJob = null
         spectrumJob?.cancel()
         spectrumJob = null
+        scopeJob?.cancel()
+        scopeJob = null
     }
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
@@ -584,6 +600,42 @@ class SynthEngineMonitor(
         }
     }
 
+    /**
+     * Enable/disable the master-mix scope poll. Its own gate, not the Signal Monitor's or the
+     * Spectrograph's; like the other UI polls it runs only while monitoring with the UI visible.
+     * Disabling keeps the last window, so a paused trace can hold it.
+     */
+    fun setScopeEnabled(enabled: Boolean): Unit = synchronized(pollLock) {
+        scopeRequested = enabled
+        if (!enabled) {
+            scopeJob?.cancel()
+            scopeJob = null
+        } else if (uiVisible && monitoringActive) {
+            launchScopePoll()
+        }
+    }
+
+    /**
+     * ~60fps scope poll (UI-only consumer). Each job owns its scratch: cancel() is cooperative, so
+     * a quick off-on can leave the old job mid-read while the new one starts.
+     */
+    private fun launchScopePoll() {
+        if (scopeJob != null) return
+        scopeJob = monitoringScope.launch(dispatcherProvider.io) {
+            val scratch = FloatArray(SCOPE_POINTS)
+            while (isActive) {
+                pollScope(scratch)
+                delay(VIZ_POLL_INTERVAL)
+            }
+        }
+    }
+
+    /** One scope tick: the bridge fills [scratch], then it is published. Allocates nothing. */
+    internal fun pollScope(scratch: FloatArray) {
+        val result = nativeBridge.nativeGetScope(scratch, SCOPE_WINDOW_MS)
+        if (result >= 0) scopeBuffer.publish(scratch, triggered = result == 1)
+    }
+
     /** Update bend flow from external sources (setBend facade, setPluginPort). */
     fun updateBend(value: Float) {
         _bendFlow.value = value
@@ -597,6 +649,10 @@ class SynthEngineMonitor(
         private val MONITOR_POLL_INTERVAL = 200.milliseconds
         private val VIZ_POLL_INTERVAL = 16.milliseconds  // ~60fps
         const val SPECTRUM_BAND_COUNT = 40
+        /** Points per scope window; the native reader takes up to 1024. */
+        const val SCOPE_POINTS = 256
+        /** Audio time per scope window: a few cycles of a bass note. */
+        const val SCOPE_WINDOW_MS = 40f
         // Signal-monitor oscilloscope poll — the heaviest UI poll (24 channels,
         // each allocating a fresh FloatArray ring per tick). Run at half the
         // Pulsar/turntable rate: the Orphoscope only redraws at the display

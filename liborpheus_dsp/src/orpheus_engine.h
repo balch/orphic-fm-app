@@ -12,6 +12,7 @@
 #include "orpheus_voice.h"
 #include "orpheus_viz.h"
 #include "orpheus_spectrum.h"
+#include "orpheus_scope.h"
 
 // Include MI Clouds granular processor
 #include "clouds/dsp/granular_processor.h"
@@ -1384,4 +1385,7 @@ struct OrpheusEngine {
     // spectrum_analyzer.Analyze() off the audio thread.
     SampleRing       spectrum_ring;
     SpectrumAnalyzer spectrum_analyzer;
+
+    // ── Scope tap: the final output of every callback, read by orpheus_engine_get_scope ──
+    ScopeRing scope_ring;
 };

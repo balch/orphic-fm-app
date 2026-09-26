@@ -191,6 +191,7 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeLoadPulsarClip(slot: Int, samples: FloatArray, sampleRate: Int) { /* WASM: no TTS generator, so no clips */ }
     override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
     override fun nativeGetSpectrum(bands: FloatArray): Int = 0
+    override fun nativeGetScope(out: FloatArray, windowMs: Float): Int = -1 // WASM: no scope tap
     override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) { /* WASM: not yet implemented */ }
     override fun nativeGetPulsarViz(
         gatesOut: BooleanArray, velocitiesOut: FloatArray,

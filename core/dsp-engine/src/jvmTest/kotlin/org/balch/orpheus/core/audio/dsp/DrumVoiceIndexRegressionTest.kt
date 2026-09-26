@@ -164,6 +164,7 @@ class DrumVoiceIndexRegressionTest {
         override fun nativeGetMonitor(out: FloatArray) {}
         override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
         override fun nativeGetSpectrum(bands: FloatArray): Int = 0
+        override fun nativeGetScope(out: FloatArray, windowMs: Float): Int = -1
         override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) {}
         override fun nativeTriggerDrum(drumIndex: Int, accent: Float) {}
         override fun nativeLoadGraph(data: ByteArray): Int = 0

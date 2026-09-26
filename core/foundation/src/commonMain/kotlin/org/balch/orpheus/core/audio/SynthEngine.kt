@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.core.plugin.viz.ScopeFrame
 
 private val emptyVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
 private val emptyPulsarTrackVizFlows: List<StateFlow<FloatArray>> = List(8) { emptyVizFlow }
@@ -253,6 +254,9 @@ interface SynthEngine {
     // Spectrum analyzer flow (FFT band magnitudes, gated by setSpectrumEnabled)
     val spectrumFlow: StateFlow<FloatArray> get() = emptyVizFlow
 
+    /** Triggered scope of the master mix, read by value in a frame loop; filled while [setScopeEnabled]. */
+    val scopeFrame: ScopeFrame get() = ScopeFrame.Empty
+
     // Pulsar step grid visualization
     val pulsarVizFlow: StateFlow<PulsarVizData> get() = emptyPulsarVizFlow
 
@@ -267,6 +271,9 @@ interface SynthEngine {
 
     /** Enable/disable spectrum FFT polling. Only poll while Spectrograph is active. */
     fun setSpectrumEnabled(enabled: Boolean) {}
+
+    /** Enable/disable the 60 Hz scope poll behind [scopeFrame]. Independent of the other viz gates. */
+    fun setScopeEnabled(enabled: Boolean) {}
 
     /** Enable/disable turntable viz polling (DJ platter waveforms). */
     fun setTurntableVizEnabled(enabled: Boolean) {}

@@ -226,6 +226,7 @@ class SynthEngineMonitorEmissionGateTest {
         override fun nativeGetMonitor(out: FloatArray) {}
         override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
         override fun nativeGetSpectrum(bands: FloatArray): Int = 0
+        override fun nativeGetScope(out: FloatArray, windowMs: Float): Int = -1
 
         // Unused control surface.
         override fun nativeSetVoiceGate(index: Int, active: Boolean) {}

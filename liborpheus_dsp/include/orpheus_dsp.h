@@ -126,6 +126,16 @@ int  orpheus_engine_get_viz(OrpheusEngine* engine, int channel,
 // Fills bands[0..num_bands) with linear magnitude per log-spaced band. Returns num_bands.
 int  orpheus_engine_get_spectrum(OrpheusEngine* engine, float* bands, int num_bands);
 
+// ── Master scope (polled at ~60fps off the audio thread; the audio thread only writes) ──
+// Fills out[0..num_points) with window_ms (finite, > 0, clamped to 1-100) of the master mix as
+// heard, mono (L+R)/2, oldest first, each point a triangle-weighted average of the samples around
+// it. The window starts on a rising zero crossing that leaves a full window and repeats: the
+// steepest one within the latest repeat period, so a chord keeps its phase from read to read.
+// Returns 1 when triggered; 0 when no trigger was found (silence or noise), with out holding the
+// newest window; -1 for bad arguments or when the audio thread lapped the read, with out untouched.
+#define ORPHEUS_SCOPE_MAX_POINTS 1024
+int  orpheus_engine_get_scope(OrpheusEngine* engine, float* out, int num_points, float window_ms);
+
 // ── Automation (called from UI thread) ──────────
 // target: 0=VOICE_GATE, 1=VOICE_FREQ
 // voice_index: 0-11

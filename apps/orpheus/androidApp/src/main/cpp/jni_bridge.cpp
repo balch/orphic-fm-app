@@ -292,6 +292,18 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetSpectrum(
     return count;
 }
 
+// Reads into a stack buffer and copies out only on success: no pinning, no Java allocation.
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetScope(
+        JNIEnv *env, jobject thiz, jfloatArray out, jfloat windowMs) {
+    float points[ORPHEUS_SCOPE_MAX_POINTS];
+    const jsize n = env->GetArrayLength(out);
+    if (n <= 0 || n > ORPHEUS_SCOPE_MAX_POINTS) return -1;
+    const int result = sEngine.getScope(points, n, windowMs);
+    if (result >= 0) env->SetFloatArrayRegion(out, 0, n, points);
+    return result;
+}
+
 JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarViz(
         JNIEnv *env, jobject thiz,

@@ -3,6 +3,7 @@
 
 #include <oboe/Oboe.h>
 #include "orpheus_dsp.h"
+#include "orpheus_engine_slot.h"
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -24,9 +25,6 @@ public:
     int32_t getFramesPerBuffer() const;
     double getCpuLoad() const;
     int32_t getXRunCount() const;
-
-    // Direct C++ DSP engine access
-    OrpheusEngine* getDspEngine() { return dsp_engine_.load(std::memory_order_acquire); }
 
     // C API pass-through (called from JNI bridge for parameter control)
     void setPort(const char* uri, const char* sym, float value);
@@ -55,6 +53,7 @@ public:
     void getMonitor(OrpheusMonitorData* out);
     int  getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
     int  getSpectrum(float* bands, int numBands);
+    int  getScope(float* out, int numPoints, float windowMs);
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void getPulsarActiveEngines(int* out);
     void getPulsarArrangement(int* out);
@@ -83,7 +82,8 @@ public:
 
 private:
     std::shared_ptr<oboe::AudioStream> mStream;
-    std::atomic<OrpheusEngine*> dsp_engine_{nullptr};
+    // JNI threads borrow the engine per call, so a route-change rebuild can't free it under them.
+    OrpheusEngineSlot engine_;
     int32_t mCreatedSampleRate = 0;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};

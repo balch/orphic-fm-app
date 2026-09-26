@@ -58,6 +58,7 @@ class OboeAudioBridge : NativeDspBridge {
     external override fun nativeGetMonitor(out: FloatArray)
     external override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     external override fun nativeGetSpectrum(bands: FloatArray): Int
+    external override fun nativeGetScope(out: FloatArray, windowMs: Float): Int
     external override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     external override fun nativeLoadGraph(data: ByteArray): Int
     external override fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
