@@ -2,9 +2,11 @@ package org.balch.orpheus.ui.widgets
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -226,7 +228,9 @@ fun <T> EnumDropdown(
             DropdownValueText(
                 text = selectedDisplay,
                 color = color,
-                modifier = Modifier.widthIn(max = valueMaxWidth),
+                // Measured after the arrow and takes the leftover, so a squeezed chip ellipsizes
+                // its value instead of pushing the arrow off.
+                modifier = Modifier.weight(1f, fill = false).widthIn(max = valueMaxWidth),
             )
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
@@ -272,7 +276,11 @@ fun <T> EnumDropdown(
  *   real D-pad. Every production call site leaves this false.
  * @param locked shows the current value but never opens. The click target goes with it, which is
  *   also what takes the control out of the D-pad's focus order rather than leaving a dead stop.
+ * @param onLongPress fires on a long press; the Vibe picker arms the Void Anomaly with it.
+ * @param showLabel false drops the "LABEL: " prefix, leaving a narrow bar's room to the value. The
+ *   arrow still names [label] to a screen reader.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun <T> TvInlinePicker(
     label: String,
@@ -286,6 +294,8 @@ fun <T> TvInlinePicker(
     menuMaxHeight: Dp = 400.dp,
     previewFocused: Boolean = false,
     locked: Boolean = false,
+    onLongPress: (() -> Unit)? = null,
+    showLabel: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -315,23 +325,27 @@ fun <T> TvInlinePicker(
                         )
                     }
                 )
-                .clickable(
+                .combinedClickable(
                     enabled = !locked,
                     interactionSource = interactionSource,
                     indication = LocalIndication.current,
+                    onLongClick = onLongPress,
                     onClick = { expanded = true },
                 )
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "$label: ",
-                color = if (locked) Color.Gray else color.lighten(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 16.sp,
-                maxLines = 1,
-            )
+            if (showLabel) {
+                Text(
+                    text = "$label: ",
+                    color = if (locked) Color.Gray else color.lighten(),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                )
+            }
+            // Weighted, so a narrow picker ellipsises the value and keeps its label and arrow.
             Text(
                 text = selectedDisplay,
                 color = valueColor,
@@ -339,6 +353,7 @@ fun <T> TvInlinePicker(
                 fontSize = 19.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
             Icon(
                 imageVector = if (locked) Icons.Default.Lock else Icons.Default.ArrowDropDown,
@@ -548,6 +563,38 @@ private fun TvInlinePickerPreview() {
                 displayName = { it },
                 onSelected = {},
                 color = OrpheusColors.neonCyan,
+            )
+        }
+    }
+}
+
+@Preview(name = "TvInlinePicker — values only, for a narrow bar")
+@Composable
+private fun TvInlinePickerValuesOnlyPreview() {
+    OrpheusTheme {
+        Row(
+            modifier = Modifier
+                .background(OrpheusColors.blackHoleBackground)
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TvInlinePicker(
+                label = "Vibe",
+                selectedDisplay = "Dog House",
+                entries = listOf("Bell Tolls", "Dog House", "Filter Funk"),
+                displayName = { it },
+                onSelected = {},
+                color = OrpheusColors.cosmicPurple,
+                showLabel = false,
+            )
+            TvInlinePicker(
+                label = "Viz",
+                selectedDisplay = "Off",
+                entries = listOf("Random", "Off", "Aquarium"),
+                displayName = { it },
+                onSelected = {},
+                color = OrpheusColors.neonCyan,
+                showLabel = false,
             )
         }
     }

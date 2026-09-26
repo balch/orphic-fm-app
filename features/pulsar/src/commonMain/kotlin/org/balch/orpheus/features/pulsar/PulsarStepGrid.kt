@@ -58,8 +58,8 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
 
-/** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX */
-internal val TrackColors = listOf(
+/** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX. The DJ app's progress wave wears them too. */
+val PulsarTrackColors = listOf(
     Color(0xFFE53935), // 0 KICK - red
     Color(0xFFFF9800), // 1 PERC - orange
     Color(0xFFFFEB3B), // 2 HIHAT - yellow
@@ -264,7 +264,7 @@ fun PulsarStepGrid(
                 val trackY = track * (trackHeight + trackGap)
                 val totalCellGaps = (steps - 1) * cellGap
                 val cellWidth = (size.width - totalCellGaps) / steps
-                val color = TrackColors[track]
+                val color = PulsarTrackColors[track]
                 val playhead = viz.playheads[track]
 
                 // Selection highlight border
@@ -427,7 +427,7 @@ fun PulsarStepGrid(
                 if (data.isEmpty()) continue
 
                 val trackY = track * (trackHeight + trackGap)
-                val color = TrackColors[track]
+                val color = PulsarTrackColors[track]
                 // Anchor at 85% down (15% from bottom), peaks reach 7% from top
                 val baseY = trackY + trackHeight * 0.85f
                 val maxH = trackHeight * 0.78f  // 85% - 7% = 78% range

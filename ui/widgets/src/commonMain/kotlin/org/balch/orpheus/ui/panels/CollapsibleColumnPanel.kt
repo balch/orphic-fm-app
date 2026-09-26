@@ -68,6 +68,7 @@ private val TvPanelFocusBorderWidth = 5.dp
  *                   content between two weighted spacers. Set false to size to content
  *                   instead, which the DJ app's TV dock needs so panels keep their own
  *                   proportions rather than being pulled tall with a dead band.
+ * @param centerContent With [fillHeight], false pins content to the top and leaves the slack below.
  */
 @Composable
 fun CollapsibleColumnPanel(
@@ -80,6 +81,7 @@ fun CollapsibleColumnPanel(
     initialExpanded: Boolean = false,
     showCollapsedHeader: Boolean = true,
     fillHeight: Boolean = true,
+    centerContent: Boolean = true,
     backgroundContent: (@Composable () -> Unit)? = null,
     // Preview seam only: draws the same region-focus border [tvFocusRegionBorder] would, without
     // needing a real shared TvFocusRegionHolder + D-pad focus event to drive it. Every real call
@@ -220,7 +222,7 @@ fun CollapsibleColumnPanel(
 
                     // The spacers centre content in a full-height panel; with fillHeight off
                     // they would be the dead band we are trying to remove.
-                    if (fillHeight) Spacer(modifier = Modifier.weight(1f))
+                    if (fillHeight && centerContent) Spacer(modifier = Modifier.weight(1f))
                     content()
                     if (fillHeight) Spacer(modifier = Modifier.weight(1f))
                 }

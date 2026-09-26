@@ -30,8 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,13 +77,17 @@ private val PULSAR_SCALE_INDICES: List<Int> = PULSAR_SCALE_NAMES.indices.toList(
 private val PULSAR_ENVELOPE_INDICES: List<Int> = PULSAR_ENVELOPE_NAMES.indices.toList()
 
 /**
- * Ceiling on the VIBE value, past which the name ellipsizes.
- *
- * The selector row is a single non-wrapping line, so its width has to be predictable. ROOT, SCALE
- * and ENV are all short and bounded; VIBE is the only one whose length is open-ended, so capping it
- * caps the row. Sized to hold a two-word name and keep the four inside a phone's width.
+ * Ceiling on the VIBE value. VIBE is granted this before SCALE gets anything past
+ * [ScaleValueFloorWidth] — see [PulsarSelectorRow]'s doc for the full priority order.
  */
-private val VibeValueMaxWidth: Dp = 72.dp
+private val VibeValueMaxWidth: Dp = 160.dp
+
+/**
+ * Floor SCALE's value shrinks to once VIBE claims the row's leftover space. Chosen by rendering
+ * (`DropdownRenderHarness`, `PulsarSelectorRowTest`): wide enough that the "SCALE" caption above it
+ * never clips, narrow enough that it still reads as a value ("Pen…") rather than a bare ellipsis.
+ */
+private val ScaleValueFloorWidth: Dp = 84.dp
 
 /**
  * Pulsar Beat Machine panel.
@@ -98,10 +106,15 @@ fun PulsarPanel(
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
     fillHeight: Boolean = true,
+    centerContent: Boolean = true,
     // TV docks ENDING as its own bottom-bar button (DjTvBottomBar's "Ends") so it stays reachable
     // without expanding this panel. Everywhere else it stays here.
     showEndingControl: Boolean = true,
-    // A host with a short slot (closed iPhone Duo) passes less so the knob labels stay inside.
+    // The DJ dock's top bar is its one vibe picker (and carries the anomaly long-press), so the
+    // docked panel drops VIBE and keeps ROOT/SCALE/ENV.
+    showVibePicker: Boolean = true,
+    // A host with a short slot (closed iPhone Duo, a Fold's cover screen sideways) passes less so
+    // the knob labels stay inside.
     gridHeight: Dp = PulsarGridHeight,
 ) {
     // Held as State, not unwrapped: the flow emits every 16ms during playback, and the grid
@@ -119,6 +132,7 @@ fun PulsarPanel(
         expandedTitle = if (showExpandedTitle) "8 Track" else null,
         showCollapsedHeader = showCollapsedHeader,
         fillHeight = fillHeight,
+        centerContent = centerContent,
     ) {
         val state by pulsar.stateFlow.collectAsStateWithLifecycle()
         // scoreTick/scoreHeld free-run at 5Hz once a score plays (other consumers read them);
@@ -143,6 +157,7 @@ fun PulsarPanel(
                 actions = actions,
                 vibeList = vibeList,
                 voidGain = voidGain,
+                showVibe = showVibePicker,
             )
         }
 
@@ -241,10 +256,15 @@ fun PulsarPanel(
 }
 
 /**
- * VIBE/ROOT/SCALE/ENV dropdown row. Deliberately one line that never wraps: a Row measures each
- * child against what the earlier ones left over, so the only thing that can squeeze the rest is
- * VIBE, whose value length is unbounded. [VibeValueMaxWidth] caps it, which keeps the row's total
- * inside a phone's width without anything having to reflow.
+ * VIBE/ROOT/SCALE/ENV dropdown row. Deliberately one line that never wraps.
+ *
+ * Priority order, tightest to loosest: ROOT and ENV (at most 2 and 5 characters) always keep their
+ * natural width. VIBE is measured next and gets its whole name up to [VibeValueMaxWidth]. Only once
+ * VIBE has what it needs does SCALE give way, ellipsizing down to [ScaleValueFloorWidth]; VIBE
+ * itself ellipsises only after SCALE is already at that floor. [PriorityFitSelectorRow] is a custom
+ * [Layout] because a plain [Row] can't express this: a `weight(1f, fill = false)` child never hands
+ * its unused share back to a sibling, which is how VIBE used to ellipsize to a few letters while
+ * SCALE showed in full on a narrow panel.
  */
 @Composable
 private fun PulsarSelectorRow(
@@ -252,28 +272,29 @@ private fun PulsarSelectorRow(
     actions: PulsarPanelActions,
     vibeList: List<Vibe>,
     voidGain: Float,
+    showVibe: Boolean,
 ) {
     // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
     // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
     // dips below 1 and deepens the tint, breathing back as the mix returns.
     val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        EnumDropdown(
-            label = "VIBE",
-            selectedDisplay = state.vibe.name,
-            entries = vibeList,
-            displayName = { it.name },
-            onSelected = { actions.setVibe(it) },
-            color = OrpheusColors.cosmicPurple,
-            onLongPress = actions.onTriggerAnomaly,
-            highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
-            valueMaxWidth = VibeValueMaxWidth,
-            // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
-            menuWidth = 200.dp,
-        )
+    PriorityFitSelectorRow(gap = 8.dp) {
+        if (showVibe) {
+            EnumDropdown(
+                label = "VIBE",
+                selectedDisplay = state.vibe.name,
+                entries = vibeList,
+                displayName = { it.name },
+                onSelected = { actions.pickVibe(it) },
+                color = OrpheusColors.cosmicPurple,
+                modifier = Modifier.layoutId(SelectorSlot.Vibe),
+                onLongPress = actions.onTriggerAnomaly,
+                highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
+                valueMaxWidth = VibeValueMaxWidth,
+                // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
+                menuWidth = 200.dp,
+            )
+        }
 
         EnumDropdown(
             label = "ROOT",
@@ -282,6 +303,7 @@ private fun PulsarSelectorRow(
             displayName = { PULSAR_NOTE_NAMES[it] },
             onSelected = actions.setRootNote,
             color = OrpheusColors.cosmicPurple,
+            modifier = Modifier.layoutId(SelectorSlot.Root),
             // M3's own DropdownMenu floor, so short note names look as they always did.
             menuWidth = 112.dp,
         )
@@ -293,6 +315,7 @@ private fun PulsarSelectorRow(
             displayName = { PULSAR_SCALE_NAMES[it] },
             onSelected = actions.setScale,
             color = OrpheusColors.cosmicPurple,
+            modifier = Modifier.layoutId(SelectorSlot.Scale),
             menuWidth = 140.dp,
         )
 
@@ -308,9 +331,95 @@ private fun PulsarSelectorRow(
             displayName = { PULSAR_ENVELOPE_NAMES[it] },
             onSelected = actions.setEnvelopeMode,
             color = OrpheusColors.cosmicPurple,
+            modifier = Modifier.layoutId(SelectorSlot.Env),
             menuWidth = 112.dp,
         )
     }
+}
+
+/** Tags for [PriorityFitSelectorRow]'s children; VIBE is the only one that may be absent. */
+private enum class SelectorSlot { Vibe, Root, Scale, Env }
+
+/**
+ * Custom [Layout] implementing [PulsarSelectorRow]'s priority order. ROOT and ENV are measured at
+ * their intrinsic (natural) width first and always get it. VIBE is measured next, also at its
+ * intrinsic width (already capped internally by [EnumDropdown]'s own `valueMaxWidth`). SCALE gets
+ * whatever's left: its natural width if there's room, otherwise it shrinks toward
+ * [ScaleValueFloorWidth] before VIBE gives up anything.
+ *
+ * `BoxWithConstraints` is deliberately not used here: it crashes in this app's dialog layer.
+ * [androidx.compose.ui.layout.IntrinsicMeasurable.maxIntrinsicWidth] finds each child's natural
+ * width without committing a measurement, so every child is still measured exactly once, with the
+ * final width this pass decides on.
+ */
+@Composable
+private fun PriorityFitSelectorRow(
+    gap: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    // Remembered, as Row/Column do their own: a bare lambda would be a new policy every
+    // recomposition and remeasure this row on each voidGain frame of an anomaly duck.
+    val measurePolicy = remember(gap) {
+        MeasurePolicy { measurables, constraints ->
+            val gapPx = gap.roundToPx()
+            val rootM = measurables.first { it.layoutId == SelectorSlot.Root }
+            val scaleM = measurables.first { it.layoutId == SelectorSlot.Scale }
+            val envM = measurables.first { it.layoutId == SelectorSlot.Env }
+            val vibeM = measurables.firstOrNull { it.layoutId == SelectorSlot.Vibe }
+
+            val h = constraints.maxHeight
+            val rootWidth = rootM.maxIntrinsicWidth(h)
+            val envWidth = envM.maxIntrinsicWidth(h)
+            val scaleNatural = scaleM.maxIntrinsicWidth(h)
+
+            // On the dock (vibeM == null) ROOT/SCALE/ENV keep today's behavior: natural width, no floor.
+            val (vibeWidth, scaleWidth) = if (vibeM == null) {
+                0 to scaleNatural
+            } else {
+                val vibeNatural = vibeM.maxIntrinsicWidth(h)
+                val remaining = constraints.maxWidth - rootWidth - envWidth - gapPx * 3
+                val scaleFloorPx = ScaleValueFloorWidth.roundToPx()
+                when {
+                    // Everyone fits at their natural size.
+                    remaining >= vibeNatural + scaleNatural -> vibeNatural to scaleNatural
+                    // VIBE gets its full (capped) width; SCALE takes whatever's left, down to its floor.
+                    remaining >= vibeNatural + scaleFloorPx -> vibeNatural to (remaining - vibeNatural)
+                    // SCALE is pinned at its floor if that fits; below ~170dp (no real host is this
+                    // narrow) it shrinks further too, so this never asks for more than remaining.
+                    else -> {
+                        val scale = minOf(scaleFloorPx, remaining).coerceAtLeast(0)
+                        (remaining - scale).coerceAtLeast(0) to scale
+                    }
+                }
+            }
+
+            fun fit(width: Int) = Constraints(minWidth = width, maxWidth = width, maxHeight = h)
+
+            val vibeP = vibeM?.measure(fit(vibeWidth))
+            val rootP = rootM.measure(fit(rootWidth))
+            val scaleP = scaleM.measure(fit(scaleWidth))
+            val envP = envM.measure(fit(envWidth))
+
+            val gapCount = if (vibeP != null) 3 else 2
+            val totalWidth = (vibeP?.width ?: 0) + rootP.width + scaleP.width + envP.width + gapPx * gapCount
+            val totalHeight = maxOf(vibeP?.height ?: 0, rootP.height, scaleP.height, envP.height)
+
+            layout(totalWidth, totalHeight) {
+                var x = 0
+                vibeP?.let {
+                    it.placeRelative(x, 0)
+                    x += it.width + gapPx
+                }
+                rootP.placeRelative(x, 0)
+                x += rootP.width + gapPx
+                scaleP.placeRelative(x, 0)
+                x += scaleP.width + gapPx
+                envP.placeRelative(x, 0)
+            }
+        }
+    }
+    Layout(content = content, modifier = modifier, measurePolicy = measurePolicy)
 }
 
 /** The step grid's height wherever the panel has room for it. */
@@ -388,7 +497,7 @@ private fun PulsarVoiceDetailStrip(
             onClick = { actions.toggleTrackMute(selected) },
             shape = RoundedCornerShape(6.dp),
             color = if (isMuted) Color.Transparent
-                    else TrackColors[selected].copy(alpha = 0.15f),
+                    else PulsarTrackColors[selected].copy(alpha = 0.15f),
             shadowElevation = animatedElevation,
             modifier = Modifier
                 .graphicsLayer {
@@ -399,7 +508,7 @@ private fun PulsarVoiceDetailStrip(
         ) {
             Text(
                 text = PULSAR_TRACK_NAMES[selected],
-                color = TrackColors[selected],
+                color = PulsarTrackColors[selected],
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
