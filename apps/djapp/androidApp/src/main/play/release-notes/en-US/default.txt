@@ -1,8 +1,6 @@
-A new way to move between vibes, plus a fuller Fifth.
+This release is all about the Play button
 
-• Vibe transport: swipe the play button to change vibes, ringed by the song's progress drawn live from the mix.
-• A redesigned dock built around it.
-• Symphony No. 5 grows into a full score: ten sections, horn calls, an oboe cadenza, and timpani.
-• Stay Asleep gets new faces and a snare that brackets the song.
-• The DJ deck stays up while a fader is raised.
-• Steadier audio through headphone and Bluetooth disconnects.
+• Enjoy the big Play button with Vibe title underneath
+• Swipe for Prev/Next vibe
+• Progress rings the Play button and syncs with the music
+• Stay Asleep gets new faces and a snare that brackets the song
