@@ -24,6 +24,12 @@ interface MetadataProducer {
     val songFlow: StateFlow<String> get() = titleFlow
 
     /**
+     * Bumped each time a song starts from its top, including a restart of the same song, which
+     * [songFlow] cannot show. Producers without songs leave it at 0.
+     */
+    val songStartsFlow: StateFlow<Int> get() = NO_SONG_STARTS
+
+    /**
      * PNG-encoded artwork for the now-playing surface (macOS Control Center,
      * Auto, lock screen, etc). Null = "no artwork to advertise" — the
      * controller will not push an artwork update. Producers that don't render
@@ -37,3 +43,4 @@ interface MetadataProducer {
 
 private val EMPTY_ARTWORK: StateFlow<ByteArray?> = MutableStateFlow(null)
 private val NO_PROGRESS: StateFlow<PlaybackProgress?> = MutableStateFlow(null)
+private val NO_SONG_STARTS: StateFlow<Int> = MutableStateFlow(0)

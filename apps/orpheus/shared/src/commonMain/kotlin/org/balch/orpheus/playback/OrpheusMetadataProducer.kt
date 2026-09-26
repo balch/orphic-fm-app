@@ -82,6 +82,8 @@ class OrpheusMetadataProducer(
     // locked to one vibe) from unlocking just because an AI toggle changed the displayed title.
     override val songFlow: StateFlow<String> = pulsarMetadata.titleFlow
 
+    override val songStartsFlow: StateFlow<Int> = pulsarMetadata.songStartsFlow
+
     // Pass Pulsar's procedural artwork through unchanged. When AI / Evo modes
     // are active, we still surface Pulsar's vibe artwork — there isn't an
     // Orpheus-side image to advertise, and showing the underlying vibe gives

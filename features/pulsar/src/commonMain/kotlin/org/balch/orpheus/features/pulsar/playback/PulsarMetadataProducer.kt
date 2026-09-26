@@ -61,6 +61,8 @@ class PulsarMetadataProducer(
 
     override val progressFlow: StateFlow<PlaybackProgress?> = pulsarSession.progressFlow
 
+    override val songStartsFlow: StateFlow<Int> = pulsarSession.songGenerationFlow
+
     // Monotonic, so a wall-clock change cannot read as a huge or negative loop-cycle.
     private val clockOrigin = TimeSource.Monotonic.markNow()
     private val progressTracker = SongProgressTracker { clockOrigin.elapsedNow().inWholeMilliseconds }

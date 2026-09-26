@@ -131,6 +131,8 @@ class FaceMorphViz(
             // songFlow, not titleFlow: Orpheus overlays "Orpheus" onto titleFlow during AI/Evo
             // modes, and that toggle must not look like a song change mid-turn.
             var lastTitle = metadataProducer.songFlow.value
+            // A restart or a repeating song keeps its title; only the start count moves.
+            var lastStart = metadataProducer.songStartsFlow.value
             while (true) {
                 withFrameNanos { now ->
                     val dt = if (last == 0L) 0.016f else ((now - last) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
@@ -140,8 +142,10 @@ class FaceMorphViz(
                         shaderTime += dt
 
                         val title = metadataProducer.songFlow.value
-                        if (title != lastTitle) {
+                        val start = metadataProducer.songStartsFlow.value
+                        if (title != lastTitle || start != lastStart) {
                             lastTitle = title
+                            lastStart = start
                             director.reset()
                             turnOrigin.onSongChange(metadataProducer.progressFlow.value)
                         }
