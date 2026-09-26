@@ -108,7 +108,7 @@ play {
     // normal builds are unaffected.
     val serviceAccountKey = listOf(
         rootProject.file(".secrets"),
-        rootProject.file("apps/djapp/play-store/.secrets"),
+        rootProject.file("apps/djapp/store-listings/.secrets"),
     )
         .flatMap { it.listFiles()?.toList().orEmpty() }
         .filter { it.extension == "json" }

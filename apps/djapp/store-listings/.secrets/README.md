@@ -1,14 +1,17 @@
-# Play publishing secrets
+# Store publishing secrets
 
-Drop the Google Play service-account JSON key as `play-service-account.json` in
-EITHER location (the build checks the repo-root one first):
+Holds the Google Play service-account key and the App Store Connect `.p8` API keys
+(`AuthKey_<KEYID>.p8`, used by the `release-djapp` skill). Everything here except this
+README and `.gitignore` is ignored — **never commit a key**.
 
-    .secrets/play-service-account.json                     (repo root)
-    apps/djapp/play-store/.secrets/play-service-account.json  (here)
+Drop the Play key as `play-service-account.json` in EITHER location (the build
+checks the repo-root one first):
+
+    .secrets/play-service-account.json                               (repo root)
+    apps/djapp/store-listings/.secrets/play-service-account.json     (here)
 
 This is the key for `owner-830@orphic-dj.iam.gserviceaccount.com` (GCP project
-`orphic-dj`). Both paths are gitignored (`/.secrets/` and
-`apps/djapp/play-store/.secrets/*.json`) — **never commit the key**.
+`orphic-dj`).
 
 Used by Gradle Play Publisher (configured in
 `apps/djapp/androidApp/build.gradle.kts`). To publish:

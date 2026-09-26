@@ -165,7 +165,7 @@ session goes stale independently of the cert — see the `reference_apple_dev_te
 
 **Credentials — never hardcode these in a committed file:**
 
-- The `.p8` private key lives at `apps/djapp/play-store/.secrets/AuthKey_<KEYID>.p8`
+- The `.p8` private key lives at `apps/djapp/store-listings/.secrets/AuthKey_<KEYID>.p8`
   (gitignored — confirm with `git check-ignore -v` before touching that directory).
 - The **Key ID** is the `<KEYID>` in the filename above.
 - The **Issuer ID** (a UUID) is account-level, from App Store Connect → Users and Access →
@@ -199,7 +199,7 @@ xcodebuild -project <ABSOLUTE>/apps/djapp/iosApp/DjApp.xcodeproj -scheme DjApp \
   -configuration Release -destination generic/platform=iOS \
   -archivePath <ABSOLUTE>/DjApp.xcarchive \
   -allowProvisioningUpdates \
-  -authenticationKeyPath <ABSOLUTE>/apps/djapp/play-store/.secrets/AuthKey_<KEYID>.p8 \
+  -authenticationKeyPath <ABSOLUTE>/apps/djapp/store-listings/.secrets/AuthKey_<KEYID>.p8 \
   -authenticationKeyID <KEYID> -authenticationKeyIssuerID <ISSUER_ID> \
   MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" \
   archive > /tmp/xcodebuild-archive.log 2>&1
@@ -212,13 +212,13 @@ xcodebuild -exportArchive \
   -archivePath <ABSOLUTE>/DjApp.xcarchive \
   -exportPath <ABSOLUTE>/export-appstore-vX.Y.Z \
   -allowProvisioningUpdates \
-  -authenticationKeyPath <ABSOLUTE>/apps/djapp/play-store/.secrets/AuthKey_<KEYID>.p8 \
+  -authenticationKeyPath <ABSOLUTE>/apps/djapp/store-listings/.secrets/AuthKey_<KEYID>.p8 \
   -authenticationKeyID <KEYID> -authenticationKeyIssuerID <ISSUER_ID> \
   > /tmp/xcodebuild-export.log 2>&1
 
 # 6. Upload to App Store Connect. altool needs the key named exactly `AuthKey_<KEYID>.p8`
 #    in the dir pointed to by API_PRIVATE_KEYS_DIR.
-API_PRIVATE_KEYS_DIR=<ABSOLUTE>/apps/djapp/play-store/.secrets \
+API_PRIVATE_KEYS_DIR=<ABSOLUTE>/apps/djapp/store-listings/.secrets \
   xcrun altool --upload-app -f <ABSOLUTE>/export-appstore-vX.Y.Z/DjApp.ipa --type ios \
   --apiKey <KEYID> --apiIssuer <ISSUER_ID>
 ```

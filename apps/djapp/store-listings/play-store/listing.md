@@ -1,7 +1,7 @@
 # Orphic DJ — Play Store listing
 
 **The marketing copy is not in this file.** It lives in
-[`../androidApp/src/main/play/`](../androidApp/src/main/play/) and is uploaded from there by
+[`../../androidApp/src/main/play/`](../../androidApp/src/main/play/) and is uploaded from there by
 Gradle Play Publisher. Edit the `.txt` files; this document holds only the fields that have no
 file in that tree.
 

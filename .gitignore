@@ -72,9 +72,13 @@ keystore.properties
 *.keystore
 *.jks
 
-# Play Store service-account key (Gradle Play Publisher)
+# Store credentials: Play service-account key, App Store Connect .p8 keys
 /.secrets/
-apps/djapp/play-store/.secrets/*.json
+apps/djapp/store-listings/.secrets/*
+!apps/djapp/store-listings/.secrets/.gitignore
+!apps/djapp/store-listings/.secrets/README.md
+# Old home of the keys, kept ignored so leftover files there can't be committed
+apps/djapp/play-store/.secrets/
 
 # Local R8 / Perfetto analysis artifacts
 tmp/

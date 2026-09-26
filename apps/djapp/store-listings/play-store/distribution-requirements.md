@@ -9,7 +9,7 @@ are conditional and trigger only on **paid apps / in-app purchases**, **games**,
 
 Companion docs: [`play-console-setup.md`](play-console-setup.md) (click-through
 setup), [`listing.md`](listing.md) (Console-only listing fields; the marketing copy itself lives in
-[`../androidApp/src/main/play/`](../androidApp/src/main/play/)).
+[`../../androidApp/src/main/play/`](../../androidApp/src/main/play/)).
 
 Last reviewed: **2026-06-14** (Orphic DJ v1.4.2, `org.balch.djapp`).
 

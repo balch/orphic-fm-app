@@ -6,7 +6,7 @@ is self-contained so you can pause and resume.
 
 Companion document: [`listing.md`](listing.md) holds the Console-only fields (category, tags,
 privacy policy, title rationale). The marketing copy itself lives in
-[`../androidApp/src/main/play/`](../androidApp/src/main/play/) and is uploaded by Gradle Play
+[`../../androidApp/src/main/play/`](../../androidApp/src/main/play/) and is uploaded by Gradle Play
 Publisher — this walkthrough's manual-paste steps are the first-time path, not the ongoing one.
 
 ---
@@ -19,9 +19,9 @@ Have these to hand:
 - [ ] $25 one-time developer registration fee (already paid if you've used the console before)
 - [ ] Phone with the app installed for screenshots
 - [ ] `apps/djapp/androidApp/src/main/play/listings/en-US/` open in another window (the copy you'll
-      paste); `apps/djapp/play-store/listing.md` for the Console-only fields
-- [ ] Final app icon: `apps/djapp/play-store/assets/play-icon-512.png`
-- [ ] Feature graphic: `apps/djapp/play-store/assets/feature-graphic-1024x500.png`
+      paste); `apps/djapp/store-listings/play-store/listing.md` for the Console-only fields
+- [ ] Final app icon: `apps/djapp/store-listings/play-store/play-icon-512.png`
+- [ ] Feature graphic: `apps/djapp/store-listings/play-store/feature-graphic-1024x500.png`
 - [ ] Phone screenshots (≥2; see §3 below for capture instructions)
 - [ ] Privacy policy URL: `https://orphic.fm/dj/privacy/` (confirm it's live)
 - [ ] Release-signed AAB at `apps/djapp/androidApp/build/outputs/bundle/release/djapp-release.aab`
@@ -87,11 +87,11 @@ listing — they show in the carousel directly under the feature graphic.
 ~/Library/Android/sdk/platform-tools/adb devices         # confirm device
 ~/Library/Android/sdk/platform-tools/adb shell screencap -p /sdcard/orphic-1.png
 ~/Library/Android/sdk/platform-tools/adb pull /sdcard/orphic-1.png \
-    apps/djapp/play-store/assets/screenshots/01-main.png
+    apps/djapp/store-listings/capture/screenshots/01-main.png
 ~/Library/Android/sdk/platform-tools/adb shell rm /sdcard/orphic-1.png
 ```
 
-Save them under `apps/djapp/play-store/assets/screenshots/` with predictable
+Save them under `apps/djapp/store-listings/capture/screenshots/` with predictable
 names so the order is obvious in Play Console upload.
 
 ### Capture from desktop JVM build (fallback)
@@ -123,7 +123,7 @@ names (Pulsar, etc.).
 
 ## 4. Main store listing (left rail → Grow → Store presence → Main store listing)
 
-Paste from `../androidApp/src/main/play/`, which is the published source of truth. Paths below are
+Paste from `../../androidApp/src/main/play/`, which is the published source of truth. Paths below are
 relative to that directory:
 
 | Field | Source | Notes |
@@ -355,7 +355,7 @@ Store within ~15 minutes.
    - Permissions list matches §7
 5. **Release name** (internal): `1.0.0 – first closed beta`
 6. **Release notes** (per locale; en-US): paste the contents of
-   `../androidApp/src/main/play/release-notes/en-US/default.txt`.
+   `../../androidApp/src/main/play/release-notes/en-US/default.txt`.
 
    Keep it short. The first 80 chars are what shows up under the version
    number in the user's Play Store updates list.
@@ -446,10 +446,14 @@ views.
 ## Appendix C — Files in this directory
 
 - `listing.md` — Console-only fields (category, tags, privacy policy, title rationale) and the
-  writing rules. **Not** the copy; that lives in `../androidApp/src/main/play/`.
+  writing rules. **Not** the copy; that lives in `../../androidApp/src/main/play/`.
 - `play-console-setup.md` — this document
 - `distribution-requirements.md` — per-region legal compliance record
-- `assets/framed/*.html` — render sources for the store graphics and screenshot captions
-- `assets/framed/*.png`, `assets/screenshots/*.png` — rendered frames and raw captures
-- `assets/appstore/` — iPad screenshots for the Apple listing (copy in `../app-store/`)
-- `.secrets/` — GPP service account + App Store Connect `.p8` (gitignored)
+- `testing-instructions.md` — reviewer testing notes
+- `play-icon-512.png`, `feature-graphic-1024x500.png`, `tv-banner-1280x720.png` — staged store
+  graphics; the published copies are under `../../androidApp/src/main/play/listings/en-US/graphics/`
+
+Shared with the App Store listing, one level up in `store-listings/`:
+- `capture/` — screenshot tooling, caption templates (`framed/*.html`) and raw captures
+- `../app-store/` — Apple copy and the iPhone/iPad screenshot sets
+- `../.secrets/` — GPP service account + App Store Connect `.p8` (gitignored)
