@@ -1805,7 +1805,8 @@ private fun NavDestinationPanel(route: DjRoute, modifier: Modifier) {
             val density = LocalDensity.current
             HornPanel(
                 feature = HornViewModel.previewFeature(),
-                modifier = modifier.onSizeChanged { slotPx = it.height },
+                // Over the phone bar, as DjAppScreen lifts it off the dome's name pill.
+                modifier = modifier.padding(bottom = HornPillClearance).onSizeChanged { slotPx = it.height },
                 isExpanded = true,
                 onExpandedChange = {},
                 showCollapsedHeader = false,

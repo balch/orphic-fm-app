@@ -294,6 +294,10 @@ fun DjAppScreen(
                             )
                         }
                         HornTab -> {
+                            // Over the phone bar the dome's name pill rises onto Horn's knob labels:
+                            // the panel sits that much higher, its display giving up the height.
+                            val overBar = !docked && !layout.usesLandscapeChrome()
+                            val lift = if (overBar) HornPillClearance else 0.dp
                             // Only a filled slot is read back: its height comes from the layout,
                             // not the content. A docked panel wraps its content and keeps 160dp.
                             var slotPx by remember { mutableIntStateOf(0) }
@@ -306,7 +310,7 @@ fun DjAppScreen(
                                 outVizFlow = synthEngine.hornOutVizFlow,
                                 hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
                                 wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
-                                modifier = panelModifier.onSizeChanged { slotPx = it.height },
+                                modifier = panelModifier.padding(bottom = lift).onSizeChanged { slotPx = it.height },
                                 isExpanded = true,
                                 onExpandedChange = {},
                                 showCollapsedHeader = false,
@@ -1278,3 +1282,6 @@ private fun HornTabLandscapePreview() {
         }
     }
 }
+
+/** How far the Horn panel sits up off the phone bar, so the dome's name pill clears its knob labels. */
+internal val HornPillClearance = 16.dp
