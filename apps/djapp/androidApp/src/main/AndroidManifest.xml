@@ -38,8 +38,10 @@
             android:name=".DjMediaLibraryService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true">
+            <!-- Android Auto finds media apps by the legacy MediaBrowserService action. -->
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 
