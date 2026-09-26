@@ -11,20 +11,33 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import org.balch.orpheus.features.pulsar.VibeNavState
+import org.balch.orpheus.features.pulsar.playback.songArc
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 
-/** One tracker update: whose song, where it is and how long it runs, in ms. */
+/**
+ * One tracker update: whose song, where it is and how long it runs, in ms. Until [final] the
+ * length is only the tracker's estimate, and the song's last section has not begun. [estimateMs]
+ * is the song's first estimate, which holds while the length moves on to the forced or rolling end.
+ */
 @Immutable
-internal data class SongPosition(val song: String, val positionMs: Long, val durationMs: Long)
+internal data class SongPosition(
+    val song: String,
+    val positionMs: Long,
+    val durationMs: Long,
+    val final: Boolean = true,
+    val estimateMs: Long = durationMs,
+    /** Where the end locked in, which the arc bends from (see songArc); null until then. */
+    val lockedAtMs: Long? = null,
+)
 
 /** The nav state's song times, or null without them (no bar yet, or a render harness). */
 internal fun VibeNavState.songPosition(): SongPosition? {
     val position = positionMs ?: return null
     val duration = durationMs?.takeIf { it > 0L } ?: return null
-    return SongPosition(currentName, position, duration)
+    return SongPosition(currentName, position, duration, durationFinal, estimateMs?.takeIf { it > 0L } ?: duration, lockedAtMs)
 }
 
 /** The loop-cycle a hold or an ease may cover until two updates have measured one. */
@@ -41,32 +54,38 @@ private const val RestartWithinMs = 1_000L
  * only while playing. It runs on at play time from the last update, at most a cycle past it, eases
  * up to one ahead of it, and holds for one less than a cycle behind until the song catches up,
  * never backing up. A new song, a restart, or an update a cycle or more away (a seek) jumps.
+ *
+ * Its fraction is [songArc] at that position, from the latest update's numbers alone, so a ring
+ * mounted late or remounted draws the arc every other surface does.
  */
 @Immutable
 internal class SmoothPosition private constructor(
-    val song: String,
-    val durationMs: Long,
+    private val update: SongPosition,
     private val anchorMs: Long,
     private val shownMs: Float,
     private val realMs: Float,
     private val cycleMs: Long,
 ) {
+    val song: String get() = update.song
+    val durationMs: Long get() = update.durationMs
+
     fun positionAt(clockMs: Long): Float {
         val dt = (clockMs - anchorMs).coerceAtLeast(0L).toFloat()
         // Capped a cycle on: if the updates stall, the next one never has to pull it back.
         val real = realMs + min(dt, cycleMs.toFloat())
         val behind = realMs - shownMs
         val shown = if (behind > 0f) real - behind * exp(-dt / CatchUpMillis) else max(shownMs, real)
-        return shown.coerceAtMost(durationMs.toFloat())
+        return shown.coerceAtMost(update.durationMs.toFloat())
     }
 
-    fun fractionAt(clockMs: Long): Float = (positionAt(clockMs) / durationMs).coerceIn(0f, 1f)
+    fun fractionAt(clockMs: Long): Float =
+        songArc(positionAt(clockMs), update.durationMs, update.final, update.estimateMs, update.lockedAtMs)
 
     fun next(update: SongPosition, clockMs: Long): SmoothPosition {
         // Same song, same boundary, new length (the ending armed mid-cycle): the song has not moved,
         // so re-anchoring that stale boundary to now would stall the display until the next one.
         if (update.song == song && update.positionMs == realMs.toLong()) {
-            return SmoothPosition(song, update.durationMs, anchorMs, shownMs, realMs, cycleMs)
+            return SmoothPosition(update, anchorMs, shownMs, realMs, cycleMs)
         }
         val shown = positionAt(clockMs)
         val real = update.positionMs.toFloat()
@@ -76,13 +95,13 @@ internal class SmoothPosition private constructor(
         // A cycle is the step between two updates that ran on from each other; a jump measures nothing.
         val step = update.positionMs - realMs.toLong()
         val cycle = if (!jump && step > 0L) step else cycleMs
-        return SmoothPosition(update.song, update.durationMs, clockMs, if (jump) real else shown, real, cycle)
+        return SmoothPosition(update, clockMs, if (jump) real else shown, real, cycle)
     }
 
     companion object {
         fun start(update: SongPosition, clockMs: Long): SmoothPosition {
             val real = update.positionMs.toFloat()
-            return SmoothPosition(update.song, update.durationMs, clockMs, real, real, DefaultCycleMs)
+            return SmoothPosition(update, clockMs, real, real, DefaultCycleMs)
         }
     }
 }

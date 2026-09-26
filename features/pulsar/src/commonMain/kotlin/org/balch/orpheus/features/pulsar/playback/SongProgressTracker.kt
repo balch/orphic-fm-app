@@ -4,6 +4,7 @@ import org.balch.orpheus.core.media.PlaybackProgress
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import kotlin.math.abs
+import kotlin.math.min
 
 /** How many recent loop-cycle intervals the median is taken over. */
 internal const val CycleWindow = 5
@@ -101,6 +102,10 @@ class SongProgressTracker(private val nowMs: () -> Long) {
 
     /** Bar time of the sections already played this song. */
     private var songMsBeforeSection = 0L
+    /** The shortest estimate this song has had: the arc's slowdown scale, which the forced and rolling ends never move. */
+    private var songEstimateMs = Long.MAX_VALUE
+    /** Where this song's end first locked in: every surface's arc bends from here (see songArc). */
+    private var songLockedAtMs: Long? = null
     private var sectionBarsTotal = 0
     private var msPerCycle = 0f
 
@@ -116,6 +121,8 @@ class SongProgressTracker(private val nowMs: () -> Long) {
                 songId = timing.songId
                 vibeStartedMs = now
                 songMsBeforeSection = 0L
+                songEstimateMs = Long.MAX_VALUE
+                songLockedAtMs = null
                 startSection(state, timing.bpmMultiplier, now)
             }
             state.sectionIndex != sectionIndex || state.barsElapsed < barsAtBoundary -> {
@@ -146,14 +153,24 @@ class SongProgressTracker(private val nowMs: () -> Long) {
         sectionBarsTotal = state.barsTotal
         val sectionEndMs = songMsBeforeSection + (state.barsTotal * msPerCycle).toLong()
         val positionMs = songMsBeforeSection + (state.barsElapsed * msPerCycle).toLong()
+        songEstimateMs = min(songEstimateMs, timing.estimatedMs)
+        val final = state.sectionIndex == timing.finalSectionIndex
         val durationMs = when {
-            state.sectionIndex == timing.finalSectionIndex -> sectionEndMs
+            final -> sectionEndMs
             positionMs < timing.estimatedMs -> timing.estimatedMs
             // The ending is forced at the maximum; past that it is off, and the end rolls a section at a time.
+            // The song has no end then, so it stays unfinal and the arc holds short of a full ring.
             positionMs < timing.maxMs -> timing.maxMs
             else -> sectionEndMs
         }
-        return PlaybackProgress(positionMs = positionMs.coerceIn(0L, durationMs), durationMs = durationMs)
+        if (final && songLockedAtMs == null) songLockedAtMs = positionMs
+        return PlaybackProgress(
+            positionMs = positionMs.coerceIn(0L, durationMs),
+            durationMs = durationMs,
+            durationFinal = final,
+            estimateMs = songEstimateMs,
+            lockedAtMs = if (final) songLockedAtMs else null,
+        )
     }
 
     private fun startSection(state: PulsarArrangementState, bpmMultiplier: Float, now: Long) {

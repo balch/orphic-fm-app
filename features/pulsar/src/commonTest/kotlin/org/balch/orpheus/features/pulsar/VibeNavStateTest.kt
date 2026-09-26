@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar
 
 import org.balch.orpheus.core.media.PlaybackProgress
+import org.balch.orpheus.features.pulsar.playback.songArc
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,8 +26,19 @@ class VibeNavStateTest {
         assertEquals(1f, vibeNavStateOf(names, "A", PlaybackProgress(300_000, 200_000)).progress)
     }
 
+    // Every surface draws the same arc, TV and a ring's first frame included: slowed until the end is
+    // known, then bending from where it locked in.
     @Test
-    fun aZeroDurationHasNoProgress() = assertNull(vibeNavStateOf(names, "A", PlaybackProgress(0, 0)).progress)
+    fun progressIsTheSongArc() {
+        val estimated = PlaybackProgress(230_000, 240_000, durationFinal = false, estimateMs = 217_000)
+        assertEquals(songArc(230_000f, 240_000, false, 217_000, null), vibeNavStateOf(names, "A", estimated).progress)
+        val locked = PlaybackProgress(250_000, 280_000, estimateMs = 217_000, lockedAtMs = 240_000)
+        assertEquals(songArc(250_000f, 280_000, true, 217_000, 240_000), vibeNavStateOf(names, "A", locked).progress)
+        assertEquals(240_000L, vibeNavStateOf(names, "A", locked).lockedAtMs)
+    }
+
+    @Test
+    fun aZeroDurationHasNoProgress()= assertNull(vibeNavStateOf(names, "A", PlaybackProgress(0, 0)).progress)
 
     // The chrome runs the playhead on between the tracker's loop-cycle updates, so it needs the times too.
     @Test

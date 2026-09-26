@@ -17,6 +17,14 @@ class SongProgressTrackerTest {
     private val doubleTime = verse.copy(bpmMultiplier = 2f)
     private val estimate = 217_000L
 
+    // Progress before the final section begins: its end is only a guess.
+    private fun estimated(positionMs: Long, durationMs: Long, estimateMs: Long = estimate) =
+        PlaybackProgress(positionMs, durationMs, durationFinal = false, estimateMs = estimateMs)
+
+    // Progress in the final section: its end is real, locked in at [lockedAtMs], and the song's estimate rides along.
+    private fun locked(positionMs: Long, durationMs: Long, lockedAtMs: Long) =
+        PlaybackProgress(positionMs, durationMs, estimateMs = estimate, lockedAtMs = lockedAtMs)
+
     private fun state(section: Int, bars: Int, total: Int = 8) =
         PulsarArrangementState(section, bars, total, false, -1, 0)
 
@@ -32,21 +40,21 @@ class SongProgressTrackerTest {
 
     @Test
     fun theSeedDrivesASectionsFirstCycles() {
-        assertEquals(PlaybackProgress(0, estimate), tracker.update(state(0, 0), verse))
-        assertEquals(PlaybackProgress(4_000, estimate), play(0, bars = 1, gapMs = 8_000))
+        assertEquals(estimated(0, estimate), tracker.update(state(0, 0), verse))
+        assertEquals(estimated(4_000, estimate), play(0, bars = 1, gapMs = 8_000))
     }
 
     @Test
     fun twoSamplesDoNotOverruleTheSeed() {
         tracker.update(state(0, 0), verse)
-        assertEquals(PlaybackProgress(8_000, estimate), play(0, bars = 2, gapMs = 8_000))
+        assertEquals(estimated(8_000, estimate), play(0, bars = 2, gapMs = 8_000))
     }
 
     @Test
     fun threeSamplesReplaceAWrongSeed() {
         // The loop really runs 8000ms, twice the seed; the median takes over at three samples.
         tracker.update(state(0, 0), verse)
-        assertEquals(PlaybackProgress(24_000, estimate), play(0, bars = 3, gapMs = 8_000))
+        assertEquals(estimated(24_000, estimate), play(0, bars = 3, gapMs = 8_000))
     }
 
     @Test
@@ -56,7 +64,7 @@ class SongProgressTrackerTest {
             clock += gap
             tracker.update(state(0, i + 1), verse)
         }
-        assertEquals(PlaybackProgress(20_000, estimate), tracker.update(state(0, 5), verse))
+        assertEquals(estimated(20_000, estimate), tracker.update(state(0, 5), verse))
     }
 
     @Test
@@ -65,8 +73,8 @@ class SongProgressTrackerTest {
         play(0, bars = 8)
         // Eight 4000ms cycles are behind us when the second section starts.
         clock += 4_000
-        assertEquals(PlaybackProgress(32_000, estimate), tracker.update(state(1, 0), verse))
-        assertEquals(PlaybackProgress(44_000, estimate), play(1, bars = 3))
+        assertEquals(estimated(32_000, estimate), tracker.update(state(1, 0), verse))
+        assertEquals(estimated(44_000, estimate), play(1, bars = 3))
     }
 
     @Test
@@ -76,7 +84,7 @@ class SongProgressTrackerTest {
         play(0, bars = 8, gapMs = 8_000)
         clock += 8_000
         tracker.update(state(1, 0), doubleTime)
-        assertEquals(PlaybackProgress(64_000 + 8_000, estimate), play(1, bars = 2, gapMs = 4_000, timing = doubleTime))
+        assertEquals(estimated(64_000 + 8_000, estimate), play(1, bars = 2, gapMs = 4_000, timing = doubleTime))
     }
 
     @Test
@@ -85,7 +93,7 @@ class SongProgressTrackerTest {
         play(0, bars = 8)
         clock += 4_000
         // barsElapsed drops back to 0 in the same section: the engine re-entered it.
-        assertEquals(PlaybackProgress(32_000, estimate), tracker.update(state(0, 0), verse))
+        assertEquals(estimated(32_000, estimate), tracker.update(state(0, 0), verse))
     }
 
     @Test
@@ -94,8 +102,17 @@ class SongProgressTrackerTest {
         play(0, bars = 8, gapMs = 8_000)
         val next = SongTiming("Rust Belt", stepCount = 16, bpm = 60f, bpmMultiplier = 1f, songSeconds = 180..200, finalSectionIndex = -1)
         // 16 x 15000 / 60 = 4000ms, the new vibe's seed, not the old measurement; estimate 180 + 20 * 3 / 4 = 195s.
-        assertEquals(PlaybackProgress(0, 195_000), tracker.update(state(0, 0), next))
-        assertEquals(PlaybackProgress(4_000, 195_000), play(0, bars = 1, gapMs = 8_000, timing = next))
+        assertEquals(estimated(0, 195_000, 195_000), tracker.update(state(0, 0), next))
+        assertEquals(estimated(4_000, 195_000, 195_000), play(0, bars = 1, gapMs = 8_000, timing = next))
+    }
+
+    // The estimate is the shortest this song has had, so a longer one after a shorter song must still show.
+    @Test
+    fun eachSongHasItsOwnEstimate() {
+        val short = SongTiming("Rust Belt", stepCount = 32, bpm = 120f, bpmMultiplier = 1f, songSeconds = 180..200, finalSectionIndex = -1)
+        tracker.update(state(0, 0), short)
+        assertEquals(estimated(4_000, 195_000, 195_000), play(0, bars = 1, timing = short))
+        assertEquals(estimated(0, estimate), tracker.update(state(0, 0), verse))
     }
 
     @Test
@@ -106,8 +123,8 @@ class SongProgressTrackerTest {
         // The engine still reports the old song's section for a poll after the vibe changes.
         tracker.update(state(2, 5), next)
         clock += 200
-        assertEquals(PlaybackProgress(0, estimate), tracker.update(state(0, 0), next))
-        assertEquals(PlaybackProgress(8_000, estimate), play(0, bars = 2, timing = next))
+        assertEquals(estimated(0, estimate), tracker.update(state(0, 0), next))
+        assertEquals(estimated(8_000, estimate), play(0, bars = 2, timing = next))
     }
 
     @Test
@@ -124,8 +141,20 @@ class SongProgressTrackerTest {
         clock += 4_000
         // The ending is armed and the outro (section 3, 6 bars) begins: the song ends when it does.
         val ending = verse.copy(finalSectionIndex = 3)
-        assertEquals(PlaybackProgress(32_000, 56_000), tracker.update(state(3, 0, total = 6), ending))
-        assertEquals(PlaybackProgress(44_000, 56_000), play(3, bars = 3, timing = ending, total = 6))
+        assertEquals(locked(32_000, 56_000, lockedAtMs = 32_000), tracker.update(state(3, 0, total = 6), ending))
+        assertEquals(locked(44_000, 56_000, lockedAtMs = 32_000), play(3, bars = 3, timing = ending, total = 6))
+    }
+
+    // The lock is the song's: a restart that reaches its final section again locks where it gets there.
+    @Test
+    fun aRestartLocksAfresh() {
+        val ending = verse.copy(finalSectionIndex = 0)
+        tracker.update(state(0, 0), verse)
+        play(0, bars = 3)
+        assertEquals(12_000L, tracker.update(state(0, 3), ending)?.lockedAtMs)
+        clock += 4_000
+        tracker.update(state(0, 0), ending.copy(songId = 1))
+        assertEquals(locked(8_000, 32_000, lockedAtMs = 0), play(0, bars = 2, timing = ending.copy(songId = 1)))
     }
 
     @Test
@@ -133,19 +162,20 @@ class SongProgressTrackerTest {
         tracker.update(state(0, 0), verse)
         play(0, bars = 3)
         // Armed while already in the outro: the engine finishes this pass, then re-enters and ends.
-        assertEquals(PlaybackProgress(12_000, 32_000), tracker.update(state(0, 3), verse.copy(finalSectionIndex = 0)))
+        assertEquals(locked(12_000, 32_000, lockedAtMs = 12_000), tracker.update(state(0, 3), verse.copy(finalSectionIndex = 0)))
     }
 
     @Test
     fun overrunningTheEstimateBumpsToTheForcedEndThenRollsBySection() {
         tracker.update(state(0, 0, total = 60), verse)
         // 55 cycles = 220s, past the 217s estimate: the duration moves to the forced 240s end.
-        assertEquals(PlaybackProgress(216_000, estimate), play(0, bars = 54, total = 60))
-        assertEquals(PlaybackProgress(220_000, 240_000), play(0, bars = 1, total = 60, from = 54))
-        // Past the forced end (song ending off), the end rolls to the current section's boundary.
+        assertEquals(estimated(216_000, estimate), play(0, bars = 54, total = 60))
+        assertEquals(estimated(220_000, 240_000), play(0, bars = 1, total = 60, from = 54))
+        // Past the forced end (song ending off), the end rolls to the current section's boundary. It is
+        // never final, since the song never ends: the arc holds short of a full ring on the same estimate.
         clock += 4_000
         tracker.update(state(1, 0, total = 50), verse)
-        assertEquals(PlaybackProgress(280_000, 440_000), play(1, bars = 10, total = 50))
+        assertEquals(estimated(280_000, 440_000), play(1, bars = 10, total = 50))
     }
 
     // Records one loop-cycle boundary [gapMs] after the last and returns the published duration.
@@ -201,6 +231,6 @@ class SongProgressTrackerTest {
         play(1, bars = 3)
         // Same vibe re-applied: only the song id moves, and the engine is back at section 0.
         clock += 4_000
-        assertEquals(PlaybackProgress(0, estimate), tracker.update(state(0, 0), verse.copy(songId = 1)))
+        assertEquals(estimated(0, estimate), tracker.update(state(0, 0), verse.copy(songId = 1)))
     }
 }
