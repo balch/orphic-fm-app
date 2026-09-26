@@ -13,7 +13,8 @@
 - [Pulsar TransitionSettingsSheet design](pulsar_transition_settings_sheet.md) — MORPH header, style chips, handoff knob, cosmicPurple
 
 ## Compose Library Internals
-- [NavigationSuiteScaffold per-item colors](navigation_suite_scaffold_colors.md) — no scaffold-level color param, must pass colors to every `item()`, how to read CMP sources from the Gradle cache
+- [DjAppNavScaffold bar/rail + item colors](navigation_suite_scaffold_colors.md) — suite scaffold dropped for Column/Row around M3 bar/rail with a custom transport slot (why), per-item indicator colors, how to read CMP sources from the Gradle cache
+- [Overhanging content hit testing](compose_overhang_hit_testing.md) — lift outside pointer nodes, M3 Surface clips, NavigationBarItem label drifts with icon height, wake overlay eats stage overhangs
 - [iOS Skiko shader support](ios_skiko_shader_support.md) — iOS renders through skiko same as JVM/WASM; `skikoShaderMain` source-set fan-out pattern
 
 ## Pulsar Panel Patterns
@@ -30,3 +31,7 @@
 
 ## Rendering Performance
 - [Sprite-baking for path-heavy visualizations](sprite_baking_path_heavy_viz.md) — Skia CPU `TriangulatingPathOp` is the cost; bake per-colour `ImageBitmap` once and blit, why `BlendMode.Plus` makes it safe, `ImageComposeScene` A/B technique
+- [Frame budget lessons](frame_budget_measurement_lessons.md) — what ScopeCounter counts, pixel-identical swaps that held, bimodal scenes, `--rerun` binds per task
+- [Dome cues + shared-worktree testing](dome_cues_and_shared_worktree_testing.md) — `LocalVibeDomeCues` reaches every dome, same-frame moves hide double rolls, S7 first-swipe warm-up, private scratch worktree A/B
+- [Scope ring tuned on real audio](scope_ring_real_audio_tuning.md) — port-dump + C++ replay capture recipe, real window levels/trigger rates, hits arrive untriggered, why 40ms
+- [ImageComposeScene's shared lifecycle registry](imagecomposescene_shared_lifecycle_registry.md) — LifecycleStartEffect races collectAsStateWithLifecycle in scene tests; HoldWhileStarted; hand-moved lifecycle recipe
