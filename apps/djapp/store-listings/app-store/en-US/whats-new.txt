@@ -1,8 +1,7 @@
-A new vibe and visualization paying homage to a classic. Plus widget and fold support.
+A new way to move between vibes, plus a fuller Fifth.
 
-• Stay Asleep: a new vibe and visualization showing off all-new sound and visual effects.
-• Home Screen and Lock Screen widgets for one-tap transport control.
-• New iPhone Duo and iPad layouts.
-• Whole-song progress now shows on your Lock Screen and Now Playing.
-• New street sounds: sirens, footsteps, passing trains, and spoken phrases.
-• Smarter solo and jam mechanics — the band listens and answers.
+• Vibe transport: swipe the play button to change vibes, ringed by the song's progress drawn live from the mix.
+• A redesigned dock built around it.
+• Symphony No. 5 grows into a full score: ten sections, horn calls, an oboe cadenza, and timpani.
+• Stay Asleep gets new faces and a snare that brackets the song.
+• The DJ deck stays up while a fader is raised.

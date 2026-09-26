@@ -10,6 +10,7 @@ living solely in a web form, which is how a broken sentence shipped in 2.0.5.
 | `en-US/description.txt` | Description (version page) | 4,000 |
 | `en-US/promotional-text.txt` | Promotional Text (version page) | 170 |
 | `en-US/keywords.txt` | Keywords (version page), comma-separated | 100 |
+| `en-US/name.txt` | Name — **App Information**, not the version page. Matches Play's title; the home-screen label stays `Orphic DJ` (`APP_DISPLAY_NAME` in `iosApp/project.yml`) | 30 |
 | `en-US/subtitle.txt` | Subtitle — **App Information**, not the version page | 30 |
 
 Deliberately unlike Play: no `• 1 home-screen widget` bullet (Glance is Android-only) and no
