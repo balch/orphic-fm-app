@@ -5,7 +5,7 @@ internal object NewsCopy {
     const val bannerColour = "BREAKING NEWS"
     const val bannerMono = "STAY ASLEEP"
 
-    const val profileColour = "Congressman"
+    const val profileColour = "POLITICS"
     const val profileMono = "OBEY"
 
     /** One line each, top to bottom; the last is set smaller. */
