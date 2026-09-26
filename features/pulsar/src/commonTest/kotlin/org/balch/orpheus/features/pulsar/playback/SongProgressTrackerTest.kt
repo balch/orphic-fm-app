@@ -18,8 +18,8 @@ class SongProgressTrackerTest {
     private val estimate = 217_000L
 
     // Progress before the final section begins: its end is only a guess.
-    private fun estimated(positionMs: Long, durationMs: Long, estimateMs: Long = estimate) =
-        PlaybackProgress(positionMs, durationMs, durationFinal = false, estimateMs = estimateMs)
+    private fun estimated(positionMs: Long, durationMs: Long, estimateMs: Long = estimate, endless: Boolean = false) =
+        PlaybackProgress(positionMs, durationMs, durationFinal = false, estimateMs = estimateMs, endless = endless)
 
     // Progress in the final section: its end is real, locked in at [lockedAtMs], and the song's estimate rides along.
     private fun locked(positionMs: Long, durationMs: Long, lockedAtMs: Long) =
@@ -172,10 +172,20 @@ class SongProgressTrackerTest {
         assertEquals(estimated(216_000, estimate), play(0, bars = 54, total = 60))
         assertEquals(estimated(220_000, 240_000), play(0, bars = 1, total = 60, from = 54))
         // Past the forced end (song ending off), the end rolls to the current section's boundary. It is
-        // never final, since the song never ends: the arc holds short of a full ring on the same estimate.
+        // never final, since the song never ends: the arc holds short of a full ring on the same estimate,
+        // and the gap lights up to say the song is still going.
         clock += 4_000
         tracker.update(state(1, 0, total = 50), verse)
-        assertEquals(estimated(280_000, 440_000), play(1, bars = 10, total = 50))
+        assertEquals(estimated(280_000, 440_000, endless = true), play(1, bars = 10, total = 50))
+    }
+
+    // Arming past the forced end (auto-ending turned back on, or armed by hand) puts the light out.
+    @Test
+    fun armingPastTheForcedEndIsNoLongerEndless() {
+        tracker.update(state(0, 0, total = 70), verse)
+        assertEquals(true, play(0, bars = 61, total = 70)?.endless)
+        val armed = verse.copy(finalSectionIndex = 2)
+        assertEquals(estimated(248_000, 280_000), play(0, bars = 1, total = 70, from = 61, timing = armed))
     }
 
     // Records one loop-cycle boundary [gapMs] after the last and returns the published duration.

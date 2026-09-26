@@ -419,7 +419,10 @@ private fun ringWaveColor(wave: ProgressWave, color: Color): Color =
 internal class RingStrokes(size: Size) {
     val width = size.minDimension * RingStrokeShare
     val track = Stroke(width)
-    val line = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    val bloom = Stroke(width * BloomWidthShare, cap = StrokeCap.Round)
+    val glow = Stroke(width * GlowWidthShare, cap = StrokeCap.Round)
+    val filament = Stroke(width * FilamentWidthShare, cap = StrokeCap.Round)
+    val line =Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round)
     val scopeWidth = size.minDimension * ScopeStrokeShare
     val scope = Stroke(scopeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
 }
@@ -433,7 +436,8 @@ internal fun DrawScope.drawProgressRingTrack(color: Color, strokes: RingStrokes)
 /**
  * The transport ring: elapsed arc from 12 o'clock, the rest a dim flat track. With a scope the arc
  * traces it, the newest audio at the playhead, in a finer line; without one it is a plain arc.
- * Stroke and height are shares of the ring's size. Paused, the zip lights the held shape.
+ * Stroke and height are shares of the ring's size. Paused, the zip lights the held shape. An
+ * [endless] song's gap blazes instead of sitting dim (see EndlessGap).
  */
 internal fun DrawScope.drawProgressRing(
     path: Path,
@@ -442,6 +446,7 @@ internal fun DrawScope.drawProgressRing(
     color: Color,
     strokes: RingStrokes,
     zip: ZipGradient,
+    endless: Boolean = false,
 ) {
     // Pulled in by the full amplitude so a crest never leaves the box.
     val radius = ringCentreRadius(size.minDimension)
@@ -451,6 +456,7 @@ internal fun DrawScope.drawProgressRing(
     val arcSize = Size(radius * 2, radius * 2)
     drawArc(track, -90f + 360f * p, 360f * (1f - p), false, topLeft, arcSize, style = strokes.track)
     val fill = ringWaveColor(wave, color)
+    if (endless) drawEndlessRingGlow(p, radius, fill, strokes, wave.playMs)
     val scope = wave.scope
     val stroke = if (scope != null) strokes.scopeWidth else strokes.width
     val line = if (scope != null) strokes.scope else strokes.line
@@ -481,6 +487,8 @@ internal fun DrawScope.drawProgressRing(
             if (flat) drawArc(brush, 0f, 360f * p, false, topLeft, arcSize, style = line) else drawPath(path, brush, style = line)
         }
     }
+    // Over the arc: the glints dance on past 12 across its start.
+    if (endless) drawEndlessRingGlints(radius, fill, strokes, wave.playMs)
 }
 
 /** Where the playhead sits along a track [width] px wide. */

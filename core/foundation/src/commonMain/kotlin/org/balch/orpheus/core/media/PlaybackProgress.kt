@@ -4,6 +4,7 @@ package org.balch.orpheus.core.media
  * Where playback sits within the current item, for the system seek bar. Display-only.
  * [durationFinal] is false while [durationMs] is only an estimate of where the item will end.
  * [estimateMs] is the item's first estimate, which stays put while [durationMs] moves.
+ * [endless] means the item has run past any end it could have and will play on until stopped.
  * [lockedAtMs] is where [durationFinal] first came true, the point a progress arc bends from.
  */
 data class PlaybackProgress(
@@ -11,5 +12,6 @@ data class PlaybackProgress(
     val durationMs: Long,
     val durationFinal: Boolean = true,
     val estimateMs: Long = durationMs,
+    val endless: Boolean = false,
     val lockedAtMs: Long? = null,
 )

@@ -202,10 +202,22 @@ internal class SongBandPainter(
     private var unheardAccent = Color.Unspecified
     private var anyUnheard = false
 
-    fun DrawScope.draw(story: SongStory, progress: Float, elapsedMs: Long, wave: ProgressWave, accent: Color, liveHead: Boolean = true) {
+    fun DrawScope.draw(
+        story: SongStory,
+        progress: Float,
+        elapsedMs: Long,
+        wave: ProgressWave,
+        accent: Color,
+        liveHead: Boolean = true,
+        endless: Boolean = false,
+    ) {
         val baseline = layout.baseline
         val playX = playheadX(layout.width, progress)
-        drawLine(accent.copy(alpha = 0.2f), Offset(playX, baseline), Offset(layout.width, baseline), SongBandTrackStroke.toPx())
+        val trackStroke = SongBandTrackStroke.toPx()
+        drawLine(accent.copy(alpha = 0.2f), Offset(playX, baseline), Offset(layout.width, baseline), trackStroke)
+        val liveColor = blendTrackColors(wave.trackLevels, PulsarTrackColors, accent)
+        // An endless song's unplayed stretch blazes instead of sitting dim (see EndlessGap).
+        if (endless) drawEndlessBandGap(playX, layout.width, baseline, trackStroke, liveColor, wave.playMs)
         val shape = shapes.shapeFor(story, layout, playX, elapsedMs)
         // Past the live head a bar's level and colour are the shape's alone.
         val settled = (shape.bars - if (liveHead) LiveBars else 0).coerceAtLeast(0)
@@ -230,7 +242,6 @@ internal class SongBandPainter(
         val zipAt = if (playX >= ZipMinLength.toPx()) wave.zipMs else -1L
         if (zipAt >= 0) for (k in 0 until settled) drawZip(k, shape.levels[k], shape.color(k, accent), playX, zipAt)
         val live = wave.level.coerceIn(0f, 1f) * wave.amplitude
-        val liveColor = blendTrackColors(wave.trackLevels, PulsarTrackColors, accent)
         val head = shape.bars - 1
         for (k in settled..head) {
             val back = head - k
@@ -358,6 +369,6 @@ private fun DrawScope.drawDockBand(
         return
     }
     with(band) {
-        draw(songStory, smooth.fractionOr(coarse), smooth.positionMsOr(songStory.elapsedMs), wave, tint, liveHead)
+        draw(songStory, smooth.fractionOr(coarse), smooth.positionMsOr(songStory.elapsedMs), wave, tint, liveHead, smooth.endless)
     }
 }

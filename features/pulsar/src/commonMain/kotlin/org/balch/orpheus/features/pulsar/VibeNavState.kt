@@ -26,6 +26,8 @@ data class VibeNavState(
     val durationFinal: Boolean = true,
     /** The song's first estimated length, which holds while [durationMs] moves to the forced or rolling end. */
     val estimateMs: Long? = null,
+    /** The song has run past any end it could have and plays on until stopped. */
+    val endless: Boolean = false,
     /** Where the song's end locked in, which [progress] bends from; null until then. */
     val lockedAtMs: Long? = null,
 ) {
@@ -49,6 +51,7 @@ internal fun vibeNavStateOf(names: List<String>, current: String, progress: Play
         durationMs = timed?.durationMs,
         durationFinal = timed?.durationFinal ?: true,
         estimateMs = timed?.estimateMs,
+        endless = timed?.endless ?: false,
         lockedAtMs = timed?.lockedAtMs,
     )
 }

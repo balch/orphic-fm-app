@@ -169,6 +169,8 @@ class SongProgressTracker(private val nowMs: () -> Long) {
             durationMs = durationMs,
             durationFinal = final,
             estimateMs = songEstimateMs,
+            // Past the forced end with nothing armed, the song plays on until stopped.
+            endless = timing.finalSectionIndex < 0 && positionMs >= timing.maxMs,
             lockedAtMs = if (final) songLockedAtMs else null,
         )
     }

@@ -373,6 +373,35 @@ class FrameBudgetTest {
         assertTrue(bandZip < BandZipBudget, "a band zip frame allocated $bandZip B over S0")
     }
 
+    // ==================== S10: an endless song's blazing gap ====================
+
+    // Past its forced end with nothing armed: the arc holds short and the gap blazes and twinkles every frame.
+    private val endlessPosition = SongPosition("Rust Belt", 250_000L, 280_000L, final = false, estimateMs = 217_000L, endless = true)
+    private val endlessNav = navState.copy(progress = 0.89f, positionMs = 250_000L, durationMs = 280_000L, durationFinal = false, estimateMs = 217_000L, endless = true)
+
+    @Test
+    fun anEndlessGapBlazesWithoutRecomposingOrGarbage() {
+        val ringScope = Scope(windows)
+        counted { scopes ->
+            scene(128, 128, scopes = scopes, feed = ringScope.feed) {
+                VibeTransportRing(paused = false, progress = 0.89f, position = endlessPosition, pulse = { pulses[3] })
+            }
+        }.use { ring ->
+            val bytes = ring.bytesPerFrame(before = ringScope.newWindow) - baseline
+            val scopes = ring.scopesPerFrame(before = ringScope.newWindow)
+            report("S10a endless ring, gap blazing: $bytes B/frame over S0, $scopes scopes/frame")
+            assertEquals(0.0, scopes, "an endless ring recomposed")
+            assertTrue(bytes < RingFrameBudget, "an endless ring frame allocated $bytes B over S0")
+        }
+        counted { scopes -> scene(2560, 80, scopes = scopes) { DockSongBand(pulsar(paused = false, nav = endlessNav)) } }.use { band ->
+            val bytes = band.bytesPerFrame() - baseline
+            val scopes = band.scopesPerFrame()
+            report("S10b endless band, gap blazing: $bytes B/frame over S0, $scopes scopes/frame")
+            assertEquals(0.0, scopes, "an endless band recomposed")
+            assertTrue(bytes < BandFrameBudget, "an endless band frame allocated $bytes B over S0")
+        }
+    }
+
     // ==================== S4: the song band, and the dock under a dynamic visualization ====================
 
     private fun bandMeter(tv: Boolean, story: MutableStateFlow<SongStory>): FrameMeter {

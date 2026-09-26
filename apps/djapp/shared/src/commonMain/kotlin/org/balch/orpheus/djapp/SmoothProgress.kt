@@ -29,6 +29,8 @@ internal data class SongPosition(
     val durationMs: Long,
     val final: Boolean = true,
     val estimateMs: Long = durationMs,
+    /** The song has no end left to reach: the gap past the arc lights up (see EndlessGap). */
+    val endless: Boolean = false,
     /** Where the end locked in, which the arc bends from (see songArc); null until then. */
     val lockedAtMs: Long? = null,
 )
@@ -37,7 +39,7 @@ internal data class SongPosition(
 internal fun VibeNavState.songPosition(): SongPosition? {
     val position = positionMs ?: return null
     val duration = durationMs?.takeIf { it > 0L } ?: return null
-    return SongPosition(currentName, position, duration, durationFinal, estimateMs?.takeIf { it > 0L } ?: duration, lockedAtMs)
+    return SongPosition(currentName, position, duration, durationFinal, estimateMs?.takeIf { it > 0L } ?: duration, endless, lockedAtMs)
 }
 
 /** The loop-cycle a hold or an ease may cover until two updates have measured one. */
@@ -68,6 +70,7 @@ internal class SmoothPosition private constructor(
 ) {
     val song: String get() = update.song
     val durationMs: Long get() = update.durationMs
+    val endless: Boolean get() = update.endless
 
     fun positionAt(clockMs: Long): Float {
         val dt = (clockMs - anchorMs).coerceAtLeast(0L).toFloat()
@@ -117,6 +120,9 @@ internal class SmoothProgress(private val state: State<SmoothPosition?>, private
         val smooth = state.value ?: return coarse
         return smooth.fractionAt(wave.playMs)
     }
+
+    /** Whether the song plays on with no end left to reach; false without song times (TV, render harness). */
+    val endless: Boolean get() = state.value?.endless == true
 
     /** How far into the song that is, in ms, or [fallback] without song times. */
     fun positionMsOr(fallback: Long): Long {

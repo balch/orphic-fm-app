@@ -372,7 +372,7 @@ internal fun VibeTransportRing(
                     if (progress == null) {
                         drawProgressRingTrack(ringColor, strokes)
                     } else {
-                        drawProgressRing(path, smooth.fractionOr(progress), wave, ringColor, strokes, zip)
+                        drawProgressRing(path, smooth.fractionOr(progress), wave, ringColor, strokes, zip, smooth.endless)
                     }
                 }
             },
