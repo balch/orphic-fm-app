@@ -410,6 +410,35 @@ class PulsarSongEndingTest {
             collected.any { it is SongEndingEvent.SongEnded },
             "a play-once song hands off as soon as its outro plays out",
         )
+        assertTrue(
+            collected.filterIsInstance<SongEndingEvent.SongEnded>().all { it.repeat },
+            "with endings off (PLAYS) a play-once song repeats instead of advancing",
+        )
+        job.cancel()
+    }
+
+    @Test
+    fun `a play-once song armed by hand in PLAYS moves on instead of repeating`() = runTest {
+        val vibe = mkVibeWithOutro("Once", sectionCount = 3, outroIndex = 2, playOnce = true)
+        val harness = TestHarness(this, initialVibe = vibe)
+        harness.playbackController.play()
+
+        val collected = mutableListOf<SongEndingEvent>()
+        val job = launch { harness.songEnding.songEndingEvents.collect { collected += it } }
+        runCurrent()
+
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(0, 1, 4, false, -1, 0)
+        runCurrent()
+        harness.songEnding.armOutro()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 1, 4, false, -1, 0)
+        runCurrent()
+        harness.synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(2, 0, 4, false, -1, 0)
+        runCurrent()
+
+        val ended = collected.filterIsInstance<SongEndingEvent.SongEnded>()
+        assertTrue(ended.isNotEmpty() && ended.none { it.repeat })
         job.cancel()
     }
 

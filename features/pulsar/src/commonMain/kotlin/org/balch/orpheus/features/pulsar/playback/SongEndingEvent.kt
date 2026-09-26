@@ -9,6 +9,9 @@ sealed interface SongEndingEvent {
     /** The outro request has been issued; the next bar will route into the final section. */
     data class OutroTriggered(val vibeName: String) : SongEndingEvent
 
-    /** The final section has finished. The default advancer (if installed) loads the next vibe. */
-    data class SongEnded(val vibeName: String) : SongEndingEvent
+    /**
+     * The final section has finished. The default advancer (if installed) loads the next vibe, or
+     * with [repeat] plays this one again from its top.
+     */
+    data class SongEnded(val vibeName: String, val repeat: Boolean = false) : SongEndingEvent
 }

@@ -17,7 +17,7 @@ enum class VibeMoveKind {
     /** A step back. */
     Previous,
 
-    /** ◀ late in a song: the playing vibe again from its top. */
+    /** ◀ late in a song, or a fixed-ending song repeating: the playing vibe again from its top. */
     Restart,
 
     /** A vibe chosen from a list. */

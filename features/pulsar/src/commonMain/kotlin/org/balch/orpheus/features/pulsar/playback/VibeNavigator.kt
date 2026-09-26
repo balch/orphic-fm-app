@@ -158,7 +158,12 @@ class VibeNavigator(
         val current = feature.vibeFlow.value
         val spec = transitionPreferences.defaultFlow.value
         return when (command) {
-            is Command.Advance -> Move(command.name, command.spec, VibeMoveKind.Next) { feature.applyVibeByName(command.name) }
+            // An advance onto the playing vibe is a song repeating; re-apply it, as it may not be curated.
+            is Command.Advance -> if (command.name == current.name) {
+                Move(current.name, command.spec, VibeMoveKind.Restart) { feature.applyVibe(current) }
+            } else {
+                Move(command.name, command.spec, VibeMoveKind.Next) { feature.applyVibeByName(command.name) }
+            }
             is Command.User -> when (val request = command.request) {
                 is VibeRequest.Pick -> Move(request.vibe.name, spec, VibeMoveKind.Pick) { feature.applyVibe(request.vibe) }
                 VibeRequest.Next -> stepOn(feature, current, spec)

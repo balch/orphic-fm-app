@@ -53,7 +53,11 @@ class PulsarSongAdvancer(
                     log.info { "SongEnded(${event.vibeName}) during a user transition — ignoring" }
                     return@collect
                 }
-                val nextName = neighborVibe(pulsarFeature.vibeNames, currentName, 1) ?: return@collect
+                val nextName = if (event.repeat) {
+                    currentName
+                } else {
+                    neighborVibe(pulsarFeature.vibeNames, currentName, 1) ?: return@collect
+                }
 
                 val configured: TransitionSpec = pulsarFeature.vibeFlow.value
                     .arrangement?.transitionOut

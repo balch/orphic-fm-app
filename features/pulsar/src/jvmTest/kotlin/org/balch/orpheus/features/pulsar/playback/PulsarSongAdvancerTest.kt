@@ -96,6 +96,23 @@ class PulsarSongAdvancerTest {
     }
 
     @Test
+    fun `a repeating SongEnded replays the playing vibe`() = runTest {
+        val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        val applied = mutableListOf<String>()
+        feature.onVibeApplied = { applied += feature.vibeFlow.value.name }
+        val source = FakeSongEndingEventSource()
+        val advancer = makeAdvancer(feature, source)
+        advanceUntilIdle()
+        @Suppress("UNUSED_EXPRESSION") advancer
+
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A", repeat = true))
+        advanceUntilIdle()
+
+        assertEquals(listOf("A"), applied, "the song starts over rather than moving on")
+    }
+
+    @Test
     fun `stale SongEnded queued during a transition does not double-advance`() = runTest {
         val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"), mkMinimalVibe("C"))
         val feature = FakePulsarFeature(vibes, vibes[0])

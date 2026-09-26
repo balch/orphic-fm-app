@@ -123,6 +123,7 @@ class PulsarSongEnding(
     @Volatile private var lastObservedSectionIndex: Int = -1
     @Volatile private var lastObservedBarsElapsed: Int = -1
     @Volatile private var songEndedEmitted: Boolean = false
+    @Volatile private var armedManually: Boolean = false
 
     // Hooks for tests; production paths use real wall-clock + Random.
     internal var nowMillis: () -> Long = { currentTimeMillis() }
@@ -207,9 +208,13 @@ class PulsarSongEnding(
                 } else {
                     log.info { "song ended: $name (transitionedOut=$transitionedOut sectionLooped=$sectionLooped)" }
                 }
+                // With endings off (PLAYS) a play-once song's fixed end comes round again,
+                // unless the user armed it by hand to move on.
+                val repeat = !preferences.enabledFlow.value && !armedManually &&
+                    vibe.arrangement?.playOnce == true
                 // Latch only on a successful emit, so a dropped SongEnded retries on the next
                 // section loop instead of stranding the song in its outro forever.
-                if (_events.tryEmit(SongEndingEvent.SongEnded(name))) {
+                if (_events.tryEmit(SongEndingEvent.SongEnded(name, repeat))) {
                     songEndedEmitted = true
                 } else {
                     log.warn { "SongEnded emit dropped for $name; will retry on next loop" }
@@ -278,6 +283,7 @@ class PulsarSongEnding(
     override fun armOutro() {
         if (_endingTriggered.value) return
         log.info { "armOutro() invoked manually" }
+        armedManually = true
         triggerOutro()
     }
 
@@ -321,6 +327,7 @@ class PulsarSongEnding(
         lastObservedSectionIndex = -1
         lastObservedBarsElapsed = -1
         songEndedEmitted = false
+        armedManually = false
         // Defensive: tell C++ to drop any stale outro request from the previous vibe.
         synthController.setPluginControl(
             PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
