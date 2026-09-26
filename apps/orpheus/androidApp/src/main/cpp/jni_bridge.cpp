@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "OboeEngine.h"
+#include <atomic>
 #include <cstring>
 #include <mutex>
 
@@ -8,17 +9,18 @@ static OboeEngine sEngine;
 // JVM + global ref for the engine-recreated callback. Stored in C++ so the
 // callback survives the JNI call that registered it. The Runnable.run()
 // method is invoked from Oboe's error thread when the DSP engine is rebuilt.
-static JavaVM* sCallbackJvm = nullptr;
+// Atomic because the callback reads it before taking sCallbackMutex.
+static std::atomic<JavaVM*> sCallbackJvm{nullptr};
 static jobject sEngineRecreatedRunnable = nullptr;
 // Cached at registration on a real JNI thread. Resolving the method id from the
 // Oboe error thread would leak the jclass local ref (that thread is attached
 // manually, so its local refs are not reclaimed until DetachCurrentThread).
 static jmethodID sEngineRecreatedRun = nullptr;
-// Guards the three globals above. Registration (main thread) can delete the
+// Guards the Runnable ref and method id above. Registration (main thread) can delete the
 // global ref at the same moment Oboe's error thread is mid-upcall; without this
 // the error thread would call through a freed ref. The lock is held across the
-// upcall so the ref stays alive for its whole use. Oboe invokes the callback
-// without holding any of its own locks (atomics only), so there is no
+// upcall so the ref stays alive for its whole use. OboeEngine invokes the callback
+// after releasing its lifecycle lock, and Oboe holds none of its own, so there is no
 // lock-ordering hazard, and the Kotlin Runnable does not re-register the
 // callback, so a non-recursive mutex cannot self-deadlock.
 static std::mutex sCallbackMutex;
@@ -29,11 +31,12 @@ static std::mutex sCallbackMutex;
 // state and can crash the JVM if the thread later exits without detaching.
 static JNIEnv* attachToJvm(bool* needsDetach) {
     *needsDetach = false;
-    if (!sCallbackJvm) return nullptr;
+    JavaVM* jvm = sCallbackJvm.load();
+    if (!jvm) return nullptr;
     JNIEnv* env = nullptr;
-    int status = sCallbackJvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    int status = jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (status == JNI_EDETACHED) {
-        if (sCallbackJvm->AttachCurrentThread(&env, nullptr) != 0) return nullptr;
+        if (jvm->AttachCurrentThread(&env, nullptr) != 0) return nullptr;
         *needsDetach = true;
     } else if (status != JNI_OK) {
         return nullptr;
@@ -59,6 +62,12 @@ JNIEXPORT jint JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeStop(
         JNIEnv *env, jobject thiz) {
     return static_cast<jint>(sEngine.stop());
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeEnsureRunning(
+        JNIEnv *env, jobject thiz) {
+    sEngine.ensureRunning();
 }
 
 JNIEXPORT jboolean JNICALL
@@ -437,7 +446,9 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetEngineRecreatedCa
     if (cls != nullptr) env->DeleteLocalRef(cls);
 
     std::lock_guard<std::mutex> lock(sCallbackMutex);
-    env->GetJavaVM(&sCallbackJvm);
+    JavaVM* jvm = nullptr;
+    env->GetJavaVM(&jvm);
+    sCallbackJvm.store(jvm);
     if (sEngineRecreatedRunnable) {
         env->DeleteGlobalRef(sEngineRecreatedRunnable);
         sEngineRecreatedRunnable = nullptr;
@@ -464,7 +475,7 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetEngineRecreatedCa
                 if (e->ExceptionCheck()) e->ExceptionClear();
             }
         }
-        if (needsDetach) sCallbackJvm->DetachCurrentThread();
+        if (needsDetach) sCallbackJvm.load()->DetachCurrentThread();
     });
 }
 

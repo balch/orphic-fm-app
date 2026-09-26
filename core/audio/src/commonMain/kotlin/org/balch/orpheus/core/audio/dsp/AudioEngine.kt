@@ -40,13 +40,13 @@ interface AudioEngine {
 
     /**
      * Verify the host is actually rendering and repair it if not. Default
-     * no-op — platforms whose host cannot die out from under them (Android,
-     * Desktop, WASM) need no override.
+     * no-op — platforms whose host cannot die out from under them (Desktop,
+     * WASM) need no override. Overrides must return immediately, so callers on
+     * the main thread do not block.
      *
-     * `IosAudioEngine.ensureRunning` is the one override: it kicks the
-     * AVAudioEngine host watchdog immediately instead of waiting for the next
-     * scheduled poll. It hands the pass to the audio host's serial queue and
-     * returns immediately, so callers on the main thread do not block.
+     * `IosAudioEngine.ensureRunning` kicks the AVAudioEngine host watchdog
+     * instead of waiting for the next scheduled poll. `OboeAudioEngine`'s
+     * reopens a stream that a route change failed to reopen.
      */
     fun ensureRunning() {}
 }

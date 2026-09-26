@@ -9,8 +9,10 @@ package org.balch.orpheus.core.audio
  * Platform feeds:
  * - iOS: kicks the AVAudioEngine watchdog tick immediately (AVAudioEngine can
  *   stop itself with no app-visible event, e.g. a hardware config change).
- * - Android / Desktop / WASM: no-op — the platform host cannot die out from
- *   under the app the same way, so there is nothing to repair.
+ * - Android: reopens the Oboe stream when a route change's reopen failed and
+ *   left the host with none.
+ * - Desktop / WASM: no-op — the platform host cannot die out from under the
+ *   app the same way, so there is nothing to repair.
  */
 interface AudioHostRepair {
     /**

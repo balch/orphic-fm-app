@@ -6,7 +6,7 @@
 #include "orpheus_engine_slot.h"
 #include <atomic>
 #include <chrono>
-#include <functional>
+#include <mutex>
 
 class OboeEngine : public oboe::AudioStreamDataCallback,
                    public oboe::AudioStreamErrorCallback {
@@ -14,11 +14,12 @@ public:
     OboeEngine();
     ~OboeEngine();
 
-    oboe::Result openStream();
     oboe::Result open();
     int loadGraph(const uint8_t* data, size_t length);
     oboe::Result requestStart();
     oboe::Result stop();
+    // Reopens a started host whose route-change reopen failed; a no-op otherwise.
+    void ensureRunning();
 
     bool isRunning() const;
     int32_t getSampleRate() const;
@@ -74,24 +75,35 @@ public:
 
     // Register a callback that fires after the C++ DSP engine is recreated
     // (e.g. on a route-change with a different sample rate). Pass nullptr to
-    // clear. Called from Oboe's error thread; the implementation must marshal
-    // off-thread before doing real work.
-    void setEngineRecreatedCallback(std::function<void()> cb) {
-        mEngineRecreatedCallback = std::move(cb);
+    // clear. Called from Oboe's error thread or the repair thread, holding no
+    // lock; the implementation must marshal off-thread before doing real work.
+    // A plain function pointer, so swapping it can't tear a call in flight.
+    void setEngineRecreatedCallback(void (*cb)()) {
+        mEngineRecreatedCallback.store(cb);
     }
 
 private:
+    // Both: caller holds mLifecycleMutex.
+    oboe::Result openStream();
+    void reopenLocked(bool* engineRecreated);
+
+    // Held by everything that touches mStream or swaps the engine, so a stop() and the error
+    // thread's reopen can't interleave. The audio callback never takes it.
+    mutable std::mutex mLifecycleMutex;
     std::shared_ptr<oboe::AudioStream> mStream;
     // JNI threads borrow the engine per call, so a route-change rebuild can't free it under them.
     OrpheusEngineSlot engine_;
     int32_t mCreatedSampleRate = 0;
+    // Set by a successful start, cleared by stop(); guarded by mLifecycleMutex. Unlike mIsRunning
+    // it survives a failed reopen, which is what tells ensureRunning() there is a host to repair.
+    bool mWantRunning = false;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};
     // Cumulative underrun count for the current stream, mirrored out of the
     // audio callback. Exclusive MMAP underruns are only visible to the client
     // (AudioFlinger never sees them), so this is the sole source of truth.
     std::atomic<int32_t> mXRunCount{0};
-    std::function<void()> mEngineRecreatedCallback;
+    std::atomic<void (*)()> mEngineRecreatedCallback{nullptr};
 };
 
 #endif

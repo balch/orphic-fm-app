@@ -12,6 +12,7 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import java.util.concurrent.Executors
 
 /**
  * Oboe-backed AudioEngine for Android using liborpheus_dsp.
@@ -26,6 +27,10 @@ class OboeAudioEngine(
 ) : AudioEngine, NativeDspBridge by bridge {
 
     private var routeLostCallback: (() -> Unit)? = null
+
+    private val repairExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "oboe-repair").apply { isDaemon = true }
+    }
 
     // The system sends this just before audio falls back to the built-in speaker
     // (BT speaker off, headphones unplugged), never when a device connects.
@@ -80,6 +85,12 @@ class OboeAudioEngine(
 
     override fun stop() {
         bridge.nativeStop()
+    }
+
+    // A route change whose reopen failed leaves the host with no stream, and nothing else restarts
+    // it. The reopen can take hundreds of ms, so it runs on repairExecutor, never the caller.
+    override fun ensureRunning() {
+        repairExecutor.execute { bridge.nativeEnsureRunning() }
     }
 
     override val isRunning: Boolean

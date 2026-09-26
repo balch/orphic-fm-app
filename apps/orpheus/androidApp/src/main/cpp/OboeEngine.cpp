@@ -45,6 +45,7 @@ oboe::Result OboeEngine::openStream() {
 }
 
 oboe::Result OboeEngine::open() {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
     oboe::Result result = openStream();
     if (result != oboe::Result::OK) {
         LOGE("Failed to open stream: %s", oboe::convertToText(result));
@@ -54,7 +55,8 @@ oboe::Result OboeEngine::open() {
     float sr = static_cast<float>(mStream->getSampleRate());
     mCreatedSampleRate = mStream->getSampleRate();
     OrpheusEngine* created = orpheus_engine_create(sr);
-    engine_.publish(created);
+    // A failed reopen keeps its engine with no stream rendering it, so the slot may not be empty.
+    engine_.replace(created);
 
     // Log what we actually got, not what we asked for: sharing/performance mode and the
     // MMAP verdict are negotiated by the HAL and are the first thing to check on silence.
@@ -72,18 +74,22 @@ int OboeEngine::loadGraph(const uint8_t* data, size_t length) {
 }
 
 oboe::Result OboeEngine::requestStart() {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
     mIsRunning.store(true);
     oboe::Result result = mStream->requestStart();
     if (result != oboe::Result::OK) {
         LOGE("requestStart failed: %s", oboe::convertToText(result));
         mIsRunning.store(false);
     } else {
+        mWantRunning = true;
         LOGI("Stream started successfully");
     }
     return result;
 }
 
 oboe::Result OboeEngine::stop() {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
+    mWantRunning = false;
     mIsRunning.store(false);
 
     oboe::Result result = oboe::Result::OK;
@@ -100,8 +106,14 @@ oboe::Result OboeEngine::stop() {
 }
 
 bool OboeEngine::isRunning() const { return mIsRunning.load(); }
-int32_t OboeEngine::getSampleRate() const { return mStream ? mStream->getSampleRate() : 0; }
-int32_t OboeEngine::getFramesPerBuffer() const { return mStream ? mStream->getFramesPerBurst() : 0; }
+int32_t OboeEngine::getSampleRate() const {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
+    return mStream ? mStream->getSampleRate() : 0;
+}
+int32_t OboeEngine::getFramesPerBuffer() const {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
+    return mStream ? mStream->getFramesPerBurst() : 0;
+}
 double OboeEngine::getCpuLoad() const { return mCpuLoad.load(); }
 int32_t OboeEngine::getXRunCount() const { return mXRunCount.load(std::memory_order_relaxed); }
 
@@ -132,35 +144,70 @@ oboe::DataCallbackResult OboeEngine::onAudioReady(
 }
 
 void OboeEngine::onErrorAfterClose(oboe::AudioStream* stream, oboe::Result error) {
-    LOGE("Stream disconnected: %s — reopening", oboe::convertToText(error));
-    if (mIsRunning.load()) {
-        int32_t old_sr = mCreatedSampleRate;
-        oboe::Result result = openStream();
-        if (result == oboe::Result::OK) {
-            int32_t new_sr = mStream->getSampleRate();
-            bool engineRecreated = false;
-            // Recreate DSP engine if sample rate changed (e.g. speaker → Bluetooth). The old
-            // stream is closed and the new one not started, so no audio callback holds it;
-            // replace() waits out JNI calls still inside it (scope, spectrum, setPort...).
-            if (new_sr != old_sr) {
-                LOGI("Sample rate changed %d → %d — recreating DSP engine", old_sr, new_sr);
-                engine_.replace(nullptr);
-                engine_.publish(orpheus_engine_create(static_cast<float>(new_sr)));
-                mCreatedSampleRate = new_sr;
-                engineRecreated = true;
-            }
-            mIsRunning.store(true);
-            mStream->requestStart();
-            LOGI("Stream reopened: sampleRate=%d, framesPerBurst=%d",
-                 new_sr, mStream->getFramesPerBurst());
-            // Notify Kotlin to reload the graph + re-push port state into the
-            // brand-new engine. Without this, audio stays silent: the new
-            // engine has no graph and no port writes have hit it yet.
-            if (engineRecreated && mEngineRecreatedCallback) {
-                mEngineRecreatedCallback();
-            }
+    LOGE("Stream disconnected: %s", oboe::convertToText(error));
+    bool engineRecreated = false;
+    {
+        std::lock_guard<std::mutex> lock(mLifecycleMutex);
+        // A stop() that got the lock first owns the outcome, and so does an open() that has
+        // since replaced this stream; reopening over either leaks a running stream.
+        if (!mIsRunning.load() || stream != mStream.get()) {
+            LOGI("Not reopening: the stream was stopped or replaced");
+            return;
         }
+        reopenLocked(&engineRecreated);
     }
+    // Notify Kotlin to reload the graph + re-push port state into the
+    // brand-new engine. Without this, audio stays silent: the new
+    // engine has no graph and no port writes have hit it yet.
+    // Called unlocked: it upcalls into the JVM and takes the bridge's own lock.
+    void (*cb)() = mEngineRecreatedCallback.load();
+    if (engineRecreated && cb) cb();
+}
+
+void OboeEngine::ensureRunning() {
+    bool engineRecreated = false;
+    {
+        std::lock_guard<std::mutex> lock(mLifecycleMutex);
+        if (!mWantRunning || mIsRunning.load()) return;
+        LOGI("Repairing: the last reopen failed, retrying");
+        reopenLocked(&engineRecreated);
+    }
+    void (*cb)() = mEngineRecreatedCallback.load();
+    if (engineRecreated && cb) cb();
+}
+
+// On failure leaves no stream and mIsRunning clear, with the engine kept for ensureRunning(). An
+// engine rebuilt before a failed start still reports engineRecreated, as it needs its graph.
+void OboeEngine::reopenLocked(bool* engineRecreated) {
+    int32_t old_sr = mCreatedSampleRate;
+    oboe::Result result = openStream();
+    if (result != oboe::Result::OK) {
+        LOGE("Reopen failed: %s", oboe::convertToText(result));
+        mIsRunning.store(false);
+        return;
+    }
+    int32_t new_sr = mStream->getSampleRate();
+    // Recreate DSP engine if sample rate changed (e.g. speaker → Bluetooth). The old
+    // stream is closed and the new one not started, so no audio callback holds it;
+    // replace() waits out JNI calls still inside it (scope, spectrum, setPort...).
+    if (new_sr != old_sr) {
+        LOGI("Sample rate changed %d → %d — recreating DSP engine", old_sr, new_sr);
+        engine_.replace(nullptr);
+        engine_.publish(orpheus_engine_create(static_cast<float>(new_sr)));
+        mCreatedSampleRate = new_sr;
+        *engineRecreated = true;
+    }
+    mIsRunning.store(true);
+    result = mStream->requestStart();
+    if (result != oboe::Result::OK) {
+        LOGE("Reopened stream failed to start: %s", oboe::convertToText(result));
+        mIsRunning.store(false);
+        mStream->close();
+        mStream.reset();
+        return;
+    }
+    LOGI("Stream reopened: sampleRate=%d, framesPerBurst=%d",
+         new_sr, mStream->getFramesPerBurst());
 }
 
 // ── C API pass-throughs ──────────────────────────────
