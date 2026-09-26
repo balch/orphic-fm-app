@@ -1,6 +1,6 @@
 # App Store listing copy (Orphic DJ, iOS)
 
-Mirrors `../androidApp/src/main/play/listings/en-US/` for the Apple side. **Nothing consumes
+Mirrors `../../androidApp/src/main/play/listings/en-US/` for the Apple side. **Nothing consumes
 these files** — the iOS pipeline (`xcodebuild` → `altool`) only reaches TestFlight, and App Store
 metadata is set through App Store Connect. They exist so the copy is diffable in review instead of
 living solely in a web form, which is how a broken sentence shipped in 2.0.5.
@@ -30,4 +30,7 @@ GET   /v1/appStoreVersions/{vid}/appStoreVersionLocalizations
 PATCH /v1/appStoreVersionLocalizations/{lid}   # description, promotionalText, keywords, whatsNew
 ```
 
-`app-store/` holds copy only. Screenshots live in `../play-store/assets/appstore/`.
+`en-US/` holds the copy; `iphone-69/` (1320x2868) and `ipad-13/` (2752x2064) hold the screenshot
+sets, uploaded through the ASC API. They're produced by the tooling in `../capture/`. `raw/` holds the
+unframed iPad captures that `../capture/framed/frame-large.html` (#9-12) frames into `ipad-13/`; the
+iPhone set ships unframed, so its raws are the set itself.

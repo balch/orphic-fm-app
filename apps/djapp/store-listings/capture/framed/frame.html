@@ -108,27 +108,27 @@
     // Each entry produces one 1080x1920 Play Store frame.
     const FRAMES = [
       {
-        img: "../screenshots/01-hero.png",
+        img: "../screenshots/new/phone-02.png",
         headline: "Four knobs.\nYou conduct.",
         subhead: "Energy · Complexity · Mood · Space",
       },
       {
-        img: "../screenshots/03-vibe-picker.png",
+        img: "../screenshots/new/phone-03.png",
         headline: "Pick your vibe,\nendless variations",
         subhead: "From upbeat grooves to deep ambient drones",
       },
       {
-        img: "../screenshots/02-active-mix.png",
+        img: "../screenshots/new/phone-04.png",
         headline: "Ride the mix, live",
         subhead: "Balance every track in real time",
       },
       {
-        img: "../screenshots/07-extra.png",
+        img: "../screenshots/new/phone-05.png",
         headline: "Drop effects\non the fly",
         subhead: "Delay, reverb, filters — your DJ module",
       },
       {
-        img: "../screenshots/04-timer.png",
+        img: "../screenshots/new/phone-06.png",
         headline: "Drift off with\nthe sleep timer",
         subhead: "For bedtime, focus blocks, or a long drive",
       },
@@ -156,7 +156,9 @@
     ];
 
     const idx = Math.max(0, parseInt((location.hash || "#0").slice(1), 10) || 0);
-    const f = FRAMES[idx] || FRAMES[0];
+    // A bad index must fail loudly: falling back to frame 0 shipped the wrong caption silently.
+    const f = FRAMES[idx];
+    if (!f) throw new Error(`no frame #${idx}`);
     document.getElementById("headline").textContent = f.headline;
     document.getElementById("subhead").textContent = f.subhead;
     const shot = document.getElementById("shot");

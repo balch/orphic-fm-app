@@ -112,34 +112,34 @@
     // Headlines and subheads are the phone frames' verbatim, from frame.html — the listing says
     // the same things about the same screens whatever the device, so a large-screen shot is not
     // pitching the app differently from the phone one beside it.
+    // Index map: 0-3 Fold (Play 7-inch, 2560x1600), 4-7 Android tablet (Play 10-inch, 2560x1600),
+    // 8 phone landscape (Play phone slot, 1920x1080), 9-12 iPad 13" landscape (2752x2064).
+    // Neighbouring shots use different vibes and visualizations so no pair reads as one screen twice.
+    const KNOBS = { headline: "Four knobs.\nYou conduct.", subhead: "Energy · Complexity · Mood · Space" };
+    const VIBES = { headline: "Pick your vibe,\nendless variations", subhead: "From upbeat grooves to deep ambient drones" };
+    const MIX = { headline: "Ride the mix, live", subhead: "Balance every track in real time" };
+    const FX = { headline: "Drop effects\non the fly", subhead: "Delay, reverb, filters — your DJ module" };
+    const TIMER = { headline: "Drift off with\nthe sleep timer", subhead: "For bedtime, focus blocks, or a long drive" };
     const FRAMES = [
-      // 0-1: Android tablet (2560x1600).
-      {
-        img: "../screenshots/large-01-dock.png",
-        headline: "Four knobs.\nYou conduct.",
-        subhead: "Energy · Complexity · Mood · Space",
-      },
-      {
-        img: "../screenshots/large-02-catalog.png",
-        headline: "Pick your vibe,\nendless variations",
-        subhead: "From upbeat grooves to deep ambient drones",
-      },
-      // 2-3: iPad 13" landscape (2752x2064). Deliberately a different vibe and visualization
-      // from each other, so the pair does not read as one screen shot twice.
-      {
-        img: "../screenshots/ipad-01-dock.png",
-        headline: "Four knobs.\nYou conduct.",
-        subhead: "Energy · Complexity · Mood · Space",
-      },
-      {
-        img: "../screenshots/ipad-02-mix.png",
-        headline: "Ride the mix, live",
-        subhead: "Balance every track in real time",
-      },
+      { img: "../screenshots/new/fold-01.png", ...KNOBS },
+      { img: "../screenshots/new/fold-02.png", ...MIX },
+      { img: "../screenshots/new/fold-03.png", ...FX },
+      { img: "../screenshots/new/fold-04.png", ...VIBES },
+      { img: "../screenshots/new/tablet-01.png", ...KNOBS },
+      { img: "../screenshots/new/tablet-02.png", ...VIBES },
+      { img: "../screenshots/new/tablet-03.png", ...MIX },
+      { img: "../screenshots/new/tablet-04.png", ...TIMER },
+      { img: "../screenshots/new/phone-07-land.png", ...MIX },
+      { img: "../../app-store/raw/ipad-01.png", ...KNOBS },
+      { img: "../../app-store/raw/ipad-02.png", ...VIBES },
+      { img: "../../app-store/raw/ipad-03.png", ...MIX },
+      { img: "../../app-store/raw/ipad-04.png", ...TIMER },
     ];
 
     const idx = Math.max(0, parseInt((location.hash || "#0").slice(1), 10) || 0);
-    const f = FRAMES[idx] || FRAMES[0];
+    // A bad index must fail loudly: falling back to frame 0 shipped the wrong caption silently.
+    const f = FRAMES[idx];
+    if (!f) throw new Error(`no frame #${idx}`);
     document.getElementById("headline").textContent = f.headline;
     document.getElementById("subhead").textContent = f.subhead;
     document.getElementById("shot").src = f.img;
