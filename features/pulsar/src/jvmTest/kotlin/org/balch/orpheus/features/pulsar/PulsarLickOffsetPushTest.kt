@@ -80,6 +80,7 @@ class PulsarLickOffsetPushTest {
             transitionRunner = StubTransitionRunner(),
             songEndingEventSource = StubSongEndingEventSource(),
             engagementTracker = DefaultEngagementTracker(),
+            musicPulseSource = MusicPulseSource.Silent,
         )
     }
 

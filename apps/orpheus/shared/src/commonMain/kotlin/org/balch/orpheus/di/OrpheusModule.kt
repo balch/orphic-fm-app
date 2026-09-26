@@ -20,7 +20,7 @@ import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.core.playback.SkipHandler
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.playback.PulsarSkipHandler
+import org.balch.orpheus.features.pulsar.playback.VibeNavigator
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 import org.balch.orpheus.playback.OrpheusMetadataProducer
@@ -43,7 +43,7 @@ interface OrpheusModule {
      */
     @Binds val TimerOverlayProducer.bindOverlayProducer: OverlaySubtitleProducer?
 
-    @Binds val PulsarSkipHandler.bindSkipHandler: SkipHandler?
+    @Binds val VibeNavigator.bindSkipHandler: SkipHandler?
 
     @Binds val OrpheusMetadataProducer.bindMetadataProducer: MetadataProducer
 

@@ -14,6 +14,7 @@ import org.balch.orpheus.features.pulsar.FakePulsarFeature
 import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
+import org.balch.orpheus.features.pulsar.makeVibeNavigator
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,9 +88,10 @@ class PulsarSongAdvancerIntegrationTest {
         prefs: StubTransitionPreferences,
         engine: RecordingEngine,
     ): PulsarSongAdvancer {
-        val scope = makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler))
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = makeAppCoroutineScope(dispatcher)
         val runner = PulsarTransitionRunnerImpl(engine, random = { it.first() })
-        return PulsarSongAdvancer(feature, source, prefs, runner, scope)
+        return PulsarSongAdvancer(feature, source, prefs, makeVibeNavigator(feature, runner, prefs, dispatcher), scope)
     }
 
     @Test

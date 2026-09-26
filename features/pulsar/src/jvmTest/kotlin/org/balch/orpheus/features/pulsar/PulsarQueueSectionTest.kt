@@ -76,6 +76,7 @@ class PulsarQueueSectionTest {
             transitionRunner = StubTransitionRunner(),
             songEndingEventSource = songEnding,
             engagementTracker = DefaultEngagementTracker(),
+            musicPulseSource = MusicPulseSource.Silent,
         )
     }
 

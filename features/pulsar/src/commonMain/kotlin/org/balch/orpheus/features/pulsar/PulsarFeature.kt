@@ -9,6 +9,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -16,8 +17,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
@@ -110,7 +115,10 @@ import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
 import org.balch.orpheus.features.pulsar.playback.SectionQueue
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
+import org.balch.orpheus.features.pulsar.playback.NoVibeMoves
 import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
+import org.balch.orpheus.features.pulsar.playback.VibeMove
+import org.balch.orpheus.features.pulsar.playback.VibeRequest
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
@@ -152,7 +160,14 @@ data class PulsarUiState(
 
 @Immutable
 data class PulsarPanelActions(
+    /** Applies at once with no transition. Lists call [pickVibe]. */
     val setVibe: (Vibe) -> Unit = {},
+    /** A pick from a vibe list; runs the transition through the navigator. */
+    val pickVibe: (Vibe) -> Unit = {},
+    val nextVibe: () -> Unit = {},
+    val previousVibe: () -> Unit = {},
+    /** A committed swipe on the play/pause dome: [nextVibe] or [previousVibe], its move marked as the dome's. */
+    val swipeVibe: (next: Boolean) -> Unit = {},
     val setEnergy: (Float) -> Unit = {},
     val setComplexity: (Float) -> Unit = {},
     val setSpace: (Float) -> Unit = {},
@@ -270,6 +285,28 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
         get() = emptyList()
 
     val vibeFlow: StateFlow<Vibe>
+
+    /** Previous/next/progress for the navigator chrome. Stub default for previews and fakes. */
+    val vibeNavFlow: StateFlow<VibeNavState>
+        get() = EmptyVibeNavFlow
+
+    /**
+     * Each vibe change the navigator accepts, as its transition starts: which way and who asked.
+     * [applyVibe] bypasses the navigator and announces nothing. Stub default for previews and fakes.
+     */
+    val vibeMoves: SharedFlow<VibeMove>
+        get() = NoVibeMoves
+
+    /** The current song's loudness and track mix, a beat at a time. Stub default for previews and fakes. */
+    val songStoryFlow: StateFlow<SongStory>
+        get() = MusicPulseSource.Silent.songStory
+
+    /** The music right now: loudness, track levels and beat phase at the viz rate. Stub default as above. */
+    val musicPulseFlow: StateFlow<MusicPulse>
+        get() = MusicPulseSource.Silent.pulse
+
+    /** Keeps [musicPulseFlow] current while held: see [MusicPulseSource.holdPulse]. A no-op for previews and fakes. */
+    fun holdMusicPulse(): DisposableHandle = MusicPulseSource.Silent.holdPulse()
 
     fun applyVibe(vibe: Vibe)
 
@@ -459,6 +496,7 @@ class PulsarViewModel(
     private val transitionRunner: PulsarTransitionRunner,
     private val songEndingEventSource: SongEndingEventSource,
     private val engagementTracker: EngagementTracker,
+    private val musicPulseSource: MusicPulseSource,
 ) : PulsarFeature {
 
     // The injected set filtered + ordered through VibeCatalog (the green-light map):
@@ -841,6 +879,18 @@ class PulsarViewModel(
     private val _vibeFlow = MutableStateFlow(curatedProviders.first().vibe)
     override val vibeFlow: StateFlow<Vibe> = _vibeFlow.asStateFlow()
 
+    override val vibeNavFlow: StateFlow<VibeNavState> =
+        combine(vibeFlow, pulsarSession.progressFlow) { vibe, progress ->
+            vibeNavStateOf(vibeNames, vibe.name, progress)
+        }.stateIn(scope, SharingStarted.Eagerly, vibeNavStateOf(vibeNames, vibeFlow.value.name, null))
+
+    override val vibeMoves: SharedFlow<VibeMove> get() = pulsarSession.vibeMoves
+
+    override val songStoryFlow: StateFlow<SongStory> = musicPulseSource.songStory
+    override val musicPulseFlow: StateFlow<MusicPulse> = musicPulseSource.pulse
+
+    override fun holdMusicPulse(): DisposableHandle = musicPulseSource.holdPulse()
+
     init {
         pulsarSession.updateVibe(_vibeFlow.value)
     }
@@ -966,6 +1016,13 @@ class PulsarViewModel(
             engagementTracker.record(EngagementAction.VIBE_SELECT)
             applyVibe(vibe)
         },
+        pickVibe = { vibe ->
+            engagementTracker.record(EngagementAction.VIBE_SELECT)
+            pulsarSession.requestVibe(VibeRequest.Pick(vibe))
+        },
+        nextVibe = { pulsarSession.requestVibe(VibeRequest.Next) },
+        previousVibe = { pulsarSession.requestVibe(VibeRequest.Previous) },
+        swipeVibe = { next -> pulsarSession.requestVibe(VibeRequest.DomeSwipe(next)) },
         setEnergy = energyId.floatSetter(),
         setComplexity = complexityId.floatSetter(),
         setSpace = { value ->

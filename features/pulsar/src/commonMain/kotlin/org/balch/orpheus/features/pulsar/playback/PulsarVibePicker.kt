@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarSession
 
 /**
  * Maps Android Auto media-id selections to Pulsar vibes.
@@ -19,11 +20,12 @@ class PulsarVibePicker(
     // → PulsarFeature. PulsarFeature is only touched inside onPlay(), so a
     // plain `by lazy` defers resolution to the first runtime callback.
     pulsarFeatureProvider: () -> PulsarFeature,
+    private val pulsarSession: PulsarSession,
 ) : PlayFromMediaIdHandler {
     private val pulsarFeature: PulsarFeature by lazy(pulsarFeatureProvider)
 
     override fun onPlay(mediaId: String) {
         pulsarFeature.vibeList.firstOrNull { it.name == mediaId }
-            ?.let { pulsarFeature.applyVibe(it) }
+            ?.let { pulsarSession.requestVibe(VibeRequest.Pick(it)) }
     }
 }

@@ -431,7 +431,7 @@ on both apps and every platform.
   `@Multibinds(allowEmpty = true)` when empty is legitimate.
 - **Platform overrides need `replaces`.** `JvmAiVibeArchive` and `AndroidAiVibeArchive` both use
   `@ContributesBinding(AppScope::class, replaces = [NoOpAiVibeArchive::class])`.
-- **AppScope bindings that need a feature take `() -> T`.** `PulsarSkipHandler` and the vibe tools
+- **AppScope bindings that need a feature take `() -> T`.** `VibeNavigator` and the vibe tools
   take `pulsarFeatureProvider: () -> PulsarFeature`. Injecting the feature eagerly pulls the child
   graph into `AppScope` construction and Metro stack-overflows.
 

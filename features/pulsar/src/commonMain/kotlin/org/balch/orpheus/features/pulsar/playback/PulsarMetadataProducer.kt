@@ -44,7 +44,7 @@ class PulsarMetadataProducer(
     // PulsarViewModel → PulsarSongEnding → PlaybackController → MetadataProducer → here),
     // which also needed a main-dispatch deferral to avoid deadlocking on adjacent
     // BaseDoubleCheck locks while AWT built the graph. PulsarSession retires both.
-    pulsarSession: PulsarSession,
+    private val pulsarSession: PulsarSession,
     scope: AppCoroutineScope,
     dispatcherProvider: DispatcherProvider,
 ) : MetadataProducer {
@@ -59,8 +59,7 @@ class PulsarMetadataProducer(
     override val subtitleFlow: StateFlow<String> = _subtitle.asStateFlow()
     override val artworkPngFlow: StateFlow<ByteArray?> = _artwork.asStateFlow()
 
-    private val _progress = MutableStateFlow<PlaybackProgress?>(null)
-    override val progressFlow: StateFlow<PlaybackProgress?> = _progress.asStateFlow()
+    override val progressFlow: StateFlow<PlaybackProgress?> = pulsarSession.progressFlow
 
     // Monotonic, so a wall-clock change cannot read as a huge or negative loop-cycle.
     private val clockOrigin = TimeSource.Monotonic.markNow()
@@ -126,12 +125,13 @@ class PulsarMetadataProducer(
                 pulsarSession.arrangementStateFlow,
                 pulsarSession.vibeFlow,
                 pulsarSession.finalSectionIndexFlow,
-            ) { state, vibe, finalSection ->
+                pulsarSession.songGenerationFlow,
+            ) { state, vibe, finalSection, generation ->
                 progressTracker.update(
                     state,
-                    vibe?.let { songTimingOf(it.name, it.stepCount, it.bpm, it.arrangement, state.sectionIndex, finalSection) },
+                    vibe?.let { songTimingOf(it.name, it.stepCount, it.bpm, it.arrangement, state.sectionIndex, finalSection, generation) },
                 )
-            }.collect { _progress.value = it }
+            }.collect { pulsarSession.updateProgress(it) }
         }
     }
 }

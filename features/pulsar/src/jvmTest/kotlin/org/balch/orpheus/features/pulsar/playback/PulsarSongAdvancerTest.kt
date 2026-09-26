@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.pulsar.playback
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -13,6 +14,7 @@ import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
+import org.balch.orpheus.features.pulsar.makeVibeNavigator
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,8 +68,9 @@ class PulsarSongAdvancerTest {
         source: FakeSongEndingEventSource,
         prefs: StubTransitionPreferences = StubTransitionPreferences(),
         runner: PulsarTransitionRunner = RecordingRunner(),
+        dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
     ): PulsarSongAdvancer = PulsarSongAdvancer(
-        feature, source, prefs, runner, makeAppCoroutineScope(),
+        feature, source, prefs, makeVibeNavigator(feature, runner, prefs, dispatcher), makeAppCoroutineScope(dispatcher),
     )
 
     @Test
@@ -98,10 +101,8 @@ class PulsarSongAdvancerTest {
         val feature = FakePulsarFeature(vibes, vibes[0])
         val source = FakeSongEndingEventSource()
         val runner = DelayingRunner(preApplyMs = 1_000L)
-        val advancer = PulsarSongAdvancer(
-            feature, source, StubTransitionPreferences(), runner,
-            makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-        )
+        val prefs = StubTransitionPreferences()
+        val advancer = makeAdvancer(feature, source, prefs, runner, UnconfinedTestDispatcher(testScheduler))
         @Suppress("UNUSED_EXPRESSION") advancer
 
         source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
@@ -118,6 +119,52 @@ class PulsarSongAdvancerTest {
             "a re-emit naming the song we already left must be dropped, not advanced past",
         )
         assertEquals(1, runner.specs.size, "only one transition should have run")
+    }
+
+    @Test
+    fun `SongEnded while a user skip is in flight is dropped`() = runTest {
+        val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"), mkMinimalVibe("C"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        val source = FakeSongEndingEventSource()
+        val runner = DelayingRunner(preApplyMs = 1_000L)
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val prefs = StubTransitionPreferences()
+        val navigator = makeVibeNavigator(feature, runner, prefs, dispatcher)
+        @Suppress("UNUSED_VARIABLE", "unused")
+        val advancer = PulsarSongAdvancer(feature, source, prefs, navigator, makeAppCoroutineScope(dispatcher))
+
+        navigator.request(VibeRequest.Pick(vibes[2]))
+        advanceTimeBy(100L)
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceUntilIdle()
+
+        assertEquals("C", feature.vibeFlow.value.name)
+        assertEquals(1, runner.specs.size, "the advance must not cancel the user's pick")
+    }
+
+    @Test
+    fun `a user pick during an advance beats the buffered re-emit`() = runTest {
+        val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"), mkMinimalVibe("C"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        val applied = mutableListOf<String>()
+        feature.onVibeApplied = { applied += feature.vibeFlow.value.name }
+        val source = FakeSongEndingEventSource()
+        val runner = DelayingRunner(preApplyMs = 1_000L)
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val prefs = StubTransitionPreferences()
+        val navigator = makeVibeNavigator(feature, runner, prefs, dispatcher)
+        @Suppress("UNUSED_VARIABLE", "unused")
+        val advancer = PulsarSongAdvancer(feature, source, prefs, navigator, makeAppCoroutineScope(dispatcher))
+
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceTimeBy(100L)
+        // Recovery-net re-emit, buffered while the advancer waits on its advance.
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        navigator.request(VibeRequest.Pick(vibes[2]))
+        advanceUntilIdle()
+
+        assertEquals("C", feature.vibeFlow.value.name)
+        assertEquals(listOf("C"), applied, "the song's own advance to B must never land over the pick")
     }
 
     @Test
@@ -153,7 +200,7 @@ class PulsarSongAdvancerTest {
         val source = FakeSongEndingEventSource()
         val prefs = StubTransitionPreferences(initial = TransitionSpec(TransitionStyle.CROSSFADE))
         val runner = RecordingRunner()
-        val advancer = PulsarSongAdvancer(feature, source, prefs, runner, makeAppCoroutineScope())
+        val advancer = makeAdvancer(feature, source, prefs, runner)
         @Suppress("UNUSED_EXPRESSION") advancer
 
         // Mirror what PulsarSongEnding would set in production: the advancer
@@ -181,10 +228,7 @@ class PulsarSongAdvancerTest {
         val prefs = StubTransitionPreferences(initial = TransitionSpec(TransitionStyle.FADE))
         val runner = RecordingRunner()
         // Wire the advancer onto the runTest scheduler so any internal delays virtualize.
-        val advancer = PulsarSongAdvancer(
-            feature, source, prefs, runner,
-            makeAppCoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-        )
+        val advancer = makeAdvancer(feature, source, prefs, runner, UnconfinedTestDispatcher(testScheduler))
         @Suppress("UNUSED_EXPRESSION") advancer
 
         // Mirror PulsarSongEnding's resolution: vibe A overrides to GAP.

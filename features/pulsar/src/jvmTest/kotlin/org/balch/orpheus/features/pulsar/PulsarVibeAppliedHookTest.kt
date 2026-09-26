@@ -79,6 +79,7 @@ class PulsarVibeAppliedHookTest {
             transitionRunner = StubTransitionRunner(),
             songEndingEventSource = songEnding,
             engagementTracker = DefaultEngagementTracker(),
+            musicPulseSource = MusicPulseSource.Silent,
         )
     }
 

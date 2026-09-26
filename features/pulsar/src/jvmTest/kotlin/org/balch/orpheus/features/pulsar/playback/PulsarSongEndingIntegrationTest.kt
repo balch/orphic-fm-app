@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
 import org.balch.orpheus.features.pulsar.makeSongEnding
 import org.balch.orpheus.features.pulsar.makeStubPlaybackController
+import org.balch.orpheus.features.pulsar.makeVibeNavigator
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -92,8 +93,10 @@ class PulsarSongEndingIntegrationTest {
                 applyNext()
             }
         }
+        val transitionPrefs = StubTransitionPreferences()
         val advancer = PulsarSongAdvancer(
-            feature, songEnding, StubTransitionPreferences(), runner, scope,
+            feature, songEnding, transitionPrefs,
+            makeVibeNavigator(feature, runner, transitionPrefs, dispatcher, pulsarSession), scope,
         )
 
         val collected = mutableListOf<SongEndingEvent>()

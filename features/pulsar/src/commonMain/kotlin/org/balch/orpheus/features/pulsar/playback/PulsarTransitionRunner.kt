@@ -24,9 +24,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * for [TransitionStyle.CUT]).
  *
  * The runner returns only after the transition is fully complete (including
- * the post-applyNext fade-in). Cancellation is cooperative — cancelling
- * mid-transition leaves the engine at whatever fader state was last requested;
- * the caller is responsible for any cleanup (e.g. resetting master volume).
+ * the post-applyNext fade-in). Cancellation is cooperative. A cancelled or
+ * failed transition re-aims the master fader at unity before it rethrows, so
+ * an interrupted fade never leaves the app silent.
  */
 interface PulsarTransitionRunner {
     /**
@@ -79,6 +79,11 @@ class PulsarTransitionRunnerImpl(
                 TransitionStyle.FILTER    -> runFilter(ms, applyNext)
                 TransitionStyle.RANDOM    -> error("RANDOM handled above")
             }
+        } catch (t: Throwable) {
+            // Cancelled or failed mid-way, the fader may still be ramping toward 0 or 0.5, and its
+            // level can read unity before the ramp moves. Aim it home; a following style re-arms it.
+            engine.fadeMasterVolume(1f, DECLICK_MS, FadeCurve.LINEAR)
+            throw t
         } finally {
             _activeStyle.value = null
         }
@@ -86,13 +91,17 @@ class PulsarTransitionRunnerImpl(
 
     private suspend fun runCut(applyNext: suspend () -> Unit) {
         applyNext()
+        // Every other style restores unity as it starts; a CUT that finds the fader low must too.
+        if (engine.getMasterVolume() < UNITY_THRESHOLD) {
+            engine.fadeMasterVolume(1f, DECLICK_MS, FadeCurve.LINEAR)
+        }
     }
 
     /** Quick declick fade-out, pause beats, silent gap, swap, fade-in, resume. */
     private suspend fun runGap(gapMs: Int, applyNext: suspend () -> Unit) {
         engine.fadeMasterVolume(0f, DECLICK_MS, FadeCurve.LINEAR)
         delay(DECLICK_MS.toLong().milliseconds)
-        // Hand the gate back as we found it, from a finally: PulsarSkipHandler cancels the
+        // Hand the gate back as we found it, from a finally: VibeNavigator cancels the
         // in-flight transition on every rapid tap, and nothing re-asserts this port until
         // PlaybackController.state changes, so a gate left at 0 is permanent silence. A hard
         // 1 is equally wrong, since a skip can arrive while EXPLICIT playback is not running.

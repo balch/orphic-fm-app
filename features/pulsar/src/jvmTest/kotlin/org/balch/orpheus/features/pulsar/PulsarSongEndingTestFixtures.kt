@@ -31,8 +31,10 @@ import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
 import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
+import org.balch.orpheus.features.pulsar.playback.VibeNavigator
 
 /**
  * Shared no-op stubs for the new song-ending dependencies that
@@ -147,6 +149,16 @@ internal class FixturesDispatchers(private val d: CoroutineDispatcher) : Dispatc
 internal fun makeAppCoroutineScope(
     dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
 ): AppCoroutineScope = AppCoroutineScope(FixturesDispatchers(dispatcher))
+
+/** A real [VibeNavigator] over a [FakePulsarFeature], on one dispatcher so tests can drive virtual time. */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun makeVibeNavigator(
+    feature: FakePulsarFeature,
+    runner: PulsarTransitionRunner,
+    prefs: TransitionPreferences = StubTransitionPreferences(),
+    dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
+    session: PulsarSession = PulsarSession(SongEndingStubSynthEngine(), makeAppCoroutineScope(dispatcher), FixturesDispatchers(dispatcher)),
+): VibeNavigator = VibeNavigator({ feature }, session, runner, prefs, makeAppCoroutineScope(dispatcher))
 
 /**
  * The only sanctioned way to build a real [PulsarSongEnding] over a

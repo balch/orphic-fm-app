@@ -27,6 +27,8 @@ data class SongTiming(
     val songSeconds: IntRange,
     /** The section the song ends in once the ending is armed, else -1. */
     val finalSectionIndex: Int,
+    /** Bumped on every apply, so a restart of the same vibe reads as a new song. */
+    val songId: Int = 0,
 ) {
     /**
      * The end to show until the final section is known: three quarters into the authored range.
@@ -47,6 +49,7 @@ internal fun songTimingOf(
     arrangement: Arrangement?,
     sectionIndex: Int,
     finalSectionIndex: Int,
+    songId: Int = 0,
 ): SongTiming? {
     val sections = arrangement?.sections
     if (sections.isNullOrEmpty()) return null
@@ -57,6 +60,7 @@ internal fun songTimingOf(
         bpmMultiplier = sections.getOrNull(sectionIndex)?.bpmMultiplier ?: 1f,
         songSeconds = passSeconds(arrangement, stepCount, bpm) ?: arrangement.lengthSeconds,
         finalSectionIndex = finalSectionIndex,
+        songId = songId,
     )
 }
 
@@ -86,6 +90,7 @@ private fun passSeconds(arrangement: Arrangement, stepCount: Int, bpm: Float): I
  */
 class SongProgressTracker(private val nowMs: () -> Long) {
     private var vibeName: String? = null
+    private var songId: Int? = null
     private var vibeStartedMs = 0L
     private var sectionIndex = -1
     private var multiplier = 1f
@@ -104,10 +109,11 @@ class SongProgressTracker(private val nowMs: () -> Long) {
         val seed = seedMsPerCycle(timing.stepCount, timing.bpm, timing.bpmMultiplier) ?: return null
         val now = nowMs()
         when {
-            timing.vibeName != vibeName -> {
+            timing.vibeName != vibeName || timing.songId != songId -> {
                 samples.clear()
                 publishedMsPerCycle = null
                 vibeName = timing.vibeName
+                songId = timing.songId
                 vibeStartedMs = now
                 songMsBeforeSection = 0L
                 startSection(state, timing.bpmMultiplier, now)

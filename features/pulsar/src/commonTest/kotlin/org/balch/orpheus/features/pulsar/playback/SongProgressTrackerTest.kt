@@ -191,4 +191,16 @@ class SongProgressTrackerTest {
         assertNull(seedMsPerCycle(32, 0f, 1f))
         assertNull(seedMsPerCycle(0, 120f, 1f))
     }
+
+    @Test
+    fun aRestartOfTheSameVibeStartsTheSongOver() {
+        tracker.update(state(0, 0), verse)
+        play(0, bars = 8)
+        clock += 4_000
+        tracker.update(state(1, 0), verse)
+        play(1, bars = 3)
+        // Same vibe re-applied: only the song id moves, and the engine is back at section 0.
+        clock += 4_000
+        assertEquals(PlaybackProgress(0, estimate), tracker.update(state(0, 0), verse.copy(songId = 1)))
+    }
 }

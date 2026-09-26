@@ -15,9 +15,9 @@ import kotlin.concurrent.Volatile
 
 /**
  * Default behavior for [SongEndingEvent.SongEnded]: resolve the active
- * [TransitionSpec] (per-vibe override or global default) and run it via
- * [PulsarTransitionRunner], which handles fades / gaps / tape-stop and
- * invokes `applyVibeByName` at the right moment.
+ * [TransitionSpec] (per-vibe override or global default) and hand the
+ * transition to [VibeNavigator], which runs it on the one job every vibe
+ * change shares and applies the next vibe at the right moment.
  */
 @SingleIn(AppScope::class)
 @Inject
@@ -26,7 +26,7 @@ class PulsarSongAdvancer(
     private val pulsarFeature: PulsarFeature,
     private val songEndingEventSource: SongEndingEventSource,
     private val transitionPreferences: TransitionPreferences,
-    private val transitionRunner: PulsarTransitionRunner,
+    private val vibeNavigator: VibeNavigator,
     scope: AppCoroutineScope,
 ) {
     private val log = logging("PulsarSongAdvancer")
@@ -39,8 +39,6 @@ class PulsarSongAdvancer(
             songEndingEventSource.songEndingEvents.collect { event ->
                 if (!enabled) return@collect
                 if (event !is SongEndingEvent.SongEnded) return@collect
-                val names = pulsarFeature.vibeNames
-                if (names.isEmpty()) return@collect
                 val currentName = pulsarFeature.vibeFlow.value.name
                 // PulsarSongEnding re-emits SongEnded every outro loop as a
                 // recovery net. One queued behind an in-flight runTransition
@@ -49,9 +47,13 @@ class PulsarSongAdvancer(
                     log.info { "stale SongEnded(${event.vibeName}); now playing $currentName — ignoring" }
                     return@collect
                 }
-                val idx = names.indexOf(currentName)
-                val nextIndex = ((idx + 1) % names.size).coerceAtLeast(0)
-                val nextName = names[nextIndex]
+                // A user request is playing out; it wins over the song's own ending. A cheap
+                // pre-check only: VibeNavigator makes the final call when it dequeues the advance.
+                if (vibeNavigator.isBusy) {
+                    log.info { "SongEnded(${event.vibeName}) during a user transition — ignoring" }
+                    return@collect
+                }
+                val nextName = neighborVibe(pulsarFeature.vibeNames, currentName, 1) ?: return@collect
 
                 val configured: TransitionSpec = pulsarFeature.vibeFlow.value
                     .arrangement?.transitionOut
@@ -64,9 +66,7 @@ class PulsarSongAdvancer(
                 val spec = configured.copy(style = resolvedStyle)
                 log.info { "SongEnded(${event.vibeName}) -> transition=${spec.style} (configured=${configured.style}) -> applyVibe($nextName)" }
 
-                transitionRunner.runTransition(spec) {
-                    pulsarFeature.applyVibeByName(nextName)
-                }
+                vibeNavigator.advance(from = currentName, name = nextName, spec = spec)
             }
         }
     }

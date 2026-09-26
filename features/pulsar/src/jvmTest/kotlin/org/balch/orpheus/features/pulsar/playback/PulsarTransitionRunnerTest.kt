@@ -279,6 +279,65 @@ class PulsarTransitionRunnerTest {
         assertTrue(applied)
     }
 
+    // ── Unity after an interrupted fade ─────────────────────────────────
+
+    @Test
+    fun `CUT fades back to unity when the fader was left low`() = runTest {
+        val engine = RecordingEngine(initialVolume = 0.3f)
+        engine.now = { testScheduler.currentTime }
+        makeRunner(engine).runTransition(TransitionSpec(TransitionStyle.CUT)) {}
+        assertEquals(listOf(1f to DECLICK_MS.toInt()), engine.fades.map { it.target to it.durationMs })
+        assertEquals(1f, engine.getMasterVolume())
+    }
+
+    @Test
+    fun `a CUT after a cancelled FADE ends at unity`() = runTest {
+        val engine = RecordingEngine()
+        engine.now = { testScheduler.currentTime }
+        val runner = makeRunner(engine)
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.FADE)) {} }
+        advanceTimeBy(50L) // mid fade-out
+        job.cancelAndJoin()
+        runner.runTransition(TransitionSpec(TransitionStyle.CUT)) {}
+        advanceUntilIdle()
+        assertEquals(1f, engine.getMasterVolume())
+    }
+
+    // The native fader reads its current level, which has barely moved when a second
+    // command cancels the first straight away: the ramp toward 0 must still be re-aimed.
+    @Test
+    fun `a FADE cancelled before the fader moves is re-aimed at unity`() = runTest {
+        val engine = object : SongEndingStubSynthEngine() {
+            val targets = mutableListOf<Float>()
+            override fun fadeMasterVolume(target: Float, durationMs: Int, curve: FadeCurve) { targets += target }
+        }
+        val runner = PulsarTransitionRunnerImpl(engine, random = { it.first() })
+        val job = launch { runner.runTransition(TransitionSpec(TransitionStyle.FADE)) {} }
+        advanceTimeBy(1L)
+        job.cancelAndJoin()
+        runner.runTransition(TransitionSpec(TransitionStyle.CUT)) {}
+        assertEquals(1f, engine.targets.last(), "fader left heading for ${engine.targets.last()}")
+    }
+
+    @Test
+    fun `a FADE whose swap throws ends at unity`() = runTest {
+        val engine = RecordingEngine()
+        engine.now = { testScheduler.currentTime }
+        val runner = makeRunner(engine)
+        var thrown: Throwable? = null
+        val job = launch {
+            try {
+                runner.runTransition(TransitionSpec(TransitionStyle.FADE)) { error("swap blew up") }
+            } catch (e: IllegalStateException) {
+                thrown = e
+            }
+        }
+        advanceUntilIdle()
+        job.join()
+        assertEquals("swap blew up", thrown?.message, "the failure still reaches the caller")
+        assertEquals(1f, engine.getMasterVolume())
+    }
+
     @Test
     fun `activeStyle reports the running style and clears on completion`() = runTest {
         val engine = RecordingEngine()
@@ -384,7 +443,7 @@ class PulsarTransitionRunnerTest {
     private fun RecordingEngine.pulsarPlaying(): Int? =
         getPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol)?.asInt()
 
-    // PulsarSkipHandler cancels the in-flight transition on every rapid tap. Before the
+    // VibeNavigator cancels the in-flight transition on every rapid tap. Before the
     // fix the gate stayed at 0 forever: PulsarPlaybackBridge only writes it on a
     // PlaybackController.state CHANGE, so nothing re-asserted it and Pulsar went silent
     // until the user toggled play/pause.

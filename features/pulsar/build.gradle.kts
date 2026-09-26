@@ -97,6 +97,7 @@ kotlin {
             implementation(projects.core.pluginApi)
             implementation(projects.core.tts)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.collections.immutable)
         }
         // kotlin("test") comes from the orpheus.kmp.compose convention plugin.
         // coroutines-test must live here, not jvmTest: commonTest is compiled by

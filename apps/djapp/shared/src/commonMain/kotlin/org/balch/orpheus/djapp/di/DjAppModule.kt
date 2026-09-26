@@ -21,8 +21,8 @@ import org.balch.orpheus.core.playback.SkipHandler
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
-import org.balch.orpheus.features.pulsar.playback.PulsarSkipHandler
 import org.balch.orpheus.features.pulsar.playback.PulsarVibePicker
+import org.balch.orpheus.features.pulsar.playback.VibeNavigator
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 
@@ -45,7 +45,7 @@ interface DjAppModule {
      */
     @Binds val TimerOverlayProducer.bindOverlayProducer: OverlaySubtitleProducer?
 
-    @Binds val PulsarSkipHandler.bindSkipHandler: SkipHandler?
+    @Binds val VibeNavigator.bindSkipHandler: SkipHandler?
 
     @Binds val PulsarVibePicker.bindPlayFromMediaIdHandler: PlayFromMediaIdHandler?
 
