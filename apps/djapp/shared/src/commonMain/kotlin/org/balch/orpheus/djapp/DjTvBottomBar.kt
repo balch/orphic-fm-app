@@ -195,7 +195,7 @@ internal fun bottomBarPanels(dockable: List<DjRoute>): List<DjRoute> =
  * them while running or paused.
  *
  * Play/pause is the vibe transport's dome in the centre slot, between the two middle toggles as in
- * the phone bar, raised out of the bar with its name on the toggles' label line (see [DockDome]).
+ * the phone bar, hung from the toggles' label line with its name in a pill above it (see [DockDome]).
  * The song's story rides its own band under the top bar (see [DockSongBand]).
  *
  * Docked/focused tint follows the selected visualization's own title color (see
@@ -249,7 +249,6 @@ fun DjTvBottomBar(
     // Between the two middle toggles, as the phone bar puts its transport.
     val domeIndex = panels.size / 2
     val domeSideRoom = if (LocalTelevisionHardware.current) 0.dp else DockDomeSideRoom
-    val nameLane = dockNameLane(panels, domeIndex, isDocked, domeSideRoom)
 
     // Region-focus border — see tvFocusRegionBorder's doc for the single-holder exclusivity
     // guarantee and why reading it in the draw phase costs nothing per frame.
@@ -316,8 +315,8 @@ fun DjTvBottomBar(
                         previewFocused = previewFocusPreviousTile,
                     )
                 }
-                // Aligned by the first baseline, so the dome's name sits on the toggles' label line
-                // and a running Timer's countdown hangs below its own.
+                // Aligned by the first baseline, so the dome hangs from the toggles' label line and a
+                // running Timer's countdown hangs below its own.
                 Row(horizontalArrangement = Arrangement.spacedBy(TvBottomBarItemGap)) {
                     for (index in 0..panels.size) {
                         if (index == domeIndex) {
@@ -326,7 +325,6 @@ fun DjTvBottomBar(
                                 onTogglePlayback = onTogglePlayback,
                                 ringSize = domeRingSize,
                                 nameStyle = nameStyle,
-                                nameLane = nameLane,
                                 accent = dockAccent,
                                 modifier = Modifier.alignBy(FirstBaseline).padding(horizontal = domeSideRoom),
                                 previewWavePhase = previewWavePhase,
@@ -362,33 +360,6 @@ fun DjTvBottomBar(
             }
         }
     }
-}
-
-/**
- * How wide the dome's name may draw, given its slot's width in px: centred on the slot, and
- * [BarNameClearance] short of the nearer of the neighbouring toggles' labels, each centred in its
- * item past the bar's gap and the dome's [sideRoom]. A docked neighbour's wash fills its whole item,
- * so there the lane stops short of the item instead.
- */
-@Composable
-private fun dockNameLane(panels: List<DjRoute>, domeIndex: Int, isDocked: (DjRoute) -> Boolean, sideRoom: Dp): (Int) -> Int {
-    val measurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.labelMedium
-    val density = LocalDensity.current
-    val neighbours = listOfNotNull(panels.getOrNull(domeIndex - 1), panels.getOrNull(domeIndex))
-    val plated = neighbours.map(isDocked)
-    val freePx = remember(neighbours, plated, labelStyle, density) {
-        with(density) {
-            val itemPadding = TvBottomBarItemPadding.roundToPx()
-            neighbours.withIndex().minOfOrNull { (i, route) ->
-                if (plated[i]) return@minOfOrNull 0
-                val labelPx = measurer.measure(route.label, labelStyle.copy(fontSize = TvBottomBarLabelSize)).size.width
-                (maxOf(TvBottomBarMinWidth.roundToPx(), labelPx + 2 * itemPadding) - labelPx) / 2
-            } ?: 0
-        }
-    }
-    val reachPx = with(density) { (TvBottomBarItemGap + sideRoom - BarNameClearance).roundToPx() }
-    return remember(freePx, reachPx) { { slotPx -> slotPx + 2 * (reachPx + freePx) } }
 }
 
 /**

@@ -128,9 +128,20 @@ class DockDomeTest {
 
         fun pixels(): PixelMap = Image.makeFromEncoded(frame().encodeToData()!!.bytes).toComposeImageBitmap().toPixelMap()
 
+        /** Lets [ms] pass on the coroutine clock alone, then renders [frames] frames for any animation it started. */
+        fun idle(ms: Long, frames: Int) {
+            now += ms
+            scheduler.advanceTimeBy(ms)
+            scheduler.runCurrent()
+            repeat(frames) { frame() }
+        }
+
+        /** The pill's fill in its left padding, beside the name: over this scene's clear ground, its alpha is the pill's. */
+        fun pillAlpha(): Float = pixels()[Offset(nameLine.left - 4f, nameLine.center.y)].alpha
+
         /**
          * Drawn pixels on the focus mark's circle around the ring, at its sides only: the name sits
-         * under the ring, and the bar's region border runs along the bar's edges.
+         * above or under the ring, and the bar's region border runs along the bar's edges.
          */
         fun markPixels(): Int {
             val px = pixels()
@@ -207,15 +218,27 @@ class DockDomeTest {
 
         val domeBox: Rect get() = assertNotNull(dome).bounds
 
-        /** The ring as laid out: from the node's top padding to the name under it. */
-        val measuredRing: Float
+        /** The name's line, in the pill above the ring. */
+        val nameLine: Rect
             get() = assertNotNull(
                 unmerged.firstOrNull { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text == vibe } },
-                "no name under the dome",
-            ).positionInRoot.y - domeBox.top - TransportPadding.value
+                "no name on the dome",
+            ).bounds
 
-        /** The ring's centre: 4dp under the node's top, then half the ring. */
-        val ringCentre: Offset get() = domeBox.let { Offset(it.center.x, it.top + TransportPadding.value + ringSize.value / 2) }
+        /** The ring as laid out: the node is the padded ring alone, its pill outside it. */
+        val measuredRing: Float
+            get() = domeBox.height - 2 * TransportPadding.value
+
+        /** The neighbour the pill peeks: the name beside its arrow, or null at rest. The step tiles name them too. */
+        fun peeked(): String? {
+            val arrow = unmerged.firstOrNull { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text == " ›" || it.text == "‹ " } }
+            return arrow?.parent?.children.orEmpty().flatMap { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+                .firstOrNull { it != " ›" && it != "‹ " }
+        }
+
+        /** The ring's centre: 4dp inside the node's bottom, under the pill, then half the ring. */
+        val ringCentre: Offset
+            get() = domeBox.let { Offset(it.center.x, it.bottom - TransportPadding.value - ringSize.value / 2) }
 
         /** A Play or Pause plate of its own, as TV hardware's top bar once had. */
         val plate: SemanticsNode?
@@ -308,7 +331,7 @@ class DockDomeTest {
         abs(red - other.red) + abs(green - other.green) + abs(blue - other.blue) + abs(alpha - other.alpha) < 0.03f
 
     // Launch focus leaves the dome as it was, the mark aside; hover and press lighten a circle on
-    // the ring, never darken it and never reach the name under it or the node's square corners.
+    // the ring, never darken it and never reach the name's pill above it or the node's square corners.
     @Test
     fun focusLeavesTheBigDomeAloneAndHoverAndPressLightenItInACircle() {
         // Paused, so the name holds still rather than scrolling in its lane.
@@ -317,11 +340,11 @@ class DockDomeTest {
             assertNotNull(dock.focused, "sanity: the dome took the launch focus")
             val box = dock.domeBox
             val centre = dock.ringCentre
-            // On the dome's body below the glyph, in the node's corner outside the ring and its mark,
-            // and on the name's line under the ring.
+            // On the dome's body below the glyph, in the node's bottom corner outside the ring and its
+            // mark, and on the name's line in the pill above the ring.
             val body = Offset(centre.x, centre.y + DockDomeRingSize.value * 0.28f)
-            val corner = Offset(box.left + 4f, box.top + 6f)
-            val name = Offset(centre.x, box.bottom - 12f)
+            val corner = Offset(box.left + 4f, box.bottom - 6f)
+            val name = dock.nameLine.center
             val focusedLook = dock.pixels()
             dock.press(Key.Tab)
             assertTrue(vibe !in assertNotNull(dock.focused).reads(), "sanity: Tab did not move focus off the dome")
@@ -339,10 +362,36 @@ class DockDomeTest {
             val pressed = dock.pixels()
             assertTrue(pressed[body].luminance() > hovered[body].luminance(), "a press did not lighten the dome: ${pressed[body]} vs ${hovered[body]}")
             assertTrue(pressed[corner].near(rest[corner]), "a press reached the node's square corner")
-            assertTrue(pressed[name].near(rest[name]), "a press lit the name under the ring")
+            assertTrue(pressed[name].near(rest[name]), "a press lit the name's pill above the ring")
             dock.pointer(PointerEventType.Release, centre)
         } finally {
             dock.close()
+        }
+    }
+
+    // Whole while paused; playing, whole for its first 12s, then settling to half. TV hardware holds it whole.
+    @Test
+    fun thePillSettlesToHalfAfterPlayingAWhileButNotPaused() {
+        listOf(false to false, true to false, false to true).forEach { (paused, tv) ->
+            val dock = Dock(tv = tv, paused = paused)
+            val what = if (tv) "on TV hardware" else if (paused) "paused" else "playing"
+            try {
+                dock.idle(1_000, 20)
+                val fresh = dock.pillAlpha()
+                assertTrue(fresh > 0.5f, "sanity: the $what pill is only $fresh opaque at first")
+                dock.idle(10_000, 5)
+                assertEquals(fresh, dock.pillAlpha(), 0.02f, "the $what pill faded before 12s")
+                // Past the delay, then through the 3s fade.
+                dock.idle(2_000, 200)
+                val settled = dock.pillAlpha()
+                if (paused || tv) {
+                    assertEquals(fresh, settled, 0.02f, "the $what pill faded")
+                } else {
+                    assertEquals(fresh * 0.5f, settled, 0.04f, "the $what pill did not settle to half")
+                }
+            } finally {
+                dock.close()
+            }
         }
     }
 
@@ -372,10 +421,11 @@ class DockDomeTest {
             dock.drag(centre, -48)
             assertEquals(1, dock.previouses, "a drag left")
             assertEquals(1, dock.toggles, "a drag also toggled playback")
-            // The name under the ring peeks the neighbour as the drag goes, as in the phone bar.
-            assertTrue(vibe in assertNotNull(dock.dome).reads(), "sanity: the dome's name is not under it")
+            // The pill peeks the neighbour as the drag goes, as in the phone bar.
+            assertTrue(vibe in assertNotNull(dock.dome).reads(), "sanity: the dome's description does not name the vibe")
+            assertNull(dock.peeked(), "sanity: the pill peeks at rest")
             dock.drag(centre, 24, release = false)
-            assertTrue("Stay Asleep" in assertNotNull(dock.dome).reads(), "a drag right never peeked the next vibe")
+            assertEquals("Stay Asleep", dock.peeked(), "a drag right never peeked the next vibe")
             dock.pointer(PointerEventType.Release, centre + Offset(24f, 0f))
             assertEquals(1, dock.nexts, "a 24dp drag committed")
         } finally {

@@ -815,7 +815,7 @@ class VibeDomeCueTest {
     /**
      * The dock's bottom bar under [cues], its centre dome still on the rig's short name with no
      * progress. It arrives a frame after the scene starts, as the dock does, so the dome takes the
-     * launch focus. Pixels are compared on the ring alone: the name under it changes with the vibe.
+     * launch focus. Pixels are compared on the ring alone: the name above it changes with the vibe.
      */
     private inner class Dock(cues: VibeDomeCues?, private val scheduler: TestCoroutineScheduler, feature: PulsarFeature = RigPulsarFeature()) {
         private var nowMs = 1_000L
@@ -848,15 +848,22 @@ class VibeDomeCueTest {
 
         val domeFocused: Boolean get() = dome().config.getOrNull(SemanticsProperties.Focused) == true
 
-        /** The neighbour the dome's own label peeks; the step tiles name them too, in nodes of their own. */
-        fun peek(): String? = dome().config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-            .firstOrNull { it == "Dog House" || it == "Stay Asleep" }
+        /** The neighbour the dome's pill peeks; the step tiles name them too, in nodes of their own. */
+        fun peek(): String? {
+            fun collect(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::collect)
+            val arrows = setOf(" ›", "‹ ")
+            // The pill's peek row: the name beside its arrow, apart from the tiles' own names.
+            val arrow = scene.semanticsOwners.flatMap { collect(it.unmergedRootSemanticsNode) }
+                .firstOrNull { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text in arrows } }
+            return arrow?.parent?.children.orEmpty().flatMap { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+                .firstOrNull { it !in arrows }
+        }
 
-        /** The ring's box, under the dome node's 4dp padding. */
+        /** The ring's box, over the dome node's bottom 4dp padding, under the name's pill. */
         val ring: IntRect by lazy {
             val node = dome()
             val centre = node.positionInRoot.x + node.size.width / 2f
-            val top = node.positionInRoot.y + TransportPadding.value
+            val top = node.positionInRoot.y + node.size.height - TransportPadding.value - BarRingSize.value
             IntRect((centre - BarRingSize.value / 2).toInt(), top.toInt(), (centre + BarRingSize.value / 2).toInt(), (top + BarRingSize.value).toInt())
         }
 

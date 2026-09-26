@@ -1,16 +1,20 @@
 package org.balch.orpheus.djapp
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,12 +55,15 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -65,14 +72,20 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.features.pulsar.MusicPulse
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusRegion
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.darken
+import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.viz.LocalVizStage
 import org.balch.orpheus.ui.viz.vizStageOverhang
 import kotlin.math.abs
@@ -96,10 +109,10 @@ internal fun swipeDecision(dragDp: Float, velocityDpPerSec: Float): SwipeDecisio
 }
 
 /**
- * The phone bar's ring, oversized against the 24dp tab icons and the size of the rail's
- * [RailRingSize]: one dome for both chromes. The bar's 80dp holds its name, and the ring rises above it.
+ * The phone bar's ring, oversized against the 24dp tab icons. Hung [PhoneBarDomeDrop] below the tab
+ * labels' line, it rises about 12dp out of the 80dp bar, its name's pill above it over the stage.
  */
-internal val BarRingSize = 64.dp
+internal val BarRingSize = 80.dp
 
 /** Above the ring and below its name, inside the transport's pointer and semantics bounds. */
 internal val TransportPadding = 4.dp
@@ -405,19 +418,18 @@ internal fun VibeTransportItem(
     previousRestarts: Boolean = false,
     // The rail: a name that fits sits centred on the ring's axis; a longer one scrolls.
     centerLabel: Boolean = false,
-    // The phone bar: lays out as its name alone, so the ring rises out over what is above.
+    // The phone bar: its ring and pill reach over the stage, so it reports that reach.
     raiseRing: Boolean = false,
     // The name, resting and peeked. The rail keeps the tabs' labelSmall: its tier budgets measure that line.
     nameStyle: TextStyle = MaterialTheme.typography.labelSmall,
-    // The phone bar and the dock: how wide the name may draw, given its slot's width in px. It stays
-    // centred on the slot, and its layout, like the tap target, keeps the slot's width.
+    // The phone bar and the dock: how wide the name's pill may draw, given its slot's width in px. It
+    // stays centred on the slot, and its layout, like the tap target, keeps the slot's width.
     nameLane: ((slotPx: Int) -> Int)? = null,
     // The dock: the name lays out no wider than the ring, however wide it draws, so the tap target is
     // the ring's width and the stage beside a raised ring keeps its taps.
     ringWideTarget: Boolean = false,
-    // The phone bar and the dock: the name is drawn this far below its laid-out line, for room under the ring.
-    // Draw-only, so the row's baseline alignment and the ring stay put.
-    nameDrop: Dp = 0.dp,
+    // The phone bar and the dock: the name rides above the ring in a pill, over the stage.
+    namePill: Boolean = false,
     ringSize: Dp = BarRingSize,
     // The keyboard focus mark's colour, read in draw: the dock's follows its accent.
     focusColor: ColorProducer = RingFocusColor,
@@ -494,10 +506,104 @@ internal fun VibeTransportItem(
     // The dock's, whose idle fade the mark rides; elsewhere the mark stays while focused.
     val region = LocalTvFocusRegion.current
 
+    val ring = @Composable {
+        Box(contentAlignment = Alignment.Center) {
+            // Its own layer under the ring, so the focus fade's frames re-record the mark alone. The
+            // layer does not clip, and the circle reaches past the ring's box.
+            Spacer(
+                Modifier.matchParentSize().graphicsLayer().drawWithCache {
+                    val radius = domeFocusRadius(ringSize).toPx()
+                    val stroke = Stroke(DomeFocusStroke.toPx())
+                    onDrawBehind {
+                        // The mode and the fade are read only while focused, so an unfocused dome never redraws with them.
+                        if (!focused.value || inputModes.inputMode != InputMode.Keyboard) return@onDrawBehind
+                        val fade = region?.alpha?.value ?: 1f
+                        if (fade <= 0f) return@onDrawBehind
+                        val color = focusColor()
+                        drawCircle(color.copy(alpha = color.alpha * fade), radius, center, style = stroke)
+                    }
+                },
+            )
+            VibeTransportRing(
+                paused = paused, progress = progress, ringSize = ringSize, position = position, domeTilt = domeTilt,
+                pulse = pulse, previewWavePhase = previewWavePhase, previewZipMs = previewZipMs,
+            )
+        }
+    }
+    // The label slides with the drag: right peeks the next name, left the previous (or the restart).
+    val side = if (previewDragDp != 0f) peekSideOf(previewDragDp) else peekSide.intValue
+    val peekNext = side > 0 && nextName != null
+    val peekPrevious = side < 0 && previousName != null
+    val nameColor = if (namePill) VibeNamePillColor else OrpheusColors.cosmicPurple
+    val labelColor = remember(shownDrag, nextName, previousName, nameColor) {
+        ColorProducer { nameColor.copy(alpha = labelAlpha(shownDrag(), nextName, previousName)) }
+    }
+    // Slides with the drag, and draws in its lane, wider than the ring's.
+    val reportPx = if (ringWideTarget) with(density) { ringSize.roundToPx() } else null
+    // The pill's glass samples the stage through it, and it settles back once a vibe has played a
+    // while; TV hardware goes without both, as its bars go without glass and its dome without motion.
+    val animatedPill = namePill && !LocalTelevisionHardware.current
+    val pillLiquid = if (animatedPill) LocalLiquidState.current else null
+    val pillFade = if (animatedPill) rememberPillFade(paused, name) else null
+    val pillPaddingX = with(density) { (nameStyle.fontSize * PillPaddingEm).toDp() }
+    val nameModifier = remember(shownDrag, nameLane, reportPx, namePill, pillLiquid, pillFade, pillPaddingX) {
+        Modifier.slideWith(shownDrag)
+            .nameLane(nameLane, reportPx)
+            .then(
+                if (!namePill) Modifier
+                // Inside the lane, so the fade's layer spans the whole pill however far past the slot it draws.
+                else Modifier.graphicsLayer { alpha = pillFade?.value ?: 1f }
+                    .vibeNamePill(pillLiquid, pillPaddingX)
+                    // The play button's description already names the vibe.
+                    .semantics { hideFromAccessibility() },
+            )
+    }
+    val label = @Composable {
+        if (peekNext || peekPrevious) {
+            // The arrow is its own element so it never ellipsizes away with a long neighbour
+            // name; only the name shrinks to make room for it.
+            Row(modifier = nameModifier, verticalAlignment = Alignment.CenterVertically) {
+                if (peekNext) {
+                    Text(
+                        text = nextName,
+                        color = labelColor,
+                        style = nameStyle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Text(" ›", color = labelColor, style = nameStyle, maxLines = 1, softWrap = false)
+                } else {
+                    Text("‹ ", color = labelColor, style = nameStyle, maxLines = 1, softWrap = false)
+                    Text(
+                        text = previousName!!,
+                        color = labelColor,
+                        style = nameStyle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+            }
+        } else {
+            MarqueeLabel(
+                text = name,
+                style = nameStyle,
+                colorProducer = labelColor,
+                textAlign = if (centerLabel) TextAlign.Center else null,
+                modifier = nameModifier,
+            )
+        }
+    }
+
     Column(
-        modifier = if (raiseRing) modifier.raisedAboveName(ringSize) else modifier,
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // The pill rides above the ring outside its pointer node, so a tap or a drag on it reaches
+        // what is under it, and the stage overhang and the tap target are the ring's alone. With no
+        // name yet there is nothing to hold, so no empty pill.
+        if (namePill && (name.isNotEmpty() || peekNext || peekPrevious)) label()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -550,85 +656,9 @@ internal fun VibeTransportItem(
                 }
                 .padding(vertical = TransportPadding),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Its own layer under the ring, so the focus fade's frames re-record the mark alone. The
-                // layer does not clip, and the circle reaches past the ring's box.
-                Spacer(
-                    Modifier.matchParentSize().graphicsLayer().drawWithCache {
-                        val radius = domeFocusRadius(ringSize).toPx()
-                        val stroke = Stroke(DomeFocusStroke.toPx())
-                        onDrawBehind {
-                            // The mode and the fade are read only while focused, so an unfocused dome never redraws with them.
-                            if (!focused.value || inputModes.inputMode != InputMode.Keyboard) return@onDrawBehind
-                            val fade = region?.alpha?.value ?: 1f
-                            if (fade <= 0f) return@onDrawBehind
-                            val color = focusColor()
-                            drawCircle(color.copy(alpha = color.alpha * fade), radius, center, style = stroke)
-                        }
-                    },
-                )
-                VibeTransportRing(
-                    paused = paused, progress = progress, ringSize = ringSize, position = position, domeTilt = domeTilt,
-                    pulse = pulse, previewWavePhase = previewWavePhase, previewZipMs = previewZipMs,
-                )
-            }
-            // The label slides with the drag: right peeks the next name, left the previous (or the restart).
-            val side = if (previewDragDp != 0f) peekSideOf(previewDragDp) else peekSide.intValue
-            val peekNext = side > 0 && nextName != null
-            val peekPrevious = side < 0 && previousName != null
-            val labelColor = remember(shownDrag, nextName, previousName) {
-                ColorProducer { OrpheusColors.cosmicPurple.copy(alpha = labelAlpha(shownDrag(), nextName, previousName)) }
-            }
-            // Slides with the drag; in the phone bar it also drops and draws in its wider lane.
-            val reportPx = if (ringWideTarget) with(density) { ringSize.roundToPx() } else null
-            val nameModifier = remember(shownDrag, nameDrop, nameLane, reportPx) {
-                Modifier.slideWith(shownDrag)
-                    // Drawn lower, not laid out lower: a layer's translation would move its baseline too,
-                    // and the row would align the whole transport, ring and all, back up by the drop.
-                    // Whole pixels, as the marquee's offset is, so a fractional density never softens the glyphs.
-                    .then(
-                        if (nameDrop == 0.dp) Modifier
-                        else Modifier.drawWithContent {
-                            translate(top = nameDrop.toPx().roundToInt().toFloat()) { this@drawWithContent.drawContent() }
-                        },
-                    )
-                    .nameLane(nameLane, reportPx)
-            }
-            if (peekNext || peekPrevious) {
-                // The arrow is its own element so it never ellipsizes away with a long neighbour
-                // name; only the name shrinks to make room for it.
-                Row(modifier = nameModifier, verticalAlignment = Alignment.CenterVertically) {
-                    if (peekNext) {
-                        Text(
-                            text = nextName,
-                            color = labelColor,
-                            style = nameStyle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Text(" ›", color = labelColor, style = nameStyle, maxLines = 1, softWrap = false)
-                    } else {
-                        Text("‹ ", color = labelColor, style = nameStyle, maxLines = 1, softWrap = false)
-                        Text(
-                            text = previousName!!,
-                            color = labelColor,
-                            style = nameStyle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                    }
-                }
-            } else {
-                MarqueeLabel(
-                    text = name,
-                    style = nameStyle,
-                    colorProducer = labelColor,
-                    textAlign = if (centerLabel) TextAlign.Center else null,
-                    modifier = nameModifier,
-                )
-            }
+            ring()
+            // Elsewhere the name sits under the ring, part of its target.
+            if (!namePill) label()
         }
     }
 }
@@ -670,15 +700,80 @@ private fun Modifier.slideWith(dragDp: () -> Float): Modifier = layout { measura
 }
 
 /**
- * Reports the transport from its name down and places the ring above that, so a row aligned by
- * baseline puts the name on its labels' line. Outside the pointer and semantics nodes, which still
- * measure the whole ring: with no clip in between, the raised part stays live.
+ * With the name in its pill: reports no height, with its baselines at its top, so a row aligned by
+ * baseline puts that line on its labels' and keeps its own height. It hangs the transport above that
+ * line, the ring's bottom [drop] below it and the pill over the stage. No clip in between, so the
+ * ring's tap target stays live where it rises out of the bar.
  */
-private fun Modifier.raisedAboveName(ringSize: Dp): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    val lift = (TransportPadding.roundToPx() + ringSize.roundToPx()).coerceAtMost(placeable.height)
-    layout(placeable.width, placeable.height - lift) { placeable.placeRelative(0, -lift) }
+internal fun Modifier.hangFromLabelLine(drop: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+    val below = drop.roundToPx() + TransportPadding.roundToPx()
+    layout(placeable.width, 0, mapOf(FirstBaseline to 0, LastBaseline to 0)) {
+        placeable.placeRelative(0, below - placeable.height)
+    }
 }
+
+/** The pill's room either side of the name, in ems of its font: 16dp round the dock's 28sp name. */
+private const val PillPaddingEm = 0.57f
+
+/** The pill's room above and below the name; the ring's own padding is its gap above the ring. */
+internal val VibeNamePillPaddingY = 2.dp
+
+/**
+ * The pill's fade: whole while paused and while a vibe is fresh, then after [PillRestDelayMillis]
+ * of playing it eases to [PillRestAlpha] over [PillRestFadeMillis], so it stops competing with the
+ * panels under it. A pause or a new vibe brings it back whole.
+ */
+private const val PillRestAlpha = 0.5f
+private const val PillRestDelayMillis = 12_000L
+private const val PillRestFadeMillis = 3_000
+private const val PillWakeMillis = 250
+
+@Composable
+private fun rememberPillFade(paused: Boolean, name: String): Animatable<Float, AnimationVector1D> {
+    val fade = remember { Animatable(1f) }
+    LaunchedEffect(paused, name) {
+        // Only when it has faded: a still pill asks for no frames.
+        if (fade.value < 1f) fade.animateTo(1f, tween(PillWakeMillis))
+        if (paused) return@LaunchedEffect
+        delay(PillRestDelayMillis)
+        fade.animateTo(PillRestAlpha, tween(PillRestFadeMillis, easing = LinearEasing))
+    }
+    return fade
+}
+
+/**
+ * The pill's glass: the stage through it muted to low saturation and contrast, frosted and darkened
+ * well past halfway, so the name holds over the brightest visualization (a lime-and-yellow one read
+ * as mid-grey at 0.35). Fixed, not the visualization's, so nothing here reads effects that some
+ * visualizations change every frame.
+ */
+private val PillGlassScope = VisualizationLiquidScope(saturation = 0.15f, contrast = 0.7f)
+private val PillFrost = 12.dp
+private const val PillTintAlpha = 0.72f
+
+/** Deep indigo, the dome's own shadow colour, so the pill reads as part of the button. */
+private val PillTint = OrpheusColors.cosmicPurple.darken(0.8f)
+private val PillShape = RoundedCornerShape(50)
+
+/** A pale lilac, the bar's purple lightened well up: the full purple sinks on the pill's dark glass. */
+internal val VibeNamePillColor = OrpheusColors.cosmicPurple.lighten(0.8f)
+
+/**
+ * The name's pill: liquid glass over the stage, or with no [liquidState] (TV hardware) the same
+ * indigo as a flat fill. Plain, so a caller can remember it.
+ */
+private fun Modifier.vibeNamePill(liquidState: LiquidState?, paddingX: Dp): Modifier = this
+    .liquidVizEffects(
+        liquidState = liquidState,
+        scope = PillGlassScope,
+        frostAmount = PillFrost,
+        color = PillTint,
+        tintAlpha = PillTintAlpha,
+        shape = PillShape,
+    )
+    .border(1.dp, Color.White.copy(alpha = 0.15f), PillShape)
+    .padding(horizontal = paddingX, vertical = VibeNamePillPaddingY)
 
 /**
  * Lets the name measure as wide as [lane] allows, never narrower than its slot, and draw centred

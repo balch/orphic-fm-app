@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import io.github.fletchmckee.liquid.liquefiable
@@ -186,13 +188,14 @@ class MusicWaveRenderHarness {
     /**
      * The dock bottom bar's centre at 3x, in glass over the busy backdrop: the dome playing, paused
      * mid-zip, and holding the launch focus, which arrives a frame after the bar as the dock does,
-     * with its focus mark awake and after the idle fade.
+     * with its focus mark awake and after the idle fade. "bright" plays over a lime-and-yellow
+     * backdrop, the worst case for the name's pill; "tv" is TV hardware, glassless with its smaller ring.
      */
     @Test
     fun renderDockDome() {
         val outDir = File("build/djapp-render").apply { mkdirs() }
         val scale = 3f
-        listOf("playing" to null, "paused" to 700L, "focused" to null, "focused-faded" to null).forEach { (tag, zipMs) ->
+        listOf("playing" to null, "paused" to 700L, "focused" to null, "focused-faded" to null, "bright" to null, "tv" to null).forEach { (tag, zipMs) ->
             runCatching {
                 val focusing = tag.startsWith("focused")
                 val docked = mutableStateOf(!focusing)
@@ -201,17 +204,19 @@ class MusicWaveRenderHarness {
                 // A standard dispatcher runs the launch focus request after layout, as the app's does.
                 val scheduler = TestCoroutineScheduler()
                 val scene = ImageComposeScene(
-                    (1280 * scale).toInt(), (200 * scale).toInt(), Density(scale), StandardTestDispatcher(scheduler),
+                    (1280 * scale).toInt(), (280 * scale).toInt(), Density(scale), StandardTestDispatcher(scheduler),
                 ) {
                     OrpheusTheme {
                         val liquid = rememberLiquidState()
                         CompositionLocalProvider(
                             LocalLiquidState provides liquid,
-                            LocalTelevisionHardware provides false,
+                            LocalTelevisionHardware provides (tag == "tv"),
                             LocalTvFocusRegion provides region,
                         ) {
                             Box(Modifier.fillMaxSize()) {
-                                Box(Modifier.fillMaxSize().liquefiable(liquid)) { busyVizBackdrop() }
+                                Box(Modifier.fillMaxSize().liquefiable(liquid)) {
+                                    if (tag == "bright") brightVizBackdrop() else busyVizBackdrop()
+                                }
                                 if (docked.value) DjTvBottomBar(
                                     panels = bottomBarPanels(largeScreenPanels()),
                                     isDocked = { it == DjTab },
@@ -220,7 +225,8 @@ class MusicWaveRenderHarness {
                                     pulsarFeature = pulsar,
                                     onTogglePlayback = {},
                                     modifier = Modifier.align(Alignment.BottomCenter),
-                                    glass = true,
+                                    domeRingSize = dockDomeRingSize(television = tag == "tv"),
+                                    glass = tag != "tv",
                                     previewWavePhase = wavePhase,
                                     previewZipMs = zipMs,
                                 )
@@ -234,9 +240,9 @@ class MusicWaveRenderHarness {
                     docked.value = true
                     repeat(3) { frame() }
                     if (tag == "focused-faded") runBlocking { region.alpha.snapTo(0f) }
-                    // The bar's centre 360 x 200dp: the dome, its name and the toggles either side.
+                    // The bar's centre 360 x 280dp: the dome, its pill above and the toggles either side.
                     val full = Image.makeFromEncoded(frame().encodeToData()!!.bytes)
-                    val crop = Surface.makeRasterN32Premul((360 * scale).toInt(), (200 * scale).toInt())
+                    val crop = Surface.makeRasterN32Premul((360 * scale).toInt(), (280 * scale).toInt())
                     crop.canvas.drawImage(full, -460 * scale, 0f)
                     File(outDir, "dock-dome-$tag.png").writeBytes(crop.makeImageSnapshot().encodeToData()!!.bytes)
                 } finally {
@@ -342,4 +348,14 @@ class MusicWaveRenderHarness {
             }.onFailure { println("[render-harness] zip dock $t skipped: $it") }
         }
     }
+}
+
+/** A lime, yellow and cyan wash like the brightest visualizations: the name's pill has to hold over it. */
+@Composable
+private fun brightVizBackdrop() {
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Color(0xFFF2F56A), Color(0xFF8BEA4E), Color(0xFF62E6E8))),
+        ),
+    )
 }

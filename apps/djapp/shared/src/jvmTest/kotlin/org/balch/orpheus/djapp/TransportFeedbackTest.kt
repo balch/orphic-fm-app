@@ -88,7 +88,10 @@ class TransportFeedbackTest {
         val box: Rect get() = Rect(transport.positionInRoot, transport.size.toSize())
         val focused: Boolean get() = transport.config.getOrNull(SemanticsProperties.Focused) == true
 
-        /** 4dp under the node's top, then half the ring. */
+        /** The phone bar's name rides in a pill above its ring, outside the node; the rail's sits under it, inside. */
+        val pill: Boolean get() = layout == DjLayout.Portrait
+
+        /** 4dp under the node's top, then half the ring: the phone's pill sits outside the node, above it. */
         val ringCentre: Offset get() = Offset(box.center.x, box.top + (TransportPadding.value + ringSize.value / 2) * density)
 
         val ringSize get() = if (layout == DjLayout.Portrait) BarRingSize else RailRingSize
@@ -124,10 +127,10 @@ class TransportFeedbackTest {
             val nav = Nav(layout, w, h)
             try {
                 val centre = nav.ringCentre
-                // The dome's body below the glyph, the node's corner outside the ring and its mark, and the name.
+                // The dome's body below the glyph, the node's corner by the ring outside it and its mark, and the name.
                 val body = Offset(centre.x, centre.y + nav.ringSize.value * 0.28f * density)
                 val corner = Offset(nav.box.left + 4 * density, nav.box.top + 6 * density)
-                val name = Offset(centre.x, nav.box.bottom - 10 * density)
+                val name = Offset(centre.x, if (nav.pill) nav.box.top - 10 * density else nav.box.bottom - 10 * density)
                 val rest = nav.pixels()
 
                 nav.pointer(PointerEventType.Move, centre)
@@ -141,7 +144,7 @@ class TransportFeedbackTest {
                 val pressed = nav.pixels()
                 assertTrue(pressed[body].luminance() > hovered[body].luminance(), "$layout: a press did not lighten the dome")
                 assertTrue(pressed[corner].near(rest[corner]), "$layout: a press reached the node's square corner ${pressed[corner]} vs ${rest[corner]}")
-                assertTrue(pressed[name].near(rest[name]), "$layout: a press lit the name under the ring")
+                assertTrue(pressed[name].near(rest[name]), "$layout: a press lit the name")
                 nav.pointer(PointerEventType.Release, centre)
             } finally {
                 nav.close()

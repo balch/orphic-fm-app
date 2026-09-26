@@ -49,7 +49,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
@@ -100,28 +99,11 @@ internal val barNameStyle: TextStyle
         return remember(labelSmall) { labelSmall.copy(fontSize = 13.sp) }
     }
 
-/** How far the bar's name is drawn below the tab labels' line, for room under the ring: tune from 1 to 2dp. */
-internal val BarNameDrop = 2.dp
+/** How far the bar's ring hangs below the tab labels' line, its name's pill above it over the stage. */
+internal val PhoneBarDomeDrop = 8.dp
 
-/** The bar's name may draw past its slot, up to this far short of the neighbouring tab labels. */
-internal val BarNameClearance = 8.dp
-
-/**
- * The bar's name lane for a slot of `slotPx`: centred on the slot and [BarNameClearance] short of
- * the wider label beside the transport, wherever that label sits centred in its own equal slot.
- */
-@Composable
-private fun barNameLane(tabs: List<DjRoute>, transportIndex: Int): (Int) -> Int {
-    val measurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.labelSmall
-    val labelPx = listOfNotNull(tabs.getOrNull(transportIndex - 1), tabs.getOrNull(transportIndex))
-        .maxOfOrNull { measurer.measure(it.label, labelStyle).size.width } ?: 0
-    val density = LocalDensity.current
-    val gapPx = with(density) { NavBarItemGap.roundToPx() }
-    val clearancePx = with(density) { BarNameClearance.roundToPx() }
-    // The neighbour's label starts (slot - label) / 2 into its slot, a gap past the transport's edge.
-    return remember(labelPx, gapPx, clearancePx) { { slotPx -> 2 * (slotPx + gapPx - clearancePx) - labelPx } }
-}
+/** The widest the bar's name pill draws over the stage; a longer name scrolls inside it. */
+internal val PhoneNamePillMaxWidth = 280.dp
 
 /**
  * M3's rail width (internal there). The transport takes exactly this: fillMaxWidth in the rail's
@@ -130,7 +112,7 @@ private fun barNameLane(tabs: List<DjRoute>, transportIndex: Int): (Int) -> Int 
 private val RailItemWidth = 80.dp
 /** Keeps the vibe name clear of the rail's glass border; a long one scrolls in what is left. */
 private val RailLabelInset = 4.dp
-/** The rail's ring, 64dp inside its 72dp between the label insets; the phone bar's [BarRingSize] matches it. */
+/** The rail's ring, 64dp inside its 72dp between the label insets. */
 internal val RailRingSize = 64.dp
 /** The ring on a rail too short for [RailRingSize] and its title, such as the Fold 8's 360dp cover screen. */
 internal val RailCompactRingSize = 48.dp
@@ -198,7 +180,8 @@ fun DjAppNavScaffold(
     val actions = pulsarFeature.actions
     // The bar's transport sits between the two middle tabs.
     val transportIndex = tabs.size / 2
-    val barLane = if (usesRail) null else barNameLane(tabs, transportIndex)
+    val pillPx = with(LocalDensity.current) { PhoneNamePillMaxWidth.roundToPx() }
+    val barLane = remember(pillPx) { { _: Int -> pillPx } }
 
     // The rail passes its tier; the phone bar passes null.
     val transport: @Composable (Modifier, RailTransport?) -> Unit = { itemModifier, rail ->
@@ -217,7 +200,7 @@ fun DjAppNavScaffold(
             raiseRing = rail == null,
             nameStyle = if (rail == null) barNameStyle else MaterialTheme.typography.labelSmall,
             nameLane = if (rail == null) barLane else null,
-            nameDrop = if (rail == null) BarNameDrop else 0.dp,
+            namePill = rail == null,
             ringSize = rail?.ringSize ?: BarRingSize,
             position = nav.songPosition(),
             pulse = pulse,
@@ -313,7 +296,7 @@ fun DjAppNavScaffold(
                         .consumeWindowInsets(NavigationBarDefaults.windowInsets.only(WindowInsetsSides.Bottom)),
                 ) { content() }
                 // NavigationBar's own Row without its Surface, whose clip would cut the raised ring and its hits.
-                // Aligned by baseline: the transport lays out as its name alone, so the ring rises over the stage.
+                // Aligned by baseline: the transport hangs from the tab labels' line, its pill over the stage.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -324,7 +307,9 @@ fun DjAppNavScaffold(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     tabs.forEachIndexed { index, route ->
-                        if (index == transportIndex) transport(Modifier.weight(1f).alignBy(LastBaseline), null)
+                        if (index == transportIndex) {
+                            transport(Modifier.weight(1f).alignBy(LastBaseline).hangFromLabelLine(PhoneBarDomeDrop), null)
+                        }
                         val selected = isSelected(route)
                         NavigationBarItem(
                             selected = selected,
