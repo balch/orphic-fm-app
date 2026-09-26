@@ -26,11 +26,11 @@ Two different tasks push them, which is why "publish a build" and "change the li
 acts:
 
 ```bash
-./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal
 ```
 
 That uploads the AAB **and** `release-notes/` for that release only. Title, descriptions and
-graphics move separately via `publishListing` / `publishOgApps` — so "leave the listing alone"
+graphics move separately via `publishOgReleaseListing` — so "leave the listing alone"
 during a release is the default, not something you have to arrange. See the `release-djapp` skill.
 
 ## Console-only fields

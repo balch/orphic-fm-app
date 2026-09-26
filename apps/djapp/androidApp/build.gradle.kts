@@ -117,14 +117,12 @@ play {
         serviceAccountCredentials.set(serviceAccountKey)
     }
     // Upload target track, overridable per-invocation with -PplayTrack=<id>
-    // (e.g. alpha, beta, production). Defaults to the internal testing track — no review
-    // delay; exercises the in-app-update flow for internal testers. The going-forward
-    // CLOSED testing track is "alpha" — publish with -PplayTrack=alpha. (The former custom
-    // "Launch" closed track was retired 2026-06-22.)
+    // (e.g. internal, production). Defaults to the internal testing track. Releases go to
+    // internal, then are promoted to production; alpha is unused since v2.3.0.
     // To move an EXISTING release between tracks without re-uploading, use the promote
     // task instead — it has its own flags and needs no config here:
-    //   ./gradlew :apps:djapp:androidApp:promoteReleaseArtifact \
-    //       --from-track internal --promote-track alpha
+    //   ./gradlew :apps:djapp:androidApp:promoteOgReleaseArtifact \
+    //       --from-track internal --promote-track production
     track.set((findProperty("playTrack") as String?) ?: "internal")
     // In-app-update priority (0..5) for this release, opt-in via -PplayUpdatePriority=N.
     // Drives UpdatePolicy's Immediate-vs-Flexible decision on the client: 5 forces an

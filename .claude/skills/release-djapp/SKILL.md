@@ -1,6 +1,6 @@
 ---
 name: release-djapp
-description: Use when cutting a new release of the DJ app (Orphic DJ) — tagging, building AAB + APK, creating a GitHub release with structured notes (without attaching binaries to the release), publishing to the Google Play alpha track and/or Apple TestFlight, and handling mid-release commit additions or backfilling releases for tags that already exist. Triggers on phrases like "cut a release", "tag v1.x.x", "release the dj app", "build a release aab", "create a github release", "publish to testflight", "publish to alpha", or "backfill releases for old tags". Use this skill even when the user only mentions one part of the flow (just tagging, just building, just iOS) — the steps interlock and a tag without a release-notes plan tends to drift out of sync with the artifact on disk.
+description: Use when cutting a new release of the DJ app (Orphic DJ) — tagging, building AAB + APK, creating a GitHub release with structured notes (without attaching binaries to the release), publishing to Google Play (internal + production) and/or Apple TestFlight, and handling mid-release commit additions or backfilling releases for tags that already exist. Triggers on phrases like "cut a release", "tag v1.x.x", "release the dj app", "build a release aab", "create a github release", "publish to testflight", "publish to production", or "backfill releases for old tags". Use this skill even when the user only mentions one part of the flow (just tagging, just building, just iOS) — the steps interlock and a tag without a release-notes plan tends to drift out of sync with the artifact on disk.
 ---
 
 # Releasing the DJ App
@@ -111,14 +111,17 @@ EOF
 
 Verify with `gh release view v1.X.Y` and surface the URL to the user.
 
-### 7. Publish to Google Play (alpha track)
+### 7. Publish to Google Play (internal, then production)
 
-The signed AAB is uploaded to Play via **Gradle Play Publisher (GPP)**, not by hand. The
-**going-forward closed testing track is `alpha`** (the former custom `Launch` track was
-retired 2026-06-22). Publish the bundle built in step 3:
+The signed AAB is uploaded to Play via **Gradle Play Publisher (GPP)**, not by hand. Since
+v2.3.0 (2026-09-26) releases go to **`internal` and `production`**; the `alpha` closed track is
+no longer used (v2.3.0 was its last release). Upload to internal, then promote the same
+versionCode to production so both tracks carry identical bytes:
 
 ```bash
-./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal
+./gradlew --no-configuration-cache :apps:djapp:androidApp:promoteOgReleaseArtifact \
+  --from-track internal --promote-track production --version-code <N> --release-status completed
 ```
 
 `publishOgReleaseBundle` builds + signs + uploads the AAB and assigns it to the track in one
@@ -127,12 +130,12 @@ release variant, and `ai` is not a Play Store app. There is **no `--track` CLI f
 track is the `-PplayTrack=<id>` Gradle property read by `play { track.set(...) }` in
 `apps/djapp/androidApp/build.gradle.kts`. Omit it and it defaults to `internal`. Success
 looks like GPP logging
-`Updating [completed] release (org.balch.djapp:[<versionCode>]) in track 'alpha'` then
+`Updating [completed] release (org.balch.djapp:[<versionCode>]) in track 'internal'` then
 `Committing changes`.
 
 **`publishOgReleaseBundle` does not touch the store listing.** It uploads the bundle and the
 `release-notes/` text for that release only. Title, descriptions and graphics move via
-`publishListing` / `publishOgApps`, so when the user says "leave the listing alone", the
+`publishOgReleaseListing`, so when the user says "leave the listing alone", the
 bundle task is already the right choice — just don't edit `src/main/play/` and the previous
 "What's New" copy carries over verbatim.
 
@@ -146,7 +149,7 @@ in-app-update flow, add `-PplayUpdatePriority=5` (un-deferrable) or `4` (after 3
 
 ```bash
 ./gradlew :apps:djapp:androidApp:promoteOgReleaseArtifact \
-  --from-track <source> --promote-track alpha --version-code <N> --release-status completed
+  --from-track <source> --promote-track <target> --version-code <N> --release-status completed
 ```
 
 Re-running `publishOgReleaseBundle` for a versionCode that's already uploaded is a no-op
@@ -326,7 +329,7 @@ The body should feel useful to a developer scanning the release page, not like a
 
 ## Artifacts
 
-The signed Play-Console-ready bundle (`djapp-v1.X.Y-og-release.aab`) and universal sideload APK (`djapp-v1.X.Y-og-release.apk`) are built, but are not attached to this release. The bundle is published directly to the Play Store alpha closed testing track.
+The signed Play-Console-ready bundle (`djapp-v1.X.Y-og-release.aab`) and universal sideload APK (`djapp-v1.X.Y-og-release.apk`) are built, but are not attached to this release. The bundle is published to the Play Store internal and production tracks.
 
 ## Full changelog
 
@@ -433,7 +436,8 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | Build universal APK | `./gradlew :apps:djapp:androidApp:assembleOgRelease` |
 | AAB output path | `apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-vX.Y.Z-og-release.aab` |
 | APK output path | `apps/djapp/androidApp/build/outputs/apk/og/release/djapp-vX.Y.Z-og-release.apk` |
-| Publish to a Play track | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=alpha` |
+| Publish to a Play track | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal` |
+| Publish store listing + graphics | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseListing` |
 | List real task names | `./gradlew :apps:djapp:androidApp:tasks --all \| grep -iE "^bundle\|^publish"` |
 | Push a tag | `git push origin vX.Y.Z` |
 | Force-update a published tag | `git push origin vX.Y.Z --force` |
