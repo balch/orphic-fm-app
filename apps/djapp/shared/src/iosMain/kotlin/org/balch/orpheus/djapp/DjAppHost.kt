@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import org.balch.orpheus.djapp.di.DjAppGraphIos
 import org.balch.orpheus.djapp.widget.IosDjWidgetUpdater
+import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerStatus
 import org.balch.orpheus.features.timer.TimerWidgetCommand
@@ -97,7 +98,12 @@ object DjAppHost {
             "play" -> controller.play()
             "pause" -> controller.pause()
             "skipNext" -> { controller.onSkipNext(); awaitVibeChange(before) }
-            "skipPrev" -> { controller.onSkipPrevious(); awaitVibeChange(before) }
+            "skipPrev" -> {
+                // A restart keeps the title, so waiting for it to change would block the full SETTLE_MS.
+                val restarts = pulsarFeature()?.vibeNavFlow?.value?.previousRestarts == true
+                controller.onSkipPrevious()
+                if (!restarts) awaitVibeChange(before)
+            }
             "timerStop" -> {
                 val previousStatus = timerFeature()?.stateFlow?.value?.status
                 TimerWidgetCommandBus.send(TimerWidgetCommand.STOP)
@@ -131,4 +137,10 @@ object DjAppHost {
         runCatching {
             requireGraph().featureGraphHolder.featureGraph.featureCollection.getFeature(TimerFeature::class)
         }.onFailure { log.warn(it) { "timer feature unavailable" } }.getOrNull()
+
+    /** Resolves PulsarFeature; null on a cold-start race, like [timerFeature]. */
+    private fun pulsarFeature(): PulsarFeature? =
+        runCatching {
+            requireGraph().featureGraphHolder.featureGraph.featureCollection.getFeature(PulsarFeature::class)
+        }.onFailure { log.warn(it) { "pulsar feature unavailable" } }.getOrNull()
 }

@@ -132,11 +132,14 @@ class DjTvBarGlassRenderHarness {
                         )
                         Column(Modifier.fillMaxSize()) {
                             DjTvTopBar(
+                                panels = topBarPanels(allPanels),
+                                isDocked = { it in docked },
+                                onToggle = {},
                                 vizFeature = VizViewModel.previewFeature(),
                                 pulsarFeature = PulsarViewModel.previewFeature(),
-                                onTogglePlayback = {},
-                                modifier = Modifier.tvBarGlass(glass),
+                                glass = glass,
                             )
+                            DockSongBand(PulsarViewModel.previewFeature())
                             Box(Modifier.weight(1f).fillMaxWidth()) {
                                 DjPanelDock(
                                     panels = docked,
@@ -149,7 +152,8 @@ class DjTvBarGlassRenderHarness {
                                 onToggle = {},
                                 timerFeature = TimerViewModel.previewFeature(),
                                 pulsarFeature = PulsarViewModel.previewFeature(),
-                                modifier = Modifier.tvBarGlass(glass),
+                                onTogglePlayback = {},
+                                glass = glass,
                             )
                         }
                     }

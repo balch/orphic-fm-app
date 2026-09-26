@@ -110,7 +110,8 @@ class PanelIdleInputTest {
     @Test
     fun `with no chrome inside it the stage is blocked whole`() {
         val stage = Rect(0f, 44f, 360f, 700f)
-        assertEquals(listOf(stage), wakeBlockers(stage, chrome = null))
+        assertEquals(listOf(stage), wakeBlockers(stage, holes = emptyList()))
+        assertEquals(listOf(stage), wakeBlockers(stage, holes = listOf(null, null)))
     }
 
     /** Tabletop: the header sits between the folded halves, so the block has to skip it. */
@@ -120,7 +121,7 @@ class PanelIdleInputTest {
         val chrome = Rect(0f, 380f, 400f, 420f)
         assertEquals(
             listOf(Rect(0f, 0f, 400f, 380f), Rect(0f, 420f, 400f, 800f)),
-            wakeBlockers(stage, chrome),
+            wakeBlockers(stage, listOf(chrome)),
         )
     }
 
@@ -129,12 +130,57 @@ class PanelIdleInputTest {
         val stage = Rect(0f, 100f, 400f, 800f)
         assertEquals(
             listOf(Rect(0f, 160f, 400f, 800f)),
-            wakeBlockers(stage, Rect(0f, 40f, 400f, 160f)),
+            wakeBlockers(stage, listOf(Rect(0f, 40f, 400f, 160f))),
             "a band overlapping the top edge should leave only what is below it",
         )
         assertTrue(
-            wakeBlockers(stage, Rect(0f, 0f, 400f, 900f)).isEmpty(),
+            wakeBlockers(stage, listOf(Rect(0f, 0f, 400f, 900f))).isEmpty(),
             "a band covering the whole stage should leave nothing to block",
+        )
+    }
+
+    /** The phone bar's dome rises from below the stage: blocked above it and either side, nothing below. */
+    @Test
+    fun `a dome rising from the bottom edge leaves the stage above it and either side`() {
+        val stage = Rect(0f, 44f, 360f, 700f)
+        val dome = Rect(148f, 680f, 212f, 772f)
+        assertEquals(
+            listOf(Rect(0f, 44f, 360f, 680f), Rect(0f, 680f, 148f, 700f), Rect(212f, 680f, 360f, 700f)),
+            wakeBlockers(stage, listOf(dome)),
+        )
+    }
+
+    /** Tabletop with the bar: the header band and the dome, each applied to what the other left. */
+    @Test
+    fun `a band and a dome together leave both live`() {
+        val stage = Rect(0f, 0f, 400f, 800f)
+        val band = Rect(0f, 380f, 400f, 420f)
+        val dome = Rect(168f, 780f, 232f, 872f)
+        assertEquals(
+            listOf(
+                Rect(0f, 0f, 400f, 380f),
+                Rect(0f, 420f, 400f, 780f),
+                Rect(0f, 780f, 168f, 800f),
+                Rect(232f, 780f, 400f, 800f),
+            ),
+            wakeBlockers(stage, listOf(band, dome)),
+        )
+    }
+
+    @Test
+    fun `a hole outside the stage changes nothing`() {
+        val stage = Rect(0f, 44f, 360f, 700f)
+        assertEquals(listOf(stage), wakeBlockers(stage, listOf(Rect(148f, 720f, 212f, 780f))))
+        // Touching the edge is not overlapping it.
+        assertEquals(listOf(stage), wakeBlockers(stage, listOf(Rect(148f, 700f, 212f, 780f))))
+    }
+
+    @Test
+    fun `a hole over a corner leaves the stage below it and beside it`() {
+        val stage = Rect(0f, 100f, 400f, 800f)
+        assertEquals(
+            listOf(Rect(0f, 200f, 400f, 800f), Rect(100f, 100f, 400f, 200f)),
+            wakeBlockers(stage, listOf(Rect(-50f, 50f, 100f, 200f))),
         )
     }
 

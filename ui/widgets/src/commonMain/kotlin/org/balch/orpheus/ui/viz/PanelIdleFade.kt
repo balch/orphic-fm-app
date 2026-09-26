@@ -159,7 +159,8 @@ fun Modifier.panelIdleFade(fade: PanelIdleFade?): Modifier =
 
 /**
  * Eats the one gesture that brings faded panels back, so the knob under the pointer is not also
- * turned by it. Covers the stage only, leaving the header and the nav live throughout.
+ * turned by it. Covers the stage only, leaving the header and the nav live throughout, and skips
+ * the chrome the stage reports inside it (the tabletop header, the phone bar's raised dome).
  *
  * Present the whole time the panels are anything less than fully drawn, not only once they are
  * invisible: a control half way through a 600 ms fade is barely there and must not be operable,
@@ -185,18 +186,29 @@ fun PanelWakeOverlay(fade: PanelIdleFade?, stage: VizStage?, enabled: Boolean) {
     val covering by remember(fade) { derivedStateOf { fade.alpha.value < 1f } }
     val bounds = stage.bounds
     if (!covering || bounds == null || bounds.isEmpty) return
-    wakeBlockers(bounds, stage.chromeBand).forEach { rect -> WakeBlocker(rect) }
+    wakeBlockers(bounds, listOf(stage.chromeBand, stage.chromeOverhang)).forEach { rect -> WakeBlocker(rect) }
 }
 
 /**
- * The stage split around a band of chrome that does not fade with the panels, so a tap on it is
- * never eaten. A rectangle cannot have a hole, which is why this returns up to two of them.
+ * The stage less every piece of chrome in it that does not fade with the panels, so a tap on
+ * visible chrome is never eaten. A rectangle cannot have a hole, so each hole splits every piece
+ * it touches into up to four: above it, below it, and left and right of it across its rows.
  */
-internal fun wakeBlockers(stage: Rect, chrome: Rect?): List<Rect> {
-    if (chrome == null || chrome.isEmpty) return listOf(stage)
-    val above = Rect(stage.left, stage.top, stage.right, chrome.top.coerceIn(stage.top, stage.bottom))
-    val below = Rect(stage.left, chrome.bottom.coerceIn(stage.top, stage.bottom), stage.right, stage.bottom)
-    return listOf(above, below).filterNot { it.isEmpty }
+internal fun wakeBlockers(stage: Rect, holes: List<Rect?>): List<Rect> =
+    holes.fold(listOf(stage)) { pieces, hole ->
+        if (hole == null || hole.isEmpty) pieces else pieces.flatMap { it.around(hole) }
+    }
+
+private fun Rect.around(hole: Rect): List<Rect> {
+    if (!overlaps(hole)) return listOf(this)
+    val holeTop = hole.top.coerceIn(top, bottom)
+    val holeBottom = hole.bottom.coerceIn(top, bottom)
+    return listOf(
+        Rect(left, top, right, holeTop),
+        Rect(left, holeBottom, right, bottom),
+        Rect(left, holeTop, hole.left.coerceIn(left, right), holeBottom),
+        Rect(hole.right.coerceIn(left, right), holeTop, right, holeBottom),
+    ).filterNot { it.isEmpty }
 }
 
 /** One rectangle of dead input over the faded panels. */

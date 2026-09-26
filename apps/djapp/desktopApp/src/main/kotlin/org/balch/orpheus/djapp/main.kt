@@ -7,6 +7,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
+import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.ui.viz.PanelKeyBridge
 
 fun main() {
@@ -23,9 +24,18 @@ fun main() {
         // app's own root handler never sees one and no key would bring the faded panels back.
         // The window hook sees every key regardless of focus, and runs the exact same rule.
         val panelKeys = remember { PanelKeyBridge() }
+        val vibeKeys = remember { VibeStepKeys() }
 
         Window(
             onPreviewKeyEvent = { panelKeys.onKeyEvent(it) },
+            // Bubbling phase, after the focused element: see vibeStepForKey.
+            onKeyEvent = { event ->
+                when (vibeKeys.stepFor(event)) {
+                    SkipDirection.NEXT -> { graph.playbackController.onSkipNext(); true }
+                    SkipDirection.PREVIOUS -> { graph.playbackController.onSkipPrevious(); true }
+                    null -> false
+                }
+            },
             onCloseRequest = {
                 // Fade out audio before exiting to avoid crackles/pops.
                 // Set volume to 0, let the C++ smoother ramp down (~50ms),

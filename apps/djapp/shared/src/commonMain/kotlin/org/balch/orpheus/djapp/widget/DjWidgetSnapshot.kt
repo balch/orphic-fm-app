@@ -1,5 +1,7 @@
 package org.balch.orpheus.djapp.widget
 
+import org.balch.orpheus.features.pulsar.playback.neighborVibe
+
 /**
  * Immutable render model for the DjApp home-screen widget. Built inside the
  * Glance composition from the live graph flows exposed by `DjWidgetData.sources()`
@@ -46,11 +48,7 @@ object DjWidgetSnapshotBuilder {
         artworkPng = artworkPng,
     )
 
-    /** Next vibe in cycle (same rule as PulsarSkipHandler). */
-    fun nextVibe(currentVibe: String, vibeNames: List<String>): String {
-        if (vibeNames.isEmpty()) return NONE
-        val idx = vibeNames.indexOf(currentVibe)
-        val nextIdx = if (idx < 0) 0 else (idx + 1) % vibeNames.size
-        return vibeNames[nextIdx]
-    }
+    /** Next vibe in cycle, by the same rule the navigator and the advancer use. */
+    fun nextVibe(currentVibe: String, vibeNames: List<String>): String =
+        neighborVibe(vibeNames, currentVibe, 1) ?: NONE
 }

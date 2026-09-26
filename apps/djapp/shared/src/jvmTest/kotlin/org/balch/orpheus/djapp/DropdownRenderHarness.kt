@@ -143,13 +143,9 @@ class DropdownRenderHarness {
      * push onto a second, so either render alone is satisfied by always-wrap or never-wrap.
      *
      * The long case is the whole row at its widest, not just the vibe name: a sharp root, the
-     * longest scale, and BLEND. A Row measures each child against what the earlier ones left over
-     * and ENV is measured last, so this is the combination that decides whether the row fits.
-     *
-     * It does not fit, knowingly: this render is roughly 40dp over and ENV ellipsizes. Every value
-     * at once is a corner the row was never budgeted for, and buying the width back costs either
-     * the shared chip insets or the VIBE cap. ENV opens a menu, so the truncated value is still
-     * readable. Treat a *wrapped* row here as the regression, not the ellipsis.
+     * longest scale, and BLEND. `PriorityFitSelectorRow` (task 28A) gives ROOT and ENV their
+     * natural width unconditionally, so ENV ("BLEND") always shows here in full; SCALE gives way
+     * to its floor ("Whol…") before VIBE itself ellipsises. Nothing wraps.
      */
     @Test
     fun renderPulsarSelectorRowNarrow() {

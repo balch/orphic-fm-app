@@ -44,13 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -113,7 +110,6 @@ import org.balch.orpheus.ui.viz.LocalPanelIdleFade
 import org.balch.orpheus.ui.viz.LocalVizStage
 import org.balch.orpheus.ui.viz.PanelIdleFadeWatcher
 import org.balch.orpheus.ui.viz.PanelWakeOverlay
-import org.balch.orpheus.ui.viz.VizStage
 import org.balch.orpheus.ui.viz.panelIdleFade
 import org.balch.orpheus.ui.viz.vizStage
 import org.balch.orpheus.ui.viz.vizStageChrome
@@ -258,9 +254,12 @@ fun DjAppScreen(
                             showCollapsedHeader = false,
                             showExpandedTitle = showTitle,
                             fillHeight = fill,
-                            // TV docks the ending picker as the bottom bar's "Ends" button
-                            // instead (routePanel's docked=true only ever happens on TV).
+                            // The dock has the ending picker as the top bar's "Ends" toggle
+                            // instead (routePanel's docked=true only ever happens in the dock).
                             showEndingControl = !docked,
+                            // The dock's top bar carries the one Vibe picker (and the anomaly
+                            // long-press); the docked panel drops its own duplicate chip.
+                            showVibePicker = !docked,
                         )
                         DjTab -> DjPanel(
                             feature = djFeature,
@@ -396,6 +395,7 @@ fun DjAppScreen(
                 val tvHardware = isTelevisionHardware()
                 DjAppTvChrome(
                     tvHardware = tvHardware,
+                    domeRingSize = dockDomeRingSize(television = tvHardware),
                     barGlass = shouldShowTvBarGlass(layout, tvHardware),
                     vizHidesPanelsWhenIdle = hidesPanelsWhenIdle,
                     focusRegion = focusRegion,
@@ -525,44 +525,50 @@ internal fun DjAppMainContent(
             }
         }
         DjLayout.Landscape -> {
-            // Landscape: Header top, Pulsar left + nav content right. The inset keeps Pulsar's top
-            // row clear of flex mode's status bar and is consumed, so the header does not pad twice.
-            //
-            // The header sits INSIDE this Row, so no single node is the stage: the tracker takes
-            // the Row and shaves off a strip as tall as the header. The fade goes on the two
-            // panels separately for the same reason, so it never reaches the header.
-            val landscapeStage = remember(stage) { LandscapeStageTracker(stage) }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(platformSafeAreaInsets().only(WindowInsetsSides.Top))
-                    .onGloballyPositioned { landscapeStage.onContent(it.boundsInRoot()) },
-            ) {
-                PulsarPanel(
-                    modifier = Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade),
-                    pulsar = pulsarFeature,
-                    vizFlow = synthEngine.pulsarVizFlow,
-                    trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                    isExpanded = true,
-                    onExpandedChange = {},
-                    showCollapsedHeader = false,
-                    showExpandedTitle = false,
-                )
-                Column(
+            // Landscape: the header spans everything right of the rail, Pulsar left + nav content
+            // right below it, so the two panels start level.
+            Column(modifier = Modifier.fillMaxSize()) {
+                DjAppHeaderRow(
+                    vizFeature = vizFeature,
+                    onInfoClick = onShowVibeInfo,
                     modifier = Modifier
-                        .weight(.5f)
-                        .fillMaxHeight()
-                        .padding(top = 4.dp)) {
-                    DjAppHeaderRow(
-                        vizFeature = vizFeature,
-                        onInfoClick = onShowVibeInfo,
-                        // Reported first in the chain, so the rect covers the padding too.
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    // Top clears flex mode's status bar; the rail already covers the start side.
+                    insetSides = WindowInsetsSides.Top + WindowInsetsSides.End,
+                )
+                // The panels' own container, as in portrait. The fade goes on each panel.
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .vizStage(stage),
+                ) {
+                    // A short screen (the Fold 8's 360dp cover) takes its shortfall off the grid, as
+                    // portrait does. The slot's height comes from the row, so reading it back is safe.
+                    var pulsarSlotPx by remember { mutableIntStateOf(0) }
+                    val density = LocalDensity.current
+                    val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
+                        pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
+                    }
+                    PulsarPanel(
                         modifier = Modifier
-                            .onGloballyPositioned { landscapeStage.onHeader(it.boundsInRoot()) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalPadding = 0.dp,
+                            .weight(.5f)
+                            .fillMaxHeight()
+                            .onSizeChanged { pulsarSlotPx = it.height }
+                            .panelIdleFade(fade),
+                        pulsar = pulsarFeature,
+                        vizFlow = synthEngine.pulsarVizFlow,
+                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                        isExpanded = true,
+                        onExpandedChange = {},
+                        showCollapsedHeader = false,
+                        showExpandedTitle = false,
+                        // Top-anchored: centred, a short wide window left ~140dp dead above the selectors.
+                        centerContent = false,
+                        gridHeight = gridHeight,
                     )
-                    navContent(Modifier.panelIdleFade(fade))
+                    navContent(Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade))
                 }
             }
         }
@@ -659,31 +665,6 @@ internal fun DjAppMainContent(
 }
 
 /**
- * Collects the landscape stage from two nodes: the content Row, and the header drawn inside it
- * whose height comes off the top. Plain fields rather than state: both callbacks run in the same
- * layout pass, so whichever fires second has both rects and reports the right one.
- */
-internal class LandscapeStageTracker(private val stage: VizStage?) {
-    private var content: Rect? = null
-    private var headerBottom = 0f
-
-    fun onContent(rect: Rect) {
-        content = rect
-        push()
-    }
-
-    fun onHeader(rect: Rect) {
-        headerBottom = rect.bottom
-        push()
-    }
-
-    private fun push() {
-        val c = content ?: return
-        stage?.report(Rect(c.left, maxOf(c.top, headerBottom), c.right, c.bottom))
-    }
-}
-
-/**
  * Up to [PortraitPairCapacity] panels side by side, in the order the user chose them. One panel
  * takes the full width; none leaves the row empty so the visualization shows through, the same
  * as an empty dock.
@@ -749,13 +730,18 @@ private fun DjAppOverlaySheets(
 }
 
 /**
- * TV layout: top bar (global actions) + bottom bar (panel toggles) around the stage. Provides
- * the TV compositionLocals shared widgets and docked panels read. See each local's own kdoc
+ * The dock: the top bar (Pulsar, Info and Ends toggles, the title, the pickers), the song band,
+ * the stage, and the bottom bar (the other toggles around the play/pause dome). Provides the TV
+ * compositionLocals shared widgets and docked panels read. See each local's own kdoc
  * (LocalTvFocusChrome, LocalTvFocusRegion, LocalTelevisionHardware) for what it gates.
+ *
+ * Internal so the dock's scene tests drive the real chrome, draw order and glass included.
  */
 @Composable
-private fun DjAppTvChrome(
+internal fun DjAppTvChrome(
     tvHardware: Boolean,
+    // The bottom bar's centre dome, from dockDomeRingSize.
+    domeRingSize: Dp,
     barGlass: Boolean,
     vizHidesPanelsWhenIdle: Boolean,
     focusRegion: TvFocusRegionHolder,
@@ -788,15 +774,36 @@ private fun DjAppTvChrome(
         TvFocusIdleWatcher(focusRegion)
 
         val panelFade = LocalPanelIdleFade.current
+        // Sheet-only tab contributions (e.g. AI) have no dock slot of their own; appending them
+        // here is their only entry point on this layout. Remembered, so a chrome recomposition
+        // that is not the bottom bar's business (a window resize) leaves it free to skip.
+        val bottomPanels = remember(dockablePanels, tabs) {
+            bottomBarPanels(dockablePanels) + tabs.filter { it.opensAsSheet }
+        }
+        val topPanels = remember(dockablePanels) { topBarPanels(dockablePanels) }
+        // Both bars' toggles. Branch on dockablePanels membership, NOT route.opensAsSheet:
+        // VibeInfoTab also has opensAsSheet=true (it governs only the phone/tablet path per its own
+        // kdoc) but IS in dockablePanels, so it must keep toggling the dock, not activeSheet.
+        val isDocked: (DjRoute) -> Boolean = { route ->
+            if (route in dockablePanels) route in dockedPanels else route == activeSheet
+        }
+        val onToggle: (DjRoute) -> Unit = { route ->
+            if (route in dockablePanels) {
+                onToggleDocked(route)
+            } else {
+                onActiveSheetChange(if (activeSheet == route) null else route)
+            }
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 // Tunnels through here before reaching whatever's focused. This ONLY
                 // timestamps activity and always returns false, so it never consumes the
-                // event or otherwise changes behavior. Confirmed safe: nothing else in
-                // this tree uses onPreviewKeyEvent, and every D-pad adjust-mode handler
-                // (RotaryKnob, SegmentedAlgoKnob, BenderFaderWidget) uses onKeyEvent,
-                // which fires during the later bubbling phase exactly as before.
+                // event or otherwise changes behavior. The dome's own preview watchers (the
+                // keyboard focus mark's input mode, the wiggle's key cancel) also only watch
+                // and return false, and every D-pad adjust-mode handler (RotaryKnob,
+                // SegmentedAlgoKnob, BenderFaderWidget) uses onKeyEvent, which fires during
+                // the later bubbling phase exactly as before.
                 //
                 // The dock never fades (see fadesPanelsWhenIdle), so nothing here is ever
                 // swallowed: this always returns false. The fade is still told about the press,
@@ -810,54 +817,29 @@ private fun DjAppTvChrome(
                     false
                 },
         ) {
+            // Each bar draws its glass to the bezel and keeps its content inside the safe area.
             DjTvTopBar(
+                panels = topPanels,
+                isDocked = isDocked,
+                onToggle = onToggle,
                 vizFeature = vizFeature,
                 pulsarFeature = pulsarFeature,
-                onTogglePlayback = onTogglePlayback,
-                // The bar's top/left/right edges are all physical screen edges here.
-                // tvBarGlass goes OUTSIDE the inset padding on purpose: the fill should run to
-                // the physical edge and let only the content sit inside the safe area.
-                modifier = Modifier
-                    .tvBarGlass(barGlass)
-                    .windowInsetsPadding(
-                        platformSafeAreaInsets().only(
-                            WindowInsetsSides.Top + WindowInsetsSides.Start +
-                                WindowInsetsSides.End
-                        )
-                    ),
+                glass = barGlass,
             )
+            // Full width under the top bar, off the glass; the stage gives up its height.
+            DockSongBand(pulsarFeature)
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) { stage() }
+            // After the stage, so the dome rising out of the bar draws over it and takes its taps
+            // first; nothing else in the bar reaches past its top edge.
             DjTvBottomBar(
-                // Sheet-only tab contributions (e.g. AI) have no dock slot of their own;
-                // appending them here is their only entry point on this layout. Branch on
-                // dockablePanels membership, NOT route.opensAsSheet: VibeInfoTab also has
-                // opensAsSheet=true (it governs only the phone/tablet path per its own
-                // kdoc) but IS in dockablePanels, so it must keep toggling the dock, not
-                // activeSheet.
-                panels = bottomBarPanels(dockablePanels) + tabs.filter { it.opensAsSheet },
-                isDocked = { route ->
-                    if (route in dockablePanels) route in dockedPanels
-                    else route == activeSheet
-                },
-                onToggle = { route ->
-                    if (route in dockablePanels) {
-                        onToggleDocked(route)
-                    } else {
-                        onActiveSheetChange(if (activeSheet == route) null else route)
-                    }
-                },
+                panels = bottomPanels,
+                isDocked = isDocked,
+                onToggle = onToggle,
                 timerFeature = timerFeature,
                 pulsarFeature = pulsarFeature,
-                // Bottom/left/right edges are all physical screen edges here. Same ordering as
-                // the top bar: glass to the bezel, content inside the safe area.
-                modifier = Modifier
-                    .tvBarGlass(barGlass)
-                    .windowInsetsPadding(
-                        platformSafeAreaInsets().only(
-                            WindowInsetsSides.Bottom + WindowInsetsSides.Start +
-                                WindowInsetsSides.End
-                        )
-                    ),
+                onTogglePlayback = onTogglePlayback,
+                domeRingSize = domeRingSize,
+                glass = barGlass,
             )
         }
     }

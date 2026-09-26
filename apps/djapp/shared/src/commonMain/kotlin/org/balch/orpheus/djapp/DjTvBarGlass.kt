@@ -1,5 +1,7 @@
 package org.balch.orpheus.djapp
 
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -55,6 +57,23 @@ fun shouldShowTvBarGlass(
 @Composable
 fun Modifier.tvBarGlass(enabled: Boolean): Modifier {
     if (!enabled) return this
+    return tvBarGlassFill()
+}
+
+/**
+ * A dock bar's glass, behind its content and spanning its box, as a leaf of its own. It reads the
+ * visualization's effects, which some visualizations change every frame: those frames recompose
+ * this leaf while the bar skips. In the bottom bar it is the only such reader; the top bar's title
+ * and pickers read them in leaves of their own too. Behind rather than around, since the glass
+ * clips and the dock's dome rises out of its bar.
+ */
+@Composable
+internal fun BoxScope.DockBarGlass() {
+    Spacer(Modifier.matchParentSize().tvBarGlassFill())
+}
+
+@Composable
+private fun Modifier.tvBarGlassFill(): Modifier {
     val effects = LocalLiquidEffects.current
     return panelGlassChrome(
         liquidState = LocalLiquidState.current,

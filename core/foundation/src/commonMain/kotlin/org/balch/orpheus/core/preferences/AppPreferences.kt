@@ -40,6 +40,11 @@ data class AppPreferences(
      * configured; an empty list is the valid visualizer-only state.
      */
     val portraitPairPanels: List<String>? = null,
+    /**
+     * Whether the DJ app's user has ever committed a swipe on its play/pause dome. Until then the
+     * dome wiggles once a launch to show that it swipes.
+     */
+    val domeSwiped: Boolean = false,
     /** Serialized effect UI states for DJ app cross-session persistence. */
     val lastTimerJson: String? = null,
     val lastReverbJson: String? = null,

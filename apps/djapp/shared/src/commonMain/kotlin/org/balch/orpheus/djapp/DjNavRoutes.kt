@@ -77,9 +77,9 @@ data object PulsarTab : DjRoute {
 }
 
 /**
- * The vibe-ending picker's route. A first-class TV-dockable panel (see [EndsPanel]) — the
- * bottom bar's "Ends" item is a dock toggle like DJ/Mix/Horn/Timer, not a sheet trigger. Not a
- * nav tab — never in [djTabs] — since it only exists on the TV/LargeScreen layout; phone/tablet
+ * The vibe-ending picker's route. A first-class TV-dockable panel (see [EndsPanel]) — the top
+ * bar's Ends toggle docks it as Pulsar's and Info's dock theirs, not a sheet trigger. Not a nav
+ * tab — never in [djTabs] — since it only exists on the TV/LargeScreen layout; phone/tablet
  * reach the same controls via Pulsar's own ENDING pill instead.
  */
 @Serializable

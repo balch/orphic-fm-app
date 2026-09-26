@@ -57,7 +57,6 @@ kotlin {
             api(project(":features:distortion"))
             api(project(":features:visualizations"))
             implementation(libs.jetbrains.navigation3.ui)
-            implementation(compose.material3AdaptiveNavigationSuite)
             implementation(libs.compose.material.icons)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)

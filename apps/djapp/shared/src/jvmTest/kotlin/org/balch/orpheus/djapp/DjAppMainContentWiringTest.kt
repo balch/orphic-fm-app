@@ -3,12 +3,11 @@ package org.balch.orpheus.djapp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -18,6 +17,9 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.runBlocking
@@ -26,6 +28,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizViewModel
+import org.balch.orpheus.ui.infrastructure.TvFocusRegionHolder
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.LocalPanelIdleFade
 import org.balch.orpheus.ui.viz.LocalVizStage
@@ -50,7 +53,8 @@ import kotlin.test.assertTrue
  * Two properties per layout, both read off the rendered frame rather than off the source:
  *  - the reported stage leaves the header and the navigation out (tabletop's header sits inside
  *    it by construction and is reported separately as the live chrome band);
- *  - with the fade at 0 nothing inside the stage is painted, while the chrome still is.
+ *  - with the fade at 0 nothing inside the stage is painted, while the chrome still is (the phone
+ *    bar's ring rises over the stage's bottom edge, so its bounds count as chrome).
  *
  * ./gradlew :apps:djapp:shared:jvmTest --tests '*DjAppMainContentWiringTest*' --rerun
  */
@@ -75,14 +79,14 @@ class DjAppMainContentWiringTest {
             )
 
             // Nothing inside the stage may be painted: everything there wears the fade. The
-            // tabletop header is the one piece of chrome inside it, and keeps drawing.
+            // tabletop header and the phone bar's raised dome are the chrome inside it, and keep drawing.
             val faded = stage.deflate(EdgeSlack)
-            val painted = shot.paintedIn(faded, except = case.chromeBand(shot))
+            val painted = shot.paintedIn(faded, except = case.chromeInStage(shot))
             assertTrue(
                 painted == 0,
                 "${case.name}: $painted pixels inside the stage survived the fade, so a panel " +
                     "there is not wearing panelIdleFade. Stage $stage, painted within " +
-                    shot.paintedBox(faded, case.chromeBand(shot)),
+                    shot.paintedBox(faded, case.chromeInStage(shot)),
             )
 
             // The navigation is outside the content area in every layout that has one, and the
@@ -281,25 +285,27 @@ class DjAppMainContentWiringTest {
     private class Shot(
         val stage: Rect?,
         val chromeBand: Rect?,
+        /** The vibe transport's bounds, ring and name: the phone bar's ring rises into the stage. */
+        val transport: Rect?,
         val content: Rect,
         val width: Int,
         val height: Int,
         private val painted: (Int, Int) -> Boolean,
     ) {
-        fun paintedIn(rect: Rect, except: Rect? = null): Int {
+        fun paintedIn(rect: Rect, except: List<Rect> = emptyList()): Int {
             var count = 0
             forEachPixel(rect) { x, y ->
-                if (except != null && except.holds(x, y)) return@forEachPixel
+                if (except.any { it.holds(x, y) }) return@forEachPixel
                 if (painted(x, y)) count++
             }
             return count
         }
 
         /** Where the survivors are, so a failure says which edge or panel leaked. */
-        fun paintedBox(rect: Rect, except: Rect?): String {
+        fun paintedBox(rect: Rect, except: List<Rect>): String {
             var l = Int.MAX_VALUE; var t = Int.MAX_VALUE; var r = -1; var b = -1
             forEachPixel(rect) { x, y ->
-                if (except != null && except.holds(x, y)) return@forEachPixel
+                if (except.any { it.holds(x, y) }) return@forEachPixel
                 if (painted(x, y)) {
                     if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > b) b = y
                 }
@@ -334,9 +340,11 @@ class DjAppMainContentWiringTest {
         /** Whether a header of this layout's own sits between the content top and the stage. */
         val headerAboveStage: Boolean = true,
     ) {
-        /** Tabletop reports the band its header occupies; nothing else has chrome inside the stage. */
-        fun chromeBand(shot: Shot): Rect? =
-            if (layout is DjLayout.Tabletop) shot.chromeBand?.deflate(-EdgeSlack) else null
+        /** Tabletop reports the band its header occupies, and the phone bar's ring rises over the stage's bottom edge. */
+        fun chromeInStage(shot: Shot): List<Rect> = listOfNotNull(
+            if (layout is DjLayout.Tabletop) shot.chromeBand?.deflate(-EdgeSlack) else null,
+            if (!layout.usesLandscapeChrome()) shot.transport?.deflate(-EdgeSlack) else null,
+        )
 
         fun assertHeader(shot: Shot, stage: Rect) {
             if (layout is DjLayout.Tabletop) {
@@ -421,6 +429,7 @@ class DjAppMainContentWiringTest {
             Shot(
                 stage = stage.bounds,
                 chromeBand = stage.chromeBand,
+                transport = scene.semanticsOwners.firstNotNullOfOrNull { it.rootSemanticsNode.findTransport() }?.boundsInRoot,
                 content = content,
                 width = case.width,
                 height = case.height,
@@ -435,21 +444,24 @@ class DjAppMainContentWiringTest {
     @Composable
     private fun Chrome(layout: DjLayout, content: @Composable () -> Unit) {
         when (layout) {
-            DjLayout.LargeScreen -> Column(Modifier.fillMaxSize()) {
-                DjTvTopBar(
-                    vizFeature = VizViewModel.previewFeature(),
-                    pulsarFeature = PulsarViewModel.previewFeature(),
-                    onTogglePlayback = {},
-                )
-                Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-                DjTvBottomBar(
-                    panels = bottomBarPanels(largeScreenPanels()),
-                    isDocked = { false },
-                    onToggle = {},
-                    timerFeature = TimerViewModel.previewFeature(),
-                    pulsarFeature = PulsarViewModel.previewFeature(),
-                )
-            }
+            DjLayout.LargeScreen -> DjAppTvChrome(
+                tvHardware = false,
+                domeRingSize = BarRingSize,
+                barGlass = false,
+                vizHidesPanelsWhenIdle = true,
+                focusRegion = remember { TvFocusRegionHolder() },
+                vizFeature = VizViewModel.previewFeature(),
+                pulsarFeature = PulsarViewModel.previewFeature(),
+                timerFeature = TimerViewModel.previewFeature(),
+                onTogglePlayback = {},
+                dockablePanels = largeScreenPanels(),
+                dockedPanels = emptyList(),
+                activeSheet = null,
+                tabs = djTabs,
+                onToggleDocked = {},
+                onActiveSheetChange = {},
+                stage = content,
+            )
             else -> DjAppNavScaffold(
                 isSelected = { it == DjTab },
                 onItemClick = {},
@@ -518,6 +530,13 @@ class DjAppMainContentWiringTest {
 
         fun Rect.holds(x: Int, y: Int): Boolean =
             x >= left && x < right && y >= top && y < bottom
+
+        /** The vibe transport's node: the one carrying the "Next vibe" action. */
+        fun SemanticsNode.findTransport(): SemanticsNode? {
+            val actions = config.getOrNull(SemanticsActions.CustomActions).orEmpty()
+            if (actions.any { it.label == "Next vibe" }) return this
+            return children.firstNotNullOfOrNull { it.findTransport() }
+        }
 
         fun Rect.contains(other: Rect, slack: Float): Boolean =
             other.left >= left - slack && other.right <= right + slack &&

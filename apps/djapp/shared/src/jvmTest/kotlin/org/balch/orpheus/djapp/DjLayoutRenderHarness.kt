@@ -17,16 +17,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
@@ -36,13 +43,19 @@ import org.balch.orpheus.features.horn.HornDisplayHeight
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
+import org.balch.orpheus.features.pulsar.MusicPulse
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarGridHeight
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
+import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.SongStory
+import org.balch.orpheus.features.pulsar.VibeNavState
 import org.balch.orpheus.features.pulsar.mixer.MixerPanel
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
+import org.balch.orpheus.features.reverb.ReverbPanel
+import org.balch.orpheus.features.reverb.ReverbViewModel
 import org.balch.orpheus.features.timer.TimerPanel
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
 import org.balch.orpheus.features.timer.TimerStatus
@@ -54,6 +67,7 @@ import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
+import org.balch.orpheus.ui.infrastructure.TvFocusRegionHolder
 import org.balch.orpheus.ui.infrastructure.TvGlassEnabled
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -155,33 +169,10 @@ class DjLayoutRenderHarness {
         listOf(0, 3, 7).forEach { count ->
             runCatching {
                 val docked = allPanels.take(count)
-                val dockedSet = docked.toSet()
                 val scene = ImageComposeScene(1280, 720, Density(1f)) {
                     OrpheusTheme {
-                        androidx.compose.runtime.CompositionLocalProvider(
-                            LocalTvFocusChrome provides true,
-                            LocalTelevisionHardware provides true,
-                        ) {
-                            Column(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
-                                DjTvTopBar(
-                                    vizFeature = VizViewModel.previewFeature(),
-                                    pulsarFeature = PulsarViewModel.previewFeature(),
-                                    onTogglePlayback = {},
-                                )
-                                Box(Modifier.weight(1f).fillMaxWidth()) {
-                                    DjPanelDock(
-                                        panels = docked,
-                                        modifier = Modifier.fillMaxSize(),
-                                    ) { route, mod -> PreviewRoutePanel(route, mod) }
-                                }
-                                DjTvBottomBar(
-                                    panels = bottomBarPanels(allPanels),
-                                    isDocked = { it in dockedSet },
-                                    onToggle = {},
-                                    timerFeature = TimerViewModel.previewFeature(),
-                                    pulsarFeature = PulsarViewModel.previewFeature(),
-                                )
-                            }
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            DockChrome(docked, tvHardware = true)
                         }
                     }
                 }
@@ -216,35 +207,11 @@ class DjLayoutRenderHarness {
         listOf(3, 7).forEach { count ->
             runCatching {
                 val docked = allPanels.take(count)
-                val dockedSet = docked.toSet()
                 val scene = ImageComposeScene(1280, 1153, Density(1f)) {
                     OrpheusTheme {
-                        CompositionLocalProvider(
-                            // A foldable is not television hardware, so the bars carry the panel
-                            // glass (see shouldShowTvBarGlass) exactly as they do on desktop.
-                            LocalTvFocusChrome provides false,
-                            LocalTelevisionHardware provides false,
-                        ) {
-                            Column(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
-                                DjTvTopBar(
-                                    vizFeature = VizViewModel.previewFeature(),
-                                    pulsarFeature = PulsarViewModel.previewFeature(),
-                                    onTogglePlayback = {},
-                                )
-                                Box(Modifier.weight(1f).fillMaxWidth()) {
-                                    DjPanelDock(
-                                        panels = docked,
-                                        modifier = Modifier.fillMaxSize(),
-                                    ) { route, mod -> PreviewRoutePanel(route, mod) }
-                                }
-                                DjTvBottomBar(
-                                    panels = bottomBarPanels(allPanels),
-                                    isDocked = { it in dockedSet },
-                                    onToggle = {},
-                                    timerFeature = TimerViewModel.previewFeature(),
-                                    pulsarFeature = PulsarViewModel.previewFeature(),
-                                )
-                            }
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            // A foldable is not television hardware.
+                            DockChrome(docked, tvHardware = false)
                         }
                     }
                 }
@@ -499,6 +466,47 @@ class DjLayoutRenderHarness {
         }
     }
 
+    /**
+     * Pulsar alone in the Fold 8 cover screen's landscape column: 362dp wide ((840 - the 116dp rail
+     * with its cutout) / 2) at font scale 1.3, sized by [pulsarGridHeightFor] as DjAppScreen does.
+     * 316dp is that screen's slot under the header.
+     */
+    @Test
+    fun renderPulsarLandscapeFoldSweep() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        listOf(290, 305, 316, 335, 350).forEach { height ->
+            runCatching {
+                val scene = ImageComposeScene(362 * 2, height * 2, Density(2f, 1.3f)) {
+                    OrpheusTheme {
+                        Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
+                            PulsarPanel(
+                                pulsar = PulsarViewModel.previewFeature(),
+                                vizFlow = emptyPulsarVizFlow,
+                                trackVizFlows = emptyTrackVizFlows,
+                                modifier = Modifier.fillMaxSize(),
+                                isExpanded = true,
+                                onExpandedChange = {},
+                                showCollapsedHeader = false,
+                                showExpandedTitle = false,
+                                centerContent = false,
+                                gridHeight = pulsarGridHeightFor(height.dp, PulsarGridHeight),
+                            )
+                        }
+                    }
+                }
+                try {
+                    File(outDir, "pulsar-landscape-fold-$height.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] pulsar landscape fold $height skipped: $it")
+            }
+        }
+    }
+
     /** Mix and Horn alone at 466dp wide over a sweep of heights: the lower panel's own minimum. */
     @Test
     fun renderLowerPanelCompactSweep() {
@@ -598,6 +606,61 @@ class DjLayoutRenderHarness {
     }
 
     /**
+     * The Fold 8's closed cover screen upright (1080x2520px at density 3, system bars hidden) at its
+     * 1.3 font scale, once per tab: the real Portrait branch of DjAppMainContent, with the nav
+     * destinations as DjAppScreen builds them, to see what the bar's raised dome sits over.
+     */
+    @Test
+    fun renderFoldCoverPortrait() {
+        val outDir = File("build/djapp-render").apply { mkdirs() }
+        val base = PulsarViewModel.previewFeature()
+        val pulsar = object : PulsarFeature by base {
+            override val vibeNavFlow: StateFlow<VibeNavState> =
+                MutableStateFlow(VibeNavState("Space & Drift", "Dog House", "Stay Asleep", progress = 0.62f))
+        }
+        listOf(DjTab, MixTab, HornTab, TimerTab).forEach { route ->
+            runCatching {
+                val scene = ImageComposeScene(360 * 3, 840 * 3, Density(3f, 1.3f)) {
+                    OrpheusTheme {
+                        DjAppNavScaffold(
+                            isSelected = { it == route },
+                            onItemClick = {},
+                            layout = DjLayout.Portrait,
+                            pulsarFeature = pulsar,
+                            timerFeature = TimerViewModel.previewFeature(),
+                            onTogglePlayback = {},
+                            modifier = Modifier.fillMaxSize().background(Color(0xFF14141F)),
+                        ) {
+                            DjAppMainContent(
+                                layout = DjLayout.Portrait,
+                                dockedPanels = emptyList(),
+                                pairPanels = emptyList(),
+                                pulsarFeature = pulsar,
+                                synthEngine = RenderProbeSynthEngine(),
+                                vizFeature = VizViewModel.previewFeature(),
+                                onShowVibeInfo = {},
+                                routePanel = { _, _, _ -> },
+                                navContent = { mod -> Box(mod) { NavDestinationPanel(route, Modifier.fillMaxSize()) } },
+                            )
+                        }
+                    }
+                }
+                try {
+                    // Pulsar's grid and Horn's display size from the slots measured the frame before.
+                    repeat(3) { scene.render() }
+                    File(outDir, "fold-cover-portrait-${route.label}.png")
+                        .writeBytes(scene.render().encodeToData()!!.bytes)
+                } finally {
+                    scene.close()
+                }
+            }.onFailure {
+                if (it is IllegalStateException) throw it
+                println("[render-harness] fold cover ${route.label} skipped: $it")
+            }
+        }
+    }
+
+    /**
      * Renders [DjTvBottomBar] and [DjTvTopBar] with one item forced focused, against both a
      * flat dark ground and [busyVizBackdrop], so the raised-plate focus treatment can be judged
      * against the same conditions a real television sees (bright, busy visualization behind
@@ -611,7 +674,8 @@ class DjLayoutRenderHarness {
         listOf(false, true).forEach { busy ->
             val tag = if (busy) "busy" else "dark"
             runCatching {
-                val scene = ImageComposeScene(1280, 260, Density(1f)) {
+                // Tall enough for both bars and the song band above the bottom one.
+                val scene = ImageComposeScene(1280, 290, Density(1f)) {
                     OrpheusTheme {
                         Box(Modifier.fillMaxSize()) {
                             if (busy) busyVizBackdrop() else Box(
@@ -619,9 +683,11 @@ class DjLayoutRenderHarness {
                             )
                             Column(Modifier.fillMaxSize()) {
                                 DjTvTopBar(
+                                    panels = topBarPanels(allPanels),
+                                    isDocked = { it == PulsarTab },
+                                    onToggle = {},
                                     vizFeature = VizViewModel.previewFeature(),
                                     pulsarFeature = PulsarViewModel.previewFeature(),
-                                    onTogglePlayback = {},
                                     previewFocusedButton = TvTopBarButtonId.VIZ_PICKER,
                                 )
                                 DjTvBottomBar(
@@ -630,6 +696,7 @@ class DjLayoutRenderHarness {
                                     onToggle = {},
                                     timerFeature = TimerViewModel.previewFeature(),
                                     pulsarFeature = PulsarViewModel.previewFeature(),
+                                    onTogglePlayback = {},
                                     previewFocusedRoute = HornTab,
                                 )
                             }
@@ -650,11 +717,31 @@ class DjLayoutRenderHarness {
         println("[render-harness] wrote nav focus PNGs to ${outDir.absolutePath}")
     }
 
+    /** Playing mid-song with a TAPE ending armed, so the band and the Ends toggle's ring show. */
+    private val armedPulsar: PulsarFeature by lazy {
+        val basePulsar = PulsarViewModel.previewFeature()
+        object : PulsarFeature by basePulsar {
+            override val actions: PulsarPanelActions = PulsarPanelActions(
+                songEndingEnabled = MutableStateFlow(true),
+                transitionSpec = MutableStateFlow(TransitionSpec(style = TransitionStyle.TAPE)),
+                outroArmed = MutableStateFlow(true),
+            )
+            override val stateFlow: StateFlow<PulsarUiState> =
+                MutableStateFlow(basePulsar.stateFlow.value.copy(globalPaused = false))
+            override val vibeNavFlow: StateFlow<VibeNavState> = MutableStateFlow(BreakdownDropNav)
+            override val songStoryFlow: StateFlow<SongStory> = MutableStateFlow(BreakdownDropStory)
+            override val musicPulseFlow: StateFlow<MusicPulse> =
+                MutableStateFlow(MusicPulse(0.9f, FloatArray(8).also { it[0] = 0.9f }, 0.25f, 469f))
+        }
+    }
+
     /**
-     * [DjTvTopBar]'s idle plate (title, Play/Pause, both pickers) should re-theme with the
-     * selected visualization instead of wearing one fixed purple/cyan regardless of it. Renders
-     * [VizTestPalettes] against both a flat ground and [busyVizBackdrop], so re-theming and
-     * legibility over a bright/busy background are both judged from the same PNGs.
+     * [DjTvTopBar]'s idle plate (title, toggles, both pickers) should re-theme with the selected
+     * visualization instead of wearing one fixed purple/cyan regardless of it. Pulsar and Ends are
+     * docked, Info focused and Ends armed, so the three independent channels (docked wash, focused
+     * plate, armed ring) can be judged for separability under each palette — including that the
+     * armed ring (fixed cosmicPurple) never blends into whichever hue the palette happens to be.
+     * Renders [VizTestPalettes] against both a flat ground and [busyVizBackdrop].
      */
     @Test
     fun renderTvTopBarVizPalettes() {
@@ -672,9 +759,12 @@ class DjLayoutRenderHarness {
                                 )
                                 CompositionLocalProvider(LocalLiquidEffects provides effects) {
                                     DjTvTopBar(
+                                        panels = topBarPanels(largeScreenPanels()),
+                                        isDocked = { it == PulsarTab || it == EndsTab },
+                                        onToggle = {},
                                         vizFeature = VizViewModel.previewFeature(),
-                                        pulsarFeature = PulsarViewModel.previewFeature(),
-                                        onTogglePlayback = {},
+                                        pulsarFeature = armedPulsar,
+                                        previewFocusedRoute = VibeInfoTab,
                                     )
                                 }
                             }
@@ -697,45 +787,38 @@ class DjLayoutRenderHarness {
 
     /**
      * [DjTvBottomBar]'s docked/focused accent should re-theme with [VizTestPalettes] exactly like
-     * the top bar, so the two read as one piece of chrome. Docks Pulsar+DJ, focuses Horn, and arms
-     * Ends all in the same render so the three independent channels (docked wash, focused plate,
-     * armed ring) can be judged for separability under each palette, not just under the old fixed
-     * neonCyan — including that the armed ring (fixed cosmicPurple, unlike the other two) never
-     * blends into whichever hue the palette happens to be.
+     * the top bar, so the two read as one piece of chrome. Docks DJ and focuses Horn, with the dome
+     * playing mid-song and the song band over the bar, judged over each backdrop.
      */
     @Test
     fun renderTvBottomBarVizPalettes() {
         val outDir = File("build/djapp-render").apply { mkdirs() }
         val allPanels = largeScreenPanels()
-        val armedActions = PulsarPanelActions(
-            songEndingEnabled = MutableStateFlow(true),
-            transitionSpec = MutableStateFlow(TransitionSpec(style = TransitionStyle.TAPE)),
-            outroArmed = MutableStateFlow(true),
-        )
-        val basePulsar = PulsarViewModel.previewFeature()
-        val armedPulsar = object : PulsarFeature by basePulsar {
-            override val actions: PulsarPanelActions = armedActions
-        }
 
         listOf(false, true).forEach { busy ->
             val bgTag = if (busy) "busy" else "dark"
             VizTestPalettes.forEach { (paletteTag, effects) ->
                 runCatching {
-                    val scene = ImageComposeScene(1560, 200, Density(1f)) {
+                    val scene = ImageComposeScene(1560, 210, Density(1f)) {
                         OrpheusTheme {
                             Box(Modifier.fillMaxSize()) {
                                 if (busy) busyVizBackdrop() else Box(
                                     Modifier.fillMaxSize().background(Color(0xFF14141F)),
                                 )
                                 CompositionLocalProvider(LocalLiquidEffects provides effects) {
-                                    DjTvBottomBar(
-                                        panels = bottomBarPanels(allPanels),
-                                        isDocked = { it == PulsarTab || it == DjTab || it == EndsTab },
-                                        onToggle = {},
-                                        timerFeature = TimerViewModel.previewFeature(),
-                                        pulsarFeature = armedPulsar,
-                                        previewFocusedRoute = HornTab,
-                                    )
+                                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Bottom) {
+                                        DockSongBand(armedPulsar, previewWavePhase = 1f)
+                                        DjTvBottomBar(
+                                            panels = bottomBarPanels(allPanels),
+                                            isDocked = { it == DjTab },
+                                            onToggle = {},
+                                            timerFeature = TimerViewModel.previewFeature(),
+                                            pulsarFeature = armedPulsar,
+                                            onTogglePlayback = {},
+                                            previewFocusedRoute = HornTab,
+                                            previewWavePhase = 1f,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -860,9 +943,11 @@ class DjLayoutRenderHarness {
                                         modifier = Modifier.width(70.dp),
                                     )
                                     DjTvTopBar(
+                                        panels = topBarPanels(largeScreenPanels()),
+                                        isDocked = { it == PulsarTab },
+                                        onToggle = {},
                                         vizFeature = VizViewModel.previewFeature(),
                                         pulsarFeature = PulsarViewModel.previewFeature(),
-                                        onTogglePlayback = {},
                                         previewFocusedButton = TvTopBarButtonId.VIZ_PICKER,
                                         previewRegionFocused = true,
                                         previewRegionFocusAlpha = alpha,
@@ -907,6 +992,7 @@ class DjLayoutRenderHarness {
                                         onToggle = {},
                                         timerFeature = TimerViewModel.previewFeature(),
                                         pulsarFeature = PulsarViewModel.previewFeature(),
+                                        onTogglePlayback = {},
                                         previewFocusedRoute = HornTab,
                                         previewRegionFocused = true,
                                         previewRegionFocusAlpha = alpha,
@@ -955,9 +1041,11 @@ class DjLayoutRenderHarness {
                             Column(Modifier.fillMaxSize()) {
                                 // Top bar "focused": only its border shows.
                                 DjTvTopBar(
+                                    panels = topBarPanels(allPanels),
+                                    isDocked = { it == PulsarTab },
+                                    onToggle = {},
                                     vizFeature = VizViewModel.previewFeature(),
                                     pulsarFeature = PulsarViewModel.previewFeature(),
-                                    onTogglePlayback = {},
                                     previewRegionFocused = true,
                                 )
                                 Row(Modifier.weight(1f).fillMaxWidth()) {
@@ -993,6 +1081,7 @@ class DjLayoutRenderHarness {
                                     onToggle = {},
                                     timerFeature = TimerViewModel.previewFeature(),
                                     pulsarFeature = PulsarViewModel.previewFeature(),
+                                    onTogglePlayback = {},
                                     previewRegionFocused = true,
                                 )
                             }
@@ -1226,14 +1315,13 @@ class DjLayoutRenderHarness {
     }
 
     /**
-     * Close-up of the bottom bar's Ends item across all three of its independent signals:
-     * idle, docked, focused, and armed (a song ending is actively in progress) — including the
-     * combinations that must all stay readable at once per the user's explicit requirement. Then
-     * the full 7-item bar with the same armed SCRATCH state, at the bar's real (unconstrained)
-     * sizing, to confirm the longer style name never clips in practice.
+     * The top bar's Ends toggle across all three of its independent signals: idle, docked,
+     * focused, and armed (a song ending is actively in progress) — including the combinations
+     * that must all stay readable at once per the user's explicit requirement. One bar per state,
+     * then the full bar with the same armed SCRATCH state, to confirm the longer style name fits.
      */
     @Test
-    fun renderEndsBottomBarSignals() {
+    fun renderEndsTopBarSignals() {
         val outDir = File("build/djapp-render").apply { mkdirs() }
         fun endsOnlyBar(armed: Boolean): PulsarFeature {
             val base = PulsarViewModel.previewFeature()
@@ -1247,69 +1335,53 @@ class DjLayoutRenderHarness {
             }
         }
         runCatching {
-            val scene = ImageComposeScene(1560, 560, Density(1f)) {
+            val scene = ImageComposeScene(1280, 820, Density(1f)) {
                 OrpheusTheme {
                     Column(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            listOf(
-                                Triple(false, false, false) to "idle",
-                                Triple(true, false, false) to "docked",
-                                Triple(false, true, false) to "focused",
-                                Triple(true, true, false) to "docked+focused",
-                                Triple(false, false, true) to "armed",
-                                Triple(true, false, true) to "docked+armed",
-                                Triple(true, true, true) to "docked+focused+armed",
-                            ).forEach { (state, tag) ->
-                                val (docked, focused, armed) = state
-                                // DjTvBottomBar fillMaxWidth()s internally, so each swatch needs
-                                // a fixed width here rather than a plain (unweighted) Column —
-                                // otherwise every swatch fights for the full Row width at once.
-                                // 200dp is generously wider than the item's own natural content
-                                // width purely so this diagnostic grid doesn't clip its own
-                                // caption text — the real bar below is unconstrained.
-                                Column(
-                                    modifier = Modifier.width(200.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(tag, color = Color.White, fontSize = 11.sp)
-                                    DjTvBottomBar(
-                                        panels = listOf(EndsTab),
-                                        isDocked = { docked },
-                                        onToggle = {},
-                                        timerFeature = TimerViewModel.previewFeature(),
-                                        pulsarFeature = endsOnlyBar(armed),
-                                        previewFocusedRoute = if (focused) EndsTab else null,
-                                    )
-                                }
-                            }
+                        listOf(
+                            Triple(false, false, false) to "idle",
+                            Triple(true, false, false) to "docked",
+                            Triple(false, true, false) to "focused",
+                            Triple(true, true, false) to "docked+focused",
+                            Triple(false, false, true) to "armed",
+                            Triple(true, false, true) to "docked+armed",
+                            Triple(true, true, true) to "docked+focused+armed",
+                        ).forEach { (state, tag) ->
+                            val (docked, focused, armed) = state
+                            Text(tag, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(start = 16.dp))
+                            DjTvTopBar(
+                                panels = listOf(EndsTab),
+                                isDocked = { docked },
+                                onToggle = {},
+                                vizFeature = VizViewModel.previewFeature(),
+                                pulsarFeature = endsOnlyBar(armed),
+                                previewFocusedRoute = if (focused) EndsTab else null,
+                            )
                         }
                         Text(
-                            "Real 7-item bar, unconstrained width, SCRATCH armed:",
+                            "The full bar, SCRATCH armed and docked, Pulsar docked:",
                             color = Color.White,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                         )
-                        DjTvBottomBar(
-                            panels = bottomBarPanels(largeScreenPanels()),
+                        DjTvTopBar(
+                            panels = topBarPanels(largeScreenPanels()),
                             isDocked = { it == PulsarTab || it == EndsTab },
                             onToggle = {},
-                            timerFeature = TimerViewModel.previewFeature(),
+                            vizFeature = VizViewModel.previewFeature(),
                             pulsarFeature = endsOnlyBar(armed = true),
                         )
                     }
                 }
             }
             try {
-                File(outDir, "ends-bottombar-signals.png").writeBytes(scene.render().encodeToData()!!.bytes)
+                File(outDir, "ends-topbar-signals.png").writeBytes(scene.render().encodeToData()!!.bytes)
             } finally {
                 scene.close()
             }
         }.onFailure {
             if (it is IllegalStateException) throw it
-            println("[render-harness] ends bottom bar signals skipped: $it")
+            println("[render-harness] ends top bar signals skipped: $it")
         }
     }
 
@@ -1357,22 +1429,24 @@ class DjLayoutRenderHarness {
                                         onToggle = {},
                                         timerFeature = timer(status, remaining),
                                         pulsarFeature = PulsarViewModel.previewFeature(),
+                                        onTogglePlayback = {},
                                     )
                                 }
                             }
                         }
                         Text(
-                            "Real 7-item bar, timer running — every item must stay the same height:",
+                            "The real bar, timer running — every item must stay the same height:",
                             color = Color.White,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                         )
                         DjTvBottomBar(
                             panels = bottomBarPanels(largeScreenPanels()),
-                            isDocked = { it == PulsarTab || it == TimerTab },
+                            isDocked = { it == DjTab || it == TimerTab },
                             onToggle = {},
                             timerFeature = timer(TimerStatus.RUNNING, 53.seconds),
                             pulsarFeature = PulsarViewModel.previewFeature(),
+                            onTogglePlayback = {},
                         )
                     }
                 }
@@ -1545,7 +1619,7 @@ private val VizTestPalettes = listOf(
  * calls out — "bright and busy... a sunset scene with bokeh in places" — not just flat black.
  */
 @Composable
-private fun busyVizBackdrop() {
+internal fun busyVizBackdrop() {
     Canvas(Modifier.fillMaxSize()) {
         drawRect(
             brush = Brush.verticalGradient(
@@ -1585,9 +1659,34 @@ private fun labeledKnob(caption: String, knob: @Composable () -> Unit) {
     }
 }
 
+/** The real dock chrome with [docked] panels as preview renders, no glass. */
+@Composable
+private fun DockChrome(docked: List<DjRoute>, tvHardware: Boolean) {
+    DjAppTvChrome(
+        tvHardware = tvHardware,
+        domeRingSize = BarRingSize,
+        barGlass = false,
+        vizHidesPanelsWhenIdle = false,
+        focusRegion = remember { TvFocusRegionHolder() },
+        vizFeature = VizViewModel.previewFeature(),
+        pulsarFeature = PulsarViewModel.previewFeature(),
+        timerFeature = TimerViewModel.previewFeature(),
+        onTogglePlayback = {},
+        dockablePanels = largeScreenPanels(),
+        dockedPanels = docked,
+        activeSheet = null,
+        tabs = djTabs,
+        onToggleDocked = {},
+        onActiveSheetChange = {},
+        stage = {
+            DjPanelDock(panels = docked, modifier = Modifier.fillMaxSize()) { route, mod -> PreviewRoutePanel(route, mod) }
+        },
+    )
+}
+
 /** Renders one route with its preview feature, titles on, as the dock shows it. */
 @Composable
-private fun PreviewRoutePanel(route: DjRoute, modifier: Modifier) {
+internal fun PreviewRoutePanel(route: DjRoute, modifier: Modifier) {
     when (route) {
         PulsarTab -> PulsarPanel(
             pulsar = PulsarViewModel.previewFeature(),
@@ -1661,6 +1760,66 @@ private fun PreviewRoutePanel(route: DjRoute, modifier: Modifier) {
             showCollapsedHeader = false,
             showExpandedTitle = false,
             fillHeight = false,
+        )
+        else -> Unit
+    }
+}
+
+/** A phone nav destination as DjAppScreen's routePanel builds it undocked: filled, Mix with its reverb strip. */
+@Composable
+private fun NavDestinationPanel(route: DjRoute, modifier: Modifier) {
+    when (route) {
+        DjTab -> DjPanel(
+            feature = DjViewModel.previewFeature(),
+            vizFlowA = emptyVizFlow,
+            vizFlowB = emptyVizFlow,
+            outVizFlow = emptyVizFlow,
+            modifier = modifier,
+            isExpanded = true,
+            onExpandedChange = {},
+            showCollapsedHeader = false,
+            showExpandedTitle = false,
+        )
+        MixTab -> Column(modifier) {
+            ReverbPanel(
+                feature = ReverbViewModel.previewFeature(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+            MixerPanel(
+                feature = MixerViewModel.previewFeature(),
+                trackVizFlows = emptyTrackVizFlows,
+                masterOutVizFlow = emptyVizFlow,
+                modifier = Modifier.fillMaxWidth(),
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+            )
+        }
+        HornTab -> {
+            var slotPx by remember { mutableIntStateOf(0) }
+            val density = LocalDensity.current
+            HornPanel(
+                feature = HornViewModel.previewFeature(),
+                modifier = modifier.onSizeChanged { slotPx = it.height },
+                isExpanded = true,
+                onExpandedChange = {},
+                showCollapsedHeader = false,
+                showExpandedTitle = false,
+                displayHeight = if (slotPx == 0) HornDisplayHeight else {
+                    hornDisplayHeightFor(with(density) { slotPx.toDp() }, HornDisplayHeight)
+                },
+            )
+        }
+        TimerTab -> TimerPanel(
+            feature = TimerViewModel.previewFeature(),
+            modifier = modifier,
+            showCollapsedHeader = false,
+            showExpandedTitle = false,
         )
         else -> Unit
     }

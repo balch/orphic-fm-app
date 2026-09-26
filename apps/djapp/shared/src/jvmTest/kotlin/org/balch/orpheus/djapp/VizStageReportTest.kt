@@ -3,12 +3,11 @@ package org.balch.orpheus.djapp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -20,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizViewModel
+import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
+import org.balch.orpheus.ui.infrastructure.TvFocusRegionHolder
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.VizStage
 import org.balch.orpheus.ui.viz.vizStage
@@ -86,93 +87,92 @@ class VizStageReportTest {
         )
     }
 
-    @Test
-    fun `landscape reports the band right of the rail and below the header`() {
-        val stage = VizStage()
-        val tracker = LandscapeStageTracker(stage)
-        var header = Rect.Zero
-        var row = Rect.Zero
+    /** The dock's rows, stacked as [DjAppTvChrome] stacks them, and the stage reported from inside. */
+    private class DockRows(val topBar: Rect, val band: Rect, val stage: Rect, val bottomBar: Rect)
 
-        render(780, 360) {
-            DjAppNavScaffold(
-                isSelected = { it == DjTab },
-                onItemClick = {},
-                layout = DjLayout.Landscape,
-                pulsarFeature = PulsarViewModel.previewFeature(),
-                timerFeature = TimerViewModel.previewFeature(),
-                onTogglePlayback = {},
-            ) {
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .onGloballyPositioned {
-                            row = it.boundsInRoot()
-                            tracker.onContent(row)
-                        },
-                ) {
-                    filler(Modifier.weight(.5f).fillMaxHeight())
-                    Column(Modifier.weight(.5f).fillMaxHeight()) {
-                        DjAppHeaderRow(
-                            vizFeature = VizViewModel.previewFeature(),
-                            onInfoClick = {},
-                            modifier = Modifier
-                                .onGloballyPositioned {
-                                    header = it.boundsInRoot()
-                                    tracker.onHeader(header)
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalPadding = 0.dp,
-                        )
-                        filler(Modifier.weight(1f).fillMaxWidth())
+    private fun dockRows(tv: Boolean): DockRows {
+        val stage = VizStage()
+        var topBar = Rect.Zero
+        var band = Rect.Zero
+        var bottomBar = Rect.Zero
+        render(1280, 720) {
+            CompositionLocalProvider(LocalTelevisionHardware provides tv) {
+                Column(Modifier.fillMaxSize()) {
+                    DjTvTopBar(
+                        panels = topBarPanels(largeScreenPanels()),
+                        isDocked = { false },
+                        onToggle = {},
+                        vizFeature = VizViewModel.previewFeature(),
+                        pulsarFeature = PulsarViewModel.previewFeature(),
+                        modifier = Modifier.onGloballyPositioned { topBar = it.boundsInRoot() },
+                    )
+                    DockSongBand(PulsarViewModel.previewFeature(), Modifier.onGloballyPositioned { band = it.boundsInRoot() })
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        DjPanelDock(
+                            panels = listOf(PulsarTab, DjTab),
+                            modifier = Modifier.fillMaxSize().vizStage(stage),
+                        ) { _, mod -> filler(mod) }
                     }
+                    DjTvBottomBar(
+                        panels = bottomBarPanels(largeScreenPanels()),
+                        isDocked = { false },
+                        onToggle = {},
+                        timerFeature = TimerViewModel.previewFeature(),
+                        pulsarFeature = PulsarViewModel.previewFeature(),
+                        onTogglePlayback = {},
+                        modifier = Modifier.onGloballyPositioned { bottomBar = it.boundsInRoot() },
+                    )
                 }
             }
         }
-
-        val bounds = assertNotNull(stage.bounds, "landscape never reported a stage")
-        assertTrue(header.height > 0f, "the header measured nothing")
-        assertClose(header.bottom, bounds.top, "stage starts below the header")
-        assertClose(row.left, bounds.left, "stage starts at the content's left edge")
-        assertClose(row.bottom, bounds.bottom, "stage ends where the content does")
-        // The rail is outside the scaffold's content, so the content starts right of zero.
-        assertTrue(row.left > 1f, "the nav rail took no width: content starts at ${row.left}")
+        return DockRows(topBar, band, assertNotNull(stage.bounds, "the dock never reported a stage (tv=$tv)"), bottomBar)
     }
 
-    @Test
-    fun `the large screen reports the band between the two television bars`() {
+    /** The stage the real [DjAppTvChrome] reports, so the stack above cannot drift from it. */
+    private fun chromeStage(tv: Boolean): Rect {
         val stage = VizStage()
-        var topBar = Rect.Zero
-        var bottomBar = Rect.Zero
-
         render(1280, 720) {
-            Column(Modifier.fillMaxSize()) {
-                DjTvTopBar(
-                    vizFeature = VizViewModel.previewFeature(),
-                    pulsarFeature = PulsarViewModel.previewFeature(),
-                    onTogglePlayback = {},
-                    modifier = Modifier.onGloballyPositioned { topBar = it.boundsInRoot() },
-                )
-                Box(Modifier.weight(1f).fillMaxWidth()) {
+            DjAppTvChrome(
+                tvHardware = tv,
+                domeRingSize = BarRingSize,
+                barGlass = false,
+                vizHidesPanelsWhenIdle = false,
+                focusRegion = TvFocusRegionHolder(),
+                vizFeature = VizViewModel.previewFeature(),
+                pulsarFeature = PulsarViewModel.previewFeature(),
+                timerFeature = TimerViewModel.previewFeature(),
+                onTogglePlayback = {},
+                dockablePanels = largeScreenPanels(),
+                dockedPanels = listOf(PulsarTab, DjTab),
+                activeSheet = null,
+                tabs = djTabs,
+                onToggleDocked = {},
+                onActiveSheetChange = {},
+                stage = {
                     DjPanelDock(
                         panels = listOf(PulsarTab, DjTab),
                         modifier = Modifier.fillMaxSize().vizStage(stage),
                     ) { _, mod -> filler(mod) }
-                }
-                DjTvBottomBar(
-                    panels = bottomBarPanels(largeScreenPanels()),
-                    isDocked = { false },
-                    onToggle = {},
-                    timerFeature = TimerViewModel.previewFeature(),
-                    pulsarFeature = PulsarViewModel.previewFeature(),
-                    modifier = Modifier.onGloballyPositioned { bottomBar = it.boundsInRoot() },
-                )
-            }
+                },
+            )
         }
+        return assertNotNull(stage.bounds, "the chrome never reported a stage (tv=$tv)")
+    }
 
-        val bounds = assertNotNull(stage.bounds, "the large screen never reported a stage")
-        assertTrue(topBar.height > 0f && bottomBar.height > 0f, "a television bar measured nothing")
-        assertClose(topBar.bottom, bounds.top, "stage starts under the top bar")
-        assertClose(bottomBar.top, bounds.bottom, "stage ends above the bottom bar")
+    // The song band is a 36dp row under the top bar, on TV hardware too, and the stage starts under it.
+    @Test
+    fun `the large screen reports the stage between the song band and the bottom bar`() {
+        listOf(false, true).forEach { tv ->
+            val rows = dockRows(tv)
+            assertTrue(rows.topBar.height > 0f && rows.bottomBar.height > 0f, "a television bar measured nothing (tv=$tv)")
+            assertClose(rows.topBar.bottom, rows.band.top, "the band starts under the top bar (tv=$tv)")
+            assertClose(SongBandHeight.value, rows.band.height, "the band's height (tv=$tv)")
+            assertClose(rows.band.bottom, rows.stage.top, "the stage starts under the band (tv=$tv)")
+            assertClose(rows.bottomBar.top, rows.stage.bottom, "the stage ends above the bottom bar (tv=$tv)")
+            val chrome = chromeStage(tv)
+            assertClose(rows.stage.top, chrome.top, "the chrome's stage top (tv=$tv)")
+            assertClose(rows.stage.bottom, chrome.bottom, "the chrome's stage bottom (tv=$tv)")
+        }
     }
 
     /** Stands in for a real panel: the stage is about geometry, not about panel content. */

@@ -9,13 +9,21 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSimple
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -111,6 +119,21 @@ fun Modifier.orpheusChromeWash(
     .background(accent.copy(alpha = washAlpha), shape)
 
 /**
+ * [orpheusChromeWash] with its [accent] read in draw, for a surface whose accent can change every
+ * frame: the change redraws the wash instead of recomposing the surface.
+ */
+fun Modifier.orpheusChromeWash(
+    shape: Shape,
+    accent: () -> Color,
+    washAlpha: Float = PlateWashAlpha,
+): Modifier = this
+    .background(raisedPlateBase, shape)
+    .drawWithCache {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        onDrawBehind { drawOutline(outline, accent().copy(alpha = washAlpha)) }
+    }
+
+/**
  * [org.balch.orpheus.ui.widgets.AppTitleTreatment]'s own idle plate — [orpheusChromeWash] under a
  * lit [accent] bevel and a matching-tinted shadow — shared so every TV top/bottom-bar element
  * wears the same idle TREATMENT. Callers should source [accent] from the selected visualization's
@@ -141,7 +164,66 @@ fun Modifier.orpheusRaisedPlate(
         spotColor = accent,
     )
     .orpheusChromeWash(shape = shape, accent = accent)
-    .border(width = 1.5.dp, brush = raisedBevelBrush(accent), shape = shape)
+    .border(width = RaisedBevelWidth, brush = raisedBevelBrush(accent), shape = shape)
+
+/**
+ * [orpheusRaisedPlate] with its [accent] read in draw, for a surface whose accent can change every
+ * frame: the change updates the shadow's layer and redraws the wash and bevel instead of
+ * recomposing the surface. Draws what the Color overload draws.
+ */
+fun Modifier.orpheusRaisedPlate(
+    shape: Shape,
+    accent: () -> Color,
+    elevation: Dp = 6.dp,
+): Modifier = this
+    // What Modifier.shadow sets, with the colours read in the layer block.
+    .graphicsLayer {
+        shadowElevation = elevation.toPx()
+        this.shape = shape
+        clip = false
+        val tint = accent()
+        ambientShadowColor = tint
+        spotShadowColor = tint
+    }
+    .orpheusChromeWash(shape = shape, accent = accent)
+    .raisedBevel(shape = shape, accent = accent)
+
+private val RaisedBevelWidth = 1.5.dp
+
+/**
+ * The bevel as Modifier.border draws it: on a simple rounded rect, a stroke inset by half its width
+ * with the corners shrunk to match. Other outlines get a plain stroke. The brush is rebuilt only
+ * when the colour moves.
+ */
+private fun Modifier.raisedBevel(shape: Shape, accent: () -> Color): Modifier = drawWithCache {
+    val stroke = RaisedBevelWidth.toPx()
+    val half = stroke / 2
+    val style = Stroke(stroke)
+    val outline = shape.createOutline(size, layoutDirection, this)
+    var shown: Color? = null
+    var brush: Brush = SolidColor(Color.Transparent)
+    onDrawWithContent {
+        drawContent()
+        val tint = accent()
+        if (tint != shown) {
+            shown = tint
+            brush = raisedBevelBrush(tint)
+        }
+        val rounded = (outline as? Outline.Rounded)?.roundRect
+        if (rounded != null && rounded.isSimple) {
+            val corner = rounded.topLeftCornerRadius
+            drawRoundRect(
+                brush = brush,
+                topLeft = Offset(half, half),
+                size = Size(size.width - stroke, size.height - stroke),
+                cornerRadius = CornerRadius((corner.x - half).coerceAtLeast(0f), (corner.y - half).coerceAtLeast(0f)),
+                style = style,
+            )
+        } else {
+            drawOutline(outline, brush, style = style)
+        }
+    }
+}
 
 /**
  * "Raised on filled" chrome for a TV-focused control: an opaque bevel-gradient plate plus a
@@ -167,7 +249,7 @@ fun Modifier.raisedAccentSurface(
         ),
         shape,
     )
-    .border(width = 1.5.dp, brush = raisedBevelBrush(accent), shape = shape)
+    .border(width = RaisedBevelWidth, brush = raisedBevelBrush(accent), shape = shape)
 
 /**
  * Lit-[accent]-to-dark bevel border shared by [orpheusRaisedPlate] and [raisedAccentSurface].
@@ -267,6 +349,18 @@ fun Modifier.tvFocusRegionBorder(
     color: Color,
     shape: Shape,
     width: Dp = 2.dp,
+): Modifier = tvFocusRegionBorder(holder, token, { color }, shape, width)
+
+/**
+ * [tvFocusRegionBorder] with its colour read in draw too, for a container whose accent can change
+ * every frame: the change redraws the border instead of recomposing the container.
+ */
+fun Modifier.tvFocusRegionBorder(
+    holder: TvFocusRegionHolder?,
+    token: Any,
+    color: () -> Color,
+    shape: Shape,
+    width: Dp = 2.dp,
 ): Modifier {
     if (holder == null) return this
     return this.drawWithContent {
@@ -277,9 +371,10 @@ fun Modifier.tvFocusRegionBorder(
         if (holder.current === token) {
             val fade = holder.alpha.value
             if (fade > 0f) {
+                val tint = color()
                 drawOutline(
                     outline = shape.createOutline(size, layoutDirection, this),
-                    color = color.copy(alpha = color.alpha * fade),
+                    color = tint.copy(alpha = tint.alpha * fade),
                     style = Stroke(width.toPx()),
                 )
             }

@@ -15,6 +15,7 @@ import org.balch.djapp.DjAppGraphAndroid
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.playback.neighborVibe
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.timer.TimerWidgetCommand
@@ -37,21 +38,21 @@ private fun pulsarOf(graph: DjAppGraphAndroid): PulsarFeature =
         .getFeature(PulsarFeature::class)
 
 /**
- * The vibe name a skip will land on — same cycle rule as [PulsarSkipHandler].
+ * The vibe name a skip will land on, by [neighborVibe]. PREVIOUS restarts the current vibe
+ * instead of going back once far enough into the song ([PulsarFeature.vibeNavFlow]'s
+ * `previousRestarts`), which keeps the title unchanged.
  * Returns null when no list is available; returns the current name when the
- * cycle wraps back to it (single-vibe list), which lets the caller skip the
- * settle wait entirely instead of blocking the full timeout for a title that
+ * cycle wraps back to it (single-vibe list) or a restart is coming, which lets the caller
+ * skip the settle wait entirely instead of blocking the full timeout for a title that
  * will never change.
  */
 private fun expectedSkipTarget(pulsar: PulsarFeature, direction: SkipDirection): String? {
-    val names = pulsar.vibeNames
-    if (names.isEmpty()) return null
-    val idx = names.indexOf(pulsar.vibeFlow.value.name)
-    val next = when (direction) {
-        SkipDirection.NEXT -> (idx + 1).mod(names.size)
-        SkipDirection.PREVIOUS -> if (idx <= 0) names.size - 1 else idx - 1
+    val nav = pulsar.vibeNavFlow.value
+    return when {
+        direction == SkipDirection.NEXT -> neighborVibe(pulsar.vibeNames, pulsar.vibeFlow.value.name, 1)
+        nav.previousRestarts -> pulsar.vibeFlow.value.name
+        else -> neighborVibe(pulsar.vibeNames, pulsar.vibeFlow.value.name, -1)
     }
-    return names[next]
 }
 
 /**
