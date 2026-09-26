@@ -30,8 +30,8 @@ def phone(w, h):
 # slot: (dir, count, check(w, h) -> error or None)
 SLOTS = {
     "phone": (PLAY / "phone-screenshots", 8, phone),
-    "seven": (PLAY / "seven-inch-screenshots", 4, play_tablet),
-    "ten": (PLAY / "ten-inch-screenshots", 4, play_tablet),
+    "seven": (PLAY / "tablet-screenshots", 4, play_tablet),
+    "ten": (PLAY / "large-tablet-screenshots", 4, play_tablet),
     "tv": (PLAY / "tv-screenshots", 4, exact(3840, 2160)),
     "feature": (PLAY / "feature-graphic", 1, exact(1024, 500)),
     "iphone": (ASC / "iphone-69", 5, exact(1320, 2868)),

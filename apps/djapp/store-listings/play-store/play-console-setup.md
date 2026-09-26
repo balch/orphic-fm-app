@@ -135,7 +135,7 @@ relative to that directory:
 | App icon | `listings/en-US/graphics/icon/` | 512×512 |
 | Feature graphic | `listings/en-US/graphics/feature-graphic/` | 1024×500 |
 | Phone screenshots | `listings/en-US/graphics/phone-screenshots/` | min 2 |
-| Tablet / TV screenshots | `graphics/{seven-inch,ten-inch,tv}-*/` | optional |
+| Tablet / TV screenshots | `graphics/{tablet,large-tablet,tv}-screenshots/` (GPP's names; any other dir is silently skipped) | optional |
 | Video | _(skip)_ | optional |
 
 **After the first time, don't paste at all.** `publishListing` / `publishOgApps` upload all of the
