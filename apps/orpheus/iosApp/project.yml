@@ -15,6 +15,9 @@ targets:
       - path: OrpheusApp
         excludes:
           - Info.plist
+      # HandTrackingBridge loads this from the bundle; same file desktop ships.
+      - path: ../../../core/mediapipe/src/jvmMain/resources/models/hand_landmarker.task
+        buildPhase: resources
     info:
       path: OrpheusApp/Info.plist
       properties:
