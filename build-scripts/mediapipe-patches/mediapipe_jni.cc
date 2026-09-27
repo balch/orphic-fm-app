@@ -35,9 +35,9 @@ static jmethodID g_hl_onResult = nullptr;
 static jobject g_gr_callback = nullptr;
 static jmethodID g_gr_onResult = nullptr;  /* onResult(float[], String[], long) */
 
-/* Helper: pack a GestureRecognizerResult into the JNI float array format and
+/* Helper: pack a MpGestureRecognizerResult into the JNI float array format and
  * call the Java callback.  Used by the VIDEO-mode synchronous path. */
-static void gr_deliver_result(JNIEnv* env, const GestureRecognizerResult* result,
+static void gr_deliver_result(JNIEnv* env, const MpGestureRecognizerResult* result,
                               int64_t timestamp_ms);
 
 static void throw_exception(JNIEnv* env, const char* msg) {
@@ -70,7 +70,7 @@ static JNIEnv* attach_jvm(int* needs_detach) {
  * Hand Landmarker
  * ======================================================================== */
 
-static void hl_on_result(MpStatus status, const HandLandmarkerResult* result,
+static void hl_on_result(MpStatus status, const MpHandLandmarkerResult* result,
                          MpImagePtr image, int64_t timestamp_ms) {
     if (g_jvm == nullptr || g_hl_callback == nullptr) return;
 
@@ -106,7 +106,7 @@ static void hl_on_result(MpStatus status, const HandLandmarkerResult* result,
                 }
                 buf[base] = handednessValue;
 
-                struct NormalizedLandmarks* lms = &result->hand_landmarks[h];
+                struct MpNormalizedLandmarks* lms = &result->hand_landmarks[h];
                 for (unsigned int i = 0; i < lms->landmarks_count && i < 21; i++) {
                     buf[base + 1 + i * 3]     = lms->landmarks[i].x;
                     buf[base + 1 + i * 3 + 1] = lms->landmarks[i].y;
@@ -142,7 +142,7 @@ static void hl_on_result(MpStatus status, const HandLandmarkerResult* result,
  *
  * Gesture names are passed as a separate String[] (one per hand), read
  * directly from category_name each frame. No name-table indirection. */
-static void gr_deliver_result(JNIEnv* env, const GestureRecognizerResult* result,
+static void gr_deliver_result(JNIEnv* env, const MpGestureRecognizerResult* result,
                               int64_t timestamp_ms) {
     jfloatArray jResult = nullptr;
     jobjectArray jNames = nullptr;
@@ -199,7 +199,7 @@ static void gr_deliver_result(JNIEnv* env, const GestureRecognizerResult* result
                     }
                 }
 
-                struct NormalizedLandmarks* lms = &result->hand_landmarks[h];
+                struct MpNormalizedLandmarks* lms = &result->hand_landmarks[h];
                 for (unsigned int i = 0; i < lms->landmarks_count && i < 21; i++) {
                     buf[base + 2 + i * 3]     = lms->landmarks[i].x;
                     buf[base + 2 + i * 3 + 1] = lms->landmarks[i].y;
@@ -256,10 +256,10 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeCreateLandmarker(
 
     const char* model = env->GetStringUTFChars(modelPath, nullptr);
 
-    struct HandLandmarkerOptions options;
+    struct MpHandLandmarkerOptions options;
     memset(&options, 0, sizeof(options));
     options.base_options.model_asset_path = model;
-    options.running_mode = LIVE_STREAM;
+    options.running_mode = MP_RUNNING_MODE_LIVE_STREAM;
     options.num_hands = 2;
     options.min_hand_detection_confidence = 0.5f;
     options.min_hand_presence_confidence = 0.5f;
@@ -360,7 +360,7 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeCreateGestureRecognizer
 
     const char* model = env->GetStringUTFChars(modelPath, nullptr);
 
-    struct GestureRecognizerOptions options;
+    struct MpGestureRecognizerOptions options;
     memset(&options, 0, sizeof(options));
     options.base_options.model_asset_path = model;
     // Use VIDEO mode (synchronous) instead of LIVE_STREAM (async) to avoid
@@ -368,7 +368,7 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeCreateGestureRecognizer
     // The GestureRecognizer graph uses LandmarksToMatrixCalculator which
     // creates intermediate Matrix packets that get double-freed in the async
     // callback flow. VIDEO mode processes synchronously, sidestepping this.
-    options.running_mode = VIDEO;
+    options.running_mode = MP_RUNNING_MODE_VIDEO;
     options.num_hands = (int)numHands;
     options.min_hand_detection_confidence = 0.5f;
     options.min_hand_presence_confidence = 0.5f;
@@ -421,7 +421,7 @@ Java_org_balch_orpheus_core_mediapipe_MediaPipeJni_nativeRecognizeGestureForVide
     }
 
     // Synchronous recognition — blocks until result is available.
-    GestureRecognizerResult result;
+    MpGestureRecognizerResult result;
     memset(&result, 0, sizeof(result));
     status = MpGestureRecognizerRecognizeForVideo(recognizer, image, nullptr,
                                                    timestampMs, &result, &error_msg);

@@ -8,7 +8,7 @@
 # ── What it does ──────────────────────────────────────────────────────
 #
 #   1. (--setup) Patches a clean MediaPipe checkout with Orpheus-specific
-#      changes: OpenCV 4 static linking, Apple Silicon Homebrew paths,
+#      changes: OpenCV 5 static linking, Apple Silicon Homebrew paths,
 #      the combined JNI bridge Bazel target, and symbol-hiding linker flags.
 #
 #   2. Builds libmediapipe_jni.dylib via Bazel — a self-contained shared
@@ -58,9 +58,11 @@
 #   build-scripts/mediapipe-patches/mediapipe.patch
 #       Diffs applied to the MediaPipe repo:
 #       - .bazelrc: zlib fdopen conflict fix for macOS
-#       - WORKSPACE: Homebrew path for Apple Silicon (/opt/homebrew/Cellar)
-#       - third_party/opencv_macos.BUILD: OpenCV 4.13 static libs + TBB
-#         + macOS framework linkopts (was OpenCV 3 dynamic)
+#       - WORKSPACE: Homebrew's unversioned links (/opt/homebrew/opt)
+#       - third_party/opencv_macos.BUILD: OpenCV 5 static core/imgproc (plus
+#         the flann and geometry modules imgproc needs) + TBB
+#       - mediapipe/framework/port/opencv_imgproc_inc.h: includes
+#         opencv2/geometry.hpp on OpenCV 5 (boxPoints, getPerspectiveTransform)
 #       - mediapipe/tasks/c/vision/hand_landmarker/BUILD: adds the
 #         combined libmediapipe_jni.dylib cc_binary target with
 #         exported_symbols_list for symbol hiding
@@ -82,14 +84,16 @@
 # ── Output ────────────────────────────────────────────────────────────
 #
 #   core/mediapipe/src/jvmMain/resources/native/darwin-aarch64/
-#       libmediapipe_jni.dylib  (~14MB, 7 exported symbols)
+#       libmediapipe_jni.dylib  (~15MB, 7 exported symbols)
 #
 # ── Prerequisites ─────────────────────────────────────────────────────
 #
-#   brew install opencv tbb bazelisk
+#   brew install opencv tbb bazelisk      (OpenCV 5.x)
+#   Xcode Command Line Tools (the build compiles against their SDK)
 #   JDK 17+ with JAVA_HOME set (for JNI headers)
 #   Python 3.12 (for Bazel hermetic python)
 #   MediaPipe source: git clone https://github.com/google-ai-edge/mediapipe.git
+#                     git -C mediapipe checkout v1.0.0
 #
 # ── Usage ─────────────────────────────────────────────────────────────
 #
@@ -104,7 +108,9 @@
 #
 # ── MediaPipe base commit ─────────────────────────────────────────────
 #
-#   Patch tested against: ee89477cd (2025-02)
+#   Patch tested against: v1.0.0 (6d31f1ebc, 2026-07-22)
+#   1.0 prefixed the C API types with `Mp`; mediapipe_jni.cc will not
+#   compile against a 0.10.x checkout.
 #   Repo: https://github.com/google-ai-edge/mediapipe.git
 #
 # ──────────────────────────────────────────────────────────────────────
@@ -136,7 +142,7 @@ do_setup() {
         exit 1
     fi
 
-    # Apply patch (OpenCV 4 static, Homebrew paths, BUILD target, .bazelrc zlib fix)
+    # Apply patch (OpenCV 5 static, Homebrew paths, BUILD target, .bazelrc zlib fix)
     echo "    Applying mediapipe.patch..."
     cd "$MEDIAPIPE_DIR"
     git apply "$PATCHES_DIR/mediapipe.patch"
@@ -171,9 +177,22 @@ do_build() {
     echo "==> Building combined MediaPipe JNI dylib in $MEDIAPIPE_DIR"
 
     cd "$MEDIAPIPE_DIR"
+
+    # Compile against the Command Line Tools SDK. Xcode 27's clang lists SDKSettings.json as
+    # a dependency, and rules_cc only whitelists that file for the CLT SDK root, not Xcode's.
+    # Bazel scrubs action environments, so forward DEVELOPER_DIR to target AND exec builds.
+    export DEVELOPER_DIR=/Library/Developer/CommandLineTools
+
+    # layering_check is off because the SDK's libc++ module.modulemap claims headers like
+    # <cstddef> that rules_cc's generated crosstool module also lists. It is a lint only.
     bazelisk build --config darwin_arm64 -c opt --strip always \
         --define MEDIAPIPE_DISABLE_GPU=1 \
         --repo_env=HERMETIC_PYTHON_VERSION=3.12 \
+        --repo_env=DEVELOPER_DIR \
+        --action_env=DEVELOPER_DIR \
+        --host_action_env=DEVELOPER_DIR \
+        --features=-layering_check \
+        --host_features=-layering_check \
         --copt=-DEIGEN_MAX_ALIGN_BYTES=16 \
         //mediapipe/tasks/c/vision/hand_landmarker:libmediapipe_jni.dylib
 

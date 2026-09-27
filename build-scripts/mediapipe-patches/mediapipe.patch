@@ -1,5 +1,5 @@
 diff --git a/.bazelrc b/.bazelrc
-index 5965f963f..7070fa106 100644
+index 99a0afdea..297e89643 100644
 --- a/.bazelrc
 +++ b/.bazelrc
 @@ -121,6 +121,10 @@ build:darwin_x86_64 --cpu=darwin_x86_64
@@ -21,18 +21,33 @@ index 5965f963f..7070fa106 100644
 +build --per_file_copt=external/zlib/.*@-UTARGET_OS_MAC
 +build --host_per_file_copt=external/zlib/.*@-UTARGET_OS_MAC
 diff --git a/WORKSPACE b/WORKSPACE
-index 01ac6fb43..72610a34a 100644
+index c353b11b3..0f640bbcf 100644
 --- a/WORKSPACE
 +++ b/WORKSPACE
-@@ -631,7 +631,7 @@ new_local_repository(
+@@ -495,7 +495,7 @@ new_local_repository(
      # For local MacOS builds, the path should point to an opencv@3 installation.
      # If you edit the path here, you will also need to update the corresponding
      # prefix in "opencv_macos.BUILD".
 -    path = "/usr/local",  # e.g. /usr/local/Cellar for HomeBrew
-+    path = "/opt/homebrew/Cellar",  # Homebrew on Apple Silicon
++    path = "/opt/homebrew/opt",  # Homebrew on Apple Silicon (unversioned links)
  )
  
  new_local_repository(
+diff --git a/mediapipe/framework/port/opencv_imgproc_inc.h b/mediapipe/framework/port/opencv_imgproc_inc.h
+index d59c9dc39..f24c176b1 100644
+--- a/mediapipe/framework/port/opencv_imgproc_inc.h
++++ b/mediapipe/framework/port/opencv_imgproc_inc.h
+@@ -26,6 +26,10 @@
+ #if CV_VERSION_MAJOR == 4
+ #include <opencv2/imgproc/types_c.h>
+ #endif
++// OpenCV 5 moved boxPoints, getPerspectiveTransform, etc. to the geometry module.
++#if CV_VERSION_MAJOR >= 5
++#include <opencv2/geometry.hpp>
++#endif
+ #endif
+ 
+ #endif  // MEDIAPIPE_PORT_OPENCV_IMGPROC_INC_H_
 diff --git a/mediapipe/tasks/c/vision/hand_landmarker/BUILD b/mediapipe/tasks/c/vision/hand_landmarker/BUILD
 index 5060d8978..900aa539c 100644
 --- a/mediapipe/tasks/c/vision/hand_landmarker/BUILD
@@ -144,10 +159,10 @@ index 1f7b732cc..12a6631c8 100644
  }
  
 diff --git a/third_party/opencv_macos.BUILD b/third_party/opencv_macos.BUILD
-index 4139f188e..aa0d6a288 100644
+index 4139f188e..35285bcce 100644
 --- a/third_party/opencv_macos.BUILD
 +++ b/third_party/opencv_macos.BUILD
-@@ -7,52 +7,52 @@ licenses(["notice"])  # BSD license
+@@ -7,52 +7,40 @@ licenses(["notice"])  # BSD license
  
  exports_files(["LICENSE"])
  
@@ -180,9 +195,12 @@ index 4139f188e..aa0d6a288 100644
 -# "include/opencv4".
 -
 -PREFIX = "opt/opencv@3"
-+PREFIX = "opencv/4.13.0_3"
-+TBB_PREFIX = "tbb/2022.3.0"
++# Homebrew's unversioned opt/ links, so a brew upgrade does not strand a Cellar path.
++PREFIX = "opencv"
++TBB_PREFIX = "tbb"
  
++# HandLandmarker and GestureRecognizer only reach port:opencv_core and port:opencv_imgproc.
++# In OpenCV 5, imgproc also links flann and geometry.
  cc_library(
      name = "opencv",
      srcs = glob(
@@ -195,19 +213,10 @@ index 4139f188e..aa0d6a288 100644
 -            paths.join(PREFIX, "lib/libopencv_imgproc.dylib"),
 -            paths.join(PREFIX, "lib/libopencv_video.dylib"),
 -            paths.join(PREFIX, "lib/libopencv_videoio.dylib"),
-+            paths.join(PREFIX, "lib/libopencv_core.a"),
-+            paths.join(PREFIX, "lib/libopencv_calib3d.a"),
-+            paths.join(PREFIX, "lib/libopencv_features2d.a"),
-+            paths.join(PREFIX, "lib/libopencv_highgui.a"),
-+            paths.join(PREFIX, "lib/libopencv_imgcodecs.a"),
 +            paths.join(PREFIX, "lib/libopencv_imgproc.a"),
-+            paths.join(PREFIX, "lib/libopencv_video.a"),
-+            paths.join(PREFIX, "lib/libopencv_videoio.a"),
-+            # Additional static deps needed by OpenCV static libs
++            paths.join(PREFIX, "lib/libopencv_geometry.a"),
 +            paths.join(PREFIX, "lib/libopencv_flann.a"),
-+            paths.join(PREFIX, "lib/libopencv_dnn.a"),
-+            paths.join(PREFIX, "lib/libopencv_objdetect.a"),
-+            paths.join(PREFIX, "lib/libade.a"),
++            paths.join(PREFIX, "lib/libopencv_core.a"),
 +            # ARM NEON HAL acceleration
 +            paths.join(PREFIX, "lib/libkleidicv.a"),
 +            paths.join(PREFIX, "lib/libkleidicv_hal.a"),
@@ -218,21 +227,15 @@ index 4139f188e..aa0d6a288 100644
 +            # TBB (Threading Building Blocks) — used by OpenCV parallel backends
 +            paths.join(TBB_PREFIX, "lib/libtbb.a"),
          ],
++        allow_empty = False,
      ),
 -    hdrs = glob([paths.join(PREFIX, "include/opencv2/**/*.h*")]),
 -    includes = [paths.join(PREFIX, "include/")],
-+    hdrs = glob([paths.join(PREFIX, "include/opencv4/opencv2/**/*.h*")]),
-+    includes = [paths.join(PREFIX, "include/opencv4/")],
++    hdrs = glob([paths.join(PREFIX, "include/opencv5/opencv2/**/*.h*")]),
++    includes = [paths.join(PREFIX, "include/opencv5/")],
 +    linkopts = [
-+        "-framework", "AVFoundation",
-+        "-framework", "CoreMedia",
-+        "-framework", "CoreVideo",
-+        "-framework", "QuartzCore",
-+        "-framework", "AppKit",
 +        "-framework", "OpenCL",
 +        "-framework", "Accelerate",
-+        "-framework", "CoreGraphics",
-+        "-framework", "CoreImage",
 +        "-lz",
 +        "-lc++",
 +    ],
