@@ -21,6 +21,8 @@ kotlin {
         target.binaries.framework {
             baseName = "OrpheusShared"
             isStatic = true
+            // AppDelegate's hand-tracking bridge feeds IosHandTracker directly.
+            export(project(":core:mediapipe"))
         }
     }
 

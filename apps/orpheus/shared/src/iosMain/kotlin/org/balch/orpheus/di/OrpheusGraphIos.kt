@@ -2,6 +2,7 @@ package org.balch.orpheus.di
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
+import org.balch.orpheus.core.mediapipe.HandTracker
 
 /**
  * iOS concrete graph. Declared in iosMain so Metro can see the iosMain contributions
@@ -11,6 +12,9 @@ import dev.zacsweers.metro.DependencyGraph
  */
 @DependencyGraph(AppScope::class)
 interface OrpheusGraphIos : OrpheusGraph {
+
+    /** The `@SingleIn` tracker the Compose UI observes; Swift's camera bridge pushes into it. */
+    val handTracker: HandTracker
 
     @DependencyGraph.Factory
     fun interface Factory {

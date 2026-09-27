@@ -1,11 +1,20 @@
 package org.balch.orpheus.core.mediapipe
 
+import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.plus
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import platform.Foundation.NSData
+import platform.posix.memcpy
 
 /**
  * iOS [HandTracker]. Kotlin does not drive the camera here -- **Swift pushes into this**.
@@ -92,5 +101,25 @@ class IosHandTracker : HandTracker {
     /** BGRA_8888, matching [CameraFrame]. Swift mirrors at the capture connection, as Android does. */
     fun pushFrame(pixels: ByteArray, width: Int, height: Int) {
         _cameraFrame.value = CameraFrame(pixels = pixels, width = width, height = height)
+    }
+
+    /**
+     * [pushFrame] for a locked `CVPixelBuffer`'s base address. Swift can only fill a Kotlin
+     * `ByteArray` one element per call, so this copies here, dropping the row padding
+     * (`bytesPerRow` > `width * 4`) that CoreVideo adds. [data] need only live for this call.
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    fun pushFrameData(data: NSData, width: Int, height: Int, bytesPerRow: Int) {
+        val rowBytes = width * 4
+        if (width <= 0 || height <= 0 || bytesPerRow < rowBytes) return
+        if (data.length < bytesPerRow.toULong() * height.toULong()) return
+        val src = data.bytes?.reinterpret<ByteVar>() ?: return
+        val pixels = ByteArray(rowBytes * height)
+        pixels.usePinned { pin ->
+            for (y in 0 until height) {
+                memcpy(pin.addressOf(y * rowBytes), src + y.toLong() * bytesPerRow, rowBytes.convert())
+            }
+        }
+        pushFrame(pixels, width, height)
     }
 }
