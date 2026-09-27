@@ -26,6 +26,7 @@ class StartupRootGuardTest {
             "AndroidAppLifecycleManager",
             "DjAppLifecycleManager",
             "InAppReviewManager",
+            "IosAppLifecycle",
         )
 
         /**
