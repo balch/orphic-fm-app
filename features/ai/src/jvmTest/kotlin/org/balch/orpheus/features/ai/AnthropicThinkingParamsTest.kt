@@ -5,9 +5,7 @@ import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.executor.clients.anthropic.models.AnthropicThinking
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.balch.orpheus.core.ai.Opus4_8
-import org.balch.orpheus.core.ai.Opus5
-import org.balch.orpheus.core.ai.Sonnet5
+import org.balch.orpheus.core.ai.Opus5_5
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -18,7 +16,7 @@ class AnthropicThinkingParamsTest {
 
     @Test
     fun adaptiveModelsSendRawAdaptiveThinkingWithSummarizedDisplay() {
-        for (model in listOf(Opus5, Opus4_8, Sonnet5, AnthropicModels.Fable_5)) {
+        for (model in listOf(Opus5_5, AnthropicModels.Opus_5, AnthropicModels.Opus_4_8, AnthropicModels.Sonnet_5, AnthropicModels.Fable_5)) {
             val params = anthropicThinkingParams(model)
             assertNull(params.thinking, "typed thinking must stay null for ${model.id}")
             val thinking = params.additionalProperties?.get("thinking")?.jsonObject
@@ -36,7 +34,7 @@ class AnthropicThinkingParamsTest {
 
     @Test
     fun heavyTiersRequestMediumEffort() {
-        for (model in listOf(Opus5, AnthropicModels.Fable_5)) {
+        for (model in listOf(Opus5_5, AnthropicModels.Opus_5, AnthropicModels.Fable_5)) {
             val effort = anthropicThinkingParams(model)
                 .additionalProperties?.get("output_config")?.jsonObject
                 ?.get("effort")?.jsonPrimitive?.content
@@ -48,7 +46,7 @@ class AnthropicThinkingParamsTest {
     fun sonnetKeepsTheApiDefaultEffort() {
         // Sonnet is already the quick tier; dialling it down buys latency we don't need
         // and costs reasoning we do. Absent field == API default of "high".
-        assertNull(anthropicThinkingParams(Sonnet5).additionalProperties?.get("output_config"))
+        assertNull(anthropicThinkingParams(AnthropicModels.Sonnet_5).additionalProperties?.get("output_config"))
     }
 
     @Test

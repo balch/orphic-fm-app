@@ -395,6 +395,9 @@ class OrpheusAgentConfig(
         // client captures signatures and appends history correctly; reasoning still reaches
         // the feeds per turn via tapReasoning. Google keeps the live streaming path.
         streamResponses: Boolean = true,
+        // Off for models that bind thinking to an unedited history (Opus 5.5): Koog's
+        // compression replays the trailing tool call's thinking after a rewritten prefix.
+        compressHistory: Boolean = true,
     ) = strategy(name = name) {
         // Per-turn tool-round counter. Graph nodes run sequentially in one coroutine, so a plain var
         // is race-free here (parallel=true only fans out tools WITHIN a single nodeExecuteTool). It
@@ -461,14 +464,14 @@ class OrpheusAgentConfig(
 
         edge(
             (nodeExecuteTool forwardTo nodeCompressHistory)
-                    onCondition { _ -> llm.readSession { prompt.messages.size > 100 } }
+                    onCondition { _ -> compressHistory && llm.readSession { prompt.messages.size > 100 } }
         )
 
         edge(nodeCompressHistory forwardTo nodeSendToolResult)
 
         edge(
             (nodeExecuteTool forwardTo nodeSendToolResult)
-                    onCondition { _ -> llm.readSession { prompt.messages.size <= 100 } }
+                    onCondition { _ -> !compressHistory || llm.readSession { prompt.messages.size <= 100 } }
         )
 
         edge(

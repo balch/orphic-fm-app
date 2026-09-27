@@ -56,6 +56,7 @@ import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.anthropicEffort
 import org.balch.orpheus.core.ai.anthropicModelVersionsMap
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
+import org.balch.orpheus.core.ai.requiresAppendOnlyHistory
 import org.balch.orpheus.core.ai.usesAdaptiveThinking
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
@@ -82,7 +83,7 @@ private const val ANTHROPIC_MAX_TOKENS = 16_000
  * Anthropic thinking config, shaped per model generation.
  *
  * Models flagged [usesAdaptiveThinking] reject `thinking: {type: "enabled",
- * budget_tokens}` with a 400 (Opus 4.7+ / Opus 5 / Sonnet 5 / Fable 5). Koog 1.2.0 has
+ * budget_tokens}` with a 400 (Opus 4.7+ / Opus 5 / Opus 5.5 / Sonnet 5 / Fable 5). Koog 1.3.0 has
  * no adaptive variant of [AnthropicThinking], so the raw object rides
  * additionalProperties, which Koog's AnthropicMessageRequestSerializer flattens into
  * the request body. `display: "summarized"` matters: these models default to omitted
@@ -376,6 +377,7 @@ class OrpheusAgent(
             // See agentStrategy: Anthropic needs the batched nodes (signed thinking replay
             // + correct history); Google keeps live streaming.
             streamResponses = aiModelProvider.selectedModel.value.aiProvider != AiProvider.Anthropic,
+            compressHistory = !config.model.requiresAppendOnlyHistory,
         )
 
         createAgent(strategy, apiKey) {
@@ -456,8 +458,8 @@ class OrpheusAgent(
         val httpFactory = KtorKoogHttpClient.Factory()
         val llmClient: LLMClient = when (aiProvider) {
             AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
-            // The extended versions map is REQUIRED: Koog 1.0.0's serializer throws
-            // "Unsupported model" for any LLModel absent from it (all post-4.7 models).
+            // The extended versions map is REQUIRED: Koog's serializer throws
+            // "Unsupported model" for any LLModel absent from it (Opus 5.5 on Koog 1.3.0).
             AiProvider.Anthropic -> AnthropicLLMClient(
                 apiKey,
                 settings = AnthropicClientSettings(modelVersionsMap = anthropicModelVersionsMap),
