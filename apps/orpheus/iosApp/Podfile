@@ -2,5 +2,5 @@ platform :ios, '16.0'
 
 target 'OrpheusApp' do
   use_frameworks!
-  pod 'MediaPipeTasksVision', '~> 0.10'
+  pod 'MediaPipeTasksVision', '~> 1.0'
 end
