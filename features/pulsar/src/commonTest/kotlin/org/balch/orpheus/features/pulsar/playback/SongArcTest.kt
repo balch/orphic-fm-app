@@ -43,8 +43,8 @@ class SongArcTest {
     }
 
     @Test
-    fun aLockedEndBendsFromWhereTheSlowdownStoodToLandOnTheEnd() {
-        for ((lock, end) in listOf(80_000L to 90_000L, 100_000L to 150_000L, 100_000L to 400_000L)) {
+    fun aLockedEndLeavesTheSlowdownWhereItStoodAndLandsOnTheEnd() {
+        for ((lock, end) in listOf(76_000L to 90_000L, 80_000L to 84_000L, 100_000L to 150_000L, 100_000L to 400_000L)) {
             fun arc(ms: Float) = songArc(ms, end, final = true, estimateMs = estimate, lockedAtMs = lock)
             assertEquals(slowedFraction(lock.toFloat() / estimate), arc(lock.toFloat()), 1e-5f, "lock $lock end $end")
             assertEquals(1f, arc(end.toFloat()), 1e-5f, "lock $lock end $end")
@@ -53,13 +53,35 @@ class SongArcTest {
         }
     }
 
-    // No kink: the pace just after the lock is the pace just before it, where it can keep up.
+    // No kink: the pace just after the lock is the pace just before it, even while it catches up.
     @Test
     fun theLockKeepsTheSlowdownsPace() {
-        val before = slowedFraction(100_000f / estimate) - slowedFraction(99_000f / estimate)
-        val after = songArc(101_000f, 150_000L, final = true, estimateMs = estimate, lockedAtMs = 100_000L) -
-            songArc(100_000f, 150_000L, final = true, estimateMs = estimate, lockedAtMs = 100_000L)
-        assertEquals(1f, after / before, 0.05f)
+        fun arc(ms: Float) = songArc(ms, 90_000L, final = true, estimateMs = estimate, lockedAtMs = 76_000L)
+        val before = slowedFraction(76_000f / estimate) - slowedFraction(75_980f / estimate)
+        assertEquals(1f, (arc(76_020f) - arc(76_000f)) / before, 0.05f)
+    }
+
+    // An end sooner than the slowdown allowed for: the arc closes on the song within CatchUpMs, then is the song's share.
+    @Test
+    fun anEarlyEndCatchesUpToTheSongThenRidesIt() {
+        fun arc(ms: Long) = songArc(ms.toFloat(), 90_000L, final = true, estimateMs = estimate, lockedAtMs = 76_000L)
+        assertTrue(arc(76_000L) < 76_000f / 90_000f - 0.05f, "no gap to close at the lock")
+        for (ms in (76_000L + CatchUpMs.toLong())..90_000L step 250L) assertEquals(ms / 90_000f, arc(ms), 1e-6f, "at $ms")
+    }
+
+    // A short last section: it has joined the song by halfway through, never in a rush at the end.
+    @Test
+    fun aShortLastSectionRidesTheSongForItsSecondHalf() {
+        fun arc(ms: Long) = songArc(ms.toFloat(), 84_000L, final = true, estimateMs = estimate, lockedAtMs = 80_000L)
+        for (ms in 82_000L..84_000L step 100L) assertEquals(ms / 84_000f, arc(ms), 1e-6f, "at $ms")
+    }
+
+    // An end later than the slowdown allowed for: the slowdown runs on until the song's share catches it, then that share.
+    @Test
+    fun aLateEndKeepsTheSlowdownUntilTheSongCatchesUp() {
+        fun arc(ms: Long) = songArc(ms.toFloat(), 150_000L, final = true, estimateMs = estimate, lockedAtMs = 100_000L)
+        assertEquals(slowedFraction(1.2f), arc(120_000L))
+        assertEquals(140_000f / 150_000f, arc(140_000L), 1e-6f)
     }
 
     // A display a little behind the tracker's lock still draws the slowdown there, never the bend run backwards.

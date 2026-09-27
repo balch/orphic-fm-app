@@ -41,31 +41,27 @@ fun slowedFraction(x: Float): Float {
     return SlowFrom + SlowRoom * (1f - exp(-(x - SlowFrom) / SlowRoom))
 }
 
-/** [slowedFraction]'s slope at [x]: how fast the arc moves against the song there. */
-private fun slowedSlope(x: Float): Float = if (x <= SlowFrom) 1f else exp(-(x - SlowFrom) / SlowRoom)
+/** Once the end locks in, the arc closes on the song's real share within this much song time. */
+const val CatchUpMs = 6_000f
 
 /**
  * How much of the progress arc to draw at [positionMs], the same on every surface. Until [final] it
  * is [slowedFraction] over the song's [estimateMs], whatever length the tracker reports. Once the
- * end locks in at [lockedAtMs], the arc left runs over the song left from where the slowdown stood
- * and at its pace, bending to land on [durationMs] as the song does: it eases in when the end came
- * sooner than the slowdown allowed for, and off when it came later. A final length with no lock (an
- * end known from the start) is the song's own share.
+ * end locks in at [lockedAtMs] it eases off the slowdown onto the song's real share within
+ * [CatchUpMs] (at most half the song left), then rides that share to the end; a song still behind
+ * the slowdown keeps it until it catches up. A final length with no lock (an end known from the
+ * start) is the song's own share.
  */
 fun songArc(positionMs: Float, durationMs: Long, final: Boolean, estimateMs: Long, lockedAtMs: Long?): Float {
     if (!final) return slowedFraction(positionMs / estimateMs)
-    if (lockedAtMs == null) return (positionMs / durationMs).coerceIn(0f, 1f)
-    val lock = lockedAtMs.toFloat()
+    val real = (positionMs / durationMs).coerceIn(0f, 1f)
+    if (lockedAtMs == null) return real
+    val slowed = slowedFraction(positionMs / estimateMs)
     // Behind the lock (a display a moment behind the tracker) it is still the slowdown.
-    if (positionMs < lock) return slowedFraction(positionMs / estimateMs)
-    val left = durationMs - lock
-    if (left <= 0f) return 1f
-    val lockFraction = slowedFraction(lock / estimateMs)
-    // The old pace, capped at twice the average so a long end eases off to a stop and never backs up.
-    val rate = min(slowedSlope(lock / estimateMs) / estimateMs, 2f * (1f - lockFraction) / left)
-    // The quadratic from that pace that covers the arc left in the song left.
-    val bend = ((1f - lockFraction) - rate * left) / (left * left)
-    // Written from the end, so the last frames round toward 1 and never back off it.
-    val s = durationMs - positionMs
-    return (1f - s * (rate + 2f * bend * left - bend * s)).coerceIn(0f, 1f)
+    if (positionMs < lockedAtMs || real <= slowed) return slowed
+    val left = durationMs - lockedAtMs
+    if (left <= 0L) return 1f
+    val t = ((positionMs - lockedAtMs) / min(CatchUpMs, left / 2f)).coerceAtMost(1f)
+    // Smoothstep: leaves the slowdown at its pace and joins the song at its pace, no kink at either end.
+    return slowed + t * t * (3f - 2f * t) * (real - slowed)
 }

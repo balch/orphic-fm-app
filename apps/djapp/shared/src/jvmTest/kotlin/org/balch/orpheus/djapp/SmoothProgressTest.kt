@@ -157,8 +157,8 @@ class SmoothProgressTest {
         assertEquals(seen, mounted, 1e-4f)
     }
 
-    // The real end is later than the estimate: the arc left (from AtEstimate) runs on at its old pace
-    // and bends to land on the end. Whether it eases in or off depends on the tuning, so neither is pinned.
+    // The real end is later than the estimate: the slowdown runs on from AtEstimate until the song's
+    // share catches it, then rides that share to the end.
     @Test
     fun aLateEndLocksInWithoutAJumpAndLandsOnTheEnd() {
         val updates = (0L..150_000L step 2_000L).map { ms ->
@@ -172,7 +172,7 @@ class SmoothProgressTest {
         assertEquals(1f, frames.moved(100_000L, 100_096L) / frames.moved(99_904L, 100_000L), 0.05f)
     }
 
-    // An end far past the estimate: the arc starts no faster than it can keep up, and slows to the end.
+    // An end far past the estimate: the arc holds to the slowdown until the song passes it.
     @Test
     fun aVeryLateEndEasesOffWithoutBackingUp() {
         val updates = (0L..400_000L step 2_000L).map { ms ->
@@ -183,9 +183,9 @@ class SmoothProgressTest {
         assertEquals(1f, frames.last().second, 0.001f)
     }
 
-    // The real end comes sooner than the arc shows: it eases in from its old pace to land on the end with the song.
+    // The real end comes sooner than the arc shows: it catches up to the song, then keeps the song's pace to the end.
     @Test
-    fun anEarlyEndEasesInAndLandsOnTheEnd() {
+    fun anEarlyEndCatchesUpAndRidesTheSongToTheEnd() {
         val updates = (0L..90_000L step 2_000L).map { ms ->
             ms to if (ms < 80_000L) at(ms, durationMs = 100_000L, final = false) else at(ms, 90_000L, estimateMs = 100_000L, lockedAtMs = 80_000L)
         }
@@ -194,12 +194,9 @@ class SmoothProgressTest {
         assertTrue(frames.at(80_000L) < 0.8f)
         assertEquals(1f, frames.last().second, 0.001f)
         // No kink: the pace just after the lock is the pace just before it.
-        val before = frames.moved(79_904L, 80_000L)
-        val after = frames.moved(80_000L, 80_096L)
-        assertEquals(1f, after / before, 0.05f)
-        // Then it gathers pace, second by second, all the way to the end.
-        val paces = (80_000L until 90_000L step 1_000L).map { frames.moved(it, it + 1_000L) }
-        paces.zipWithNext().forEach { (a, b) -> assertTrue(b > a, "it slowed: $a -> $b in $paces") }
+        assertEquals(1f, frames.moved(80_000L, 80_016L) / frames.moved(79_984L, 80_000L), 0.05f)
+        // Caught up by halfway through the section, then no rush at the end: each second moves as the song does.
+        for (ms in 85_000L until 90_000L step 1_000L) assertEquals(1f / 90f, frames.moved(ms, ms + 1_000L), 2e-4f, "at $ms")
     }
 
     // The ending armed in the last section already playing: the length changes with no new boundary.
