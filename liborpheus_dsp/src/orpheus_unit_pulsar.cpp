@@ -1741,7 +1741,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
 
     // ── Load arrangement from engine atomics ──
     // pulsar_arrangement_generation uses acquire ordering as the fence.
-    engine->pulsar_arrangement_generation.load(std::memory_order_acquire);
+    (void)engine->pulsar_arrangement_generation.load(std::memory_order_acquire);
     int arr_active = engine->pulsar_arrangement_active.load(std::memory_order_relaxed);
 
     if (arr_active) {
