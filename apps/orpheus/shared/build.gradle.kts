@@ -139,3 +139,15 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.ui.tooling)
 }
+
+// Bare xcodegen + xcodebuild never triggers KMP resource aggregation, so hang it off the
+// framework links for project.yml's "Copy Compose Resources" phase. Without it the factory
+// presets throw MissingResourceException on launch. Same fix as apps/djapp/shared.
+listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
+    .forEach { (linkSuffix, kmpTarget) ->
+        listOf("Debug", "Release").forEach { buildType ->
+            tasks.named("link${buildType}Framework$linkSuffix") {
+                dependsOn("${kmpTarget}AggregateResources")
+            }
+        }
+    }
