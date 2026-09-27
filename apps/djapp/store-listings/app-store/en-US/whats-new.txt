@@ -4,3 +4,4 @@ This release is all about the Play button
 • Swipe for Prev/Next vibe
 • Progress rings the Play button and syncs with the music
 • Stay Asleep gets new faces and a snare that brackets the song
+• CPU and Battery Optimizations
