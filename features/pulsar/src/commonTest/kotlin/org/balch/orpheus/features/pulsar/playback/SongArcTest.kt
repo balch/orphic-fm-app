@@ -26,7 +26,14 @@ class SongArcTest {
     fun theArcNeverStopsDeadShortOfTheCeiling() {
         val late = listOf(1.5f, 1.6f, 1.7f, 1.8f, 2f).map(::slowedFraction)
         late.zipWithNext().forEach { (a, b) -> assertTrue(b > a, "it stopped: $a -> $b in $late") }
-        assertTrue(SlowCeiling in 0.9f..0.91f, "the ceiling moved to $SlowCeiling")
+        assertTrue(SlowCeiling in 0.91f..0.92f, "the ceiling moved to $SlowCeiling")
+    }
+
+    // The soft knee: just past SlowFrom it still keeps most of the song's pace.
+    @Test
+    fun theSlowdownBrakesGentlyAtTheKnee() {
+        val pace = (slowedFraction(0.761f) - slowedFraction(0.759f)) / 0.002f
+        assertTrue(pace > 0.8f, "it braked to $pace of the song's pace by 0.76")
     }
 
     @Test

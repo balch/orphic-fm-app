@@ -1,44 +1,40 @@
 package org.balch.orpheus.features.pulsar.playback
 
-import kotlin.math.exp
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /** Past this share of the estimated length the arc slows: the song may end well before or after it. */
 const val SlowFrom = 0.68f
 
 /** What the arc reads when the song reaches its estimated length. Tune freely against [SlowFrom]. */
-const val AtEstimate = 0.85f
+const val AtEstimate = 0.87f
 
 /** How far past [SlowFrom] the arc can creep, solved so it reads [AtEstimate] at the estimate. */
 private val SlowRoom: Float = slowRoomFor(SlowFrom, AtEstimate)
 
 /**
  * Where the slowdown heads and never reaches before the last section locks the real end in: never a
- * full ring. It follows from [SlowFrom] and [AtEstimate], about 0.903; a clamp below it would stop the arc dead.
+ * full ring. It follows from [SlowFrom] and [AtEstimate], about 0.916; a clamp below it would stop the arc dead.
  */
 val SlowCeiling: Float = SlowFrom + SlowRoom
 
-// Bisects room * (1 - e^(-(1 - from) / room)) = at - from; the left side rises with room toward 1 - from.
+// Solves room * v / sqrt(1 + v^2) = at - from at the estimate, where v = (1 - from) / room.
 private fun slowRoomFor(from: Float, at: Float): Float {
     require(from < at && at < 1f) { "AtEstimate ($at) must sit between SlowFrom ($from) and 1" }
-    val target = (at - from).toDouble()
-    val span = (1f - from).toDouble()
-    fun reach(room: Double) = room * (1.0 - exp(-span / room))
-    var lo = 0.0
-    var hi = 1.0
-    while (reach(hi) < target) hi *= 2.0
-    repeat(60) { val mid = (lo + hi) / 2.0; if (reach(mid) < target) lo = mid else hi = mid }
-    return hi.toFloat()
+    val span = 1f - from
+    val ratio = span / (at - from)
+    return span / sqrt(ratio * ratio - 1f)
 }
 
 /**
  * The arc for a song [x] of the way through its estimated length: [x] up to [SlowFrom], then ever
  * slower, [AtEstimate] at the estimate and ever closer to [SlowCeiling] until the last section locks
- * the real end in. Its slope is 1 where the slowdown starts and falls smoothly from there, so there is no kink.
+ * the real end in. A soft knee: slope 1 at [SlowFrom] and braking gently at first, harder later.
  */
 fun slowedFraction(x: Float): Float {
     if (x <= SlowFrom) return x
-    return SlowFrom + SlowRoom * (1f - exp(-(x - SlowFrom) / SlowRoom))
+    val v = (x - SlowFrom) / SlowRoom
+    return SlowFrom + SlowRoom * v / sqrt(1f + v * v)
 }
 
 /** Once the end locks in, the arc closes on the song's real share within this much song time. */
