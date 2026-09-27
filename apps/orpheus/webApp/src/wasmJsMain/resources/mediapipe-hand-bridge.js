@@ -27,11 +27,11 @@
       self.lastError = '';
       console.log('[MP] Loading MediaPipe Vision SDK from CDN...');
       return import(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/vision_bundle.mjs'
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.0/vision_bundle.mjs'
       ).then(function (vision) {
         console.log('[MP] SDK loaded, resolving WASM fileset...');
         return vision.FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.0/wasm'
         ).then(function (fileset) {
           console.log('[MP] WASM fileset resolved, creating HandLandmarker...');
           return vision.HandLandmarker.createFromOptions(fileset, {
