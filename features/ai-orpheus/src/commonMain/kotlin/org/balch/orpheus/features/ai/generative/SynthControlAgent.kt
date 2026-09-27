@@ -8,6 +8,7 @@ import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.http.client.ktor.KtorKoogHttpClient
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicClientSettings
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
 import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
@@ -41,6 +42,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
+import org.balch.orpheus.core.ai.anthropicModelVersionsMap
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
@@ -473,7 +475,12 @@ class SynthControlAgent(
                 val httpFactory = KtorKoogHttpClient.Factory()
                 val llmClient: LLMClient = when (aiProvider) {
                     AiProvider.Google -> GoogleLLMClient(apiKey, httpClientFactory = httpFactory)
-                    AiProvider.Anthropic -> AnthropicLLMClient(apiKey, httpClientFactory = httpFactory)
+                    // Extended map: Koog throws "Unsupported model" for anything absent (Opus 5.5).
+                    AiProvider.Anthropic -> AnthropicLLMClient(
+                        apiKey,
+                        settings = AnthropicClientSettings(modelVersionsMap = anthropicModelVersionsMap),
+                        httpClientFactory = httpFactory,
+                    )
                     else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
                 }
                 val executor = MultiLLMPromptExecutor(llmClient)
