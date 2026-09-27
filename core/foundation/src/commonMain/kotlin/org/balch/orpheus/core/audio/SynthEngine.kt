@@ -20,7 +20,7 @@ private val emptyBeatPhaseFlow: StateFlow<Float> = MutableStateFlow(0f)
 private val emptyEngineRecreatedFlow: SharedFlow<Unit> = MutableSharedFlow<Unit>().asSharedFlow()
 private val completedGraphReady: Deferred<Unit> = CompletableDeferred(Unit)
 
-interface SynthEngine {
+interface SynthEngine : AudioHostSuspender {
     fun start()
     fun stop()
 

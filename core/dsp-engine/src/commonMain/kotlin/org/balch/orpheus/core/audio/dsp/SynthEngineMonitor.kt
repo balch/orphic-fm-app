@@ -17,7 +17,6 @@ import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.core.plugin.viz.ScopeFrame
-import kotlin.concurrent.Volatile
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -164,19 +163,16 @@ class SynthEngineMonitor(
     private var scopeJob: Job? = null
     var startRequested = false
 
-    // Volatile for the lone cross-thread read in DspSynthEngine.start(); all
-    // mutations happen under pollLock.
-    @Volatile
-    var vizRequested = false
-        private set
+    /** Signal Monitor requested by UI (survives a background pause/resume and an engine restart). */
+    private var vizRequested = false
 
-    // Volatile for the lone cross-thread read in DspSynthEngine.start(); all
-    // mutations happen under pollLock.
-    @Volatile
-    var spectrumRequested = false
-        private set
+    /** Spectrograph requested by UI (survives a background pause/resume and an engine restart). */
+    private var spectrumRequested = false
 
-    /** True between startMonitoring() and stopMonitoring() — i.e. engine running. */
+    /**
+     * True between startMonitoring() and stopMonitoring(). Stays true while iOS parks the host,
+     * which the viz gates rely on.
+     */
     private var monitoringActive = false
 
     /** UI visibility gate for high-frequency polls. Defaults to visible
@@ -253,7 +249,7 @@ class SynthEngineMonitor(
             launchPulsarVizPoll()
             // If the signal scope / turntable viz was requested before the engine
             // started (e.g. Orphoscope is the launch viz), honour it now —
-            // setVizEnabled alone can't launch the poll until isRunning is true.
+            // setVizEnabled alone can't launch the poll until monitoring is active.
             if (vizRequested) launchVizPoll()
             if (turntableVizRequested) launchTurntableVizPoll()
             if (spectrumRequested) launchSpectrumPoll()
@@ -509,10 +505,13 @@ class SynthEngineMonitor(
         scopeJob = null
     }
 
-    /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
-    fun setVizEnabled(enabled: Boolean, isRunning: Boolean): Unit = synchronized(pollLock) {
+    /**
+     * Enable/disable viz data polling. Only poll when Signal Monitor is active. Gated on
+     * monitoring rather than the host's isRunning, which reads false while iOS parks the host.
+     */
+    fun setVizEnabled(enabled: Boolean): Unit = synchronized(pollLock) {
         vizRequested = enabled
-        if (enabled && isRunning && uiVisible) {
+        if (enabled && monitoringActive && uiVisible) {
             launchVizPoll()
         } else if (!enabled && vizJob != null) {
             vizJob?.cancel()
@@ -576,9 +575,9 @@ class SynthEngineMonitor(
     }
 
     /** Enable/disable spectrum FFT polling. Only poll while Spectrograph is active. */
-    fun setSpectrumEnabled(enabled: Boolean, isRunning: Boolean): Unit = synchronized(pollLock) {
+    fun setSpectrumEnabled(enabled: Boolean): Unit = synchronized(pollLock) {
         spectrumRequested = enabled
-        if (enabled && isRunning && uiVisible) {
+        if (enabled && monitoringActive && uiVisible) {
             launchSpectrumPoll()
         } else if (!enabled) {
             spectrumJob?.cancel()

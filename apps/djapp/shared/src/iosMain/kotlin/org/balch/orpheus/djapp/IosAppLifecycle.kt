@@ -15,6 +15,8 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.di.StartupRoot
+import org.balch.orpheus.core.playback.AudioHostSuspendPolicy
+import org.balch.orpheus.core.playback.PlaybackController
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSOperationQueue
 import platform.UIKit.UIApplication
@@ -24,8 +26,9 @@ import platform.UIKit.UIApplicationState
 import platform.UIKit.UIApplicationWillEnterForegroundNotification
 
 /**
- * iOS's foreground signal: gates the UI-only polls while the app is in the background. Seeded from
- * `applicationState` because a widget-intent launch builds the graph in the background.
+ * iOS's foreground signal: gates the UI-only polls and, with playback state, parks the audio host
+ * while paused in the background. Seeded from `applicationState` because a widget-intent launch
+ * builds the graph in the background.
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 @SingleIn(AppScope::class)
@@ -33,6 +36,7 @@ import platform.UIKit.UIApplicationWillEnterForegroundNotification
 @ContributesIntoSet(AppScope::class, binding = binding<@StartupRoot Any>())
 class IosAppLifecycle(
     private val synthEngine: SynthEngine,
+    playbackController: PlaybackController,
     scope: AppCoroutineScope,
 ) {
     private val log = logging("IosAppLifecycle")
@@ -66,6 +70,7 @@ class IosAppLifecycle(
         scope.launch {
             isForeground.collect { synthEngine.setUiVisible(it) }
         }
+        AudioHostSuspendPolicy(synthEngine, scope).start(playbackController.state, isForeground)
         log.info { "IosAppLifecycle initialized (foreground=${_isForeground.value})" }
     }
 

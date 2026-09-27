@@ -179,12 +179,18 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
     @Volatile
     private var _isRunning = false
 
-    // Intent, not observation. True from start() until stop(). The watchdog
+    // Intent, not observation. True from start() until stop(), except while
+    // suspendHost() has parked the host (resume sets it again). The watchdog
     // reconciles this against render progress and repairs whenever the two
     // disagree, which is what makes recovery closed-loop: there is no state
     // in which this is true and nothing is trying to repair.
     @Volatile
     private var shouldBeRunning = false
+
+    // True while suspendHost() has parked the host: stopped, session released,
+    // engine and observers kept. Written on hostQueue, cleared by start()/stop().
+    @Volatile
+    private var hostSuspended = false
 
     // CACurrentMediaTime deadline. While in the future the watchdog stands
     // down, so we never fight the system for audio during a call or Siri.
@@ -267,6 +273,7 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         // best effort; this flag is what guarantees the watchdog keeps
         // trying no matter which line throws.
         shouldBeRunning = true
+        hostSuspended = false
         // Register before configuring. None of the three observers needs an
         // engine, and a route change or interruption arriving mid-init used to
         // land on an unregistered notification centre and vanish. Genuinely
@@ -327,6 +334,7 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         // before it touches anything and returns without rescheduling, so
         // the chain unwinds itself instead of needing to be cancelled.
         shouldBeRunning = false
+        hostSuspended = false
         _isRunning = false
         // The escalation ladder counts attempts against THIS host, and both
         // the host and the engine are about to be destroyed. Not a
@@ -366,8 +374,10 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
      * Idempotent: on a healthy host the repair's first step is a
      * startAndReturnError: on an already-running engine, which is a no-op.
      *
-     * `userInitiated` because this is the one caller that is a person
-     * pressing play. It walks past both stand-down gates: the
+     * Resumes a host parked by [suspendHost] first; otherwise kicks the watchdog.
+     *
+     * `userInitiated` because a person pressed play (TTS resume is the only
+     * other user-initiated caller). It walks past both stand-down gates: the
      * [suspendWatchdogUntil] deadline and [otherAudioOwnsTheRoute]. The
      * category is AVAudioSessionCategoryPlayback, which is not mixable, so
      * "another app is playing" is exactly the case iOS expects an explicit
@@ -376,7 +386,69 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
      * dead-audio trap this whole watchdog exists to close.
      */
     override fun ensureRunning() {
-        kickWatchdog(repairNow = true, reason = "ensureRunning()", userInitiated = true)
+        // One hop, so a park queued ahead of this re-checks its stillWanted()
+        // against the Playing state play() already wrote, and a park that ran
+        // first is undone here.
+        dispatch_async(hostQueue) {
+            if (!resumeFromSuspendOnHostQueue(userInitiated = true)) {
+                kickWatchdogOnHostQueue(repairNow = true, reason = "ensureRunning()", userInitiated = true)
+            }
+        }
+    }
+
+    /**
+     * Park the host: stop AVAudioEngine and release the session, keeping the
+     * C++ engine, graph and observers. Clearing [shouldBeRunning] is what
+     * stands the watchdog down; [resumeFromSuspendOnHostQueue] undoes it.
+     */
+    override fun suspendHost(stillWanted: () -> Boolean) {
+        dispatch_async(hostQueue) {
+            if (!shouldBeRunning || hostSuspended || !stillWanted()) return@dispatch_async
+            shouldBeRunning = false
+            hostSuspended = true
+            // Same reason as stop(): the ladder counted attempts against a host
+            // we are deliberately silencing.
+            staleRepairs = 0
+            engineLock.lock()
+            try {
+                audioHost?.let { orpheus_ios_audio_stop(it) }
+                _isRunning = false
+            } finally {
+                engineLock.unlock()
+            }
+            deactivateAudioSession()
+            log.info { "Audio host parked (paused in the background)" }
+        }
+    }
+
+    override fun resumeHostIfIdle() {
+        dispatch_async(hostQueue) {
+            if (!hostSuspended) return@dispatch_async
+            // The category is non-mixable Playback, so reactivating would stop
+            // the user's music for a host that is only going to render silence.
+            if (AVAudioSession.sharedInstance().otherAudioPlaying) {
+                log.info { "Audio host stays parked: another session owns audio" }
+                return@dispatch_async
+            }
+            resumeFromSuspendOnHostQueue(userInitiated = false)
+        }
+    }
+
+    /**
+     * Undo [suspendHost] and hand the parked host to the repair path, whose
+     * tier 0 restarts an engine stopped with `orpheus_ios_audio_stop`. Returns
+     * false when nothing was parked. Must run on [hostQueue].
+     */
+    private fun resumeFromSuspendOnHostQueue(userInitiated: Boolean): Boolean {
+        if (!hostSuspended) return false
+        hostSuspended = false
+        shouldBeRunning = true
+        if (!AVAudioSession.sharedInstance().setActive(true, error = null)) {
+            log.warn { "setActive(true) refused on resume from park — the watchdog will repair" }
+        }
+        log.info { "Audio host resuming from park (userInitiated=$userInitiated)" }
+        kickWatchdogOnHostQueue(repairNow = true, reason = "resume from park", userInitiated = userInitiated)
+        return true
     }
 
     override val isRunning: Boolean get() = _isRunning
@@ -604,6 +676,9 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
             AVAudioSessionInterruptionTypeEnded -> {
                 log.info { "Audio session interruption ended" }
                 suspendWatchdogUntil = 0.0
+                // A parked host stays parked: reactivating would take the route
+                // back for silence. Resume owns reactivation.
+                if (hostSuspended) return
                 val reactivated = AVAudioSession.sharedInstance().setActive(true, error = null)
                 if (!reactivated) log.warn { "Audio session reactivation failed after interruption" }
                 // Repair now rather than waiting a tick. Failure here is not
@@ -801,7 +876,8 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
      */
     private fun watchdogTick() {
         if (!shouldBeRunning) {
-            // stop() owns teardown. Do not reschedule; start() re-arms.
+            // stop() owns teardown and suspendHost() owns a park. Do not
+            // reschedule; start() or a resume re-arms.
             // This is the one deliberate way out that leaves the chain dead,
             // so it sits above the try below rather than inside it.
             watchdogChainActive = false
@@ -1346,6 +1422,8 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
     }
 
     override fun nativePlayTts() {
+        // Speech is asked for and bypasses the master mute, so a parked host comes back for it.
+        dispatch_async(hostQueue) { resumeFromSuspendOnHostQueue(userInitiated = true) }
         withEngine { orpheus_engine_play_tts(it) }
     }
 

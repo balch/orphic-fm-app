@@ -413,8 +413,15 @@ class PlaybackControllerTest {
     @Test fun `play invokes audio host repair before unmuting`() = runTest {
         val muteCalls = mutableListOf<PlaybackState>()
         var muteCountAtRepair = -1
-        val hostRepair = FakeHostRepair(onEnsure = { muteCountAtRepair = muteCalls.size })
-        val built = build(muteCalls = muteCalls, hostRepair = hostRepair)
+        var stateAtRepair: PlaybackState? = null
+        lateinit var built: Built
+        val hostRepair = FakeHostRepair(
+            onEnsure = {
+                muteCountAtRepair = muteCalls.size
+                stateAtRepair = built.controller.state.value
+            },
+        )
+        built = build(muteCalls = muteCalls, hostRepair = hostRepair)
 
         built.controller.play()
 
@@ -427,6 +434,13 @@ class PlaybackControllerTest {
                 "rather than one tap later",
         )
         assertEquals(PlaybackState.Playing, built.controller.state.value)
+        // A later suspend policy reasons about this ordering: state must already read
+        // Playing at the moment repair fires, not just after play() returns.
+        assertEquals(
+            PlaybackState.Playing,
+            stateAtRepair,
+            "state must already be Playing at the moment ensureAudioHostRunning() is invoked",
+        )
     }
 
     // Repair must not fire on a play() the app was denied — a future edit

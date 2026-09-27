@@ -482,15 +482,9 @@ class DspSynthEngine(
         audioEngine.start()
         loadGraphAndSync()
 
-        // Poll monitor data from C++ via native bridge
+        // Poll monitor data from C++ via native bridge. Also launches any viz
+        // requested before the engine was running.
         monitor.startMonitoring()
-        // Start viz polling if it was requested before the engine was running
-        if (monitor.vizRequested) {
-            monitor.setVizEnabled(true, true)
-        }
-        if (monitor.spectrumRequested) {
-            monitor.setSpectrumEnabled(true, true)
-        }
         log.debug { "Audio Engine Started" }
         _graphReady.complete(Unit)
     }
@@ -529,11 +523,11 @@ class DspSynthEngine(
     }
 
     override fun setVizEnabled(enabled: Boolean) {
-        monitor.setVizEnabled(enabled, audioEngine.isRunning)
+        monitor.setVizEnabled(enabled)
     }
 
     override fun setSpectrumEnabled(enabled: Boolean) {
-        monitor.setSpectrumEnabled(enabled, audioEngine.isRunning)
+        monitor.setSpectrumEnabled(enabled)
     }
 
     override fun setScopeEnabled(enabled: Boolean) {
@@ -570,6 +564,13 @@ class DspSynthEngine(
     // the engine has already been started once, so it cannot repair a host
     // that died out from under an already-"started" DspSynthEngine.
     override fun ensureAudioHostRunning() = audioEngine.ensureRunning()
+
+    // TTS is mixed after the graph and bypasses the master mute, so a paused
+    // app can still be speaking; never park under it.
+    override fun suspendHost(stillWanted: () -> Boolean) =
+        audioEngine.suspendHost { stillWanted() && !isTtsPlaying() }
+
+    override fun resumeHostIfIdle() = audioEngine.resumeHostIfIdle()
 
     // ═══════════════════════════════════════════════════════════
     // DELEGATIONS & FACADE METHODS

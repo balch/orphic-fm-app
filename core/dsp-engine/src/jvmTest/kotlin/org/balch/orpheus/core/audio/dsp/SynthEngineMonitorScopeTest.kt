@@ -131,12 +131,12 @@ class SynthEngineMonitorScopeTest {
         try {
             // Other viz gates don't start it.
             monitor.startMonitoring()
-            monitor.setVizEnabled(enabled = true, isRunning = true)
-            monitor.setSpectrumEnabled(enabled = true, isRunning = true)
+            monitor.setVizEnabled(enabled = true)
+            monitor.setSpectrumEnabled(enabled = true)
             runCurrent()
             assertEquals(0, bridge.calls, "the Signal Monitor and Spectrograph gates must not run the scope")
-            monitor.setVizEnabled(enabled = false, isRunning = true)
-            monitor.setSpectrumEnabled(enabled = false, isRunning = true)
+            monitor.setVizEnabled(enabled = false)
+            monitor.setSpectrumEnabled(enabled = false)
 
             // Requested before the engine runs: waits for startMonitoring.
             monitor.stopMonitoring()

@@ -49,4 +49,13 @@ interface AudioEngine {
      * reopens a stream that a route change failed to reopen.
      */
     fun ensureRunning() {}
+
+    /**
+     * Park the host (stop rendering, release the session) if [stillWanted] still
+     * holds when the park runs. Default no-op; only iOS parks. Must not block.
+     */
+    fun suspendHost(stillWanted: () -> Boolean) {}
+
+    /** Restart a parked host unless another app owns audio. Default no-op. Must not block. */
+    fun resumeHostIfIdle() {}
 }
