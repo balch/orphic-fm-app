@@ -111,6 +111,31 @@ class VibeNavigatorTest {
         assertEquals(listOf("C"), applied, "the cancelled step to B must never land")
     }
 
+    // Never stacked: a change landing mid-transition cuts instead of starting a second effect.
+    @Test
+    fun aNextDuringATransitionCuts() = runTest {
+        val feature = FakePulsarFeature(abc, abc[0])
+        val runner = DelayingRunner(preApplyMs = 1_000)
+        val nav = makeVibeNavigator(feature, runner, StubTransitionPreferences(TransitionSpec(TransitionStyle.TAPE)), dispatcher())
+        nav.request(VibeRequest.Next)
+        advanceTimeBy(100)
+        nav.request(VibeRequest.Next)
+        advanceUntilIdle()
+        assertEquals(listOf(TransitionStyle.TAPE, TransitionStyle.CUT), runner.specs.map { it.style })
+    }
+
+    @Test
+    fun aNextAfterATransitionFinishesKeepsTheEffect() = runTest {
+        val feature = FakePulsarFeature(abc, abc[0])
+        val runner = DelayingRunner(preApplyMs = 1_000)
+        val nav = makeVibeNavigator(feature, runner, StubTransitionPreferences(TransitionSpec(TransitionStyle.TAPE)), dispatcher())
+        nav.request(VibeRequest.Next)
+        advanceUntilIdle()
+        nav.request(VibeRequest.Next)
+        advanceUntilIdle()
+        assertEquals(listOf(TransitionStyle.TAPE, TransitionStyle.TAPE), runner.specs.map { it.style })
+    }
+
     @Test
     fun previousThenNextInOneTransitionComesBack() = runTest {
         val feature = FakePulsarFeature(abc, abc[1])

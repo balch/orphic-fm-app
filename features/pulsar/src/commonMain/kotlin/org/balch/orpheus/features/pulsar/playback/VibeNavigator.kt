@@ -11,6 +11,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.TransitionSpec
+import org.balch.orpheus.core.audio.TransitionStyle
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.core.playback.SkipHandler
@@ -23,7 +24,7 @@ import kotlin.coroutines.cancellation.CancellationException
 /**
  * The one owner of "change the playing vibe": buttons, swipe, arrow keys, media keys and widgets
  * (via [SkipHandler]), list picks (via [PulsarSession.requestVibe]) and the song advancer
- * ([advance]). One transition at a time; a newer request cancels the one in flight.
+ * ([advance]). One transition at a time; a newer request cancels the one in flight and plays as a CUT.
  *
  * Steps start from the in-flight target, so two presses of ▶ inside one transition land two vibes on.
  * ▶ during an advance is the exception: it lands on the advance's own target, as the chrome names it.
@@ -93,11 +94,13 @@ class VibeNavigator(
                     command.done.complete(Unit)
                     continue
                 }
+                // Never stacked: a change landing mid-transition cuts instead of starting a second effect.
+                val stacked = inFlight?.isActive == true
                 inFlight?.cancelAndJoin()
                 inFlightIsUser = command is Command.User
                 // UNDISPATCHED enters run()'s finally before anything can cancel it, so an
                 // Advance's caller is always released.
-                inFlight = launch(start = CoroutineStart.UNDISPATCHED) { run(command) }
+                inFlight = launch(start = CoroutineStart.UNDISPATCHED) { run(command, stacked) }
             }
         }
         scope.launch {
@@ -133,14 +136,15 @@ class VibeNavigator(
         return overruled
     }
 
-    private suspend fun run(command: Command) {
+    private suspend fun run(command: Command, stacked: Boolean) {
         try {
             val move = resolve(command) ?: return
-            log.info { "${command.label} -> ${move.target} (${move.spec.style})" }
+            val spec = if (stacked) CutSpec else move.spec
+            log.info { "${command.label} -> ${move.target} (${spec.style}${if (stacked) ", stacked" else ""})" }
             pendingTarget = move.target
             pendingIsUser = command is Command.User
             pulsarSession.announceMove(VibeMove(move.kind, command.origin))
-            transitionRunner.runTransition(move.spec) { move.apply() }
+            transitionRunner.runTransition(spec) { move.apply() }
             pendingTarget = null
         } catch (e: CancellationException) {
             throw e
@@ -190,5 +194,9 @@ class VibeNavigator(
         val target = neighborVibe(feature.vibeNames, from, step) ?: return null
         val kind = if (step > 0) VibeMoveKind.Next else VibeMoveKind.Previous
         return Move(target, spec, kind) { feature.applyVibeByName(target) }
+    }
+
+    private companion object {
+        val CutSpec = TransitionSpec(TransitionStyle.CUT)
     }
 }
