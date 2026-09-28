@@ -93,6 +93,12 @@ class OboeAudioEngine(
         repairExecutor.execute { bridge.nativeEnsureRunning() }
     }
 
+    // Pause only mutes, so a paused app still streams silence and Bluetooth headsets read it as
+    // playing. Same executor as ensureRunning(), so a park queued ahead of a play() is undone by it.
+    override fun suspendHost(stillWanted: () -> Boolean) {
+        repairExecutor.execute { if (stillWanted()) bridge.nativePark() }
+    }
+
     override val isRunning: Boolean
         get() = bridge.nativeIsRunning()
 

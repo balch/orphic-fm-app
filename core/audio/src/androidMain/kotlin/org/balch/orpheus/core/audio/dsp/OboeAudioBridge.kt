@@ -27,6 +27,8 @@ class OboeAudioBridge : NativeDspBridge {
     external fun nativeStop(): Int
     // Blocks while it reopens the stream; call off the main thread.
     external fun nativeEnsureRunning()
+    // Blocks until the stream has stopped; call off the main thread.
+    external fun nativePark()
     external fun nativeIsRunning(): Boolean
     external fun nativeGetSampleRate(): Int
     external fun nativeGetFramesPerBuffer(): Int

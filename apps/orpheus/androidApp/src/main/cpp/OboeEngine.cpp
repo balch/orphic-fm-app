@@ -90,6 +90,7 @@ oboe::Result OboeEngine::requestStart() {
 oboe::Result OboeEngine::stop() {
     std::lock_guard<std::mutex> lock(mLifecycleMutex);
     mWantRunning = false;
+    mParked = false;
     mIsRunning.store(false);
 
     oboe::Result result = oboe::Result::OK;
@@ -168,12 +169,43 @@ void OboeEngine::ensureRunning() {
     bool engineRecreated = false;
     {
         std::lock_guard<std::mutex> lock(mLifecycleMutex);
-        if (!mWantRunning || mIsRunning.load()) return;
-        LOGI("Repairing: the last reopen failed, retrying");
+        if (!mWantRunning) return;
+        if (mParked) {
+            mParked = false;
+            if (mStream && mStream->requestStart() == oboe::Result::OK) {
+                LOGI("Stream unparked");
+                return;
+            }
+            // Fall through to a full reopen; close first so openStream doesn't orphan it.
+            LOGE("Unpark failed, reopening");
+            mIsRunning.store(false);
+            if (mStream) {
+                mStream->close();
+                mStream.reset();
+            }
+        } else if (mIsRunning.load()) {
+            return;
+        } else {
+            LOGI("Repairing: the last reopen failed, retrying");
+        }
         reopenLocked(&engineRecreated);
     }
     void (*cb)() = mEngineRecreatedCallback.load();
     if (engineRecreated && cb) cb();
+}
+
+// Pause only mutes, and a stream still sending silence reads as playing to Bluetooth: Samsung's
+// AVRCP holds the paused status until audio stops, so a headset keeps sending PAUSE, never PLAY.
+void OboeEngine::park() {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
+    if (!mStream || !mIsRunning.load() || mParked) return;
+    oboe::Result result = mStream->stop();
+    if (result != oboe::Result::OK) {
+        LOGE("Park failed: %s", oboe::convertToText(result));
+        return;
+    }
+    mParked = true;
+    LOGI("Stream parked");
 }
 
 // On failure leaves no stream and mIsRunning clear, with the engine kept for ensureRunning(). An
@@ -196,6 +228,12 @@ void OboeEngine::reopenLocked(bool* engineRecreated) {
         engine_.publish(orpheus_engine_create(static_cast<float>(new_sr)));
         mCreatedSampleRate = new_sr;
         *engineRecreated = true;
+    }
+    // A route change while parked reopens onto the new device but leaves it stopped for the
+    // unpark in ensureRunning(); starting here would stream silence again.
+    if (mParked) {
+        LOGI("Stream reopened parked: sampleRate=%d", new_sr);
+        return;
     }
     mIsRunning.store(true);
     result = mStream->requestStart();

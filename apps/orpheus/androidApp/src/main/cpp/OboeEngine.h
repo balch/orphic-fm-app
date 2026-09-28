@@ -18,8 +18,12 @@ public:
     int loadGraph(const uint8_t* data, size_t length);
     oboe::Result requestStart();
     oboe::Result stop();
-    // Reopens a started host whose route-change reopen failed; a no-op otherwise.
+    // Restarts a parked stream, or reopens a started host whose route-change reopen failed;
+    // a no-op otherwise.
     void ensureRunning();
+    // Stops the stream but keeps it and the engine, so ensureRunning() restarts it without a
+    // reopen. Blocks until the stream has stopped; call off the main thread.
+    void park();
 
     bool isRunning() const;
     int32_t getSampleRate() const;
@@ -97,6 +101,9 @@ private:
     // Set by a successful start, cleared by stop(); guarded by mLifecycleMutex. Unlike mIsRunning
     // it survives a failed reopen, which is what tells ensureRunning() there is a host to repair.
     bool mWantRunning = false;
+    // Set by park(), cleared by ensureRunning() and stop(); guarded by mLifecycleMutex.
+    // mIsRunning stays set while parked: the host is alive, just not rendering.
+    bool mParked = false;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};
     // Cumulative underrun count for the current stream, mirrored out of the

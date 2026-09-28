@@ -70,6 +70,12 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeEnsureRunning(
     sEngine.ensureRunning();
 }
 
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativePark(
+        JNIEnv *env, jobject thiz) {
+    sEngine.park();
+}
+
 JNIEXPORT jboolean JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeIsRunning(
         JNIEnv *env, jobject thiz) {

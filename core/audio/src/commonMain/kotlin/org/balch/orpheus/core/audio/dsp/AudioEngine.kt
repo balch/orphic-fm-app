@@ -46,13 +46,13 @@ interface AudioEngine {
      *
      * `IosAudioEngine.ensureRunning` kicks the AVAudioEngine host watchdog
      * instead of waiting for the next scheduled poll. `OboeAudioEngine`'s
-     * reopens a stream that a route change failed to reopen.
+     * restarts a parked stream, or reopens one a route change failed to reopen.
      */
     fun ensureRunning() {}
 
     /**
      * Park the host (stop rendering, release the session) if [stillWanted] still
-     * holds when the park runs. Default no-op; only iOS parks. Must not block.
+     * holds when the park runs. Default no-op; iOS and Android park. Must not block.
      */
     fun suspendHost(stillWanted: () -> Boolean) {}
 
