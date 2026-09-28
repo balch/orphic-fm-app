@@ -45,6 +45,17 @@
             </intent-filter>
         </service>
 
+        <!-- Android persists this as our media-button target, so a headset PLAY still reaches
+             us with no live session (cold launch, swiped away). Media3 starts
+             DjMediaLibraryService with the key; PAUSE-type keys are dropped by design. -->
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name="org.balch.djapp.widget.DjWidgetReceiver"
             android:exported="true">
