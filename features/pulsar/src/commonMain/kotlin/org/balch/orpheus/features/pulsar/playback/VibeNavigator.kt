@@ -24,7 +24,8 @@ import kotlin.coroutines.cancellation.CancellationException
 /**
  * The one owner of "change the playing vibe": buttons, swipe, arrow keys, media keys and widgets
  * (via [SkipHandler]), list picks (via [PulsarSession.requestVibe]) and the song advancer
- * ([advance]). One transition at a time; a newer request cancels the one in flight and plays as a CUT.
+ * ([advance]). One transition at a time; a newer request cancels the one in flight and plays as a CUT,
+ * as does any restart of the playing song.
  *
  * Steps start from the in-flight target, so two presses of ▶ inside one transition land two vibes on.
  * ▶ during an advance is the exception: it lands on the advance's own target, as the chrome names it.
@@ -139,8 +140,14 @@ class VibeNavigator(
     private suspend fun run(command: Command, stacked: Boolean) {
         try {
             val move = resolve(command) ?: return
-            val spec = if (stacked) CutSpec else move.spec
-            log.info { "${command.label} -> ${move.target} (${spec.style}${if (stacked) ", stacked" else ""})" }
+            // A restart replays the same song, so an effect over it has nothing to hand off between.
+            val cutReason = when {
+                stacked -> "stacked"
+                move.kind == VibeMoveKind.Restart -> "restart"
+                else -> null
+            }
+            val spec = if (cutReason != null) CutSpec else move.spec
+            log.info { "${command.label} -> ${move.target} (${spec.style}${cutReason?.let { ", $it" } ?: ""})" }
             pendingTarget = move.target
             pendingIsUser = command is Command.User
             pulsarSession.announceMove(VibeMove(move.kind, command.origin))

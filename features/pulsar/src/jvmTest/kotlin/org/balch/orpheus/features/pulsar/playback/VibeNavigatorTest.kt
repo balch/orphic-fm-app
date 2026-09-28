@@ -180,6 +180,29 @@ class VibeNavigatorTest {
     }
 
     @Test
+    fun aRestartCuts() = runTest {
+        val feature = FakePulsarFeature(abc, abc[1])
+        val runner = DelayingRunner()
+        val session = session()
+        session.updateProgress(PlaybackProgress(RestartAfterMs + 1_000, 200_000))
+        val prefs = StubTransitionPreferences(TransitionSpec(TransitionStyle.TAPE))
+        val nav = makeVibeNavigator(feature, runner, prefs, dispatcher(), session = session)
+        nav.request(VibeRequest.Previous)
+        advanceUntilIdle()
+        assertEquals(TransitionStyle.CUT, runner.specs.single().style)
+    }
+
+    @Test
+    fun aSongRepeatingAtItsEndCuts() = runTest {
+        val feature = FakePulsarFeature(abc, abc[0])
+        val runner = DelayingRunner()
+        val nav = makeVibeNavigator(feature, runner, dispatcher = dispatcher())
+        backgroundScope.launch(dispatcher()) { nav.advance("A", "A", TransitionSpec(TransitionStyle.FADE)) }
+        advanceUntilIdle()
+        assertEquals(TransitionStyle.CUT, runner.specs.single().style)
+    }
+
+    @Test
     fun previousRestartsAnAiVibeNotInTheCatalog() = runTest {
         val ai = mkMinimalVibe("AI Vibe")
         val feature = FakePulsarFeature(abc, ai)
