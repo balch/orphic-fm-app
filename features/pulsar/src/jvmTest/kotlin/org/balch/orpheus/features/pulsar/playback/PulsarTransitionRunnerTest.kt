@@ -222,6 +222,28 @@ class PulsarTransitionRunnerTest {
         assertEquals(100, engine.fades[2].durationMs)
     }
 
+    // A paused host is parked, so an armed effect would sit frozen and play out on unpause.
+    @Test
+    fun `a transition while paused is a CUT`() = runTest {
+        val engine = RecordingEngine()
+        engine.now = { testScheduler.currentTime }
+        engine.setPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol, PortValue.IntValue(0))
+        val runner = makeRunner(engine)
+        val applyAt = mutableListOf<Long>()
+        runner.runTransition(TransitionSpec(TransitionStyle.TAPE)) { applyAt += testScheduler.currentTime }
+        assertEquals(listOf(0L), applyAt)
+        assertTrue(engine.tapeStops.isEmpty(), "no effect may be armed while paused")
+    }
+
+    @Test
+    fun `RANDOM while paused arms no effect`() = runTest {
+        val engine = RecordingEngine()
+        engine.setPluginPort(PULSAR_URI, PulsarSymbol.PLAYING.symbol, PortValue.IntValue(0))
+        val runner = PulsarTransitionRunnerImpl(engine, random = { TransitionStyle.SCRATCH })
+        runner.runTransition(TransitionSpec(TransitionStyle.RANDOM)) {}
+        assertTrue(engine.scratches.isEmpty(), "no effect may be armed while paused")
+    }
+
     @Test
     fun `RANDOM picks from explicit pool`() = runTest {
         val engine = RecordingEngine()

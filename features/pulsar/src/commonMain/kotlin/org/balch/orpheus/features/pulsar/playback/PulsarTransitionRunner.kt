@@ -64,6 +64,13 @@ class PulsarTransitionRunnerImpl(
     override val activeStyle: StateFlow<TransitionStyle?> = _activeStyle.asStateFlow()
 
     override suspend fun runTransition(spec: TransitionSpec, applyNext: suspend () -> Unit) {
+        // Paused, the host may be parked: the C++ effects run on the sample clock, so one armed
+        // now would sit frozen and play out on unpause.
+        if (spec.style != TransitionStyle.CUT && !isPulsarPlaying()) {
+            log.info { "${spec.style} while paused -> CUT" }
+            runTransition(TransitionSpec(TransitionStyle.CUT), applyNext)
+            return
+        }
         if (spec.style == TransitionStyle.RANDOM) {
             runRandom(spec, applyNext)
             return
