@@ -189,7 +189,7 @@ class HeartbeatViz(
             // Soft red bloom on big bass beats — barely visible at low energy
             if (state.flashIntensity > 0.01f) {
                 drawRect(
-                    color = Color(0xFFFF2244).copy(alpha = state.flashIntensity.coerceAtMost(0.18f)),
+                    color = Color(0xFFFF2244).copy(alpha = state.flashIntensity.coerceAtMost(0.10f)),
                     blendMode = BlendMode.Plus,
                 )
             }
@@ -237,9 +237,9 @@ class HeartbeatViz(
         }
 
         // Beat burst — extra hearts on transients. Burst size scales with the
-        // strength of the peak so subtle beats add 1-2, big bass hits add 4-6.
+        // strength of the peak so subtle beats add 1, big bass hits add 2.
         if (isBeat) {
-            val burstCount = 1 + (smoothedPeak * 6f).toInt().coerceIn(0, 5)
+            val burstCount = 1 + (smoothedPeak * 2f).toInt().coerceIn(0, 1)
             repeat(burstCount) { spawnHeart(numDuos, isBeat = true) }
         }
 
@@ -416,9 +416,9 @@ class HeartbeatViz(
 
         // Life envelope — fade in slightly then fade out
         val lifeAlpha = (h.life * 1.2f).coerceIn(0f, 1f)
-        val glowMul = 0.5f + _glow * 0.5f
+        val glowMul = 0.3f + _glow * 0.3f
         val finalAlpha = (lifeAlpha * glowMul).coerceIn(0f, 1f)
-        val tinted = h.color.copy(alpha = finalAlpha)
+        val tinted = h.color.copy(alpha = finalAlpha * HEART_BODY_ALPHA)
 
         translate(cx, cy) {
             when {
@@ -548,11 +548,11 @@ class HeartbeatViz(
                 if (spriteGlow > 0.05f) {
                     drawHeartPath(
                         spriteRefRadius * HEART_GLOW_SCALE,
-                        color.copy(alpha = 0.18f * spriteGlow),
+                        color.copy(alpha = 0.12f * spriteGlow),
                         filled = true,
                     )
                 }
-                drawHeartPath(spriteRefRadius, color.copy(alpha = 1f), filled = true)
+                drawHeartPath(spriteRefRadius, color.copy(alpha = HEART_BODY_ALPHA), filled = true)
                 drawHeartPath(
                     spriteRefRadius,
                     Color.White.copy(alpha = 0.35f * spriteGlow),
@@ -735,9 +735,9 @@ class HeartbeatViz(
     companion object {
         private const val MAX_DUOS = 6
 
-        // Spawn pacing — at master=1 this spawns ~38/sec.
+        // Spawn pacing — at master=1 this spawns ~8/sec.
         // Silent music spawns nothing because the rate is purely smoothedMaster-proportional.
-        private const val BASE_SPAWN_RATE = 38f
+        private const val BASE_SPAWN_RATE = 8f
         private const val BEAT_DELTA_THRESHOLD = 0.15f  // master-level jump that counts as a beat
         private const val BEAT_LEVEL_THRESHOLD = 0.10f  // floor master must exceed for a beat
 
@@ -745,6 +745,8 @@ class HeartbeatViz(
         private const val HEART_MIN_SIZE = 0.018f
         private const val HEART_LEVEL_SIZE_GAIN = 0.075f
         private const val HEART_MAX_SIZE = 0.13f
+        // Body fill alpha. Hearts blend additively, so overlaps stack toward white.
+        private const val HEART_BODY_ALPHA = 0.45f
 
         // Heart life
         private const val HEART_DECAY_MIN = 0.18f
@@ -755,8 +757,8 @@ class HeartbeatViz(
         private const val DRIFT_VY_MIN = 0.6f
         private const val DRIFT_VY_MAX = 1.4f
 
-        // Population cap (perf safety) — generous fixed ceiling.
-        private const val MAX_HEARTS = 240
+        // Population cap — also keeps loud passages from carpeting the screen.
+        private const val MAX_HEARTS = 45
 
         // ── Whole-heart sprite cache tuning ────────────────────────────────
         // Glow halo draw scale relative to the heart's own body size.
