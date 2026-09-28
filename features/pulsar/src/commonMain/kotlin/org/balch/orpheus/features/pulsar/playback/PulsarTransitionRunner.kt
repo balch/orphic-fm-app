@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.pulsar.playback
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
@@ -58,6 +59,7 @@ class PulsarTransitionRunnerImpl(
     private val random: (List<TransitionStyle>) -> TransitionStyle = { it.random() },
 ) : PulsarTransitionRunner {
 
+    private val log = logging("PulsarTransition")
     private val _activeStyle = MutableStateFlow<TransitionStyle?>(null)
     override val activeStyle: StateFlow<TransitionStyle?> = _activeStyle.asStateFlow()
 
@@ -204,6 +206,7 @@ class PulsarTransitionRunnerImpl(
         }
         val chosen = random(pool)
         val handoff = if (chosen.canHandoff) chosen.handoffRange.random() else null
+        log.info { "RANDOM -> $chosen${handoff?.let { " ${it}ms" } ?: ""}" }
         runTransition(spec.copy(style = chosen, handoffMs = handoff), applyNext)
     }
 
