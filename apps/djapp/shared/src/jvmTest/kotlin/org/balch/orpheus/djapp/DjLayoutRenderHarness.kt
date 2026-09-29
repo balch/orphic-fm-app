@@ -683,6 +683,7 @@ class DjLayoutRenderHarness {
                             )
                             Column(Modifier.fillMaxSize()) {
                                 DjTvTopBar(
+                                    timerFeature = TimerViewModel.previewFeature(),
                                     panels = topBarPanels(allPanels),
                                     isDocked = { it == PulsarTab },
                                     onToggle = {},
@@ -694,7 +695,6 @@ class DjLayoutRenderHarness {
                                     panels = bottomBarPanels(allPanels),
                                     isDocked = { it == PulsarTab || it == DjTab },
                                     onToggle = {},
-                                    timerFeature = TimerViewModel.previewFeature(),
                                     pulsarFeature = PulsarViewModel.previewFeature(),
                                     onTogglePlayback = {},
                                     previewFocusedRoute = HornTab,
@@ -759,6 +759,7 @@ class DjLayoutRenderHarness {
                                 )
                                 CompositionLocalProvider(LocalLiquidEffects provides effects) {
                                     DjTvTopBar(
+                                        timerFeature = TimerViewModel.previewFeature(),
                                         panels = topBarPanels(largeScreenPanels()),
                                         isDocked = { it == PulsarTab || it == EndsTab },
                                         onToggle = {},
@@ -812,7 +813,6 @@ class DjLayoutRenderHarness {
                                             panels = bottomBarPanels(allPanels),
                                             isDocked = { it == DjTab },
                                             onToggle = {},
-                                            timerFeature = TimerViewModel.previewFeature(),
                                             pulsarFeature = armedPulsar,
                                             onTogglePlayback = {},
                                             previewFocusedRoute = HornTab,
@@ -943,6 +943,7 @@ class DjLayoutRenderHarness {
                                         modifier = Modifier.width(70.dp),
                                     )
                                     DjTvTopBar(
+                                        timerFeature = TimerViewModel.previewFeature(),
                                         panels = topBarPanels(largeScreenPanels()),
                                         isDocked = { it == PulsarTab },
                                         onToggle = {},
@@ -990,7 +991,6 @@ class DjLayoutRenderHarness {
                                         panels = bottomBarPanels(allPanels),
                                         isDocked = { it == PulsarTab || it == DjTab },
                                         onToggle = {},
-                                        timerFeature = TimerViewModel.previewFeature(),
                                         pulsarFeature = PulsarViewModel.previewFeature(),
                                         onTogglePlayback = {},
                                         previewFocusedRoute = HornTab,
@@ -1041,6 +1041,7 @@ class DjLayoutRenderHarness {
                             Column(Modifier.fillMaxSize()) {
                                 // Top bar "focused": only its border shows.
                                 DjTvTopBar(
+                                    timerFeature = TimerViewModel.previewFeature(),
                                     panels = topBarPanels(allPanels),
                                     isDocked = { it == PulsarTab },
                                     onToggle = {},
@@ -1079,7 +1080,6 @@ class DjLayoutRenderHarness {
                                     panels = bottomBarPanels(allPanels),
                                     isDocked = { it == PulsarTab || it == DjTab },
                                     onToggle = {},
-                                    timerFeature = TimerViewModel.previewFeature(),
                                     pulsarFeature = PulsarViewModel.previewFeature(),
                                     onTogglePlayback = {},
                                     previewRegionFocused = true,
@@ -1350,6 +1350,7 @@ class DjLayoutRenderHarness {
                             val (docked, focused, armed) = state
                             Text(tag, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(start = 16.dp))
                             DjTvTopBar(
+                                timerFeature = TimerViewModel.previewFeature(),
                                 panels = listOf(EndsTab),
                                 isDocked = { docked },
                                 onToggle = {},
@@ -1359,14 +1360,15 @@ class DjLayoutRenderHarness {
                             )
                         }
                         Text(
-                            "The full bar, SCRATCH armed and docked, Pulsar docked:",
+                            "The full bar, SCRATCH armed and docked, Info docked:",
                             color = Color.White,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                         )
                         DjTvTopBar(
+                            timerFeature = TimerViewModel.previewFeature(),
                             panels = topBarPanels(largeScreenPanels()),
-                            isDocked = { it == PulsarTab || it == EndsTab },
+                            isDocked = { it == VibeInfoTab || it == EndsTab },
                             onToggle = {},
                             vizFeature = VizViewModel.previewFeature(),
                             pulsarFeature = endsOnlyBar(armed = true),
@@ -1386,79 +1388,53 @@ class DjLayoutRenderHarness {
     }
 
     /**
-     * The bottom bar's Timer item, which now keeps its icon and hangs the countdown under the
-     * label instead of swapping the icon out for it. Renders idle / running / paused side by side
-     * plus the full bar with a running timer, so the two things that can go wrong here are
-     * visible: the countdown clipping out of the item, and the Timer item standing taller than
-     * its neighbours once the third line appears (TvBottomBarMinHeight reserves that line's room
-     * on every item precisely so it cannot).
+     * The top bar's Timer toggle, whose label becomes the countdown and whose icon becomes a pause
+     * glyph while paused. Every state is the full bar, stacked, so Ends lining up down the column
+     * is the check that no countdown shape resizes the toggle.
      */
     @Test
-    fun renderTimerBottomBarStates() {
+    fun renderTimerTopBarStates() {
         val outDir = File("build/djapp-render").apply { mkdirs() }
         fun timer(status: TimerStatus, remaining: kotlin.time.Duration) =
             TimerViewModel.previewFeature(
                 TimerUiState(initialTime = 45.minutes, remainingTime = remaining, status = status),
             )
         runCatching {
-            val scene = ImageComposeScene(1560, 460, Density(1f)) {
+            val scene = ImageComposeScene(1280, 820, Density(1f)) {
                 OrpheusTheme {
                     Column(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            listOf(
-                                Triple("idle", TimerStatus.IDLE, 45.minutes),
-                                Triple("running (secs)", TimerStatus.RUNNING, 53.seconds),
-                                Triple("running (mins)", TimerStatus.RUNNING, 12.minutes),
-                                Triple("running (hrs)", TimerStatus.RUNNING, 67.minutes),
-                                Triple("paused", TimerStatus.PAUSED, 12.minutes),
-                                Triple("docked+running", TimerStatus.RUNNING, 53.seconds),
-                            ).forEachIndexed { index, (tag, status, remaining) ->
-                                // DjTvBottomBar fillMaxWidth()s internally, so each swatch needs a
-                                // fixed width rather than fighting its siblings for the full Row.
-                                Column(
-                                    modifier = Modifier.width(200.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    Text(tag, color = Color.White, fontSize = 11.sp)
-                                    DjTvBottomBar(
-                                        panels = listOf(TimerTab),
-                                        isDocked = { index == 5 },
-                                        onToggle = {},
-                                        timerFeature = timer(status, remaining),
-                                        pulsarFeature = PulsarViewModel.previewFeature(),
-                                        onTogglePlayback = {},
-                                    )
-                                }
-                            }
+                        listOf(
+                            Triple("idle", TimerStatus.IDLE, 45.minutes),
+                            Triple("running (9s)", TimerStatus.RUNNING, 9.seconds),
+                            Triple("running (53s)", TimerStatus.RUNNING, 53.seconds),
+                            Triple("running (9m)", TimerStatus.RUNNING, 9.minutes),
+                            Triple("running (1:07)", TimerStatus.RUNNING, 67.minutes),
+                            Triple("paused", TimerStatus.PAUSED, 12.minutes),
+                            Triple("docked+paused", TimerStatus.PAUSED, 12.minutes),
+                            Triple("focused+running", TimerStatus.RUNNING, 12.minutes),
+                        ).forEach { (tag, status, remaining) ->
+                            Text(tag, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(start = 16.dp))
+                            DjTvTopBar(
+                                timerFeature = timer(status, remaining),
+                                panels = topBarPanels(largeScreenPanels()),
+                                isDocked = { it == TimerTab && tag.startsWith("docked") },
+                                onToggle = {},
+                                vizFeature = VizViewModel.previewFeature(),
+                                pulsarFeature = PulsarViewModel.previewFeature(),
+                                previewFocusedRoute = if (tag.startsWith("focused")) TimerTab else null,
+                            )
                         }
-                        Text(
-                            "The real bar, timer running — every item must stay the same height:",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                        )
-                        DjTvBottomBar(
-                            panels = bottomBarPanels(largeScreenPanels()),
-                            isDocked = { it == DjTab || it == TimerTab },
-                            onToggle = {},
-                            timerFeature = timer(TimerStatus.RUNNING, 53.seconds),
-                            pulsarFeature = PulsarViewModel.previewFeature(),
-                            onTogglePlayback = {},
-                        )
                     }
                 }
             }
             try {
-                File(outDir, "timer-bottombar-states.png").writeBytes(scene.render().encodeToData()!!.bytes)
+                File(outDir, "timer-topbar-states.png").writeBytes(scene.render().encodeToData()!!.bytes)
             } finally {
                 scene.close()
             }
         }.onFailure {
             if (it is IllegalStateException) throw it
-            println("[render-harness] timer bottom bar states skipped: $it")
+            println("[render-harness] timer top bar states skipped: $it")
         }
     }
 

@@ -48,7 +48,6 @@ class VibeStepRenderHarness {
                                     panels = bottomBarPanels(largeScreenPanels()),
                                     isDocked = { it == PulsarTab || it == DjTab },
                                     onToggle = {},
-                                    timerFeature = TimerViewModel.previewFeature(),
                                     pulsarFeature = pulsar,
                                     onTogglePlayback = {},
                                 )
@@ -96,7 +95,6 @@ class VibeStepRenderHarness {
                                 panels = bottomBarPanels(largeScreenPanels()),
                                 isDocked = { it == PulsarTab || it == DjTab },
                                 onToggle = {},
-                                timerFeature = TimerViewModel.previewFeature(),
                                 pulsarFeature = feature,
                                 onTogglePlayback = {},
                             )
@@ -133,7 +131,6 @@ class VibeStepRenderHarness {
                             panels = bottomBarPanels(largeScreenPanels()),
                             isDocked = { it == PulsarTab || it == DjTab },
                             onToggle = {},
-                            timerFeature = TimerViewModel.previewFeature(),
                             pulsarFeature = pulsar,
                             onTogglePlayback = {},
                             previewFocusPreviousTile = true,

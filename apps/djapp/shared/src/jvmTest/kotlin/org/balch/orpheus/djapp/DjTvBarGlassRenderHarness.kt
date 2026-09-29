@@ -132,6 +132,7 @@ class DjTvBarGlassRenderHarness {
                         )
                         Column(Modifier.fillMaxSize()) {
                             DjTvTopBar(
+                                timerFeature = TimerViewModel.previewFeature(),
                                 panels = topBarPanels(allPanels),
                                 isDocked = { it in docked },
                                 onToggle = {},
@@ -150,7 +151,6 @@ class DjTvBarGlassRenderHarness {
                                 panels = bottomBarPanels(allPanels),
                                 isDocked = { it in docked.toSet() },
                                 onToggle = {},
-                                timerFeature = TimerViewModel.previewFeature(),
                                 pulsarFeature = PulsarViewModel.previewFeature(),
                                 onTogglePlayback = {},
                                 glass = glass,

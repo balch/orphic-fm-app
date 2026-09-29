@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -57,10 +56,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.VibeNavState
-import org.balch.orpheus.features.timer.TimerFeature
-import org.balch.orpheus.features.timer.TimerStatus
-import org.balch.orpheus.features.timer.TimerUiState
-import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusRegion
@@ -69,8 +64,6 @@ import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.infrastructure.tvFocusRegionBorder
 import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Icon size for a bottom bar item — doubled from the original 30dp per the user's explicit
@@ -88,23 +81,18 @@ private val TvBottomBarIconLabelGap = 6.dp
 private val TvBottomBarLabelSize = 24.sp
 
 /**
- * Timer countdown text size — a step under the label so the label stays the item's name and the
- * countdown reads as the value beneath it, not as a second title.
- */
-private val TvBottomBarCountdownSize = 20.sp
-
-/**
  * Minimum touch/focus target. Width and height are NOT forced equal: these are icon-over-label
  * columns, so width naturally follows the (short) label text while height carries the "twice as
  * big" read. Forcing width to match the height too (148dp squares) would widen the centre group's
  * four toggles by about 190dp, taken from the ◀/▶ step tiles either side of it.
  *
- * The height also has to keep clearing the tallest item state — Timer with a running countdown
- * line under its label — so that starting a timer never grows the bar and reflows the dock above
- * it. It does at 148dp (verified by rendering: three-line content measures ~143dp), so this stays
- * where it was; the render harness's timer-bottombar-states shot is the check if it ever moves.
+ * Wide enough for "Pulsar", the longest label, so all four toggles share this width and the dome
+ * between them stays on the bar's centre.
+ *
+ * The height is kept from when Timer's running countdown made the tallest item three lines, so
+ * the dock above does not reflow.
  */
-internal val TvBottomBarMinWidth = 100.dp
+internal val TvBottomBarMinWidth = 106.dp
 private val TvBottomBarMinHeight = 148.dp
 
 /** The gap between the bar's items, the dome's slot among them. */
@@ -177,22 +165,20 @@ internal fun nextTileDescription(nav: VibeNavState): String =
     nav.nextName?.takeIf { it.isNotBlank() }?.let { "Next vibe, $it" } ?: "Next vibe"
 
 /**
- * Fixed bottom bar display order: DJ, Mix, Horn, Timer, as the phone bar orders its tabs. This is
- * independent of [dockable]'s toggle-order and of each panel's actual dock position (left/right
- * column vs. centre stage — see [assignDock]), which follows dock-toggle order, not this list.
- * Pulsar, Info and Ends are dock toggles too, in the top bar (see [topBarPanels]).
+ * Fixed bottom bar display order: DJ, Mix, Pulsar, Horn. This is independent of [dockable]'s
+ * toggle-order and of each panel's actual dock position (left/right column vs. centre stage —
+ * see [assignDock]), which follows dock-toggle order, not this list. Info, Timer and Ends are
+ * dock toggles too, in the top bar (see [topBarPanels]).
  */
-private val BottomBarOrder: List<DjRoute> = listOf(DjTab, MixTab, HornTab, TimerTab)
+private val BottomBarOrder: List<DjRoute> = listOf(DjTab, MixTab, PulsarTab, HornTab)
 
 /** Filters [dockable] down to [BottomBarOrder], preserving that fixed display order. */
 internal fun bottomBarPanels(dockable: List<DjRoute>): List<DjRoute> =
     BottomBarOrder.filter { it in dockable }
 
 /**
- * The dock's bottom bar: DJ, Mix, the play/pause dome, Horn and Timer in the centre, like the
- * phone bar, between ◀/▶ vibe navigator tiles at either end. Every toggle docks/undocks its own
- * panel (see [DjPanelDock]); Timer keeps its icon and label and adds a live countdown line beneath
- * them while running or paused.
+ * The dock's bottom bar: DJ, Mix, the play/pause dome, Pulsar and Horn in the centre, between ◀/▶
+ * vibe navigator tiles at either end. Every toggle docks/undocks its own panel (see [DjPanelDock]).
  *
  * Play/pause is the vibe transport's dome in the centre slot, between the two middle toggles as in
  * the phone bar, hung from the toggles' label line with its name in a pill above it (see [DockDome]).
@@ -208,7 +194,6 @@ fun DjTvBottomBar(
     panels: List<DjRoute>,
     isDocked: (DjRoute) -> Boolean,
     onToggle: (DjRoute) -> Unit,
-    timerFeature: TimerFeature,
     pulsarFeature: PulsarFeature,
     onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
@@ -315,8 +300,7 @@ fun DjTvBottomBar(
                         previewFocused = previewFocusPreviousTile,
                     )
                 }
-                // Aligned by the first baseline, so the dome hangs from the toggles' label line and a
-                // running Timer's countdown hangs below its own.
+                // Aligned by the first baseline, so the dome hangs from the toggles' label line.
                 Row(horizontalArrangement = Arrangement.spacedBy(TvBottomBarItemGap)) {
                     for (index in 0..panels.size) {
                         if (index == domeIndex) {
@@ -339,8 +323,6 @@ fun DjTvBottomBar(
                             onClick = { onToggle(route) },
                             accent = dockAccent,
                             modifier = Modifier.alignBy(FirstBaseline),
-                            // Read inside the Timer item, so its once-a-second tick recomposes the countdown alone.
-                            countdown = if (route is TimerTab) timerFeature else null,
                             previewFocused = route == previewFocusedRoute,
                         )
                     }
@@ -385,8 +367,8 @@ private fun StepSlot(
 
 /**
  * A ◀/▶ vibe step tile on one line: its arrow at the bar's outer end and the neighbour's [name]
- * beside it, its baseline on the toggles' label line (task 28C) -- the same line DJ, Mix, Horn and
- * Timer's own labels sit on, since [TvBottomBarItem] stacks an identical icon over its label with
+ * beside it, its baseline on the toggles' label line (task 28C) -- the same line DJ, Mix, Pulsar and
+ * Horn's own labels sit on, since [TvBottomBarItem] stacks an identical icon over its label with
  * the same [TvBottomBarIconLabelGap]. A name too long for its slot marquee-scrolls, or on TV
  * hardware ellipsises. Not a dock toggle, so no docked wash and no shown/hidden badge; the D-pad
  * cursor lifts it onto the accent plate as it does the toggles. Its [contentDescription] is read
@@ -467,8 +449,7 @@ private fun StepTile(
 }
 
 /**
- * One dock toggle: icon over label, plus — for Timer while running/paused — a countdown line under
- * the label. Two independent signals, each on its own visual channel so neither can be mistaken for
+ * One dock toggle: icon over label. Two independent signals, each on its own visual channel so neither can be mistaken for
  * the other:
  * - Docked state (a panel is currently shown) is a persistent accent tint/wash.
  * - Focus (the D-pad cursor is on this item right now) is an opaque accent-tinted raised plate.
@@ -485,8 +466,6 @@ private fun TvBottomBarItem(
     onClick: () -> Unit,
     accent: DockAccent,
     modifier: Modifier = Modifier,
-    // Timer only: its countdown line, running or paused.
-    countdown: TimerFeature? = null,
     previewFocused: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -544,9 +523,7 @@ private fun TvBottomBarItem(
                 )
                 .padding(TvBottomBarItemPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            // Top-packed, deliberately: every item's icon and label then sit at the same height
-            // across the row, and Timer's countdown hangs into the slack underneath instead of
-            // pushing its own icon up out of line with its neighbours'.
+            // Top-packed, deliberately: every item's icon and label sit at the same height across the row.
             verticalArrangement = Arrangement.spacedBy(TvBottomBarIconLabelGap),
         ) {
             DockIcon(icon = icon, contentDescription = label, tint = tint, modifier = Modifier.size(TvBottomBarIconSize))
@@ -559,7 +536,6 @@ private fun TvBottomBarItem(
                 softWrap = false,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (countdown != null) TvBottomBarCountdown(countdown)
         }
 
         // Whether this panel is on screen, said outright — but only under the cursor. On every
@@ -586,26 +562,6 @@ private fun TvBottomBarItem(
 
 private val IdleItemTint = ColorProducer { Color.White.copy(alpha = TvBottomBarIdleAlpha) }
 
-/**
- * The Timer's countdown digits while it runs or is paused, pulsing via [countdownColor] while
- * running. The timer is collected here, not in the bar, so its once-a-second tick recomposes
- * these digits alone; the pulse is read in draw, so its frames recompose nothing.
- */
-@Composable
-private fun TvBottomBarCountdown(timerFeature: TimerFeature) {
-    val timer by timerFeature.stateFlow.collectAsStateWithLifecycle()
-    val running = timer.status == TimerStatus.RUNNING
-    if (!running && timer.status != TimerStatus.PAUSED) return
-    Text(
-        text = formatNavCountdown(timer.remainingTime),
-        color = countdownColor(paused = !running),
-        fontFamily = FontFamily.Monospace,
-        fontSize = TvBottomBarCountdownSize,
-        maxLines = 1,
-        softWrap = false,
-    )
-}
-
 // ==================== PREVIEWS ====================
 
 @Preview(widthDp = 1280, heightDp = 200, name = "TV Bottom Bar — Default Dock")
@@ -617,14 +573,13 @@ private fun DjTvBottomBarDefaultPreview() {
             panels = bottomBarPanels(largeScreenPanels()),
             isDocked = { it in docked },
             onToggle = {},
-            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
             onTogglePlayback = {},
         )
     }
 }
 
-@Preview(widthDp = 1280, heightDp = 200, name = "TV Bottom Bar — Everything Docked, Timer Running")
+@Preview(widthDp = 1280, heightDp = 200, name = "TV Bottom Bar — Everything Docked")
 @Composable
 private fun DjTvBottomBarEverythingDockedPreview() {
     OrpheusTheme {
@@ -632,13 +587,6 @@ private fun DjTvBottomBarEverythingDockedPreview() {
             panels = bottomBarPanels(largeScreenPanels()),
             isDocked = { true },
             onToggle = {},
-            timerFeature = TimerViewModel.previewFeature(
-                TimerUiState(
-                    initialTime = 45.minutes,
-                    remainingTime = 12.minutes.plus(6.seconds),
-                    status = TimerStatus.RUNNING,
-                ),
-            ),
             pulsarFeature = PulsarViewModel.previewFeature(),
             onTogglePlayback = {},
         )
@@ -654,7 +602,6 @@ private fun DjTvBottomBarFocusedPreview() {
             panels = bottomBarPanels(largeScreenPanels()),
             isDocked = { it in docked },
             onToggle = {},
-            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
             onTogglePlayback = {},
             previewFocusedRoute = HornTab,
@@ -671,7 +618,6 @@ private fun DjTvBottomBarRegionFocusedPreview() {
             panels = bottomBarPanels(largeScreenPanels()),
             isDocked = { it in docked },
             onToggle = {},
-            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
             onTogglePlayback = {},
             previewRegionFocused = true,

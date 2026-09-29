@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,9 +48,11 @@ import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
@@ -64,6 +67,9 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.timer.TimerFeature
+import org.balch.orpheus.features.timer.TimerStatus
+import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
@@ -115,10 +121,10 @@ private val TvTopBarArmedStroke = 2.5.dp
 private val TvTopBarBadgeSize = 18.dp
 
 /**
- * The top bar's dock toggles, all grouped at its start: Pulsar, Info, then Ends. Independent of
+ * The top bar's dock toggles, all grouped at its start: Info, Timer, then Ends. Independent of
  * the dock's own slot order (see [assignDock]).
  */
-private val TopBarOrder: List<DjRoute> = listOf(PulsarTab, VibeInfoTab, EndsTab)
+private val TopBarOrder: List<DjRoute> = listOf(VibeInfoTab, TimerTab, EndsTab)
 
 /** Filters [dockable] down to [TopBarOrder], preserving that fixed display order. */
 internal fun topBarPanels(dockable: List<DjRoute>): List<DjRoute> = TopBarOrder.filter { it in dockable }
@@ -152,8 +158,8 @@ private val TvTopBarPickerPrefixWidth = 345.dp
 
 /**
  * The left group's toggle padding, icon and icon-to-label gap, and the gap between toggles — the
- * fixed, tightened style every toggle now uses, since Ends always shares the row with Pulsar and
- * Info: it fits a 900dp bar's 328dp side with PLAYS. A longer ending style ellipsises there.
+ * fixed, tightened style every toggle now uses, since Ends always shares the row with Info and
+ * Timer: it fits a 900dp bar's 328dp side with PLAYS. A longer ending style ellipsises there.
  */
 private val TvTopBarCompactPadding = 12.dp
 private val TvTopBarCompactIconSize = 28.dp
@@ -172,9 +178,9 @@ private sealed interface VizPickerEntry {
 }
 
 /**
- * The dock's top bar: the Pulsar, Info and Ends dock toggles (left), the app title (centred,
+ * The dock's top bar: the Info, Timer and Ends dock toggles (left), the app title (centred,
  * non-interactive), and the Vibe + Viz pickers (right). Ends always sits in the left group, after
- * Pulsar and Info, at every dock width and platform. The toggles dock their panels exactly as the
+ * Info and Timer, at every dock width and platform. The toggles dock their panels exactly as the
  * bottom bar's do, through the same [isDocked] and [onToggle]. Play/pause is the bottom bar's
  * centre dome (see [DockDome]). A narrow bar only drops the pickers' "Vibe: "/"Viz: " prefixes
  * (see [TvTopBarPickerPrefixWidth]).
@@ -189,6 +195,7 @@ fun DjTvTopBar(
     onToggle: (DjRoute) -> Unit,
     vizFeature: VizFeature,
     pulsarFeature: PulsarFeature,
+    timerFeature: TimerFeature,
     modifier: Modifier = Modifier,
     // The bar's glass, behind its content; television hardware goes without.
     glass: Boolean = false,
@@ -284,16 +291,26 @@ fun DjTvTopBar(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     startPanels.forEach { route ->
-                        TvTopBarToggle(
-                            icon = route.icon,
-                            // Short form for the bar; the route's own label ("Vibe Info") stays intact for
-                            // everything keyed on it (preferences persistence, the phone-nav sheet saver).
-                            label = if (route == VibeInfoTab) "Info" else route.label,
-                            docked = isDocked(route),
-                            onClick = { onToggle(route) },
-                            accent = accent,
-                            previewFocused = route == previewFocusedRoute,
-                        )
+                        if (route == TimerTab) {
+                            TvTimerToggle(
+                                timerFeature = timerFeature,
+                                docked = isDocked(route),
+                                onClick = { onToggle(route) },
+                                accent = accent,
+                                previewFocused = route == previewFocusedRoute,
+                            )
+                        } else {
+                            TvTopBarToggle(
+                                icon = route.icon,
+                                // Short form for the bar; the route's own label ("Vibe Info") stays intact for
+                                // everything keyed on it (preferences persistence, the phone-nav sheet saver).
+                                label = if (route == VibeInfoTab) "Info" else route.label,
+                                docked = isDocked(route),
+                                onClick = { onToggle(route) },
+                                accent = accent,
+                                previewFocused = route == previewFocusedRoute,
+                            )
+                        }
                     }
                     if (EndsTab in panels) {
                         TvEndsToggle(
@@ -302,7 +319,7 @@ fun DjTvTopBar(
                             onClick = { onToggle(EndsTab) },
                             accent = accent,
                             previewFocused = previewFocusedRoute == EndsTab,
-                            // Last in the row, so a long ending style is what ellipsises, not Pulsar or Info.
+                            // Last in the row, so a long ending style is what ellipsises, not Info or Timer.
                             modifier = Modifier.weight(1f, fill = false),
                         )
                     }
@@ -489,8 +506,50 @@ private fun TvEndsToggle(
 }
 
 /**
+ * Every shape the Timer toggle's label takes: its name and [formatNavCountdown]'s buckets, which
+ * cap at 4:20. Digits are tabular, so "00" is as wide as any two.
+ */
+private val TimerLabelShapes = listOf(TimerTab.label, "00m", "00s", "0:00")
+
+/**
+ * The Timer toggle: its label is the countdown while the timer runs or is paused, and "Timer"
+ * otherwise; paused, its icon becomes a pause glyph. The label is held at its widest shape, so
+ * a tick never slides Ends along the row. The timer is collected here, so its once-a-second tick
+ * recomposes this toggle alone.
+ */
+@Composable
+private fun TvTimerToggle(
+    timerFeature: TimerFeature,
+    docked: Boolean,
+    onClick: () -> Unit,
+    accent: DockAccent,
+    previewFocused: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val timer by timerFeature.stateFlow.collectAsStateWithLifecycle()
+    val paused = timer.status == TimerStatus.PAUSED
+    val counting = paused || timer.status == TimerStatus.RUNNING
+    TvTopBarToggle(
+        icon = if (paused) Icons.Rounded.Pause else TimerTab.icon,
+        label = if (counting) formatNavCountdown(timer.remainingTime) else TimerTab.label,
+        // A bare "12m" doesn't say what the toggle is, so the icon names it while counting.
+        iconDescription = when {
+            paused -> "Timer, paused"
+            counting -> TimerTab.label
+            else -> null
+        },
+        stableLabels = TimerLabelShapes,
+        docked = docked,
+        onClick = onClick,
+        accent = accent,
+        previewFocused = previewFocused,
+        modifier = modifier,
+    )
+}
+
+/**
  * A dock toggle at the top bar's control height, on the same raised plate as the title and the
- * pickers, in the left group's fixed tightened style (see [TvTopBarCompactPadding]) — Pulsar, Info
+ * pickers, in the left group's fixed tightened style (see [TvTopBarCompactPadding]) — Info, Timer
  * and Ends always share that row, so every toggle uses the size that fits all three at 900dp.
  * Three signals, each on a channel of its own:
  * - docked: a stronger wash of the [accent] on the plate, and the icon and label lit in it, as the
@@ -514,9 +573,20 @@ private fun TvTopBarToggle(
     onClick: () -> Unit,
     accent: DockAccent,
     modifier: Modifier = Modifier,
+    // Only where the label alone doesn't name the toggle.
+    iconDescription: String? = null,
+    // Labels the toggle may swap between; its label is held at the widest, so a swap never resizes it.
+    stableLabels: List<String> = emptyList(),
     armed: Boolean = false,
     previewFocused: Boolean = false,
 ) {
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontSize = TvTopBarLabelSize, fontFeatureSettings = "tnum")
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val labelMinWidth = remember(stableLabels, labelStyle, density) {
+        val widest = stableLabels.maxOfOrNull { measurer.measure(it, labelStyle, maxLines = 1, softWrap = false).size.width } ?: 0
+        with(density) { widest.toDp() }
+    }
     val interactionSource = remember { MutableInteractionSource() }
     val liveFocused by interactionSource.collectIsFocusedAsState()
     // A cursor's treatment: a mouse click takes focus too, and must not leave the toggle looking selected.
@@ -577,19 +647,18 @@ private fun TvTopBarToggle(
         ) {
             DockIcon(
                 icon = icon,
-                contentDescription = null,
+                contentDescription = iconDescription,
                 tint = tint,
                 modifier = Modifier.size(TvTopBarCompactIconSize),
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = labelStyle,
                 color = tint,
-                fontSize = TvTopBarLabelSize,
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f, fill = false).widthIn(min = labelMinWidth),
             )
         }
         if (focused) {
@@ -625,9 +694,10 @@ private fun DjTvTopBarEndsArmedPreview() {
         }
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab || it == EndsTab },
+            isDocked = { it == VibeInfoTab || it == EndsTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = armed,
             previewFocusedRoute = VibeInfoTab,
         )
@@ -641,9 +711,10 @@ private fun DjTvTopBarPlayingPreview() {
         val basePulsar = PulsarViewModel.previewFeature()
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab },
+            isDocked = { it == VibeInfoTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(
                 PulsarUiState(globalPaused = false, vibe = basePulsar.vibeList.first()),
             ),
@@ -663,9 +734,10 @@ private fun DjTvTopBarNarrowLongVibePreview() {
         val basePulsar = PulsarViewModel.previewFeature()
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab },
+            isDocked = { it == VibeInfoTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(
                 PulsarUiState(
                     globalPaused = false,
@@ -683,9 +755,10 @@ private fun DjTvTopBarCompactPreview() {
     OrpheusTheme {
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab || it == EndsTab },
+            isDocked = { it == VibeInfoTab || it == EndsTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
         )
     }
@@ -697,9 +770,10 @@ private fun DjTvTopBarVibeFocusedPreview() {
     OrpheusTheme {
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab },
+            isDocked = { it == VibeInfoTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
             previewFocusedButton = TvTopBarButtonId.VIBE_PICKER,
         )
@@ -712,9 +786,10 @@ private fun DjTvTopBarVizFocusedPreview() {
     OrpheusTheme {
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab },
+            isDocked = { it == VibeInfoTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
             previewFocusedButton = TvTopBarButtonId.VIZ_PICKER,
         )
@@ -727,9 +802,10 @@ private fun DjTvTopBarRegionFocusedPreview() {
     OrpheusTheme {
         DjTvTopBar(
             panels = PreviewTopPanels,
-            isDocked = { it == PulsarTab },
+            isDocked = { it == VibeInfoTab },
             onToggle = {},
             vizFeature = VizViewModel.previewFeature(),
+            timerFeature = TimerViewModel.previewFeature(),
             pulsarFeature = PulsarViewModel.previewFeature(),
             previewRegionFocused = true,
         )
@@ -759,9 +835,10 @@ private fun DjTvTopBarPinkVizPalettePreview() {
         CompositionLocalProvider(LocalLiquidEffects provides PinkVizPalette) {
             DjTvTopBar(
                 panels = PreviewTopPanels,
-                isDocked = { it == PulsarTab },
+                isDocked = { it == VibeInfoTab },
                 onToggle = {},
                 vizFeature = VizViewModel.previewFeature(),
+                timerFeature = TimerViewModel.previewFeature(),
                 pulsarFeature = PulsarViewModel.previewFeature(),
             )
         }
@@ -775,9 +852,10 @@ private fun DjTvTopBarOrangeVizPalettePreview() {
         CompositionLocalProvider(LocalLiquidEffects provides OrangeVizPalette) {
             DjTvTopBar(
                 panels = PreviewTopPanels,
-                isDocked = { it == PulsarTab },
+                isDocked = { it == VibeInfoTab },
                 onToggle = {},
                 vizFeature = VizViewModel.previewFeature(),
+                timerFeature = TimerViewModel.previewFeature(),
                 pulsarFeature = PulsarViewModel.previewFeature(),
             )
         }

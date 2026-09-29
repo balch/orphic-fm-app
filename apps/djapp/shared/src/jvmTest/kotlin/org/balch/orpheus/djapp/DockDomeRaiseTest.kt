@@ -292,18 +292,18 @@ class DockDomeRaiseTest {
     private fun Color.near(other: Color) =
         abs(red - other.red) + abs(green - other.green) + abs(blue - other.blue) < 0.06f
 
-    // DJ, Mix, the dome, Horn and Timer, centred in the bar as the phone bar's tabs and dome are.
+    // DJ, Mix, the dome, Pulsar and Horn, centred in the bar as the phone bar's tabs and dome are.
     @Test
-    fun theCentreHoldsDjMixTheDomeHornAndTimer() {
+    fun theCentreHoldsDjMixTheDomePulsarAndHorn() {
         listOf(1280 to 720, 1512 to 982).forEach { (w, h) ->
             val dock = Dock(w, h)
             try {
                 val centres = listOf("DJ", "Mix").map { dock.text(it).center() } + dock.dome.center.x +
-                    listOf("Horn", "Timer").map { dock.text(it).center() }
+                    listOf("Pulsar", "Horn").map { dock.text(it).center() }
                 assertEquals(centres.sorted(), centres, "the centre is out of order at ${w}x$h: $centres")
                 assertEquals(w / 2f, dock.dome.center.x, 0.5f, "the dome is off the bar's centre at ${w}x$h")
                 // Label centres, each rounded to a whole pixel inside its item.
-                assertEquals(centres[2] - centres[1], centres[3] - centres[2], 1.5f, "the dome is not midway between Mix and Horn")
+                assertEquals(centres[2] - centres[1], centres[3] - centres[2], 1.5f, "the dome is not midway between Mix and Pulsar")
             } finally {
                 dock.close()
             }
@@ -512,15 +512,15 @@ class DockDomeRaiseTest {
             }
     }
 
-    // Off TV the dome's slot has DockDomeSideRoom more on each side, so Mix and Horn sit 12dp from it.
+    // Off TV the dome's slot has DockDomeSideRoom more on each side, so Mix and Pulsar sit 12dp from it.
     @Test
     fun theDomeHasExtraRoomBesideItOffTelevision() {
         listOf(Dock(1512, 982) to DockDomeSideRoom, Dock(1366, 1024, desktop = false) to DockDomeSideRoom, Dock(1280, 720, desktop = false, tv = true) to 0.dp)
             .forEach { (dock, side) ->
                 try {
-                    val between = (dock.toggle("Horn").left - dock.toggle("Mix").right) / dock.totalScale
+                    val between = (dock.toggle("Pulsar").left - dock.toggle("Mix").right) / dock.totalScale
                     val expected = dock.ringSize + (TvBottomBarItemGap + side) * 2
-                    assertEquals(expected.value, between, 1f, "Mix to Horn around a ${dock.ringSize} dome")
+                    assertEquals(expected.value, between, 1f, "Mix to Pulsar around a ${dock.ringSize} dome")
                 } finally {
                     dock.close()
                 }

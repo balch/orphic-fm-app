@@ -828,6 +828,7 @@ internal fun DjAppTvChrome(
                 onToggle = onToggle,
                 vizFeature = vizFeature,
                 pulsarFeature = pulsarFeature,
+                timerFeature = timerFeature,
                 glass = barGlass,
             )
             // Full width under the top bar, off the glass; the stage gives up its height.
@@ -839,7 +840,6 @@ internal fun DjAppTvChrome(
                 panels = bottomPanels,
                 isDocked = isDocked,
                 onToggle = onToggle,
-                timerFeature = timerFeature,
                 pulsarFeature = pulsarFeature,
                 onTogglePlayback = onTogglePlayback,
                 domeRingSize = domeRingSize,

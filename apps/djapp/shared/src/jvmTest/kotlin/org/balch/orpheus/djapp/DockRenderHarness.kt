@@ -139,6 +139,7 @@ class DockRenderHarness {
                     OrpheusTheme {
                         Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
                             DjTvTopBar(
+                                timerFeature = TimerViewModel.previewFeature(),
                                 panels = topBarPanels(largeScreenPanels()),
                                 isDocked = { it == PulsarTab || it == EndsTab },
                                 onToggle = {},

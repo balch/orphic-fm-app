@@ -221,7 +221,6 @@ class MusicWaveRenderHarness {
                                     panels = bottomBarPanels(largeScreenPanels()),
                                     isDocked = { it == DjTab },
                                     onToggle = {},
-                                    timerFeature = TimerViewModel.previewFeature(),
                                     pulsarFeature = pulsar,
                                     onTogglePlayback = {},
                                     modifier = Modifier.align(Alignment.BottomCenter),

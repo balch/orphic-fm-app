@@ -451,7 +451,6 @@ class MarqueeLabelTest {
                         panels = bottomBarPanels(largeScreenPanels()),
                         isDocked = { compositions++; it == PulsarTab },
                         onToggle = {},
-                        timerFeature = TimerViewModel.previewFeature(),
                         pulsarFeature = pulsar,
                         onTogglePlayback = {},
                     )

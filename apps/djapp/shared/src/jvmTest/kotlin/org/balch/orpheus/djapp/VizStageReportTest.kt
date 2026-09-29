@@ -99,6 +99,7 @@ class VizStageReportTest {
             CompositionLocalProvider(LocalTelevisionHardware provides tv) {
                 Column(Modifier.fillMaxSize()) {
                     DjTvTopBar(
+                        timerFeature = TimerViewModel.previewFeature(),
                         panels = topBarPanels(largeScreenPanels()),
                         isDocked = { false },
                         onToggle = {},
@@ -117,7 +118,6 @@ class VizStageReportTest {
                         panels = bottomBarPanels(largeScreenPanels()),
                         isDocked = { false },
                         onToggle = {},
-                        timerFeature = TimerViewModel.previewFeature(),
                         pulsarFeature = PulsarViewModel.previewFeature(),
                         onTogglePlayback = {},
                         modifier = Modifier.onGloballyPositioned { bottomBar = it.boundsInRoot() },

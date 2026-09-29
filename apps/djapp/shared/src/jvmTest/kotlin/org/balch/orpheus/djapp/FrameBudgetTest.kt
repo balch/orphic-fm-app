@@ -213,7 +213,7 @@ class FrameBudgetTest {
         scene(widthDp, 200, density = 1f, scopes = scopes, feed = feed) {
             DjTvBottomBar(
                 panels = panels, isDocked = { false }, onToggle = {},
-                timerFeature = TimerViewModel.previewFeature(), pulsarFeature = pulsar, onTogglePlayback = {},
+                pulsarFeature = pulsar, onTogglePlayback = {},
                 domeRingSize = TvDockDomeRingSize,
             )
         }
@@ -464,7 +464,7 @@ class FrameBudgetTest {
                         DockSongBand(pulsar)
                         DjTvBottomBar(
                             panels = panels, isDocked = { it == DjTab }, onToggle = {},
-                            timerFeature = TimerViewModel.previewFeature(), pulsarFeature = pulsar, onTogglePlayback = {},
+                            pulsarFeature = pulsar, onTogglePlayback = {},
                             glass = !tv,
                             domeRingSize = TvDockDomeRingSize,
                         )
@@ -569,21 +569,6 @@ class FrameBudgetTest {
             assertEquals(0.0, scopes, "the countdown's pulse recomposed the phone bar")
             assertTrue(bytes < PhoneCountdownBudget, "a countdown frame allocated $bytes B over S0")
             assertStillPulses(it, "phone bar")
-        }
-        counted { scopes ->
-            scene(2560, 440, scopes = scopes) {
-                DjTvBottomBar(
-                    panels = panels, isDocked = { it == PulsarTab }, onToggle = {}, timerFeature = timer, pulsarFeature = still,
-                    onTogglePlayback = {}, domeRingSize = TvDockDomeRingSize,
-                )
-            }
-        }.use {
-            val bytes = it.bytesPerFrame(count = 120) - baseline
-            val scopes = it.scopesPerFrame()
-            report("S6b dock, timer running: $bytes B/frame over S0, $scopes scopes/frame")
-            assertEquals(0.0, scopes, "the countdown's pulse recomposed the dock")
-            assertTrue(bytes < DockCountdownBudget, "a countdown frame allocated $bytes B over S0")
-            assertStillPulses(it, "dock")
         }
     }
 
@@ -739,9 +724,6 @@ class FrameBudgetTest {
 
         /** S6, a running countdown frame over S0 in the phone bar: measured 1088 B. */
         private const val PhoneCountdownBudget = 1_990L
-
-        /** S6, the same in the dock, whose layer the digits redraw: measured 2.2 KB (2.9 KB before the dock redesign). */
-        private const val DockCountdownBudget = 4_360L
 
         /**
          * S7, one swipe move, pointer handling included: measured 18.3 KB, cold or warm. 1.3x, below the

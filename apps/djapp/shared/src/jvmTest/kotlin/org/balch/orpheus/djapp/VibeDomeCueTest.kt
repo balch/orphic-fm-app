@@ -826,7 +826,7 @@ class VibeDomeCueTest {
                     Box(Modifier.fillMaxSize().background(background)) {
                         if (shown.value) DjTvBottomBar(
                             panels = bottomBarPanels(largeScreenPanels()), isDocked = { false }, onToggle = {},
-                            timerFeature = TimerViewModel.previewFeature(), pulsarFeature = feature, onTogglePlayback = {},
+                            pulsarFeature = feature, onTogglePlayback = {},
                         )
                     }
                 }

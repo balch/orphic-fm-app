@@ -48,7 +48,6 @@ class DockStepTileTest {
                         panels = bottomBarPanels(largeScreenPanels()),
                         isDocked = { false },
                         onToggle = {},
-                        timerFeature = TimerViewModel.previewFeature(),
                         pulsarFeature = pulsar,
                         onTogglePlayback = {},
                     )

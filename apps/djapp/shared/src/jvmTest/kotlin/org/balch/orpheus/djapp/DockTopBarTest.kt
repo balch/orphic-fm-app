@@ -21,6 +21,9 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.timer.TimerFeature
+import org.balch.orpheus.features.timer.TimerStatus
+import org.balch.orpheus.features.timer.TimerUiState
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.TvFocusRegionHolder
@@ -29,9 +32,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
- * The dock's top row: Pulsar, Info and Ends at its start, each a dock toggle as the bottom bar's
+ * The dock's top row: Info, Timer and Ends at its start, each a dock toggle as the bottom bar's
  * are, and the Vibe + Viz pickers at its end. None of them ever reach the centred title, and below
  * about 930dp wide the pickers drop their "Vibe: "/"Viz: " prefixes.
  *
@@ -39,8 +44,8 @@ import kotlin.test.assertTrue
  */
 class DockTopBarTest {
 
-    /** The real chrome at [width] x 720, Pulsar docked; [longest], the longest vibe name and ending style. */
-    private class Dock(val width: Int, longest: Boolean = true) {
+    /** The real chrome at [width] x 720, Timer docked; [longest], the longest vibe name and ending style. */
+    private class Dock(val width: Int, longest: Boolean = true, timer: TimerFeature = TimerViewModel.previewFeature()) {
         val toggled = mutableListOf<DjRoute>()
         private val pulsar: PulsarFeature = run {
             val base = PulsarViewModel.previewFeature()
@@ -65,10 +70,10 @@ class DockTopBarTest {
                         focusRegion = TvFocusRegionHolder(),
                         vizFeature = VizViewModel.previewFeature(),
                         pulsarFeature = pulsar,
-                        timerFeature = TimerViewModel.previewFeature(),
+                        timerFeature = timer,
                         onTogglePlayback = {},
                         dockablePanels = largeScreenPanels(),
-                        dockedPanels = listOf(PulsarTab, DjTab),
+                        dockedPanels = listOf(TimerTab, DjTab),
                         activeSheet = null,
                         tabs = djTabs,
                         onToggleDocked = { toggled += it },
@@ -146,34 +151,85 @@ class DockTopBarTest {
     }
 
     @Test
-    fun pulsarInfoAndEndsSitAtTheStartAndEachTogglesItsPanel() {
+    fun infoTimerAndEndsSitAtTheStartAndEachTogglesItsPanel() {
         val dock = Dock(1280)
         try {
-            val pulsar = dock.control("Pulsar")
             val info = dock.control("Info")
+            val timer = dock.control("Timer")
             val ends = dock.control("CROSSFADE")
             val title = dock.title
             // In the top bar, all at the start, before the title.
-            listOf(pulsar, info, ends).forEach { assertTrue(it.bounds.bottom <= 72f, "${it.bounds} is not in the top bar") }
+            listOf(info, timer, ends).forEach { assertTrue(it.bounds.bottom <= 72f, "${it.bounds} is not in the top bar") }
             assertTrue(
-                pulsar.bounds.right < info.bounds.left && info.bounds.right < ends.bounds.left && ends.bounds.right < title.left,
-                "Pulsar, Info, Ends and the title are out of order",
+                info.bounds.right < timer.bounds.left && timer.bounds.right < ends.bounds.left && ends.bounds.right < title.left,
+                "Info, Timer, Ends and the title are out of order",
             )
             // Docked state, as the bottom bar's toggles show it.
-            assertEquals("Shown", pulsar.state())
+            assertEquals("Shown", timer.state())
             assertEquals("Hidden", info.state())
-            dock.click(pulsar)
             dock.click(info)
+            dock.click(timer)
             dock.click(ends)
-            assertEquals(listOf(PulsarTab, VibeInfoTab, EndsTab), dock.toggled, "the toggles did not dock their own panels")
-            // And they left the bottom bar.
+            assertEquals(listOf(VibeInfoTab, TimerTab, EndsTab), dock.toggled, "the toggles did not dock their own panels")
+            // And they left the bottom bar, where Pulsar now sits beside the play dome.
             assertTrue(dock.control("DJ").bounds.top > 400f, "sanity: DJ is not in the bottom bar")
+            assertTrue(dock.control("Pulsar").bounds.top > 400f, "Pulsar is not in the bottom bar")
         } finally {
             dock.close()
         }
     }
 
-    // Ends always sits in the left group, after Pulsar and Info, at every width the dock is laid out at.
+    // A running timer's countdown replaces the "Timer" label, and the toggle stays where it was.
+    @Test
+    fun theTimerToggleShowsTheCountdownWhileRunning() {
+        val running = TimerViewModel.previewFeature(TimerUiState(remainingTime = 12.minutes, status = TimerStatus.RUNNING))
+        val dock = Dock(1280, longest = false, timer = running)
+        try {
+            val toggle = dock.control("12m")
+            assertTrue(!dock.shows("Timer"), "the Timer label is still showing beside its countdown")
+            assertTrue(toggle.bounds.bottom <= 72f, "${toggle.bounds} is not in the top bar")
+        } finally {
+            dock.close()
+        }
+    }
+
+    // No countdown shape resizes the toggle, so Ends never slides under a D-pad cursor as it ticks.
+    @Test
+    fun theTimerToggleHoldsItsWidthAsTheCountdownChangesShape() {
+        val states = listOf(
+            TimerStatus.IDLE to 45.minutes,
+            TimerStatus.RUNNING to 9.seconds,
+            TimerStatus.RUNNING to 53.seconds,
+            TimerStatus.RUNNING to 9.minutes,
+            TimerStatus.RUNNING to 67.minutes,
+        )
+        val widths = states.map { (status, remaining) ->
+            val dock = Dock(1280, longest = false, timer = TimerViewModel.previewFeature(TimerUiState(remainingTime = remaining, status = status)))
+            try {
+                val label = if (status == TimerStatus.IDLE) "Timer" else formatNavCountdown(remaining)
+                label to dock.control(label).bounds.width
+            } finally {
+                dock.close()
+            }
+        }
+        assertEquals(1, widths.map { it.second }.distinct().size, "the Timer toggle changed width: $widths")
+    }
+
+    // A bare countdown doesn't name the toggle, so its icon does, and says when it is paused.
+    @Test
+    fun theTimerToggleNamesItselfWhileCounting() {
+        listOf(TimerStatus.RUNNING to "Timer", TimerStatus.PAUSED to "Timer, paused").forEach { (status, name) ->
+            val dock = Dock(1280, longest = false, timer = TimerViewModel.previewFeature(TimerUiState(remainingTime = 12.minutes, status = status)))
+            try {
+                val descriptions = dock.control("12m").config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+                assertEquals(listOf(name), descriptions, "$status")
+            } finally {
+                dock.close()
+            }
+        }
+    }
+
+    // Ends always sits in the left group, after Info and Timer, at every width the dock is laid out at.
     @Test
     fun endsSitsAtTheStartAtEveryWidth() {
         listOf(900, 1032, 1280, 1920).forEach { width ->
@@ -228,7 +284,7 @@ class DockTopBarTest {
             val dock = Dock(width)
             try {
                 val title = dock.title
-                val start = listOf("Pulsar", "Info", "CROSSFADE").map { dock.control(it).bounds }
+                val start = listOf("Info", "Timer", "CROSSFADE").map { dock.control(it).bounds }
                 val end = listOf("Vibe", "Viz").map { dock.picker(it).bounds }
                 start.forEach { assertTrue(it.left >= 0f && it.right <= title.left, "at ${width}dp $it reaches the title $title") }
                 end.forEach { assertTrue(it.left >= title.right && it.right <= width.toFloat(), "at ${width}dp $it reaches the title $title or leaves the bar") }
