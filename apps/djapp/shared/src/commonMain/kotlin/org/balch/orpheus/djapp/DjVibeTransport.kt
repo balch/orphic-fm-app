@@ -431,8 +431,8 @@ internal fun VibeTransportItem(
     // The phone bar and the dock: the name rides above the ring in a pill, over the stage.
     namePill: Boolean = false,
     ringSize: Dp = BarRingSize,
-    // The keyboard focus mark's colour, read in draw: the dock's follows its accent.
-    focusColor: ColorProducer = RingFocusColor,
+    // The keyboard focus mark's colour, read in draw: the dock's follows its accent. Null draws no mark.
+    focusColor: ColorProducer? = RingFocusColor,
     // The song times behind [progress], so the ring's arc runs on between the tracker's updates.
     position: SongPosition? = null,
     // Read only in the ring's frame loop, never in composition.
@@ -516,7 +516,7 @@ internal fun VibeTransportItem(
                     val stroke = Stroke(DomeFocusStroke.toPx())
                     onDrawBehind {
                         // The mode and the fade are read only while focused, so an unfocused dome never redraws with them.
-                        if (!focused.value || inputModes.inputMode != InputMode.Keyboard) return@onDrawBehind
+                        if (focusColor == null || !focused.value || inputModes.inputMode != InputMode.Keyboard) return@onDrawBehind
                         val fade = region?.alpha?.value ?: 1f
                         if (fade <= 0f) return@onDrawBehind
                         val color = focusColor()

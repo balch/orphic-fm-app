@@ -64,6 +64,8 @@ internal fun DockDome(
     nameStyle: TextStyle,
     accent: DockAccent,
     modifier: Modifier = Modifier,
+    // The keyboard focus mark; only TV hardware wears it.
+    focusMark: Boolean = true,
     // Render-harness seams only: pin the ring's wave phase and paused zip, see rememberProgressWave.
     previewWavePhase: Float? = null,
     previewZipMs: Long? = null,
@@ -107,7 +109,7 @@ internal fun DockDome(
             ringWideTarget = true,
             namePill = true,
             ringSize = ringSize,
-            focusColor = focusColor,
+            focusColor = focusColor.takeIf { focusMark },
             position = nav.songPosition(),
             pulse = pulse,
             previewWavePhase = previewWavePhase,

@@ -199,6 +199,8 @@ fun DjTvTopBar(
     modifier: Modifier = Modifier,
     // The bar's glass, behind its content; television hardware goes without.
     glass: Boolean = false,
+    // The region border when focus is in the bar; only TV hardware wears it.
+    focusHighlights: Boolean = true,
     // Preview/render-harness seam only: forces one element's focus visual without real D-pad
     // input. The production call site in DjAppScreen.kt leaves this null.
     previewFocusedButton: TvTopBarButtonId? = null,
@@ -249,7 +251,7 @@ fun DjTvTopBar(
                 Modifier
                     .matchParentSize()
                     .tvFocusRegionBorder(
-                        holder = focusRegion,
+                        holder = focusRegion.takeIf { focusHighlights },
                         token = focusToken,
                         color = regionColor,
                         shape = barShape,

@@ -202,6 +202,8 @@ fun DjTvBottomBar(
     domeRingSize: Dp = BarRingSize,
     // The bar's glass, behind its content; television hardware goes without.
     glass: Boolean = false,
+    // The region border when focus is in the bar, and the dome's focus mark; only TV hardware wears them.
+    focusHighlights: Boolean = true,
     // Render-harness seams only: pin the dome ring's wave phase and paused zip, see rememberProgressWave.
     previewWavePhase: Float? = null,
     previewZipMs: Long? = null,
@@ -264,7 +266,7 @@ fun DjTvBottomBar(
                 Modifier
                     .matchParentSize()
                     .tvFocusRegionBorder(
-                        holder = focusRegion,
+                        holder = focusRegion.takeIf { focusHighlights },
                         token = focusToken,
                         color = accentNow,
                         shape = barShape,
@@ -311,6 +313,7 @@ fun DjTvBottomBar(
                                 nameStyle = nameStyle,
                                 accent = dockAccent,
                                 modifier = Modifier.alignBy(FirstBaseline).padding(horizontal = domeSideRoom),
+                                focusMark = focusHighlights,
                                 previewWavePhase = previewWavePhase,
                                 previewZipMs = previewZipMs,
                             )

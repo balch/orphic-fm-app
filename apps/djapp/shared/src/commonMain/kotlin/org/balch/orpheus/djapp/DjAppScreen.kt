@@ -402,6 +402,7 @@ fun DjAppScreen(
                     domeRingSize = dockDomeRingSize(television = tvHardware),
                     barGlass = shouldShowTvBarGlass(layout, tvHardware),
                     vizHidesPanelsWhenIdle = hidesPanelsWhenIdle,
+                    barFocusHighlights = tvHardware,
                     focusRegion = focusRegion,
                     vizFeature = vizFeature,
                     pulsarFeature = pulsarFeature,
@@ -748,6 +749,8 @@ internal fun DjAppTvChrome(
     domeRingSize: Dp,
     barGlass: Boolean,
     vizHidesPanelsWhenIdle: Boolean,
+    // Both bars' region border and the dome's focus mark: a TV's D-pad needs them, a pointer or touch doesn't.
+    barFocusHighlights: Boolean = true,
     focusRegion: TvFocusRegionHolder,
     vizFeature: VizFeature,
     pulsarFeature: PulsarFeature,
@@ -830,6 +833,7 @@ internal fun DjAppTvChrome(
                 pulsarFeature = pulsarFeature,
                 timerFeature = timerFeature,
                 glass = barGlass,
+                focusHighlights = barFocusHighlights,
             )
             // Full width under the top bar, off the glass; the stage gives up its height.
             DockSongBand(pulsarFeature)
@@ -844,6 +848,7 @@ internal fun DjAppTvChrome(
                 onTogglePlayback = onTogglePlayback,
                 domeRingSize = domeRingSize,
                 glass = barGlass,
+                focusHighlights = barFocusHighlights,
             )
         }
     }
