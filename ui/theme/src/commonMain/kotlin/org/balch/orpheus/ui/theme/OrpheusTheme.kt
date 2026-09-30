@@ -9,60 +9,43 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.em
 
-// Synth-inspired color palette
-private val NeonCyan = Color(0xFF00F5FF)
-private val NeonMagenta = Color(0xFFFF00FF)
-private val NeonOrange = Color(0xFFFF9F00) // Added Neon Orange
-private val ElectricBlue = Color(0xFF0080FF)
-private val DeepPurple = Color(0xFF1A0A2E)
-private val DarkVoid = Color(0xFF0D0D1A)
-private val SoftPurple = Color(0xFF2D1B4E)
-private val WarmGlow = Color(0xFFFF6B35)
-private val SynthGreen = Color(0xFF39FF14)
-private val SynthPink = Color(0xFFFF69B4)
-private val SeahawksNavy = Color(0xFF002244)
-private val SeahawksGreen = Color(0xFF69BE28)
-private val SeahawksGrey = Color(0xFFA5ACAF)
-private val NinersRed = Color(0xFFFF5252)
-private val NinersGold = Color(0xFFFFD740)
-
 private val DarkColorScheme = darkColorScheme(
-    primary = NeonCyan,
-    onPrimary = DarkVoid,
-    primaryContainer = SoftPurple,
-    onPrimaryContainer = NeonCyan,
-    secondary = NeonMagenta,
-    onSecondary = DarkVoid,
-    secondaryContainer = DeepPurple,
-    onSecondaryContainer = NeonMagenta,
-    tertiary = ElectricBlue,
-    onTertiary = DarkVoid,
-    tertiaryContainer = SoftPurple,
-    onTertiaryContainer = ElectricBlue,
-    error = WarmGlow,
-    onError = DarkVoid,
+    primary = OrpheusColors.neonCyan,
+    onPrimary = OrpheusColors.darkVoid,
+    primaryContainer = OrpheusColors.softPurple,
+    onPrimaryContainer = OrpheusColors.neonCyan,
+    secondary = OrpheusColors.neonMagenta,
+    onSecondary = OrpheusColors.darkVoid,
+    secondaryContainer = OrpheusColors.deepPurple,
+    onSecondaryContainer = OrpheusColors.neonMagenta,
+    tertiary = OrpheusColors.electricBlue,
+    onTertiary = OrpheusColors.darkVoid,
+    tertiaryContainer = OrpheusColors.softPurple,
+    onTertiaryContainer = OrpheusColors.electricBlue,
+    error = OrpheusColors.warmGlow,
+    onError = OrpheusColors.darkVoid,
     errorContainer = OrpheusColors.errorContainerDark,
-    onErrorContainer = WarmGlow,
-    background = DarkVoid,
+    onErrorContainer = OrpheusColors.warmGlow,
+    background = OrpheusColors.darkVoid,
     onBackground = OrpheusColors.onSurfaceDark,
-    surface = DeepPurple,
+    surface = OrpheusColors.deepPurple,
     onSurface = OrpheusColors.onSurfaceDark,
-    surfaceVariant = SoftPurple,
+    surfaceVariant = OrpheusColors.softPurple,
     onSurfaceVariant = OrpheusColors.onSurfaceVariantDark,
     outline = OrpheusColors.outlineDark,
     outlineVariant = OrpheusColors.outlineVariantDark,
     inverseSurface = OrpheusColors.onSurfaceDark,
-    inverseOnSurface = DarkVoid,
-    inversePrimary = DeepPurple,
-    surfaceTint = NeonCyan,
+    inverseOnSurface = OrpheusColors.darkVoid,
+    inversePrimary = OrpheusColors.deepPurple,
+    surfaceTint = OrpheusColors.neonCyan,
 )
 
 // Light scheme for completeness (synth apps are typically dark)
 private val LightColorScheme = lightColorScheme(
-    primary = ElectricBlue,
+    primary = OrpheusColors.electricBlue,
     onPrimary = Color.White,
     primaryContainer = OrpheusColors.primaryContainerLight,
-    onPrimaryContainer = ElectricBlue,
+    onPrimaryContainer = OrpheusColors.electricBlue,
     secondary = OrpheusColors.secondaryLight,
     onSecondary = Color.White,
     background = OrpheusColors.backgroundLight,
@@ -145,23 +128,26 @@ fun TextStyle.proportional(): TextStyle = copy(
     ),
 )
 
-// Convenience extension colors for synth-specific UI
+// Convenience extension colors for synth-specific UI. The schemes above read these, so nothing
+// here may read this file's top-level values: whichever class initialized second would see
+// zeroed, transparent colours.
 object OrpheusColors {
-    val neonCyan = NeonCyan
-    val neonMagenta = NeonMagenta
-    val neonOrange = NeonOrange // Added
-    val electricBlue = ElectricBlue
-    val deepPurple = DeepPurple
-    val darkVoid = DarkVoid
-    val softPurple = SoftPurple
-    val warmGlow = WarmGlow
-    val synthGreen = SynthGreen
-    val synthPink = SynthPink // Added
-    val seahawksNavy = SeahawksNavy
-    val seahawksGreen = SeahawksGreen
-    val seahawksGrey = SeahawksGrey
-    val ninersRed = NinersRed
-    val ninersGold = NinersGold
+    // Synth-inspired color palette
+    val neonCyan = Color(0xFF00F5FF)
+    val neonMagenta = Color(0xFFFF00FF)
+    val neonOrange = Color(0xFFFF9F00)
+    val electricBlue = Color(0xFF0080FF)
+    val deepPurple = Color(0xFF1A0A2E)
+    val darkVoid = Color(0xFF0D0D1A)
+    val softPurple = Color(0xFF2D1B4E)
+    val warmGlow = Color(0xFFFF6B35)
+    val synthGreen = Color(0xFF39FF14)
+    val synthPink = Color(0xFFFF69B4)
+    val seahawksNavy = Color(0xFF002244)
+    val seahawksGreen = Color(0xFF69BE28)
+    val seahawksGrey = Color(0xFFA5ACAF)
+    val ninersRed = Color(0xFFFF5252)
+    val ninersGold = Color(0xFFFFD740)
 
     // Material Theme Defaults
     val errorContainerDark = Color(0xFF4A1F1F)
@@ -294,9 +280,9 @@ object OrpheusColors {
     val metallicBlueLight = Color(0xFF90CAF9) // Lighter version for Flux panel
 
     // Glow colors for knobs/buttons
-    val knobGlow = NeonCyan.copy(alpha = 0.6f)
-    val pulseGlow = NeonMagenta.copy(alpha = 0.8f)
-    val holdGlow = SynthGreen.copy(alpha = 0.7f)
+    val knobGlow = neonCyan.copy(alpha = 0.6f)
+    val pulseGlow = neonMagenta.copy(alpha = 0.8f)
+    val holdGlow = synthGreen.copy(alpha = 0.7f)
     val fadedCyan = Color(0xFF00A0A0)
     
     // LA Lakers Color Palette (for Resonator panel)
