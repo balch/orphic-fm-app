@@ -2,8 +2,8 @@ package org.balch.orpheus.djapp.playlist
 
 import kotlin.random.Random
 
-// Each shows in capitals on the die, about three lines of eight characters at 160dp,
-// so keep every phrase at most 24 characters.
+// Each shows on one line over the stage at 22sp, wide enough to read, and flies to the sheet's header:
+// keep every phrase at most 24 characters so the line fits a phone's width.
 internal val EightBallPhrases: List<String> = listOf(
     "Signs point to funk",
     "Ask again after the drop",

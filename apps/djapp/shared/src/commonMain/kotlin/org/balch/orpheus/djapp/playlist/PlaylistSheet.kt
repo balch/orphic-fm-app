@@ -59,6 +59,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -95,7 +97,8 @@ private const val InfinityScale = 1.3f
 /** Lowers the enlarged ∞, in its own ascents, so its middle sits on the lowercase letters' middle. */
 private val InfinityDrop = BaselineShift(-0.1f)
 
-private val PhraseBlue = Color(0xFF9FB3FF)
+/** The phrase in the header, and over the stage as it flies there. */
+internal val PhraseBlue = Color(0xFF9FB3FF)
 private val MutedText = Color(0xFF8F86B8)
 private val BadgeBorder = Color(0xFF4A4A6A)
 private val RowDivider = Color(0xFF231A40)
@@ -111,10 +114,22 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
         val view by pulsar.playlistFlow.collectAsStateWithLifecycle()
         val nav by pulsar.vibeNavFlow.collectAsStateWithLifecycle()
         val eightBall = LocalEightBall.current
+        // The header's phrase line tells the reveal where it sits, for its own phrase to fly to, and
+        // stays clear until that is landing. Built once per ball; read only in layout and draw.
+        val phraseLine = remember(eightBall) {
+            if (eightBall == null) Modifier
+            else Modifier
+                .onGloballyPositioned { line ->
+                    val at = line.positionInRoot()
+                    eightBall.anchorPhrase(at.x, at.y + line.size.height / 2f)
+                }
+                .graphicsLayer { alpha = eightBall.headerPhraseAlpha }
+        }
         PlaylistContent(
             view = view,
             current = nav.currentName,
             phrase = eightBall?.phrase ?: EightBallPhrases.first(),
+            phraseLine = phraseLine,
             onEdit = pulsar::editPlaylist,
             onShuffle = {
                 pulsar.editPlaylist(PlaylistEdit.Shuffle)
@@ -130,6 +145,7 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
  * NOW, Up next (≡ reorders, − sets aside) and Set aside (+ brings back), under the mini 8-ball, Shuffle
  * and the album chips (a tap queues that album). Stateless apart from a drag and a chip's lift. [overhang]
  * is how far chrome draws over the bottom edge: the list, Reset order with it, scrolls clear of it.
+ * [phraseLine] rides the header's phrase, for the reveal to find and to hold back.
  */
 @Composable
 internal fun PlaylistContent(
@@ -141,6 +157,7 @@ internal fun PlaylistContent(
     onPlay: (String) -> Unit,
     modifier: Modifier = Modifier,
     overhang: Dp = 0.dp,
+    phraseLine: Modifier = Modifier,
 ) {
     val sections = remember(view, current) { playlistSections(view, current) }
     val albumOf = remember(view.albums) { view.albums.flatMap { (album, names) -> names.map { it to album } }.toMap() }
@@ -179,7 +196,7 @@ internal fun PlaylistContent(
     }
 
     Column(modifier.fillMaxSize()) {
-        PlaylistHeader(phrase = phrase, wobble = { wobble.value }, onShuffle = {
+        PlaylistHeader(phrase = phrase, phraseLine = phraseLine, wobble = { wobble.value }, onShuffle = {
             onShuffle()
             scope.launch {
                 wobble.animateTo(0f, keyframes {
@@ -342,13 +359,13 @@ private fun Modifier.albumLift(on: Boolean, progress: () -> Float): Modifier = i
     }
 
 @Composable
-private fun PlaylistHeader(phrase: String, wobble: () -> Float, onShuffle: () -> Unit) {
+private fun PlaylistHeader(phrase: String, phraseLine: Modifier, wobble: () -> Float, onShuffle: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        EightBall(EightBallFace.Die(""), 40.dp, Modifier.graphicsLayer { rotationZ = wobble() })
+        EightBall(EightBallFace.Die, 40.dp, Modifier.graphicsLayer { rotationZ = wobble() })
         Column(Modifier.weight(1f)) {
             val titleStyle = MaterialTheme.typography.titleMedium
             val title = remember(titleStyle.fontSize) {
@@ -363,7 +380,7 @@ private fun PlaylistHeader(phrase: String, wobble: () -> Float, onShuffle: () ->
             Text(title, style = titleStyle, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // The column's weight bounds the slot, so a phrase wider than it scrolls as the dome's name does.
             MarqueeLabel(
-                "“$phrase”", MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic), color = PhraseBlue,
+                "“$phrase”", MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic), phraseLine, color = PhraseBlue,
             )
         }
         OutlinedButton(onClick = onShuffle) {

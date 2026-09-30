@@ -84,6 +84,7 @@ import kotlinx.coroutines.withContext
 import org.balch.orpheus.djapp.playlist.EightBall
 import org.balch.orpheus.djapp.playlist.EightBallFace
 import org.balch.orpheus.djapp.playlist.LocalEightBall
+import org.balch.orpheus.djapp.playlist.turnTo
 import org.balch.orpheus.features.pulsar.MusicPulse
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
@@ -351,8 +352,8 @@ internal fun VibeTransportRing(
     position: SongPosition? = null,
     // Read only in draw: see VibeDome.
     domeTilt: () -> Float = NoTilt,
-    // Read only in draw: the 8-ball stands in for the dome while its reveal runs.
-    hideDome: () -> Boolean = { false },
+    // Read only in draw: 1 is the dome, 0 the 8-ball standing in for it, and between them the turn of turnDegrees.
+    ringTurn: () -> Float = { 1f },
     // Read only in the wave's frame loop: see rememberProgressWave.
     pulse: (() -> MusicPulse)? = null,
     // Render-harness seams only: pin the wave's phase and the paused zip, see rememberProgressWave.
@@ -382,10 +383,10 @@ internal fun VibeTransportRing(
     // Required, not preferred: a slot narrower than the ring (six phone tabs) lets it overhang the
     // gaps rather than squeeze the ring out of step with its dome.
     Box(modifier = modifier.requiredSize(ringSize), contentAlignment = Alignment.Center) {
-        // Under the ring, so the shadow never dims its lower crests. It hides with the dome.
+        // Under the ring, so the shadow never dims its lower crests. It goes with the dome, and comes back as it turns in.
         VibeDomeShadow(
             tilt = domeTilt, diameter = domeDiameter,
-            modifier = Modifier.graphicsLayer { alpha = if (hideDome()) 0f else 1f },
+            modifier = Modifier.graphicsLayer { alpha = if (ringTurn() >= 0.5f) 1f else 0f },
         )
         // Its own layer: each wave frame re-records the ring alone, not the bar or rail around it.
         // Its strokes and zip stops are built once per size, not every frame.
@@ -402,9 +403,14 @@ internal fun VibeTransportRing(
                 }
             },
         )
+        // The dome is the back of the ball's turn: it swings in from edge-on once the ball has gone.
         VibeDome(
             paused = paused, tilt = domeTilt, diameter = domeDiameter,
-            modifier = Modifier.graphicsLayer { alpha = if (hideDome()) 0f else 1f },
+            modifier = Modifier.graphicsLayer {
+                val turn = ringTurn()
+                turnTo(turn)
+                alpha = if (turn >= 0.5f) 1f else 0f
+            },
         )
     }
 }
@@ -416,7 +422,8 @@ internal fun VibeTransportRing(
  * Under [LocalVibeDomeCues] the dome also rolls with changes made elsewhere, wiggles to show it
  * swipes, and a committed swipe asks through the cues; [onNext] and [onPrevious] then serve the
  * accessibility actions alone. A long press raises the playlist's 8-ball through [LocalEightBall];
- * while the playlist is open the ball rests in the ring, a pill layout draws no pill, and a tap closes it.
+ * while the playlist is open the ball rests in the ring, a pill layout draws no pill, and a tap closes
+ * it: the ball then turns back into the dome, however the sheet closed, and a tap while it turns waits it out.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -493,10 +500,17 @@ internal fun VibeTransportItem(
     // The dome's bounds in root coordinates, where the ball rises from. Written on layout, read on a press.
     val domeBounds = remember { mutableStateOf(Rect.Zero) }
     val domeRadiusPx = with(density) { (ringSize / 2 - domeInset(ringSize)).toPx() }
-    val hideDome: () -> Boolean = remember(eightBall) { { eightBall?.hidesDome == true } }
-    // The playlist is open: the ball rests where the dome was, and a pill layout hides its pill.
+    val ringTurn: () -> Float = remember(eightBall) { { eightBall?.ringTurn ?: 1f } }
+    // The ball is in the ring: resting where the dome was while the playlist is open, and turning back
+    // into it as it closes. A tap on it closes the playlist, or waits out the turn: never a toggle.
     val openBall = eightBall?.takeIf { it.showsBallInRing }
     val ballInRing = openBall != null
+    // The playlist is open: the dome reads as the ball's.
+    val sheetOpen = eightBall?.isOpen == true
+    // A pill layout's name fades out as the ball rises and in as the dome turns back, composed for both
+    // and gone in between: the sheet has it when open. Read in draw, never per frame in composition.
+    val namePresent = eightBall?.namePresent ?: true
+    val nameAlpha: () -> Float = remember(eightBall) { { eightBall?.nameAlpha ?: 1f } }
     // A touch or a key on the dome: no wiggle to come, and none still going.
     val stopCue: () -> Unit = remember(cues, dome) { { cues?.skipWiggle(); dome.stopWiggle() } }
     if (cues != null) {
@@ -556,11 +570,19 @@ internal fun VibeTransportItem(
             )
             VibeTransportRing(
                 paused = paused, progress = progress, ringSize = ringSize, position = position, domeTilt = domeTilt,
-                pulse = pulse, previewWavePhase = previewWavePhase, previewZipMs = previewZipMs, hideDome = hideDome,
+                pulse = pulse, previewWavePhase = previewWavePhase, previewZipMs = previewZipMs, ringTurn = ringTurn,
             )
             // The die with no text: at the dome's size a phrase is too small to read. The sheet's header carries it.
+            // Turning back it goes edge-on first, and the dome swings in behind it.
             if (ballInRing) {
-                EightBall(EightBallFace.Die(""), ringSize - domeInset(ringSize) * 2, Modifier.clearAndSetSemantics {})
+                EightBall(
+                    EightBallFace.Die, ringSize - domeInset(ringSize) * 2,
+                    Modifier.clearAndSetSemantics {}.graphicsLayer {
+                        val turn = ringTurn()
+                        turnTo(turn)
+                        alpha = if (turn < 0.5f) 1f else 0f
+                    },
+                )
             }
         }
     }
@@ -580,13 +602,13 @@ internal fun VibeTransportItem(
     val pillLiquid = if (animatedPill) LocalLiquidState.current else null
     val pillFade = if (animatedPill) rememberPillFade(paused, name) else null
     val pillPaddingX = with(density) { (nameStyle.fontSize * PillPaddingEm).toDp() }
-    val nameModifier = remember(shownDrag, nameLane, reportPx, namePill, pillLiquid, pillFade, pillPaddingX) {
+    val nameModifier = remember(shownDrag, nameLane, reportPx, namePill, pillLiquid, pillFade, pillPaddingX, nameAlpha) {
         Modifier.slideWith(shownDrag)
             .nameLane(nameLane, reportPx)
             .then(
                 if (!namePill) Modifier
                 // Inside the lane, so the fade's layer spans the whole pill however far past the slot it draws.
-                else Modifier.graphicsLayer { alpha = pillFade?.value ?: 1f }
+                else Modifier.graphicsLayer { alpha = (pillFade?.value ?: 1f) * nameAlpha() }
                     .vibeNamePill(pillLiquid, pillPaddingX)
                     // The play button's description already names the vibe.
                     .semantics { hideFromAccessibility() },
@@ -637,7 +659,7 @@ internal fun VibeTransportItem(
         // The pill rides above the ring outside its pointer node, so a tap or a drag on it reaches
         // what is under it, and the stage overhang and the tap target are the ring's alone. With no
         // name yet there is nothing to hold, so no empty pill, and none while the ball sits in the ring.
-        if (namePill && !ballInRing && (name.isNotEmpty() || peekNext || peekPrevious)) label()
+        if (namePill && namePresent && (name.isNotEmpty() || peekNext || peekPrevious)) label()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -681,8 +703,8 @@ internal fun VibeTransportItem(
                 .combinedClickable(
                     interactionSource = null,
                     indication = indication,
-                    onClickLabel = if (ballInRing) "Close playlist" else null,
-                    onLongClickLabel = if (eightBall != null && !ballInRing) "Playlist" else null,
+                    onClickLabel = if (sheetOpen) "Close playlist" else null,
+                    onLongClickLabel = if (eightBall != null && !sheetOpen) "Playlist" else null,
                     onLongClick = eightBall?.let { ball -> { ball.launch(domeBounds.value) } },
                     onClick = openBall?.let { ball -> ball::close } ?: onTogglePlayback,
                 )
@@ -690,12 +712,12 @@ internal fun VibeTransportItem(
                 // below, but an explicit contentDescription wins over that merged text for
                 // announcement, so a transient peek string is never what gets read out.
                 .semantics(mergeDescendants = true) {
-                    contentDescription = if (ballInRing) "Close playlist" else "$playLabel, $name"
+                    contentDescription = if (sheetOpen) "Close playlist" else "$playLabel, $name"
                     // The swipe's stand-ins: a screen reader's user has learned what the wiggle would show.
                     customActions = listOfNotNull(
                         CustomAccessibilityAction("Next vibe") { onNext(); cues?.swipeLearned(); true },
                         CustomAccessibilityAction(previousLabel) { onPrevious(); cues?.swipeLearned(); true },
-                        eightBall?.takeIf { !ballInRing }?.let { ball ->
+                        eightBall?.takeIf { !sheetOpen }?.let { ball ->
                             CustomAccessibilityAction("Playlist") { ball.openNow(); true }
                         },
                     )

@@ -27,7 +27,6 @@ class EightBallRenderHarness {
     fun renderFaces() {
         runCatching {
             outDir.mkdirs()
-            val longest = EightBallPhrases.maxBy { it.length }
             val scene = ImageComposeScene(900, 440, Density(2f)) {
                 OrpheusTheme {
                     Row(
@@ -36,8 +35,8 @@ class EightBallRenderHarness {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         EightBall(EightBallFace.Eight, 56.dp)
-                        EightBall(EightBallFace.Die(longest), 160.dp)
-                        EightBall(EightBallFace.Die("Outlook groovy"), 38.dp)
+                        EightBall(EightBallFace.Die, 160.dp)
+                        EightBall(EightBallFace.Die, 38.dp)
                     }
                 }
             }

@@ -155,6 +155,26 @@ class DomeLongPressTest {
 
         val elapsedMs get() = now
 
+        /** Where the pill's name sits, from the unmerged tree: it stays in it, hidden from accessibility, while composed. */
+        val pillRegion: Rect
+            get() {
+                var found: SemanticsNode? = null
+                fun walk(n: SemanticsNode) {
+                    if (found == null && n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == "Dog House" } == true) found = n
+                    n.children.forEach(::walk)
+                }
+                walk(scene.semanticsOwners.first().unmergedRootSemanticsNode)
+                return assertNotNull(found, "the pill is not composed").boundsInRoot
+            }
+
+        /** The alpha drawn within [within] in the current frame: what is left of the pill's name as it fades. */
+        fun inkIn(within: Rect): Float {
+            val pixels = scene.render(now * 1_000_000).toComposeImageBitmap().toPixelMap()
+            var sum = 0f
+            for (y in within.top.toInt() until within.bottom.toInt()) for (x in within.left.toInt() until within.right.toInt()) sum += pixels[x, y].alpha
+            return sum
+        }
+
         /** The playlist is open: the ring holds the ball. */
         fun open() { ball.openNow(); idle(32) }
 
@@ -229,13 +249,53 @@ class DomeLongPressTest {
 
     @Test
     fun whileOpenATapClosesThePlaylistAndNeverToggles() {
-        val dome = Dome()
+        val dome = Dome(reveal = true)
         try {
             dome.open()
             dome.hold(48)
             assertEquals(1, dome.closed)
             assertEquals(0, dome.toggles)
+            assertIs<RevealPhase.Closing>(dome.ball.phase, "the ball turns back into the dome")
+            dome.idle(600)
             assertIs<RevealPhase.Idle>(dome.ball.phase)
+            assertEquals(0, dome.toggles)
+        } finally { dome.close() }
+    }
+
+    @Test
+    fun aSecondTapWhileTheBallTurnsBackNeitherClosesNorToggles() {
+        val dome = Dome(reveal = true)
+        try {
+            dome.open()
+            dome.hold(48)
+            // Still turning: a double tap is not a pause.
+            dome.hold(48)
+            assertEquals(1, dome.closed)
+            assertEquals(0, dome.toggles)
+            dome.idle(600)
+            assertIs<RevealPhase.Idle>(dome.ball.phase)
+        } finally { dome.close() }
+    }
+
+    @Test
+    fun theRingTurnsFromTheBallToTheDomeRatherThanSnapping() {
+        val dome = Dome(reveal = true)
+        try {
+            dome.open()
+            val whole = assertNotNull(dome.dieBounds(), "the ball sits in the ring").width
+            dome.pointer(PointerEventType.Press, dome.centre)
+            dome.pointer(PointerEventType.Release, dome.centre)
+            var narrowest = whole
+            var frames = 0
+            var last: Rect? = null
+            while (dome.ball.phase !is RevealPhase.Idle) {
+                check(++frames < 60) { "the ball never finished turning" }
+                last = dome.dieBounds()
+                last?.let { narrowest = minOf(narrowest, it.width) }
+            }
+            assertTrue(frames > 4, "it took $frames frames: more than a snap")
+            assertTrue(narrowest < whole * 0.35f, "the ball narrowed to $narrowest of $whole as it turned edge-on")
+            assertNull(dome.dieBounds(), "the dome is back: no die left in the ring")
         } finally { dome.close() }
     }
 
@@ -252,6 +312,46 @@ class DomeLongPressTest {
             val next = dome.ball.roll()
             dome.idle(32)
             assertFalse(next in dome.barTexts, "the bar reads ${dome.barTexts}")
+        } finally { dome.close() }
+    }
+
+    // The reveal's ball stands in for the dome, and the vibe's name has no business over it: it fades as the ball rises.
+    @Test
+    fun theNamePillFadesOutAsTheBallRisesNotWhenTheSheetOpens() {
+        val dome = Dome(pill = true)
+        try {
+            val pill = dome.pillRegion
+            val full = dome.inkIn(pill)
+            assertTrue(full > 0f, "sanity: the pill is drawn")
+            // No overlay here: the test sets how far the ball has risen, so nothing else draws in the pill's box.
+            dome.ball.launch(Rect(dome.centre, 24f))
+            dome.ball.travel = 0.5f
+            dome.idle(32)
+            assertEquals(0.5f * full, dome.inkIn(pill), 0.15f * full, "half risen, the name is half faded")
+            dome.ball.travel = 1f
+            dome.idle(32)
+            assertEquals(0f, dome.inkIn(pill), "risen, it is gone")
+            assertIs<RevealPhase.Showing>(dome.ball.phase, "and the sheet is yet to open")
+        } finally { dome.close() }
+    }
+
+    @Test
+    fun theNamePillFadesBackInAsTheBallTurnsIntoTheDome() {
+        val dome = Dome(pill = true)
+        try {
+            val pill = dome.pillRegion
+            val full = dome.inkIn(pill)
+            dome.open()
+            // No overlay here to run the turn: the test sets how far it has come.
+            dome.ball.close()
+            dome.idle(32)
+            assertEquals(0f, dome.inkIn(pill), 0.05f * full, "the turn has not begun")
+            dome.ball.flip = 0.5f
+            dome.idle(32)
+            assertEquals(0.5f * full, dome.inkIn(pill), 0.15f * full, "halfway, the name is half in")
+            dome.ball.flip = 1f
+            dome.idle(32)
+            assertEquals(full, dome.inkIn(pill), 0.1f * full, "turned, the name is whole")
         } finally { dome.close() }
     }
 
@@ -272,12 +372,14 @@ class DomeLongPressTest {
 
     @Test
     fun whileOpenATapOnAPillLayoutsDomeClosesThePlaylist() {
-        val dome = Dome(pill = true)
+        val dome = Dome(pill = true, reveal = true)
         try {
             dome.open()
             dome.hold(48)
             assertEquals(1, dome.closed)
             assertEquals(0, dome.toggles)
+            assertTrue("Dog House" in dome.barTexts, "closing, the pill is back at once: ${dome.barTexts}")
+            dome.idle(600)
             assertIs<RevealPhase.Idle>(dome.ball.phase)
             assertTrue("Dog House" in dome.barTexts, "closed, the pill is back: ${dome.barTexts}")
         } finally { dome.close() }
