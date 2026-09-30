@@ -8,7 +8,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.djapp.AdaptiveAiSheet
+import org.balch.orpheus.djapp.AdaptiveSheet
 import org.balch.orpheus.djapp.AiTab
 import org.balch.orpheus.djapp.DjRoute
 import org.balch.orpheus.djapp.HornTab
@@ -36,7 +36,7 @@ class AiTabContribution : DjTabContribution {
         val feature = DjAiViewModel.feature()
         if (isOpen) {
             BoxWithConstraints(modifier.fillMaxSize()) {
-                AdaptiveAiSheet(
+                AdaptiveSheet(
                     isLandscape = isLandscape,
                     portraitPeekHeight = maxHeight * 0.66f,
                     onDismiss = onDismiss,

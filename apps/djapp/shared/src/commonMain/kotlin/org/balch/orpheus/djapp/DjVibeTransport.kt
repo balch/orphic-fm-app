@@ -5,7 +5,7 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
@@ -57,10 +58,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.layout.LastBaseline
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -77,6 +81,9 @@ import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.djapp.playlist.EightBall
+import org.balch.orpheus.djapp.playlist.EightBallFace
+import org.balch.orpheus.djapp.playlist.LocalEightBall
 import org.balch.orpheus.features.pulsar.MusicPulse
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
@@ -344,6 +351,8 @@ internal fun VibeTransportRing(
     position: SongPosition? = null,
     // Read only in draw: see VibeDome.
     domeTilt: () -> Float = NoTilt,
+    // Read only in draw: the 8-ball stands in for the dome while its reveal runs.
+    hideDome: () -> Boolean = { false },
     // Read only in the wave's frame loop: see rememberProgressWave.
     pulse: (() -> MusicPulse)? = null,
     // Render-harness seams only: pin the wave's phase and the paused zip, see rememberProgressWave.
@@ -373,8 +382,11 @@ internal fun VibeTransportRing(
     // Required, not preferred: a slot narrower than the ring (six phone tabs) lets it overhang the
     // gaps rather than squeeze the ring out of step with its dome.
     Box(modifier = modifier.requiredSize(ringSize), contentAlignment = Alignment.Center) {
-        // Under the ring, so the shadow never dims its lower crests.
-        VibeDomeShadow(tilt = domeTilt, diameter = domeDiameter)
+        // Under the ring, so the shadow never dims its lower crests. It hides with the dome.
+        VibeDomeShadow(
+            tilt = domeTilt, diameter = domeDiameter,
+            modifier = Modifier.graphicsLayer { alpha = if (hideDome()) 0f else 1f },
+        )
         // Its own layer: each wave frame re-records the ring alone, not the bar or rail around it.
         // Its strokes and zip stops are built once per size, not every frame.
         Spacer(
@@ -390,7 +402,10 @@ internal fun VibeTransportRing(
                 }
             },
         )
-        VibeDome(paused = paused, tilt = domeTilt, diameter = domeDiameter)
+        VibeDome(
+            paused = paused, tilt = domeTilt, diameter = domeDiameter,
+            modifier = Modifier.graphicsLayer { alpha = if (hideDome()) 0f else 1f },
+        )
     }
 }
 
@@ -400,7 +415,8 @@ internal fun VibeTransportRing(
  * peeks and commits the neighbour. Hover and a press light the ring, and keyboard focus rings it.
  * Under [LocalVibeDomeCues] the dome also rolls with changes made elsewhere, wiggles to show it
  * swipes, and a committed swipe asks through the cues; [onNext] and [onPrevious] then serve the
- * accessibility actions alone.
+ * accessibility actions alone. A long press raises the playlist's 8-ball through [LocalEightBall];
+ * while the playlist is open the ball rests in the ring, a pill layout draws no pill, and a tap closes it.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -472,6 +488,15 @@ internal fun VibeTransportItem(
     val domeTilt: () -> Float = remember(dome, previewDomeTilt) { { previewDomeTilt ?: dome.tilt } }
     // Nothing on a TV's dome animates, so there it takes no cues at all.
     val cues = LocalVibeDomeCues.current.takeUnless { LocalTelevisionHardware.current }
+    // The playlist's 8-ball, a long press away. TV hardware, previews and tests go without.
+    val eightBall = LocalEightBall.current.takeUnless { LocalTelevisionHardware.current }
+    // The dome's bounds in root coordinates, where the ball rises from. Written on layout, read on a press.
+    val domeBounds = remember { mutableStateOf(Rect.Zero) }
+    val domeRadiusPx = with(density) { (ringSize / 2 - domeInset(ringSize)).toPx() }
+    val hideDome: () -> Boolean = remember(eightBall) { { eightBall?.hidesDome == true } }
+    // The playlist is open: the ball rests where the dome was, and a pill layout hides its pill.
+    val openBall = eightBall?.takeIf { it.showsBallInRing }
+    val ballInRing = openBall != null
     // A touch or a key on the dome: no wiggle to come, and none still going.
     val stopCue: () -> Unit = remember(cues, dome) { { cues?.skipWiggle(); dome.stopWiggle() } }
     if (cues != null) {
@@ -507,7 +532,12 @@ internal fun VibeTransportItem(
     val region = LocalTvFocusRegion.current
 
     val ring = @Composable {
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = if (eightBall == null) Modifier else Modifier.onGloballyPositioned {
+                domeBounds.value = Rect(it.boundsInRoot().center, domeRadiusPx)
+            },
+        ) {
             // Its own layer under the ring, so the focus fade's frames re-record the mark alone. The
             // layer does not clip, and the circle reaches past the ring's box.
             Spacer(
@@ -526,8 +556,12 @@ internal fun VibeTransportItem(
             )
             VibeTransportRing(
                 paused = paused, progress = progress, ringSize = ringSize, position = position, domeTilt = domeTilt,
-                pulse = pulse, previewWavePhase = previewWavePhase, previewZipMs = previewZipMs,
+                pulse = pulse, previewWavePhase = previewWavePhase, previewZipMs = previewZipMs, hideDome = hideDome,
             )
+            // The die with no text: at the dome's size a phrase is too small to read. The sheet's header carries it.
+            if (ballInRing) {
+                EightBall(EightBallFace.Die(""), ringSize - domeInset(ringSize) * 2, Modifier.clearAndSetSemantics {})
+            }
         }
     }
     // The label slides with the drag: right peeks the next name, left the previous (or the restart).
@@ -602,8 +636,8 @@ internal fun VibeTransportItem(
     ) {
         // The pill rides above the ring outside its pointer node, so a tap or a drag on it reaches
         // what is under it, and the stage overhang and the tap target are the ring's alone. With no
-        // name yet there is nothing to hold, so no empty pill.
-        if (namePill && (name.isNotEmpty() || peekNext || peekPrevious)) label()
+        // name yet there is nothing to hold, so no empty pill, and none while the ball sits in the ring.
+        if (namePill && !ballInRing && (name.isNotEmpty() || peekNext || peekPrevious)) label()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -642,16 +676,28 @@ internal fun VibeTransportItem(
                 }
                 .onFocusChanged { focused.value = it.isFocused }
                 // Round and light on the ring, never a square over the name: see DomeIndication.
-                .clickable(interactionSource = null, indication = indication, onClick = onTogglePlayback)
+                // A long press raises the playlist's 8-ball instead of toggling; with it open, it
+                // does nothing and a tap closes it.
+                .combinedClickable(
+                    interactionSource = null,
+                    indication = indication,
+                    onClickLabel = if (ballInRing) "Close playlist" else null,
+                    onLongClickLabel = if (eightBall != null && !ballInRing) "Playlist" else null,
+                    onLongClick = eightBall?.let { ball -> { ball.launch(domeBounds.value) } },
+                    onClick = openBall?.let { ball -> ball::close } ?: onTogglePlayback,
+                )
                 // Same node as the click: mergeDescendants pulls in the ring's icon and the label
                 // below, but an explicit contentDescription wins over that merged text for
                 // announcement, so a transient peek string is never what gets read out.
                 .semantics(mergeDescendants = true) {
-                    contentDescription = "$playLabel, $name"
+                    contentDescription = if (ballInRing) "Close playlist" else "$playLabel, $name"
                     // The swipe's stand-ins: a screen reader's user has learned what the wiggle would show.
-                    customActions = listOf(
+                    customActions = listOfNotNull(
                         CustomAccessibilityAction("Next vibe") { onNext(); cues?.swipeLearned(); true },
                         CustomAccessibilityAction(previousLabel) { onPrevious(); cues?.swipeLearned(); true },
+                        eightBall?.takeIf { !ballInRing }?.let { ball ->
+                            CustomAccessibilityAction("Playlist") { ball.openNow(); true }
+                        },
                     )
                 }
                 .padding(vertical = TransportPadding),

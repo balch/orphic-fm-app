@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,6 +49,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
@@ -67,6 +70,10 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.djapp.playlist.EightBallReveal
+import org.balch.orpheus.djapp.playlist.EightBallRevealState
+import org.balch.orpheus.djapp.playlist.LocalEightBall
+import org.balch.orpheus.djapp.playlist.PlaylistSheet
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.djapp.variant.mergeTabContributions
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
@@ -150,7 +157,7 @@ fun DjAppScreen(
     // rememberSaveable: survives Android rotation so an in-flight AI generation stays visible
     // instead of the sheet closing mid-run while the agent keeps working unseen.
     val sheetRouteSaver = remember(tabs) {
-        val byKey = (tabs + VibeInfoTab).associateBy { it.label }
+        val byKey = (tabs + VibeInfoTab + PlaylistRoute).associateBy { it.label }
         Saver<DjRoute?, String>(
             save = { route -> route?.label ?: "" },
             restore = { key -> byKey[key] },
@@ -159,6 +166,18 @@ fun DjAppScreen(
     var activeSheet by rememberSaveable(stateSaver = sheetRouteSaver) {
         mutableStateOf<DjRoute?>(null)
     }
+
+    // The dome's long press: the 8-ball rises over the stage, then opens the playlist sheet. It rests
+    // in the ring while the sheet is open, and a tap there closes it.
+    val eightBall = remember {
+        EightBallRevealState(
+            openSheet = { activeSheet = PlaylistRoute },
+            closeSheet = { if (activeSheet == PlaylistRoute) activeSheet = null },
+        )
+    }
+    // However the sheet closes (scrim, Back, another sheet), the ring hears of it.
+    val playlistOpen = activeSheet == PlaylistRoute
+    SideEffect { eightBall.sheetOpen = playlistOpen }
 
     // An ordered list, not a single route: TV docks several panels at once, and toggle order is
     // slot-fill order (see assignDock). Null until prefs load so the first frame doesn't flash
@@ -215,125 +234,59 @@ fun DjAppScreen(
         }
     }
 
-    DjLayoutBox(
-        // Edge-to-edge on purpose: no inset padding, so the UI and the VizBackground behind it
-        // fill into the display cutout instead of letterboxing below the notch (system bars are
-        // hidden in MainActivity; DjAppHeaderRow's own SpaceBetween clears a center punch-hole).
-        modifier = modifier
-            .fillMaxSize(),
-    ) { layout ->
-        val panelFade = LocalPanelIdleFade.current
-        // One expression for the whole feature, read inside the layout box so a window crossing
-        // the dock threshold turns it off in the same composition that picks the new layout.
-        val fadeEnabled = fadesPanelsWhenIdle(
-            layout,
-            hidesPanelsWhenIdle,
-            sheetOpen = activeSheet != null,
-            turntableUp = turntableUp,
-        )
-        PanelIdleFadeWatcher(fade = panelFade, enabled = fadeEnabled)
-        // The stage is identical in every layout; only the navigation around it differs.
-        val stage: @Composable () -> Unit = {
-            // One renderer per route, shared by the nav destinations and the TV dock, so a
-            // panel looks the same however it got on screen. showTitle names panels apart
-            // when several are docked at once; a lone nav destination needs no title.
-            val routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit =
-                { route, panelModifier, docked ->
-                    // No panel titles in the dock: the panels are distinct enough by shape
-                    // and colour, and the headers cost vertical space on a television.
-                    val showTitle = false
-                    val fill = !docked
-                    when (route) {
-                        PulsarTab -> PulsarPanel(
-                            pulsar = pulsarFeature,
-                            vizFlow = synthEngine.pulsarVizFlow,
-                            trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                            modifier = panelModifier,
-                            isExpanded = true,
-                            onExpandedChange = {},
-                            showCollapsedHeader = false,
-                            showExpandedTitle = showTitle,
-                            fillHeight = fill,
-                            // The dock has the ending picker as the top bar's "Ends" toggle
-                            // instead (routePanel's docked=true only ever happens in the dock).
-                            showEndingControl = !docked,
-                            // The dock's top bar carries the one Vibe picker (and the anomaly
-                            // long-press); the docked panel drops its own duplicate chip.
-                            showVibePicker = !docked,
-                        )
-                        DjTab -> DjPanel(
-                            feature = djFeature,
-                            vizFlowA = synthEngine.djVizFlowA,
-                            vizFlowB = synthEngine.djVizFlowB,
-                            outVizFlow = synthEngine.djOutVizFlow,
-                            beatPhaseFlow = synthEngine.beatPhaseFlow,
-                            modifier = panelModifier,
-                            isExpanded = true,
-                            onExpandedChange = {},
-                            showCollapsedHeader = false,
-                            showExpandedTitle = showTitle,
-                            fillHeight = fill,
-                        )
-                        TimerTab -> TimerPanel(
-                            modifier = panelModifier,
-                            showCollapsedHeader = false,
-                            showExpandedTitle = showTitle,
-                            fillHeight = fill,
-                        )
-                        MixTab -> Column(modifier = panelModifier) {
-                            MixerPanel(
-                                feature = mixerFeature,
+    CompositionLocalProvider(LocalEightBall provides eightBall) {
+        DjLayoutBox(
+            // Edge-to-edge on purpose: no inset padding, so the UI and the VizBackground behind it
+            // fill into the display cutout instead of letterboxing below the notch (system bars are
+            // hidden in MainActivity; DjAppHeaderRow's own SpaceBetween clears a center punch-hole).
+            modifier = modifier
+                .fillMaxSize(),
+        ) { layout ->
+            val panelFade = LocalPanelIdleFade.current
+            // One expression for the whole feature, read inside the layout box so a window crossing
+            // the dock threshold turns it off in the same composition that picks the new layout.
+            val fadeEnabled = fadesPanelsWhenIdle(
+                layout,
+                hidesPanelsWhenIdle,
+                sheetOpen = activeSheet != null,
+                turntableUp = turntableUp,
+            )
+            PanelIdleFadeWatcher(fade = panelFade, enabled = fadeEnabled)
+            // The stage is identical in every layout; only the navigation around it differs.
+            val stage: @Composable () -> Unit = {
+                // One renderer per route, shared by the nav destinations and the TV dock, so a
+                // panel looks the same however it got on screen. showTitle names panels apart
+                // when several are docked at once; a lone nav destination needs no title.
+                val routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit =
+                    { route, panelModifier, docked ->
+                        // No panel titles in the dock: the panels are distinct enough by shape
+                        // and colour, and the headers cost vertical space on a television.
+                        val showTitle = false
+                        val fill = !docked
+                        when (route) {
+                            PulsarTab -> PulsarPanel(
+                                pulsar = pulsarFeature,
+                                vizFlow = synthEngine.pulsarVizFlow,
                                 trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                                masterOutVizFlow = synthEngine.masterOutVizFlow,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = panelModifier,
                                 isExpanded = true,
                                 onExpandedChange = {},
                                 showCollapsedHeader = false,
                                 showExpandedTitle = showTitle,
                                 fillHeight = fill,
+                                // The dock has the ending picker as the top bar's "Ends" toggle
+                                // instead (routePanel's docked=true only ever happens in the dock).
+                                showEndingControl = !docked,
+                                // The dock's top bar carries the one Vibe picker (and the anomaly
+                                // long-press); the docked panel drops its own duplicate chip.
+                                showVibePicker = !docked,
                             )
-                        }
-                        HornTab -> {
-                            // Over the phone bar the dome's name pill rises onto Horn's knob labels:
-                            // the panel sits that much higher, its display giving up the height.
-                            val overBar = !docked && !layout.usesLandscapeChrome()
-                            val lift = if (overBar) HornPillClearance else 0.dp
-                            // Only a filled slot is read back: its height comes from the layout,
-                            // not the content. A docked panel wraps its content and keeps 160dp.
-                            var slotPx by remember { mutableIntStateOf(0) }
-                            val density = LocalDensity.current
-                            val displayHeight = if (!fill || slotPx == 0) HornDisplayHeight else {
-                                hornDisplayHeightFor(with(density) { slotPx.toDp() }, HornDisplayHeight)
-                            }
-                            HornPanel(
-                                inVizFlow = synthEngine.hornInVizFlow,
-                                outVizFlow = synthEngine.hornOutVizFlow,
-                                hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
-                                wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
-                                modifier = panelModifier.padding(bottom = lift).onSizeChanged { slotPx = it.height },
-                                isExpanded = true,
-                                onExpandedChange = {},
-                                showCollapsedHeader = false,
-                                showExpandedTitle = showTitle,
-                                fillHeight = fill,
-                                displayHeight = displayHeight,
-                            )
-                        }
-                        VibeInfoTab -> VibeInfoPanel(
-                            pulsar = pulsarFeature,
-                            vizFlow = synthEngine.pulsarVizFlow,
-                            modifier = panelModifier,
-                            fillHeight = fill,
-                        )
-                        EndsTab -> {
-                            val songEndingEnabled by pulsarFeature.actions.songEndingEnabled.collectAsStateWithLifecycle()
-                            val transitionSpec by pulsarFeature.actions.transitionSpec.collectAsStateWithLifecycle()
-                            EndsPanel(
-                                spec = transitionSpec,
-                                enabled = songEndingEnabled,
-                                onSetEnabled = pulsarFeature.actions.onSetSongEndingEnabled,
-                                onStyleChange = pulsarFeature.actions.onSetTransitionStyle,
-                                onHandoffMsChange = pulsarFeature.actions.onSetTransitionHandoffMs,
+                            DjTab -> DjPanel(
+                                feature = djFeature,
+                                vizFlowA = synthEngine.djVizFlowA,
+                                vizFlowB = synthEngine.djVizFlowB,
+                                outVizFlow = synthEngine.djOutVizFlow,
+                                beatPhaseFlow = synthEngine.beatPhaseFlow,
                                 modifier = panelModifier,
                                 isExpanded = true,
                                 onExpandedChange = {},
@@ -341,121 +294,194 @@ fun DjAppScreen(
                                 showExpandedTitle = showTitle,
                                 fillHeight = fill,
                             )
+                            TimerTab -> TimerPanel(
+                                modifier = panelModifier,
+                                showCollapsedHeader = false,
+                                showExpandedTitle = showTitle,
+                                fillHeight = fill,
+                            )
+                            MixTab -> Column(modifier = panelModifier) {
+                                MixerPanel(
+                                    feature = mixerFeature,
+                                    trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                                    masterOutVizFlow = synthEngine.masterOutVizFlow,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    isExpanded = true,
+                                    onExpandedChange = {},
+                                    showCollapsedHeader = false,
+                                    showExpandedTitle = showTitle,
+                                    fillHeight = fill,
+                                )
+                            }
+                            HornTab -> {
+                                // Over the phone bar the dome's name pill rises onto Horn's knob labels:
+                                // the panel sits that much higher, its display giving up the height.
+                                val overBar = !docked && !layout.usesLandscapeChrome()
+                                val lift = if (overBar) HornPillClearance else 0.dp
+                                // Only a filled slot is read back: its height comes from the layout,
+                                // not the content. A docked panel wraps its content and keeps 160dp.
+                                var slotPx by remember { mutableIntStateOf(0) }
+                                val density = LocalDensity.current
+                                val displayHeight = if (!fill || slotPx == 0) HornDisplayHeight else {
+                                    hornDisplayHeightFor(with(density) { slotPx.toDp() }, HornDisplayHeight)
+                                }
+                                HornPanel(
+                                    inVizFlow = synthEngine.hornInVizFlow,
+                                    outVizFlow = synthEngine.hornOutVizFlow,
+                                    hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
+                                    wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
+                                    modifier = panelModifier.padding(bottom = lift).onSizeChanged { slotPx = it.height },
+                                    isExpanded = true,
+                                    onExpandedChange = {},
+                                    showCollapsedHeader = false,
+                                    showExpandedTitle = showTitle,
+                                    fillHeight = fill,
+                                    displayHeight = displayHeight,
+                                )
+                            }
+                            VibeInfoTab -> VibeInfoPanel(
+                                pulsar = pulsarFeature,
+                                vizFlow = synthEngine.pulsarVizFlow,
+                                modifier = panelModifier,
+                                fillHeight = fill,
+                            )
+                            EndsTab -> {
+                                val songEndingEnabled by pulsarFeature.actions.songEndingEnabled.collectAsStateWithLifecycle()
+                                val transitionSpec by pulsarFeature.actions.transitionSpec.collectAsStateWithLifecycle()
+                                EndsPanel(
+                                    spec = transitionSpec,
+                                    enabled = songEndingEnabled,
+                                    onSetEnabled = pulsarFeature.actions.onSetSongEndingEnabled,
+                                    onStyleChange = pulsarFeature.actions.onSetTransitionStyle,
+                                    onHandoffMsChange = pulsarFeature.actions.onSetTransitionHandoffMs,
+                                    modifier = panelModifier,
+                                    isExpanded = true,
+                                    onExpandedChange = {},
+                                    showCollapsedHeader = false,
+                                    showExpandedTitle = showTitle,
+                                    fillHeight = fill,
+                                )
+                            }
+                            else -> Unit
                         }
-                        else -> Unit
+                    }
+
+                // Shared nav content composable used in both orientations
+                val navContent: @Composable (Modifier) -> Unit = { navModifier ->
+                    Box(modifier = navModifier) {
+                        NavDisplay(
+                            backStack = backStack,
+                            onBack = { backStack.removeLastOrNull() },
+                            entryDecorators = listOf(
+                                rememberSaveableStateHolderNavEntryDecorator(),
+                            ),
+                            entryProvider = entryProvider {
+                                entry<DjTab> { routePanel(DjTab, Modifier.fillMaxSize(), false) }
+                                entry<TimerTab> { routePanel(TimerTab, Modifier.fillMaxSize(), false) }
+                                entry<MixTab> { routePanel(MixTab, Modifier.fillMaxSize(), false) }
+                                entry<HornTab> { routePanel(HornTab, Modifier.fillMaxSize(), false) }
+                            },
+                        )
                     }
                 }
 
-            // Shared nav content composable used in both orientations
-            val navContent: @Composable (Modifier) -> Unit = { navModifier ->
-                Box(modifier = navModifier) {
-                    NavDisplay(
-                        backStack = backStack,
-                        onBack = { backStack.removeLastOrNull() },
-                        entryDecorators = listOf(
-                            rememberSaveableStateHolderNavEntryDecorator(),
-                        ),
-                        entryProvider = entryProvider {
-                            entry<DjTab> { routePanel(DjTab, Modifier.fillMaxSize(), false) }
-                            entry<TimerTab> { routePanel(TimerTab, Modifier.fillMaxSize(), false) }
-                            entry<MixTab> { routePanel(MixTab, Modifier.fillMaxSize(), false) }
-                            entry<HornTab> { routePanel(HornTab, Modifier.fillMaxSize(), false) }
+                // The 8-ball rises to this box's centre.
+                Box(Modifier.fillMaxSize().onGloballyPositioned { eightBall.stageBounds = it.boundsInRoot() }) {
+                    DjAppMainContent(
+                        layout = layout,
+                        dockedPanels = dockedPanels.orEmpty(),
+                        pairPanels = pairPanels.orEmpty(),
+                        pulsarFeature = pulsarFeature,
+                        synthEngine = synthEngine,
+                        vizFeature = vizFeature,
+                        // With room for a pair, Info earns a slot instead of covering the screen.
+                        onShowVibeInfo = {
+                            if (layout.showsPair()) togglePair(VibeInfoTab) else activeSheet = VibeInfoTab
                         },
+                        routePanel = routePanel,
+                        navContent = navContent,
+                    )
+
+                    DjAppOverlaySheets(
+                        activeSheet = activeSheet,
+                        layout = layout,
+                        pulsarFeature = pulsarFeature,
+                        synthEngine = synthEngine,
+                        tabContributions = tabContributions,
+                        onDismiss = { activeSheet = null },
                     )
                 }
             }
 
-            DjAppMainContent(
-                layout = layout,
-                dockedPanels = dockedPanels.orEmpty(),
-                pairPanels = pairPanels.orEmpty(),
-                pulsarFeature = pulsarFeature,
-                synthEngine = synthEngine,
-                vizFeature = vizFeature,
-                // With room for a pair, Info earns a slot instead of covering the screen.
-                onShowVibeInfo = {
-                    if (layout.showsPair()) togglePair(VibeInfoTab) else activeSheet = VibeInfoTab
-                },
-                routePanel = routePanel,
-                navContent = navContent,
-            )
-
-            DjAppOverlaySheets(
-                activeSheet = activeSheet,
-                layout = layout,
-                pulsarFeature = pulsarFeature,
-                synthEngine = synthEngine,
-                tabContributions = tabContributions,
-                onDismiss = { activeSheet = null },
-            )
-        }
-
-        when (layout) {
-            DjLayout.LargeScreen -> {
-                // remember: the holder must survive recomposition or focus resets.
-                val focusRegion = remember { TvFocusRegionHolder() }
-                // Read once and passed down: DjAppTvChrome needs it for LocalTelevisionHardware and
-                // the bar glass needs it for its own gate, and they must not disagree.
-                val tvHardware = isTelevisionHardware()
-                DjAppTvChrome(
-                    tvHardware = tvHardware,
-                    domeRingSize = dockDomeRingSize(television = tvHardware),
-                    barGlass = shouldShowTvBarGlass(layout, tvHardware),
-                    vizHidesPanelsWhenIdle = hidesPanelsWhenIdle,
-                    barFocusHighlights = tvHardware,
-                    focusRegion = focusRegion,
-                    vizFeature = vizFeature,
-                    pulsarFeature = pulsarFeature,
-                    timerFeature = timerFeature,
-                    onTogglePlayback = onTogglePlayback,
-                    dockablePanels = dockablePanels,
-                    dockedPanels = dockedPanels.orEmpty(),
-                    activeSheet = activeSheet,
-                    tabs = tabs,
-                    onToggleDocked = toggleDocked,
-                    onActiveSheetChange = { activeSheet = it },
-                    stage = stage,
-                )
-            }
-            DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop -> {
-                DjAppNavScaffold(
-                    isSelected = { route ->
-                        when {
-                            route.opensAsSheet -> route == activeSheet
-                            // Both halves of the pair light up, the way docked panels do on TV.
-                            layout.showsPair() -> route in pairPanels.orEmpty()
-                            else -> route == currentRoute
-                        }
-                    },
-                    onItemClick = { route ->
-                        when {
-                            // Toggle: tapping the active sheet's nav item closes it, otherwise open
-                            // (replacing whatever sheet was open).
-                            route.opensAsSheet -> activeSheet = if (activeSheet == route) null else route
-                            // Pair layouts: the nav is a toggle bar, not single-select navigation.
-                            layout.showsPair() -> togglePair(route)
-                            route != currentRoute -> {
-                                backStack.clear()
-                                backStack.add(route)
+            when (layout) {
+                DjLayout.LargeScreen -> {
+                    // remember: the holder must survive recomposition or focus resets.
+                    val focusRegion = remember { TvFocusRegionHolder() }
+                    // Read once and passed down: DjAppTvChrome needs it for LocalTelevisionHardware and
+                    // the bar glass needs it for its own gate, and they must not disagree.
+                    val tvHardware = isTelevisionHardware()
+                    DjAppTvChrome(
+                        tvHardware = tvHardware,
+                        domeRingSize = dockDomeRingSize(television = tvHardware),
+                        barGlass = shouldShowTvBarGlass(layout, tvHardware),
+                        vizHidesPanelsWhenIdle = hidesPanelsWhenIdle,
+                        barFocusHighlights = tvHardware,
+                        focusRegion = focusRegion,
+                        vizFeature = vizFeature,
+                        pulsarFeature = pulsarFeature,
+                        timerFeature = timerFeature,
+                        onTogglePlayback = onTogglePlayback,
+                        dockablePanels = dockablePanels,
+                        dockedPanels = dockedPanels.orEmpty(),
+                        activeSheet = activeSheet,
+                        tabs = tabs,
+                        onToggleDocked = toggleDocked,
+                        onActiveSheetChange = { activeSheet = it },
+                        stage = stage,
+                    )
+                }
+                DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop -> {
+                    DjAppNavScaffold(
+                        isSelected = { route ->
+                            when {
+                                route.opensAsSheet -> route == activeSheet
+                                // Both halves of the pair light up, the way docked panels do on TV.
+                                layout.showsPair() -> route in pairPanels.orEmpty()
+                                else -> route == currentRoute
                             }
-                        }
-                    },
-                    layout = layout,
-                    pulsarFeature = pulsarFeature,
-                    timerFeature = timerFeature,
-                    onTogglePlayback = onTogglePlayback,
-                    tabs = tabs,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    stage()
+                        },
+                        onItemClick = { route ->
+                            activeSheet = sheetAfterBarTab(activeSheet, route)
+                            when {
+                                route.opensAsSheet -> Unit
+                                // Pair layouts: the nav is a toggle bar, not single-select navigation.
+                                layout.showsPair() -> togglePair(route)
+                                route != currentRoute -> {
+                                    backStack.clear()
+                                    backStack.add(route)
+                                }
+                            }
+                        },
+                        layout = layout,
+                        pulsarFeature = pulsarFeature,
+                        timerFeature = timerFeature,
+                        onTogglePlayback = onTogglePlayback,
+                        tabs = tabs,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        stage()
+                    }
                 }
             }
-        }
 
-        // Last child of the layout box, so it sits over whatever chrome that layout drew, and
-        // gated on the same expression as the fade: the frame that picks the dock is the frame
-        // that stops blocking input.
-        PanelWakeOverlay(fade = panelFade, stage = LocalVizStage.current, enabled = fadeEnabled)
+            // Last child of the layout box, so it sits over whatever chrome that layout drew, and
+            // gated on the same expression as the fade: the frame that picks the dock is the frame
+            // that stops blocking input.
+            PanelWakeOverlay(fade = panelFade, stage = LocalVizStage.current, enabled = fadeEnabled)
+
+            // Over everything, the wake overlay included, so a tap reaches the ball to skip ahead.
+            EightBallReveal(eightBall)
+        }
     }
 }
 
@@ -464,8 +490,9 @@ fun DjAppScreen(
  *
  * The dock layout is out: there the bottom bar's toggles are what show and hide panels, and a
  * fade would both argue with that and hide controls the user parked there deliberately. An open
- * sheet lives in its own window and would not fade with the panels' alpha, so it stops the clock
- * too; dropdown popups do the same through the holder's own modal count (see KeepPanelsAwake).
+ * sheet stops the clock too: it sits over the stage, outside the panels' fade, where the wake
+ * overlay would eat the next tap meant for it. Dropdown popups do the same through the holder's
+ * own modal count (see KeepPanelsAwake).
  * A turntable fader left up means the user is mid-mix, so the deck stays in view.
  */
 internal fun fadesPanelsWhenIdle(
@@ -477,6 +504,16 @@ internal fun fadesPanelsWhenIdle(
     DjLayout.LargeScreen -> false
     DjLayout.Portrait, DjLayout.PortraitPair, DjLayout.Landscape, is DjLayout.Tabletop ->
         vizOptsIn && !sheetOpen && !turntableUp
+}
+
+/**
+ * The sheet left open after a bar tab's tap. A sheet's tab toggles it, replacing whatever sheet was
+ * open; a panel's tab closes the playlist, which covers the stage, and leaves any other sheet alone.
+ */
+internal fun sheetAfterBarTab(activeSheet: DjRoute?, tapped: DjRoute): DjRoute? = when {
+    tapped.opensAsSheet -> if (activeSheet == tapped) null else tapped
+    activeSheet == PlaylistRoute -> null
+    else -> activeSheet
 }
 
 /** Either deck's level fader above the floor. */
@@ -719,6 +756,13 @@ private fun DjAppOverlaySheets(
             onDismiss = onDismiss,
         )
     }
+
+    PlaylistSheet(
+        pulsar = pulsarFeature,
+        isLandscape = layout.usesLandscapeChrome(),
+        open = activeSheet == PlaylistRoute,
+        onDismiss = onDismiss,
+    )
 
     // Contributions stay composed while closed (isOpen tracks activeSheet) so they can
     // cancel in-flight work on close. See DjTabContribution.Content's kdoc.

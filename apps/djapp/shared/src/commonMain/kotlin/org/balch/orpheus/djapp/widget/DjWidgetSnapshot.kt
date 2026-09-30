@@ -48,7 +48,10 @@ object DjWidgetSnapshotBuilder {
         artworkPng = artworkPng,
     )
 
-    /** Next vibe in cycle, by the same rule the navigator and the advancer use. */
+    /**
+     * The vibe after [currentVibe] in [vibeNames]' catalog order, not the playlist's. Production passes
+     * no names: the chrome's next name comes from `vibeNavFlow`.
+     */
     fun nextVibe(currentVibe: String, vibeNames: List<String>): String =
         neighborVibe(vibeNames, currentVibe, 1) ?: NONE
 }

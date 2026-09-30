@@ -26,6 +26,7 @@ kotlinx-serialization = "1.11.0"
 kotlinx-datetime = "0.8.0"
 kotlinx-collections-immutable = "0.5.2"
 liquid = "1.1.1"
+reorderable = "3.1.0"
 kmlogging = "2.1.2"
 material3Version = "1.12.0-alpha03"
 media3 = "1.11.1"
@@ -33,6 +34,7 @@ slf4jApi = "2.0.20"
 logback = "1.6.4"
 metro = "1.4.5"
 multiplatform-nav3-ui = "1.1.2"
+multiplatform-navigationevent = "1.1.0"
 ktmidi = "0.12.0"
 coremidi4j = "1.6"
 navigation3 = "1.2.0"
@@ -65,6 +67,7 @@ kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", v
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3Version" }
 metro-gradle-plugin = { module = "dev.zacsweers.metro:metro-gradle-plugin", version.ref = "metro" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }
@@ -104,6 +107,7 @@ metrox-viewmodel = { module = "dev.zacsweers.metro:metrox-viewmodel", version.re
 
 # Navigation3 (JetBrains KMP)
 jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "multiplatform-nav3-ui" }
+jetbrains-navigationevent-compose = { module = "org.jetbrains.androidx.navigationevent:navigationevent-compose", version.ref = "multiplatform-navigationevent" }
 
 # Navigation3 (AndroidX)
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }

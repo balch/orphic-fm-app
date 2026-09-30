@@ -102,6 +102,19 @@ internal val barNameStyle: TextStyle
 /** How far the bar's ring hangs below the tab labels' line, its name's pill above it over the stage. */
 internal val PhoneBarDomeDrop = 8.dp
 
+/** How far the bar's ring rises out of the bar, over the stage, at font scale 1. */
+internal val PhoneBarRingRise = 12.dp
+
+/**
+ * How far the bar's raised ring and its caption pill reach up over the stage's bottom edge: the
+ * ring's rise and its padding, and the pill, whose line follows the font scale.
+ */
+@Composable
+internal fun phoneBarOverhang(): Dp {
+    val line = with(LocalDensity.current) { barNameStyle.lineHeight.toDp() }
+    return PhoneBarRingRise + TransportPadding + line + VibeNamePillPaddingY * 2
+}
+
 /** The widest the bar's name pill draws over the stage; a longer name scrolls inside it. */
 internal val PhoneNamePillMaxWidth = 280.dp
 

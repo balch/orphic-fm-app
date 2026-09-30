@@ -5,6 +5,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SportsScore
 import androidx.compose.material.icons.rounded.SurroundSound
 import androidx.compose.material.icons.rounded.Timer
@@ -63,6 +64,14 @@ data object AiTab : DjRoute {
 data object VibeInfoTab : DjRoute {
     override val icon: ImageVector get() = Icons.Rounded.Info
     override val label: String = "Vibe Info"
+    override val opensAsSheet: Boolean = true
+}
+
+/** The playlist sheet the dome's long press opens. Never a tab and never docked. */
+@Serializable
+data object PlaylistRoute : DjRoute {
+    override val icon: ImageVector get() = Icons.Rounded.Shuffle
+    override val label: String = "Playlist"
     override val opensAsSheet: Boolean = true
 }
 
