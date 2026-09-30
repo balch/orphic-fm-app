@@ -46,10 +46,10 @@ class AiModelCatalogTest {
 
     @Test
     fun anthropicEntriesWireTheLatestModelIds() {
-        assertEquals("claude-sonnet-5", AiModel.SONNET.llmModel.id)
+        assertEquals("claude-sonnet-5-5", AiModel.SONNET.llmModel.id)
         assertEquals("claude-opus-5-5", AiModel.OPUS.llmModel.id)
         assertEquals("claude-fable-5", AiModel.FABLE.llmModel.id)
-        assertEquals("Sonnet 5", AiModel.SONNET.displayName)
+        assertEquals("Sonnet 5.5", AiModel.SONNET.displayName)
         assertEquals("Opus 5.5", AiModel.OPUS.displayName)
         assertEquals("Fable 5", AiModel.FABLE.displayName)
         assertEquals(AiProvider.Anthropic, AiModel.SONNET.aiProvider)
@@ -73,6 +73,7 @@ class AiModelCatalogTest {
         assertTrue(AnthropicModels.Opus_5.usesAdaptiveThinking)
         assertTrue(AnthropicModels.Opus_4_8.usesAdaptiveThinking)
         assertTrue(AnthropicModels.Sonnet_5.usesAdaptiveThinking)
+        assertTrue(Sonnet5_5.usesAdaptiveThinking)
         assertTrue(AnthropicModels.Fable_5.usesAdaptiveThinking)
         assertTrue(AnthropicModels.Opus_4_7.usesAdaptiveThinking)
         assertFalse(AnthropicModels.Haiku_4_5.usesAdaptiveThinking)
@@ -86,6 +87,7 @@ class AiModelCatalogTest {
         assertEquals("medium", AnthropicModels.Opus_5.anthropicEffort)
         assertEquals("medium", AnthropicModels.Fable_5.anthropicEffort)
         assertNull(AnthropicModels.Sonnet_5.anthropicEffort)
+        assertNull(Sonnet5_5.anthropicEffort)
         // Haiku 4.5 rejects output_config outright — it must never carry a value.
         assertNull(AnthropicModels.Haiku_4_5.anthropicEffort)
     }
@@ -106,9 +108,11 @@ class AiModelCatalogTest {
 
     @Test
     fun onlyPreservedThinkingModelsRequireAppendOnlyHistory() {
-        // Opus 5.5 400s a replayed thinking block whose prefix was rewritten, which is
-        // what Koog's history compression does.
+        // Opus 5.5 and Sonnet 5.5 400 a replayed thinking block whose prefix was rewritten,
+        // which is what Koog's history compression does.
         assertTrue(Opus5_5.requiresAppendOnlyHistory)
+        assertTrue(Sonnet5_5.requiresAppendOnlyHistory)
+        assertFalse(AnthropicModels.Sonnet_5.requiresAppendOnlyHistory)
         assertFalse(AnthropicModels.Opus_5.requiresAppendOnlyHistory)
         assertFalse(AnthropicModels.Fable_5.requiresAppendOnlyHistory)
         assertFalse(GeminiFlashLatest.requiresAppendOnlyHistory)

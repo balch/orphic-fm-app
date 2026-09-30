@@ -26,7 +26,7 @@ enum class AiModel(
     val llmModel: LLModel,
 ) {
     HAIKU("Haiku", "Haiku 4.5", AiProvider.Anthropic, AnthropicModels.Haiku_4_5),
-    SONNET("Sonnet", "Sonnet 5", AiProvider.Anthropic, AnthropicModels.Sonnet_5),
+    SONNET("Sonnet", "Sonnet 5.5", AiProvider.Anthropic, Sonnet5_5),
     OPUS("opus", "Opus 5.5", AiProvider.Anthropic, Opus5_5),
     FABLE("fable", "Fable 5", AiProvider.Anthropic, AnthropicModels.Fable_5),
     // Google slots ride floating aliases, so the display name carries no version number —

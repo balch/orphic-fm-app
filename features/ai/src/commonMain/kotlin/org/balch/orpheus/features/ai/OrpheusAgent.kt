@@ -83,7 +83,7 @@ private const val ANTHROPIC_MAX_TOKENS = 16_000
  * Anthropic thinking config, shaped per model generation.
  *
  * Models flagged [usesAdaptiveThinking] reject `thinking: {type: "enabled",
- * budget_tokens}` with a 400 (Opus 4.7+ / Opus 5 / Opus 5.5 / Sonnet 5 / Fable 5). Koog 1.3.0 has
+ * budget_tokens}` with a 400 (Opus 4.7+ / Opus 5 / Opus 5.5 / Sonnet 5 / Sonnet 5.5 / Fable 5). Koog 1.3.0 has
  * no adaptive variant of [AnthropicThinking], so the raw object rides
  * additionalProperties, which Koog's AnthropicMessageRequestSerializer flattens into
  * the request body. `display: "summarized"` matters: these models default to omitted
