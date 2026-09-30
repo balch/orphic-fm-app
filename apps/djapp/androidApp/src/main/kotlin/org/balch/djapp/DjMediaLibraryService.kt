@@ -17,6 +17,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.models.Album
+import org.balch.orpheus.features.pulsar.playback.albumListing
 import java.util.Locale
 
 class DjMediaLibraryService : MediaLibraryService() {
@@ -136,16 +137,15 @@ class DjLibraryCallback(
         )
 
         val items: List<MediaItem> = when {
+            // Albums and their tracks in AlbumCatalog order, only the vibes this build shows.
             parentId == ROOT_ID -> {
-                Album.entries.mapNotNull { album ->
-                    val vibesInAlbum = feature.vibeList.filter { it.album == album }
-                    if (vibesInAlbum.isEmpty()) return@mapNotNull null
+                albumListing(feature.vibeNames).map { (album, names) ->
                     MediaItem.Builder()
                         .setMediaId(ALBUM_PREFIX + album.name)
                         .setMediaMetadata(
                             MediaMetadata.Builder()
                                 .setTitle(album.title)
-                                .setSubtitle("${vibesInAlbum.size} vibes")
+                                .setSubtitle("${names.size} vibes")
                                 .setIsBrowsable(true)
                                 .setIsPlayable(false)
                                 .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_ALBUMS)
@@ -158,8 +158,10 @@ class DjLibraryCallback(
                 val albumName = parentId.removePrefix(ALBUM_PREFIX)
                 val album = Album.entries.firstOrNull { it.name == albumName }
                 if (album == null) return Futures.immediateFuture(LibraryResult.ofItemList(ImmutableList.of(), params))
-                feature.vibeList
-                    .filter { it.album == album }
+                // The bodies only for the BPM subtitle.
+                val vibes = feature.vibeList.associateBy { it.name }
+                albumListing(feature.vibeNames)[album].orEmpty()
+                    .mapNotNull { vibes[it] }
                     .map { vibe ->
                         MediaItem.Builder()
                             .setMediaId(vibe.name)

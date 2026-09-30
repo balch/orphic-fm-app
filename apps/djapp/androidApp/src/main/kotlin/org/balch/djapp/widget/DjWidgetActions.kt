@@ -15,7 +15,6 @@ import org.balch.djapp.DjAppGraphAndroid
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.playback.neighborVibe
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.timer.TimerWidgetCommand
@@ -38,7 +37,7 @@ private fun pulsarOf(graph: DjAppGraphAndroid): PulsarFeature =
         .getFeature(PulsarFeature::class)
 
 /**
- * The vibe name a skip will land on, by [neighborVibe]. PREVIOUS restarts the current vibe
+ * The vibe name a skip will land on, as the chrome names it. PREVIOUS restarts the current vibe
  * instead of going back once far enough into the song ([PulsarFeature.vibeNavFlow]'s
  * `previousRestarts`), which keeps the title unchanged.
  * Returns null when no list is available; returns the current name when the
@@ -49,9 +48,9 @@ private fun pulsarOf(graph: DjAppGraphAndroid): PulsarFeature =
 private fun expectedSkipTarget(pulsar: PulsarFeature, direction: SkipDirection): String? {
     val nav = pulsar.vibeNavFlow.value
     return when {
-        direction == SkipDirection.NEXT -> neighborVibe(pulsar.vibeNames, pulsar.vibeFlow.value.name, 1)
+        direction == SkipDirection.NEXT -> nav.nextName
         nav.previousRestarts -> pulsar.vibeFlow.value.name
-        else -> neighborVibe(pulsar.vibeNames, pulsar.vibeFlow.value.name, -1)
+        else -> nav.previousName
     }
 }
 
