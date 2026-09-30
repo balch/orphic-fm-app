@@ -43,6 +43,8 @@ class VibeApplyToolTest {
         val dh = DogHouseVibe().vibe
         val mangled = vibeApplyJson.encodeToString(dh)
             .replace("\"album\":\"${dh.album.name}\"", "\"album\":\"Heartland Echoes\"")
+        // The default album decodes back to itself, so a replace that missed would pass unseen.
+        assertTrue("\"album\":\"Heartland Echoes\"" in mangled, "precondition: the album field was not mangled")
         val result = decodeVibe(vibeApplyJson, mangled)
         assertTrue(result.isSuccess, "decode should tolerate an unknown album: ${result.exceptionOrNull()?.message}")
         assertEquals(Album.STEALTH, result.getOrThrow().album)

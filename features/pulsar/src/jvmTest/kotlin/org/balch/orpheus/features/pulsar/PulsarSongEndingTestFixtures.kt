@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
 import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 import org.balch.orpheus.features.pulsar.playback.VibeNavigator
+import org.balch.orpheus.features.pulsar.playback.VibeRotation
 
 /**
  * Shared no-op stubs for the new song-ending dependencies that
@@ -118,6 +119,9 @@ internal class FakePulsarFeature(
     val arrangement: MutableStateFlow<PulsarArrangementState> = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
     override val arrangementStateFlow: kotlinx.coroutines.flow.StateFlow<PulsarArrangementState> = arrangement
     override val vibeNames: List<String> = vibeList.map { it.name }
+
+    /** Catalog order until a test sets its own rotation. */
+    override val rotationFlow: MutableStateFlow<VibeRotation> = MutableStateFlow(VibeRotation.of(vibeNames))
 
     /**
      * Mirrors `PulsarViewModel.applyVibe()`'s `onVibeApplied()` call. Do not set

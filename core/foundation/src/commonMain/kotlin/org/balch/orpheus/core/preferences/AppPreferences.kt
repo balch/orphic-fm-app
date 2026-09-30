@@ -45,6 +45,8 @@ data class AppPreferences(
      * dome wiggles once a launch to show that it swipes.
      */
     val domeSwiped: Boolean = false,
+    /** The DJ app's vibe rotation: order and set-aside vibes. Null means catalog order. */
+    val vibePlaylist: VibePlaylistPrefs? = null,
     /** Serialized effect UI states for DJ app cross-session persistence. */
     val lastTimerJson: String? = null,
     val lastReverbJson: String? = null,

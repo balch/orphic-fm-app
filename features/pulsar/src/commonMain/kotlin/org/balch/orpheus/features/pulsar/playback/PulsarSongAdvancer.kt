@@ -56,7 +56,7 @@ class PulsarSongAdvancer(
                 val nextName = if (event.repeat) {
                     currentName
                 } else {
-                    neighborVibe(pulsarFeature.vibeNames, currentName, 1) ?: return@collect
+                    stepInRotation(pulsarFeature.rotationFlow.value, currentName, 1) ?: return@collect
                 }
 
                 val configured: TransitionSpec = pulsarFeature.vibeFlow.value

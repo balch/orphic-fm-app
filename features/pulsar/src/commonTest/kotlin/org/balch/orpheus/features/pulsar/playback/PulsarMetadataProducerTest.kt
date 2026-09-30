@@ -17,16 +17,16 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
+import org.balch.orpheus.features.pulsar.vibes.AlbumCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 private fun sampleVibe(
     name: String = "Test Vibe",
     bpm: Float = 128f,
-    album: Album = Album.STEALTH,
 ) = Vibe(
     name = name,
-    album = album,
     bpm = bpm,
     rootNote = RootNote.C,
     scaleType = ScaleType.MINOR,
@@ -63,25 +63,41 @@ class PulsarMetadataProducerTest {
      * Real [PulsarSession] seeded with [initial], not a fake. Mirrors production, where the
      * producer only ever reads `PulsarSession.vibeFlow`.
      */
-    private fun buildProducer(initial: Vibe): Pair<PulsarSession, PulsarMetadataProducer> =
-        buildProducer().also { (session, _) -> session.updateVibe(initial) }
+    private fun buildProducer(initial: Vibe, albums: AlbumCatalog = noAlbums): Pair<PulsarSession, PulsarMetadataProducer> =
+        buildProducer(albums).also { (session, _) -> session.updateVibe(initial) }
 
     /** No vibe pushed — the AppScope window before PulsarViewModel is ever constructed. */
-    private fun buildProducer(): Pair<PulsarSession, PulsarMetadataProducer> {
+    private fun buildProducer(albums: AlbumCatalog = noAlbums): Pair<PulsarSession, PulsarMetadataProducer> {
         val dispatchers = testDispatchers()
         val scope = AppCoroutineScope(dispatchers)
         val session = PulsarSession(NoOpSynthEngine(), scope, dispatchers)
-        return session to PulsarMetadataProducer(session, scope, dispatchers)
+        return session to PulsarMetadataProducer(session, scope, dispatchers, albums)
     }
+
+    private val noAlbums = AlbumCatalog(emptyList())
 
     @Test fun `title is initial vibe name`() = runTest {
         val (_, producer) = buildProducer(sampleVibe(name = "Initial Vibe"))
         assertEquals("Initial Vibe", producer.titleFlow.value)
     }
 
-    @Test fun `subtitle is initial album title`() = runTest {
-        val (_, producer) = buildProducer(sampleVibe(album = Album.ZERO_TO_ONE))
+    @Test fun `subtitle is the title of the album the catalog lists the vibe on`() = runTest {
+        val albums = AlbumCatalog(
+            listOf(
+                Album.STEALTH to listOf(VibeName("Other")),
+                Album.ZERO_TO_ONE to listOf(VibeName("Test Vibe")),
+            ),
+        )
+        val (session, producer) = buildProducer(sampleVibe(), albums)
         assertEquals(Album.ZERO_TO_ONE.title, producer.subtitleFlow.value)
+        session.updateVibe(sampleVibe(name = "Other"))
+        assertEquals(Album.STEALTH.title, producer.subtitleFlow.value)
+    }
+
+    // An AI's vibe is on no album, whatever its JSON's album field says.
+    @Test fun `a vibe no album lists has no subtitle`() = runTest {
+        val (_, producer) = buildProducer(sampleVibe(name = "An AI Vibe").copy(album = Album.RIF))
+        assertEquals("", producer.subtitleFlow.value)
     }
 
     @Test fun `title updates when vibe changes`() = runTest {

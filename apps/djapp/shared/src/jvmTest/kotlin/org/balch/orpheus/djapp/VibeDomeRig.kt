@@ -21,6 +21,7 @@ import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 import org.balch.orpheus.features.pulsar.playback.VibeMove
 import org.balch.orpheus.features.pulsar.playback.VibeNavigator
 import org.balch.orpheus.features.pulsar.playback.VibeRequest
+import org.balch.orpheus.features.pulsar.playback.VibeRotation
 
 // The playing one short enough for the rail's slot: a longer name would scroll, and a still dome ask for frames.
 internal val RigVibeNames = listOf("Dog House", "Drift", "Stay Asleep")
@@ -31,6 +32,7 @@ internal class RigPulsarFeature(
 ) : PulsarFeature by base {
     private val vibes = RigVibeNames.map { base.vibeFlow.value.copy(name = it) }
     override val vibeNames: List<String> = RigVibeNames
+    override val rotationFlow: StateFlow<VibeRotation> = MutableStateFlow(VibeRotation.of(RigVibeNames))
     override val vibeFlow = MutableStateFlow(vibes[1])
     private val nav = MutableStateFlow(navOf(vibes[1].name))
     override val vibeNavFlow: StateFlow<VibeNavState> = nav

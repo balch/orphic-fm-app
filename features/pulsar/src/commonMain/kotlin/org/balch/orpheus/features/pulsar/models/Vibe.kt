@@ -13,6 +13,10 @@ import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 
+/**
+ * An album's identity: title, art and Android Auto id. Its vibes and their order come from
+ * `vibes/AlbumCatalog.kt`, where STEALTH also takes every vibe no other album lists.
+ */
 enum class Album(val title: String) {
     STEALTH("Stealth"),
     RIF("RIF"),
@@ -75,6 +79,8 @@ enum class ScaleType(val scaleIndex: Int) {
  * 7. Optionally add an **arrangement** for section-based structure (verse/chorus/solo).
  *
  * @param name Display name for the vibe selector.
+ * @param album Not read by the apps: a vibe's album comes from `vibes/AlbumCatalog.kt`. Kept only so
+ *   older vibe JSON (AI archives, `tools/vibe-codegen` input) still decodes.
  * @param tracks Exactly 8 tracks. See [TrackVoice] for per-track tuning.
  * @param lick Optional lead riff pattern. Tracks with `lickMode` set to Squash or Fill play this.
  * @param lickMutation How much the lick varies on repeat, 0-1. 0 = exact, 0.5 = moderate drift.

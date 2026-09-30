@@ -5,9 +5,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.media.PlaybackProgress
-import org.balch.orpheus.features.pulsar.playback.neighborVibe
+import org.balch.orpheus.features.pulsar.playback.VibeRotation
 import org.balch.orpheus.features.pulsar.playback.shouldRestartOnPrevious
 import org.balch.orpheus.features.pulsar.playback.songArc
+import org.balch.orpheus.features.pulsar.playback.stepInRotation
 
 /** What the vibe navigator chrome shows: the vibe, its neighbours, and how far into the song. */
 @Immutable
@@ -39,12 +40,12 @@ data class VibeNavState(
 /** The stub [PulsarFeature.vibeNavFlow]: one shared flow, so the default getter never allocates. */
 internal val EmptyVibeNavFlow: StateFlow<VibeNavState> = MutableStateFlow(VibeNavState.EMPTY).asStateFlow()
 
-internal fun vibeNavStateOf(names: List<String>, current: String, progress: PlaybackProgress?): VibeNavState {
+internal fun vibeNavStateOf(rotation: VibeRotation, current: String, progress: PlaybackProgress?): VibeNavState {
     val timed = progress?.takeIf { it.durationMs > 0 }
     return VibeNavState(
         currentName = current,
-        previousName = neighborVibe(names, current, -1),
-        nextName = neighborVibe(names, current, 1),
+        previousName = stepInRotation(rotation, current, -1),
+        nextName = stepInRotation(rotation, current, 1),
         progress = timed?.let { songArc(it.positionMs.toFloat(), it.durationMs, it.durationFinal, it.estimateMs, it.lockedAtMs) },
         previousRestarts = shouldRestartOnPrevious(progress),
         positionMs = timed?.positionMs,

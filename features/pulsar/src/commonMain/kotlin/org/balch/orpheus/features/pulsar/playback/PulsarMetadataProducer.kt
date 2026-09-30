@@ -20,17 +20,19 @@ import org.balch.orpheus.core.playback.MetadataProducer
 import org.balch.orpheus.features.pulsar.PulsarSession
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.vibes.AlbumCatalog
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import orpheus.features.pulsar.generated.resources.Res
 import kotlin.time.TimeSource
 
 /**
- * Pulsar-as-primary-metadata: title is the current vibe name, subtitle the album title. Used
- * directly by DJApp; wrapped by OrpheusMetadataProducer in Orpheus.
+ * Pulsar-as-primary-metadata: title is the current vibe name, subtitle the title of the album
+ * [AlbumCatalog] lists it on, empty for a vibe on no album (an AI's). Used directly by DJApp;
+ * wrapped by OrpheusMetadataProducer in Orpheus.
  *
- * [artworkPngFlow] emits PNG album art per vibe: STEALTH renders procedurally via
- * [AlbumArtRenderer], RIF/ZERO_TO_ONE/ANOMALIES decode a static WebP and re-encode as PNG (older macOS
- * NSImage won't decode WebP).
+ * [artworkPngFlow] emits PNG album art per vibe: STEALTH and a vibe on no album render procedurally
+ * via [AlbumArtRenderer], RIF/ZERO_TO_ONE/ANOMALIES decode a static WebP and re-encode as PNG (older
+ * macOS NSImage won't decode WebP).
  *
  * Art is cached per vibe name and the *same* ByteArray instance must be returned on a hit.
  * That instance rule does the heavy lifting: PlaybackController de-dupes on StateFlow
@@ -47,6 +49,8 @@ class PulsarMetadataProducer(
     private val pulsarSession: PulsarSession,
     scope: AppCoroutineScope,
     dispatcherProvider: DispatcherProvider,
+    // Unbound in the app graphs, so the shipped albums; tests pass their own listing.
+    private val albumCatalog: AlbumCatalog = AlbumCatalog.Default,
 ) : MetadataProducer {
 
     // Matches PlaybackController.snapshotOf's title.ifEmpty { "Orpheus" } fallback, so the
@@ -79,8 +83,8 @@ class PulsarMetadataProducer(
         if (cachedArtworkVibe == vibe.name) return@withLock cachedArtworkBytes
         // A missing native lib (Skia off a test classpath) yields null artwork, not a crash.
         val bytes: ByteArray? = try {
-            when (vibe.album) {
-                Album.STEALTH ->
+            when (albumCatalog.albumOf(vibe.name)) {
+                Album.STEALTH, null ->
                     AlbumArtRenderer.render(seed = vibe.name.hashCode().toLong()).toPngBytes()
                 Album.RIF -> loadStaticArt("drawable/album_art_rif.webp")
                 Album.ZERO_TO_ONE -> loadStaticArt("drawable/album_art_021.webp")
@@ -112,7 +116,7 @@ class PulsarMetadataProducer(
         scope.launch(dispatcherProvider.default) {
             pulsarSession.vibeFlow.filterNotNull().collect { vibe ->
                 _title.value = vibe.name
-                _subtitle.value = vibe.album.title
+                _subtitle.value = albumCatalog.albumOf(vibe.name)?.title.orEmpty()
             }
         }
         // collectLatest so a rapid vibe change cancels an in-flight render.

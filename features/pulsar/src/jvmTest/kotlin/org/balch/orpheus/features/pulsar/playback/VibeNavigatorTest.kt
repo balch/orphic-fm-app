@@ -529,4 +529,26 @@ class VibeNavigatorTest {
         assertEquals("B", feature.vibeFlow.value.name, "the next request still runs after a throw")
         assertEquals(2, runner.calls)
     }
+
+    // ==================== the playlist's rotation ====================
+
+    @Test
+    fun nextFollowsTheRotationNotTheCatalog() = runTest {
+        val feature = FakePulsarFeature(abc, abc[0])
+        feature.rotationFlow.value = VibeRotation(listOf("A", "B", "C"), listOf("A", "C"))
+        val nav = makeVibeNavigator(feature, DelayingRunner(), dispatcher = dispatcher())
+        nav.request(VibeRequest.Next)
+        advanceUntilIdle()
+        assertEquals("C", feature.vibeFlow.value.name)
+    }
+
+    @Test
+    fun previousFromASetAsideVibeStepsFromItsSlot() = runTest {
+        val feature = FakePulsarFeature(abc, abc[1])
+        feature.rotationFlow.value = VibeRotation(listOf("A", "B", "C"), listOf("A", "C"))
+        val nav = makeVibeNavigator(feature, DelayingRunner(), dispatcher = dispatcher())
+        nav.request(VibeRequest.Previous)
+        advanceUntilIdle()
+        assertEquals("A", feature.vibeFlow.value.name)
+    }
 }

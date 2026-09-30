@@ -259,4 +259,18 @@ class PulsarSongAdvancerTest {
         assertEquals(300, runner.specs.single().handoffMs)
         assertEquals("B", feature.vibeFlow.value.name)
     }
+
+    // The chrome says "Up next: C"; the song's end must agree with it.
+    @Test
+    fun `a song's end advances by the rotation, as the chrome names it`() = runTest {
+        val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"), mkMinimalVibe("C"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        feature.rotationFlow.value = VibeRotation(listOf("A", "B", "C"), listOf("A", "C"))
+        val source = FakeSongEndingEventSource()
+        makeAdvancer(feature, source)
+        advanceUntilIdle()
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceUntilIdle()
+        assertEquals("C", feature.vibeFlow.value.name)
+    }
 }

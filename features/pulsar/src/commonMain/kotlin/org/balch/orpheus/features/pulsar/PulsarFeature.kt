@@ -61,6 +61,7 @@ import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.core.preferences.VibePlaylistPrefs
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.core.tts.TtsGenerator
@@ -74,6 +75,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingStyle
@@ -116,9 +118,18 @@ import org.balch.orpheus.features.pulsar.playback.SectionQueue
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
 import org.balch.orpheus.features.pulsar.playback.NoVibeMoves
+import org.balch.orpheus.features.pulsar.playback.PlaylistEdit
+import org.balch.orpheus.features.pulsar.playback.PlaylistView
 import org.balch.orpheus.features.pulsar.playback.TransitionPreferences
 import org.balch.orpheus.features.pulsar.playback.VibeMove
+import org.balch.orpheus.features.pulsar.playback.VibePlaylistStore
 import org.balch.orpheus.features.pulsar.playback.VibeRequest
+import org.balch.orpheus.features.pulsar.playback.VibeRotation
+import org.balch.orpheus.features.pulsar.playback.albumListing
+import org.balch.orpheus.features.pulsar.playback.applyPlaylistEdit
+import org.balch.orpheus.features.pulsar.playback.rotationOf
+import org.balch.orpheus.features.pulsar.playback.stepInRotation
+import org.balch.orpheus.features.pulsar.vibes.AlbumCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
@@ -289,6 +300,28 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     /** Previous/next/progress for the navigator chrome. Stub default for previews and fakes. */
     val vibeNavFlow: StateFlow<VibeNavState>
         get() = EmptyVibeNavFlow
+
+    /**
+     * The rotation Next, Previous, song-end and the chrome step through. The stub is catalog order,
+     * built per read; a fake that drives a real navigator should hold its own.
+     */
+    val rotationFlow: StateFlow<VibeRotation>
+        get() = MutableStateFlow(VibeRotation.of(vibeNames))
+
+    /** What the playlist sheet draws. The stub has no albums. */
+    val playlistFlow: StateFlow<PlaylistView>
+        get() = MutableStateFlow(PlaylistView(rotationFlow.value))
+
+    /** Applies one playlist sheet edit. A no-op for previews and fakes. */
+    fun editPlaylist(edit: PlaylistEdit) {}
+
+    /**
+     * [PulsarPanelActions.pickVibe] by display name, building only that vibe's body. Previews and fakes
+     * resolve it through [vibeList].
+     */
+    fun pickVibeByName(name: String) {
+        vibeList.firstOrNull { it.name == name }?.let(actions.pickVibe)
+    }
 
     /**
      * Each vibe change the navigator accepts, as its transition starts: which way and who asked.
@@ -497,6 +530,10 @@ class PulsarViewModel(
     private val songEndingEventSource: SongEndingEventSource,
     private val engagementTracker: EngagementTracker,
     private val musicPulseSource: MusicPulseSource,
+    // Default keeps direct test construction terse; the app graphs bind AppVibePlaylistStore.
+    private val vibePlaylistStore: VibePlaylistStore = VibePlaylistStore.InMemory(),
+    // Unbound in the app graphs, so the shipped albums; tests pass their own listing.
+    albumCatalog: AlbumCatalog = AlbumCatalog.Default,
 ) : PulsarFeature {
 
     // The injected set filtered + ordered through VibeCatalog (the green-light map):
@@ -521,6 +558,43 @@ class PulsarViewModel(
 
     // Cheap accessor — never forces Vibe construction.
     override val vibeNames: List<String> = curatedProviders.map { it.name.value }
+
+    // Each album with a curated vibe and its curated vibes in track order: the chips, badges and queue.
+    private val albums: Map<Album, List<String>> = albumListing(vibeNames, albumCatalog)
+
+    override val rotationFlow: StateFlow<VibeRotation> =
+        vibePlaylistStore.prefsFlow.map { rotationOf(vibeNames, it) }
+            .stateIn(scope, SharingStarted.Eagerly, rotationOf(vibeNames, vibePlaylistStore.prefsFlow.value))
+
+    // Kept current from the start, so the sheet's first frame never shows a view from before the load.
+    override val playlistFlow: StateFlow<PlaylistView> =
+        rotationFlow.map { PlaylistView(it, albums) }
+            .stateIn(scope, SharingStarted.Eagerly, PlaylistView(rotationFlow.value, albums))
+
+    override fun editPlaylist(edit: PlaylistEdit) {
+        val paused = stateFlow.value.globalPaused
+        val applied = if (edit is PlaylistEdit.QueueAlbum) edit.copy(andPick = paused) else edit
+        // Both stores apply the edit synchronously, so the new order is known here.
+        var edited: VibePlaylistPrefs? = null
+        vibePlaylistStore.update { prefs ->
+            applyPlaylistEdit(prefs, vibeNames, { albums[it].orEmpty() }, applied).also { edited = it }
+        }
+        // Paused, a queued album or a shuffle replaces the playing vibe instead of waiting for it to end.
+        val now = vibeFlow.value.name
+        val pick = when {
+            !paused -> null
+            applied is PlaylistEdit.QueueAlbum -> albums[applied.album]?.firstOrNull()
+            applied == PlaylistEdit.Shuffle -> stepInRotation(rotationOf(vibeNames, edited), now, 1)
+            else -> null
+        }
+        if (pick == null || pick == now) return
+        // Only that vibe's body is built.
+        curatedProviders.firstOrNull { it.name.value == pick }?.let { pulsarSession.requestVibe(VibeRequest.Pick(it.vibe)) }
+    }
+
+    override fun pickVibeByName(name: String) {
+        curatedProviders.firstOrNull { it.name.value == name }?.let { actions.pickVibe(it.vibe) }
+    }
 
     // Id -> provider, resolved once at construction (these instances live for the
     // ViewModel's lifetime, so a provider's own `cached` field actually caches -- unlike a
@@ -880,9 +954,9 @@ class PulsarViewModel(
     override val vibeFlow: StateFlow<Vibe> = _vibeFlow.asStateFlow()
 
     override val vibeNavFlow: StateFlow<VibeNavState> =
-        combine(vibeFlow, pulsarSession.progressFlow) { vibe, progress ->
-            vibeNavStateOf(vibeNames, vibe.name, progress)
-        }.stateIn(scope, SharingStarted.Eagerly, vibeNavStateOf(vibeNames, vibeFlow.value.name, null))
+        combine(vibeFlow, pulsarSession.progressFlow, rotationFlow) { vibe, progress, rotation ->
+            vibeNavStateOf(rotation, vibe.name, progress)
+        }.stateIn(scope, SharingStarted.Eagerly, vibeNavStateOf(rotationFlow.value, vibeFlow.value.name, null))
 
     override val vibeMoves: SharedFlow<VibeMove> get() = pulsarSession.vibeMoves
 

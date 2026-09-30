@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar
 
 import org.balch.orpheus.core.media.PlaybackProgress
+import org.balch.orpheus.features.pulsar.playback.VibeRotation
 import org.balch.orpheus.features.pulsar.playback.songArc
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,7 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VibeNavStateTest {
-    private val names = listOf("A", "B", "C")
+    private val names = VibeRotation.of(listOf("A", "B", "C"))
 
     @Test
     fun namesBothNeighbours() {
@@ -65,5 +66,12 @@ class VibeNavStateTest {
         val s = vibeNavStateOf(names, "AI Vibe", null)
         assertEquals("C", s.previousName)
         assertEquals("A", s.nextName)
+    }
+
+    @Test
+    fun aSetAsideVibeNamesItsSlotsNeighbours() {
+        val s = vibeNavStateOf(VibeRotation(listOf("A", "B", "C", "D"), listOf("A", "D")), "B", null)
+        assertEquals("A", s.previousName)
+        assertEquals("D", s.nextName)
     }
 }

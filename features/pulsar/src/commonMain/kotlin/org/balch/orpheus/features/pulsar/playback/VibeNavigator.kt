@@ -198,7 +198,7 @@ class VibeNavigator(
         }
 
     private fun step(feature: PulsarFeature, from: String, step: Int, spec: TransitionSpec): Move? {
-        val target = neighborVibe(feature.vibeNames, from, step) ?: return null
+        val target = stepInRotation(feature.rotationFlow.value, from, step) ?: return null
         val kind = if (step > 0) VibeMoveKind.Next else VibeMoveKind.Previous
         return Move(target, spec, kind) { feature.applyVibeByName(target) }
     }

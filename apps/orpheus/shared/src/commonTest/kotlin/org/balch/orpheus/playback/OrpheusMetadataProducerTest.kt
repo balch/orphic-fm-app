@@ -21,7 +21,9 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
+import org.balch.orpheus.features.pulsar.vibes.AlbumCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -29,10 +31,8 @@ import kotlin.test.assertSame
 private fun sampleVibe(
     name: String = "Test",
     bpm: Float = 120f,
-    album: Album = Album.STEALTH,
 ) = Vibe(
     name = name,
-    album = album,
     bpm = bpm,
     rootNote = RootNote.C,
     scaleType = ScaleType.MINOR,
@@ -73,7 +73,7 @@ class OrpheusMetadataProducerTest {
         mode: PlaybackMode,
         vibeName: String = "MyVibe",
         bpm: Float = 130f,
-        album: Album = Album.STEALTH,
+        albums: AlbumCatalog = AlbumCatalog(emptyList()),
         evoActive: Boolean = false,
     ): Harness {
         val dispatchers = TestDispatcherProvider(UnconfinedTestDispatcher())
@@ -81,9 +81,9 @@ class OrpheusMetadataProducerTest {
         // Real PulsarSession, not a PulsarFeature fake. Mirrors production, where the
         // producer only ever reads PulsarSession.vibeFlow.
         val pulsarSession = PulsarSession(TestSynthEngine(), scope, dispatchers).apply {
-            updateVibe(sampleVibe(vibeName, bpm, album))
+            updateVibe(sampleVibe(vibeName, bpm))
         }
-        val pulsarMetadata = PulsarMetadataProducer(pulsarSession, scope, dispatchers)
+        val pulsarMetadata = PulsarMetadataProducer(pulsarSession, scope, dispatchers, albums)
         val aiFeature = FakeAiFeature(mode)
         val mediaState = MediaSessionStateManager(scope).apply { setEvoActive(evoActive) }
         val producer = OrpheusMetadataProducer(aiFeature, pulsarMetadata, mediaState, scope)
@@ -106,7 +106,8 @@ class OrpheusMetadataProducerTest {
     }
 
     @Test fun `USER mode delegates subtitle to Pulsar album title`() = runTest {
-        val h = build(mode = PlaybackMode.USER, album = Album.ZERO_TO_ONE)
+        val albums = AlbumCatalog(listOf(Album.ZERO_TO_ONE to listOf(VibeName("MyVibe"))))
+        val h = build(mode = PlaybackMode.USER, albums = albums)
         assertEquals(Album.ZERO_TO_ONE.title, h.producer.subtitleFlow.value)
     }
 
