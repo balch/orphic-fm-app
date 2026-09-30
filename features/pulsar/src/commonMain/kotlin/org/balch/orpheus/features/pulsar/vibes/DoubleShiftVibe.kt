@@ -41,6 +41,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
@@ -66,7 +67,7 @@ import org.balch.orpheus.features.pulsar.models.chords
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class DoubleShiftVibe : VibeProvider {
-    override val name: String = "Double Shift"
+    override val name: VibeName = VibeNames.DOUBLE_SHIFT
 
     // Verse: IV-I three times, then V-I to turn it around. Eight bars, one chord each,
     // so the harmony moves slower than the riff and the drone has time to bite.
@@ -95,7 +96,7 @@ class DoubleShiftVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
+            name = name.value,
             bpm = 104f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.C,

@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 import kotlin.math.abs
@@ -549,10 +550,10 @@ private fun dailyDriftVibe(displayName: String, seed: Int, hourBasis: TimeZone):
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class UtcDriftVibe : VibeProvider {
-    override val name: String = "UTC"
+    override val name: VibeName = VibeNames.UTC
     override val vibe: Vibe
         get() = dailyDriftVibe(
-            displayName = name,
+            displayName = name.value,
             seed = utcHourlySeed(),
             hourBasis = TimeZone.UTC,
         )
@@ -560,10 +561,10 @@ class UtcDriftVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class TimeZoneDriftVibe : VibeProvider {
-    override val name: String = "TimeZone"
+    override val name: VibeName = VibeNames.TIME_ZONE
     override val vibe: Vibe
         get() = dailyDriftVibe(
-            displayName = name,
+            displayName = name.value,
             seed = localHourlySeed(),
             hourBasis = TimeZone.currentSystemDefault(),
         )

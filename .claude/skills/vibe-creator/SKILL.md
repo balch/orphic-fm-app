@@ -13,9 +13,15 @@ A Vibe is a complete Pulsar preset: 8 tracks, tempo, key, macro defaults, sectio
 - Schema (every type you will reference): the `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/models/` package — **one file per type**, not a single `PulsarVibe.kt` (that file does not exist). The top-level `Vibe` data class plus the `RootNote` / `ScaleType` / `EnvelopeType` / `Album` enums live in `models/Vibe.kt`; the rest are siblings (`OrpheusEngine.kt`, `TrackVoice.kt`, `TrackRole.kt`, `GenreProfile.kt`, `ChordComping.kt`, `Lick.kt`, `ChordStep.kt`, `Band.kt`, `TensionProfile.kt`, `VibeEffects.kt`, `Arrangement.kt`, `Anomaly.kt`, `LickAnomaly.kt`, `VoidAnomaly.kt`, `MacroTarget.kt`, `Evolution.kt`, `EnvelopeProfile.kt`, `SoloBehavior.kt`, `VibeProvider.kt`).
 - Canonical quality benchmark: `DogHouseVibe.kt` — after any Pulsar change, test this vibe first; a new vibe should feel at least as coherent and musical.
 
-Registration is automatic via Metro DI — each vibe class carries `@Inject` and `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())`, and `PulsarViewModel` receives `Set<VibeProvider>` in its constructor. **No extra registration file, DI module, or list edit is required** — dropping a correctly-annotated file into the `vibes/` directory is enough.
+DI registration is automatic via Metro — each vibe class carries `@Inject` and `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())`, and `PulsarViewModel` receives `Set<VibeProvider>` in its constructor. No DI module edit is needed, but the apps show a vibe only once it has a name and a catalog entry in `vibes/`:
 
-`VibeProvider` has **two** members, both required: `override val name: String` (a cheap constant for picker sorting) and `override val vibe: Vibe` (the heavy body — declare it `by lazy { Vibe(name = name, ...) }` so selecting the picker, not listing it, builds the tracks). See the file template below.
+- `VibeNames.kt`: its name, `val MY_NEW_VIBE = VibeName("My New Vibe")`, added alphabetically by constant. The provider and both catalogs reference this constant, so the name is typed once.
+- `VibeCatalog.kt`: `VibeNames.MY_NEW_VIBE to CatalogEntry(...)`, its tier (`WIP` while tuning, `LIVE` once it passes its ear test). Position = picker order.
+- `AlbumCatalog.kt`: only for RIF, 0-2-1 or Anomalies. STEALTH takes every cataloged vibe no other album lists, so a vibe that belongs there needs no line. Otherwise add `VibeNames.MY_NEW_VIBE` to that album's list where it should play. Album order and track order are authored there, never on the `Vibe`. `AlbumCatalogTest` fails on a listed name that is not a `VibeCatalog` entry.
+
+Do not set `album` on the `Vibe`. The apps ignore it (the field exists only so older JSON decodes), and `AlbumCatalogTest` fails on a vibe that sets a non-default one.
+
+`VibeProvider` has **two** members, both required: `override val name: VibeName` (a cheap constant for picker sorting, written `VibeNames.MY_NEW_VIBE`) and `override val vibe: Vibe` (the heavy body — declare it `by lazy { Vibe(name = name.value, ...) }` so selecting the picker, not listing it, builds the tracks). See the file template below.
 
 ## Starting from a codegen-imported vibe
 
@@ -24,7 +30,8 @@ compiling `<Class>Vibe.kt` in this directory with every field spelled out explic
 provenance-header comment instead of prose. Once that vibe earns a keep, start from *that* file
 rather than `DogHouseVibe.kt` — your job is polish, not translation: collapse identical
 `engineEdm`/`engineSpace` pairs into the `OrpheusEngine(...).let { x -> TrackVoice(engineEdm = x,
-engineSpace = x) }` idiom (the generator never does this itself), add the musical-intent KDoc
+engineSpace = x) }` idiom (the generator never does this itself), delete the generated `album =`
+line (the album comes from `AlbumCatalog.kt`; STEALTH needs no line there), add the musical-intent KDoc
 every hand-authored vibe carries (see the naming rule below — no trademarks), and tune by ear.
 
 ## Naming rule — read this first
@@ -65,7 +72,7 @@ Outside those two conditions nothing changes. A vibe that references a modern ba
    - Marching / militant / anthemic — `ArmyStompVibe`.
    - Reggae / skank — `RastaManVibe`.
    - CHORDAL-comping demo — `CompLabVibe` (uses a `generateCompLabVibe` helper — note: the file also contains commented-out family examples).
-3. **Copy that template file** to your new `<Name>Vibe.kt`, change the class name, the display `name`, and then tune each parameter against your musical decomposition. Do not start from a blank file — there are too many required fields.
+3. **Copy that template file** to your new `<Name>Vibe.kt`, change the class name, the display `name`, and then tune each parameter against your musical decomposition. Do not start from a blank file — there are too many required fields. Add its `VibeNames` constant in `VibeNames.kt` (alphabetical) and list `VibeNames.<CONST>` in `VibeCatalog.kt` (as `WIP`). It lands on STEALTH; add it to `AlbumCatalog.kt`, at its track position, only if it belongs on RIF, 0-2-1 or Anomalies.
 4. **Compile.** Run `./gradlew :features:pulsar:compileKotlinJvm` (fast — Pulsar only). Fix any type errors. If any section sets a `soloMode`, the vibe needs a `band` — `BandPresets.quartet(...)` is the one-liner (see the `Band` section).
 5. **Run it live.** Build the JVM desktop app and load the vibe from the picker. A/B against `DogHouseVibe`.
 6. **Tune by ear.** The file should change first, not any wider code. If you find yourself wanting to change Pulsar DSP, stop — the DogHouseVibe benchmark exists to catch regressions, and vibes should only tune what the schema exposes.
@@ -78,8 +85,8 @@ All of this is in the `models/` package (one file per type — see "Where vibes 
 
 | Field | Purpose | Decision rule |
 |---|---|---|
-| `name` | Vibe picker label | Short, evocative, **no trademarks**. Must equal `vibe.name`. |
-| `album` | Picker grouping | Optional, default `Album.STEALTH` (also `RIF`, `ZERO_TO_ONE`, `ANOMALIES`). |
+| `name` | Vibe picker label | Short, evocative, **no trademarks**. Pass `name = name.value` so it equals the provider's `VibeNames` constant. |
+| `album` | Not set here | The album and track position go in `vibes/AlbumCatalog.kt` (STEALTH needs no line). The field stays only so older JSON decodes. |
 | `bpm` | Tempo | Match the reference's BPM (use a tap-tempo app if unsure). |
 | `envelopeType` | `AD` / `TIDES` / `BLEND` | `AD` for tight/EDM/techno, `TIDES` for ambient/drone/pad-heavy, `BLEND` for anything that spans a dynamic range. |
 | `rootNote` | Musical root | Use enharmonic equivalents where needed (`RootNote.G_SHARP` == Ab). |
@@ -557,7 +564,7 @@ Copy-paste the imports and class skeleton, then tune. Always start from a workin
 
 Two things that bite every time:
 - **`OrpheusEngineId` lives in `org.balch.orpheus.core.audio`** — NOT the pulsar package. Everything else (the schema types *and* the `bandMatrix` / `row` / `chords` / `chordMatrix` helpers) lives in `org.balch.orpheus.features.pulsar.models`. There is no `org.balch.orpheus.features.pulsar.*` package for these — that import will not resolve.
-- **`VibeProvider` has two members: `name` and `vibe`.** Declare `name` as a cheap constant and `vibe` `by lazy` so picker sorting never builds the heavy body, and pass `name = name` so the two stay in sync.
+- **`VibeProvider` has two members: `name` and `vibe`.** Declare `name` as a cheap `VibeNames` constant and `vibe` `by lazy` so picker sorting never builds the heavy body, and pass `name = name.value` so the two stay in sync.
 
 ```kotlin
 package org.balch.orpheus.features.pulsar.vibes
@@ -592,12 +599,11 @@ import org.balch.orpheus.features.pulsar.models.chords
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class MyNewVibe : VibeProvider {
-    override val name: String = "My New Vibe"
+    override val name: VibeName = VibeNames.MY_NEW_VIBE
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
-            // album = Album.STEALTH,
+            name = name.value,
             bpm = 120f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.A,
@@ -633,7 +639,8 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
 - **"section(s) [...] declare a soloMode but Vibe.band is null"**: set `band` (start with `BandPresets.quartet(...)`) or drop the `soloMode` from the named sections. A solo is the band passing a lead around; with no band there is nobody to pass it to.
 - **The solo section sounds like every other section**: the vibe has a band, but the only members that could lead are `alwaysActive`, or their tracks are all `Chordal`/`Percussive` (a `Jam` lead must own a `Melodic`-role track), or the section `density = 0f`s the soloist. See the `Band` section.
 - **"customProgression degrees must be 0..6"**: use 0 (I) through 6 (VII). Do not use negative numbers or values >= 7.
-- **Vibe does not show up in the picker**: verify the `@Inject` + `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())` annotations are both present and the class implements `VibeProvider`. Also rebuild — Metro DI code generation requires a recompile.
+- **Vibe does not show up in the picker**: verify the `@Inject` + `@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())` annotations are both present and the class implements `VibeProvider`, and that its `VibeNames` constant is listed in `VibeCatalog.kt` (a `WIP` entry shows only on debug builds and `-Pcatalog=wip` desktop runs). Also rebuild — Metro DI code generation requires a recompile.
+- **Vibe shows no album badge or chip, or is missing from Android Auto**: it is not in `VibeCatalog.kt` (STEALTH takes every cataloged vibe no other album lists). A vibe that should be on RIF, 0-2-1 or Anomalies instead sits on STEALTH until it is listed in `AlbumCatalog.kt`.
 - **Bass wanders off-key**: `chordFollow = ROOT_ONLY` on the bass track snaps it to the chord root. Most driving grooves want this.
 - **Pads sound random / nothing locks in**: set `barStrategy = REPEAT` or `MUTATE` on at least the rhythm and bass tracks; reserve `INDEPENDENT` for genuine texture layers.
 - **Lead does not follow the key**: verify the track's `role` is `TrackRole.Melodic` (not `Percussive`) and that `noteRangeLow/High` overlap with the scale notes.

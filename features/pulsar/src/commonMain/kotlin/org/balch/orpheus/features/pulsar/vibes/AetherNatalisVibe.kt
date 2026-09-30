@@ -8,7 +8,6 @@ import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -56,6 +55,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.row
@@ -76,7 +76,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 public class AetherNatalisVibe : VibeProvider {
-  override val name: String = "Aether Natalis"
+  override val name: VibeName = VibeNames.AETHER_NATALIS
 
   /** The hook: a rising modal figure that reaches the bVII and falls back. 16 beats. */
   private val ascentLick = Lick(
@@ -127,8 +127,7 @@ public class AetherNatalisVibe : VibeProvider {
 
   override val vibe: Vibe by lazy {
       Vibe(
-        name = name,
-        album = Album.STEALTH,
+        name = name.value,
         tracks = listOf(
           // 0 — UNDERCROFT. Filtered sub-pedal, the only percussive voice: a slow toll that
           // gives the float something to hang off. Macro ranges carry the hand-tuned darker /

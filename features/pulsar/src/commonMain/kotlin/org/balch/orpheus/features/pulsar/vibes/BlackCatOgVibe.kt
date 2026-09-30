@@ -7,6 +7,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
@@ -21,7 +22,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class BlackCatOgVibe : VibeProvider {
-    override val name: String = "Black Cat OG"
+    override val name: VibeName = VibeNames.BLACK_CAT_OG
 
     // Faithful 2-bar hook (BLUES: 0=C#, 1=E/b3, 2=F#/4, 4=G#/5, 5=B/b7, 6=C#/oct).
     // Bar 1: root anchor, breath, stutter, then the pentatonic climb to the 5th.
@@ -58,6 +59,6 @@ class BlackCatOgVibe : VibeProvider {
     }
 
     override val vibe: Vibe by lazy {
-        BlackCatVibe().vibe.copy(name = name, lick = ogLick, lickMutation = 0.08f)
+        BlackCatVibe().vibe.copy(name = name.value, lick = ogLick, lickMutation = 0.08f)
     }
 }

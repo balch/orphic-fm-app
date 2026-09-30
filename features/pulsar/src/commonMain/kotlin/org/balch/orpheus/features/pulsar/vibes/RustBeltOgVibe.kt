@@ -7,6 +7,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
@@ -23,7 +24,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RustBeltOgVibe : VibeProvider {
-    override val name: String = "Rust Belt OG"
+    override val name: VibeName = VibeNames.RUST_BELT_OG
 
     // The faithful 2-bar hook: three thumps on the root, a jump up to the 5th/b7, a staccato
     // walk-up back into the thumps. Preserved verbatim (DORIAN: 0=D,2=F/b3,3=G/4,4=A/5,5=B/6,6=C/b7).
@@ -48,6 +49,6 @@ class RustBeltOgVibe : VibeProvider {
     )
 
     override val vibe: Vibe by lazy {
-        RustBeltVibe().vibe.copy(name = name, lick = ogLick, lickMutation = 0.14f, stepCount = 32)
+        RustBeltVibe().vibe.copy(name = name.value, lick = ogLick, lickMutation = 0.14f, stepCount = 32)
     }
 }

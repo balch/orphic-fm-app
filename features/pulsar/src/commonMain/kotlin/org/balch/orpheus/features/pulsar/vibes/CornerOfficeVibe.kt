@@ -5,7 +5,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -44,6 +43,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
@@ -78,7 +78,7 @@ import org.balch.orpheus.features.pulsar.models.chords
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CornerOfficeVibe : VibeProvider {
-    override val name: String = "Corner Office"
+    override val name: VibeName = VibeNames.CORNER_OFFICE
 
     // Verse hangs on the i — the strut carries the motion.
     private val verseProgression = chords(0)
@@ -216,8 +216,7 @@ class CornerOfficeVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
-            album = Album.RIF,
+            name = name.value,
             bpm = 122f,
             arrangement = Arrangement(
                 introIndex = 0,

@@ -43,6 +43,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -69,7 +70,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class SwampSwaggerVibe : VibeProvider {
-    override val name: String = "Swamp Swagger"
+    override val name: VibeName = VibeNames.SWAMP_SWAGGER
 
     // I–IV–bVII vamp in B Mixolydian. Hang on the tonic, lean into the IV (E),
     // shove the bVII (A) for the rock turnaround, land home.
@@ -83,7 +84,7 @@ class SwampSwaggerVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
+            name = name.value,
             bpm = 122f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.B,

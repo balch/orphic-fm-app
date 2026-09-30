@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.vibes
 
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,15 +10,16 @@ import kotlin.test.assertTrue
 class VibeCatalogTest {
 
     /** Provider whose vibe body must never be touched — curation is name-only by contract. */
-    private class LazyGuardProvider(override val name: String) : VibeProvider {
+    private class LazyGuardProvider(vibeName: String) : VibeProvider {
+        override val name = VibeName(vibeName)
         override val vibe: Vibe
-            get() = error("curate() must not force Vibe construction (touched '$name')")
+            get() = error("curate() must not force Vibe construction (touched '${name.value}')")
     }
 
     @Test
     fun curateFiltersToLiveEntriesInCatalogOrder() {
         val names = VibeCatalog.entries.keys.toList()
-        val providers = names.map { LazyGuardProvider(it) }.toSet<VibeProvider>()
+        val providers = names.map { LazyGuardProvider(it.value) }.toSet<VibeProvider>()
         val curated = VibeCatalog.curate(providers)
 
         val expected = VibeCatalog.entries
@@ -34,7 +36,7 @@ class VibeCatalogTest {
             LazyGuardProvider("Totally Unknown"),    // not cataloged
         )
         val curated = VibeCatalog.curate(providers)
-        assertEquals(listOf("Dog House"), curated.map { it.name })
+        assertEquals(listOf("Dog House"), curated.map { it.name.value })
     }
 
     @Test
@@ -45,14 +47,14 @@ class VibeCatalogTest {
             LazyGuardProvider("Corner Office"),
         )
         val curated = VibeCatalog.curate(providers, visibleThrough = VibeStatus.WIP)
-        assertEquals(setOf("Dog House", "Corner Office"), curated.map { it.name }.toSet())
+        assertEquals(setOf("Dog House", "Corner Office"), curated.map { it.name.value }.toSet())
     }
 
     @Test
     fun shelfProvidersNeverAppearBelowShelfLevel() {
         val entries = linkedMapOf(
-            "Alive" to CatalogEntry(VibeStatus.LIVE),
-            "Parked" to CatalogEntry(VibeStatus.SHELF),
+            VibeName("Alive") to CatalogEntry(VibeStatus.LIVE),
+            VibeName("Parked") to CatalogEntry(VibeStatus.SHELF),
         )
         val providers = setOf<VibeProvider>(
             LazyGuardProvider("Alive"),
@@ -60,16 +62,16 @@ class VibeCatalogTest {
         )
         // WIP level still excludes SHELF — only SHELF level would surface it.
         val curated = VibeCatalog.curate(providers, visibleThrough = VibeStatus.WIP, entries = entries)
-        assertEquals(listOf("Alive"), curated.map { it.name })
+        assertEquals(listOf("Alive"), curated.map { it.name.value })
     }
 
     @Test
     fun visibleThroughIsCumulativeLeftAcrossTiers() {
         // Ordered so curated order is deterministic and tiers are interleaved by ordinal.
         val entries = linkedMapOf(
-            "Live One" to CatalogEntry(VibeStatus.LIVE),
-            "Wip One" to CatalogEntry(VibeStatus.WIP),
-            "Shelf One" to CatalogEntry(VibeStatus.SHELF),
+            VibeName("Live One") to CatalogEntry(VibeStatus.LIVE),
+            VibeName("Wip One") to CatalogEntry(VibeStatus.WIP),
+            VibeName("Shelf One") to CatalogEntry(VibeStatus.SHELF),
         )
         val providers = setOf<VibeProvider>(
             LazyGuardProvider("Live One"),
@@ -80,17 +82,17 @@ class VibeCatalogTest {
         // LIVE (default) shows only live entries.
         assertEquals(
             listOf("Live One"),
-            VibeCatalog.curate(providers, entries = entries).map { it.name },
+            VibeCatalog.curate(providers, entries = entries).map { it.name.value },
         )
         // WIP shows live + wip, in catalog order.
         assertEquals(
             listOf("Live One", "Wip One"),
-            VibeCatalog.curate(providers, visibleThrough = VibeStatus.WIP, entries = entries).map { it.name },
+            VibeCatalog.curate(providers, visibleThrough = VibeStatus.WIP, entries = entries).map { it.name.value },
         )
         // SHELF shows live + wip + shelf.
         assertEquals(
             listOf("Live One", "Wip One", "Shelf One"),
-            VibeCatalog.curate(providers, visibleThrough = VibeStatus.SHELF, entries = entries).map { it.name },
+            VibeCatalog.curate(providers, visibleThrough = VibeStatus.SHELF, entries = entries).map { it.name.value },
         )
     }
 
@@ -107,7 +109,7 @@ class VibeCatalogTest {
     @Test
     fun catalogNeverConstructsVibes() {
         // LazyGuardProvider throws on vibe access; surviving curate() proves laziness.
-        val providers = VibeCatalog.entries.keys.map { LazyGuardProvider(it) }.toSet<VibeProvider>()
+        val providers = VibeCatalog.entries.keys.map { LazyGuardProvider(it.value) }.toSet<VibeProvider>()
         assertTrue(VibeCatalog.curate(providers).isNotEmpty())
     }
 
@@ -120,6 +122,6 @@ class VibeCatalogTest {
             LazyGuardProvider("Alpha Unknown"),
         )
         val curated = VibeCatalog.curate(strangers)
-        assertEquals(listOf("Alpha Unknown", "Zeta Unknown"), curated.map { it.name })
+        assertEquals(listOf("Alpha Unknown", "Zeta Unknown"), curated.map { it.name.value })
     }
 }

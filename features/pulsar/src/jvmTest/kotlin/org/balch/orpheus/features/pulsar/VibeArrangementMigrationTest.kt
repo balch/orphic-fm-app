@@ -131,17 +131,17 @@ class VibeArrangementMigrationTest {
         for (provider in allVibes) {
             val vibe = provider.vibe
             val arrangement = vibe.arrangement
-            assertNotNull(arrangement, "${provider.name}: arrangement is null")
+            assertNotNull(arrangement, "${provider.name.value}: arrangement is null")
             assertTrue(
                 arrangement.sections.isNotEmpty(),
-                "${provider.name}: arrangement has no sections",
+                "${provider.name.value}: arrangement has no sections",
             )
             // name parity is part of the VibeProvider contract — guard it here
             // since the transition runner identifies vibes by vibe.name.
             assertEquals(
-                provider.name,
+                provider.name.value,
                 vibe.name,
-                "${provider.name}: VibeProvider.name does not match vibe.name=${vibe.name}",
+                "${provider.name.value}: VibeProvider.name does not match vibe.name=${vibe.name}",
             )
         }
     }

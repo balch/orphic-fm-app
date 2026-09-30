@@ -5,7 +5,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
@@ -44,6 +43,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -66,7 +66,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class BellTollsVibe : VibeProvider {
-    override val name: String = "Bell Tolls"
+    override val name: VibeName = VibeNames.BELL_TOLLS
 
     // Roots reggae: hang on tonic for 3 bars, VII turnaround on bar 4.
     // Am-Am-Am-G — the signature "one drop" phrase shape.
@@ -263,8 +263,7 @@ class BellTollsVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
-            album = Album.RIF,
+            name = name.value,
             bpm = 78f,  // classic roots reggae tempo
             arrangement = Arrangement(
                 introIndex = 0,

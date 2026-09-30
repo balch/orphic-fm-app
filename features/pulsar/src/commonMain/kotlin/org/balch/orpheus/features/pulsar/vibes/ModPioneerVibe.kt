@@ -31,6 +31,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -48,7 +49,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class ModPioneerVibe : VibeProvider {
-    override val name: String = "Mod Pioneer"
+    override val name: VibeName = VibeNames.MOD_PIONEER
     // i — bVII — bVI — v (Am — G — F — E in A minor). Descending minor move.
     private val verseProgression = chords(0, 6, 5, 4)
 
@@ -60,7 +61,7 @@ class ModPioneerVibe : VibeProvider {
     override val vibe: Vibe by lazy {
 
         Vibe(
-            name = "Mod Pioneer",
+            name = name.value,
             bpm = 124f,
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.A,

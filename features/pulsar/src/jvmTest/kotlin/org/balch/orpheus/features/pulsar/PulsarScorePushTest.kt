@@ -38,6 +38,7 @@ import org.balch.orpheus.features.pulsar.models.ScoreEvent
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -402,7 +403,7 @@ private fun scorePushTestVibe(): Vibe = Vibe(
 )
 
 private class ScorePushTestVibeProvider(override val vibe: Vibe) : VibeProvider {
-    override val name: String get() = vibe.name
+    override val name = VibeName(vibe.name)
 }
 
 /** Counts loads so a test can assert resolution reused the injected instance, not a fresh one. */

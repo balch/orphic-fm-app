@@ -28,7 +28,7 @@ internal object VibeCatalogScan {
      */
     const val MIN_EXPECTED_PROVIDERS = 40
 
-    private fun discoverClasses(): List<Class<*>> {
+    private fun discoverClasses(subpackages: Boolean): List<Class<*>> {
         val loader = javaClass.classLoader
         val roots = loader.getResources(PACKAGE_PATH).toList()
             .filter { it.protocol == "file" }
@@ -43,9 +43,12 @@ internal object VibeCatalogScan {
         )
 
         return roots
-            .flatMap { it.listFiles().orEmpty().toList() }
-            .filter { it.isFile && it.name.endsWith(".class") && !it.name.contains('$') }
-            .map { PACKAGE_NAME + "." + it.name.removeSuffix(".class") }
+            .flatMap { root ->
+                val files = if (subpackages) root.walkTopDown().toList() else root.listFiles().orEmpty().toList()
+                files
+                    .filter { it.isFile && it.name.endsWith(".class") && !it.name.contains('$') }
+                    .map { PACKAGE_NAME + "." + it.relativeTo(root).invariantSeparatorsPath.removeSuffix(".class").replace('/', '.') }
+            }
             .distinct()
             .sorted()
             .mapNotNull { runCatching { Class.forName(it, false, loader) }.getOrNull() }
@@ -53,9 +56,12 @@ internal object VibeCatalogScan {
             .filter { !it.isInterface && !Modifier.isAbstract(it.modifiers) }
     }
 
-    /** Every shipped provider, constructed. Fails rather than silently skipping any. */
-    fun allProviders(): List<VibeProvider> {
-        val classes = discoverClasses()
+    /**
+     * Every shipped provider, constructed. Fails rather than silently skipping any. [subpackages]
+     * adds the vibes in packages below this one (`classical`), which the older sweeps never covered.
+     */
+    fun allProviders(subpackages: Boolean = false): List<VibeProvider> {
+        val classes = discoverClasses(subpackages)
 
         // A provider we cannot construct is a provider we cannot check.
         val unconstructable = classes.filter { runCatching { it.getDeclaredConstructor() }.isFailure }

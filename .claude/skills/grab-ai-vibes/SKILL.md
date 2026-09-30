@@ -89,10 +89,14 @@ Gradle task to decode the JSON through the app's own lenient decoder (`features/
 `vibeApplyJson` — the exact leniency the app uses when an AI vibe is applied live) and
 reflectively generate a real `<Class>Vibe.kt` — a normal `VibeProvider` with `override val vibe:
 Vibe by lazy { Vibe(...) }`, fully spelled out. No embedded JSON string, no runtime decode, no
-`kotlinx-serialization-json` dependency added to `features/pulsar`. It then appends a
-`VibeCatalog` entry (**WIP by default**, so it stays hidden until you ear-test it — an
-uncataloged provider is auto-hidden anyway) and skips cleanly if the provider or catalog entry
-already exists.
+`kotlinx-serialization-json` dependency added to `features/pulsar`. The provider's name is a
+`VibeNames` constant derived from the display name (`Space & Drums` becomes `SPACE_AND_DRUMS`):
+the script adds it to `VibeNames.kt` alphabetically, then appends a
+`VibeNames.<CONST> to CatalogEntry(...)` line to `VibeCatalog` (**WIP by default**, so it stays
+hidden until you ear-test it — an uncataloged provider is auto-hidden anyway). It skips cleanly if
+the provider, constant or catalog entry already exists, and stops before writing anything if that
+constant already names a different vibe. `AlbumCatalog.kt` is not touched: the vibe lands on
+STEALTH until you list it on RIF, 0-2-1 or Anomalies there.
 
 ```bash
 scripts/import_vibe.sh /tmp/grab/jvm/1783127285298_Saffron_Mirage.json

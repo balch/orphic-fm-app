@@ -6,7 +6,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -48,6 +47,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -80,7 +80,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RustBeltVibe : VibeProvider {
-    override val name: String = "Rust Belt"
+    override val name: VibeName = VibeNames.RUST_BELT
 
     // Verse hangs on the i: the hook carries all the motion, so the bed stays planted
     // and the bass never transposes until the chorus asks it to.
@@ -428,8 +428,7 @@ class RustBeltVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
-            album = Album.ANOMALIES,
+            name = name.value,
             bpm = 87f,
             arrangement = Arrangement(
                 introIndex = 0,

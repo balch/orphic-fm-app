@@ -17,6 +17,6 @@ class StayAsleepExclusiveVizGuardTest {
 
     @Test
     fun `Stay Asleep vibe name matches FaceMorphViz's exclusive song`() {
-        assertEquals(FaceMorphViz.EXCLUSIVE_SONG, StayAsleepVibe().name)
+        assertEquals(FaceMorphViz.EXCLUSIVE_SONG, StayAsleepVibe().name.value)
     }
 }

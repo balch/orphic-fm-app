@@ -42,6 +42,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -61,7 +62,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class BlacktopBoogieVibe : VibeProvider {
-    override val name: String = "Blacktop Boogie"
+    override val name: VibeName = VibeNames.BLACKTOP_BOOGIE
 
     // The full 12-bar blues in A Mixolydian: I-I-I-I-IV-IV-I-I-V-IV-I-V.
     //   A – A – A – A – D – D – A – A – E – D – A – E
@@ -74,7 +75,7 @@ class BlacktopBoogieVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
+            name = name.value,
             bpm = 168f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.A,

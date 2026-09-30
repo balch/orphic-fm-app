@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -52,7 +53,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class SixtiesRebelVibe : VibeProvider {
-    override val name: String = "Sixties Rebel"
+    override val name: VibeName = VibeNames.SIXTIES_REBEL
     // I — IV (E — A in E Mixolydian). Simple back-and-forth.
     private val verseProgression = chords(0, 3, 0, 3)
     private val chordsPerBar = 1
@@ -64,7 +65,7 @@ class SixtiesRebelVibe : VibeProvider {
     override val vibe: Vibe by lazy {
 
         Vibe(
-            name = "Sixties Rebel",
+            name = name.value,
             bpm = 136f,
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.E,

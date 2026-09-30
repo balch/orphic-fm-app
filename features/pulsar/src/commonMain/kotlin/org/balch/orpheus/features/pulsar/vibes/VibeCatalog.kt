@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.vibes
 
 import com.diamondedge.logging.logging
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.curate
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.vibeStatusFromArg
@@ -24,7 +25,7 @@ enum class VibeStatus { LIVE, WIP, SHELF }
  * @param tags free-form grouping attributes ("rock", "ambient", "riff", …). Not consumed by
  *   any UI yet — they exist so a future grouped/filterable picker (and the AI agent's vibe
  *   tools, which could bias suggestions by tag) have attributes to key on without a schema
- *   migration. `Vibe.album` remains the coarse grouping; tags are the fine one.
+ *   migration. [AlbumCatalog] is the coarse grouping; tags are the fine one.
  */
 data class CatalogEntry(
     val status: VibeStatus,
@@ -40,9 +41,11 @@ data class CatalogEntry(
  * FIRST entry the fresh-install default vibe).
  *
  * Authoring workflow:
- * 1. Drop a new `<Name>Vibe.kt` in this package (auto-registers via DI).
- * 2. Add its name here as [VibeStatus.WIP] — it stays out of the picker but compiles/ships in
- *    the codebase for tuning sessions (flip to LIVE locally while ear-testing).
+ * 1. Drop a new `<Name>Vibe.kt` in this package (auto-registers via DI), naming it with a new
+ *    constant in [VibeNames].
+ * 2. Add that name here as [VibeStatus.WIP]: it stays out of the picker but compiles/ships in
+ *    the codebase for tuning sessions (flip to LIVE locally while ear-testing). It lands on
+ *    STEALTH; to put it on another album, list it there in [AlbumCatalog] at its track position.
  * 3. When it passes the ear test, flip to [VibeStatus.LIVE]. One-word diff, no comments.
  *
  * An unlisted-but-registered provider is treated as WIP (hidden) and logged — a new vibe can
@@ -86,82 +89,82 @@ object VibeCatalog {
     private val log = logging("VibeCatalog")
 
     /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
-    private val entryList: List<Pair<String, CatalogEntry>> = listOf(
-        "Rust Belt" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
-        "Dog House" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
-        "Fire Sky .5f" to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
-        "Filter Funk" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
-        "Bell Tolls" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
-        "Fire Sky" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
-        "Space & Drums" to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
-        "Techno Wobble" to CatalogEntry(VibeStatus.LIVE, tags = listOf("club")),
-        "Velvet Leash" to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock")),
-        "Voltage Strut" to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
-        "Lost In Space" to CatalogEntry(VibeStatus.LIVE, tags = listOf("ambient")),
-        "Stay Asleep" to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff", "blues", "minimal", "cinematic")),
-        "Odysseus Lore" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "wah", "psych")),
+    private val entryList: List<Pair<VibeName, CatalogEntry>> = listOf(
+        VibeNames.RUST_BELT to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
+        VibeNames.DOG_HOUSE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
+        VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
+        VibeNames.FILTER_FUNK to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
+        VibeNames.BELL_TOLLS to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
+        VibeNames.FIRE_SKY to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
+        VibeNames.SPACE_AND_DRUMS to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
+        VibeNames.TECHNO_WOBBLE to CatalogEntry(VibeStatus.LIVE, tags = listOf("club")),
+        VibeNames.VELVET_LEASH to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock")),
+        VibeNames.VOLTAGE_STRUT to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
+        VibeNames.LOST_IN_SPACE to CatalogEntry(VibeStatus.LIVE, tags = listOf("ambient")),
+        VibeNames.STAY_ASLEEP to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff", "blues", "minimal", "cinematic")),
+        VibeNames.ODYSSEUS_LORE to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff", "wah", "psych")),
 
 // -----------------------------
-        "Double Shift" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "drone", "lope")),
-        "Blues Burn" to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
-        "Fire Sky CX" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Fire Sky OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Rust Belt OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Black Cat" to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
-        "Black Cat OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        "Dust Groove" to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
+        VibeNames.DOUBLE_SHIFT to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "drone", "lope")),
+        VibeNames.BLUES_BURN to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
+        VibeNames.FIRE_SKY_CX to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        VibeNames.FIRE_SKY_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        VibeNames.RUST_BELT_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        VibeNames.BLACK_CAT to CatalogEntry(VibeStatus.WIP, tags = listOf("blues", "riff", "soul")),
+        VibeNames.BLACK_CAT_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        VibeNames.DUST_GROOVE to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
-        "Aether Natalis" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
-        "Corner Office" to CatalogEntry(VibeStatus.WIP, tags = listOf("funk", "rock", "riff")),
-        "Corner Office OG" to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
+        VibeNames.AETHER_NATALIS to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
+        VibeNames.CORNER_OFFICE to CatalogEntry(VibeStatus.WIP, tags = listOf("funk", "rock", "riff")),
+        VibeNames.CORNER_OFFICE_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         // ── STEALTH: grooves and moods ──
-        "Tremolo Tide" to CatalogEntry(VibeStatus.WIP, tags = listOf("surf")),
-        "Army Stomp" to CatalogEntry(VibeStatus.WIP, tags = listOf("march")),
-        "Swamp Swagger" to CatalogEntry(VibeStatus.WIP, tags = listOf("swamp")),
-        "Blacktop Boogie" to CatalogEntry(VibeStatus.WIP, tags = listOf("boogie")),
-        "Sixties Rebel" to CatalogEntry(VibeStatus.WIP, tags = listOf("garage")),
-        "Garage Blitz" to CatalogEntry(VibeStatus.WIP, tags = listOf("garage")),
-        "Mod Pioneer" to CatalogEntry(VibeStatus.WIP, tags = listOf("mod")),
+        VibeNames.TREMOLO_TIDE to CatalogEntry(VibeStatus.WIP, tags = listOf("surf")),
+        VibeNames.ARMY_STOMP to CatalogEntry(VibeStatus.WIP, tags = listOf("march")),
+        VibeNames.SWAMP_SWAGGER to CatalogEntry(VibeStatus.WIP, tags = listOf("swamp")),
+        VibeNames.BLACKTOP_BOOGIE to CatalogEntry(VibeStatus.WIP, tags = listOf("boogie")),
+        VibeNames.SIXTIES_REBEL to CatalogEntry(VibeStatus.WIP, tags = listOf("garage")),
+        VibeNames.GARAGE_BLITZ to CatalogEntry(VibeStatus.WIP, tags = listOf("garage")),
+        VibeNames.MOD_PIONEER to CatalogEntry(VibeStatus.WIP, tags = listOf("mod")),
         // ── Blitz family ──
-        "Ascending Blitz" to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz")),
-        "Dark Blitz" to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz")),
-        "Floor Blitz" to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz")),
-        "Jazz Blitz" to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz", "jazz")),
+        VibeNames.ASCENDING_BLITZ to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz")),
+        VibeNames.DARK_BLITZ to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz")),
+        VibeNames.FLOOR_BLITZ to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz")),
+        VibeNames.JAZZ_BLITZ to CatalogEntry(VibeStatus.WIP, tags = listOf("blitz", "jazz")),
         // ── Club / ambient / time ──
-        "Cosmic Techno" to CatalogEntry(VibeStatus.WIP, tags = listOf("club")),
-        "Deep Space" to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient")),
-        "TimeZone" to CatalogEntry(VibeStatus.WIP, tags = listOf("time")),
-        "UTC" to CatalogEntry(VibeStatus.WIP, tags = listOf("time")),
+        VibeNames.COSMIC_TECHNO to CatalogEntry(VibeStatus.WIP, tags = listOf("club")),
+        VibeNames.DEEP_SPACE to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient")),
+        VibeNames.TIME_ZONE to CatalogEntry(VibeStatus.WIP, tags = listOf("time")),
+        VibeNames.UTC to CatalogEntry(VibeStatus.WIP, tags = listOf("time")),
         // ── Comp Lab: comping-style demos ──
-        "Comp Pad" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Rock" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Funk" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Blues" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Jazz" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Gospel" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Reggae" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Comp Ska" to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
-        "Vanished Skyline" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
-        "Kaleidoscope Drift" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "opus 4.8", "drone", "void")),
-        "Ouroboros Bloom" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "sonnet 5", "drone", "void")),
-        "Natalis Shimmer" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
-        "Bricklayer's Lament" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
-        "Mellow Haze" to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        VibeNames.COMP_PAD to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_ROCK to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_FUNK to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_BLUES to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_JAZZ to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_GOSPEL to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_REGGAE to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.COMP_SKA to CatalogEntry(VibeStatus.WIP, tags = listOf("comp")),
+        VibeNames.VANISHED_SKYLINE to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        VibeNames.KALEIDOSCOPE_DRIFT to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "opus 4.8", "drone", "void")),
+        VibeNames.OUROBOROS_BLOOM to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "sonnet 5", "drone", "void")),
+        VibeNames.NATALIS_SHIMMER to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        VibeNames.BRICKLAYERS_LAMENT to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
+        VibeNames.MELLOW_HAZE to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
 
         // ── Classical adaptations ──
-        "Symphony No. 5 in C Minor" to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "electro", "riff")),
-        "Jupiter, the Bringer of Jollity" to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "rock", "riff")),
+        VibeNames.SYMPHONY_NO_5 to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "electro", "riff")),
+        VibeNames.JUPITER to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "rock", "riff")),
     )
 
     /** Ordered master map: catalog position = picker order; first LIVE entry = default vibe. */
-    val entries: Map<String, CatalogEntry> = entryList.toMap(LinkedHashMap())
+    val entries: Map<VibeName, CatalogEntry> = entryList.toMap(LinkedHashMap())
 
     init {
         // A repeated name is silent and asymmetric: the map keeps the LAST entry's status but
         // the FIRST entry's position, so the vibe reads as curated where you look and is
         // governed where you don't. "Aether Natalis" shipped hidden that way. Fail instead.
         val dupes = entryList.groupingBy { it.first }.eachCount().filterValues { it > 1 }.keys
-        require(dupes.isEmpty()) { "VibeCatalog lists these vibes more than once: $dupes" }
+        require(dupes.isEmpty()) { "VibeCatalog lists these vibes more than once: ${dupes.map { it.value }}" }
     }
 
     /**
@@ -179,7 +182,7 @@ object VibeCatalog {
     fun curate(
         providers: Set<VibeProvider>,
         visibleThrough: VibeStatus = VibeStatus.LIVE,
-        entries: Map<String, CatalogEntry> = this.entries,
+        entries: Map<VibeName, CatalogEntry> = this.entries,
     ): List<VibeProvider> {
         val byName = providers.associateBy { it.name }
 
@@ -187,7 +190,7 @@ object VibeCatalog {
         // line for a new vibe, or a display-name drift between the provider and the catalog.
         val unlisted = providers.map { it.name }.filterNot { it in entries }
         if (unlisted.isNotEmpty()) {
-            log.warn { "Uncataloged vibes hidden from picker (add VibeCatalog entries): $unlisted" }
+            log.warn { "Uncataloged vibes hidden from picker (add VibeCatalog entries): ${unlisted.map { it.value }}" }
         }
 
         val curated = entries.mapNotNull { (name, entry) ->
@@ -196,7 +199,7 @@ object VibeCatalog {
                 provider == null -> {
                     // Cataloged but not registered — benched code or a stale entry. Quiet:
                     // this is expected while a vibe is parked out of DI entirely.
-                    log.debug { "Catalog entry '$name' has no registered provider" }
+                    log.debug { "Catalog entry '${name.value}' has no registered provider" }
                     null
                 }
                 entry.status.ordinal <= visibleThrough.ordinal -> provider
@@ -209,7 +212,7 @@ object VibeCatalog {
         // from stub providers — fail open to the uncurated set rather than brick playback.
         if (curated.isEmpty()) {
             log.error { "VibeCatalog matched no registered providers — falling back to the uncurated set" }
-            return providers.sortedBy { it.name }
+            return providers.sortedBy { it.name.value }
         }
         return curated
     }

@@ -8,6 +8,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VibeFileGeneratorTest {
@@ -33,10 +34,11 @@ class VibeFileGeneratorTest {
             },
         )
 
-        val output = generateVibeFile(vibe, "TestVibe").toString()
+        val output = generateVibeFile(vibe, "TestVibe", "TEST_VIBE").toString()
 
         assertTrue(output.contains("class TestVibe : VibeProvider"), output)
-        assertTrue(output.contains("override val name: String = \"Test Vibe\""), output)
+        assertTrue(output.contains("override val name: VibeName = VibeNames.TEST_VIBE"), output)
+        assertFalse(output.contains("VibeName(\""), output)
         assertTrue(output.contains("override val vibe: Vibe by lazy {"), output)
         assertTrue(output.contains("import org.balch.orpheus.features.pulsar.models.Vibe"), output)
         assertTrue(output.contains("import dev.zacsweers.metro.binding"), output)

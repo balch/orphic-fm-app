@@ -5,7 +5,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.BarStrategy
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -40,6 +39,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.VibeSpeech
 import org.balch.orpheus.features.pulsar.models.chords
@@ -75,7 +75,7 @@ import org.balch.orpheus.features.pulsar.models.chords
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class StayAsleepVibe : VibeProvider {
-    override val name: String = "Stay Asleep"
+    override val name: VibeName = VibeNames.STAY_ASLEEP
 
     // Tonic pedal. The gesture is the only thing that moves.
     private val tonicProgression = chords(0)
@@ -352,8 +352,7 @@ class StayAsleepVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
-            album = Album.ANOMALIES,
+            name = name.value,
             bpm = 80f,
             arrangement = Arrangement(
                 introIndex = 0,

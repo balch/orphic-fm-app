@@ -7,7 +7,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -49,6 +48,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.chords
 
@@ -125,11 +125,11 @@ private val tweakLick by lazy {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FireSkyOgVibe : VibeProvider {
-    override val name: String = "Fire Sky OG"
+    override val name: VibeName = VibeNames.FIRE_SKY_OG
 
     override val vibe: Vibe by lazy {
         FireSkyVibeBase().vibe.copy(
-            name = name,
+            name = name.value,
             lick = ogLick,
             lickMutation = 0.10f,
             stepCount = 32
@@ -140,11 +140,11 @@ class FireSkyOgVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FireSkyCxVibe : VibeProvider {
-    override val name: String = "Fire Sky CX"
+    override val name: VibeName = VibeNames.FIRE_SKY_CX
 
     override val vibe: Vibe by lazy {
         FireSkyVibeBase().vibe.copy(
-            name = name,
+            name = name.value,
             lick = tweakLick,
             lickMutation = 0.60f,
             stepCount = 32
@@ -155,10 +155,10 @@ class FireSkyCxVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FireSkyVibe : VibeProvider {
-    override val name: String = "Fire Sky"
+    override val name: VibeName = VibeNames.FIRE_SKY
     override val vibe: Vibe by lazy {
         FireSkyVibeBase().vibe.copy(
-            name = name,
+            name = name.value,
             lick = aiLick,
             lickMutation = 0.25f,
             lickRotation = LickRotation(pool = listOf(aiLick, tweakLick)),
@@ -186,11 +186,11 @@ class FireSkyVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FireSky05Vibe : VibeProvider {
-    override val name: String = "Fire Sky .5f"
+    override val name: VibeName = VibeNames.FIRE_SKY_05F
 
     override val vibe: Vibe by lazy {
         FireSkyVibeBase(baseBpm = 60f, halfTimeMult = 1.0f, buildScratchMs = 0).vibe.copy(
-            name = name,
+            name = name.value,
             lick = tweakLick,  // fallback seed; the pool overrides it at load
             lickRotation = LickRotation(pool = listOf(tweakLick, aiLick)),
             anomalies = listOf(
@@ -489,7 +489,6 @@ private class FireSkyVibeBase(
     val vibe: Vibe by lazy {
         Vibe(
             name = name,
-            album = Album.ZERO_TO_ONE,
             bpm = baseBpm,
             arrangement = Arrangement(
                 introIndex = 0,

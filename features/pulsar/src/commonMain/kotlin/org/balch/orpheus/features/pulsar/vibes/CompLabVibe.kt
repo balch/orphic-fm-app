@@ -34,6 +34,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -45,13 +46,13 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompPadVibe : VibeProvider {
-    override val name: String = "Comp Pad"
+    override val name: VibeName = VibeNames.COMP_PAD
 
     // PAD: sustained chords with section-level comping override demo.
     // verse=PAD default, chorus=FUNK_STABS+FIRST_INVERSION, breakdown=PAD+ROOT_ONLY chord-follow
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Pad",
+            name = name.value,
             compingOverride = ChordComping(
                 style = CompingStyle.PAD,
                 sectionInversion = SectionInversion.FOLLOW_STYLE,
@@ -98,13 +99,13 @@ class CompPadVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompRockVibe : VibeProvider {
-    override val name: String = "Comp Rock"
+    override val name: VibeName = VibeNames.COMP_ROCK
     // ROCK: electric piano grace-note + root (PD engine, 2-note DOWN arp)
     // arpDirection=DOWN with voicing=2 plays 5th → root, giving a piano
     // "grace note landing on root" feel without the climbing blip.
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Rock",
+            name = name.value,
             chordEngineEdm = OrpheusEngineId.PD,
             chordEngineSpace = OrpheusEngineId.PD,
             compingOverride = ChordComping(
@@ -127,11 +128,11 @@ class CompRockVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompFunkVibe : VibeProvider {
-    override val name: String = "Comp Funk"
+    override val name: VibeName = VibeNames.COMP_FUNK
     // FUNK: clav-like PD root stabs, first inversion (voicing via extensions)
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Funk",
+            name = name.value,
             bpm = 100f,
             chordEngineEdm = OrpheusEngineId.PD,
             chordEngineSpace = OrpheusEngineId.PD,
@@ -158,11 +159,11 @@ class CompFunkVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompSkaVibe : VibeProvider {
-    override val name: String = "Comp Ska"
+    override val name: VibeName = VibeNames.COMP_SKA
     // SKA: high off-beats, second inversion for brightness, tight stabs
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Ska",
+            name = name.value,
             bpm = 130f,
             compingOverride = ChordComping(
                 style = CompingStyle.SKA_UPSTROKES,
@@ -186,11 +187,11 @@ class CompSkaVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompBluesVibe : VibeProvider {
-    override val name: String = "Comp Blues"
+    override val name: VibeName = VibeNames.COMP_BLUES
     // BLUES: electric piano root stabs on PD, heavy extensions for blues color
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Blues",
+            name = name.value,
             bpm = 92f,
             rootNote = RootNote.E,
             progressionStyle = ProgressionStyle.BLUES,
@@ -214,11 +215,11 @@ class CompBluesVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompJazzVibe : VibeProvider {
-    override val name: String = "Comp Jazz"
+    override val name: VibeName = VibeNames.COMP_JAZZ
     // JAZZ: PD piano root stabs, busy altered-tone comping via extensions
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Jazz",
+            name = name.value,
             bpm = 105f,
             progressionStyle = ProgressionStyle.JAZZ,
             scaleType = ScaleType.MINOR_PENTATONIC,
@@ -247,11 +248,11 @@ class CompJazzVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompReggaeVibe : VibeProvider {
-    override val name: String = "Comp Reggae"
+    override val name: VibeName = VibeNames.COMP_REGGAE
     // REGGAE: skank on 2 and 4, second inversion for upper-register punch
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Reggae",
+            name = name.value,
             bpm = 78f,
             rootNote = RootNote.A,
             compingOverride = ChordComping(
@@ -276,12 +277,12 @@ class CompReggaeVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CompGospelVibe : VibeProvider {
-    override val name: String = "Comp Gospel"
+    override val name: VibeName = VibeNames.COMP_GOSPEL
 
     // GOSPEL: gospel piano root stabs on PD, dense 8ths, chord color via extensions
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateCompLabVibe(
-            name = "Comp Gospel",
+            name = name.value,
             bpm = 96f,
             rootNote = RootNote.G,
             chordEngineEdm = OrpheusEngineId.PD,

@@ -6,7 +6,6 @@ import dev.zacsweers.metro.binding
 import kotlin.String
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandMember
@@ -43,6 +42,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 
@@ -54,12 +54,11 @@ import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 public class KaleidoscopeDriftVibe : VibeProvider {
-  override val name: String = "Kaleidoscope Drift"
+  override val name: VibeName = VibeNames.KALEIDOSCOPE_DRIFT
 
   override val vibe: Vibe by lazy {
       Vibe(
-        name = "Kaleidoscope Drift",
-        album = Album.STEALTH,
+        name = name.value,
         tracks = listOf(
           TrackVoice(
             engineEdm = OrpheusEngine(

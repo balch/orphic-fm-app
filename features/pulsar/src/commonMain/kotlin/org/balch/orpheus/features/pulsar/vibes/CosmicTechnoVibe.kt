@@ -31,6 +31,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.row
@@ -39,10 +40,10 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CosmicTechnoVibe : VibeProvider {
-    override val name: String = "Cosmic Techno"
+    override val name: VibeName = VibeNames.COSMIC_TECHNO
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         Vibe(
-            name = "Cosmic Techno",
+            name = name.value,
             bpm = 128f,
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.D,

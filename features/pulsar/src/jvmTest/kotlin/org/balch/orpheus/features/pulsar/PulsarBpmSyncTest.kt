@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -252,9 +253,9 @@ class PulsarBpmSyncTest {
 // don't exercise return zero/no-op.
 
 private class StubVibeProvider : VibeProvider {
-    override val name: String = "Test"
+    override val name = VibeName("Test")
     override val vibe: Vibe = Vibe(
-        name = name,
+        name = name.value,
         bpm = 120f,
         rootNote = RootNote.C,
         scaleType = ScaleType.MINOR,

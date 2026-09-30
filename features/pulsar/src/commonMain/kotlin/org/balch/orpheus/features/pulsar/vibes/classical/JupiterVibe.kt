@@ -37,10 +37,12 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
+import org.balch.orpheus.features.pulsar.vibes.VibeNames
 
 /**
  * Jupiter, the Bringer of Jollity — the broad central theme, reimagined as an anthemic
@@ -82,7 +84,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class JupiterVibe : VibeProvider {
-    override val name: String = "Jupiter, the Bringer of Jollity"
+    override val name: VibeName = VibeNames.JUPITER
 
     // THE THEME — scale-degree sequence verified against Hymnary.org's THAXTED (Holst)
     // tune incipit "35617 51217 67653" (1-indexed: 1=do..7=ti), converted to this
@@ -224,7 +226,7 @@ class JupiterVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
+            name = name.value,
             bpm = 76f, // verified: flutetunes.com + musicnotes.com, "Andante maestoso"
             arrangement = Arrangement(
                 introIndex = 0,

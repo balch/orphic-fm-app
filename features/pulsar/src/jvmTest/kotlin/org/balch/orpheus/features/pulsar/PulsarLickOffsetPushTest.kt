@@ -32,6 +32,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -132,7 +133,7 @@ private fun offsetTestVibe(track4: TrackRole, track5: TrackRole): Vibe = Vibe(
 )
 
 private class OffsetTestVibeProvider(override val vibe: Vibe) : VibeProvider {
-    override val name: String get() = vibe.name
+    override val name = VibeName(vibe.name)
 }
 
 private class OffsetTestAudioEngine : AudioEngine {

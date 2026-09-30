@@ -1,5 +1,6 @@
 package org.balch.orpheus.tools.vibecodegen
 
+import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.PropertySpec
@@ -9,6 +10,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 private const val VIBES_PACKAGE = "org.balch.orpheus.features.pulsar.vibes"
@@ -17,9 +19,10 @@ private const val VIBES_PACKAGE = "org.balch.orpheus.features.pulsar.vibes"
  * Builds the Kotlin source for a `<className>Vibe.kt` provider from a decoded [Vibe] — the
  * generated-file analog of a hand-authored `*Vibe.kt` (see RustBeltVibe.kt for the shape this
  * mirrors), except every field is emitted explicitly and there's no musical prose (see the v1
- * scope boundaries in the design spec).
+ * scope boundaries in the design spec). The name is `VibeNames.[nameConst]`, an entry the
+ * caller adds to `VibeNames.kt` (import_vibe.sh does).
  */
-fun generateVibeFile(vibe: Vibe, className: String): FileSpec {
+fun generateVibeFile(vibe: Vibe, className: String, nameConst: String): FileSpec {
     val providerType = TypeSpec.classBuilder(className)
         .addKdoc(
             "%L — generated from an AI-archived vibe JSON by tools:vibe-codegen (NOT hand-authored).\n" +
@@ -39,9 +42,9 @@ fun generateVibeFile(vibe: Vibe, className: String): FileSpec {
         )
         .addSuperinterface(VibeProvider::class.asClassName())
         .addProperty(
-            PropertySpec.builder("name", String::class.asClassName())
+            PropertySpec.builder("name", VibeName::class.asClassName())
                 .addModifiers(KModifier.OVERRIDE)
-                .initializer("%S", vibe.name)
+                .initializer("%T.%N", ClassName(VIBES_PACKAGE, "VibeNames"), nameConst)
                 .build(),
         )
         .addProperty(

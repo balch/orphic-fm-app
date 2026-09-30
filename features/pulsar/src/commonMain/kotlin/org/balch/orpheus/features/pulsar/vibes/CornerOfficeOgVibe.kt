@@ -7,6 +7,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
@@ -21,7 +22,7 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class CornerOfficeOgVibe : VibeProvider {
-    override val name: String = "Corner Office OG"
+    override val name: VibeName = VibeNames.CORNER_OFFICE_OG
 
     // Faithful 4-bar strut (MINOR: 0=E,2=G/b3,3=A/4,4=B/5,5=C/b6,6=D/b7). Preserved verbatim.
     private val ogLick = Lick(
@@ -68,6 +69,6 @@ class CornerOfficeOgVibe : VibeProvider {
     )
 
     override val vibe: Vibe by lazy {
-        CornerOfficeVibe().vibe.copy(name = name, lick = ogLick, lickMutation = 0.16f, stepCount = 64)
+        CornerOfficeVibe().vibe.copy(name = name.value, lick = ogLick, lickMutation = 0.16f, stepCount = 64)
     }
 }

@@ -6,7 +6,6 @@ import dev.zacsweers.metro.binding
 import kotlin.String
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -51,6 +50,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
@@ -61,12 +61,11 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 public class BricklayerSLamentVibe : VibeProvider {
-  override val name: String = "Bricklayer's Lament"
+  override val name: VibeName = VibeNames.BRICKLAYERS_LAMENT
 
   override val vibe: Vibe by lazy {
       Vibe(
-        name = "Bricklayer's Lament",
-        album = Album.RIF,
+        name = name.value,
         tracks = listOf(
           TrackVoice(
             engineEdm = OrpheusEngine(

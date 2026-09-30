@@ -33,6 +33,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 
 /**
@@ -50,10 +51,10 @@ import org.balch.orpheus.features.pulsar.models.VibeProvider
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class GarageBlitzVibe : VibeProvider {
-    override val name: String = "Garage Blitz"
+    override val name: VibeName = VibeNames.GARAGE_BLITZ
     override val vibe: Vibe by lazy {
         Vibe(
-            name = "Garage Blitz",
+            name = name.value,
             bpm = 132f,  // close to the original's tempo
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.G,
@@ -266,10 +267,10 @@ class GarageBlitzVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FloorBlitzVibe : VibeProvider {
-    override val name: String = "Floor Blitz"
+    override val name: VibeName = VibeNames.FLOOR_BLITZ
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateBaseVibe(
-            name = "Floor Blitz",
+            name = name.value,
             bpm = 120f,
             envelopeType = EnvelopeType.AD,
             rootNote = RootNote.A,
@@ -297,10 +298,10 @@ class FloorBlitzVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class DarkBlitzVibe : VibeProvider {
-    override val name: String = "Dark Blitz"
+    override val name: VibeName = VibeNames.DARK_BLITZ
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateBaseVibe(
-            name = "Dark Blitz",
+            name = name.value,
             bpm = 75f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.D_SHARP,
@@ -329,10 +330,10 @@ class DarkBlitzVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class JazzBlitzVibe : VibeProvider {
-    override val name: String = "Jazz Blitz"
+    override val name: VibeName = VibeNames.JAZZ_BLITZ
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateBaseVibe(
-            name = "Jazz Blitz",
+            name = name.value,
             bpm = 97f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.C,
@@ -361,10 +362,10 @@ class JazzBlitzVibe : VibeProvider {
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class AscBlitzVibe : VibeProvider {
-    override val name: String = "Ascending Blitz"
+    override val name: VibeName = VibeNames.ASCENDING_BLITZ
     override val vibe: org.balch.orpheus.features.pulsar.models.Vibe by lazy {
         generateBaseVibe(
-            name = "Ascending Blitz",
+            name = name.value,
             bpm = 86f,
             envelopeType = EnvelopeType.BLEND,
             rootNote = RootNote.C,

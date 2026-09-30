@@ -41,10 +41,12 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
+import org.balch.orpheus.features.pulsar.vibes.VibeNames
 
 /**
  * Symphony No. 5 in C Minor — the opening movement's four-note motif, reimagined as a
@@ -91,7 +93,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class FifthSymphonyVibe : VibeProvider {
-    override val name: String = "Symphony No. 5 in C Minor"
+    override val name: VibeName = VibeNames.SYMPHONY_NO_5
 
     // THE MOTIF — given verbatim by the spec. Zero-based scaleDegree in C MINOR
     // (C=0 D=1 Eb=2 F=3 G=4 Ab=5 Bb=6): G-G-G-Eb (4-4-4-2), then F-F-F-D (3-3-3-1),
@@ -441,7 +443,7 @@ class FifthSymphonyVibe : VibeProvider {
 
     override val vibe: Vibe by lazy {
         Vibe(
-            name = name,
+            name = name.value,
             bpm = 108f,
             arrangement = Arrangement(
                 introIndex = 0,

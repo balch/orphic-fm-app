@@ -7,7 +7,6 @@ import kotlin.String
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
@@ -50,6 +49,7 @@ import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.WahParams
 
@@ -61,12 +61,11 @@ import org.balch.orpheus.features.pulsar.models.WahParams
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 public class MellowHazeVibe : VibeProvider {
-  override val name: String = "Mellow Haze"
+  override val name: VibeName = VibeNames.MELLOW_HAZE
 
   override val vibe: Vibe by lazy {
       Vibe(
-        name = "Mellow Haze",
-        album = Album.RIF,
+        name = name.value,
         tracks = listOf(
           TrackVoice(
             engineEdm = OrpheusEngine(

@@ -42,13 +42,14 @@ class RunCodegenTest {
             val outFile = runCodegen(
                 jsonPath = jsonFile.absolutePath,
                 className = "FixtureVibe",
+                nameConst = "FIXTURE_VIBE",
                 outDir = tempDir.absolutePath,
             )
 
             assertTrue(outFile.exists(), "expected ${outFile.absolutePath} to exist")
             val content = outFile.readText()
             assertTrue(content.contains("class FixtureVibe : VibeProvider"), content)
-            assertTrue(content.contains("override val name: String = \"Fixture Vibe\""), content)
+            assertTrue(content.contains("override val name: VibeName = VibeNames.FIXTURE_VIBE"), content)
             assertTrue(content.contains("override val vibe: Vibe by lazy {"), content)
         } finally {
             tempDir.deleteRecursively()

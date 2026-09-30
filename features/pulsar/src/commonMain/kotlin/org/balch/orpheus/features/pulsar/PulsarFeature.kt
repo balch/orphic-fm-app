@@ -520,7 +520,7 @@ class PulsarViewModel(
     }
 
     // Cheap accessor — never forces Vibe construction.
-    override val vibeNames: List<String> = curatedProviders.map { it.name }
+    override val vibeNames: List<String> = curatedProviders.map { it.name.value }
 
     // Id -> provider, resolved once at construction (these instances live for the
     // ViewModel's lifetime, so a provider's own `cached` field actually caches -- unlike a
@@ -1355,7 +1355,7 @@ class PulsarViewModel(
         val name = saved.vibeName.ifEmpty { saved.vibe.name }
         // Use provider.name (cheap) to look up by name without forcing all
         // 26 vibes to materialize. Only the matched provider's `vibe` is built.
-        val provider = curatedProviders.firstOrNull { it.name == name }
+        val provider = curatedProviders.firstOrNull { it.name.value == name }
             ?: curatedProviders.first()
         applyVibe(provider.vibe)
         // Then override with saved macro values
@@ -1418,7 +1418,7 @@ class PulsarViewModel(
         style?.engineId ?: 0  // PAD (default for non-CHORDAL tracks — harmless)
 
     override fun applyVibeByName(name: String): Boolean {
-        val provider = curatedProviders.firstOrNull { it.name == name } ?: return false
+        val provider = curatedProviders.firstOrNull { it.name.value == name } ?: return false
         applyVibe(provider.vibe)
         return true
     }

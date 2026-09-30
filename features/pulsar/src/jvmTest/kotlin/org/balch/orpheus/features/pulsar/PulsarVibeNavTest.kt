@@ -24,6 +24,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.ports.PortRegistry
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.playback.VibeRequest
 import kotlin.test.AfterTest
@@ -150,7 +151,7 @@ private class NavTestDispatchers(private val d: CoroutineDispatcher) : Dispatche
 }
 
 private class NavTestVibeProvider(override val vibe: Vibe) : VibeProvider {
-    override val name: String get() = vibe.name
+    override val name: VibeName get() = VibeName(vibe.name)
 }
 
 private class NavTestPrefs : AppPreferencesRepository {

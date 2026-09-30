@@ -6,7 +6,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
-import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
@@ -46,6 +45,7 @@ import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -67,7 +67,7 @@ import org.balch.orpheus.features.pulsar.models.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class TechnoWobbleVibe : VibeProvider {
-    override val name: String = "Techno Wobble"
+    override val name: VibeName = VibeNames.TECHNO_WOBBLE
 
     private val mainProgression = chords(0, 0, 0, 0, 6, 5, 0, 3)
     private val chordsPerBar = 1
@@ -98,8 +98,7 @@ class TechnoWobbleVibe : VibeProvider {
     override val vibe: Vibe by lazy {
 
         Vibe(
-            name = name,
-            album = Album.RIF,
+            name = name.value,
             bpm = 84f,
             envelopeType = EnvelopeType.BLEND,  // punchy drums, breathing pads
             rootNote = RootNote.G_SHARP,         // G# minor = Ab minor enharmonic
