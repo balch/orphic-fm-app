@@ -18,6 +18,7 @@
 #include "pulsar_score_clock.h"
 #include "pulsar_score_sched.h"
 #include "pulsar_lick_growth.h"
+#include "pulsar_lick_calm.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -170,8 +171,20 @@ static inline float tension_drive_step(PulsarState* state, OrpheusEngine* engine
     return held;
 }
 
+// A lick channel's render mutation under the current Complexity zone (spurts included).
+static inline float lick_render_mutation(const PulsarState* state, float mutation) {
+    return lick_calm::effective_mutation(mutation, state->in_spurt, state->lick_variation,
+                                         static_cast<lick_calm::Zone>(state->lick_zone));
+}
+
 static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine* engine) {
     state->loop_count++;
+
+    const float variation = lick_calm::variation_for(complexity);
+    const lick_calm::Zone zone = lick_calm::zone_for(complexity);
+    state->zone_snap = lick_calm::dropped_zone(static_cast<lick_calm::Zone>(state->lick_zone), zone);
+    state->lick_zone = static_cast<int>(zone);
+    state->lick_variation = variation;
 
     // ── Compute tension intensity from inner/outer cycle phases ──
     int inner = state->tension.inner_bars;
@@ -285,7 +298,9 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
         PulsarTrackState& ts = state->tracks[t];
         // Per-track variation budget: scales the global complexity into the
         // track's role-aware {min,max} range (RHYTHM/drums tight, WILD wide).
-        float track_var = lerp_macro(complexity, ts.macro_map.complexity_variation);
+        // The Complexity zone then scales it: toward zero when steady (WILD's floor
+        // included), past the budget in the crazy zone.
+        float track_var = lerp_macro(complexity, ts.macro_map.complexity_variation) * variation;
 
         for (int s = 0; s < ts.step_count; s++) {
             PulsarStep& step = ts.steps[s];
@@ -365,7 +380,7 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             if (!use_markov_contour[t]) continue;
             PulsarTrackState& ts = state->tracks[t];
             SoloBehaviorParam& sb = state->track_solo_behavior[t];
-            float track_var = lerp_macro(complexity, ts.macro_map.complexity_variation);
+            float track_var = lerp_macro(complexity, ts.macro_map.complexity_variation) * variation;
 
             // Only mutate a fraction of steps per bar, scaling with the
             // per-track variation budget (was raw complexity).
@@ -1014,8 +1029,7 @@ static void regenerate_lick_tracks(PulsarState* state, OrpheusEngine* engine, ui
         if (r_lick_mode == LickMode::NONE) continue;
         LickChannel ch = track_lick_channel(state, engine, rt);
         if (ch.length <= 0) continue;
-        float ch_mut = state->in_spurt
-            ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+        float ch_mut = lick_render_mutation(state, ch.mutation);
         PulsarStep before[kMaxPulsarSteps];
         const int before_count = std::min(rts.step_count, kMaxPulsarSteps);
         if (carry_ghosts) std::memcpy(before, rts.steps, sizeof(PulsarStep) * before_count);
@@ -1181,8 +1195,7 @@ static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
         // would sit at step_count 16 while every other track runs 32 and drift out of
         // phase within a bar. Same contract as the load and déjà-vu paths.
         if (step_count_cfg > 16) {
-            const float ch_mut = state->in_spurt
-                ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+            const float ch_mut = lick_render_mutation(state, ch.mutation);
             apply_bar_strategy(ts, t, ts.bar_strategy, percussive, genre,
                                static_cast<uint8_t>(root), scale,
                                energy, complexity,
@@ -1296,6 +1309,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->smooth_complexity = engine->pulsar_complexity.load(std::memory_order_relaxed);
     state->smooth_space      = engine->pulsar_space.load(std::memory_order_relaxed);
     state->smooth_mood       = engine->pulsar_mood.load(std::memory_order_relaxed);
+    // The load renders below already honor the zone, so loading a vibe never snaps.
+    state->lick_variation = lick_calm::variation_for(clamp01(state->smooth_complexity));
+    state->lick_zone = static_cast<int>(lick_calm::zone_for(clamp01(state->smooth_complexity)));
+    state->zone_snap = false;
 
 
     // Read genre profile from atomics
@@ -1502,8 +1519,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         // below reads these, including the generative branch: mutation is per CHANNEL,
         // so a BASS-source track must never be rendered at the lead's mutation.
         LickChannel ch = track_lick_channel(state, engine, t);
-        float ch_mut = state->in_spurt
-            ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+        float ch_mut = lick_render_mutation(state, ch.mutation);
 
         // Density this pattern is about to be built at, so a section entry can tell whether
         // its per-track override actually changes anything. See apply_section_densities().
@@ -4056,8 +4072,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                     // Re-render the bare hook (load/déjà-vu recipe + seed) so last
                                     // bar's ornaments can't compound into the riff. GENRE range, as
                                     // the load path passed — a different one moves lick_octave_base.
-                                    float mt_mut = state->in_spurt
-                                        ? std::min(1.0f, mt_ch.mutation * 3.0f) : mt_ch.mutation;
+                                    float mt_mut = lick_render_mutation(state, mt_ch.mutation);
                                     render_lick_into_track(
                                         lts, mt, mt_ch.lick, mt_ch.length, mt_mut,
                                         static_cast<uint8_t>(live_root), sc,
@@ -4418,7 +4433,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 // Déjà vu reset: regenerate patterns from original seed periodically
                 state->loops_since_reset++;
                 int reset_interval = std::max(8, static_cast<int>(32.0f * (1.0f - complexity)));
-                if (state->loops_since_reset >= reset_interval) {
+                if (state->loops_since_reset >= reset_interval || state->zone_snap) {
+                    state->zone_snap = false;
                     state->loops_since_reset = 0;
                     // Re-read genre profile for regeneration
                     PulsarGenreProfile rg;
@@ -4466,8 +4482,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // capped at 1.0). Resolved before the branch because BOTH arms
                         // need it: the generative arm's CALL_RESPONSE renders a lick too.
                         LickChannel ch = track_lick_channel(state, engine, rt);
-                        float ch_mut = state->in_spurt
-                            ? std::min(1.0f, ch.mutation * 3.0f) : ch.mutation;
+                        float ch_mut = lick_render_mutation(state, ch.mutation);
                         if (ch.length > 0 && r_use_lick && !perc) {
                             // Shared lick->track render (#5): honors CALL_RESPONSE,
                             // else loops the lick. Genre note range (rg) matches the

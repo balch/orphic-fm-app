@@ -359,6 +359,7 @@ if(BUILD_TESTS)
         test/test_osc.cpp
         test/test_pulsar_osc.cpp
         test/test_pulsar_lick_growth.cpp
+        test/test_pulsar_complexity_calm.cpp
         test/test_pulsar_speech.cpp
         test/test_pulsar_street.cpp
         test/test_pulsar_str_lick.cpp

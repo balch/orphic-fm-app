@@ -1106,6 +1106,9 @@ struct PulsarState {
     uint32_t step_salt = 0;     // per-load salt for the stateless step_hash rolls
     int loop_count;             // how many full loops completed
     int loops_since_reset;      // loops since last déjà vu reset
+    float lick_variation = 1.0f;  // lick_calm::variation_for(complexity), refreshed each bar
+    int lick_zone = 1;            // lick_calm::Zone of that complexity (1 = NORMAL)
+    bool zone_snap = false;       // this bar dropped a zone: force the déjà vu rebuild
 
     // Drunk timing: per-step random offsets (in samples)
     float drunk_offsets[kNumPulsarTracks][kMaxPulsarSteps];
