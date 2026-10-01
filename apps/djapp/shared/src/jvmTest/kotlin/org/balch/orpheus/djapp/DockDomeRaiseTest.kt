@@ -330,13 +330,13 @@ class DockDomeRaiseTest {
         }
     }
 
-    // TV hardware's smaller ring hangs the same drop below the label line, and still clears the bar.
+    // TV hardware's smaller ring hangs its own, lower drop below the label line, and sits wholly inside the bar.
     @Test
-    fun onTelevisionTheRingHangsTheSameDrop() {
+    fun onTelevisionTheRingHangsTheTvDrop() {
         val dock = Dock(960, 540, desktop = false, tv = true)
         try {
-            assertEquals(DockDomeDrop.value, dock.ring.bottom - dock.baseline("Horn"), 1f, "the TV ring's drop below the label line")
-            assertTrue(dock.barTop - dock.ring.top >= 2f, "the TV ring never rises out of the bar: ${dock.ring} under ${dock.barTop}")
+            assertEquals(TvDockDomeDrop.value, dock.ring.bottom - dock.baseline("Horn"), 1f, "the TV ring's drop below the label line")
+            assertTrue(dock.ring.top >= dock.barTop, "the TV ring rises out of the bar: ${dock.ring} under ${dock.barTop}")
         } finally {
             dock.close()
         }

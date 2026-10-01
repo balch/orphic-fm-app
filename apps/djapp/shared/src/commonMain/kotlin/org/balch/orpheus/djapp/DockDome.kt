@@ -34,10 +34,13 @@ internal val DockDomeRingSize = 160.dp
 /** How far the ring's bottom sits below the toggles' label line. */
 internal val DockDomeDrop = 16.dp
 
-/** TV hardware keeps a smaller dome, static there, hung the same way with its pill above. */
-internal val TvDockDomeRingSize = 144.dp
+/** TV hardware keeps a smaller dome, static there, small enough to sit wholly inside the bar. */
+internal val TvDockDomeRingSize = 136.dp
 
 internal fun dockDomeRingSize(television: Boolean): Dp = if (television) TvDockDomeRingSize else DockDomeRingSize
+
+/** TV hardware hangs its dome lower, so the ring sits inside the bar with its name pill just above. */
+internal val TvDockDomeDrop = DockDomeDrop + 14.dp
 
 /** Extra room each side of the dome's slot off TV hardware, so it isn't crowded by Mix and Horn. */
 internal val DockDomeSideRoom = 4.dp
@@ -90,7 +93,7 @@ internal fun DockDome(
         modifier
             .width(ringSize)
             .focusRequester(focusRequester)
-            .hangFromLabelLine(DockDomeDrop),
+            .hangFromLabelLine(if (LocalTelevisionHardware.current) TvDockDomeDrop else DockDomeDrop),
     ) {
         VibeTransportItem(
             name = nav.currentName,
