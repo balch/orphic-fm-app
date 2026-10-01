@@ -20,6 +20,16 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
 
     init {
         log.info { "NativeDspAudioEngine created (C++ DSP + miniaudio)" }
+        try {
+            val stamp = bridge.nativeBuildStamp()
+            log.info { "DSP build $stamp loaded from ${bridge.nativeLibraryPath()}" }
+            System.getProperty(DspStaleCheck.SOURCE_DIR_PROPERTY)?.let { dir ->
+                DspStaleCheck.staleWarning(stamp, java.io.File(dir))?.let { log.warn { it } }
+            }
+        } catch (e: UnsatisfiedLinkError) {
+            // A library built before the stamp existed is, by definition, stale.
+            log.warn { "DSP build stamp missing: native library predates it and is stale" }
+        }
     }
 
     // -- AudioEngine ----------------------------------------------------------

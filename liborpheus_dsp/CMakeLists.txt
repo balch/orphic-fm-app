@@ -172,6 +172,7 @@ set(ORPHEUS_SRC
     "src/orpheus_master_crossfade.cpp"
     "src/orpheus_master_swell.cpp"
     "src/orpheus_master_cut.cpp"
+    "src/orpheus_build_info.cpp"
     "src/chaos/lorenz.cpp"
     "src/chaos/rossler.cpp"
     "src/chaos/duffing.cpp"
@@ -199,6 +200,23 @@ add_library(orpheus_dsp STATIC
     ${TIDES2_SRC}
     ${BRAIDS_SRC}
 )
+
+# ── Build stamp ───────────────────────────────────
+# Regenerated on every build (not just when some TU recompiles), so the app can log which
+# build of the library it actually loaded. Lands in the build dir, never the source tree.
+set(ORPHEUS_BUILD_STAMP_CPP "${CMAKE_CURRENT_BINARY_DIR}/generated/orpheus_build_stamp.cpp")
+add_custom_target(orpheus_build_stamp_gen
+    COMMAND "${CMAKE_COMMAND}"
+        "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+        "-DOUTPUT=${ORPHEUS_BUILD_STAMP_CPP}"
+        "-DCONFIG=$<CONFIG>"
+        "-DWITH_GRIDS=${ORPHEUS_WITH_GRIDS}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_stamp.cmake"
+    BYPRODUCTS "${ORPHEUS_BUILD_STAMP_CPP}"
+    VERBATIM
+)
+target_sources(orpheus_dsp PRIVATE "${ORPHEUS_BUILD_STAMP_CPP}")
+add_dependencies(orpheus_dsp orpheus_build_stamp_gen)
 
 if(ORPHEUS_WITH_GRIDS)
     # PUBLIC: the #ifdef in orpheus_units.h is read by consumers of the library, not just

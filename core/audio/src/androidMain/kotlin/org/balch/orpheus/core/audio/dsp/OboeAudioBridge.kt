@@ -33,6 +33,8 @@ class OboeAudioBridge : NativeDspBridge {
     external fun nativeGetSampleRate(): Int
     external fun nativeGetFramesPerBuffer(): Int
     external fun nativeGetCpuLoad(): Double
+    external fun nativeBuildStamp(): String
+    external fun nativeLibraryPath(): String
     external override fun nativeGetXRunCount(): Int
 
     // ── Parameter control (called from UI thread) ─

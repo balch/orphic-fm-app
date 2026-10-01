@@ -44,6 +44,7 @@ class OboeAudioEngine(
 
     init {
         log.info { "OboeAudioEngine created (C++ DSP)" }
+        log.info { "DSP build ${bridge.nativeBuildStamp()} loaded from ${bridge.nativeLibraryPath()}" }
     }
 
     override fun setOnAudioRouteLostCallback(callback: (() -> Unit)?) {

@@ -79,6 +79,8 @@ class DesktopDspBridge {
     external fun nativeIsRunning(): Boolean
     external fun nativeGetSampleRate(): Float
     external fun nativeGetCpuLoad(): Double
+    external fun nativeBuildStamp(): String
+    external fun nativeLibraryPath(): String
 
     // -- Parameter control (called from UI thread) ----------------------------
     external fun nativeSetPort(uri: String, symbol: String, value: Float)

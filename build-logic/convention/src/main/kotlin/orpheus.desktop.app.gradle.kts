@@ -29,3 +29,9 @@ kotlin {
 configurations.all {
     exclude(group = "dev.atsushieno", module = "libremidi-panama")
 }
+
+// Dev runs only (run, hotRun), never packaged launchers: lets the app warn when the DSP
+// library it loaded is older than the C++ sources. See DspStaleCheck.
+tasks.withType<JavaExec>().configureEach {
+    systemProperty("orpheus.dsp.sourceDir", rootDir.resolve("liborpheus_dsp").absolutePath)
+}

@@ -61,6 +61,16 @@ JNI_FN(nativeGetCpuLoad)(JNIEnv *env, jobject thiz) {
     return sEngine.getCpuLoad();
 }
 
+JNIEXPORT jstring JNICALL
+JNI_FN(nativeBuildStamp)(JNIEnv *env, jobject thiz) {
+    return env->NewStringUTF(orpheus_build_stamp());
+}
+
+JNIEXPORT jstring JNICALL
+JNI_FN(nativeLibraryPath)(JNIEnv *env, jobject thiz) {
+    return env->NewStringUTF(orpheus_library_path());
+}
+
 // -- Parameter control ----------------------------------------------------
 
 JNIEXPORT void JNICALL

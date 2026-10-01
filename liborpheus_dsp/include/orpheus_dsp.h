@@ -31,6 +31,13 @@ void orpheus_engine_process_deinterleaved(OrpheusEngine* engine,
 // ── Diagnostics ────
 void  orpheus_engine_dump_state(OrpheusEngine* engine);
 
+// Identifies this build of the library: build time, git rev (+dirty), newest source mtime.
+// Changes whenever the library is rebuilt from changed sources. Static storage; never free.
+const char* orpheus_build_stamp(void);
+
+// Absolute path of the binary this library was loaded from, or "" if unknown.
+const char* orpheus_library_path(void);
+
 // ── Parameter control (called from UI thread) ────
 void  orpheus_engine_set_port(OrpheusEngine* engine,
                               const char* plugin_uri,

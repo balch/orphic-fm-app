@@ -113,6 +113,18 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetCpuLoad(
     return sEngine.getCpuLoad();
 }
 
+JNIEXPORT jstring JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeBuildStamp(
+        JNIEnv *env, jobject thiz) {
+    return env->NewStringUTF(orpheus_build_stamp());
+}
+
+JNIEXPORT jstring JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeLibraryPath(
+        JNIEnv *env, jobject thiz) {
+    return env->NewStringUTF(orpheus_library_path());
+}
+
 JNIEXPORT jint JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetXRunCount(
         JNIEnv *env, jobject thiz) {

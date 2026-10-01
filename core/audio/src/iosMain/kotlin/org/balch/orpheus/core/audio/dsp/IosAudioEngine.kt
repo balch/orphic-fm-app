@@ -24,9 +24,11 @@ import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.staticCFunction
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import orpheus_dsp.ORPHEUS_SCOPE_MAX_POINTS
 import orpheus_dsp.OrpheusMonitorData
+import orpheus_dsp.orpheus_build_stamp
 import orpheus_dsp.orpheus_engine_blocks_rendered
 import orpheus_dsp.orpheus_engine_clear_automation
 import orpheus_dsp.orpheus_engine_create
@@ -74,6 +76,7 @@ import orpheus_dsp.orpheus_ios_audio_is_running
 import orpheus_dsp.orpheus_ios_audio_set_config_change_callback
 import orpheus_dsp.orpheus_ios_audio_start
 import orpheus_dsp.orpheus_ios_audio_stop
+import orpheus_dsp.orpheus_library_path
 import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
 import platform.AVFAudio.AVAudioSessionInterruptionNotification
@@ -266,6 +269,9 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
 
     init {
         log.info { "IosAudioEngine created (C++ DSP via cinterop)" }
+        log.info {
+            "DSP build ${orpheus_build_stamp()?.toKString()} loaded from ${orpheus_library_path()?.toKString()}"
+        }
     }
 
     override fun start() {
