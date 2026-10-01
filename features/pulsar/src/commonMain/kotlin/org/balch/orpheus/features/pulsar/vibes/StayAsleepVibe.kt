@@ -372,7 +372,7 @@ class StayAsleepVibe : VibeProvider {
             seed = 0,
             // --- macro defaults: slow, dark, the echo audible ---
             energy = 0.50f,
-            complexity = 0.30f,
+            complexity = 0.45f,
             space = 0.45f,
             mood = 0.40f,
             deep = 0.50f,
