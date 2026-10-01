@@ -189,7 +189,7 @@ Orphic DJ ships as Android `og`/`ai` flavors plus a desktop build selected with 
 
 ```bash
 # Orpheus desktop (C++ DSP engine via JNI + miniaudio)
-./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run
+./gradlew :apps:orpheus:desktopApp:run
 
 # Orpheus Android
 ./gradlew :apps:orpheus:androidApp:installDebug

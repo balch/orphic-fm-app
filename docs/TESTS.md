@@ -107,7 +107,7 @@ Structured test plans for manual verification of each feature. Each plan has num
 To verify audio parity across platforms:
 
 1. **Desktop JSyn** (reference): `./gradlew :apps:orpheus:desktopApp:run`
-2. **Desktop C++**: `./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run -Dorpheus.engine=cpp`
+2. **Desktop C++**: `./gradlew :apps:orpheus:desktopApp:run`
 3. **WASM**: `./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun`
 
 Play the same patch on each platform and compare:

@@ -43,7 +43,7 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 
 ```bash
 # Desktop (C++ DSP engine via JNI + miniaudio)
-./gradlew buildDesktopNative && ./gradlew :apps:orpheus:desktopApp:run
+./gradlew :apps:orpheus:desktopApp:run
 
 # Android (Orpheus)
 ./gradlew :apps:orpheus:androidApp:installDebug
@@ -69,17 +69,16 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 The audio engine is the C++ DSP library (`liborpheus_desktop.dylib` on macOS) loaded via JNI, with [miniaudio](https://miniaud.io/) for low-latency audio output.
 
 ```bash
-# Build the native library
-./gradlew buildDesktopNative
-
-# Run desktop app
+# Run desktop app (builds the native library first)
 ./gradlew :apps:orpheus:desktopApp:run
 
 # Package for distribution (requires full JDK with jpackage)
 ./gradlew :apps:orpheus:desktopApp:packageReleaseDistributionForCurrentOS
 ```
 
-The native library is built from `liborpheus_dsp/` using `liborpheus_dsp/platform/jvm/CMakeLists.txt`.
+The native library is built from `liborpheus_dsp/` using `liborpheus_dsp/desktop/CMakeLists.txt`. `run` and packaging both depend on `buildDesktopNative`, which runs cmake incrementally into `build/nativeResources`, so there is no separate build step.
+
+At startup the app logs which library it loaded, e.g. `DSP build built=… git=<rev>[-dirty] src=<newest source mtime>(<file>) … loaded from <path>`. On dev runs it also logs `DSP library is STALE` if a file under `liborpheus_dsp/` is newer than the library; rerun `buildDesktopNative` if you see it.
 
 #### Windows Installers (MSI / EXE)
 

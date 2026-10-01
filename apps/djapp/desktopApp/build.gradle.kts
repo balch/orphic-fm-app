@@ -53,17 +53,24 @@ val buildDesktopNative = tasks.register<Exec>("buildDesktopNative") {
         when { "mac" in it -> "darwin"; "linux" in it -> "linux"; else -> "windows" }
     }
     val libName = System.mapLibraryName("orpheus_desktop")
-    val targetDir = layout.projectDirectory.dir("src/main/resources/native/$osName-$arch")
+    val outDir = layout.buildDirectory.dir("nativeResources").get().asFile
+    val targetDir = outDir.resolve("native/$osName-$arch")
+    // Builds before this one copied into src/main/resources; a leftover would shadow the fresh lib.
+    val legacyDir = layout.projectDirectory.dir("src/main/resources/native").asFile
+    // A declared output in build/, so Gradle sees every write. cmake owns incrementality, so run it
+    // every time; an unchanged dylib hashes the same and processResources stays up to date.
+    outputs.dir(outDir)
+    outputs.upToDateWhen { false }
     workingDir = desktopDir
     commandLine("bash", "-c",
         // Own build dir, not just an own flag: all three desktop apps share liborpheus_dsp/desktop,
         // so a cached ORPHEUS_WITH_GRIDS=OFF here would silently strip Grids from Orpheus.
         "cmake -B build-nogrids -DCMAKE_BUILD_TYPE=Release -DORPHEUS_WITH_GRIDS=OFF -DEURORACK_DIR=$eurorackDir && " +
         "cmake --build build-nogrids --config Release && " +
-        "mkdir -p ${targetDir.asFile.absolutePath} && cp build-nogrids/$libName ${targetDir.asFile.absolutePath}/$libName"
+        "rm -f ${legacyDir.absolutePath}/*/liborpheus_desktop.* && " +
+        "mkdir -p ${targetDir.absolutePath} && cp build-nogrids/$libName ${targetDir.absolutePath}/$libName"
     )
 }
 
-tasks.named("processResources") {
-    dependsOn(buildDesktopNative)
-}
+// Wiring the task as a resource dir also makes processResources depend on it.
+sourceSets.main { resources.srcDir(buildDesktopNative) }
