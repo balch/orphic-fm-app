@@ -600,6 +600,11 @@ struct PulsarChordState {
     int     chord_index;
     int     chord_step_counter;
     int     steps_per_chord;
+    // The bar the chords divide: chord j spans [ceil(j*S/N), ceil((j+1)*S/N)), so a count that
+    // does not divide the bar (3 on 32) keeps its changes on the same steps every bar.
+    int     steps_per_bar = 0;
+    int     chords_per_bar = 0;     // 0 = not initialised, fall back to steps_per_chord
+    int     chord_in_bar = 0;
     int     matrix_index;
     uint32_t chord_seed;
     // Custom per-vibe transition matrix (overrides built-in when active)

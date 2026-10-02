@@ -163,6 +163,9 @@ inline void init_chord_progression(PulsarChordState& cs, int style,
     if (chords_per_bar > 8) chords_per_bar = 8;
     cs.steps_per_chord = step_count / chords_per_bar;
     if (cs.steps_per_chord < 1) cs.steps_per_chord = 1;
+    cs.steps_per_bar = step_count;
+    cs.chords_per_bar = chords_per_bar;
+    cs.chord_in_bar = 0;
 
     std::memcpy(cs.original_progression, cs.progression, sizeof(cs.progression));
     // Seed at 1 so the first anchor reset lands on cycle N (not cycle N+1).
@@ -230,8 +233,14 @@ inline void maybe_mutate_progression(PulsarChordState& cs, float complexity, flo
 
 inline void advance_chord(PulsarChordState& cs, float complexity, float mood) {
     cs.chord_step_counter++;
-    if (cs.chord_step_counter >= cs.steps_per_chord) {
+    int chord_len = cs.steps_per_chord;
+    if (cs.chords_per_bar > 0 && cs.steps_per_bar >= cs.chords_per_bar) {
+        const int n = cs.chords_per_bar, bar = cs.steps_per_bar, j = cs.chord_in_bar;
+        chord_len = ((j + 1) * bar + n - 1) / n - (j * bar + n - 1) / n;
+    }
+    if (cs.chord_step_counter >= chord_len) {
         cs.chord_step_counter = 0;
+        if (cs.chords_per_bar > 0) cs.chord_in_bar = (cs.chord_in_bar + 1) % cs.chords_per_bar;
         cs.chord_index = (cs.chord_index + 1) % cs.progression_length;
 
         // At progression wrap, maybe mutate or reset to anchor

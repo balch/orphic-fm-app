@@ -492,6 +492,32 @@ bool run_pulsar_chords_tests() {
         else { printf("    FAIL\n"); fail++; }
     }
 
+    // ── Chord clock stays on the bar when chords_per_bar does not divide the steps ──
+    // 32 steps / 3 chords truncated to 10 steps per chord, a 30-step loop against a 32-step
+    // bar, so each chord change slid a step or two earlier every bar.
+    {
+        printf("  Test: 3 chords on a 32-step bar land on the same steps every bar\n");
+        const int custom[3] = {0, 4, 6};
+        PulsarChordState cs;
+        std::memset(&cs, 0, sizeof(cs));
+        init_chord_progression(cs, 0, 3, 32, 42, custom, 3);
+        int first_bar[32] = {};
+        bool ok = true;
+        for (int bar = 0; bar < 4; bar++) {
+            for (int step = 0; step < 32; step++) {
+                const int idx = cs.chord_index;
+                if (bar == 0) first_bar[step] = idx;
+                else if (idx != first_bar[step]) ok = false;
+                advance_chord(cs, 0.0f, 0.5f);
+            }
+        }
+        // Chords of 11, 11 and 10 steps, summing to the bar.
+        ok = ok && first_bar[0] == 0 && first_bar[10] == 0 && first_bar[11] == 1
+                && first_bar[21] == 1 && first_bar[22] == 2 && first_bar[31] == 2;
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL\n"); fail++; }
+    }
+
     // ── Summary ──────────────────────────────────────────────────────────
     printf("\n  Pulsar Chords: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);
