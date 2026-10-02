@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("orpheus.kmp.library")
 }
@@ -16,6 +18,7 @@ kotlin {
         }
     }
 
+    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
     }

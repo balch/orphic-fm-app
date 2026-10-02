@@ -13,7 +13,7 @@ plugins {
 dependencies {
     implementation(projects.apps.orpheus.shared)
     implementation(compose.desktop.currentOs)
-    implementation(compose.components.resources)
+    implementation(libs.compose.components.resources)
     implementation(libs.kotlinx.coroutinesSwing)
     implementation(libs.kmlogging)
     implementation(libs.metrox.viewmodel.compose)

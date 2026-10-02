@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("orpheus.kmp.compose")
     alias(libs.plugins.metro)
@@ -8,6 +10,7 @@ kotlin {
         namespace = "org.balch.orpheus.features.mediapipe"
     }
 
+    @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
     }

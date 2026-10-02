@@ -21,9 +21,9 @@ kotlin {
     sourceSets {
         wasmJsMain.dependencies {
             implementation(projects.apps.orpheus.shared)
-            implementation(compose.runtime)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.components.resources)
             implementation(libs.kmlogging)
             implementation(libs.metrox.viewmodel.compose)
         }
