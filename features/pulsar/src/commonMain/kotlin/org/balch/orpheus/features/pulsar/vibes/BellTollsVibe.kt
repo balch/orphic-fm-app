@@ -105,7 +105,10 @@ class BellTollsVibe : VibeProvider {
                     energy = 0.45f, complexity = 0.25f, space = 0.8f, mood = 0.9f,
                 ),
                 chordsPerBar = 3,
-                customProgression = chords(0, 0, 6)
+                customProgression = chords(0, 0, 6),
+                trackOverrides = mapOf(
+                    5 to TrackSectionOverride(volume = .25f, reverbSend = 0.4f, density = .2f),
+                ),
             ),
             // 1 GROOVE: Full band roots feel — the main pocket.
             // groove -> chorus / solo: skankLift (gentle energy climb).
@@ -451,7 +454,7 @@ class BellTollsVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.CHD,
                     volume = 0.32f,
-                    noteRangeLow = 45, noteRangeHigh = 60,  // A2-C4 guitar mid-low register
+                    noteRangeLow = 43, noteRangeHigh = 60,  // G2-C4; 43 lets the bVII sit under the A
                     reverbBrightness = 0.55f, reverbSend = 0.25f, delaySend = 0.30f,
                 ).let { skank ->
                     TrackVoice(
