@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.pulsar.vibes
 
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 
@@ -11,6 +12,7 @@ import dev.zacsweers.metro.Provides
  * An unset or unrecognized value falls back to LIVE (see [VibeCatalog.vibeStatusFromArg]).
  */
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface VibeCatalogPolicyProvider {
     companion object {
         @Provides

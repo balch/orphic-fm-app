@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.vibes
 import android.app.Application
 import android.content.pm.ApplicationInfo
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 
@@ -14,6 +15,7 @@ import dev.zacsweers.metro.Provides
  * type is debuggable; `release` and `debugRelease` (initWith(release), R8) are not.
  */
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface VibeCatalogPolicyProvider {
     companion object {
         @Provides

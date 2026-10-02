@@ -1,6 +1,7 @@
 package org.balch.orpheus.djapp.di
 
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Multibinds
@@ -27,6 +28,7 @@ import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.playback.TimerOverlayProducer
 
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface DjAppModule {
     /**
      * `allowEmpty` because the `og` edition has no `:apps:djapp:ai` on its classpath, so nothing

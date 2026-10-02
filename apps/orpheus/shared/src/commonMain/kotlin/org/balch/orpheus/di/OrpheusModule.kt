@@ -2,6 +2,7 @@ package org.balch.orpheus.di
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -33,6 +34,7 @@ import org.balch.orpheus.playback.OrpheusMetadataProducer
  * @ContributesBinding from platform-specific implementations.
  */
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface OrpheusModule {
     /**
      * The three playback hooks `PlaybackController` takes as optional constructor params.

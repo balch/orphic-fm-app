@@ -2,6 +2,7 @@ package org.balch.orpheus.di
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Binds
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -17,6 +18,7 @@ import org.balch.orpheus.core.presets.SynthPresetRepository
  * `@ContributesBinding` on the impls, and for the `@Binds` scoping note.
  */
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface JvmRepositoryModule {
     @Binds val JvmSynthPresetRepository.bindSynthPresetRepository: SynthPresetRepository
 

@@ -2,6 +2,7 @@ package org.balch.orpheus.djapp.di
 
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -14,6 +15,7 @@ import org.balch.orpheus.core.presets.SynthPresetRepository
 import platform.Foundation.NSUserDefaults
 
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface IosDjAppModule {
     companion object {
         @Provides

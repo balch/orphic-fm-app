@@ -3,6 +3,7 @@ package org.balch.orpheus.di
 import android.app.Application
 import android.content.Context
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.Binds
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -25,6 +26,7 @@ import org.balch.orpheus.core.presets.SynthPresetRepository
  * `AndroidSynthPresetRepository` directly returns the same instance the interface hands out.
  */
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface AndroidRepositoryModule {
     @Binds val AndroidSynthPresetRepository.bindSynthPresetRepository: SynthPresetRepository
 

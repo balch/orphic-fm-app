@@ -1,12 +1,14 @@
 package org.balch.orpheus.features.pulsar.vibes
 
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import kotlin.experimental.ExperimentalNativeApi
 
 /** iOS [VibeCatalogPolicy]: WIP vibes visible in debug framework binaries only. */
 @ContributesTo(AppScope::class)
+@BindingContainer
 interface VibeCatalogPolicyProvider {
     companion object {
         @OptIn(ExperimentalNativeApi::class)
