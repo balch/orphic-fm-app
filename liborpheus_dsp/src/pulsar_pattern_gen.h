@@ -42,9 +42,17 @@ inline int chord_degree_to_semitones(int degree, const PulsarScale& scale) {
     if (degree < scale.count) {
         return scale.degrees[degree];
     }
-    // Fallback: approximate diatonic mapping
-    constexpr int kDiatonic[7] = {0, 2, 4, 5, 7, 9, 11};
-    return kDiatonic[degree];
+    // Degree past a short (5-6 note) scale: read the diatonic parent. A scale with a minor
+    // third and no major third is minor-family, so its VI and VII are b6 and b7, not the
+    // major 6th and leading tone (G# over A, which is what "VII" used to play).
+    constexpr int kMajor[7] = {0, 2, 4, 5, 7, 9, 11};
+    constexpr int kMinor[7] = {0, 2, 3, 5, 7, 8, 10};
+    bool minor_third = false, major_third = false;
+    for (int i = 0; i < scale.count; i++) {
+        if (scale.degrees[i] == 3) minor_third = true;
+        if (scale.degrees[i] == 4) major_third = true;
+    }
+    return (minor_third && !major_third) ? kMinor[degree] : kMajor[degree];
 }
 
 // Helper: create a PulsarStep with raw_note = note (non-destructive re-quantization source)

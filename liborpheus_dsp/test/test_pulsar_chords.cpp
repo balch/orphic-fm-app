@@ -455,6 +455,43 @@ bool run_pulsar_chords_tests() {
         }
     }
 
+    // ── Chord degrees beyond a short scale ──────────────────────────────
+    // Bell Tolls' "VII turnaround" (degree 6) on minor pentatonic used to play 11 semitones
+    // (a leading tone, G# over an A root) because the fallback table was always major.
+    {
+        printf("  Test: chord degree past a minor-family scale reads the natural-minor table\n");
+        const int pent = 10, blues = 13, hirajoshi = 11;
+        bool ok = chord_degree_to_semitones(6, kPulsarScales[pent]) == 10    // bVII, was 11
+               && chord_degree_to_semitones(5, kPulsarScales[pent]) == 8     // b6, was 9
+               && chord_degree_to_semitones(6, kPulsarScales[blues]) == 10   // was 11
+               && chord_degree_to_semitones(6, kPulsarScales[hirajoshi]) == 10
+               && chord_degree_to_semitones(5, kPulsarScales[hirajoshi]) == 8;
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL\n"); fail++; }
+    }
+    {
+        printf("  Test: chord degree past a major-family scale keeps the major table\n");
+        const int pent = 2, whole_tone = 4, in_sen = 12, major_blues = 15;
+        bool ok = chord_degree_to_semitones(6, kPulsarScales[pent]) == 11
+               && chord_degree_to_semitones(5, kPulsarScales[pent]) == 9
+               && chord_degree_to_semitones(6, kPulsarScales[whole_tone]) == 11
+               && chord_degree_to_semitones(6, kPulsarScales[in_sen]) == 11
+               && chord_degree_to_semitones(6, kPulsarScales[major_blues]) == 11;
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL\n"); fail++; }
+    }
+    {
+        printf("  Test: seven-note scales and in-range degrees are untouched\n");
+        bool ok = true;
+        for (int si = 0; si < kNumPulsarScales; si++) {
+            const PulsarScale& sc = kPulsarScales[si];
+            for (int d = 0; d < 7 && d < sc.count; d++)
+                if (chord_degree_to_semitones(d, sc) != sc.degrees[d]) ok = false;
+        }
+        if (ok) { printf("    PASS\n"); pass++; }
+        else { printf("    FAIL\n"); fail++; }
+    }
+
     // ── Summary ──────────────────────────────────────────────────────────
     printf("\n  Pulsar Chords: %d passed, %d failed\n", pass, fail);
     TEST_SUITE_RETURN(pass, fail);
