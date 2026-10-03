@@ -1220,6 +1220,46 @@ static bool test_djapp_pulsar_send_slots_reset_per_block() {
     return pass;
 }
 
+// ── Warps slot 9 ownership: bass voice when present, Pulsar bass bus otherwise ──
+
+static bool check_slot9(bool production, const char* label) {
+    printf("\n=== Test: slot 9 in %s ===\n", label);
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool loaded = production ? load_production_graph(engine) : load_dj_graph(engine);
+    if (!loaded) { orpheus_engine_destroy(engine); return false; }
+    setup_pulsar_baseline(engine);
+    engine->bass_mix.store(0.0f, std::memory_order_relaxed);  // bass voice bypassed
+
+    constexpr int kFrames = 128;
+    float buf[kFrames * 2];
+    float bus_peak = 0.0f, slot_peak = 0.0f, max_err = 0.0f;
+    for (int blk = 0; blk < 400; blk++) {
+        orpheus_engine_process(engine, buf, kFrames);
+        for (int i = 0; i < kFrames; i++) {
+            float bus = (engine->pulsar_bus_bass_l[i] + engine->pulsar_bus_bass_r[i]) * 0.5f;
+            float slot = engine->warps_source_buffers[9][i];
+            float expected = production ? 0.0f : bus;
+            bus_peak = std::fmax(bus_peak, std::fabs(bus));
+            slot_peak = std::fmax(slot_peak, std::fabs(slot));
+            max_err = std::fmax(max_err, std::fabs(slot - expected));
+        }
+    }
+    bool pass = bus_peak > 0.001f && max_err < 1e-5f;
+    printf("  pulsar bass bus peak=%.4f slot 9 peak=%.4f max err=%.6f %s\n",
+           bus_peak, slot_peak, max_err, pass ? "PASS" : "FAIL");
+    if (bus_peak <= 0.001f) printf("  FAIL: Pulsar bass bus silent, test proves nothing\n");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
+static bool test_slot9_bass_voice_graph_excludes_pulsar() {
+    return check_slot9(true, "Orpheus graph (bass voice owns it, Pulsar excluded)");
+}
+
+static bool test_slot9_dj_graph_carries_pulsar_bass() {
+    return check_slot9(false, "DJ graph (Pulsar bass bus for turntable capture)");
+}
+
 // ── Suite runner ────────────────────────────────────────────────────
 
 bool run_djapp_graph_tests() {
@@ -1245,6 +1285,8 @@ bool run_djapp_graph_tests() {
     tally(test_djapp_pulsar_delay_vs_reverb());
     tally(test_djapp_pulsar_reverb_room_smoothing());
     tally(test_djapp_pulsar_send_slots_reset_per_block());
+    tally(test_slot9_bass_voice_graph_excludes_pulsar());
+    tally(test_slot9_dj_graph_carries_pulsar_bass());
     printf("\nDJ App graph tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

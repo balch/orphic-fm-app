@@ -726,6 +726,7 @@ struct OrpheusEngine {
 
     // Bass double-buffer read (new, for turntable + future use)
     float warps_bass_read[kMaxFrames] = {};
+    bool  bass_voice_in_graph{false};  // audio thread only; set per block from the graph
 
     // Previous frame's master output for turntable "master" source
     float turntable_prev_master[kMaxFrames] = {};

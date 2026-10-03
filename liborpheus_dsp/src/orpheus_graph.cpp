@@ -296,6 +296,11 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
                 graph->exec_order[graph->exec_count++] = u;
         }
     }
+
+    graph->has_bass_voice = false;
+    for (int u = 0; u < n; u++) {
+        if (graph->units[u].type == UNIT_BASS_VOICE) graph->has_bass_voice = true;
+    }
 }
 
 // -- Dump execution order for debugging ----
@@ -370,6 +375,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float)); // BASS
     std::memset(engine->warps_source_buffers[14], 0, kMaxFrames * sizeof(float)); // PULSAR_DELAY_SEND
     std::memset(engine->warps_source_buffers[15], 0, kMaxFrames * sizeof(float)); // PULSAR_REVERB_SEND
+    engine->bass_voice_in_graph = graph->has_bass_voice;
 
     // Smooth warps_mix here (before any voice runs) so warps_dry_scale()
     // reads a consistent value regardless of execution order.

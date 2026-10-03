@@ -197,6 +197,9 @@ struct OrpheusGraph {
     // Master output unit index
     int master_out_index;
 
+    // A BASS_VOICE unit owns Warps slot 9; Pulsar's bass bus only fills it when absent
+    bool has_bass_voice;
+
     float sample_rate;
 };
 

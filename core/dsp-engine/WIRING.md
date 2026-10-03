@@ -118,7 +118,7 @@ Sources are double-buffered where needed to decouple from graph execution order.
 | 6 | FLUX | unit_process_marbles (X1 CV) | = | none | no | none | - |
 | 7 | BENDER | unit_process_bender (audio) | = | none | no | none | - |
 | 8 | STRINGS | unit_process_per_string_bender | = | none | no | none | - |
-| 9 | BASS | unit_process_bass (=) + Pulsar bass bus (+=) | mixed | none | zeroed per frame; Warps reads live | none | - |
+| 9 | BASS | unit_process_bass; Pulsar bass bus only when the graph has no bass voice (DJ) | = / += | none | YES (`warps_bass_read`) | none | - |
 | 10-13 | TIDES1-4 | unit_process_tides (channels 0-3; ch 3 has no graph port) | = | none | no | none | - |
 | 14 | PULSAR_DELAY_SEND | unit_process_pulsar (per-track delay sends, L+R × 0.5) | += | none | no | none | - |
 | 15 | PULSAR_REVERB_SEND | unit_process_pulsar (per-track reverb sends, L+R × 0.5) | += | none | no | none | - |

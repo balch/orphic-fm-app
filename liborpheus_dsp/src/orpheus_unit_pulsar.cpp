@@ -5897,13 +5897,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     // Copy bus buffers to warps_source_buffers for turntable capture.
     // warps_source_buffers were zeroed at frame start; += accumulates with other sources.
+    // Slot 9 belongs to the bass voice when the graph has one (its FX send reads it).
+    const bool fill_bass_slot = !engine->bass_voice_in_graph;
     for (int i = 0; i < num_frames; i++) {
         engine->warps_source_buffers[0][i] +=
             (engine->pulsar_bus_keys_l[i] + engine->pulsar_bus_keys_r[i]) * 0.5f;
         engine->warps_source_buffers[1][i] +=
             (engine->pulsar_bus_drums_l[i] + engine->pulsar_bus_drums_r[i]) * 0.5f;
-        engine->warps_source_buffers[9][i] +=
-            (engine->pulsar_bus_bass_l[i] + engine->pulsar_bus_bass_r[i]) * 0.5f;
+        if (fill_bass_slot)
+            engine->warps_source_buffers[9][i] +=
+                (engine->pulsar_bus_bass_l[i] + engine->pulsar_bus_bass_r[i]) * 0.5f;
         // Per-track effect send buses → slots 14 (delay) and 15 (reverb)
         engine->warps_source_buffers[14][i] +=
             (engine->pulsar_delay_send_l[i] + engine->pulsar_delay_send_r[i]) * 0.5f;
