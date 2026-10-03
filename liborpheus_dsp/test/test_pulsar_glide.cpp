@@ -317,6 +317,24 @@ static bool test_step_sentinel_falls_through_to_track() {
 }
 
 // ── Suite runner ────────────────────────────────────────────────────────────
+// The glide steps once per block; after the same elapsed time the remaining distance
+// must match the per-sample curve (1 - rate)^frames, whatever the host block size.
+static bool test_glide_block_size_independent() {
+    printf("\n=== Test: glide covers the same distance at 128 and 512 frames ===\n");
+    bool pass = true;
+    for (float p : {0.0f, 0.25f, 0.5f}) {
+        float rate = 0.001f * std::pow(0.02f, p);
+        float ideal = std::pow(1.0f - rate, 512.0f);
+        float rem128 = std::pow(1.0f - pulsar_glide_alpha(rate, 128), 4.0f);
+        float rem512 = 1.0f - pulsar_glide_alpha(rate, 512);
+        bool ok = std::fabs(rem128 - ideal) < 1e-3f && std::fabs(rem512 - ideal) < 1e-3f;
+        printf("  glide %.2f: remaining after 512 samples ideal=%.4f 4x128=%.4f 1x512=%.4f %s\n",
+               p, ideal, rem128, rem512, ok ? "PASS" : "FAIL");
+        pass &= ok;
+    }
+    return pass;
+}
+
 bool run_pulsar_glide_tests() {
     printf("\n═══ Pulsar Glide Priority & Chord-Edge Tracking ═══\n");
     int passed = 0, failed = 0;
@@ -329,6 +347,7 @@ bool run_pulsar_glide_tests() {
     run(test_first_chord_edge_skips_glide);
     run(test_step_glide_overrides_track);
     run(test_step_sentinel_falls_through_to_track);
+    run(test_glide_block_size_independent);
 
     printf("\n  Pulsar Glide: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);

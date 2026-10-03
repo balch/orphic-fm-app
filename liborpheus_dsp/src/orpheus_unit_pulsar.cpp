@@ -5051,8 +5051,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         // Apply pitch glide (exponential approach toward target_pitch)
         if (ts.glide_rate != 0.0f) {
-            float alpha = ts.glide_rate * static_cast<float>(num_frames);
-            alpha = alpha > 1.0f ? 1.0f : alpha;
+            float alpha = pulsar_glide_alpha(ts.glide_rate, num_frames);
             ts.current_pitch += (ts.target_pitch - ts.current_pitch) * alpha;
             if (std::abs(ts.target_pitch - ts.current_pitch) < 0.01f) {
                 ts.current_pitch = ts.target_pitch;

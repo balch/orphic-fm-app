@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include "pulsar_limits.h"
 #include "pulsar_transition_fx.h"
 #include "orpheus_voice.h"
@@ -473,6 +474,12 @@ struct PulsarTrackState {
     float evo_voicing_tension = 1.0f;
     int anchor_indices[2] = {-1, -1};  // cached anchor positions
 };
+
+// Fraction of the remaining glide distance covered by one block of `frames`: the
+// per-sample rate compounded, so the glide time doesn't depend on host block size.
+inline float pulsar_glide_alpha(float glide_rate, int frames) {
+    return 1.0f - std::pow(1.0f - glide_rate, static_cast<float>(frames));
+}
 
 // The window of steps a track's playhead currently cycles: [start, start + len).
 // Only half-lick modes produce a non-zero start.
