@@ -1177,6 +1177,49 @@ static bool test_djapp_pulsar_reverb_room_smoothing() {
     return all_pass;
 }
 
+// ── Warps slots 14/15 hold only the current block's Pulsar sends ────
+// Pulsar `+=`s its delay/reverb send buses into these slots, so they must be zeroed
+// at frame start like the other accumulated slots or they integrate without bound.
+
+static bool test_djapp_pulsar_send_slots_reset_per_block() {
+    printf("\n=== Test: Warps slots 14/15 track the current block's Pulsar sends ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+    setup_pulsar_baseline(engine);
+    set_pulsar_delay_sends(engine, 0.8f);
+    set_pulsar_reverb_sends(engine, 0.8f);
+
+    constexpr int kFrames = 128;
+    float buf[kFrames * 2];
+    float max_err[2] = {}, slot_peak[2] = {}, send_peak[2] = {};
+    for (int blk = 0; blk < 400; blk++) {
+        orpheus_engine_process(engine, buf, kFrames);
+        const float* l[2] = { engine->pulsar_delay_send_l, engine->pulsar_reverb_send_l };
+        const float* r[2] = { engine->pulsar_delay_send_r, engine->pulsar_reverb_send_r };
+        for (int s = 0; s < 2; s++) {
+            const float* slot = engine->warps_source_buffers[14 + s];
+            for (int i = 0; i < kFrames; i++) {
+                float expected = (l[s][i] + r[s][i]) * 0.5f;
+                max_err[s] = std::fmax(max_err[s], std::fabs(slot[i] - expected));
+                slot_peak[s] = std::fmax(slot_peak[s], std::fabs(slot[i]));
+                send_peak[s] = std::fmax(send_peak[s], std::fabs(expected));
+            }
+        }
+    }
+
+    const char* names[2] = { "DELAY_SEND (14)", "REVERB_SEND (15)" };
+    bool pass = send_peak[0] > 0.001f || send_peak[1] > 0.001f;  // sends must carry signal
+    if (!pass) printf("  FAIL: Pulsar send buses silent, test proves nothing\n");
+    for (int s = 0; s < 2; s++) {
+        bool ok = max_err[s] < 1e-5f;
+        printf("  %-16s slot peak=%.4f send peak=%.4f max err=%.6f %s\n",
+               names[s], slot_peak[s], send_peak[s], max_err[s], ok ? "PASS" : "FAIL");
+        pass &= ok;
+    }
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 // ── Suite runner ────────────────────────────────────────────────────
 
 bool run_djapp_graph_tests() {
@@ -1201,6 +1244,7 @@ bool run_djapp_graph_tests() {
     tally(test_djapp_pulsar_zero_sends());
     tally(test_djapp_pulsar_delay_vs_reverb());
     tally(test_djapp_pulsar_reverb_room_smoothing());
+    tally(test_djapp_pulsar_send_slots_reset_per_block());
     printf("\nDJ App graph tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

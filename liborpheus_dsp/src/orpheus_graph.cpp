@@ -368,6 +368,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     std::memset(engine->warps_source_buffers[1], 0, kMaxFrames * sizeof(float)); // DRUMS
     std::memset(engine->warps_source_buffers[2], 0, kMaxFrames * sizeof(float)); // REPL
     std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float)); // BASS
+    std::memset(engine->warps_source_buffers[14], 0, kMaxFrames * sizeof(float)); // PULSAR_DELAY_SEND
+    std::memset(engine->warps_source_buffers[15], 0, kMaxFrames * sizeof(float)); // PULSAR_REVERB_SEND
 
     // Smooth warps_mix here (before any voice runs) so warps_dry_scale()
     // reads a consistent value regardless of execution order.
