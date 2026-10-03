@@ -38,6 +38,10 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         } else if (src == 2) {
             // REPL uses double-buffered read
             std::memcpy(dest, engine->warps_repl_read, num_frames * sizeof(float));
+        } else if (src == 9) {
+            // BASS is zeroed at frame start and written after Warps runs; use the
+            // double-buffered read like delay/reverb/clouds do
+            std::memcpy(dest, engine->warps_bass_read, num_frames * sizeof(float));
         } else if (src >= 0 && src < OrpheusEngine::kNumWarpsSources) {
             std::memcpy(dest, engine->warps_source_buffers[src], num_frames * sizeof(float));
         } else {

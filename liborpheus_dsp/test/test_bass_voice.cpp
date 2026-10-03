@@ -293,6 +293,54 @@ static bool test_bass_writes_to_warps_source_buffer() {
     return pass;
 }
 
+// Warps runs before BASS_VOICE in the production graph and slot 9 is zeroed at frame
+// start, so selecting BASS as a Warps source must not read the empty live buffer.
+static bool test_warps_bass_source_hears_bass() {
+    printf("\n=== Test: Warps with BASS source receives the bass voice ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+    engine->bass_mix.store(1.0f, std::memory_order_relaxed);
+    engine->bass_engine.store(0, std::memory_order_relaxed);
+    engine->clock_running.store(1, std::memory_order_relaxed);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+
+    engine->warps_bypass.store(0, std::memory_order_relaxed);
+    engine->warps_mix.store(1.0f, std::memory_order_relaxed);
+    engine->warps_carrier_source.store(9, std::memory_order_relaxed);
+    engine->warps_modulator_source.store(9, std::memory_order_relaxed);
+    engine->warps_algorithm.store(0.5f, std::memory_order_relaxed);  // crossfade
+    engine->warps_timbre.store(0.5f, std::memory_order_relaxed);
+    engine->warps_level1.store(0.5f, std::memory_order_relaxed);
+    engine->warps_level2.store(0.5f, std::memory_order_relaxed);
+
+    auto* graph = engine->graph.load(std::memory_order_acquire);
+    GraphUnit* warps = nullptr;
+    for (int k = 0; k < graph->exec_count; k++) {
+        GraphUnit* u = &graph->units[graph->exec_order[k]];
+        if (u->type == UNIT_WARPS) { warps = u; break; }
+    }
+    if (!warps) { printf("  FAIL: no Warps unit in production graph\n"); orpheus_engine_destroy(engine); return false; }
+
+    float buf[128 * 2];
+    float bass_peak = 0.0f, warps_peak = 0.0f;
+    for (int blk = 0; blk < 200; blk++) {
+        orpheus_engine_process(engine, buf, 128);
+        if (blk < 20) continue;  // let the sequencer and mix smoothing settle
+        for (int i = 0; i < 128; i++) {
+            bass_peak = std::fmax(bass_peak, std::fabs(engine->warps_bass_read[i]));
+            warps_peak = std::fmax(warps_peak, std::fabs(warps->output_buffers[OPORT_OUT][i]));
+        }
+    }
+
+    // Crossfade of bass with itself should land near the bass level; reading the
+    // zeroed live slot measured ~1/160 of it.
+    bool pass = bass_peak > 0.01f && warps_peak > 0.25f * bass_peak;
+    printf("  bass peak=%.4f warps out peak=%.4f %s\n", bass_peak, warps_peak, pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 static bool test_bass_fx_send_mixes_into_clouds() {
     printf("\n=== Test: Bass grains send mixes bass into Clouds input ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
@@ -1034,6 +1082,7 @@ bool run_bass_voice_tests() {
     tally(test_bass_voice_silent_when_bypassed());
     tally(test_bass_voice_full_graph());
     tally(test_bass_writes_to_warps_source_buffer());
+    tally(test_warps_bass_source_hears_bass());
     tally(test_bass_fx_send_mixes_into_clouds());
     tally(test_bass_flux_t_gating());
     tally(test_bass_slide_portamento());
