@@ -35,7 +35,7 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
         }
     }
 
-    // Load and smooth parameters (~5ms ramp to avoid clicks from knob changes
+    // Load and smooth parameters (ramped to avoid clicks from knob changes
     // propagating through the reverb's feedback loop)
     float amount_target = engine->reverb_amount.load(std::memory_order_relaxed);
     float time_target   = engine->reverb_time.load(std::memory_order_relaxed);
@@ -47,8 +47,10 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
     float damp_raw = engine->reverb_damping.load(std::memory_order_relaxed);
     float damp_target = 1.0f - 0.95f * damp_raw;  // DAMP 0→1.0, DAMP 1→0.05
 
-    float rv_coeff = smooth_coeff(sample_rate);
-    engine->smooth_reverb_time      += rv_coeff * (time_target - engine->smooth_reverb_time);
+    // Time/damping/diffusion step once per block (20 ms); amount steps per sample (~5 ms)
+    float rv_coeff = block_smooth_coeff(sample_rate, num_frames, kDuoDepthSmoothSeconds);
+    float amount_coeff = smooth_coeff(sample_rate);
+    engine->smooth_reverb_time     += rv_coeff * (time_target - engine->smooth_reverb_time);
     engine->smooth_reverb_damping   += rv_coeff * (damp_target - engine->smooth_reverb_damping);
     engine->smooth_reverb_diffusion += rv_coeff * (diff_target - engine->smooth_reverb_diffusion);
 
@@ -163,7 +165,7 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
         ALLPASS(dap1a_base, dap1a_len, acc, -kap, acc);
         ALLPASS(dap1b_base, dap1b_len, acc,  kap, acc);
         WB(del1_base, acc);
-        engine->smooth_reverb_amount += rv_coeff * (amount_target - engine->smooth_reverb_amount);
+        engine->smooth_reverb_amount += amount_coeff * (amount_target - engine->smooth_reverb_amount);
         float amount = engine->smooth_reverb_amount;
         out_l[i] = acc * 2.0f * amount;
 

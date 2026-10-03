@@ -1,5 +1,6 @@
 // Effects bypass passthrough + active processing tests
 #include "test_harness.h"
+#include "orpheus_units_common.h"
 
 static bool test_effects_bypass_passthrough() {
     printf("\n=== Test: Effects bypass passthrough ===\n");
@@ -220,10 +221,38 @@ static bool test_effects_active() {
     return all_pass;
 }
 
+// Reverb time/damping/diffusion are smoothed once per block; a knob move must settle
+// in 20 ms at any block size rather than over seconds.
+static bool test_reverb_param_smoothing() {
+    printf("\n=== Test: reverb time/damp/diffusion smooth in 20 ms at any block size ===\n");
+    constexpr int kFrames = 1536;  // 12 x 128 and 3 x 512
+    const float k = 1.0f - std::exp(-kFrames / (kDuoDepthSmoothSeconds * 48000.0f));
+    bool pass = true;
+    for (int block : {128, 512}) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit u = {};
+        u.type = UNIT_REVERB; u.enabled = true;
+        unit_init(&u, 48000.0f);
+        engine->reverb_bypass.store(0);
+        engine->reverb_amount.store(0.5f);
+        engine->reverb_time.store(0.9f);       // smoothed value starts at 0.5
+        for (int f = 0; f < kFrames; f += block)
+            unit_process_reverb(&u, engine, block, 48000.0f);
+        float expected = 0.5f + (0.9f - 0.5f) * k;
+        float t = engine->smooth_reverb_time;
+        bool ok = std::fabs(t - expected) < 0.005f;
+        printf("  block %3d: time=%.4f expected=%.4f %s\n", block, t, expected, ok ? "PASS" : "FAIL");
+        pass &= ok;
+        orpheus_engine_destroy(engine);
+    }
+    return pass;
+}
+
 bool run_effects_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
     tally(test_effects_bypass_passthrough());
     tally(test_effects_active());
+    tally(test_reverb_param_smoothing());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
