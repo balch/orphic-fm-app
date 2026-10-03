@@ -387,6 +387,10 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         engine->warps_smooth_mix += sc * (mix_target - engine->warps_smooth_mix);
         if (engine->warps_smooth_mix < 0.0001f) engine->warps_smooth_mix = 0.0f;
 
+        // Total feedback is read by HyperLFO and by the PolyLFO/Lorenz pass; step it once here
+        float tfb_target = engine->total_feedback.load(std::memory_order_relaxed);
+        engine->smooth_total_feedback += sc * (tfb_target - engine->smooth_total_feedback);
+
         // Smooth bass FX send, read by delay, reverb, and clouds units
         float fx_target = engine->bass_fx_send.load(std::memory_order_relaxed);
         engine->bass_smooth_fx_send += sc * (fx_target - engine->bass_smooth_fx_send);
@@ -572,10 +576,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     // Apply feedback AM for PolyLFO/Lorenz (DuoLFO handles its own feedback FM internally).
     // Master peak × feedback amount scales the LFO output — louder sound = stronger modulation.
     if (lfo_src != 0) {
-        float fb_target = engine->total_feedback.load(std::memory_order_relaxed);
-        engine->smooth_total_feedback += (1.0f - std::exp(-1.0f / (0.005f * sr)))
-            * (fb_target - engine->smooth_total_feedback);
-        float fb = engine->smooth_total_feedback;
+        float fb = engine->smooth_total_feedback;  // smoothed at frame start
         if (fb > 0.001f) {
             float master_peak = std::max(
                 engine->peak_left.load(std::memory_order_relaxed),

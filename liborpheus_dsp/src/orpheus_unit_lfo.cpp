@@ -23,9 +23,7 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     // Total feedback: master output peak modulates LFO frequency (FM, not AM).
     // Matches JSyn: peakOutput → totalFbGain(amount*20) → Add → LFO.frequency
     // The feedback signal is added to the LFO base frequency in Hz.
-    float fb_target = engine->total_feedback.load(std::memory_order_relaxed);
-    engine->smooth_total_feedback += smooth_coeff(sr) * (fb_target - engine->smooth_total_feedback);
-    float fb_amount = engine->smooth_total_feedback;
+    float fb_amount = engine->smooth_total_feedback;  // smoothed in orpheus_graph_process
     float master_peak = std::max(
         engine->peak_left.load(std::memory_order_relaxed),
         engine->peak_right.load(std::memory_order_relaxed));

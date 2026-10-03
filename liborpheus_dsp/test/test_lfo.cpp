@@ -1,5 +1,7 @@
 // LFO waveform, mode logic, and mod-source integration tests
 #include "test_harness.h"
+#include "orpheus_units_common.h"
+#include <vector>
 
 static constexpr float SR = 48000.0f;
 
@@ -1153,6 +1155,32 @@ static bool test_poly_lfo_rate_knob_production_graph() {
 // ═══════════════════════════════════════════════════════════════════
 // Test runner
 // ═══════════════════════════════════════════════════════════════════
+// Total feedback is one knob read by HyperLFO (DuoLFO) and by the PolyLFO/Lorenz pass.
+// It must settle in 20 ms whatever the LFO source and block size.
+static bool test_total_feedback_smoothing() {
+    printf("\n=== Test: total feedback smooths in 20 ms for every LFO source ===\n");
+    constexpr int kFrames = 1536;  // 12 x 128 and 3 x 512
+    const float expected = 1.0f - std::exp(-kFrames / (kDuoDepthSmoothSeconds * 48000.0f));
+    bool pass = true;
+    for (int src : {0, 1}) {  // 0 = DuoLFO, 1 = PolyLFO
+        for (int block : {128, 512}) {
+            OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+            if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+            engine->lfo_source.store(src);
+            engine->total_feedback.store(1.0f);
+            std::vector<float> buf(block * 2, 0.0f);
+            for (int f = 0; f < kFrames; f += block) orpheus_engine_process(engine, buf.data(), block);
+            float fb = engine->smooth_total_feedback;
+            bool ok = std::fabs(fb - expected) < 0.01f;
+            printf("  source %d block %3d: feedback=%.4f expected=%.4f %s\n",
+                   src, block, fb, expected, ok ? "PASS" : "FAIL");
+            pass &= ok;
+            orpheus_engine_destroy(engine);
+        }
+    }
+    return pass;
+}
+
 bool run_lfo_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -1172,5 +1200,6 @@ bool run_lfo_tests() {
     tally(test_lfo_4channel_output());
     tally(test_poly_lfo_rate_knob_unit());
     tally(test_poly_lfo_rate_knob_production_graph());
+    tally(test_total_feedback_smoothing());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
