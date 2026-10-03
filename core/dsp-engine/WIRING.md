@@ -1,7 +1,7 @@
 # Orpheus DSP Signal Wiring Diagram
 
 **Authoritative source**: `core/dsp-engine/src/commonMain/kotlin/.../DefaultWiringGraph.kt`
-**C++ runtime**: `liborpheus_dsp/src/orpheus_graph.cpp`, `orpheus_units.cpp`
+**C++ runtime**: `liborpheus_dsp/src/orpheus_graph.cpp` (exec order, frame-start buffer swap), `orpheus_unit_*.cpp` (one file per unit), `orpheus_engine_routing.cpp` (`set_port`)
 
 ## Graph Overview
 
@@ -109,8 +109,8 @@ Sources are double-buffered where needed to decouple from graph execution order.
 
 | # | Source | Written by | Accumulate | Norm | Double-buf | Dry Atten | Wet Boost |
 |---|--------|------------|-----------|------|------------|-----------|-----------|
-| 0 | SYNTH | unit_process_plaits (v0-7) + unit_process_duo_voice | += | 1/8 | YES | 1-mix (carrier only) | 4.0x |
-| 1 | DRUMS | unit_process_plaits (v12-14) | += | 1/3 | YES | 1-mix (carrier only) | 2.0x |
+| 0 | SYNTH | unit_process_plaits (v0-7) + unit_process_duo_voice + Pulsar keys bus | += | 1/8 | YES | 1-mix (carrier only) | 4.0x |
+| 1 | DRUMS | unit_process_plaits (v12-14) + Pulsar drums bus | += | 1/3 | YES | 1-mix (carrier only) | 2.0x |
 | 2 | REPL | unit_process_plaits (v8-11) + unit_process_duo_voice | += | 1/4 | YES | 1-mix (carrier only) | 2.0x |
 | 3 | LFO | unit_process_hyper_lfo | = | none | no | none | - |
 | 4 | RESONATOR | unit_process_rings (main only) | = | none | no | none | - |
@@ -118,6 +118,12 @@ Sources are double-buffered where needed to decouple from graph execution order.
 | 6 | FLUX | unit_process_marbles (X1 CV) | = | none | no | none | - |
 | 7 | BENDER | unit_process_bender (audio) | = | none | no | none | - |
 | 8 | STRINGS | unit_process_per_string_bender | = | none | no | none | - |
+| 9 | BASS | unit_process_bass (=) + Pulsar bass bus (+=) | mixed | none | zeroed per frame; Warps reads live | none | - |
+| 10-13 | TIDES1-4 | unit_process_tides (channels 0-3; ch 3 has no graph port) | = | none | no | none | - |
+| 14 | PULSAR_DELAY_SEND | unit_process_pulsar (per-track delay sends, L+R × 0.5) | += | none | no | none | - |
+| 15 | PULSAR_REVERB_SEND | unit_process_pulsar (per-track reverb sends, L+R × 0.5) | += | none | no | none | - |
+
+Slot names live in the comment beside `kNumWarpsSources` in `orpheus_engine.h`.
 
 ### Double-Buffering (graph execution order decoupling)
 
@@ -160,7 +166,7 @@ mod_buf ────→ int16 ──→ MI SaturatingAmplifier ──→ 6x SRC 
 
 When modifying signal routing:
 1. Update this document to reflect the change
-2. Run `./gradlew :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*"` to regenerate ODWG
+2. Run `./gradlew :core:dsp-engine:exportOdwg` to regenerate the ODWG fixtures, and commit them (`jvmTest` only verifies them)
 3. Rebuild C++ tests: `cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test`
 4. Run Warps isolation test to verify levels: check `test/output/warps_sd_*.wav`
 5. Verify no clipping in CleanPatch level sweep
