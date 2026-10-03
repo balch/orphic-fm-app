@@ -1,6 +1,8 @@
 #include "test_harness.h"
+#include "orpheus_units_common.h"
 #include <cmath>
 #include <cstring>
+#include <vector>
 
 static bool test_overdrive_passthrough() {
     // At drive=0, the overdrive bypasses and passes input through unchanged.
@@ -338,6 +340,33 @@ static bool test_warps_bass_source_hears_bass() {
     bool pass = bass_peak > 0.01f && warps_peak > 0.25f * bass_peak;
     printf("  bass peak=%.4f warps out peak=%.4f %s\n", bass_peak, warps_peak, pass ? "PASS" : "FAIL");
     orpheus_engine_destroy(engine);
+    return pass;
+}
+
+// Warps mix and bass FX send are smoothed once per block in orpheus_graph_process.
+// After the same elapsed time they must sit at the same value at any buffer size.
+static bool test_mix_and_send_smoothers_are_block_size_independent() {
+    printf("\n=== Test: Warps mix / bass FX send smoothing is block-size independent ===\n");
+    constexpr float kSr = 48000.0f;
+    constexpr int kTotalFrames = 1536;  // 12 x 128 and 3 x 512
+    const float expected = 1.0f - std::exp(-kTotalFrames / (kDuoDepthSmoothSeconds * kSr));
+    bool pass = true;
+    for (int block : {128, 512}) {
+        OrpheusEngine* engine = orpheus_engine_create(kSr);
+        if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+        engine->warps_bypass.store(0, std::memory_order_relaxed);
+        engine->warps_mix.store(1.0f, std::memory_order_relaxed);
+        engine->bass_fx_send.store(1.0f, std::memory_order_relaxed);
+        std::vector<float> buf(block * 2);
+        for (int done = 0; done < kTotalFrames; done += block)
+            orpheus_engine_process(engine, buf.data(), block);
+        float mix = engine->warps_smooth_mix, send = engine->bass_smooth_fx_send;
+        bool ok = std::fabs(mix - expected) < 0.01f && std::fabs(send - expected) < 0.01f;
+        printf("  block %3d: mix=%.4f send=%.4f expected=%.4f %s\n",
+               block, mix, send, expected, ok ? "PASS" : "FAIL");
+        pass &= ok;
+        orpheus_engine_destroy(engine);
+    }
     return pass;
 }
 
@@ -1080,6 +1109,7 @@ bool run_bass_voice_tests() {
     tally(test_bass_writes_to_warps_source_buffer());
     tally(test_warps_bass_source_hears_bass());
     tally(test_bass_fx_send_mixes_into_clouds());
+    tally(test_mix_and_send_smoothers_are_block_size_independent());
     tally(test_bass_flux_t_gating());
     tally(test_bass_slide_portamento());
     tally(test_bass_vcf_click_detection());

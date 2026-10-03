@@ -382,11 +382,12 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     {
         float mix_target = engine->warps_bypass.load(std::memory_order_relaxed)
             ? 0.0f : engine->warps_mix.load(std::memory_order_relaxed);
-        float sc = 1.0f - std::exp(-1.0f / (0.005f * sr));  // ~5ms ramp
+        // Stepped once per block, so the coefficient must account for the block length
+        float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
         engine->warps_smooth_mix += sc * (mix_target - engine->warps_smooth_mix);
         if (engine->warps_smooth_mix < 0.0001f) engine->warps_smooth_mix = 0.0f;
 
-        // Smooth bass FX send (~5ms) — read by delay, reverb, and clouds units
+        // Smooth bass FX send, read by delay, reverb, and clouds units
         float fx_target = engine->bass_fx_send.load(std::memory_order_relaxed);
         engine->bass_smooth_fx_send += sc * (fx_target - engine->bass_smooth_fx_send);
         if (engine->bass_smooth_fx_send < 0.0001f) engine->bass_smooth_fx_send = 0.0f;
