@@ -5,3 +5,4 @@ This release is all about the Play button
 • Progress rings the Play button and syncs with the music
 • Stay Asleep gets new faces and a snare that brackets the song
 • CPU and Battery Optimizations
+• New Playlist and Shuffle functionality
