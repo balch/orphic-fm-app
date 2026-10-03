@@ -362,36 +362,14 @@ static bool test_bass_fx_send_mixes_into_clouds() {
     engine->clock_running.store(1, std::memory_order_relaxed);
     engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
 
-    // Warm up so bass voice produces audio
+    // Warm up so the bass voice fills warps_bass_read. Clouds gates on the SMOOTHED
+    // send, which only advances inside orpheus_graph_process; run_unit below sets it
+    // directly so this test covers the mix path, not the smoother's timing.
+    engine->clouds_bypass.store(0, std::memory_order_relaxed);
     float warmup[128 * 2];
     for (int i = 0; i < 20; i++) {
         orpheus_engine_process(engine, warmup, 128);
     }
-
-    // Verify bass signal exists in source buffer slot 9
-    float bass_peak = 0.0f;
-    for (int i = 0; i < 128; i++) {
-        float a = std::fabs(engine->warps_source_buffers[9][i]);
-        if (a > bass_peak) bass_peak = a;
-    }
-    printf("  Bass peak in warps_source_buffers[9]: %.6f\n", bass_peak);
-
-    // Now set grains_send > 0 and exercise the Clouds unit code path by
-    // running unit_process_clouds directly with a manually prepared unit.
-    engine->bass_fx_send.store(0.5f, std::memory_order_relaxed);
-    engine->clouds_bypass.store(0, std::memory_order_relaxed);
-
-    GraphUnit u;
-    std::memset(&u, 0, sizeof(u));
-    u.type = UNIT_CLOUDS;
-    u.enabled = true;
-    unit_init(&u, 48000.0f);
-
-    // Pre-fill input buffers with known zeros so we can detect bass contribution
-    std::memset(u.inputs[IPORT_INPUT_A].buffer, 0, 128 * sizeof(float));
-    std::memset(u.inputs[IPORT_INPUT_B].buffer, 0, 128 * sizeof(float));
-    u.inputs[IPORT_INPUT_A].num_sources = 0;
-    u.inputs[IPORT_INPUT_B].num_sources = 0;
 
     // Set Clouds parameters to known-safe defaults
     engine->clouds_position.store(0.5f);
@@ -406,20 +384,38 @@ static bool test_bass_fx_send_mixes_into_clouds() {
     engine->clouds_trigger.store(0);
     engine->clouds_mode.store(0);
 
-    // This call exercises the bass send mix path without crashing
-    unit_process_clouds(&u, engine, 128, 48000.0f);
+    // Clouds mixes the send into its input buffers in place, so a standalone unit with
+    // silent inputs exposes exactly the bass contribution.
+    auto run_unit = [&](float send, float* in_peak, float* max_err) {
+        GraphUnit u;
+        std::memset(&u, 0, sizeof(u));
+        u.type = UNIT_CLOUDS;
+        u.enabled = true;
+        unit_init(&u, 48000.0f);
+        engine->bass_smooth_fx_send = send;
+        unit_process_clouds(&u, engine, 128, 48000.0f);
+        *in_peak = 0.0f;
+        *max_err = 0.0f;
+        for (int i = 0; i < 128; i++) {
+            float expected = send > 0.001f ? engine->warps_bass_read[i] * send : 0.0f;
+            *in_peak = std::fmax(*in_peak, std::fabs(u.inputs[IPORT_INPUT_A].buffer[i]));
+            *max_err = std::fmax(*max_err, std::fabs(u.inputs[IPORT_INPUT_A].buffer[i] - expected));
+            *max_err = std::fmax(*max_err, std::fabs(u.inputs[IPORT_INPUT_B].buffer[i] - expected));
+        }
+    };
 
-    // Verify input buffers were modified by bass send (in_l/in_r are the input buffers)
-    // After processing, in_l should have been modified if bass_peak > 0
-    // The output is written to output_buffers, but the input buffer modification
-    // happened in-place before Clouds processing; we can't read it back.
-    // Instead, just confirm no crash and output is non-trivially initialized.
-    bool no_crash = true;
-    float out_peak = compute_peak(u.output_buffers[OPORT_OUT], 128);
-    printf("  Clouds output peak with bass send=0.5: %.6f\n", out_peak);
-    printf("  Bass send path ran without crash: %s\n", no_crash ? "yes" : "no");
+    float bass_peak = compute_peak(engine->warps_bass_read, 128);
+    float on_peak, on_err, off_peak, off_err;
+    run_unit(0.5f, &on_peak, &on_err);
+    run_unit(0.0f, &off_peak, &off_err);
 
-    bool pass = no_crash;
+    bool on_ok = bass_peak > 0.01f && on_peak > 0.25f * bass_peak && on_err < 1e-6f;
+    bool off_ok = off_peak == 0.0f;
+    printf("  bass read peak=%.4f clouds input peak=%.4f (send 0.5) max err=%.2e %s\n",
+           bass_peak, on_peak, on_err, on_ok ? "ok" : "FAIL");
+    printf("  send=0 control: clouds input peak=%.4f %s\n", off_peak, off_ok ? "ok" : "FAIL");
+
+    bool pass = on_ok && off_ok;
     printf("Bass grains send: %s\n", pass ? "PASS" : "FAIL");
     orpheus_engine_destroy(engine);
     return pass;
