@@ -391,7 +391,7 @@ struct TtsEffectParams {
     float phaser_g;  // precomputed all-pass coefficient
 };
 
-static TtsEffectParams tts_load_effect_params(OrpheusEngine* e) {
+static TtsEffectParams tts_load_effect_params(OrpheusEngine* e, int num_frames) {
     TtsEffectParams p;
     p.phaser_amt = e->tts_phaser.load(std::memory_order_relaxed);
     p.fb_amt = e->tts_feedback.load(std::memory_order_relaxed);
@@ -402,7 +402,7 @@ static TtsEffectParams tts_load_effect_params(OrpheusEngine* e) {
     if (p.phaser_amt > 0.001f) {
         float sr = e->sample_rate;
         double lfo_rate = 0.1 + p.phaser_amt * 0.9;
-        e->tts_phaser_lfo_phase += lfo_rate / sr;
+        e->tts_phaser_lfo_phase += lfo_rate * num_frames / sr;  // advanced once per callback
         if (e->tts_phaser_lfo_phase >= 1.0) e->tts_phaser_lfo_phase -= 1.0;
 
         float tri = (e->tts_phaser_lfo_phase < 0.5)
@@ -551,7 +551,7 @@ void orpheus_engine_process(OrpheusEngine* engine,
             int len = tts_len;
 
             // Load effect params once per block (avoids per-sample atomic loads + tan())
-            TtsEffectParams fx = tts_load_effect_params(engine);
+            TtsEffectParams fx = tts_load_effect_params(engine, num_frames);
 
             for (int i = 0; i < num_frames; i++) {
                 int intPos = static_cast<int>(engine->tts_position);

@@ -527,6 +527,32 @@ static bool test_bender_random_lfo_rate() {
     return pass;
 }
 
+// The TTS phaser LFO (0.1 + 0.9 * phaser Hz) is advanced once per callback; the step
+// must cover the whole callback so the sweep runs at its rate for any buffer size.
+static bool test_tts_phaser_lfo_rate() {
+    printf("\n=== Test: TTS phaser LFO sweeps at its rate for any block size ===\n");
+    constexpr int kFrames = 6144;  // 128 ms: 48 x 128 and 12 x 512
+    const double expected = 1.0 * kFrames / 48000.0;  // phaser 1.0 -> 1 Hz
+    std::vector<float> speech(48000);
+    for (size_t i = 0; i < speech.size(); i++) speech[i] = 0.3f * std::sin(i * 0.05f);
+    bool pass = true;
+    for (int block : {128, 512}) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+        orpheus_engine_load_tts_audio(engine, speech.data(), (int)speech.size(), 48000);
+        engine->tts_phaser.store(1.0f);
+        engine->tts_trigger.store(1);
+        std::vector<float> buf(block * 2, 0.0f);
+        for (int f = 0; f < kFrames; f += block) orpheus_engine_process(engine, buf.data(), block);
+        double phase = engine->tts_phaser_lfo_phase;
+        bool ok = std::fabs(phase - expected) < 2e-3;
+        printf("  block %3d: phase=%.4f cycles expected=%.4f %s\n", block, phase, expected, ok ? "PASS" : "FAIL");
+        pass &= ok;
+        orpheus_engine_destroy(engine);
+    }
+    return pass;
+}
+
 bool run_unit_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -544,5 +570,6 @@ bool run_unit_tests() {
     tally(test_per_string_bender());
     tally(test_duo_voice_fm());
     tally(test_bender_random_lfo_rate());
+    tally(test_tts_phaser_lfo_rate());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
