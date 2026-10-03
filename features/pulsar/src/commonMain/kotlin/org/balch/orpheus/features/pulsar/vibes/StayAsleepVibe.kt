@@ -309,7 +309,7 @@ class StayAsleepVibe : VibeProvider {
                     0 to TrackSectionOverride(volume = 0.80f, morph = 0.88f, density = 0.25f),
                     1 to TrackSectionOverride(volume = 0.50f ,morph = 0.68f, density = 0.15f),
                     2 to TrackSectionOverride(volume = 0.50f, morph = 0.18f, density = 0.2f),
-                    4 to TrackSectionOverride(density = .1f, volume = 0.05f),
+                    4 to TrackSectionOverride(density = .1f, volume = 0.15f),
                     5 to TrackSectionOverride(density = 0.15f),
                     6 to TrackSectionOverride(density = 0f),
                     7 to TrackSectionOverride(volume = 0.25f),
