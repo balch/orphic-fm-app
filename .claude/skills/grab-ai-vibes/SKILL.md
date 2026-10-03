@@ -1,6 +1,6 @@
 ---
 name: grab-ai-vibes
-description: Retrieve the AI-created Vibe JSON archives that a running Orphic DJ app writes to disk — from JVM desktop (~/.config/orpheus-dj/ai-vibes/) and/or an Android device (app filesDir/ai-vibes/ via adb run-as). Use whenever the user wants to grab, pull, collect, find, or list the JSON files the AI made, get AI-generated vibes off their phone or desktop, see what vibes the agent saved, or recover an AI vibe before importing it into the codebase. Triggers on phrasings like "grab the ai vibes", "pull the json the AI created", "get the archived vibes off android", "what vibes did the AI save", even when the platform or the exact path isn't named. Pairs with the vibe-creator skill, which handles importing a grabbed JSON as a Vibe.
+description: Retrieve the AI-created Vibe JSON archives that a running Orphic DJ app writes to disk, from JVM desktop (~/.config/orpheus-dj/ai-vibes/) and/or an Android device (app filesDir/ai-vibes/ via adb run-as). Use whenever the user wants to grab, list, or recover the vibes the AI agent saved, from a phone or desktop, before importing them into the codebase. Pairs with the vibe-creator skill, which handles importing a grabbed JSON as a Vibe.
 ---
 
 # Grab AI Vibes

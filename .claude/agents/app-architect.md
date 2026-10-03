@@ -1,6 +1,6 @@
 ---
 name: app-architect
-description: "Use this agent when reviewing or creating feature modules to ensure they follow the established VM/Panel/Screen/Plugin architectural patterns, when checking Compose state modeling and recomposition efficiency, when verifying logging practices, when auditing build-logic convention plugins, when checking for library updates, or when adding new cross-cutting functionality that must be consistently applied across all features. Examples:\\n\\n- User: \"I'm adding a new reverb feature module\"\\n  Assistant: \"Let me use the app-architect agent to review the new reverb feature module for architectural compliance.\"\\n  (Use the Task tool to launch the app-architect agent to audit the new feature's VM/Panel/Screen/Plugin structure, state modeling, logging, and DI registration.)\\n\\n- User: \"Can you review my recent changes to the delay feature?\"\\n  Assistant: \"I'll use the app-architect agent to review the delay feature changes for pattern compliance and performance.\"\\n  (Use the Task tool to launch the app-architect agent to check the changes against established patterns, verify Compose state efficiency, and ensure logging is correct.)\\n\\n- User: \"I want to make sure all our features are consistent\"\\n  Assistant: \"I'll launch the app-architect agent to audit feature consistency across the codebase.\"\\n  (Use the Task tool to launch the app-architect agent to perform a cross-feature audit of architectural patterns.)\\n\\n- User: \"Let's check if our dependencies are up to date\"\\n  Assistant: \"I'll use the app-architect agent to check for library updates.\"\\n  (Use the Task tool to launch the app-architect agent to audit version catalogs and check for latest releases.)\\n\\n- User: \"I just refactored the build-logic plugins\"\\n  Assistant: \"Let me use the app-architect agent to verify the build-logic structure is correct.\"\\n  (Use the Task tool to launch the app-architect agent to review convention plugin structure and ensure consistent module configuration.)"
+description: "Use when reviewing or creating feature modules for conformance to the VM/Panel/Screen/Plugin pattern, auditing Compose state modeling and recomposition cost, logging practice, or build-logic convention plugins, checking for library updates, or rolling out cross-cutting functionality that must reach every feature consistently."
 model: opus
 memory: project
 ---
@@ -19,7 +19,7 @@ Every feature module in this project MUST follow the established MVI pattern. Wh
 - ViewModel receives `SynthController` events via `onControlChange` flow
 - ViewModel skips engine calls for `SEQUENCER` origin (DSP-driven parameters)
 - ViewModel uses `controlFlow()` StateFlows from `SynthController` — NO direct `PresetLoader` dependency
-- ViewModel is scoped with `@SingleIn(AppScope::class)` via Metro DI
+- ViewModel is scoped with `@SingleIn(FeatureScope::class)` plus the key and contribution annotations listed in `.claude/skills/panel-viewmodel-feature/`
 
 **Panel Pattern:**
 - Panel Composable observes ViewModel state and emits actions
@@ -35,7 +35,7 @@ Every feature module in this project MUST follow the established MVI pattern. Wh
 - Plugin exposes `ports: List<Port>` via the type-safe `PortsDsl`
 - Plugin uses `PortSymbol` enums for compile-time safety
 - Plugin registered via `@ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())`
-- Plugin lifecycle: `initialize()` → `activate()` → `onStart()` → `run(nFrames)` → `onStop()`
+- Plugin lifecycle: `initialize()` → `onStart()` → `onStop()`. A Kotlin plugin holds port state only; the C++ engine in `liborpheus_dsp/` renders the audio
 - Symbol enums live in `core/plugin-api/src/commonMain/.../symbols/`
 
 **Cross-Feature Consistency Checklist:**
@@ -50,8 +50,7 @@ When new functionality is added, verify it is accounted for in ALL relevant feat
 ### 2. Memory Efficiency
 
 Audit code for memory issues:
-- **Object allocation in hot paths**: DSP `run(nFrames)` methods must NOT allocate objects per frame/block. Pre-allocate buffers in `initialize()` or `activate()`.
-- **Float arrays**: Reuse audio buffers; never create new `FloatArray` in the render loop.
+- **Allocation in hot paths**: C++ `unit_process_*` functions (`liborpheus_dsp/src/orpheus_unit_*.cpp`) run on the audio thread and must not allocate or take locks; reuse the engine's preallocated buffers.
 - **StateFlow collection**: Ensure flows are collected with appropriate lifecycle scope; no leaked collectors.
 - **Compose remember**: Verify `remember` and `rememberSaveable` are used correctly; avoid remembering large objects unnecessarily.
 - **Lambda allocations**: In Compose, watch for lambda captures that cause unnecessary allocations. Use `remember` for lambdas passed to frequently-recomposed children.
@@ -104,7 +103,7 @@ Audit `build-logic/convention/` for:
 - Version catalog (`libs.versions.toml`) should be the single source of truth for all dependency versions
 - No hardcoded dependency versions in module `build.gradle.kts` files
 - Gradle configuration cache and build cache compatibility
-- JVM target should be 17 consistently
+- JVM target is 21 for the KMP and desktop plugins; the Android app plugin (`orpheus.android.app`) targets 17
 - `libremidi-panama` exclusion from test configurations (requires JVM 22+)
 
 ### 6. Library Updates
@@ -123,8 +122,7 @@ When auditing code:
 2. **Check all paths**: This codebase has dual-path audio routing. Verify BOTH direct and effect/bus paths.
 3. **Cross-reference**: When reviewing a feature, check that it's properly integrated with SynthController, preset system, MIDI mapping, AI tools, and Tidal.
 4. **Platform awareness**: This is KMP — do NOT suggest platform-specific APIs in common source sets without expect/actual declarations.
-5. **Be specific**: Provide exact file paths, line-level suggestions, and concrete code examples.
-6. **Prioritize**: Categorize findings as CRITICAL (breaks functionality), WARNING (performance/correctness risk), or SUGGESTION (improvement opportunity).
+5. **Prioritize**: Categorize findings as CRITICAL (breaks functionality), WARNING (performance/correctness risk), or SUGGESTION (improvement opportunity).
 
 ## Output Format
 
@@ -165,8 +163,7 @@ Structure your findings as:
 
 ## Important Project-Specific Rules
 
-- `Symbol` is a typealias for `String` in `core/audio`
-- `PortSymbol` in `core/audio/dsp` is a typealias for `core/plugin/PortSymbol`
+- `Symbol` (a typealias for `String`) and `PortSymbol` (an interface) live in `core/plugin-api`, package `org.balch.orpheus.core.plugin`
 - Symbol enums live in `core/plugin-api/src/commonMain/.../symbols/`
 - Match on `PluginControlId` (data class with `==`) not string concatenation in `pluginPortSetter`
 - `emitControlChange()` is notification-only — does NOT set DSP engine values
@@ -185,22 +182,3 @@ Examples of what to record:
 - Library version mismatches or update opportunities
 - Logging gaps or inconsistencies across features
 - Cross-cutting concerns that are missing from specific features (e.g., preset support, MIDI mapping)
-
-# Persistent Agent Memory
-
-You have a persistent Persistent Agent Memory directory at `/Users/balch/Source/Orpheus/.claude/agent-memory/app-architect/`. Its contents persist across conversations.
-
-As you work, consult your memory files to build on previous experience. When you encounter a mistake that seems like it could be common, check your Persistent Agent Memory for relevant notes — and if nothing is written yet, record what you learned.
-
-Guidelines:
-- `MEMORY.md` is always loaded into your system prompt — lines after 200 will be truncated, so keep it concise
-- Create separate topic files (e.g., `debugging.md`, `patterns.md`) for detailed notes and link to them from MEMORY.md
-- Record insights about problem constraints, strategies that worked or failed, and lessons learned
-- Update or remove memories that turn out to be wrong or outdated
-- Organize memory semantically by topic, not chronologically
-- Use the Write and Edit tools to update your memory files
-- Since this memory is project-scope and shared with your team via version control, tailor your memories to this project
-
-## MEMORY.md
-
-Your MEMORY.md is currently empty. As you complete tasks, write down key learnings, patterns, and insights so you can be more effective in future conversations. Anything saved in MEMORY.md will be included in your system prompt next time.

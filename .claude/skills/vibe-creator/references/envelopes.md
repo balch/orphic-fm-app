@@ -9,7 +9,7 @@ These are independent. A vibe in `EnvelopeType.AD` mode still has tracks with di
 
 ## `EnvelopeType` — vibe-global mode
 
-Source: `models/Vibe.kt` (the `EnvelopeType` enum), `liborpheus_dsp/src/orpheus_unit_pulsar.cpp:2419-2424`.
+Source: `models/Vibe.kt` (the `EnvelopeType` enum), `liborpheus_dsp/src/orpheus_unit_pulsar.cpp` (`pulsar_envelope_mode`).
 
 | Value | C++ id | Behavior |
 |---|---:|---|
@@ -32,7 +32,7 @@ ArmyStompVibe uses `BLEND`: at march-section default (energy 0.75), it's AD; in 
 
 ## `EnvelopeProfile` — per-track shape
 
-Source: `models/EnvelopeProfile.kt`, `PulsarViewModel.kt:1375-1411`, `orpheus_unit_pulsar.cpp:2440-2447`.
+Source: `models/EnvelopeProfile.kt`, `PulsarFeature.kt`, `orpheus_unit_pulsar.cpp`.
 
 Five profiles. Each one influences three things:
 
@@ -99,7 +99,6 @@ Track is an infinite-hold drone?          envelopeProfile = DRONE
 
 If you suspect the runtime envelope behavior has changed, the source-of-truth files are:
 
-- `liborpheus_dsp/src/orpheus_engine.h:728` — `pulsar_envelope_mode` atomic.
-- `liborpheus_dsp/src/orpheus_unit_pulsar.cpp:2419` — runtime crossover for BLEND.
-- `liborpheus_dsp/src/orpheus_unit_pulsar.cpp:2440-2447` — TIDES base frequencies per profile.
-- `features/pulsar/src/commonMain/kotlin/.../PulsarViewModel.kt:1375-1411` — solo/ducking defaults per profile.
+- `liborpheus_dsp/src/orpheus_engine.h` — the `pulsar_envelope_mode` atomic.
+- `liborpheus_dsp/src/orpheus_unit_pulsar.cpp` — runtime crossover for BLEND (search `pulsar_envelope_mode`) and TIDES base frequencies per profile.
+- `features/pulsar/src/commonMain/kotlin/.../PulsarFeature.kt` — solo/ducking defaults per profile (`defaultSoloBehavior`, `defaultDuckingProfile`).

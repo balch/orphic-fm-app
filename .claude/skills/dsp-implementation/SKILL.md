@@ -81,7 +81,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
 
 ## Unit Type Registration
 
-### 1. Add to enum (`orpheus_units.h`)
+### 1. Add to enum (`orpheus_graph.h`)
 
 ```cpp
 enum OrpheusUnitType : uint16_t {
@@ -228,9 +228,10 @@ A smoother read by several units (e.g. `smooth_coupling_depth`) must step once p
 **File**: `orpheus_engine.h`
 
 ```cpp
-static constexpr int kNumWarpsSources = 14;
+static constexpr int kNumWarpsSources = 16;
 // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(fb),
-// 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS, 10-13=TIDES ch0-3
+// 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS, 10-13=TIDES ch0-3,
+// 14=PULSAR_DELAY_SEND, 15=PULSAR_REVERB_SEND
 float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
 ```
 
@@ -304,7 +305,7 @@ task yourself and commit the result.
 
 - [ ] Engine atomics in `orpheus_engine.h` (with matching Kotlin defaults)
 - [ ] Engine buffers (output, smoothing state, MI module instance)
-- [ ] Unit type in `OrpheusUnitType` enum (`orpheus_units.h`)
+- [ ] Unit type in `OrpheusUnitType` enum (`orpheus_graph.h`)
 - [ ] Process function declared (`orpheus_units.h`) and implemented
 - [ ] Dispatch case in `orpheus_graph.cpp` switch
 - [ ] Init case in `unit_init()` if needed

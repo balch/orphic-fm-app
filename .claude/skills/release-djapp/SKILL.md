@@ -7,7 +7,7 @@ description: Use when cutting a new release of the DJ app (Orphic DJ) — taggin
 
 ## What this skill is for
 
-The DJ app's release pipeline has three main components (git tag → AAB/APK build → Store upload & GitHub release) that all need to stay in sync. Note that we do **not** attach AAB/APK binaries to the GitHub release page anymore, as they are published directly to the Play/App stores. The convention plugin (`build-logic/convention/src/main/kotlin/orpheus.android.app.gradle.kts`) derives versions from `git describe --tags --always --dirty`, so **the tag has to exist before the build**. Building first does not give you an obviously-wrong filename to catch it by — `versionTag` strips the `-N-gSHA` suffix (line 146), so an untagged HEAD thirteen commits past `v2.0.2` still produces `djapp-v2.0.2-og-release.aab`. The name is clean and **wrong**: it claims to be the previous release while containing unreleased code, and it collides with that release's real artifact in the same output directory. Only the versionCode differs. Tag first — the filename will not tell you if you didn't.
+The DJ app's release pipeline has three main components (git tag → AAB/APK build → Store upload & GitHub release) that all need to stay in sync. AAB/APK binaries are **not** attached to the GitHub release page; they are published directly to the Play/App stores. The convention plugin (`build-logic/convention/src/main/kotlin/orpheus.android.app.gradle.kts`) derives versions from `git describe --tags --always --dirty`, so **the tag has to exist before the build**. Building first does not give you an obviously-wrong filename to catch it by — `versionTag` strips the `-N-gSHA` suffix (line 146), so an untagged HEAD thirteen commits past `v2.0.2` still produces `djapp-v2.0.2-og-release.aab`. The name is clean and **wrong**: it claims to be the previous release while containing unreleased code, and it collides with that release's real artifact in the same output directory. Only the versionCode differs. Tag first — the filename will not tell you if you didn't.
 
 This skill captures the canonical flow plus the recovery paths for the common "I need to add one more commit" and "I never made a GitHub release for v1.0.0" cases.
 
@@ -113,9 +113,8 @@ Verify with `gh release view v1.X.Y` and surface the URL to the user.
 
 ### 7. Publish to Google Play (internal, then production)
 
-The signed AAB is uploaded to Play via **Gradle Play Publisher (GPP)**, not by hand. Since
-v2.3.0 (2026-09-26) releases go to **`internal` and `production`**; the `alpha` closed track is
-no longer used (v2.3.0 was its last release). Upload to internal, then promote the same
+The signed AAB is uploaded to Play via **Gradle Play Publisher (GPP)**, not by hand. Releases
+go to the **`internal`** and **`production`** tracks. Upload to internal, then promote the same
 versionCode to production so both tracks carry identical bytes:
 
 ```bash
@@ -173,7 +172,7 @@ session goes stale independently of the cert — see the `reference_apple_dev_te
 - The **Key ID** is the `<KEYID>` in the filename above.
 - The **Issuer ID** (a UUID) is account-level, from App Store Connect → Users and Access →
   Integrations → App Store Connect API. It is **not** stored in this repo. Check the
-  `reference_apple_dev_team` / `ios-appstore-publishing` memories first; if neither has it,
+  `reference_apple_dev_team` / `project_ios_appstore_publishing` memories first; if neither has it,
   ask the user or have them look it up in the ASC UI — don't guess, and don't paste it into
   any file this skill or the repo tracks.
 
@@ -459,11 +458,11 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 
 - **You are not sure the artifact was built on the tag**: the filename cannot tell you — `versionTag` strips the `-N-gSHA` suffix, so an off-tag build is named after the *previous* tag and looks legitimate. Dump the manifest (see "Verifying versions match expectations") and check `versionCode` against `git rev-list --count HEAD` at the tag. A stale artifact from the previous release may also be sitting in the same output directory; check mtimes before uploading.
 - **Filename says `-dirty`**: working tree has uncommitted changes. Commit them first — the current flow is to tweak on a feature branch, then land it on `main` as logical, separately revertable commits. Reach for `git stash` only if the change genuinely should not ship, and check first that the dirty files are yours: the tree often carries the user's WIP or a sibling agent's edits.
-- **`gh release create` fails with "release already exists"**: the release exists but maybe without binaries — use `gh release upload <tag> <file>` to add assets, or `gh release edit` to update notes.
+- **`gh release create` fails with "release already exists"**: use `gh release edit` to update the notes. Binaries are never attached to the release.
 - **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease`.
 - **Built artifact isn't where you expected**: the flavor segment moves between the bundle and APK trees (`bundle/ogRelease/` vs `apk/og/release/`). `find apps/djapp/androidApp/build/outputs -name "*-v1.X.Y-*"` beats guessing.
 - **You built the `ai` flavor by mistake**: it carries appId `org.balch.djapp.ai` and the INTERNET permission. Play will treat it as a different app. Rebuild with the `Og` task.
 - **AAB is unsigned**: `keystore.properties` is missing at the repo root. The convention plugin silently falls back to the debug signing config in that case. Play Console will reject the upload.
 - **A commit landed after the tag and you want the tag to include it**: see "add one more commit to a published release" above.
 - **iOS `xcodebuild archive`/`-exportArchive` fails with a login or provisioning-profile error**: the yearly Development cert or the Xcode account session has gone stale — see `reference_apple_dev_team` memory. Not a project misconfiguration.
-- **iOS build succeeds but you don't have the Issuer ID**: check the `reference_apple_dev_team` / `ios-appstore-publishing` memories first. Never store it (or the `.p8` key) in a committed file.
+- **iOS build succeeds but you don't have the Issuer ID**: check the `reference_apple_dev_team` / `project_ios_appstore_publishing` memories first. Never store it (or the `.p8` key) in a committed file.

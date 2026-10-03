@@ -241,7 +241,6 @@ fun TidesPanel(
 }
 ```
 
-- Default `feature` parameter from composable helper
 - Pass `controlId` to `Learnable`/`RotaryKnob` for MIDI learn mode
 - `collectAsState()` at leaf level to minimize recompositions
 

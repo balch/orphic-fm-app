@@ -213,7 +213,7 @@ Not a Plaits engine: a triangle/square oscillator with self-feedback, the same v
 
 `TrackMacroMap` is a plain `data class` with seven `MacroTarget(min, max)` fields. The four presets (`RHYTHM`/`MELODIC`/`EFFECT`/`WILD`) cover most cases, but you can instantiate your own inline in the `TrackVoice(...)` block when the preset ranges fight your design.
 
-**What the seven fields actually do at render time** (from `orpheus_unit_pulsar.cpp:1631-1641` and `1555`):
+**What the seven fields actually do at render time** (from `orpheus_unit_pulsar.cpp`):
 
 | Field | Macro that drives it | Effect on render |
 |---|---|---|
@@ -230,8 +230,8 @@ Interpolation is linear: `value = min + macro × (max − min)`. So `MacroTarget
 **When to write a custom map (in order of how often you'll reach for it):**
 
 1. **The preset's tonal range is wrong for the engine.** A `MOD` modal voice tuned for dark cathedral bells wants `moodHarmonics = MacroTarget(0.05f, 0.20f)`, not `RHYTHM`'s `0.3-0.6` or `MELODIC`'s `0.3-0.7`. Custom map lets you keep mood-knob expressiveness inside the *right* tonal neighborhood.
-2. **You want a parameter locked but still want evolution.** `MacroTarget(0.42f, 0.42f)` collapses the lerp to a constant — equivalent to pinning that knob *for the macro*, but tension-evolution drift (the `EvolutionTension` sweeps in lines 1662-1689) still applies. Pinning kills both.
-3. **You want to opt the track out of tension-evolution entirely.** Set `moodTimbre = MacroTarget(0f, 0f)`. The auto-rule on line 1647 (`evo_weight = (mm.mood_timbre.max_value > 0.001f) ? 1.0f : 0.0f`) zeros the evolution weight when the moodTimbre max is ≤ 0.001, so the entire EvolutionTension cycle becomes a no-op for that track. Drone/pad tracks that should never breathe with tension want this.
+2. **You want a parameter locked but still want evolution.** `MacroTarget(0.42f, 0.42f)` collapses the lerp to a constant — equivalent to pinning that knob *for the macro*, but tension-evolution drift (the `EvolutionTension` sweeps) still applies. Pinning kills both.
+3. **You want to opt the track out of tension-evolution entirely.** Set `moodTimbre = MacroTarget(0f, 0f)`. The auto-rule (`evo_weight = (mm.mood_timbre.max_value > 0.001f) ? 1.0f : 0.0f`) zeros the evolution weight when the moodTimbre max is ≤ 0.001, so the entire EvolutionTension cycle becomes a no-op for that track. Drone/pad tracks that should never breathe with tension want this.
 4. **You want an inverted relationship.** A breakdown-FX track that should *quiet down* as energy rises: `energyVolume = MacroTarget(0.8f, 0.2f)`. (`EFFECT` already attenuates volume but not by inverting.) Same trick for a hat that opens up as space rises but closes down as mood goes bright.
 5. **You want a much narrower range than any preset.** A bass track where mood should *only* shift timbre between 0.45 and 0.55 (subtle): `moodTimbre = MacroTarget(0.45f, 0.55f)`. None of the presets are that tight.
 
@@ -256,7 +256,7 @@ TrackVoice(
 )
 ```
 
-`SunPilgrimVibe.kt` and `SunCourseVibe.kt` use this form on every track to make the hand-tuned `OrpheusEngine` tonal values actually audible. Note that `moodTimbre.max` is still `> 0.001f` (it's the locked value itself), so the auto-evo-weight rule still enables tension-evolution drift — the harmonics/timbre/morph are locked to the macro but free to be modulated by tension. Setting `moodTimbre = MacroTarget(0f, 0f)` is the only way to *also* opt out of evolution; any non-zero lock keeps evolution on.
+`SpaceDroneVibe.kt` and `OdysseusLoreVibe.kt` use this form to make the hand-tuned `OrpheusEngine` tonal values actually audible. Note that `moodTimbre.max` is still `> 0.001f` (it's the locked value itself), so the auto-evo-weight rule still enables tension-evolution drift — the harmonics/timbre/morph are locked to the macro but free to be modulated by tension. Setting `moodTimbre = MacroTarget(0f, 0f)` is the only way to *also* opt out of evolution; any non-zero lock keeps evolution on.
 
 **Full-instantiation form** is for tracks that diverge from every preset:
 
@@ -290,10 +290,8 @@ TrackVoice(
 **Gotchas:**
 
 - **`morph` is driven by `spaceDecay`, not by `moodMorph`** — there is no `moodMorph` field. The naming is asymmetric. If you want morph to follow mood, you cannot get there with a custom map; you must pin morph and modulate it some other way (LFO, tension evolution).
-- **`complexitySwing` is read only from track 0** (`orpheus_unit_pulsar.cpp:1555`) — setting it on tracks 1-7 has no effect on swing. Other macro fields read per-track normally.
-- **`pushMacroMap` pushes 14 floats** even though the inline comment in `PulsarViewModel.kt:1133` says "16". Just a stale comment.
+- **`complexitySwing` is read only from track 0** (`orpheus_unit_pulsar.cpp`) — setting it on tracks 1-7 has no effect on swing. Other macro fields read per-track normally.
 - The auto-evo-weight rule means that any custom map where `moodTimbre.max <= 0.001f` silently disables tension-driven harmonics/timbre/morph drift for the whole track. If you want a track that's tension-still on timbre but tension-active on harmonics, you have to set `evolutionWeight` explicitly on the `TrackVoice` (not `-1`).
-- No existing committed vibe writes a custom map (as of this writing) — you'd be first. That's fine, the schema supports it, but it means there is no reference example to crib from yet.
 
 ### `TrackRole.Chordal` sub-tuning (`ChordComping`)
 
@@ -324,7 +322,7 @@ Instead of one static `lick`, a vibe can hold a pool of licks and rotate between
 - `MAX_LICK_POOL = 8` caps `pool.size` — plus one more shared slot if the vibe also declares a `LickAnomaly` (see the Anomalies section below): both ride the same C++ lick bank.
 - Copyright: if any pooled lick is a recognizable copyrighted riff, keep the vibe dev-only WIP — never LIVE.
 
-`LickRotation` is **pool-only** now. The rare "swap in an original riff" event that used to live here as `anomaly`/`anomalyChance` is now a **`LickAnomaly`** in `Vibe.anomalies` — configured, force-fired, and auto-rolled independently of the rotation pool (see the Anomalies section below).
+`LickRotation` is **pool-only**. The rare "swap in an original riff" event is a **`LickAnomaly`** in `Vibe.anomalies` — configured, force-fired, and auto-rolled independently of the rotation pool (see the Anomalies section below).
 
 Working example: `FireSky05Vibe` in `FireSkyVibe.kt` (rotates `aiLick`/`tweakLick` via `lickRotation`, with a rare `ogLick` `LickAnomaly`).
 
@@ -332,7 +330,7 @@ Working example: `FireSky05Vibe` in `FireSkyVibe.kt` (rotates `aiLick`/`tweakLic
 
 The cast of characters for solos. Typically 4 members: Drummer (alwaysActive), Bassist, Keys/Lead, FX. Each member lists which `tracks` it owns.
 
-**A `soloMode` does nothing without a band.** The engine starts a section solo only when the vibe declares a `Vibe.band`; with no band the solo never starts and the section plays as an ordinary one, silently. `Vibe`'s init now rejects this outright — a vibe whose arrangement has any section with a non-null `soloMode` must set `band`. Six shipped vibes carried a dead `SoloMode.Jam` for months before that require existed.
+**A `soloMode` does nothing without a band.** The engine starts a section solo only when the vibe declares a `Vibe.band`; with no band the solo never starts and the section plays as an ordinary one, silently. `Vibe`'s init rejects this outright — a vibe whose arrangement has any section with a non-null `soloMode` must set `band`.
 
 **Use a preset.** `BandPresets` (`models/BandPresets.kt`) builds a working cast from track indices alone — no hand-written matrices:
 
@@ -374,8 +372,8 @@ A decent hand-written default (see `DogHouseVibe`, `ArmyStompVibe`) is 4 members
   - `halfLick` is a `HalfLick` enum, not a boolean:
     - `HalfLick.OFF` (default) — the FILL lick plays its full length.
     - `HalfLick.JAM` — loop only the lick's first bar so the opening figure repeats
-      while its tone evolves. On release the riff re-locks to bar 1. This is what a
-      plain `halfLick = true` used to mean, and it is what you almost always want.
+      while its tone evolves. On release the riff re-locks to bar 1. This is what you
+      almost always want.
     - `HalfLick.JAM_INVERTED` — same truncation, but on release the riff deliberately
       resumes on bar 2 and stays a bar out of phase with the harmony until the next
       section boundary. Use it when you want a section to open with the riff's answer
@@ -411,12 +409,12 @@ Exceeding sections throws at `Arrangement.<init>`; exceeding edges is clamped si
 
 Optional but recommended — adds a Markov section graph on top of the vibe.
 
-- `sections`: up to 8 `Section`s. Each has:
+- `sections`: up to 12 `Section`s (`Arrangement.MAX_SECTIONS`). Each has:
   - `barsMin/Max`: how long it lives before transitioning. `barStep` (default 1) snaps the random length to multiples — set 2 for even-bar phrases, 4 for 4-bar increments.
   - `transitions`: list of `SectionTransition(targetIndex, weight, transitionBars)`. Empty = terminal. **`transitionBars`** (default 0 = hard cut) crossfades the macro overrides toward the destination over the *last* N bars of the source section — a per-edge pre-roll ramp. `DogHouseVibe` leans on this (`bluesLiftBars`/`bluesyDropBars`/`bigBluesLiftBars`); name the bar count after the musical role the ramp serves, not the count.
   - `recencyDecay`: the share of its authored weight a target keeps while it is the section *just left* — `1.0` = no penalty (pure weighted-random over `transitions`), `0.5` = half as likely as its weight implies, `0.0` = never doubles back while another edge exists. The share ramps back to full over later section visits. 0.4-0.6 keeps a 3-section vibe from locking into one rotation; go to `1.0` when you want the raw weights and nothing else.
   - `macroOverrides`: `MacroOverrides(energy, complexity, space, mood)` — **multipliers** (1.0 = no change, 1.4 = 40% boost). Use `null` to leave the default.
-  - `soloMode`: `SoloMode.Jam(probability)`, `SoloMode.LickBuilder(probability, mutationRate)`, or `SoloMode.LongFill` — these take constructor params, they aren't bare objects. **Setting any of them requires `Vibe.band`** (see the `Band` section above); without one the engine never starts the solo, and `Vibe`'s init now rejects the combination.
+  - `soloMode`: `SoloMode.Jam(probability)`, `SoloMode.LickBuilder(probability, mutationRate)`, or `SoloMode.LongFill` — these take constructor params, they aren't bare objects. **Setting any of them requires `Vibe.band`** (see the `Band` section above); without one the engine never starts the solo, and `Vibe`'s init rejects the combination.
   - `compingStyle` / `compingInversion` / `compingHumanization` / `chordFollow`: per-section overrides applied to **all** CHORDAL/melodic tracks at once.
   - `trackOverrides`: `Map<Int, TrackSectionOverride>` — per-*track* overrides scoped to this section, auto-restored on exit. This is how you pedal one track's hook on the tonic while everything else follows the progression (the octave-fold fix): `trackOverrides = mapOf(4 to TrackSectionOverride(chordFollow = ChordFollow.FIXED))`. `TrackSectionOverride` can also override density/volume/morph/sends/`envelopeProfile`/`lpgMode`/comping per section (`lpgMode` swaps the vactrol for that section, e.g. a guitar that picks `PLUCK_REPEAT_TRIPLET` only in the jam). Two carry rules worth knowing:
     - **`density`**: `0` takes the track OUT for the section (clean mute, any role, restored on exit). A *positive* value regenerates the pattern at that density at the boundary, thinning fills and ghosts — but only on tracks whose pattern is generated from density, so on a `Chordal` track or one playing a `LickMode.Fill`/`Squash` figure a positive density does nothing while `0` still mutes. To duck rather than drop, use `volume`.
@@ -545,7 +543,7 @@ When a user gives a musical reference, decompose it along these axes:
 - `chordsPerBar = 1` = slow (1 chord per bar), `2` = standard, `4` = busy.
 
 ### Lick / riff
-- **Repetitive 2-note riff** (garage rock, industrial): 2 steps x several pulses with low `lickMutation`. See the currently-commented `GarageBlitzVibe` in `GarageBlitzVibe.kt`.
+- **Repetitive 2-note riff** (garage rock, industrial): 2 steps x several pulses with low `lickMutation`. See `GarageBlitzVibe.kt`.
 - **Walking bass line**: longer lick with varied scale degrees, `loopLength` matches phrase length, moderate `lickMutation`.
 - **Static drone with occasional embellishment**: single-note lick with long duration, low velocity on the accents, `chordFollow = FIXED`.
 - **Rotating riff for variety** (keep a repetitive riff from wearing out): a `lickRotation.pool` of 2–4 licks the engine swaps per section; for a rare surprise line, add a `LickAnomaly` to `anomalies` alongside it (see the Anomalies section above). See `FireSky05Vibe`.
@@ -576,6 +574,7 @@ import org.balch.orpheus.core.audio.OrpheusEngineId          // engines: core.au
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.models.Vibe          // schema types: ...pulsar.models
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.TrackRole
@@ -619,7 +618,7 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
 ## Testing a new vibe
 
 1. **Compile check (fast)**: `./gradlew :features:pulsar:compileKotlinJvm`. Must pass. Errors here are almost always a missing import, a mistyped enum value, or an incorrect number of tracks (must be exactly 8).
-2. **Full build**: `./gradlew :apps:orpheus:build`. Runs the whole app through compile + tests.
+2. **Full build**: `./gradlew :apps:orpheus:desktopApp:build`. Runs the whole app through compile + tests.
 3. **Listen**: Launch the JVM desktop app, pick the new vibe from the Pulsar picker. Verify:
    - All 8 tracks engage where you expect.
    - The bass riff (if using a `Lick`) plays and transposes with the progression.
@@ -651,7 +650,7 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
 - Gold-standard vibe: `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/DogHouseVibe.kt`.
 - Ambient / chordMatrix example: `DeepSpaceVibe.kt`.
 - CHORDAL-comping family helper: `CompLabVibe.kt` (uses `generateCompLabVibe(...)`).
-- ViewModel that consumes vibes (for reference — no edits needed): `PulsarViewModel.kt` — takes `Set<VibeProvider>` via DI.
+- ViewModel that consumes vibes (for reference — no edits needed): `PulsarViewModel` (in `PulsarFeature.kt`) — takes `Set<VibeProvider>` via DI.
 - **`references/fm_patches.md`** — full SixOp FM patch banks for `DX`/`DX2`/`DX3`. Read before setting `harmonics` on any of these engines. Includes a per-bank index→patch-name table and the harmonics-zone math.
 - **`references/envelopes.md`** — `EnvelopeType` (vibe-global) and `EnvelopeProfile` (per-track) reference. Includes solo and ducking behavior per profile and the AD/TIDES/BLEND crossover math.
 

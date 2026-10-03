@@ -1,6 +1,6 @@
 # Worked example: translating a reference into a Vibe
 
-This reference walks through creating `SunkenPlaceVibe` as a worked example. It's the vibe that was produced by the first invocation of the vibe-creator skill — an industrial/brooding groove translated from a specific NIN song (not named here, per the project rule).
+This reference walks through creating `SunkenPlaceVibe` as a worked example. It's the vibe that was produced by the first invocation of the vibe-creator skill — an industrial/brooding groove translated from a specific song (not named here, per the project rule).
 
 Reading this end-to-end shows how each musical property of the reference maps to one or more fields in the Vibe schema.
 
