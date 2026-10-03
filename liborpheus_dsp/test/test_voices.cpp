@@ -469,6 +469,62 @@ static bool test_duo_depth_smoothing_time_constant() {
     return all_pass;
 }
 
+// The voice-coupling follower (150 ms half-life) is updated once per block on Plaits
+// voices. It must rise toward a playing voice at the same speed for any block size.
+static bool test_coupling_follower_tracks_voice() {
+    printf("\n=== Test: coupling follower tracks a Plaits voice at any block size ===\n");
+    constexpr int kFrames = 24064;  // ~0.5 s: 188 x 128 and 47 x 512
+    float env[2] = {}, lvl[2] = {};
+    const int blocks[2] = {128, 512};
+    for (int b = 0; b < 2; b++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+        for (int v = 0; v < 2; v++) {
+            auto& vp = engine->voice_params[v];
+            vp.active.store(1);
+            vp.ever_triggered.store(1);
+            vp.engine_index.store(8);
+            vp.tune.store(v ? 67.0f : 60.0f);
+            vp.gate.store(1);
+        }
+        auto* graph = engine->graph.load(std::memory_order_acquire);
+        std::vector<float> buf(blocks[b] * 2, 0.0f);
+        for (int f = 0; f < kFrames; f += blocks[b])
+            orpheus_graph_process(graph, engine, buf.data(), blocks[b]);
+        env[b] = engine->voice_envelope[0];
+        lvl[b] = engine->voice_levels[0].load();
+        printf("  block %3d: follower=%.4f voice level=%.4f\n", blocks[b], env[b], lvl[b]);
+        orpheus_engine_destroy(engine);
+    }
+    bool tracks = lvl[0] > 0.01f && env[0] > 0.5f * lvl[0] && env[1] > 0.5f * lvl[1];
+    bool matches = std::fabs(env[0] - env[1]) < 0.15f * std::fmax(env[0], env[1]);
+    printf("  tracks voice: %s, 128 vs 512 match: %s\n", tracks ? "yes" : "NO", matches ? "yes" : "NO");
+    return tracks && matches;
+}
+
+// An idle voice early-returns before rendering; its follower must still decay so the
+// partner isn't left with a frozen coupling detune.
+static bool test_coupling_follower_decays_when_idle() {
+    printf("\n=== Test: coupling follower decays on an idle voice ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+    auto& vp = engine->voice_params[0];
+    vp.active.store(1);
+    vp.ever_triggered.store(1);
+    vp.engine_index.store(8);
+    vp.gate.store(0);
+    engine->voice_envelope[0] = 1.0f;
+    auto* graph = engine->graph.load(std::memory_order_acquire);
+    float buf[128 * 2];
+    for (int f = 0; f < 7168; f += 128)  // ~150 ms, one half-life
+        orpheus_graph_process(graph, engine, buf, 128);
+    float env = engine->voice_envelope[0];
+    bool pass = env > 0.45f && env < 0.55f;
+    printf("  follower after one half-life=%.4f (expect ~0.5) %s\n", env, pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_voice_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -482,5 +538,7 @@ bool run_voice_tests() {
     tally(test_engine0_harmonics_morph());
     tally(test_swarm_particle_knob_remapping());
     tally(test_duo_depth_smoothing_time_constant());
+    tally(test_coupling_follower_tracks_voice());
+    tally(test_coupling_follower_decays_when_idle());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

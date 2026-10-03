@@ -205,6 +205,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (osc.env_stage == 0 && scaled_hold < 0.001f && actual_gate == 0) {
             std::memset(out, 0, num_frames * sizeof(float));
             engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
+            engine->voice_envelope[idx] = coupling_follower_block(engine->voice_envelope[idx], 0.0f, sr, num_frames);
             return;
         }
     } else {
@@ -217,6 +218,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             engine->voices_dsp[idx].trigger_state_ = false;
             std::memset(out, 0, num_frames * sizeof(float));
             engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
+            engine->voice_envelope[idx] = coupling_follower_block(engine->voice_envelope[idx], 0.0f, sr, num_frames);
             return;
         }
     }
@@ -477,12 +479,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memcpy(engine->voice_fm_buffer[idx], out, num_frames * sizeof(float));
 
         // Update peak follower for voice coupling (150ms half-life, matching JSyn PeakFollower)
-        {
-            float env_decay = 1.0f - 0.693f / (sr * 0.15f);
-            float env = engine->voice_envelope[idx];
-            env = (voice_peak > env) ? (1.0f - env_decay) * voice_peak + env_decay * env : env * env_decay;
-            engine->voice_envelope[idx] = env;
-        }
+        engine->voice_envelope[idx] = coupling_follower_block(engine->voice_envelope[idx], voice_peak, sr, num_frames);
 
     } else {
         // ═══ PLAITS ENGINES (1+): Render via OrpheusVoice (direct Engine::Render) ═══
@@ -716,12 +713,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memcpy(engine->voice_fm_buffer[idx], out, num_frames * sizeof(float));
 
         // Update peak follower for voice coupling (150ms half-life, matching JSyn PeakFollower)
-        {
-            float env_decay = 1.0f - 0.693f / (sr * 0.15f);
-            float env = engine->voice_envelope[idx];
-            env = (voice_peak > env) ? (1.0f - env_decay) * voice_peak + env_decay * env : env * env_decay;
-            engine->voice_envelope[idx] = env;
-        }
+        engine->voice_envelope[idx] = coupling_follower_block(engine->voice_envelope[idx], voice_peak, sr, num_frames);
 
         // Clear gate for drum voices (one-shot triggers)
         if (idx >= kDrumVoiceStart && actual_gate) {
