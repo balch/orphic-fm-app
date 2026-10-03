@@ -1060,7 +1060,6 @@ struct StormVoice {
         bed_rain_ = 0.0f; bed_rain_level_ = 0.0f; bed_rumble_ = 0.0f; bed_distance_ = 0.5f;
         strike_distance_ = 0.5f;
         distance_ = 0.5f;
-        dist_slew_ = 1.0f - std::exp(-(float)kStormChunk / (kStormDistSeconds * sample_rate));
         pending_tail_ = -1;
         pending_intensity_ = 0.0f;
         for (int k = 0; k < kMaxQueuedStrikes; ++k) queued_[k] = QueuedStrike{};
@@ -1113,6 +1112,7 @@ struct StormVoice {
     // zero bed and no strike this is exactly Process()'s own early-out condition, which
     // lets a host skip clearing and mixing buffers it would only add zeros from.
     bool settled() const { return settled_; }
+    float distance() const { return distance_; }
 
     // Darken one already-rendered output sample for an effect send. The state lives here
     // because the host's send tap is per-sample and post-void; the dry mix never sees it.
@@ -1142,9 +1142,7 @@ struct StormVoice {
             int m = (n - off < kStormChunk) ? (n - off) : kStormChunk;
             // Cut the chunk short at the next queued strike so its claps start on the
             // authored sample rather than the next kStormChunk boundary. With an empty
-            // queue this is the plain kStormChunk split, unchanged. A short chunk still
-            // takes one dist_slew_ step, so the 60 ms distance glide runs marginally
-            // quicker across the one block a strike lands in — well under audibility.
+            // queue this is the plain kStormChunk split, unchanged.
             const int until = samples_until_strike();
             if (until > 0 && until < m) m = until;
             RenderChunk(l + off, r + off, m);
@@ -1163,7 +1161,8 @@ struct StormVoice {
         // bed's own value is re-asserted here every chunk once the tail is done.
         const float target = pending_tail_ >= 0 || rumble_.tail_level() > kStormTailAudible
                                  ? strike_distance_ : bed_distance_;
-        distance_ += (target - distance_) * dist_slew_;
+        // Sized to this chunk: short chunks (small host blocks, a strike split) still glide in 60 ms
+        distance_ += (target - distance_) * (1.0f - std::exp(-(float)n / (kStormDistSeconds * sr_)));
         rumble_.set_bed(bed_rumble_, distance_);
 
         // Claps first and alone, so the echo's input is the cascade and nothing else:
@@ -1261,7 +1260,7 @@ struct StormVoice {
     float scratch_r_[kStormChunk] = {};
     float sr_ = 48000.0f;
     float bed_rain_ = 0.0f, bed_rain_level_ = 0.0f, bed_rumble_ = 0.0f, bed_distance_ = 0.5f;
-    float strike_distance_ = 0.5f, distance_ = 0.5f, dist_slew_ = 0.0f;
+    float strike_distance_ = 0.5f, distance_ = 0.5f;
     float pending_intensity_ = 0.0f;
     float send_lp_[2] = { 0.0f, 0.0f };
     int   pending_tail_ = -1;

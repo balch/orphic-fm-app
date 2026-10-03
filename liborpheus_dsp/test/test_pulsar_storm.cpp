@@ -2019,6 +2019,30 @@ static bool test_storm_bank_routing() {
     return ok;
 }
 
+// The bed-distance glide is stepped once per render chunk. Hosts deliver 128-frame
+// blocks as 128-frame chunks and 512-frame blocks as two 256-frame chunks; after the
+// same elapsed time both must sit on the same 60 ms curve.
+static bool test_distance_glide_block_size_independent() {
+    printf("\n=== Test: storm distance glide is block-size independent ===\n");
+    constexpr float kSr = 48000.0f;
+    constexpr int kFrames = 1536;  // 12 x 128 and 3 x 512
+    const float expected = 0.5f + 0.5f * (1.0f - std::exp(-kFrames / (storm::kStormDistSeconds * kSr)));
+    bool pass = true;
+    for (int block : {128, 512}) {
+        storm::StormVoice storm;
+        storm.Init(77u, kSr);
+        storm.set_bed(0.0f, 0.0f, 0.5f, 1.0f);  // rumble keeps Process running; glide 0.5 -> 1.0
+        std::vector<float> l(block), r(block);
+        for (int done = 0; done < kFrames; done += block)
+            storm.Process(l.data(), r.data(), block);
+        bool ok = std::fabs(storm.distance() - expected) < 0.002f;
+        printf("  block %3d: distance=%.4f expected=%.4f %s\n",
+               block, storm.distance(), expected, ok ? "PASS" : "FAIL");
+        pass &= ok;
+    }
+    return pass;
+}
+
 bool run_pulsar_storm_tests() {
     printf("\n=== Pulsar Storm Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -2068,6 +2092,7 @@ bool run_pulsar_storm_tests() {
         tally(test_weather_strike_chance_rolls_per_bar());
         tally(test_weather_strike_chance_midrange_strikes_less_than_certain());
         tally(test_storm_anomaly_auto_roll_at_section_entry());
+        tally(test_distance_glide_block_size_independent());
         stmlib::Random::Seed(saved);
     }
     TEST_SUITE_RETURN(suite_pass, suite_fail);
