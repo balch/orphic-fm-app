@@ -10,7 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,10 +30,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -191,8 +192,12 @@ internal fun EightBallReveal(state: EightBallRevealState, modifier: Modifier = M
             softWrap = false,
             overflow = TextOverflow.Visible,
             modifier = Modifier
-                // Its own width however narrow the stage: the hover below shrinks it to fit instead.
-                .wrapContentWidth(unbounded = true)
+                // Its own width however narrow the stage, placed at x = 0. Reporting a size past the constraints
+                // makes Compose re-centre the content (shifting an over-wide phrase left), so report within them.
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+                    layout(placeable.width.coerceAtMost(constraints.maxWidth), placeable.height) { placeable.place(0, 0) }
+                }
                 .graphicsLayer {
                     val stage = state.stageBounds.takeUnless { it == Rect.Zero } ?: overlay
                     val w = size.width

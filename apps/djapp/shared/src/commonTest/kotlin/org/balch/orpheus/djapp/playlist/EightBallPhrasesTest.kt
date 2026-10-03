@@ -21,7 +21,7 @@ class EightBallPhrasesTest {
     @Test
     fun aLonePhraseRepeats() = assertEquals("a", nextPhrase("a", listOf("a")))
 
-    // The die fits about three lines of eight capitals at the reveal's 160dp.
+    // The phrase hovers on one line over the stage, shrunk to fit a phone's width.
     @Test
-    fun everyPhraseFitsTheDie() = EightBallPhrases.forEach { assertTrue(it.length <= 24, "\"$it\" is too long for the die") }
+    fun everyPhraseFitsOneLine() = EightBallPhrases.forEach { assertTrue(it.length <= 42, "\"$it\" is too long for one line") }
 }

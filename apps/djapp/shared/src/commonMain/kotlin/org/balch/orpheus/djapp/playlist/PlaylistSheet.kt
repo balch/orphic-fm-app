@@ -114,6 +114,7 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
         val view by pulsar.playlistFlow.collectAsStateWithLifecycle()
         val nav by pulsar.vibeNavFlow.collectAsStateWithLifecycle()
         val eightBall = LocalEightBall.current
+        val fallbackPhrase = remember { EightBallPhrases.random() }
         // The header's phrase line tells the reveal where it sits, for its own phrase to fly to, and
         // stays clear until that is landing. Built once per ball; read only in layout and draw.
         val phraseLine = remember(eightBall) {
@@ -128,7 +129,7 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
         PlaylistContent(
             view = view,
             current = nav.currentName,
-            phrase = eightBall?.phrase ?: EightBallPhrases.first(),
+            phrase = eightBall?.phrase ?: fallbackPhrase,
             phraseLine = phraseLine,
             onEdit = pulsar::editPlaylist,
             onShuffle = {

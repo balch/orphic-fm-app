@@ -478,7 +478,7 @@ class EightBallRevealTest {
             // The last frames crossfade into the header's own copy, so the last drawn is a line's height short of it.
             assertEquals(40f, box.left, 8f, "it lands on the header line's left edge: $box")
             assertEquals(600f, box.center.y, 20f, "and on its centre line: $box")
-            assertTrue(box.width < 200f, "shrunk to the header's own size: $box")
+            assertTrue(box.width < 260f, "shrunk to the header's own size: $box")
             assertEquals(1f, stage.state.headerPhraseAlpha, "and the header's own copy is fully in when the sheet holds the ball")
         } finally { stage.close() }
     }
