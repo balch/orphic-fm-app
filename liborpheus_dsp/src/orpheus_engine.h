@@ -479,7 +479,7 @@ struct OrpheusEngine {
     float smooth_delay_mix{0.0f};
     float smooth_delay_feedback{0.3f};
     float smooth_master_pan{0.0f};
-    float smooth_drum_mix{0.7f};
+    float smooth_drum_mix[kNumDrumVoices] = {0.7f, 0.7f, 0.7f};  // one per drum unit
     float smooth_marbles_mix{0.0f};
     float smooth_looper_level{0.0f};
     float smooth_looper_feedback{0.0f};

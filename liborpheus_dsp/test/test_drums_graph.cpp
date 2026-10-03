@@ -1,5 +1,6 @@
 // Drum voice and graph wiring comparison tests
 #include "test_harness.h"
+#include "orpheus_units_common.h"
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 1: Drum trigger produces output via orpheus_engine_trigger_drum
@@ -935,6 +936,29 @@ static bool test_drum_bypass_toggle() {
     return pass;
 }
 
+// Each drum unit must step its own drum-mix smoother once per sample. A shared one was
+// stepped by all three units, so the "5 ms" ramp ran about 3x fast.
+static bool test_drum_mix_smoother_per_voice() {
+    printf("\n=== Test: drum mix smoother is 5 ms per drum voice ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+    engine->drum_mix.store(0.0f);  // ramp every drum from 0.7 toward 0
+    for (int d = 0; d < kNumDrumVoices; d++) orpheus_engine_trigger_drum(engine, d, 0.8f);
+    float buf[128 * 2];
+    orpheus_engine_process(engine, buf, 128);
+
+    const float expected = 0.7f * std::pow(1.0f - smooth_coeff(48000.0f), 128.0f);
+    bool pass = true;
+    for (int d = 0; d < kNumDrumVoices; d++) {
+        float g = engine->smooth_drum_mix[d];
+        bool ok = std::fabs(g - expected) < 1e-4f;
+        printf("  drum %d: gain after one block=%.4f expected=%.4f %s\n", d, g, expected, ok ? "PASS" : "FAIL");
+        pass &= ok;
+    }
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_drums_graph_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -950,5 +974,6 @@ bool run_drums_graph_tests() {
 #endif
     tally(test_drum_slot_gains());
     tally(test_drum_bypass_toggle());
+    tally(test_drum_mix_smoother_per_voice());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

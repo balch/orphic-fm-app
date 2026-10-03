@@ -731,11 +731,13 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Apply drum_mix gain to output buffer (matching Kotlin DrumPlugin: baseGain=1.6 * mix).
         // This scales the graph output so downstream units (pan, resonator, master) see the gain.
         if (idx >= kDrumVoiceStart) {
+            // Each drum unit owns its smoother; a shared one was stepped by all three.
             float dm_target = 3.2f * engine->drum_mix.load(std::memory_order_relaxed);
             float dm_coeff = smooth_coeff(sr);
+            float& dm = engine->smooth_drum_mix[idx - kDrumVoiceStart];
             for (int i = 0; i < num_frames; i++) {
-                engine->smooth_drum_mix += dm_coeff * (dm_target - engine->smooth_drum_mix);
-                out[i] *= engine->smooth_drum_mix;
+                dm += dm_coeff * (dm_target - dm);
+                out[i] *= dm;
             }
         }
     }
