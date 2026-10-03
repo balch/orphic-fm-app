@@ -502,6 +502,31 @@ static bool test_duo_voice_fm() {
     return pass;
 }
 
+// The bender's random-wobble LFO (1.5 + 3|bend| Hz) is advanced once per block, so the
+// step must cover the whole block: the phase after T seconds is rate * T at any block size.
+static bool test_bender_random_lfo_rate() {
+    printf("\n=== Test: bender random LFO runs at its rate for any block size ===\n");
+    constexpr int kFrames = 6144;  // 128 ms: 48 x 128 and 12 x 512
+    const float expected = (1.5f + 0.5f * 3.0f) * kFrames / 48000.0f;  // bend 0.5 -> 3 Hz
+    bool pass = true;
+    for (int block : {128, 512}) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        GraphUnit u = {};
+        u.type = UNIT_BENDER;
+        u.enabled = true;
+        unit_init(&u, 48000.0f);
+        engine->bend_amount.store(0.5f);
+        for (int f = 0; f < kFrames; f += block)
+            unit_process_bender(&u, engine, block, 48000.0f);
+        float phase = engine->bend_random_lfo_phase;
+        bool ok = std::fabs(phase - expected) < 1e-3f;
+        printf("  block %3d: phase=%.4f cycles expected=%.4f %s\n", block, phase, expected, ok ? "PASS" : "FAIL");
+        pass &= ok;
+        orpheus_engine_destroy(engine);
+    }
+    return pass;
+}
+
 bool run_unit_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -518,5 +543,6 @@ bool run_unit_tests() {
     tally(test_bender());
     tally(test_per_string_bender());
     tally(test_duo_voice_fm());
+    tally(test_bender_random_lfo_rate());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

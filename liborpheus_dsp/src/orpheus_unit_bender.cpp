@@ -57,7 +57,7 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // Random LFO modulation (matches JSyn BenderPlugin randomLfo + randomDepthGain)
     // JSyn: lfoRate = 1.5 + |bend| * 3.0, randomIntensity = randomDepth * |bend| * 0.1
     float lfo_rate = 1.5f + std::fabs(amount) * 3.0f;
-    engine->bend_random_lfo_phase += lfo_rate / sr;
+    engine->bend_random_lfo_phase += lfo_rate * num_frames / sr;  // advanced once per block
     engine->bend_random_lfo_phase -= std::floor(engine->bend_random_lfo_phase);
     float random_lfo = std::sin(engine->bend_random_lfo_phase * TWO_PI);
     float random_intensity = random_depth * std::fabs(amount) * 0.1f;
