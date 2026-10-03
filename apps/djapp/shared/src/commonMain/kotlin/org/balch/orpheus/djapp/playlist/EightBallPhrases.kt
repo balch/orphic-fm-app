@@ -17,7 +17,7 @@ internal val EightBallPhrases: List<String> = listOf(
     "Peace, Love and Understanding",
     "Any given Sunday",
     "Can't make this up",
-    "Love will find a way",
+    "Life will find a way",
     "Catnip is the best nip",
     "Get off my cloud",
     "Throw the damn ball",
