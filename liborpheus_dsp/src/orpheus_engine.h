@@ -19,6 +19,7 @@
 
 // Orpheus resonator (modal + Karplus-Strong, ported from Kotlin)
 #include "orpheus_resonator.h"
+#include "orpheus_horn.h"
 
 // Include MI Warps modulator
 // Undefine Clouds resource macros that collide with Warps
@@ -749,15 +750,7 @@ struct OrpheusEngine {
     float lorenz_slew_z = 0.5f;               // one-pole filter state for Z
 
     // ── Horn (Leslie Speaker) ─────────────────────────────────────
-    static constexpr int kHornBufferSize = 2048;   // delay line for chorus (~42ms @ 48kHz)
-    static constexpr int kHornMask = kHornBufferSize - 1;
-    float horn_delay_l[kHornBufferSize] = {};
-    float horn_delay_r[kHornBufferSize] = {};
-    int horn_write_pos = 0;
-    float horn_slow_phase = 0.0f;    // horn rotor phase 0..1
-    float horn_fast_phase = 0.0f;    // woofer rotor phase 0..1
-    float smooth_horn_mix = 0.0f;
-    float smooth_horn_speed = 0.5f;  // smoothed speed for inertia
+    OrpheusHorn horn;  // audio thread only: delay lines, rotors, smoothed mix
 
     // Horn parameter atomics
     std::atomic<float> horn_speed{0.5f};        // base rotor speed 0..1
