@@ -149,6 +149,9 @@ object OrpheusColors {
     val ninersRed = Color(0xFFFF5252)
     val ninersGold = Color(0xFFFFD740)
 
+    /** The Kraken pad's deep-sea accent, kept apart from VIBE's purple anomaly tint. */
+    val krakenTeal = Color(0xFF1DE9B6)
+
     // Material Theme Defaults
     val errorContainerDark = Color(0xFF4A1F1F)
     val onSurfaceDark = Color(0xFFF0F0F0)

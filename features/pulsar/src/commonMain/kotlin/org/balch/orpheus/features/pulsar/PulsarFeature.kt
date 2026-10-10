@@ -75,6 +75,8 @@ import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.kraken.KRAKEN_TARGET_COUNT
+import org.balch.orpheus.features.pulsar.kraken.KrakenGesture
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.ChordFollow
@@ -134,6 +136,7 @@ import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.TimeSource
 import kotlin.time.Duration.Companion.seconds
 
 @Serializable
@@ -254,6 +257,17 @@ data class PulsarPanelActions(
      * current vibe, so the seed change is heard now rather than at the next vibe load.
      */
     val onToggleModeOne: () -> Unit = {},
+    /** Kraken pad (DJ app): hold to shift on the next beat, double-tap to latch. See KrakenGesture. */
+    val onKrakenPress: () -> Unit = {},
+    val onKrakenRelease: () -> Unit = {},
+    val onKrakenCycleTarget: () -> Unit = {},
+    /** 0 = IV, 1 = V, 2 = relative, 3 = parallel. */
+    val krakenTarget: StateFlow<Int> = MutableStateFlow(0),
+    val krakenLatched: StateFlow<Boolean> = MutableStateFlow(false),
+    /** A finger or key is down, or the shift is latched. */
+    val krakenEngaged: StateFlow<Boolean> = MutableStateFlow(false),
+    /** The engine has the shift in effect; flips on the beat, not on touch. */
+    val krakenActive: StateFlow<Boolean> = MutableStateFlow(false),
 ) {
     companion object {
         val EMPTY = PulsarPanelActions()
@@ -629,6 +643,32 @@ class PulsarViewModel(
     // One Mode (PulsarPanelActions.modeOne). A plain flow, not a PulsarUiState field: the
     // state blob is persisted, and this must not outlive the session.
     private val _modeOne = MutableStateFlow(false)
+
+    // Kraken: native-only ports and a session-only gesture; nothing here is persisted.
+    private val krakenTargetId = synthController.controlFlow(PulsarSymbol.KRAKEN_TARGET.controlId)
+    private val krakenHeldId = synthController.controlFlow(PulsarSymbol.KRAKEN_HELD.controlId)
+    private val krakenPressesId = synthController.controlFlow(PulsarSymbol.KRAKEN_PRESSES.controlId)
+    private val krakenStart = TimeSource.Monotonic.markNow()
+    private val krakenGesture = KrakenGesture(now = { krakenStart.elapsedNow().inWholeMilliseconds })
+    private val _krakenTarget = MutableStateFlow(0)
+    private val _krakenLatched = MutableStateFlow(false)
+    private val _krakenEngaged = MutableStateFlow(false)
+    private val krakenActiveFlow = synthEngine.pulsarVizFlow
+        .map { it.krakenShift >= 0 }
+        .distinctUntilChanged()
+        .stateIn(scope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private fun pushKraken() {
+        _krakenLatched.value = krakenGesture.latched
+        _krakenEngaged.value = krakenGesture.engaged
+        krakenPressesId.value = IntValue(krakenGesture.presses)
+        krakenHeldId.value = IntValue(if (krakenGesture.engaged) 1 else 0)
+    }
+
+    private fun resetKraken() {
+        krakenGesture.reset()
+        pushKraken()
+    }
     private var speechClipJob: Job? = null
     // True once a vibe with speech has used the clip bank, so later vibes clear it once.
     private var speechSlotsDirty = false
@@ -1011,6 +1051,7 @@ class PulsarViewModel(
     // so the first emission matches the system tempo, not the plugin default.
     init {
         bpmId.value = FloatValue(globalTempo.getBpm().toFloat())
+        krakenTargetId.value = IntValue(0)
         // Restore saved state on startup, then re-apply after every preset load
         // (since applyPreset() resets all ports including Pulsar).
         scope.launch(dispatcherProvider.io) {
@@ -1192,6 +1233,17 @@ class PulsarViewModel(
             // Restart the playing vibe so the seed change is heard now, not at the next load.
             applyVibe(vibeFlow.value)
         },
+        onKrakenPress = { krakenGesture.press(); pushKraken() },
+        onKrakenRelease = { krakenGesture.release(); pushKraken() },
+        onKrakenCycleTarget = {
+            val next = (_krakenTarget.value + 1) % KRAKEN_TARGET_COUNT
+            _krakenTarget.value = next
+            krakenTargetId.value = IntValue(next)
+        },
+        krakenTarget = _krakenTarget.asStateFlow(),
+        krakenLatched = _krakenLatched.asStateFlow(),
+        krakenEngaged = _krakenEngaged.asStateFlow(),
+        krakenActive = krakenActiveFlow,
     )
 
     // ═══════════════════════════════════════════════════════════
@@ -1228,6 +1280,15 @@ class PulsarViewModel(
         vibe = vibeFlow.value,
     ))
     override val stateFlow: StateFlow<PulsarUiState> = _state.asStateFlow()
+
+    // A pause drops a held or latched Kraken so it cannot survive into the next play.
+    init {
+        scope.launch {
+            stateFlow.map { it.globalPaused }.distinctUntilChanged().collect { paused ->
+                if (paused) resetKraken()
+            }
+        }
+    }
 
     init {
         // Always-on reducer: drives state mutation independent of UI
@@ -1501,6 +1562,7 @@ class PulsarViewModel(
      * Push the entire vibe recipe to C++. Called from setVibe action and restoreSavedState.
      */
     override fun applyVibe(vibe: Vibe) {
+        resetKraken()
         log.info { "applyVibe name=${vibe.name} bpm=${vibe.bpm} tracks=${vibe.tracks.size} sections=${vibe.arrangement?.sections?.size ?: 0}" }
         // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends.
         setVibe(vibe)

@@ -9,8 +9,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -52,6 +54,7 @@ import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.features.pulsar.kraken.KrakenPad
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
@@ -97,8 +100,11 @@ enum class PulsarSelectors {
     /** VIBE/ROOT/SCALE/ENV. */
     All,
 
-    /** VIBE alone, spanning the grid's width. The DJ app leaves ROOT/SCALE/ENV to the vibe. */
+    /** VIBE spanning the grid's width. The DJ app leaves ROOT/SCALE/ENV to the vibe. */
     VibeOnly,
+
+    /** [VibeOnly] with the Kraken pad beside VIBE. */
+    VibeAndKraken,
 
     /** No row: the DJ dock's top bar is its one vibe picker. */
     None,
@@ -172,14 +178,24 @@ fun PulsarPanel(
                     vibeList = vibeList,
                     voidGain = voidGain,
                 )
-                PulsarSelectors.VibeOnly -> PulsarVibeDropdown(
-                    state = state,
-                    actions = actions,
-                    vibeList = vibeList,
-                    voidGain = voidGain,
-                    modifier = Modifier.widthIn(max = PulsarGridWidth).fillMaxWidth(),
-                    hero = true,
-                )
+                PulsarSelectors.VibeOnly, PulsarSelectors.VibeAndKraken -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom,
+                    // Min intrinsic height levels the pad with the VIBE chip without growing the row.
+                    modifier = Modifier.widthIn(max = PulsarGridWidth).fillMaxWidth().height(IntrinsicSize.Min),
+                ) {
+                    PulsarVibeDropdown(
+                        state = state,
+                        actions = actions,
+                        vibeList = vibeList,
+                        voidGain = voidGain,
+                        modifier = Modifier.weight(1f),
+                        hero = true,
+                    )
+                    if (selectors == PulsarSelectors.VibeAndKraken) {
+                        KrakenPad(actions = actions, modifier = Modifier.fillMaxHeight())
+                    }
+                }
                 // Without a row the grid would sit 4dp under the panel's top edge; this plus the
                 // column's 12dp gap gives it 20dp.
                 PulsarSelectors.None -> Spacer(Modifier.height(4.dp))
@@ -763,6 +779,20 @@ private fun PulsarPanelVibeOnlyPreview() {
             isExpanded = true,
             showCollapsedHeader = false,
             selectors = PulsarSelectors.VibeOnly,
+        )
+    }
+}
+
+@Suppress("StateFlowValueCalledInComposition")
+@Preview(widthDp = 360, heightDp = 420, name = "DJ — VIBE and Kraken")
+@Composable
+private fun PulsarPanelVibeAndKrakenPreview() {
+    OrpheusTheme {
+        PulsarPanel(
+            pulsar = PulsarViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false,
+            selectors = PulsarSelectors.VibeAndKraken,
         )
     }
 }
