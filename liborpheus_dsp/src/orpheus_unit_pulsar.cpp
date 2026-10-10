@@ -2582,6 +2582,25 @@ static inline void schedule_triplet_repick(PulsarTrackState& ts, int seg_start, 
     }
 }
 
+// Copies the tracks' steps and playheads to pulsar_viz for the step grid. Audio thread only.
+static void publish_pulsar_viz(const PulsarState* state, OrpheusEngine* engine) {
+    auto& viz = engine->pulsar_viz;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        const PulsarTrackState& ts = state->tracks[t];
+        viz.playheads[t] = ts.playhead;
+        int sc = std::min(ts.step_count, kMaxPulsarSteps);
+        viz.step_counts[t] = sc;
+        // Through effective_step so a pinned section shows its pin, not the hidden groove.
+        PulsarStep pinned_scratch = {};
+        for (int s = 0; s < sc; s++) {
+            const PulsarStep& step = effective_step(ts, t, s, pinned_scratch);
+            viz.step_gates[t][s] = step.gate;
+            viz.step_velocities[t][s] = step.velocity;
+        }
+    }
+    engine->pulsar_viz_version.fetch_add(1, std::memory_order_release);
+}
+
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate) {
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
 
@@ -2721,6 +2740,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // and the Svf state all pick up exactly where they left off, and a pause is an
         // audio gap regardless. The old master-bus wah counted down through a pause because
         // it lived downstream of this return, not because anything wanted it to.
+        //
+        // load_vibe has already rolled the patterns that the first play will fire, so the
+        // grid shows them now instead of sitting dark until play. Once per vibe load.
+        if (state->viz_published_generation != state->current_vibe_generation) {
+            publish_pulsar_viz(state, engine);
+            state->viz_published_generation = state->current_vibe_generation;
+        }
         return;
     }
 
@@ -5984,21 +6010,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     std::memcpy(u->output_buffers[OPORT_OUT_RIGHT], out_r, num_frames * sizeof(float));
 
     // ── Write visualization data ──
-    auto& viz = engine->pulsar_viz;
-    for (int t = 0; t < kNumPulsarTracks; t++) {
-        const PulsarTrackState& ts = state->tracks[t];
-        viz.playheads[t] = ts.playhead;
-        int sc = std::min(ts.step_count, kMaxPulsarSteps);
-        viz.step_counts[t] = sc;
-        // Through effective_step so a pinned section shows its pin, not the hidden groove.
-        PulsarStep pinned_scratch = {};
-        for (int s = 0; s < sc; s++) {
-            const PulsarStep& step = effective_step(ts, t, s, pinned_scratch);
-            viz.step_gates[t][s] = step.gate;
-            viz.step_velocities[t][s] = step.velocity;
-        }
-    }
-    engine->pulsar_viz_version.fetch_add(1, std::memory_order_release);
+    publish_pulsar_viz(state, engine);
 
     #undef PULSAR_PICK
 }

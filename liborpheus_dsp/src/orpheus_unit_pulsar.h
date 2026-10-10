@@ -1088,6 +1088,9 @@ struct PulsarState {
     // still starts rather than sitting silent forever.
     int start_hold_samples = 0;
     int current_vibe_generation;
+    // The vibe generation last published to pulsar_viz while paused, so a vibe loaded
+    // before the first play still fills the step grid, once rather than every block.
+    int viz_published_generation = -1;
     bool initialized;
     float smooth_energy, smooth_complexity, smooth_space, smooth_mood;
 

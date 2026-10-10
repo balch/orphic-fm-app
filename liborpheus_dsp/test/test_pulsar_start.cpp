@@ -8,6 +8,7 @@
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/orpheus_graph.h"
+#include "../src/pulsar_pattern_gen.h"
 #include "stmlib/utils/random.h"
 #include <cstdio>
 #include <cmath>
@@ -329,6 +330,58 @@ static bool test_stopped_load_fires_downbeat_on_play() {
     return precondition && consumed && fired;
 }
 
+// ── Test 6b: a vibe loaded before the first play still fills the step grid ──
+// The DJ app launches paused, and pulsar_viz was written only on the playing path, so
+// the grid sat dark (step_counts 0) until play. Each paused load publishes once.
+static bool viz_matches_tracks(OrpheusEngine* engine, const char* what) {
+    const PulsarState* state = engine->pulsar_state;
+    const auto& viz = engine->pulsar_viz;
+    int lit = 0;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        const PulsarTrackState& ts = state->tracks[t];
+        int sc = std::min(ts.step_count, kMaxPulsarSteps);
+        if (viz.step_counts[t] != sc) {
+            printf("  FAIL %s t%d: viz step_count %d, track %d\n", what, t, viz.step_counts[t], sc);
+            return false;
+        }
+        PulsarStep scratch = {};
+        for (int s = 0; s < sc; s++) {
+            bool gate = effective_step(ts, t, s, scratch).gate;
+            if (viz.step_gates[t][s] != gate) {
+                printf("  FAIL %s t%d s%d: viz gate %d, track %d\n", what, t, s, viz.step_gates[t][s], gate);
+                return false;
+            }
+            if (gate) lit++;
+        }
+    }
+    printf("  %s: track 0 shows %d steps, %d gates lit\n", what, viz.step_counts[0], lit);
+    return viz.step_counts[0] > 0 && lit > 0;
+}
+
+static bool test_paused_load_fills_the_grid() {
+    printf("\n=== Test: a vibe loaded while paused fills the step grid ===\n");
+    OrpheusEngine* engine = make_start_engine(setup_fixture_dense_fast);  // 16-step
+    engine->pulsar_playing.store(0, std::memory_order_relaxed);
+    GraphUnit unit = make_start_unit();
+
+    unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
+    bool cold = viz_matches_tracks(engine, "cold launch");
+    int version = engine->pulsar_viz_version.load(std::memory_order_relaxed);
+    for (int b = 0; b < 4; b++) unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
+    bool once = engine->pulsar_viz_version.load(std::memory_order_relaxed) == version;
+    printf("  later paused blocks republish: %s\n", once ? "no -- PASS" : "yes -- FAIL");
+
+    setup_fixture_blues(engine);  // 32-step
+    pin_pulsar_rngs(engine);
+    trigger_vibe_load(engine);
+    unit_process_pulsar(&unit, engine, kBlock, kSampleRate);
+    bool switched = viz_matches_tracks(engine, "switch while paused") &&
+                    engine->pulsar_viz.step_counts[0] == 32;
+
+    orpheus_engine_destroy(engine);
+    return cold && once && switched;
+}
+
 // ── Test 7: a load during a band solo is not ducked by the old solo ────────
 // clear_solo_modifiers zeroes the solo TARGETS but not the smoothed _current
 // twins the render path actually reads, and their only drain is the per-bar
@@ -455,6 +508,7 @@ bool run_pulsar_start_tests() {
     tally(test_load_boundary_consumes_no_chord_tick());
     tally(test_load_clears_carried_phase_inversion());
     tally(test_stopped_load_fires_downbeat_on_play());
+    tally(test_paused_load_fills_the_grid());
     tally(test_load_clears_inflight_solo_duck());
     tally(test_start_waits_for_an_audible_mix());
     tally(test_start_hold_is_bounded());
