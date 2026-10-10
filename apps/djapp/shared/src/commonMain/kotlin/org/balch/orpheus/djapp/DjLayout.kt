@@ -40,9 +40,10 @@ val PortraitPairMinHeight: Dp = 700.dp
 /**
  * Smallest portrait Pulsar slot that fits the full step grid. Set by rendering at a closed iPhone
  * Duo's 466dp width (`renderPulsarCompactSweep`): the knob labels clip at 320dp, touch the panel
- * edge at 335dp and clear it at 350dp.
+ * edge at 335dp and clear it at 350dp. Plus 20dp for the hero VIBE row, 17dp taller than the old
+ * selector row at the Fold's 1.3 font scale.
  */
-val PulsarFullGridSlotHeight: Dp = 350.dp
+val PulsarFullGridSlotHeight: Dp = 370.dp
 
 /** Under this the 8 track rows stop reading as rows; a shorter slot clips instead. */
 val PulsarGridMinHeight: Dp = 64.dp

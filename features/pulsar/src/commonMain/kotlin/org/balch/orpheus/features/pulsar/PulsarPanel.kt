@@ -10,9 +10,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,6 +92,18 @@ private val VibeValueMaxWidth: Dp = 160.dp
  */
 private val ScaleValueFloorWidth: Dp = 84.dp
 
+/** Which selectors [PulsarPanel]'s top row shows. TV hardware drops the row whatever this says. */
+enum class PulsarSelectors {
+    /** VIBE/ROOT/SCALE/ENV. */
+    All,
+
+    /** VIBE alone, spanning the grid's width. The DJ app leaves ROOT/SCALE/ENV to the vibe. */
+    VibeOnly,
+
+    /** No row: the DJ dock's top bar is its one vibe picker. */
+    None,
+}
+
 /**
  * Pulsar Beat Machine panel.
  *
@@ -110,9 +125,7 @@ fun PulsarPanel(
     // TV docks ENDING as its own bottom-bar button (DjTvBottomBar's "Ends") so it stays reachable
     // without expanding this panel. Everywhere else it stays here.
     showEndingControl: Boolean = true,
-    // The DJ dock's top bar is its one vibe picker (and carries the anomaly long-press), so the
-    // docked panel drops VIBE and keeps ROOT/SCALE/ENV.
-    showVibePicker: Boolean = true,
+    selectors: PulsarSelectors = PulsarSelectors.All,
     // A host with a short slot (closed iPhone Duo, a Fold's cover screen sideways) passes less so
     // the knob labels stay inside.
     gridHeight: Dp = PulsarGridHeight,
@@ -152,13 +165,25 @@ fun PulsarPanel(
         // this is the heaviest panel.
         if (!LocalTelevisionHardware.current) {
             val vibeList = remember { pulsar.vibeList }
-            PulsarSelectorRow(
-                state = state,
-                actions = actions,
-                vibeList = vibeList,
-                voidGain = voidGain,
-                showVibe = showVibePicker,
-            )
+            when (selectors) {
+                PulsarSelectors.All -> PulsarSelectorRow(
+                    state = state,
+                    actions = actions,
+                    vibeList = vibeList,
+                    voidGain = voidGain,
+                )
+                PulsarSelectors.VibeOnly -> PulsarVibeDropdown(
+                    state = state,
+                    actions = actions,
+                    vibeList = vibeList,
+                    voidGain = voidGain,
+                    modifier = Modifier.widthIn(max = PulsarGridWidth).fillMaxWidth(),
+                    hero = true,
+                )
+                // Without a row the grid would sit 4dp under the panel's top edge; this plus the
+                // column's 12dp gap gives it 20dp.
+                PulsarSelectors.None -> Spacer(Modifier.height(4.dp))
+            }
         }
 
         PulsarStepGridSection(
@@ -272,29 +297,16 @@ private fun PulsarSelectorRow(
     actions: PulsarPanelActions,
     vibeList: List<Vibe>,
     voidGain: Float,
-    showVibe: Boolean,
 ) {
-    // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
-    // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
-    // dips below 1 and deepens the tint, breathing back as the mix returns.
-    val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
     PriorityFitSelectorRow(gap = 8.dp) {
-        if (showVibe) {
-            EnumDropdown(
-                label = "VIBE",
-                selectedDisplay = state.vibe.name,
-                entries = vibeList,
-                displayName = { it.name },
-                onSelected = { actions.pickVibe(it) },
-                color = OrpheusColors.cosmicPurple,
-                modifier = Modifier.layoutId(SelectorSlot.Vibe),
-                onLongPress = actions.onTriggerAnomaly,
-                highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
-                valueMaxWidth = VibeValueMaxWidth,
-                // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
-                menuWidth = 200.dp,
-            )
-        }
+        PulsarVibeDropdown(
+            state = state,
+            actions = actions,
+            vibeList = vibeList,
+            voidGain = voidGain,
+            modifier = Modifier.layoutId(SelectorSlot.Vibe),
+            valueMaxWidth = VibeValueMaxWidth,
+        )
 
         EnumDropdown(
             label = "ROOT",
@@ -337,7 +349,39 @@ private fun PulsarSelectorRow(
     }
 }
 
-/** Tags for [PriorityFitSelectorRow]'s children; VIBE is the only one that may be absent. */
+/** VIBE's dropdown, in [PulsarSelectorRow] or alone across the row for [PulsarSelectors.VibeOnly]. */
+@Composable
+private fun PulsarVibeDropdown(
+    state: PulsarUiState,
+    actions: PulsarPanelActions,
+    vibeList: List<Vibe>,
+    voidGain: Float,
+    modifier: Modifier = Modifier,
+    valueMaxWidth: Dp = Dp.Unspecified,
+    hero: Boolean = false,
+) {
+    // Long press arms the Void Anomaly, same as ENDING's outro arm. Armed tints the
+    // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
+    // dips below 1 and deepens the tint, breathing back as the mix returns.
+    val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
+    EnumDropdown(
+        label = "VIBE",
+        selectedDisplay = state.vibe.name,
+        entries = vibeList,
+        displayName = { it.name },
+        onSelected = { actions.pickVibe(it) },
+        color = OrpheusColors.cosmicPurple,
+        modifier = modifier,
+        onLongPress = actions.onTriggerAnomaly,
+        highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
+        valueMaxWidth = valueMaxWidth,
+        // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
+        menuWidth = 200.dp,
+        hero = hero,
+    )
+}
+
+/** Tags for [PriorityFitSelectorRow]'s children. */
 private enum class SelectorSlot { Vibe, Root, Scale, Env }
 
 /**
@@ -366,51 +410,43 @@ private fun PriorityFitSelectorRow(
             val rootM = measurables.first { it.layoutId == SelectorSlot.Root }
             val scaleM = measurables.first { it.layoutId == SelectorSlot.Scale }
             val envM = measurables.first { it.layoutId == SelectorSlot.Env }
-            val vibeM = measurables.firstOrNull { it.layoutId == SelectorSlot.Vibe }
+            val vibeM = measurables.first { it.layoutId == SelectorSlot.Vibe }
 
             val h = constraints.maxHeight
             val rootWidth = rootM.maxIntrinsicWidth(h)
             val envWidth = envM.maxIntrinsicWidth(h)
             val scaleNatural = scaleM.maxIntrinsicWidth(h)
+            val vibeNatural = vibeM.maxIntrinsicWidth(h)
+            val remaining = constraints.maxWidth - rootWidth - envWidth - gapPx * 3
+            val scaleFloorPx = ScaleValueFloorWidth.roundToPx()
 
-            // On the dock (vibeM == null) ROOT/SCALE/ENV keep today's behavior: natural width, no floor.
-            val (vibeWidth, scaleWidth) = if (vibeM == null) {
-                0 to scaleNatural
-            } else {
-                val vibeNatural = vibeM.maxIntrinsicWidth(h)
-                val remaining = constraints.maxWidth - rootWidth - envWidth - gapPx * 3
-                val scaleFloorPx = ScaleValueFloorWidth.roundToPx()
-                when {
-                    // Everyone fits at their natural size.
-                    remaining >= vibeNatural + scaleNatural -> vibeNatural to scaleNatural
-                    // VIBE gets its full (capped) width; SCALE takes whatever's left, down to its floor.
-                    remaining >= vibeNatural + scaleFloorPx -> vibeNatural to (remaining - vibeNatural)
-                    // SCALE is pinned at its floor if that fits; below ~170dp (no real host is this
-                    // narrow) it shrinks further too, so this never asks for more than remaining.
-                    else -> {
-                        val scale = minOf(scaleFloorPx, remaining).coerceAtLeast(0)
-                        (remaining - scale).coerceAtLeast(0) to scale
-                    }
+            val (vibeWidth, scaleWidth) = when {
+                // Everyone fits at their natural size.
+                remaining >= vibeNatural + scaleNatural -> vibeNatural to scaleNatural
+                // VIBE gets its full (capped) width; SCALE takes whatever's left, down to its floor.
+                remaining >= vibeNatural + scaleFloorPx -> vibeNatural to (remaining - vibeNatural)
+                // SCALE is pinned at its floor if that fits; below ~170dp (no real host is this
+                // narrow) it shrinks further too, so this never asks for more than remaining.
+                else -> {
+                    val scale = minOf(scaleFloorPx, remaining).coerceAtLeast(0)
+                    (remaining - scale).coerceAtLeast(0) to scale
                 }
             }
 
             fun fit(width: Int) = Constraints(minWidth = width, maxWidth = width, maxHeight = h)
 
-            val vibeP = vibeM?.measure(fit(vibeWidth))
+            val vibeP = vibeM.measure(fit(vibeWidth))
             val rootP = rootM.measure(fit(rootWidth))
             val scaleP = scaleM.measure(fit(scaleWidth))
             val envP = envM.measure(fit(envWidth))
 
-            val gapCount = if (vibeP != null) 3 else 2
-            val totalWidth = (vibeP?.width ?: 0) + rootP.width + scaleP.width + envP.width + gapPx * gapCount
-            val totalHeight = maxOf(vibeP?.height ?: 0, rootP.height, scaleP.height, envP.height)
+            val totalWidth = vibeP.width + rootP.width + scaleP.width + envP.width + gapPx * 3
+            val totalHeight = maxOf(vibeP.height, rootP.height, scaleP.height, envP.height)
 
             layout(totalWidth, totalHeight) {
                 var x = 0
-                vibeP?.let {
-                    it.placeRelative(x, 0)
-                    x += it.width + gapPx
-                }
+                vibeP.placeRelative(x, 0)
+                x += vibeP.width + gapPx
                 rootP.placeRelative(x, 0)
                 x += rootP.width + gapPx
                 scaleP.placeRelative(x, 0)
@@ -424,6 +460,9 @@ private fun PriorityFitSelectorRow(
 
 /** The step grid's height wherever the panel has room for it. */
 val PulsarGridHeight: Dp = 120.dp
+
+/** The step grid's width, and the cap on [PulsarSelectors.VibeOnly]'s VIBE so the two line up. */
+private val PulsarGridWidth: Dp = 360.dp
 
 /**
  * The step grid row: canvas visualization of all 8 tracks, driven by the viz flow and the
@@ -463,7 +502,7 @@ private fun PulsarStepGridSection(
             // never reads "verse 3/8, RANDOM".
             pendingTransition = if (songEndingOn) resolvedStyle else null,
             modifier = Modifier
-                .width(360.dp)
+                .width(PulsarGridWidth)
                 .height(gridHeight)
                 .alpha(.8f)
             ,
@@ -709,6 +748,21 @@ private fun PulsarPanelPreview() {
             pulsar = PulsarViewModel.previewFeature(),
             isExpanded = true,
             showCollapsedHeader = false,
+        )
+    }
+}
+
+@Suppress("StateFlowValueCalledInComposition")
+@Preview(widthDp = 360, heightDp = 420, name = "DJ — VIBE only")
+@Preview(widthDp = 360, heightDp = 420, name = "DJ — VIBE only 140%", fontScale = 1.4f)
+@Composable
+private fun PulsarPanelVibeOnlyPreview() {
+    OrpheusTheme {
+        PulsarPanel(
+            pulsar = PulsarViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false,
+            selectors = PulsarSelectors.VibeOnly,
         )
     }
 }

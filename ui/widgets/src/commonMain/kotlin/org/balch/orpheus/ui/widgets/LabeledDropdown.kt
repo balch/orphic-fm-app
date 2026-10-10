@@ -2,12 +2,14 @@ package org.balch.orpheus.ui.widgets
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,7 +58,13 @@ val DropdownIconSize: Dp = 16.dp
 private val DropdownCornerRadius: Dp = 6.dp
 private val DropdownLabelGap: Dp = 2.dp
 private val DropdownLabelFontSize: TextUnit = 9.sp
-private val DropdownValueFontSize: TextUnit = 11.sp
+internal val DropdownValueFontSize: TextUnit = 11.sp
+
+/** A `hero` dropdown's bigger value, arrow, caption and insets. */
+internal val DropdownHeroValueFontSize: TextUnit = 16.sp
+internal val DropdownHeroIconSize: Dp = 22.dp
+private val DropdownHeroLabelFontSize: TextUnit = 13.sp
+private val DropdownHeroVerticalPadding: Dp = 10.dp
 
 private val DropdownBackground: Color get() = OrpheusColors.darkVoid.copy(alpha = 0.6f)
 
@@ -83,6 +91,9 @@ private val DropdownBackground: Color get() = OrpheusColors.darkVoid.copy(alpha 
  *   [DropdownCycleMinWidth].
  * @param onLongClick optional long press. Pulsar's VIBE triggers the manual anomaly with it and
  *   ENDING arms the outro.
+ * @param hero for a dropdown with a row to itself (the DJ app's VIBE): the surface fills the width
+ *   [modifier] gives, value centered, taller and outlined in [labelColor]. Pair it with a
+ *   [DropdownValueText] at [DropdownHeroValueFontSize].
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -94,6 +105,7 @@ fun LabeledDropdown(
     background: Color = DropdownBackground,
     minWidth: Dp = Dp.Unspecified,
     onLongClick: (() -> Unit)? = null,
+    hero: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Column(
@@ -104,20 +116,28 @@ fun LabeledDropdown(
             text = label,
             style = MaterialTheme.typography.labelSmall.proportional(),
             color = labelColor,
-            fontSize = DropdownLabelFontSize,
+            fontSize = if (hero) DropdownHeroLabelFontSize else DropdownLabelFontSize,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
         )
 
         Spacer(Modifier.height(DropdownLabelGap))
 
+        val shape = RoundedCornerShape(DropdownCornerRadius)
         Box(
             // Order matters. Clip bounds the press ripple to the rounded corners, and the width
             // floor and padding sit below the click handler so the whole surface stays tappable.
             // The height floor goes below the padding so it sizes the value, not the whole
             // surface, and lands on the same total height as a dropdown carrying an arrow.
             modifier = Modifier
-                .clip(RoundedCornerShape(DropdownCornerRadius))
+                .then(
+                    if (hero) {
+                        Modifier.fillMaxWidth().border(1.dp, labelColor.copy(alpha = 0.45f), shape)
+                    } else {
+                        Modifier
+                    }
+                )
+                .clip(shape)
                 .background(background)
                 .combinedClickable(
                     onClick = onClick,
@@ -126,7 +146,7 @@ fun LabeledDropdown(
                 .defaultMinSize(minWidth = minWidth)
                 .padding(
                     horizontal = DropdownHorizontalPadding,
-                    vertical = DropdownVerticalPadding,
+                    vertical = if (hero) DropdownHeroVerticalPadding else DropdownVerticalPadding,
                 )
                 .defaultMinSize(minHeight = DropdownIconSize),
             contentAlignment = Alignment.Center,
@@ -146,13 +166,14 @@ fun DropdownValueText(
     text: String,
     color: Color,
     modifier: Modifier = Modifier,
+    fontSize: TextUnit = DropdownValueFontSize,
 ) {
     Text(
         modifier = modifier,
         text = text,
         color = color,
         fontWeight = FontWeight.Bold,
-        fontSize = DropdownValueFontSize,
+        fontSize = fontSize,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         textAlign = TextAlign.Center,

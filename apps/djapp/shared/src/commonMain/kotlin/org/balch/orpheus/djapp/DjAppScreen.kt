@@ -88,6 +88,7 @@ import org.balch.orpheus.features.pulsar.EndsPanel
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarGridHeight
 import org.balch.orpheus.features.pulsar.PulsarPanel
+import org.balch.orpheus.features.pulsar.PulsarSelectors
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.mixer.MixerPanel
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
@@ -278,8 +279,8 @@ fun DjAppScreen(
                                 // instead (routePanel's docked=true only ever happens in the dock).
                                 showEndingControl = !docked,
                                 // The dock's top bar carries the one Vibe picker (and the anomaly
-                                // long-press); the docked panel drops its own duplicate chip.
-                                showVibePicker = !docked,
+                                // long-press), so the docked panel has no selector row at all.
+                                selectors = if (docked) PulsarSelectors.None else PulsarSelectors.VibeOnly,
                             )
                             DjTab -> DjPanel(
                                 feature = djFeature,
@@ -609,6 +610,7 @@ internal fun DjAppMainContent(
                         // Top-anchored: centred, a short wide window left ~140dp dead above the selectors.
                         centerContent = false,
                         gridHeight = gridHeight,
+                        selectors = PulsarSelectors.VibeOnly,
                     )
                     navContent(Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade))
                 }
@@ -657,6 +659,7 @@ internal fun DjAppMainContent(
                         showCollapsedHeader = false,
                         showExpandedTitle = false,
                         gridHeight = gridHeight,
+                        selectors = PulsarSelectors.VibeOnly,
                     )
                     lowerPanels(Modifier.weight(.4f).fillMaxWidth())
                 }
@@ -685,6 +688,7 @@ internal fun DjAppMainContent(
                         onExpandedChange = {},
                         showCollapsedHeader = false,
                         showExpandedTitle = false,
+                        selectors = PulsarSelectors.VibeOnly,
                     )
                 },
                 bottom = { mod ->
@@ -1109,6 +1113,7 @@ private fun DjAppPreviewLayout(
                 onExpandedChange = {},
                 showCollapsedHeader = false,
                 showExpandedTitle = false,
+                selectors = PulsarSelectors.VibeOnly,
             )
             tabContent(Modifier.weight(.5f).fillMaxHeight())
         }
@@ -1130,6 +1135,7 @@ private fun DjAppPreviewLayout(
                 onExpandedChange = {},
                 showCollapsedHeader = false,
                 showExpandedTitle = false,
+                selectors = PulsarSelectors.VibeOnly,
             )
             tabContent(Modifier.weight(.4f).fillMaxWidth())
         }

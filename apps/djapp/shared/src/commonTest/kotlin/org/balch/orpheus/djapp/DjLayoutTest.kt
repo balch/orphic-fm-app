@@ -79,14 +79,19 @@ class DjLayoutTest {
 
     @Test
     fun aSlotWithRoomKeepsTheFullGrid() {
-        assertEquals(120.dp, pulsarGridHeightFor(slot = 350.dp, full = 120.dp))
+        assertEquals(120.dp, pulsarGridHeightFor(slot = 370.dp, full = 120.dp))
         assertEquals(120.dp, pulsarGridHeightFor(slot = 500.dp, full = 120.dp))
     }
 
     @Test
-    fun closedDuoSlotTakesItsShortfallOffTheGrid() {
-        // 60% of the 512dp column under the header: 43dp short of a clean panel.
-        assertEquals(77.dp, pulsarGridHeightFor(slot = 307.dp, full = 120.dp))
+    fun aShortSlotTakesItsShortfallOffTheGrid() {
+        assertEquals(90.dp, pulsarGridHeightFor(slot = 340.dp, full = 120.dp))
+    }
+
+    @Test
+    fun closedDuoSlotBottomsOutAtTheMinimumGrid() {
+        // 60% of the 512dp column under the header: 63dp short of a clean panel with the hero VIBE row.
+        assertEquals(PulsarGridMinHeight, pulsarGridHeightFor(slot = 307.dp, full = 120.dp))
     }
 
     @Test

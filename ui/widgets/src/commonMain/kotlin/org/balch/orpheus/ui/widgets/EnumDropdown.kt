@@ -176,6 +176,7 @@ private class AnchoredMenuPositionProvider(private val gapPx: Int) : PopupPositi
  * @param valueMaxWidth optional ceiling on the value text, which ellipsizes past it. Caps how much
  *   of a row one long value can take, so the row stays predictable at any name length. The arrow
  *   sits outside it and is never pushed off.
+ * @param hero see [LabeledDropdown]'s; also sizes the value and arrow up to match.
  */
 @Composable
 fun <T> EnumDropdown(
@@ -195,6 +196,7 @@ fun <T> EnumDropdown(
     // ~8 rows at 48dp. M3's menu grew to nearly the full window on a 47-item list; capping it
     // keeps the popup on screen without making browsing feel cramped.
     menuMaxHeight: Dp = 400.dp,
+    hero: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val backgroundColor by animateColorAsState(
@@ -220,6 +222,7 @@ fun <T> EnumDropdown(
         background = backgroundColor,
         minWidth = minWidth,
         onLongClick = onLongPress,
+        hero = hero,
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -231,12 +234,13 @@ fun <T> EnumDropdown(
                 // Measured after the arrow and takes the leftover, so a squeezed chip ellipsizes
                 // its value instead of pushing the arrow off.
                 modifier = Modifier.weight(1f, fill = false).widthIn(max = valueMaxWidth),
+                fontSize = if (hero) DropdownHeroValueFontSize else DropdownValueFontSize,
             )
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
                 contentDescription = "Select $label",
                 tint = color,
-                modifier = Modifier.size(DropdownIconSize),
+                modifier = Modifier.size(if (hero) DropdownHeroIconSize else DropdownIconSize),
             )
         }
 

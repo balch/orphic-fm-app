@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import org.balch.orpheus.features.pulsar.PulsarPanel
+import org.balch.orpheus.features.pulsar.PulsarSelectors
 import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -26,7 +28,7 @@ import kotlin.test.assertTrue
  */
 class PulsarSelectorRowTest {
 
-    private class Node(val texts: List<String>, val bounds: Rect)
+    private class Node(val texts: List<String>, val bounds: Rect, val clickable: Boolean)
 
     private val previewVibe = PulsarViewModel.previewFeature().vibeList.first()
 
@@ -47,7 +49,11 @@ class PulsarSelectorRowTest {
     // where both VIBE and SCALE fit at their natural size.
     private val comfortableWidth = 466
 
-    private fun render(width: Int, uiState: PulsarUiState, showVibe: Boolean = true): List<Node> {
+    private fun render(
+        width: Int,
+        uiState: PulsarUiState,
+        selectors: PulsarSelectors = PulsarSelectors.All,
+    ): List<Node> {
         val scene = ImageComposeScene(width, 200, Density(1f)) {
             OrpheusTheme {
                 Box(Modifier.fillMaxSize()) {
@@ -56,7 +62,7 @@ class PulsarSelectorRowTest {
                         isExpanded = true,
                         showCollapsedHeader = false,
                         showExpandedTitle = false,
-                        showVibePicker = showVibe,
+                        selectors = selectors,
                     )
                 }
             }
@@ -69,6 +75,7 @@ class PulsarSelectorRowTest {
                     out += Node(
                         texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text },
                         bounds = node.boundsInRoot,
+                        clickable = SemanticsActions.OnClick in node.config,
                     )
                     node.children.forEach(::walk)
                 }
@@ -143,17 +150,39 @@ class PulsarSelectorRowTest {
         assertTrue(shown in 158f..161f, "capped value should sit at ~160dp, was ${shown}px")
     }
 
+    /** The VIBE chip: the clickable node holding the vibe's name. */
+    private fun List<Node>.vibeChip(name: String): Node {
+        val value = value(name).bounds
+        return filter { it.clickable && it.bounds.contains(value.center) }.minBy { it.bounds.width }
+    }
+
     @Test
-    fun dockedRowWithoutVibeIsUnchanged() {
-        val natural = render(2000, techno, showVibe = false)
-        val nodes = render(narrowWidth, techno, showVibe = false)
+    fun vibeOnlyDropsRootScaleAndEnvAndSpansTheGrid() {
+        val nodes = render(narrowWidth, techno, PulsarSelectors.VibeOnly)
         for (text in listOf("C#", "Pentatonic", "BLEND")) {
-            val naturalWidth = natural.value(text).bounds.width
-            val shownWidth = nodes.value(text).bounds.width
-            assertTrue(
-                shownWidth >= naturalWidth - 1f,
-                "\"$text\" shrank to ${shownWidth}px of ${naturalWidth}px with VIBE hidden",
-            )
+            assertTrue(nodes.none { text in it.texts }, "\"$text\" still shows with VibeOnly")
+        }
+        val chip = nodes.vibeChip("Techno Wobble").bounds.width
+        // The grid is 360dp; the panel's own inset takes a little of a 360dp scene.
+        assertTrue(chip >= 300f, "VIBE chip is ${chip}px, not the row's width")
+
+        val wide = render(1000, techno, PulsarSelectors.VibeOnly).vibeChip("Techno Wobble").bounds.width
+        assertTrue(wide in 355f..361f, "VIBE chip should stop at the 360dp grid width, was ${wide}px")
+    }
+
+    @Test
+    fun vibeOnlyLiftsTheNameCap() {
+        val longName = "Kaleidoscope Drift Kaleidoscope Drift"
+        val state = PulsarUiState(vibe = previewVibe.copy(name = longName))
+        val shown = render(1000, state, PulsarSelectors.VibeOnly).value(longName).bounds.width
+        assertTrue(shown > 170f, "a lone VIBE should outgrow the 160dp row cap, was ${shown}px")
+    }
+
+    @Test
+    fun noneDropsTheWholeRow() {
+        val nodes = render(narrowWidth, techno, PulsarSelectors.None)
+        for (text in listOf("VIBE", "Techno Wobble", "C#", "Pentatonic", "BLEND")) {
+            assertTrue(nodes.none { text in it.texts }, "\"$text\" still shows with None")
         }
     }
 }
