@@ -1,3 +1,5 @@
+A Cleaner UI with a Big Fat Vibe Picker
+
 This release is all about the Play button
 
 • Enjoy the big Play button with Vibe title above
