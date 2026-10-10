@@ -321,6 +321,7 @@ if(BUILD_TESTS)
         test/test_pulsar_section_request.cpp
         test/test_pulsar_timing.cpp
         test/test_pulsar_start.cpp
+        test/test_pulsar_kraken.cpp
         test/test_pulsar_lick_marshalling.cpp
         test/test_pulsar_bass_line.cpp
         test/test_pulsar_lick_offset.cpp

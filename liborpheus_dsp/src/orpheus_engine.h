@@ -1076,6 +1076,10 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_lick_wah_data[1 + 8 * kLickWahFields] = {};
     // Anomaly manual-trigger counter (edge-detected in the pulsar unit).
     std::atomic<int>   pulsar_anomaly_request{0};
+    // Kraken performance key shift (pulsar_kraken.h): target index, held or latched, press counter.
+    std::atomic<int>   pulsar_kraken_target{0};
+    std::atomic<int>   pulsar_kraken_held{0};
+    std::atomic<int>   pulsar_kraken_presses{0};
     // Per-track section overrides. Stride: 8 sections × 8 tracks. -1 sentinel
     // means "no override — use the track's base value". Read at vibe load and
     // consulted at section transitions for chordal pattern regeneration and

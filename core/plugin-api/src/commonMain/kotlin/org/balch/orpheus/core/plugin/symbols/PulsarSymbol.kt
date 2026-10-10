@@ -1400,6 +1400,12 @@ enum class PulsarSymbol(
     PULSAR_REVERB_SIZE("pulsar_reverb_size"),
     PULSAR_REVERB_DAMPING("pulsar_reverb_damping"),
     PULSAR_REVERB_BRIGHTNESS("pulsar_reverb_brightness"),
+
+    // Kraken performance key shift (DJ app). Native-only: never registered with the plugin,
+    // so no preset saves a shift and every boot starts at home.
+    KRAKEN_TARGET("kraken_target"),
+    KRAKEN_HELD("kraken_held"),
+    KRAKEN_PRESSES("kraken_presses"),
     ;
 
     companion object {

@@ -17,6 +17,7 @@ import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.core.plugin.viz.ScopeFrame
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -348,6 +349,7 @@ class SynthEngineMonitor(
             val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
             val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
             var lastVoidGain = 1f
+            var lastKrakenShift = -1
             // Previous-tick snapshots for change gating: emitting PulsarVizData
             // allocates ~16 arrays; at 60fps that is ~1000 allocs/sec even when
             // the step grid is static. Compare raw bridge buffers first and
@@ -359,6 +361,7 @@ class SynthEngineMonitor(
             val prevActiveEngines = IntArray(pulsarActiveEngines.size)
             val prevTrackLevels = FloatArray(PULSAR_NUM_TRACKS)
             var prevVoidGain = -1f
+            var prevKrakenShift = -1
             var everEmitted = false
             while (isActive) {
                 nativeBridge.nativeGetPulsarViz(
@@ -380,9 +383,14 @@ class SynthEngineMonitor(
                 if (voidGainCount > 0) {
                     lastVoidGain = pulsarVizBuf[voidGainCount - 1].coerceIn(0f, 1f)
                 }
+                vizReadPosBuf[0] = pulsarReadPos[VIZ_PULSAR_KRAKEN]
+                val krakenCount = nativeBridge.nativeGetViz(VIZ_PULSAR_KRAKEN, pulsarVizBuf, vizReadPosBuf)
+                pulsarReadPos[VIZ_PULSAR_KRAKEN] = vizReadPosBuf[0]
+                if (krakenCount > 0) lastKrakenShift = pulsarVizBuf[krakenCount - 1].roundToInt()
 
                 val changed = !everEmitted ||
                     lastVoidGain != prevVoidGain ||
+                    lastKrakenShift != prevKrakenShift ||
                     !pulsarPlayheads.contentEquals(prevPlayheads) ||
                     !trackLevels.contentEquals(prevTrackLevels) ||
                     !pulsarGates.contentEquals(prevGates) ||
@@ -398,6 +406,7 @@ class SynthEngineMonitor(
                         stepCounts = pulsarStepCounts.copyOf(),
                         trackLevels = trackLevels,
                         voidGain = lastVoidGain,
+                        krakenShift = lastKrakenShift,
                         activeEngines = pulsarActiveEngines.copyOf(),
                     )
                     pulsarGates.copyInto(prevGates)
@@ -407,6 +416,7 @@ class SynthEngineMonitor(
                     pulsarActiveEngines.copyInto(prevActiveEngines)
                     trackLevels.copyInto(prevTrackLevels)
                     prevVoidGain = lastVoidGain
+                    prevKrakenShift = lastKrakenShift
                     everEmitted = true
                 }
 
@@ -692,7 +702,8 @@ class SynthEngineMonitor(
         private const val VIZ_PULSAR_TRACK_0 = 29
         private const val VIZ_BEAT_PHASE = 37
         private const val VIZ_PULSAR_VOID_GAIN = 38  // Void Anomaly live gain (1.0 = idle)
-        private const val VIZ_CHANNEL_COUNT = 39  // 29 + 8 pulsar tracks + beat_phase + void_gain
+        private const val VIZ_PULSAR_KRAKEN = 39  // Kraken shift in effect (-1 = home)
+        private const val VIZ_CHANNEL_COUNT = 40  // 29 + 8 pulsar tracks + beat_phase + void_gain + kraken
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

@@ -21,6 +21,7 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  * @param voidGain Live Void Anomaly gain (1.0 = idle/no duck, dips toward the
  *   arc's floor while active). Rides the same fast viz-ring transport as
  *   [trackLevels]; drives the VIBE dropdown's glow in PulsarPanel.
+ * @param krakenShift The Kraken shift the engine has in effect (-1 = home), switched on beat lines.
  * @param activeEngines Live per-track engine id the DSP is actually playing
  *   (reflects the random crossfade + section energy overrides). -1 = unset.
  */
@@ -32,6 +33,7 @@ data class PulsarVizData(
     val trackLevels: FloatArray = FloatArray(NUM_TRACKS),  // per-track peak audio level 0..1
     val voidGain: Float = 1f,
     val activeEngines: IntArray = IntArray(NUM_TRACKS) { -1 },
+    val krakenShift: Int = -1,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -43,6 +45,7 @@ data class PulsarVizData(
         if (!trackLevels.contentEquals(other.trackLevels)) return false
         if (voidGain != other.voidGain) return false
         if (!activeEngines.contentEquals(other.activeEngines)) return false
+        if (krakenShift != other.krakenShift) return false
         return true
     }
 
@@ -54,6 +57,7 @@ data class PulsarVizData(
         result = 31 * result + trackLevels.contentHashCode()
         result = 31 * result + voidGain.hashCode()
         result = 31 * result + activeEngines.contentHashCode()
+        result = 31 * result + krakenShift
         return result
     }
 }

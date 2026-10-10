@@ -1293,6 +1293,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strcmp(symbol, "anomaly_request") == 0)
             engine->pulsar_anomaly_request.store(static_cast<int>(value), std::memory_order_release);
+        else if (std::strcmp(symbol, "kraken_target") == 0)
+            engine->pulsar_kraken_target.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "kraken_held") == 0)
+            engine->pulsar_kraken_held.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "kraken_presses") == 0)
+            engine->pulsar_kraken_presses.store(static_cast<int>(value), std::memory_order_release);
         else if (std::strncmp(symbol, "section_track_comping_", 22) == 0) {
             int idx = std::atoi(symbol + 22);
             if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)

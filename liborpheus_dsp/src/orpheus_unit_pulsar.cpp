@@ -19,6 +19,7 @@
 #include "pulsar_score_sched.h"
 #include "pulsar_lick_growth.h"
 #include "pulsar_lick_calm.h"
+#include "pulsar_kraken.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -1220,6 +1221,31 @@ static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
     return regenerated;
 }
 
+// Home with no press owed a beat: a pause or a vibe load ends any shift.
+static void kraken_clear(PulsarState* state, OrpheusEngine* engine) {
+    state->kraken_effective = kKrakenHome;
+    state->kraken_stab_pending = false;
+    state->kraken_commit_boundary = -1;
+    state->kraken_prev_presses = engine->pulsar_kraken_presses.load(std::memory_order_acquire);
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        state->tracks[t].kraken_shift = kKrakenHome;
+        state->tracks[t].kraken_base_valid = false;
+    }
+}
+
+// Moves a track onto the committed shift; a melodic note still sounding slides to its new pitch.
+static void kraken_switch_track(const PulsarState* state, PulsarTrackState& ts,
+                                int home_root, int home_scale) {
+    ts.kraken_shift = state->kraken_effective;
+    if (ts.role == TrackRole::PERCUSSIVE || !ts.kraken_base_valid) return;
+    if (!(ts.voice_active || ts.in_hold) || ts.arp_note_count > 0) return;
+    int note = kraken_apply(static_cast<int>(ts.kraken_base_pitch), home_root, home_scale, ts.kraken_shift);
+    if (note < 0) note = 0;
+    if (note > 127) note = 127;
+    ts.target_pitch = static_cast<float>(note);
+    ts.glide_rate = kKrakenGlideRate;
+}
+
 static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
     // ── Clear generative runtime state from the previous vibe ───────────
     // Solo modifiers, live-lick caches, and anchor indices all carry musical
@@ -2413,6 +2439,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     engine->pulsar_score_accent_scale.store(1.0f, std::memory_order_relaxed);
     engine->pulsar_anomaly_request.store(0, std::memory_order_relaxed);
     state->prev_anomaly_request = 0;
+    kraken_clear(state, engine);
     state->force_lick_anomaly = false;  // per-vibe hygiene: no forced anomaly carries over
 
     state->current_vibe_generation = generation;
@@ -2722,6 +2749,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memset(engine->pulsar_delay_send_r, 0, num_frames * sizeof(float));
         std::memset(engine->pulsar_reverb_send_l, 0, num_frames * sizeof(float));
         std::memset(engine->pulsar_reverb_send_r, 0, num_frames * sizeof(float));
+        kraken_clear(state, engine);
+        engine->viz_rings[VIZ_PULSAR_KRAKEN].write(static_cast<float>(kKrakenHome));
         // Report the void glow as idle while paused/muted: this return sits above the
         // void-gain pre-pass and its viz write, so without these two lines a pause
         // mid-duck freezes the Kotlin VIBE-dropdown tint at the ring's last (ducked)
@@ -2773,6 +2802,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->last_root_note = live_root;
         state->last_scale_index = live_scale;
     }
+
+    // ── Kraken: what the next beat line commits ──
+    int kraken_target = engine->pulsar_kraken_target.load(std::memory_order_relaxed);
+    if (kraken_target < 0 || kraken_target >= kKrakenTargetCount) kraken_target = KRAKEN_IV;
+    const bool kraken_held = engine->pulsar_kraken_held.load(std::memory_order_relaxed) != 0;
+    const int kraken_presses = engine->pulsar_kraken_presses.load(std::memory_order_acquire);
+    if (kraken_presses != state->kraken_prev_presses) {
+        state->kraken_prev_presses = kraken_presses;
+        state->kraken_stab_pending = true;
+    }
+    const int kraken_desired = (kraken_held || state->kraken_stab_pending) ? kraken_target : kKrakenHome;
+    state->kraken_commit_boundary = -1;
+    bool kraken_beat_seen = false;  // only track 0's first beat line this block decides
 
     // ── Read and smooth macros (~10ms time constant) ──
     // This runs once per BLOCK, so the exponent scales with the frames advanced
@@ -3446,6 +3488,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             repick_seg_start = boundary_at;
             ts.repick_live = false;
             if (ts.playhead % 4 == 0) ts.beat_origin = boundary_at;
+            // Kraken switches on track 0's first beat line this block, at the same b on every track.
+            if (t == 0 && ts.playhead % 4 == 0 && !kraken_beat_seen) {
+                kraken_beat_seen = true;
+                state->kraken_stab_pending = false;  // this beat is the stab's
+                if (kraken_desired != state->kraken_effective) {
+                    state->kraken_effective = kraken_desired;
+                    state->kraken_commit_boundary = b;
+                }
+            }
+            if (b == state->kraken_commit_boundary) kraken_switch_track(state, ts, live_root, live_scale);
 
             // Advance chord progression on track 0 step boundaries. The load
             // boundary is not an elapsed 16th, so ticking it here would put the
@@ -4858,6 +4910,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 }
                             }
 
+                            // Kraken shift, the last fire-time transform (pulsar_kraken.h).
+                            if (ts.role != TrackRole::PERCUSSIVE) {
+                                ts.kraken_base_pitch = static_cast<float>(midi_note);
+                                ts.kraken_base_valid = true;
+                                midi_note = kraken_apply(midi_note, live_root, live_scale, ts.kraken_shift);
+                            }
+
                             // Clamp to valid MIDI range
                             if (midi_note < 0) midi_note = 0;
                             if (midi_note > 127) midi_note = 127;
@@ -4870,10 +4929,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 bool use_arp = (ts.arp_mode == ArpModeId::ALWAYS)
                                                || !engine_has_native_chord(ts.engine_index);
                                 if (use_arp) {
+                                    ts.kraken_base_valid = false;  // arp notes are never re-pitched
                                     int cd = state->chord_state.progression[state->chord_state.chord_index];
                                     int arp_si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
                                     if (arp_si < 0) arp_si = 0;
                                     if (arp_si >= kNumPulsarScales) arp_si = kNumPulsarScales - 1;
+                                    arp_si = kraken_scale_for(ts.kraken_shift, arp_si);
                                     const PulsarScale& arp_sc = kPulsarScales[arp_si];
 
                                     uint32_t seed = static_cast<uint32_t>(
@@ -6011,6 +6072,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     // ── Write visualization data ──
     publish_pulsar_viz(state, engine);
+    engine->viz_rings[VIZ_PULSAR_KRAKEN].write(static_cast<float>(state->kraken_effective));
 
     #undef PULSAR_PICK
 }

@@ -331,6 +331,9 @@ struct PulsarTrackState {
     // Pitch glide (portamento)
     float current_pitch;     // smoothed pitch for rendering
     float target_pitch;      // target from current step
+    int kraken_shift = -1;           // Kraken shift this track plays under (-1 = home)
+    float kraken_base_pitch = 0.0f;  // last fired pitch before the Kraken shift
+    bool kraken_base_valid = false;
     float glide_rate;        // per-sample pitch change (MIDI notes/sample)
     bool prev_step_gated;    // was the previous step also gated
     // Set when a gated step is rejected (density roll, duck, solo simplify). Makes
@@ -1211,6 +1214,11 @@ struct PulsarState {
     VoidAnomaly void_state;
     uint32_t void_seed = 0;             // play-scoped RNG, independent of mutation_seed
     int prev_anomaly_request = 0;       // edge-detect mirror of pulsar_anomaly_request
+    // Kraken (pulsar_kraken.h): the shift in effect, switched on beat lines.
+    int kraken_effective = -1;        // -1 = home
+    int kraken_prev_presses = 0;      // edge-detect mirror of pulsar_kraken_presses
+    bool kraken_stab_pending = false; // a press not yet given its beat
+    int kraken_commit_boundary = -1;  // boundary index this block switches at, -1 = none
     bool void_declared = false;         // true when this vibe opts into the void (void_data[7])
 
     // Wah Anomaly (dispatched by the Anomaly Engine, arms a per-track insert on the
