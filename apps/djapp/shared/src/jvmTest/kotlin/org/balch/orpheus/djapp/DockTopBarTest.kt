@@ -2,6 +2,7 @@ package org.balch.orpheus.djapp
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -44,8 +45,16 @@ import kotlin.time.Duration.Companion.seconds
  */
 class DockTopBarTest {
 
-    /** The real chrome at [width] x 720, Timer docked; [longest], the longest vibe name and ending style. */
-    private class Dock(val width: Int, longest: Boolean = true, timer: TimerFeature = TimerViewModel.previewFeature()) {
+    /**
+     * The real chrome at [width] x 720, Timer docked; [longest], the longest vibe name and ending
+     * style; [kraken], the Kraken pad beside the vibe picker.
+     */
+    private class Dock(
+        val width: Int,
+        longest: Boolean = true,
+        timer: TimerFeature = TimerViewModel.previewFeature(),
+        kraken: Boolean = false,
+    ) {
         val toggled = mutableListOf<DjRoute>()
         private val pulsar: PulsarFeature = run {
             val base = PulsarViewModel.previewFeature()
@@ -62,24 +71,26 @@ class DockTopBarTest {
         val scene = ImageComposeScene(width, 720, Density(1f)) {
             OrpheusTheme {
                 Box(Modifier.fillMaxSize()) {
-                    DjAppTvChrome(
-                        tvHardware = false,
-                        domeRingSize = BarRingSize,
-                        barGlass = false,
-                        vizHidesPanelsWhenIdle = false,
-                        focusRegion = TvFocusRegionHolder(),
-                        vizFeature = VizViewModel.previewFeature(),
-                        pulsarFeature = pulsar,
-                        timerFeature = timer,
-                        onTogglePlayback = {},
-                        dockablePanels = largeScreenPanels(),
-                        dockedPanels = listOf(TimerTab, DjTab),
-                        activeSheet = null,
-                        tabs = djTabs,
-                        onToggleDocked = { toggled += it },
-                        onActiveSheetChange = {},
-                        stage = {},
-                    )
+                    CompositionLocalProvider(LocalShowKraken provides kraken) {
+                        DjAppTvChrome(
+                            tvHardware = false,
+                            domeRingSize = BarRingSize,
+                            barGlass = false,
+                            vizHidesPanelsWhenIdle = false,
+                            focusRegion = TvFocusRegionHolder(),
+                            vizFeature = VizViewModel.previewFeature(),
+                            pulsarFeature = pulsar,
+                            timerFeature = timer,
+                            onTogglePlayback = {},
+                            dockablePanels = largeScreenPanels(),
+                            dockedPanels = listOf(TimerTab, DjTab),
+                            activeSheet = null,
+                            tabs = djTabs,
+                            onToggleDocked = { toggled += it },
+                            onActiveSheetChange = {},
+                            stage = {},
+                        )
+                    }
                 }
             }
         }
@@ -100,6 +111,13 @@ class DockTopBarTest {
             },
             "no \"$label\" control at ${width}dp",
         )
+
+        /** The Kraken hold surface, if the bar shows one. */
+        fun padOrNull(): SemanticsNode? = merged.firstOrNull { n ->
+            n.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().any { it.startsWith("Kraken") }
+        }
+
+        fun pad(): SemanticsNode = assertNotNull(padOrNull(), "no Kraken pad at ${width}dp")
 
         /** A picker's clickable node, by the name its arrow gives a screen reader, prefix shown or not. */
         fun picker(name: String): SemanticsNode = assertNotNull(
@@ -248,28 +266,65 @@ class DockTopBarTest {
 
     // Below about 930dp (the dock's 900dp floor) the pickers drop their prefixes and show values
     // alone, whole, while still naming themselves to a screen reader; at 1032dp and up, the right
-    // group has the whole side to itself, so both keep their prefix and still fit whole.
+    // group has the whole side to itself, so both keep their prefix and still fit whole. With the
+    // Kraken pad beside the Vibe picker, the threshold moves up to about 1164dp.
     @Test
     fun thePickersDropTheirPrefixOnlyBelowTheThreshold() {
         val vibe = PulsarViewModel.previewFeature().stateFlow.value.vibe.name
-        val dock900 = Dock(900, longest = false)
-        try {
-            listOf("Vibe: ", "Viz: ").forEach { assertTrue(!dock900.shows(it), "at 900dp a picker still shows \"$it\"") }
-            assertTrue(dock900.whole(vibe), "at 900dp the Vibe picker ellipsised \"$vibe\"")
-            assertTrue(dock900.whole("Off"), "at 900dp the Viz picker ellipsised its value")
-            val title = dock900.title
-            val pickers = listOf("Vibe", "Viz").map { dock900.picker(it).bounds }
-            pickers.forEach { assertTrue(it.left >= title.right, "at 900dp the picker $it is not after the title $title") }
-            assertTrue(pickers[0].right <= pickers[1].left, "at 900dp the pickers are out of order: $pickers")
-        } finally {
-            dock900.close()
+        for (kraken in listOf(false, true)) {
+            val (narrowWidths, wideWidths) =
+                if (kraken) listOf(900, 1032) to listOf(1280, 1920) else listOf(900) to listOf(1032, 1280, 1920)
+            narrowWidths.forEach { width ->
+                val narrow = Dock(width, longest = false, kraken = kraken)
+                try {
+                    val at = "at ${width}dp (kraken=$kraken)"
+                    listOf("Vibe: ", "Viz: ").forEach { assertTrue(!narrow.shows(it), "$at a picker still shows \"$it\"") }
+                    assertTrue(narrow.whole(vibe), "$at the Vibe picker ellipsised \"$vibe\"")
+                    assertTrue(narrow.whole("Off"), "$at the Viz picker ellipsised its value")
+                    val title = narrow.title
+                    val pickers = listOf("Vibe", "Viz").map { narrow.picker(it).bounds }
+                    pickers.forEach { assertTrue(it.left >= title.right, "$at the picker $it is not after the title $title") }
+                    assertTrue(pickers[0].right <= pickers[1].left, "$at the pickers are out of order: $pickers")
+                } finally {
+                    narrow.close()
+                }
+            }
+            wideWidths.forEach { width ->
+                val dock = Dock(width, longest = false, kraken = kraken)
+                try {
+                    assertTrue(dock.shows("Vibe: ") && dock.shows("Viz: "), "at ${width}dp (kraken=$kraken) a picker lost its prefix")
+                    assertTrue(dock.whole(vibe), "at ${width}dp (kraken=$kraken) the Vibe picker ellipsised \"$vibe\"")
+                    assertTrue(dock.whole("Off"), "at ${width}dp (kraken=$kraken) the Viz picker ellipsised its value")
+                } finally {
+                    dock.close()
+                }
+            }
         }
-        listOf(1032, 1280, 1920).forEach { width ->
+    }
+
+    @Test
+    fun theBarHasNoKrakenPadWithoutTheFlag() {
+        listOf(900, 1280).forEach { width ->
             val dock = Dock(width, longest = false)
             try {
-                assertTrue(dock.shows("Vibe: ") && dock.shows("Viz: "), "at ${width}dp a picker lost its prefix")
-                assertTrue(dock.whole(vibe), "at ${width}dp the Vibe picker ellipsised \"$vibe\"")
-                assertTrue(dock.whole("Off"), "at ${width}dp the Viz picker ellipsised its value")
+                assertTrue(dock.padOrNull() == null, "at ${width}dp the Kraken pad shows with the flag off")
+            } finally {
+                dock.close()
+            }
+        }
+    }
+
+    // A touch tablet holds the Kraken with a thumb, so the surface stays at least 44dp wide from
+    // 1032dp up and never reaches the title or the viz picker.
+    @Test
+    fun theKrakenPadKeepsAThumbSizedSurface() {
+        listOf(900, 1032, 1280, 1920).forEach { width ->
+            val dock = Dock(width, longest = false, kraken = true)
+            try {
+                val pad = dock.pad().bounds
+                if (width >= 1032) assertTrue(pad.width >= 44f, "at ${width}dp the Kraken surface is only ${pad.width} wide")
+                assertTrue(pad.left >= dock.title.right, "at ${width}dp the pad $pad is not after the title ${dock.title}")
+                assertTrue(pad.right <= dock.picker("Viz").bounds.left, "at ${width}dp the pad $pad overlaps the viz picker ${dock.picker("Viz").bounds}")
             } finally {
                 dock.close()
             }

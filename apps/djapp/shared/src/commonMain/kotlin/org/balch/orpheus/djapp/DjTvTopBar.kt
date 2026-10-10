@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +68,9 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.kraken.KrakenPadSurface
+import org.balch.orpheus.features.pulsar.kraken.KrakenPadWidth
+import org.balch.orpheus.features.pulsar.kraken.KrakenTargetLabel
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerStatus
 import org.balch.orpheus.features.timer.TimerViewModel
@@ -155,6 +159,19 @@ private val TvTopBarMinSideWidth = 120.dp
  * would ellipsise, so both pickers drop their prefix and show the value alone.
  */
 private val TvTopBarPickerPrefixWidth = 345.dp
+
+/**
+ * [TvTopBarPickerPrefixWidth] with the Kraken pad (target button and hold surface) beside the vibe
+ * picker, about 115dp more, so a bar gives it from (460 + 12) * 2 + 180 = 1164dp.
+ */
+private val TvTopBarKrakenPrefixWidth = 460.dp
+
+/**
+ * The side budget below which the Kraken hold surface shrinks to a sliver. The values without
+ * prefixes need about 275dp and the full pad about 112dp, so the full pad fits from about 984dp
+ * and a thumb-sized surface survives an iPad's 1032dp portrait bar.
+ */
+private val TvTopBarFullPadWidth = 390.dp
 
 /**
  * The left group's toggle padding, icon and icon-to-label gap, and the gap between toggles — the
@@ -284,7 +301,10 @@ fun DjTvTopBar(
                 val sideBudget = ((maxWidth - TvTopBarTitleReserve) / 2 - TvTopBarTitleClearance)
                     .coerceAtLeast(TvTopBarMinSideWidth)
                 // The only remaining narrow-bar effect: below this, the pickers drop their prefixes.
-                val picksShowPrefix = sideBudget >= TvTopBarPickerPrefixWidth
+                val showKraken = LocalShowKraken.current
+                val picksShowPrefix =
+                    sideBudget >= if (showKraken) TvTopBarKrakenPrefixWidth else TvTopBarPickerPrefixWidth
+                val padCompact = sideBudget < TvTopBarFullPadWidth
                 Row(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
@@ -330,11 +350,18 @@ fun DjTvTopBar(
                     gap = 10.dp,
                     modifier = Modifier.align(Alignment.CenterEnd).widthIn(max = sideBudget),
                     first = {
-                        TvVibePicker(
-                            pulsarFeature = pulsarFeature,
-                            showLabel = picksShowPrefix,
-                            previewFocused = previewFocusedButton == TvTopBarButtonId.VIBE_PICKER,
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(if (padCompact) 4.dp else 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TvVibePicker(
+                                pulsarFeature = pulsarFeature,
+                                showLabel = picksShowPrefix,
+                                previewFocused = previewFocusedButton == TvTopBarButtonId.VIBE_PICKER,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            if (showKraken) TvKrakenPad(pulsarFeature = pulsarFeature, compact = padCompact)
+                        }
                     },
                     second = {
                         TvVizPicker(
@@ -434,6 +461,26 @@ private fun TvVibePicker(
         onLongPress = pulsarFeature.actions.onTriggerAnomaly,
         showLabel = showLabel,
     )
+}
+
+/** The Kraken beside the vibe picker: its target as a button, then the hold surface. */
+@Composable
+private fun TvKrakenPad(pulsarFeature: PulsarFeature, compact: Boolean) {
+    val actions = pulsarFeature.actions
+    val target by actions.krakenTarget.collectAsStateWithLifecycle()
+    val engaged by actions.krakenEngaged.collectAsStateWithLifecycle()
+    val latched by actions.krakenLatched.collectAsStateWithLifecycle()
+    val active by actions.krakenActive.collectAsStateWithLifecycle()
+    // The narrowest bar spends less on the pad so the pickers keep their values whole.
+    Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        KrakenTargetLabel(target = target, onCycle = actions.onKrakenCycleTarget, boxed = true)
+        KrakenPadSurface(
+            target = target, engaged = engaged, latched = latched, active = active,
+            onPress = actions.onKrakenPress, onRelease = actions.onKrakenRelease,
+            // The vibe picker's plate height, so the bar's items share a line.
+            modifier = Modifier.width(if (compact) 28.dp else KrakenPadWidth).height(TvTopBarControlHeight),
+        )
+    }
 }
 
 /**

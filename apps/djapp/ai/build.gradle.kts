@@ -30,3 +30,12 @@ kotlin {
         }
     }
 }
+
+// An App Store build must not carry the Kraken pad (see :apps:djapp:shared's showKraken).
+if (providers.gradleProperty("showKraken").orNull.toBoolean()) {
+    tasks.configureEach {
+        if (name.startsWith("linkReleaseFrameworkIos")) {
+            doFirst { throw GradleException("-PshowKraken=true is for local builds; drop it to link a release framework.") }
+        }
+    }
+}

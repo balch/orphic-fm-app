@@ -98,6 +98,17 @@ tasks.named("check") {
     dependsOn(verifyOgHasNoInternet)
 }
 
+// A Play build must not carry the Kraken pad (see :apps:djapp:shared's showKraken); every
+// og/ai release task runs its variant's pre-build first. debugRelease stays allowed.
+if (providers.gradleProperty("showKraken").orNull.toBoolean()) {
+    val playPreBuild = Regex("pre(Og|Ai)ReleaseBuild")
+    tasks.configureEach {
+        if (playPreBuild.matches(name)) {
+            doFirst { throw GradleException("-PshowKraken=true is for local builds; drop it to build a release.") }
+        }
+    }
+}
+
 // Google Play Developer API publishing (Gradle Play Publisher).
 // Run: ./gradlew :apps:djapp:androidApp:publishReleaseBundle
 play {

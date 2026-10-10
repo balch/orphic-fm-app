@@ -280,7 +280,7 @@ fun DjAppScreen(
                                 showEndingControl = !docked,
                                 // The dock's top bar carries the one Vibe picker (and the anomaly
                                 // long-press), so the docked panel has no selector row at all.
-                                selectors = if (docked) PulsarSelectors.None else PulsarSelectors.VibeOnly,
+                                selectors = if (docked) PulsarSelectors.None else djVibeSelectors(),
                             )
                             DjTab -> DjPanel(
                                 feature = djFeature,
@@ -610,7 +610,7 @@ internal fun DjAppMainContent(
                         // Top-anchored: centred, a short wide window left ~140dp dead above the selectors.
                         centerContent = false,
                         gridHeight = gridHeight,
-                        selectors = PulsarSelectors.VibeOnly,
+                        selectors = djVibeSelectors(),
                     )
                     navContent(Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade))
                 }
@@ -659,7 +659,7 @@ internal fun DjAppMainContent(
                         showCollapsedHeader = false,
                         showExpandedTitle = false,
                         gridHeight = gridHeight,
-                        selectors = PulsarSelectors.VibeOnly,
+                        selectors = djVibeSelectors(),
                     )
                     lowerPanels(Modifier.weight(.4f).fillMaxWidth())
                 }
@@ -688,7 +688,7 @@ internal fun DjAppMainContent(
                         onExpandedChange = {},
                         showCollapsedHeader = false,
                         showExpandedTitle = false,
-                        selectors = PulsarSelectors.VibeOnly,
+                        selectors = djVibeSelectors(),
                     )
                 },
                 bottom = { mod ->
@@ -1113,7 +1113,7 @@ private fun DjAppPreviewLayout(
                 onExpandedChange = {},
                 showCollapsedHeader = false,
                 showExpandedTitle = false,
-                selectors = PulsarSelectors.VibeOnly,
+                selectors = djVibeSelectors(),
             )
             tabContent(Modifier.weight(.5f).fillMaxHeight())
         }
@@ -1135,7 +1135,7 @@ private fun DjAppPreviewLayout(
                 onExpandedChange = {},
                 showCollapsedHeader = false,
                 showExpandedTitle = false,
-                selectors = PulsarSelectors.VibeOnly,
+                selectors = djVibeSelectors(),
             )
             tabContent(Modifier.weight(.4f).fillMaxWidth())
         }

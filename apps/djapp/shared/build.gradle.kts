@@ -1,6 +1,21 @@
+import com.codingfeline.buildkonfig.compiler.FieldSpec
+
 plugins {
     id("orpheus.kmp.compose")
     alias(libs.plugins.metro)
+    alias(libs.plugins.buildkonfig)
+}
+
+// -PshowKraken=true puts the Kraken pad in the UI (DjBuildKonfig.SHOW_KRAKEN). Local builds only:
+// the store builds' tasks here, in :apps:djapp:androidApp and in :apps:djapp:ai refuse it.
+val showKraken = providers.gradleProperty("showKraken").orNull.toBoolean()
+
+buildkonfig {
+    packageName = "org.balch.orpheus.djapp"
+    objectName = "DjBuildKonfig"
+    defaultConfigs {
+        buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_KRAKEN", showKraken.toString())
+    }
 }
 
 // ── Golden fixture guarding the Kotlin<->Swift widget wire schema ─────────────
@@ -102,6 +117,10 @@ listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
         listOf("Debug", "Release").forEach { buildType ->
             tasks.named("link${buildType}Framework$linkSuffix") {
                 dependsOn("${kmpTarget}AggregateResources")
+                // The App Store archive links the release framework.
+                if (buildType == "Release" && showKraken) {
+                    doFirst { throw GradleException("-PshowKraken=true is for local builds; drop it to link a release framework.") }
+                }
             }
         }
     }

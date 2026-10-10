@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
  */
 class PulsarSelectorRowTest {
 
-    private class Node(val texts: List<String>, val bounds: Rect, val clickable: Boolean)
+    private class Node(val texts: List<String>, val bounds: Rect, val clickable: Boolean, val description: List<String>)
 
     private val previewVibe = PulsarViewModel.previewFeature().vibeList.first()
 
@@ -53,8 +53,9 @@ class PulsarSelectorRowTest {
         width: Int,
         uiState: PulsarUiState,
         selectors: PulsarSelectors = PulsarSelectors.All,
+        fontScale: Float = 1f,
     ): List<Node> {
-        val scene = ImageComposeScene(width, 200, Density(1f)) {
+        val scene = ImageComposeScene(width, 200, Density(1f, fontScale)) {
             OrpheusTheme {
                 Box(Modifier.fillMaxSize()) {
                     PulsarPanel(
@@ -76,6 +77,7 @@ class PulsarSelectorRowTest {
                         texts = node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text },
                         bounds = node.boundsInRoot,
                         clickable = SemanticsActions.OnClick in node.config,
+                        description = node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty(),
                     )
                     node.children.forEach(::walk)
                 }
@@ -162,12 +164,22 @@ class PulsarSelectorRowTest {
         for (text in listOf("C#", "Pentatonic", "BLEND")) {
             assertTrue(nodes.none { text in it.texts }, "\"$text\" still shows with VibeOnly")
         }
+        assertTrue(nodes.none { n -> n.description.any { it.startsWith("Kraken") } }, "VibeOnly shows the Kraken pad")
         val chip = nodes.vibeChip("Techno Wobble").bounds.width
-        // The grid is 360dp; the panel's own inset takes a little of a 360dp scene.
-        assertTrue(chip >= 300f, "VIBE chip is ${chip}px, not the row's width")
+        assertTrue(chip >= narrowWidth - 1f, "VIBE chip is ${chip}px, not the row's width")
 
         val wide = render(1000, techno, PulsarSelectors.VibeOnly).vibeChip("Techno Wobble").bounds.width
-        assertTrue(wide in 355f..361f, "VIBE chip should stop at the 360dp grid width, was ${wide}px")
+        assertTrue(wide in 359f..361f, "VIBE chip should stop at the 360dp grid width, was ${wide}px")
+    }
+
+    @Test
+    fun vibeAndKrakenSharesTheGridWidthWithThePad() {
+        val chip = render(narrowWidth, techno, PulsarSelectors.VibeAndKraken).vibeChip("Techno Wobble").bounds.width
+        // The grid is 360dp; the 58dp Kraken pad and 8dp gap take their share of it.
+        assertTrue(chip >= 280f, "VIBE chip is ${chip}px, not the row's width")
+
+        val wide = render(1000, techno, PulsarSelectors.VibeAndKraken).vibeChip("Techno Wobble").bounds.width
+        assertTrue(wide in 293f..295f, "VIBE chip plus the Kraken pad should stop at the 360dp grid width, was ${wide}px")
     }
 
     @Test
@@ -184,5 +196,23 @@ class PulsarSelectorRowTest {
         for (text in listOf("VIBE", "Techno Wobble", "C#", "Pentatonic", "BLEND")) {
             assertTrue(nodes.none { text in it.texts }, "\"$text\" still shows with None")
         }
+    }
+
+    @Test
+    fun theKrakenPadMatchesTheVibeChipHeight() {
+        for (scale in listOf(1f, 1.3f)) {
+            val nodes = render(narrowWidth, techno, PulsarSelectors.VibeAndKraken, fontScale = scale)
+            val chip = nodes.vibeChip("Techno Wobble").bounds
+            val pad = nodes.first { n -> n.description.any { it.startsWith("Kraken") } }.bounds
+            assertTrue(kotlin.math.abs(pad.top - chip.top) <= 1f && kotlin.math.abs(pad.bottom - chip.bottom) <= 1f,
+                "at $scale the pad $pad is not level with the VIBE chip $chip")
+            assertTrue(pad.right <= narrowWidth + 1f, "at $scale the pad spills past the row: $pad")
+        }
+    }
+
+    @Test
+    fun orpheusRowHasNoKrakenPad() {
+        val nodes = render(narrowWidth, techno)
+        assertTrue(nodes.none { n -> n.description.any { it.startsWith("Kraken") } })
     }
 }
