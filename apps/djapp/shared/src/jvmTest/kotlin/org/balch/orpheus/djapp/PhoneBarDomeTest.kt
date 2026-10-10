@@ -71,8 +71,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * The phone bar's dome: the ring hung [PhoneBarDomeDrop] below the tab labels' line at any font
- * scale, rising out of an 80dp bar over the stage with its name in a pill above it, and the raised
- * part still live. 360x780dp at density 2, so "within 1px" is half a dp; font scale 1.3 is the
+ * scale, rising out of an 80dp bar over the stage with its name in a pill above it while a swipe
+ * peeks, and the raised part still live. 360x780dp at density 2, so "within 1px" is half a dp; font scale 1.3 is the
  * user's Fold 8.
  *
  * ./gradlew :apps:djapp:shared:jvmTest --tests '*PhoneBarDomeTest*' --rerun
@@ -241,6 +241,19 @@ class PhoneBarDomeTest {
             frame()
         }
 
+        /** Whether any text reads [label]. */
+        fun hasText(label: String): Boolean =
+            unmerged.any { n -> n.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text == label } }
+
+        /** Peeks and lets go short of the commit: the pill holds the resting name a beat after. */
+        fun showPill() {
+            val start = ringCenter
+            press(start)
+            dragRight(start, 24)
+            release(start + Offset(24 * density, 0f))
+            frame()
+        }
+
         fun close() = scene.close()
     }
 
@@ -266,9 +279,11 @@ class PhoneBarDomeTest {
                 val bar = Bar(fontScale, paused = paused)
                 try {
                     val what = "the ${if (paused) "paused" else "playing"} dome at $fontScale"
-                    assertEquals(barNameSp, bar.fontSize(name), "$what: its name is not a size up from the tabs")
                     assertEquals(tabLabelSp, bar.fontSize("Mix"), "sanity: the tab labels moved off labelSmall")
                     assertTheRingHangsTheDrop(bar, what)
+                    bar.showPill()
+                    assertTheRingHangsTheDrop(bar, "$what, its pill showing")
+                    assertEquals(barNameSp, bar.fontSize(name), "$what: its name is not a size up from the tabs")
                     // The pill's bottom padding and the ring's own, in whole px as layout rounds them.
                     val underName = ((VibeNamePillPaddingY.value + TransportPadding.value) * density).roundToInt()
                     assertEquals(bar.ringTop, bar.rect(bar.text(name)).bottom + underName, 1f, "$what: the name is not just above the ring")
@@ -287,6 +302,7 @@ class PhoneBarDomeTest {
                 val bar = Bar(fontScale, vibeName = vibe)
                 try {
                     val what = "\"$vibe\" at $fontScale"
+                    bar.showPill()
                     val line = bar.rect(bar.text(vibe))
                     assertTrue(line.bottom < bar.barTop, "$what: the name's line $line reaches into the bar at ${bar.barTop}")
                     assertTrue(!bar.nameCut(vibe), "$what: the name was cut short in its pill")
@@ -361,6 +377,7 @@ class PhoneBarDomeTest {
         listOf(1f, 1.3f).forEach { fontScale ->
             val bar = Bar(fontScale)
             try {
+                bar.showPill()
                 val resting = bar.baseline(bar.text(name))
                 val start = bar.ringCenter
                 bar.press(start)
@@ -378,6 +395,27 @@ class PhoneBarDomeTest {
         }
     }
 
+    // Pulsar's VIBE names the vibe at the top, so the pill is the swipe's alone: shown as it peeks,
+    // held a beat after the release, then gone.
+    @Test
+    fun thePillShowsOnlyWhileASwipePeeksAndABeatAfter() {
+        val bar = Bar(1f)
+        try {
+            assertTrue(!bar.hasText(name), "the pill shows at rest")
+            val start = bar.ringCenter
+            bar.press(start)
+            bar.dragRight(start, 24)
+            assertTrue(bar.hasText("Stay Asleep"), "no pill while the swipe peeks")
+            bar.release(start + Offset(24 * density, 0f))
+            repeat(30) { bar.frame() }
+            assertTrue(bar.hasText(name), "the pill left before the name could read")
+            repeat(90) { bar.frame() }
+            assertTrue(!bar.hasText(name), "the pill stayed after its fade")
+        } finally {
+            bar.close()
+        }
+    }
+
     private val longName = "Kaleidoscope Drift Sessions"
 
     // The pill is only a label over the stage: a tap on it reaches the panel under it.
@@ -386,6 +424,7 @@ class PhoneBarDomeTest {
         listOf(PointerType.Mouse, PointerType.Touch).forEach { type ->
             val bar = Bar(1f)
             try {
+                bar.showPill()
                 val onName = bar.rect(bar.text(name)).center
                 assertTrue(onName.y < bar.rect(bar.transport).top, "sanity: the name $onName is inside the dome's target")
                 bar.tap(onName, type)
@@ -428,8 +467,10 @@ class PhoneBarDomeTest {
                 abs(p.red - background.red) + abs(p.green - background.green) + abs(p.blue - background.blue) > 0.1f
             }
             assertNotNull(firstDrawn, "nothing is drawn above the bar")
+            // At rest no pill draws above it, and a flat track sits in from its box by the wave's swing room.
             val drawnRise = (bar.barTop - firstDrawn) / density
-            assertTrue(drawnRise >= 12f, "the ring draws only ${drawnRise}dp above the bar")
+            val swingRoom = BarRingSize.value * RingAmplitudeShare
+            assertTrue(drawnRise >= 12f - swingRoom - 0.5f, "the ring draws only ${drawnRise}dp above the bar")
         } finally {
             bar.close()
         }

@@ -214,6 +214,8 @@ fun DjAppNavScaffold(
             nameStyle = if (rail == null) barNameStyle else MaterialTheme.typography.labelSmall,
             nameLane = if (rail == null) barLane else null,
             namePill = rail == null,
+            // Every layout with this bar puts Pulsar's VIBE at the top of the screen.
+            pillOnSwipe = rail == null,
             ringSize = rail?.ringSize ?: BarRingSize,
             position = nav.songPosition(),
             pulse = pulse,

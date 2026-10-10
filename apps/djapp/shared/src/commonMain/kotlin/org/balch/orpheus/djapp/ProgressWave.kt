@@ -67,7 +67,7 @@ private const val BeatLockMillis = 80f
 
 /** The ring's track stroke, and the band its trace swings in, as shares of its size, so the 56-64dp rings never read thin. */
 private const val RingStrokeShare = 1f / 16
-private const val RingAmplitudeShare = 1f / 32
+internal const val RingAmplitudeShare = 1f / 32
 
 /**
  * The scope trace is a finer line than the track and swings further, in the same band: its outer

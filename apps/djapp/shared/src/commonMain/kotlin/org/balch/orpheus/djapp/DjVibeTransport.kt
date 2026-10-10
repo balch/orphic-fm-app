@@ -453,6 +453,9 @@ internal fun VibeTransportItem(
     ringWideTarget: Boolean = false,
     // The phone bar and the dock: the name rides above the ring in a pill, over the stage.
     namePill: Boolean = false,
+    // The phone bar: Pulsar's VIBE names the vibe at the top of the screen, so the pill shows only
+    // while a swipe peeks a neighbour, and a beat after the release.
+    pillOnSwipe: Boolean = false,
     ringSize: Dp = BarRingSize,
     // The keyboard focus mark's colour, read in draw: the dock's follows its accent. Null draws no mark.
     focusColor: ColorProducer? = RingFocusColor,
@@ -600,15 +603,21 @@ internal fun VibeTransportItem(
     // while; TV hardware goes without both, as its bars go without glass and its dome without motion.
     val animatedPill = namePill && !LocalTelevisionHardware.current
     val pillLiquid = if (animatedPill) LocalLiquidState.current else null
-    val pillFade = if (animatedPill) rememberPillFade(paused, name) else null
+    val pillFade = if (animatedPill && !pillOnSwipe) rememberPillFade(paused, name) else null
+    // Keyed to the peek, which already recomposes the bar, so a swipe costs nothing more. The wiggle
+    // peeks too, showing what a swipe does.
+    val swipePill = if (namePill && pillOnSwipe) rememberSwipePill(side != 0) else null
+    // Composed only while any of it shows, so a resting phone bar draws no glass. Unread while
+    // peeking, so the one recomposition it costs is its leaving once the fade ends.
+    val pillShows = swipePill == null || side != 0 || swipePill.shown.value
     val pillPaddingX = with(density) { (nameStyle.fontSize * PillPaddingEm).toDp() }
-    val nameModifier = remember(shownDrag, nameLane, reportPx, namePill, pillLiquid, pillFade, pillPaddingX, nameAlpha) {
+    val nameModifier = remember(shownDrag, nameLane, reportPx, namePill, pillLiquid, pillFade, swipePill, pillPaddingX, nameAlpha) {
         Modifier.slideWith(shownDrag)
             .nameLane(nameLane, reportPx)
             .then(
                 if (!namePill) Modifier
                 // Inside the lane, so the fade's layer spans the whole pill however far past the slot it draws.
-                else Modifier.graphicsLayer { alpha = (pillFade?.value ?: 1f) * nameAlpha() }
+                else Modifier.graphicsLayer { alpha = (pillFade?.value ?: 1f) * (swipePill?.fade?.value ?: 1f) * nameAlpha() }
                     .vibeNamePill(pillLiquid, pillPaddingX)
                     // The play button's description already names the vibe.
                     .semantics { hideFromAccessibility() },
@@ -659,7 +668,7 @@ internal fun VibeTransportItem(
         // The pill rides above the ring outside its pointer node, so a tap or a drag on it reaches
         // what is under it, and the stage overhang and the tap target are the ring's alone. With no
         // name yet there is nothing to hold, so no empty pill, and none while the ball sits in the ring.
-        if (namePill && namePresent && (name.isNotEmpty() || peekNext || peekPrevious)) label()
+        if (namePill && namePresent && pillShows && (name.isNotEmpty() || peekNext || peekPrevious)) label()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -808,6 +817,36 @@ private fun rememberPillFade(paused: Boolean, name: String): Animatable<Float, A
         fade.animateTo(PillRestAlpha, tween(PillRestFadeMillis, easing = LinearEasing))
     }
     return fade
+}
+
+/**
+ * A swipe-only pill's fade: in as a swipe peeks, then held [SwipePillHoldMillis] after so a
+ * committed swipe's new name reads before it fades over [SwipePillFadeMillis].
+ */
+private const val SwipePillHoldMillis = 900L
+private const val SwipePillFadeMillis = 400
+
+/** The pill's alpha, read in draw, and whether it is composed at all, written only as it shows and once gone. */
+private class SwipePill(peeking: Boolean) {
+    val fade = Animatable(if (peeking) 1f else 0f)
+    val shown = mutableStateOf(peeking)
+}
+
+@Composable
+private fun rememberSwipePill(peeking: Boolean): SwipePill {
+    // Starts shown when composed mid-peek, as a render harness's pinned drag is.
+    val pill = remember { SwipePill(peeking) }
+    LaunchedEffect(peeking) {
+        if (peeking) {
+            pill.shown.value = true
+            pill.fade.animateTo(1f, tween(PillWakeMillis))
+        } else if (pill.shown.value) {
+            delay(SwipePillHoldMillis)
+            pill.fade.animateTo(0f, tween(SwipePillFadeMillis))
+            pill.shown.value = false
+        }
+    }
+    return pill
 }
 
 /**

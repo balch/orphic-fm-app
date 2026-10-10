@@ -969,7 +969,8 @@ class VibeDomeCueTest {
                 var peeked = 0
                 var moved = 0
                 var recomposed = 0
-                repeat(200) {
+                // Long enough for the phone bar's pill to hold and fade out after the wiggle.
+                repeat(240) {
                     val seen = nav.scopes.entered
                     if (!nav.frame().contentEquals(rest)) moved++
                     if (nav.peeks()) peeked++
@@ -977,7 +978,9 @@ class VibeDomeCueTest {
                 }
                 assertTrue(moved > 30, "the $layout dome barely wiggled: $moved frames")
                 assertTrue(peeked > 10, "the $layout label barely peeked: $peeked frames")
-                assertEquals(4, recomposed, "the $layout chrome recomposed beyond the peek's comings and goings")
+                // The phone bar's pill, shown only for a peek, also leaves once its fade ends.
+                val expected = if (layout == DjLayout.Portrait) 5 else 4
+                assertEquals(expected, recomposed, "the $layout chrome recomposed beyond the peek's comings and goings")
                 assertTrue(nav.frame().contentEquals(rest), "the $layout dome never came back to rest")
                 assertFalse(nav.scene.hasInvalidations(), "the $layout bar still asks for frames")
             } finally {
