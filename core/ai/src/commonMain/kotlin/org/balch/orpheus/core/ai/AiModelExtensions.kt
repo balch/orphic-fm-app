@@ -49,8 +49,8 @@ val GeminiFlashLatest: LLModel = LLModel(
 val AiModelProvider.currentKoogModel: LLModel
     get() = selectedModel.value.llmModel
 
-// Anthropic models newer than Koog 1.3.0's AnthropicModels constants (which stop at Opus 5
-// and Sonnet 5). Capability list mirrors Koog's Opus_5 definition.
+// Anthropic models newer than Koog 1.3.0's AnthropicModels constants (which stop at Opus 5,
+// Sonnet 5 and Fable 5). Capability list mirrors Koog's Opus_5 definition.
 private val anthropicCapabilities: List<LLMCapability> = listOf(
     // Temperature mirrors Koog's Opus_5 metadata; the API rejects sampling params on
     // these models — never set a temperature for them.
@@ -83,6 +83,22 @@ val Sonnet5_5: LLModel = LLModel(
     maxOutputTokens = 128_000L,
 )
 
+val Haiku5_5: LLModel = LLModel(
+    provider = LLMProvider.Anthropic,
+    id = "claude-haiku-5-5",
+    capabilities = anthropicCapabilities,
+    contextLength = 1_000_000L,
+    maxOutputTokens = 128_000L,
+)
+
+val Fable5_1: LLModel = LLModel(
+    provider = LLMProvider.Anthropic,
+    id = "claude-fable-5-1",
+    capabilities = anthropicCapabilities,
+    contextLength = 1_000_000L,
+    maxOutputTokens = 128_000L,
+)
+
 /**
  * Anthropic models that reject `thinking: {type: "enabled", budget_tokens: N}` (400)
  * and take adaptive thinking instead. Opus 4.7+ generation; Haiku 4.5 still uses the
@@ -95,7 +111,9 @@ private val adaptiveThinkingModelIds = setOf(
     Opus5_5.id,
     AnthropicModels.Sonnet_5.id,
     Sonnet5_5.id,
+    Haiku5_5.id,
     AnthropicModels.Fable_5.id,
+    Fable5_1.id,
 )
 
 val LLModel.usesAdaptiveThinking: Boolean
@@ -111,7 +129,12 @@ val LLModel.usesAdaptiveThinking: Boolean
  * doubles the token price, and needs a per-key research-preview grant this app's
  * bring-your-own-key users will not have.
  */
-private val reducedEffortModelIds = setOf(AnthropicModels.Opus_5.id, Opus5_5.id, AnthropicModels.Fable_5.id)
+private val reducedEffortModelIds = setOf(
+    AnthropicModels.Opus_5.id,
+    Opus5_5.id,
+    AnthropicModels.Fable_5.id,
+    Fable5_1.id,
+)
 
 /** `output_config.effort` value for [model], or null to leave the API default alone. */
 val LLModel.anthropicEffort: String?
@@ -123,7 +146,7 @@ val LLModel.anthropicEffort: String?
  * 2026-08-31. History must be append-only, so Koog's history compression (which summarizes
  * older turns and then replays the trailing tool-call turn with its thinking) is unsafe.
  */
-private val appendOnlyHistoryModelIds = setOf(Opus5_5.id, Sonnet5_5.id)
+private val appendOnlyHistoryModelIds = setOf(Opus5_5.id, Sonnet5_5.id, Fable5_1.id)
 
 val LLModel.requiresAppendOnlyHistory: Boolean
     get() = id in appendOnlyHistoryModelIds
@@ -132,7 +155,7 @@ val LLModel.requiresAppendOnlyHistory: Boolean
  * Model-version map for constructing Koog's AnthropicLLMClient. Koog's own default map
  * is internal AND its request serializer throws "Unsupported model" for any LLModel
  * missing from it — which includes every model newer than the pinned Koog 1.3.0 knows
- * (Opus 5.5, Sonnet 5.5). This map is Koog's published defaults plus ours; pass it via
+ * (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1). This map is Koog's published defaults plus ours; pass it via
  * AnthropicClientSettings(modelVersionsMap = ...) or the new models cannot serialize a
  * single request. Any catalog addition needs an entry here too.
  */
@@ -152,4 +175,6 @@ val anthropicModelVersionsMap: Map<LLModel, String> = mapOf(
     AnthropicModels.Opus_5 to "claude-opus-5",
     Opus5_5 to Opus5_5.id,
     Sonnet5_5 to Sonnet5_5.id,
+    Haiku5_5 to Haiku5_5.id,
+    Fable5_1 to Fable5_1.id,
 )

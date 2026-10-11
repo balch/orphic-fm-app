@@ -1,6 +1,5 @@
 package org.balch.orpheus.core.ai
 
-import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.llm.LLModel
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
@@ -25,10 +24,10 @@ enum class AiModel(
     val aiProvider: AiProvider,
     val llmModel: LLModel,
 ) {
-    HAIKU("Haiku", "Haiku 4.5", AiProvider.Anthropic, AnthropicModels.Haiku_4_5),
+    HAIKU("Haiku", "Haiku 5.5", AiProvider.Anthropic, Haiku5_5),
     SONNET("Sonnet", "Sonnet 5.5", AiProvider.Anthropic, Sonnet5_5),
     OPUS("opus", "Opus 5.5", AiProvider.Anthropic, Opus5_5),
-    FABLE("fable", "Fable 5", AiProvider.Anthropic, AnthropicModels.Fable_5),
+    FABLE("fable", "Fable 5.1", AiProvider.Anthropic, Fable5_1),
     // Google slots ride floating aliases, so the display name carries no version number —
     // it would go stale the first time Google hot-swaps. See GeminiProLatest.
     PRO_LATEST("pro_latest", "Pro (latest)", AiProvider.Google, GeminiProLatest),
