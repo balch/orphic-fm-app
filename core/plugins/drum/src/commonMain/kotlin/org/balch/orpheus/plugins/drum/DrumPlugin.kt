@@ -53,11 +53,10 @@ class DrumPlugin(
     private val decays = FloatArray(3) { 0.5f }
     private val p4s = FloatArray(3) { 0.5f }
     private val p5s = FloatArray(3) { 0.5f }
-    // Drum slot engine selection is stored as the OrpheusEngineId entry ORDINAL, not
-    // the canonical id. The drum picker presents a curated subset indexed positionally,
-    // so ordinals are stable for this UI. This intentionally diverges from VoicePlugin/
-    // Pulsar, which store the canonical id. Drum engine selection does not flow to C++
-    // today (BD/SD/HH dispatch is hardcoded native-side) — this is plugin/UI state only.
+    // Drum slots store the OrpheusEngineId entry ORDINAL, not the canonical id that
+    // VoicePlugin and Pulsar store. The ordinal reaches C++ as the *_engine port and
+    // kKotlinToEngine[] in orpheus_engine_routing.cpp maps it to a Plaits index, so
+    // entry order is a contract with that table. Ordinals past its end are ignored.
     private val engineSlotIndices = IntArray(3) { i -> DEFAULT_ENGINES[i].ordinal }
 
     // Routing state (facade for engine)
