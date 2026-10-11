@@ -93,7 +93,7 @@
 #   JDK 17+ with JAVA_HOME set (for JNI headers)
 #   Python 3.12 (for Bazel hermetic python)
 #   MediaPipe source: git clone https://github.com/google-ai-edge/mediapipe.git
-#                     git -C mediapipe checkout v1.0.0
+#                     git -C mediapipe checkout v1.1.0
 #
 # ── Usage ─────────────────────────────────────────────────────────────
 #
@@ -108,7 +108,7 @@
 #
 # ── MediaPipe base commit ─────────────────────────────────────────────
 #
-#   Patch tested against: v1.0.0 (6d31f1ebc, 2026-07-22)
+#   Patch tested against: v1.1.0 (821db8a44, 2026-10-07)
 #   1.0 prefixed the C API types with `Mp`; mediapipe_jni.cc will not
 #   compile against a 0.10.x checkout.
 #   Repo: https://github.com/google-ai-edge/mediapipe.git

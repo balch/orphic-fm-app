@@ -1,8 +1,8 @@
 diff --git a/.bazelrc b/.bazelrc
-index 99a0afdea..297e89643 100644
+index 5b611244b..860b359a8 100644
 --- a/.bazelrc
 +++ b/.bazelrc
-@@ -121,6 +121,10 @@ build:darwin_x86_64 --cpu=darwin_x86_64
+@@ -124,6 +124,10 @@ build:darwin_x86_64 --cpu=darwin_x86_64
  build:darwin_arm64 --apple_platform_type=macos
  build:darwin_arm64 --macos_minimum_os=10.16
  build:darwin_arm64 --cpu=darwin_arm64
@@ -13,7 +13,7 @@ index 99a0afdea..297e89643 100644
  
  # Turn off maximum stdout size
  build --experimental_ui_max_stdouterr_bytes=-1
-@@ -130,3 +134,6 @@ try-import %workspace%/.configure.bazelrc
+@@ -133,3 +137,6 @@ try-import %workspace%/.configure.bazelrc
  
  # This bazelrc file can be used for user-specific custom build settings.
  try-import %workspace%/.user.bazelrc
@@ -21,10 +21,10 @@ index 99a0afdea..297e89643 100644
 +build --per_file_copt=external/zlib/.*@-UTARGET_OS_MAC
 +build --host_per_file_copt=external/zlib/.*@-UTARGET_OS_MAC
 diff --git a/WORKSPACE b/WORKSPACE
-index c353b11b3..0f640bbcf 100644
+index 9622cd34a..69a2b829e 100644
 --- a/WORKSPACE
 +++ b/WORKSPACE
-@@ -495,7 +495,7 @@ new_local_repository(
+@@ -546,7 +546,7 @@ new_local_repository(
      # For local MacOS builds, the path should point to an opencv@3 installation.
      # If you edit the path here, you will also need to update the corresponding
      # prefix in "opencv_macos.BUILD".
@@ -33,21 +33,6 @@ index c353b11b3..0f640bbcf 100644
  )
  
  new_local_repository(
-diff --git a/mediapipe/framework/port/opencv_imgproc_inc.h b/mediapipe/framework/port/opencv_imgproc_inc.h
-index d59c9dc39..f24c176b1 100644
---- a/mediapipe/framework/port/opencv_imgproc_inc.h
-+++ b/mediapipe/framework/port/opencv_imgproc_inc.h
-@@ -26,6 +26,10 @@
- #if CV_VERSION_MAJOR == 4
- #include <opencv2/imgproc/types_c.h>
- #endif
-+// OpenCV 5 moved boxPoints, getPerspectiveTransform, etc. to the geometry module.
-+#if CV_VERSION_MAJOR >= 5
-+#include <opencv2/geometry.hpp>
-+#endif
- #endif
- 
- #endif  // MEDIAPIPE_PORT_OPENCV_IMGPROC_INC_H_
 diff --git a/mediapipe/tasks/c/vision/hand_landmarker/BUILD b/mediapipe/tasks/c/vision/hand_landmarker/BUILD
 index 5060d8978..900aa539c 100644
 --- a/mediapipe/tasks/c/vision/hand_landmarker/BUILD
@@ -90,7 +75,7 @@ index 5060d8978..900aa539c 100644
 +    ],
 +)
 diff --git a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc
-index 35273351a..3bb156770 100644
+index c8ea26cc5..457ec693a 100644
 --- a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc
 +++ b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc
 @@ -14,7 +14,6 @@ limitations under the License.
@@ -101,18 +86,17 @@ index 35273351a..3bb156770 100644
  #include <utility>
  
  #include "absl/status/status.h"
-@@ -36,15 +35,15 @@ using ::mediapipe::api3::Calculator;
+@@ -36,15 +35,14 @@ using ::mediapipe::api3::Calculator;
  using ::mediapipe::api3::CalculatorContext;
  using ::mediapipe::tasks::vision::gesture_recognizer::GetRightHandScore;
  
 -absl::StatusOr<std::unique_ptr<Matrix>> HandednessToMatrix(
-+// Returns a 1x1 Matrix with the right-hand score.
 +// Returns by value (not unique_ptr) so Send(Matrix&&) uses MakePacket
-+// instead of Adopt — fixes Holder<Matrix> crash on macOS ARM64.
++// instead of Adopt: fixes Holder<Matrix> crash on macOS ARM64.
 +absl::StatusOr<Matrix> HandednessToMatrix(
      const mediapipe::ClassificationList& classification_list) {
 -  // Feature value is the probability that the hand is a right hand.
-   MP_ASSIGN_OR_RETURN(float score, GetRightHandScore(classification_list));
+   ABSL_ASSIGN_OR_RETURN(float score, GetRightHandScore(classification_list));
 -  auto matrix = Matrix(1, 1);
 +  Matrix matrix(1, 1);
    matrix(0, 0) = score;
@@ -123,17 +107,17 @@ index 35273351a..3bb156770 100644
  }
  
  }  // namespace
-@@ -58,7 +57,7 @@ class HandednessToMatrixNodeImpl
+@@ -58,7 +56,7 @@ class HandednessToMatrixNodeImpl
      }
      const ClassificationList& handedness = cc.in_handedness.GetOrDie();
  
--    MP_ASSIGN_OR_RETURN(auto handedness_matrix, HandednessToMatrix(handedness));
-+    MP_ASSIGN_OR_RETURN(Matrix handedness_matrix, HandednessToMatrix(handedness));
+-    ABSL_ASSIGN_OR_RETURN(auto handedness_matrix,
++    ABSL_ASSIGN_OR_RETURN(Matrix handedness_matrix,
+                           HandednessToMatrix(handedness));
      cc.out_handedness_matrix.Send(std::move(handedness_matrix));
      return absl::OkStatus();
-   }
 diff --git a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc
-index 1f7b732cc..12a6631c8 100644
+index 963f8ed22..40156eb97 100644
 --- a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc
 +++ b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc
 @@ -17,7 +17,6 @@ limitations under the License.
@@ -144,16 +128,15 @@ index 1f7b732cc..12a6631c8 100644
  #include <type_traits>
  #include <utility>
  
-@@ -172,9 +171,10 @@ absl::Status ProcessLandmarks(LandmarkListT landmarks,
+@@ -172,9 +171,9 @@ absl::Status ProcessLandmarks(LandmarkListT landmarks,
                          options.object_normalization_origin_offset()));
    }
  
 -  auto landmarks_matrix = std::make_unique<Matrix>();
 -  *landmarks_matrix = LandmarksToMatrix(landmarks);
 -  cc.landmarks_matrix.Send(std::move(landmarks_matrix));
-+  // Use Send(Matrix&&) instead of Send(unique_ptr<Matrix>) to avoid
-+  // Adopt() pointer ownership — fixes Holder<Matrix>::~Holder() crash
-+  // (POINTER_BEING_FREED_WAS_NOT_ALLOCATED) on macOS ARM64.
++  // Send(Matrix&&) instead of Send(unique_ptr<Matrix>) avoids Adopt() ownership:
++  // fixes Holder<Matrix>::~Holder() crash on macOS ARM64.
 +  cc.landmarks_matrix.Send(LandmarksToMatrix(landmarks));
    return absl::OkStatus();
  }
