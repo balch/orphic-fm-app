@@ -469,8 +469,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 };
                 int ordinal = static_cast<int>(value);
                 if (ordinal >= 0 && ordinal < static_cast<int>(sizeof(kKotlinToEngine)/sizeof(kKotlinToEngine[0]))) {
-                    vp.engine_index.store(kKotlinToEngine[ordinal], std::memory_order_relaxed);
-                    vp.engine_changed.store(1, std::memory_order_relaxed);
+                    // Boot sync re-sends this port at its current value, so flag a
+                    // retrigger only on a real change.
+                    const int want_engine = kKotlinToEngine[ordinal];
+                    if (vp.engine_index.exchange(want_engine, std::memory_order_relaxed) != want_engine)
+                        vp.engine_changed.store(1, std::memory_order_relaxed);
                 }
             }
         };

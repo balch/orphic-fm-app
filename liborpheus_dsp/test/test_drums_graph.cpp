@@ -1,6 +1,7 @@
 // Drum voice and graph wiring comparison tests
 #include "test_harness.h"
 #include "orpheus_units_common.h"
+#include "stmlib/utils/random.h"
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 1: Drum trigger produces output via orpheus_engine_trigger_drum
@@ -959,6 +960,70 @@ static bool test_drum_mix_smoother_per_voice() {
     return pass;
 }
 
+// Master-out peak over the first ~100 ms after one strike on drum slot `d`.
+// The render RNG is pinned so snare/hat noise is identical from call to call.
+static float first_hit_peak(OrpheusEngine* engine, int d) {
+    stmlib::Random::Seed(0xD2A5u);
+    orpheus_engine_trigger_drum(engine, d, 0.8f);
+    float peak = 0.0f;
+    float buf[128 * 2];
+    for (int blk = 0; blk < 38; blk++) {
+        std::memset(buf, 0, sizeof(buf));
+        orpheus_engine_process(engine, buf, 128);
+        for (int i = 0; i < 128 * 2; i++) peak = std::max(peak, std::fabs(buf[i]));
+    }
+    return peak;
+}
+
+static const char* const kDrumUri = "org.balch.orpheus.plugins.drum";
+static const char* const kDrumEngineSyms[] = {"bd_engine", "sd_engine", "hh_engine"};
+static const char* const kDrumSlotNames[] = {"kick", "snare", "hat"};
+
+// Boot sync (DspSynthEngine.syncNativeBridgeState) re-sends every drum control port,
+// engine selectors included, at values the engine already holds. The first strike
+// afterwards must match an engine that never saw the write.
+static bool test_drum_first_hit_after_engine_port_sync() {
+    printf("\n=== Test: first drum hit after boot port sync ===\n");
+    const uint32_t saved_rng = stmlib::Random::state();
+    bool pass = true;
+
+    for (int d = 0; d < kNumDrumVoices; d++) {
+        OrpheusEngine* ref = orpheus_engine_create(48000.0f);
+        OrpheusEngine* synced = orpheus_engine_create(48000.0f);
+        // Same order as loadGraphAndSync(): sync, load graph, sync again.
+        // Slot s defaults to Kotlin ordinal s (BD, SD, HH).
+        for (int s = 0; s < kNumDrumVoices; s++)
+            orpheus_engine_set_port(synced, kDrumUri, kDrumEngineSyms[s], static_cast<float>(s));
+        if (!load_production_graph(ref) || !load_production_graph(synced)) {
+            orpheus_engine_destroy(ref);
+            orpheus_engine_destroy(synced);
+            stmlib::Random::Seed(saved_rng);
+            return false;
+        }
+        for (int s = 0; s < kNumDrumVoices; s++)
+            orpheus_engine_set_port(synced, kDrumUri, kDrumEngineSyms[s], static_cast<float>(s));
+
+        // The re-send changed nothing, so it may not leave a retrigger pending.
+        int pending = 0;
+        for (int s = 0; s < kNumDrumVoices; s++)
+            pending += synced->voice_params[kDrumVoiceStart + s].engine_changed.load();
+
+        float ref_peak = first_hit_peak(ref, d);
+        float peak = first_hit_peak(synced, d);
+        bool ok = pending == 0
+               && ref_peak > 0.01f && std::fabs(peak - ref_peak) <= 0.01f * ref_peak;
+        printf("  %s: pending retriggers=%d first hit peak=%.4f reference=%.4f %s\n",
+               kDrumSlotNames[d], pending, peak, ref_peak, ok ? "PASS" : "FAIL");
+        pass &= ok;
+
+        orpheus_engine_destroy(ref);
+        orpheus_engine_destroy(synced);
+    }
+
+    stmlib::Random::Seed(saved_rng);
+    return pass;
+}
+
 bool run_drums_graph_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -975,5 +1040,6 @@ bool run_drums_graph_tests() {
     tally(test_drum_slot_gains());
     tally(test_drum_bypass_toggle());
     tally(test_drum_mix_smoother_per_voice());
+    tally(test_drum_first_hit_after_engine_port_sync());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
