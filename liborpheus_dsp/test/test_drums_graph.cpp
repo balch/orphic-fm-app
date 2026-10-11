@@ -1024,6 +1024,46 @@ static bool test_drum_first_hit_after_engine_port_sync() {
     return pass;
 }
 
+// Picking a different engine for an idle drum slot must not cost the next strike either.
+// Each slot moves to another trigger-driven drum engine, which is silent without its edge.
+static bool test_drum_first_hit_after_engine_change() {
+    printf("\n=== Test: first drum hit after a drum engine change ===\n");
+    const int kNewOrdinal[] = {1, 2, 0};      // Kotlin ordinals: SD, HH, BD
+    const int kNewEngine[] = {22, 23, 21};    // the Plaits indices those map to
+    const uint32_t saved_rng = stmlib::Random::state();
+    bool pass = true;
+
+    for (int d = 0; d < kNumDrumVoices; d++) {
+        OrpheusEngine* ref = orpheus_engine_create(48000.0f);
+        OrpheusEngine* changed = orpheus_engine_create(48000.0f);
+        if (!load_production_graph(ref) || !load_production_graph(changed)) {
+            orpheus_engine_destroy(ref);
+            orpheus_engine_destroy(changed);
+            stmlib::Random::Seed(saved_rng);
+            return false;
+        }
+        // Reference selects the engine without going through the port handler.
+        ref->voice_params[kDrumVoiceStart + d].engine_index.store(kNewEngine[d]);
+        orpheus_engine_set_port(changed, kDrumUri, kDrumEngineSyms[d],
+                                static_cast<float>(kNewOrdinal[d]));
+
+        int got_engine = changed->voice_params[kDrumVoiceStart + d].engine_index.load();
+        float ref_peak = first_hit_peak(ref, d);
+        float peak = first_hit_peak(changed, d);
+        bool ok = got_engine == kNewEngine[d]
+               && ref_peak > 0.01f && std::fabs(peak - ref_peak) <= 0.01f * ref_peak;
+        printf("  %s slot -> engine %d: first hit peak=%.4f reference=%.4f %s\n",
+               kDrumSlotNames[d], got_engine, peak, ref_peak, ok ? "PASS" : "FAIL");
+        pass &= ok;
+
+        orpheus_engine_destroy(ref);
+        orpheus_engine_destroy(changed);
+    }
+
+    stmlib::Random::Seed(saved_rng);
+    return pass;
+}
+
 bool run_drums_graph_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -1041,5 +1081,6 @@ bool run_drums_graph_tests() {
     tally(test_drum_bypass_toggle());
     tally(test_drum_mix_smoother_per_voice());
     tally(test_drum_first_hit_after_engine_port_sync());
+    tally(test_drum_first_hit_after_engine_change());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

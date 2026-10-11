@@ -1,5 +1,6 @@
 // Voice engine behavior: polyphonic, lifecycle, gate retrigger, hold, idle detection
 #include "test_harness.h"
+#include "stmlib/utils/random.h"
 
 static bool test_single_voice_engine0() {
     printf("\n=== Test: Single voice Engine 0 (VA) ===\n");
@@ -525,6 +526,73 @@ static bool test_coupling_follower_decays_when_idle() {
     return pass;
 }
 
+// A note held across an engine change must get a fresh attack on the new engine. Struck
+// engines make that audible: under a held gate they stay silent until a new trigger edge.
+static bool test_held_note_retriggers_on_engine_change() {
+    printf("\n=== Test: held note re-triggers when its engine changes ===\n");
+    const int kSources[] = {8, -1, 100};
+    const char* kSourceNames[] = {"VA", "OSC", "Braids"};
+    const int kStruck[] = {19, 20, 21};
+    const char* kStruckNames[] = {"String", "Modal", "BassDrum"};
+    const uint32_t saved_rng = stmlib::Random::state();
+
+    struct Strike { float before; float peak; int onset_block; };
+    enum How { VIA_API, BARE_INDEX_WRITE, FRESH_NOTE };
+    auto strike = [](int src, int dst, How how) -> Strike {
+        Strike s{0.0f, 0.0f, -1};
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        if (!load_production_graph(engine)) { orpheus_engine_destroy(engine); return s; }
+        float buf[128 * 2];
+        float levels[40] = {};
+        if (how != FRESH_NOTE) {
+            // Hold a note on the source engine long enough to be well into its sustain.
+            activate_voice(engine, 0, src, 60.0f);
+            for (int blk = 0; blk < 40; blk++) {
+                orpheus_engine_process(engine, buf, 128);
+                s.before = std::max(s.before, engine->voice_levels[0].load());
+            }
+        }
+        stmlib::Random::Seed(0x5712CEu);
+        if (how == VIA_API) orpheus_engine_set_voice_engine(engine, 0, dst);
+        else if (how == BARE_INDEX_WRITE) engine->voice_params[0].engine_index.store(dst);
+        else activate_voice(engine, 0, dst, 60.0f);
+
+        for (int blk = 0; blk < 40; blk++) {
+            orpheus_engine_process(engine, buf, 128);
+            levels[blk] = engine->voice_levels[0].load();
+            s.peak = std::max(s.peak, levels[blk]);
+        }
+        for (int blk = 0; blk < 40 && s.onset_block < 0; blk++)
+            if (s.peak > 0.0f && levels[blk] > 0.1f * s.peak) s.onset_block = blk;
+        orpheus_engine_destroy(engine);
+        return s;
+    };
+
+    bool pass = true;
+    for (int si = 0; si < 3; si++) {
+        for (int di = 0; di < 3; di++) {
+            const Strike fresh = strike(kSources[si], kStruck[di], FRESH_NOTE);
+            const Strike held = strike(kSources[si], kStruck[di], VIA_API);
+            const Strike bare = strike(kSources[si], kStruck[di], BARE_INDEX_WRITE);
+            // A Plaits source leaves the edge detector high: the gate drops for one block and
+            // only the flagged change may strike. OSC and Braids never raise the detector, so
+            // the held gate is its own edge and the strike lands on the change block.
+            const bool detector_high = kSources[si] == 8;
+            bool ok = held.before > 0.01f                    // the source note really was sounding
+                   && fresh.peak > 0.01f
+                   && held.peak >= 0.6f * fresh.peak         // a real strike, not a leftover
+                   && held.onset_block == (detector_high ? 1 : 0);
+            if (detector_high) ok = ok && bare.peak <= 0.05f * held.peak;
+            printf("  %-6s -> %-8s held: peak=%.4f onset_block=%d | fresh=%.4f | no-flag=%.4f %s\n",
+                   kSourceNames[si], kStruckNames[di], held.peak, held.onset_block,
+                   fresh.peak, bare.peak, ok ? "PASS" : "FAIL");
+            pass &= ok;
+        }
+    }
+    stmlib::Random::Seed(saved_rng);
+    return pass;
+}
+
 bool run_voice_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
@@ -540,5 +608,6 @@ bool run_voice_tests() {
     tally(test_duo_depth_smoothing_time_constant());
     tally(test_coupling_follower_tracks_voice());
     tally(test_coupling_follower_decays_when_idle());
+    tally(test_held_note_retriggers_on_engine_change());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

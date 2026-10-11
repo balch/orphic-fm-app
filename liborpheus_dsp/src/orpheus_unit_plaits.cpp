@@ -492,11 +492,11 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // and engines behave identically to the JSyn path.
         int plaits_gate = actual_gate;
 
-        // Engine change retrigger: force gate off for one block so
-        // OrpheusVoice sees a 0→1 rising edge on the next render.
-        if (vp.engine_changed.load(std::memory_order_relaxed)) {
+        // Engine change retrigger: a gate held across the change drops for one block so
+        // OrpheusVoice sees a fresh 0→1 edge. With the detector already low the gate is
+        // its own edge, and dropping it would eat a one-shot drum strike.
+        if (vp.engine_changed.exchange(0, std::memory_order_relaxed) && voice.trigger_state_) {
             plaits_gate = 0;
-            vp.engine_changed.store(0, std::memory_order_relaxed);
         }
 
         // Plaits note: NO fm_mod_semitones — in JSyn, VOICE_FM only modulates
