@@ -302,6 +302,50 @@ Apple and, on approval, in front of external testers. Confirm with the user befo
 especially when the release carries pre-release dependencies or changes only verified on
 simulator.
 
+## Store screenshots and App Store creative assets
+
+Only needed when a release changes how the app looks. A release that leaves the UI alone skips this
+whole section: Play keeps its listing, and a new App Store version record copies the previous
+version's screenshots.
+
+The tooling lives in `apps/djapp/store-listings/capture/`. Its README holds the device quirks
+(Fold rotation, emulator serials, iPad simulator frames) and overrides anything here.
+
+| Script | Use it when |
+|---|---|
+| `adb_ui.py` (`dump`, `tap "<label>"`, `burst <prefix>`) | Driving an Android emulator for captures. Taps by visible text, so a UI change costs a `dump`, not a rewrite. |
+| `pick_best.py <out> <frames...>` | After a burst, to keep the frame with the most detail. An animated viz often lands on a dark frame. |
+| `render_frame.sh <html> <index> <W> <H> <out>` | Turning a raw capture into a captioned store image from the `framed/*.html` templates. Serve `apps/djapp/` on port 8765 first. |
+| `verify_store_assets.py` | Before committing or publishing. Checks every slot's file count, size, alpha and brightness. Never loosen it to pass. |
+| `asc_creative_assets.py <upload\|submit\|place\|status> --app <APP_ID>` | The App Store **Header** and **Search Results** assets (`app-store/creative/`, built from `framed/appstore-header.html` and `appstore-search.html`). |
+
+**Order within a release.** Capture and stage the screenshots, land them on `main`, then tag. The
+binaries do not depend on them, but the App Store screenshots belong to the version record, so they
+must be attached before that version is submitted. Build captures from `ogDebugRelease` and the iOS
+Release configuration only (debuggable builds list WIP vibes), and never with `-PshowKraken=true`.
+
+**Publishing them.**
+- Play: `publishOgReleaseListing`. Listing-only and global, so it never touches a track.
+- App Store screenshots: replace each `appScreenshotSet` on the new version's localization
+  (delete the copied ones, reserve, upload, PATCH `uploaded` with an MD5, PATCH the order).
+- App Store Header and Search Results: `asc_creative_assets.py`. It reads `ASC_KEY_ID`,
+  `ASC_ISSUER_ID` and `ASC_KEY_PATH` from the environment. `upload` puts both PNGs in the asset
+  library and is safe to run any time. `submit` sends them for their own review, apart from the app
+  version. `place` attaches them to a version localization and only works once they are `APPROVED`.
+  `status` prints where each one is.
+
+**Gotchas.**
+- Apple allows **two open review submissions per platform**. A version in review plus one asset
+  submission fills both, so put the header and the search asset in ONE submission, or wait.
+- A `submit` is outward-facing, like the version submission. Confirm with the user first.
+- These placements show only on iOS 27 and iPadOS 27 or later.
+- `submit` and `place` were written from a third-party write-up and had not run end to end as of
+  2026-10-11. The script stops and prints Apple's error, which names the field it wanted.
+- Signing keys and `.secrets/` are gitignored, so they exist only in the main checkout. Run the
+  Play and iOS publish steps from there, not from a worktree.
+- Play reporting a production release as `completed` through the API does not mean it is live.
+  The Console shows "in review" for a while after; trust the Console.
+
 ## Release-notes structure
 
 The body should feel useful to a developer scanning the release page, not like a marketing announcement. Group by what the user/operator cares about, lead with the highest-impact items. The template that has held up well across versions:
