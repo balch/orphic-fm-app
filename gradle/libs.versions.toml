@@ -19,7 +19,7 @@ gradle = "9.4.1"
 junit = "4.13.2"
 material3AdaptiveNavigationSuite = "1.9.0"
 robolectric = "4.17"
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 kotlinpoet = "2.4.0"
 kotlinx-atomicfu = "0.33.0"
 kotlinx-coroutines = "1.11.0"
@@ -32,7 +32,7 @@ kmlogging = "2.1.2"
 material3Version = "1.12.0-alpha03"
 media3 = "1.11.1"
 slf4jApi = "2.0.20"
-logback = "1.6.4"
+logback = "1.6.5"
 metro = "1.4.5"
 multiplatform-nav3-ui = "1.1.2"
 multiplatform-navigationevent = "1.1.0"
@@ -180,5 +180,5 @@ kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 buildkonfig = { id = "com.codingfeline.buildkonfig", version.ref = "buildkonfig" }
 androidTest = { id = "com.android.test", version.ref = "agp" }
-versions-plugin = { id = "io.github.ben-manes.versions", version = "0.64.0" }
+versions-plugin = { id = "io.github.ben-manes.versions", version = "0.65.0" }
 play-publisher = { id = "com.github.triplet.play", version = "4.1.1" }
