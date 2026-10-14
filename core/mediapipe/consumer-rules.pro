@@ -12,3 +12,7 @@
 -keep class com.google.protobuf.** { *; }
 -keep class com.google.common.flogger.** { *; }
 -dontwarn com.google.mediapipe.proto.**
+
+# MediaPipe 1.1.0's image embedder refers to the optional LiteRT-LM runtime, which is not on
+# the classpath. Only hand tracking is used, so the embedder is never loaded.
+-dontwarn com.google.ai.edge.litertlm.**
