@@ -69,8 +69,9 @@ class AndroidHandTracker(
     override val isAvailable: Boolean
         get() = context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
 
-    private var gestureRecognizer: GestureRecognizer? = null
-    private var handLandmarker: HandLandmarker? = null
+    // Volatile: stopEngine() clears these so the analysis thread's next frame finds none.
+    @Volatile private var gestureRecognizer: GestureRecognizer? = null
+    @Volatile private var handLandmarker: HandLandmarker? = null
     private var useGestureRecognizer: Boolean = false
     private var lifecycleOwner: TrackerLifecycleOwner? = null
     private var analysisExecutor = Executors.newSingleThreadExecutor()
@@ -282,16 +283,26 @@ class AndroidHandTracker(
         imageAnalysis = null
         lifecycleOwner?.stop()
         lifecycleOwner = null
+        // Detach the recognizers so a late frame finds none, then let the frame in flight
+        // finish before anything it uses is closed or recycled. Bounded: this is the caller's
+        // thread, usually main.
+        val recognizer = gestureRecognizer
+        val landmarker = handLandmarker
+        gestureRecognizer = null
+        handLandmarker = null
+        useGestureRecognizer = false
+        val drained = analysisExecutor.drain(FRAME_DRAIN_TIMEOUT_MS)
         // MediaPipe's close() invokes waitUntilGraphDone() which re-throws any persisted
         // graph error onto the caller's thread. If the graph was poisoned during streaming,
         // we don't want that to take down the app on shutdown — log and continue.
-        try { gestureRecognizer?.close() } catch (e: Throwable) { log.warn(e) { "gestureRecognizer.close() failed" } }
-        gestureRecognizer = null
-        try { handLandmarker?.close() } catch (e: Throwable) { log.warn(e) { "handLandmarker.close() failed" } }
-        handLandmarker = null
-        useGestureRecognizer = false
-        analysisExecutor.shutdown()
-        reusableMirrorBitmap?.recycle()
+        try { recognizer?.close() } catch (e: Throwable) { log.warn(e) { "gestureRecognizer.close() failed" } }
+        try { landmarker?.close() } catch (e: Throwable) { log.warn(e) { "handLandmarker.close() failed" } }
+        if (drained) {
+            reusableMirrorBitmap?.recycle()
+        } else {
+            // That frame may still be drawing into the bitmap: leave it to the GC.
+            log.warn { "Analysis frame still running after ${FRAME_DRAIN_TIMEOUT_MS}ms; not recycling its bitmap" }
+        }
         reusableMirrorBitmap = null
         reusableFrameBuffer = null
     }
@@ -373,10 +384,17 @@ class AndroidHandTracker(
         // trip "Packet isn't the sole owner of the holder" (poisoning the graph). Copy
         // so MediaPipe owns its input exclusively.
         val mpImage = BitmapImageBuilder(mirrored.copy(Bitmap.Config.ARGB_8888, false)).build()
-        if (useGestureRecognizer) {
-            gestureRecognizer?.recognizeAsync(mpImage, timestampMs) ?: return
-        } else {
-            handLandmarker?.detectAsync(mpImage, timestampMs) ?: return
+        try {
+            if (useGestureRecognizer) {
+                gestureRecognizer?.recognizeAsync(mpImage, timestampMs)
+            } else {
+                handLandmarker?.detectAsync(mpImage, timestampMs)
+            }
+        } catch (e: Throwable) {
+            // A frame that outlived stopEngine()'s wait can find its recognizer closed. An
+            // uncaught throw here would kill the app from the analysis thread.
+            if (!isStopping) throw e
+            log.warn(e) { "Dropped a frame during stop" }
         }
     }
 
@@ -524,5 +542,11 @@ class AndroidHandTracker(
                 registry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
             }
         }
+    }
+
+    private companion object {
+        // A frame is tens of milliseconds of work. Long enough to outlast one, short enough
+        // that a wedged frame cannot freeze the main thread.
+        const val FRAME_DRAIN_TIMEOUT_MS = 250L
     }
 }
