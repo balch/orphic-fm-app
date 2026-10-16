@@ -15,9 +15,11 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.diamondedge.logging.logging
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
@@ -43,6 +45,9 @@ import java.util.concurrent.Executors
  *
  * This tracker self-manages the front camera via CameraX — no external camera setup needed.
  * Call [start] to begin tracking and [stop] to release the camera.
+ *
+ * Between those calls it also releases the camera and recognizer whenever the app is
+ * backgrounded, and takes them back on return. Callers do not relay the lifecycle themselves.
  *
  * @param context Android application context.
  * @param gestureModelAssetPath path to the gesture_recognizer.task model in assets.
@@ -111,7 +116,45 @@ class AndroidHandTracker(
         }
     }
 
+    // Guards runGate and the engine: start()/stop() can come from any thread, while the
+    // process lifecycle callbacks arrive on main.
+    private val lock = Any()
+    private val runGate = TrackerRunGate()
+    private var observingProcess = false
+
+    // Pauses the camera and recognizer while the app is backgrounded. The process lifecycle
+    // waits out configuration changes, so a rotation does not bounce the camera.
+    private val processObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) = reconcile { it.onForeground(true) }
+        override fun onStop(owner: LifecycleOwner) = reconcile { it.onForeground(false) }
+    }
+
     override fun start() {
+        reconcile { it.onWanted(true) }
+        observeProcessLifecycle()
+    }
+
+    override fun stop() = reconcile { it.onWanted(false) }
+
+    /** Applies one input, then moves the engine to match. Both engine calls are idempotent. */
+    private inline fun reconcile(update: (TrackerRunGate) -> Boolean) = synchronized(lock) {
+        if (update(runGate)) startEngine() else stopEngine()
+    }
+
+    /** Registered on the first start() and kept for the life of the process. */
+    private fun observeProcessLifecycle() {
+        synchronized(lock) {
+            if (observingProcess) return
+            observingProcess = true
+        }
+        // addObserver is main-thread only. It replays ON_START when the app is already
+        // visible, and that replay is what starts the engine the first time.
+        Handler(Looper.getMainLooper()).post {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
+        }
+    }
+
+    private fun startEngine() {
         if (gestureRecognizer != null || handLandmarker != null) return
         isStopping = false
 
@@ -230,7 +273,7 @@ class AndroidHandTracker(
         }, { command -> Handler(Looper.getMainLooper()).post(command) })
     }
 
-    override fun stop() {
+    private fun stopEngine() {
         isStopping = true // Signal before close — prevents in-flight frames from calling recognizeAsync
         // Before the use case goes: the listener holds it, and a rotation arriving after
         // unbind would retarget a dead ImageAnalysis.
@@ -464,7 +507,7 @@ class AndroidHandTracker(
         private val registry = LifecycleRegistry(this)
         private val mainHandler = Handler(Looper.getMainLooper())
 
-        override fun getLifecycle(): Lifecycle = registry
+        override val lifecycle: Lifecycle get() = registry
 
         fun start() {
             mainHandler.post {

@@ -35,9 +35,9 @@ interface HandTracker {
      */
     val availabilityChanges: Flow<Boolean> get() = emptyFlow()
 
-    /** Start camera capture and hand tracking. */
+    /** Start camera capture and hand tracking. Safe to call when already started. */
     fun start()
 
-    /** Stop camera capture and hand tracking. */
+    /** Stop camera capture and hand tracking. Safe to call when already stopped. */
     fun stop()
 }

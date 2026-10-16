@@ -35,6 +35,7 @@ kotlin {
             implementation(libs.camerax.camera2)
             implementation(libs.camerax.lifecycle)
             implementation(libs.camerax.view)
+            implementation(libs.androidx.lifecycle.process)
         }
         jvmMain.dependencies {
             implementation(libs.javacv.platform)
