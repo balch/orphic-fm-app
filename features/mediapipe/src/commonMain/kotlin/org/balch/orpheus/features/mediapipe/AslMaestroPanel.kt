@@ -68,10 +68,17 @@ fun AslMaestroPanel(
             onPermissionDenied = { },
         )
 
-        // Stop tracking when panel leaves composition
+        // Stop tracking when panel leaves composition. Rotating or unfolding only rebuilds the
+        // panel, so that case pauses the tracker and leaves the user's toggle alone.
+        val isChangingConfigurations = rememberConfigurationChangeCheck()
         DisposableEffect(Unit) {
+            actions.setPanelAttached(true)
             onDispose {
-                if (state.isEnabled) actions.toggleEnabled()
+                if (isChangingConfigurations()) {
+                    actions.setPanelAttached(false)
+                } else if (state.isEnabled) {
+                    actions.toggleEnabled()
+                }
             }
         }
 

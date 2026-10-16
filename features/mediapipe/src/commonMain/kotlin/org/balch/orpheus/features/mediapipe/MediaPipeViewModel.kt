@@ -66,6 +66,8 @@ enum class GesturePanelMode { VIZ, OFF, CAMERA }
 data class MediaPipeUiState(
     val panelMode: GesturePanelMode = GesturePanelMode.OFF,
     val cameraAvailable: Boolean = false,
+    // The user's toggle ("tracking is wanted"), not "the camera is open". Android pauses the
+    // tracker while the app is backgrounded without touching this.
     val isEnabled: Boolean = false,
     val isTracking: Boolean = false,
     val hands: List<TrackedHand> = emptyList(),
@@ -90,10 +92,20 @@ data class MediaPipePanelActions(
     val toggleEnabled: () -> Unit,
     val toggleHold: (voiceIndex: Int) -> Unit,
     val setPanelMode: (GesturePanelMode) -> Unit,
+    val setPanelAttached: (Boolean) -> Unit,
 ) {
     companion object {
-        val EMPTY = MediaPipePanelActions({}, {}, {})
+        val EMPTY = MediaPipePanelActions({}, {}, {}, {})
     }
+}
+
+/**
+ * Pauses the tracker while its panel is rebuilt for a configuration change and resumes it when
+ * the panel is back. [enabled] is the user's toggle: it is read here, never changed.
+ */
+internal fun HandTracker.followPanel(attached: Boolean, enabled: Boolean) {
+    if (!enabled || !isAvailable) return
+    if (attached) start() else stop()
 }
 
 interface MediaPipeFeature : SynthFeature<MediaPipeUiState, MediaPipePanelActions> {
@@ -238,6 +250,7 @@ class MediaPipeViewModel(
                 }
             }
         },
+        setPanelAttached = { attached -> handTracker.followPanel(attached, _isEnabled.value) },
     )
 
     init {
