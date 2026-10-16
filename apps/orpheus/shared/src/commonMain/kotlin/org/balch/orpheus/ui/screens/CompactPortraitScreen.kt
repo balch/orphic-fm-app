@@ -13,6 +13,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -93,6 +95,8 @@ fun CompactPortraitScreen(
  * - Bottom: AI section with mode selector and chat/dashboard
  */
 @OptIn(ExperimentalMaterial3Api::class)
+private val PanelIdSaver = Saver<PanelId, String>(save = { it.id }, restore = { PanelId(it) })
+
 @Composable
 fun CompactPortraitLayout(
     headerFeature: HeaderFeature,
@@ -124,7 +128,9 @@ fun CompactPortraitLayout(
 
     // Resolve compact panels from the Compact factory panel set
     val compactPanels = remember { headerFeature.resolvePanels(FactoryPanelSets.Compact) }
-    var selectedPanelId by remember { mutableStateOf(PanelId.EVO) }
+    // Saveable like the pager's own page. With plain remember a rotate or fold reset this to EVO
+    // while the pager restored its page, so the pager scrolled off the panel the user was on.
+    var selectedPanelId by rememberSaveable(stateSaver = PanelIdSaver) { mutableStateOf(PanelId.EVO) }
 
     // Selected panel for bottom panel switcher
     var selectedBottomPanel by remember { mutableStateOf(CompactBottomPanelType.PADS) }
