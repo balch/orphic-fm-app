@@ -100,7 +100,7 @@ fun MixerPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
     showTuning: Boolean = false,
     startOnTracks: Boolean = false,

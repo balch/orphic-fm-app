@@ -52,7 +52,6 @@ fun AslMaestroPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedTitle = "Maestro",
         showCollapsedHeader = showCollapsedHeader,
     ) {
         val state by feature.stateFlow.collectAsStateWithLifecycle()

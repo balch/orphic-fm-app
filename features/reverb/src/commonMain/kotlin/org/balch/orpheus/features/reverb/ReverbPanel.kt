@@ -28,7 +28,7 @@ fun ReverbPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
 ) {
     val uiState by feature.stateFlow.collectAsStateWithLifecycle()

@@ -86,7 +86,6 @@ fun RecordPanel(
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "REC",
-        expandedTitle = "Remember {}",
         color = RecordAccent,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,

@@ -54,7 +54,6 @@ fun FluxPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedTitle = "Warbles",
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
             SignalTrace(data = cvVizFlow, color = OrpheusColors.metallicBlueLight)

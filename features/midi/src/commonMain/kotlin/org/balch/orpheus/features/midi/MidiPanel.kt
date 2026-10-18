@@ -80,7 +80,6 @@ private fun MidiPanelLayout(
     CollapsibleColumnPanel(
         title = "MIDI",
         color = OrpheusColors.synthGreen,
-        expandedTitle = "Smart MIDI",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

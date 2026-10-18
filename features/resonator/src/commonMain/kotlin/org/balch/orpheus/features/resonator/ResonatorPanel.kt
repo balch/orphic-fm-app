@@ -77,7 +77,6 @@ fun ResonatorPanel(
     CollapsibleColumnPanel(
         title = "REZO",
         color = RingsPanelColor,
-        expandedTitle = "Cowbell",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

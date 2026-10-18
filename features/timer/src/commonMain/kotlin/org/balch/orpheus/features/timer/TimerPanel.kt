@@ -56,7 +56,7 @@ fun TimerPanel(
     isExpanded: Boolean = true,
     onExpandedChange: (Boolean) -> Unit = {},
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
     // Preview/render-harness seam only: forces one transport button's focus visual without a
     // real D-pad. Every production call site leaves this null.

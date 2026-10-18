@@ -84,7 +84,7 @@ fun HornPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
     // A host with a short slot (closed iPhone Duo) passes less so the knob row stays inside.
     displayHeight: Dp = HornDisplayHeight,

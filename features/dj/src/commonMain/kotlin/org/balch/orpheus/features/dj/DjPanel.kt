@@ -158,7 +158,7 @@ fun DjPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
     previewFaderOverride: FaderPreviewOverride? = null,
 ) {

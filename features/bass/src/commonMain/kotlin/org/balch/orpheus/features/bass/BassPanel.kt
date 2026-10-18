@@ -63,7 +63,6 @@ fun BassPanel(
     CollapsibleColumnPanel(
         title = "BASS",
         color = bassColors.panelColor,
-        expandedTitle = "Bassline",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

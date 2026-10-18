@@ -90,7 +90,6 @@ fun DuoLfoPanel(
     CollapsibleColumnPanel(
         title = "LFO",
         color = OrpheusColors.neonCyan,
-        expandedTitle = "Pong",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,

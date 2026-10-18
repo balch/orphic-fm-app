@@ -56,7 +56,6 @@ fun VizPanel(
     CollapsibleColumnPanel(
         title = "VIZ",
         color = OrpheusColors.vizGreen,
-        expandedTitle = "Fluff",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

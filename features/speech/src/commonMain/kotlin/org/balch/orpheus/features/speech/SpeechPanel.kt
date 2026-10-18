@@ -99,7 +99,6 @@ fun SpeechPanel(
 
     CollapsibleColumnPanel(
         title = "TALK",
-        expandedTitle = "Speakeasy",
         color = color,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,

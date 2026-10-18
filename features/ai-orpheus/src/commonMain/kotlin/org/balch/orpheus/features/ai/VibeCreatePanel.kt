@@ -78,7 +78,6 @@ fun VibeCreatePanel(
     CollapsibleColumnPanel(
         title = "VIBE",
         color = OrpheusColors.neonCyan,
-        expandedTitle = uiState.vibe?.name ?: "AI Vibe",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

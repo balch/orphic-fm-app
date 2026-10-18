@@ -128,7 +128,7 @@ fun PulsarPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
     centerContent: Boolean = true,
     // TV docks ENDING as its own bottom-bar button (DjTvBottomBar's "Ends") so it stays reachable

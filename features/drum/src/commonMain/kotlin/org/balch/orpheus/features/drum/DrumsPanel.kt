@@ -51,7 +51,6 @@ fun DrumsPanel(
     CollapsibleColumnPanel(
         title = "808",
         color = OrpheusColors.ninersRed,
-        expandedTitle = "808 Drums",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

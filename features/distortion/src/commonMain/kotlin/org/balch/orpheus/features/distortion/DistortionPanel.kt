@@ -44,7 +44,7 @@ fun DistortionPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
 ) {
     val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions

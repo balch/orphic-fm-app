@@ -241,7 +241,7 @@ fun EndsPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
-    showExpandedTitle: Boolean = true,
+    showExpandedTitle: Boolean = false,
     fillHeight: Boolean = true,
 ) {
     val visibleStyles = remember { TransitionStyle.entries.filter { it.isVisible } }

@@ -40,7 +40,6 @@ fun AiOptionsPanel(
     CollapsibleColumnPanel(
         title = "AI",
         color = OrpheusColors.metallicBlue,
-        expandedTitle = "Orpheus",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

@@ -71,7 +71,6 @@ fun TriggerRouterPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedTitle = "Connect",
         modifier = modifier
     ) {
         Column(

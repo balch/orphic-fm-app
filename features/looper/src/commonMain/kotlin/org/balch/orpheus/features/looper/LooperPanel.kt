@@ -83,7 +83,6 @@ fun LooperPanel(
     CollapsibleColumnPanel(
         title = "LOOP",
         color = LooperColor,
-        expandedTitle = "Circular Buffer",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

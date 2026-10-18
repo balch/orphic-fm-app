@@ -225,7 +225,6 @@ fun LiveCodePanel(
     CollapsibleColumnPanel(
         title = "CODE",
         color = OrpheusColors.neonCyan,
-        expandedTitle = "Tidal Live",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,  // Closed by default

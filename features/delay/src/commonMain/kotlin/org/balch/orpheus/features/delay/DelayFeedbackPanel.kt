@@ -41,7 +41,6 @@ fun DelayFeedbackPanel(
     CollapsibleColumnPanel(
         title = "DELAY",
         color = OrpheusColors.warmGlow,
-        expandedTitle = "Depth",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,

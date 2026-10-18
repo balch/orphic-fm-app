@@ -259,7 +259,6 @@ private fun CollapsibleColumnPanelChromeStatesPreview() {
             ) {}
             CollapsibleColumnPanel(
                 title = "ACC",
-                expandedTitle = "Accented",
                 color = Color(0xFF00E5FF),
                 isExpanded = true,
                 showCollapsedHeader = false,
@@ -269,7 +268,6 @@ private fun CollapsibleColumnPanelChromeStatesPreview() {
             }
             CollapsibleColumnPanel(
                 title = "FOC",
-                expandedTitle = "Region-focused",
                 color = Color(0xFF00E5FF),
                 isExpanded = true,
                 showCollapsedHeader = false,
@@ -308,7 +306,6 @@ private fun CollapsibleColumnPanelTvGlassPreview() {
             ) {
                 CollapsibleColumnPanel(
                     title = "TV",
-                    expandedTitle = "Docked on TV",
                     color = Color(0xFF7C4DFF),
                     isExpanded = true,
                     showCollapsedHeader = false,

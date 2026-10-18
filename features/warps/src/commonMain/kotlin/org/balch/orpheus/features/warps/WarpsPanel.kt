@@ -69,7 +69,6 @@ fun WarpsPanel(
     CollapsibleColumnPanel(
         title = "BLEND",
         color = warpsColors.panelColor,
-        expandedTitle = "X-Mod",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

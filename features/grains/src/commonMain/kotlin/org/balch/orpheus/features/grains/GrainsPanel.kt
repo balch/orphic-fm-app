@@ -61,7 +61,6 @@ fun GrainsPanel(
     CollapsibleColumnPanel(
         title = "GRAIN",
         color = panelColor,
-        expandedTitle = "Mist",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
