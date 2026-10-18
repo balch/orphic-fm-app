@@ -59,8 +59,9 @@ import kotlin.math.roundToInt
 private const val TRACK_UNITY_TRAVEL = TrackTuning.UNITY / TrackTuning.MAX_LEVEL
 private val UnlitChip = Color(0xFF15101A)
 private val STRIP_WIDTH = 42.dp
-private const val FULL_TRACK_HEIGHT = 112
-private const val MIN_TRACK_HEIGHT = 32
+
+/** M/S chip size, also the gap a mute-less BAND strip keeps so its label stays in line. */
+internal val STRIP_TOGGLE_SIZE = 18.dp
 
 /**
  * Holds a fader of [full] dp, or in a [flexible] strip whatever height is left in the slot
@@ -137,7 +138,7 @@ private fun ToggleSegment(label: String, selected: Boolean, accent: Color, onCli
 }
 
 /**
- * Eight per-track strips: name, M/S, and a 0..1.5 level fader with a live meter. With [flexible]
+ * Eight per-track strips: M/S, name, and a 0..1.5 level fader with a live meter. With [flexible]
  * the fader gives up height first when the slot is short; otherwise it keeps its full height.
  */
 @Composable
@@ -156,7 +157,7 @@ internal fun TrackTuningStrips(
     }
 
     // Fits a 360dp cover screen; a narrower one scrolls rather than squeezing the faders.
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
         Row(
             modifier = Modifier.horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(1.dp),
@@ -196,6 +197,15 @@ private fun TrackStrip(
         modifier = Modifier.width(STRIP_WIDTH).semantics { contentDescription = "Strip $who" },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            StripToggle("M", "Mute $who", muted, OrpheusColors.mixerDistRed) {
+                actions.toggleTrackMute(track)
+            }
+            StripToggle("S", "Solo $who", soloed, OrpheusColors.mixerFxAmber) {
+                actions.toggleTrackSolo(track)
+            }
+        }
+        Spacer(Modifier.height(3.dp))
         Text(
             text = who,
             color = color.copy(alpha = if (silent) 0.4f else 1f),
@@ -205,18 +215,9 @@ private fun TrackStrip(
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(3.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            StripToggle("M", "Mute $who", muted, OrpheusColors.mixerDistRed) {
-                actions.toggleTrackMute(track)
-            }
-            StripToggle("S", "Solo $who", soloed, OrpheusColors.mixerFxAmber) {
-                actions.toggleTrackSolo(track)
-            }
-        }
         Spacer(Modifier.height(4.dp))
-        // The fader takes whatever height the name and chips leave, up to its full height.
-        FlexibleFader(flexible, FULL_TRACK_HEIGHT, MIN_TRACK_HEIGHT) { height ->
+        // The fader takes whatever height the chips and name leave, up to its full height.
+        FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT) { height ->
             MixerFader(
                 value = level / TrackTuning.MAX_LEVEL,
                 onValueChange = { actions.setTrackLevel(track, it * TrackTuning.MAX_LEVEL) },
@@ -232,7 +233,7 @@ private fun TrackStrip(
                 trackWidth = 12,
                 thumbWidth = 26,
                 thumbHeight = 12,
-                ledCount = (14 * height / FULL_TRACK_HEIGHT).coerceAtLeast(4),
+                ledCount = ledCountFor(height),
                 hotZoneCount = 3,
                 unityTravel = TRACK_UNITY_TRAVEL,
                 glass = false,
@@ -253,7 +254,7 @@ internal fun StripToggle(label: String, description: String, active: Boolean, co
     val shape = RoundedCornerShape(4.dp)
     Box(
         modifier = Modifier
-            .size(18.dp)
+            .size(STRIP_TOGGLE_SIZE)
             .clip(shape)
             .background(if (active) color else UnlitChip)
             .border(1.dp, color.copy(alpha = if (active) 1f else 0.5f), shape)

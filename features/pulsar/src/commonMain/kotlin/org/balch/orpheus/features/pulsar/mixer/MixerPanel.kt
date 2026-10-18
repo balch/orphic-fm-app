@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.pulsar.mixer
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,15 +8,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -25,9 +25,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -81,12 +82,13 @@ private const val GROUP_COUNT = 4
 // Hoisted to avoid per-frame allocation on the elvis fallback in the meter loop.
 internal val EMPTY_FLOAT_ARRAY = FloatArray(0)
 
-// MixerFader's own track height and LED count; a flexible strip shrinks both together.
-private const val FULL_FADER_HEIGHT = 140
-private const val MIN_FADER_HEIGHT = 32
+// MixerFader's own track height and LED count, shared by BAND and TRACKS so both views match.
+// A flexible strip shrinks both together.
+internal const val FULL_FADER_HEIGHT = 140
+internal const val MIN_FADER_HEIGHT = 32
 private const val FULL_FADER_LEDS = 18
 
-private fun ledCountFor(height: Int) = (FULL_FADER_LEDS * height / FULL_FADER_HEIGHT).coerceAtLeast(4)
+internal fun ledCountFor(height: Int) = (FULL_FADER_LEDS * height / FULL_FADER_HEIGHT).coerceAtLeast(4)
 
 /** Test seam: called once per frame by the BUS meter loop, so a test can tell whether it runs. Null in the app. */
 val LocalBusMeterFrameProbe = staticCompositionLocalOf<(() -> Unit)?> { null }
@@ -155,6 +157,13 @@ fun MixerPanel(
             // In a short slot the faders give up height first; with no height limit they keep it all.
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val flexible = constraints.hasBoundedHeight
+                // The panel centres its content, so each view reserves the other's last height
+                // and the toggle stays put when they swap. BAND always shows first, so it seeds this.
+                var bandHeight by remember { mutableIntStateOf(0) }
+                var tracksHeight by remember { mutableIntStateOf(0) }
+                val reserved = with(LocalDensity.current) {
+                    (if (tracksShowing) bandHeight else tracksHeight).toDp()
+                }
                 Column(modifier = Modifier.fillMaxWidth()) {
                     TuningViewToggle(
                         tracksView = tracksView,
@@ -165,7 +174,13 @@ fun MixerPanel(
                         resetEnabled = uiState.tuning.isTouched,
                         onReset = actions.resetTracks,
                     )
-                    Box(modifier = if (flexible) Modifier.weight(1f, fill = false) else Modifier) {
+                    Box(
+                        modifier = (if (flexible) Modifier.weight(1f, fill = false) else Modifier)
+                            .heightIn(min = reserved)
+                            .onSizeChanged {
+                                if (tracksShowing) tracksHeight = it.height else bandHeight = it.height
+                            },
+                    ) {
                         if (tracksShowing) {
                             TrackTuningStrips(
                                 uiState = uiState,
@@ -352,6 +367,7 @@ private fun MixerStripsRow(
                 drive = uiState.drive,
                 peak = smoothedPeak.floatValue,
                 onDriveChange = actions.setDrive,
+                reserveToggleSlot = busMutesDriveTracks,
                 flexible = flexible,
             )
         }
@@ -361,42 +377,30 @@ private fun MixerStripsRow(
 
 /**
  * Shared layout shell for every channel in the mixer (PERC/BASS/KEYS/FX + DIST).
- * Owns the pulse-dot → fader → label → value stack so the columns line up across
- * the strip; per-channel data (fader behavior, value formatting, color logic)
- * arrives via parameters and the [fader] slot.
+ * Owns the mute → label → fader → value stack, the same order as the TRACKS strips, so the
+ * columns line up across the strip and across both views. Per-channel data (fader behavior,
+ * value formatting, color logic) arrives via parameters and the [fader] slot.
  *
- * The dead space between label and value was inherited line boxes, not layout slack;
- * OrpheusTheme's proportional bodyLarge now sizes those to the glyphs.
- *
- * Spacers stay explicit for two independent reasons: the gaps are asymmetric (6 / 6 / 0),
- * and the parent Row sets verticalAlignment = Alignment.Bottom, so its height is the
- * tallest child — Arrangement.SpaceBetween would redistribute that slack into every gap.
+ * [reserveToggleSlot] keeps an empty chip-sized gap on a strip with no mute (DIST) so its label
+ * sits on the same line as its neighbours'. Spacers stay explicit because the parent Row sets
+ * verticalAlignment = Alignment.Bottom, so Arrangement.SpaceBetween would spread its slack.
  */
 @Composable
 private fun FaderStrip(
     label: String,
     labelColor: Color,
-    pulseColor: Color,
     valueText: String,
     valueColor: Color,
     muteToggle: (@Composable () -> Unit)? = null,
+    reserveToggleSlot: Boolean = false,
     flexible: Boolean = false,
     fader: @Composable (trackHeight: Int) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (muteToggle != null) {
-            muteToggle()
-            Spacer(modifier = Modifier.height(4.dp))
+        if (muteToggle != null || reserveToggleSlot) {
+            if (muteToggle != null) muteToggle() else Spacer(modifier = Modifier.size(STRIP_TOGGLE_SIZE))
+            Spacer(modifier = Modifier.height(3.dp))
         }
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(pulseColor),
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT, fader)
-        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
             color = labelColor,
@@ -404,6 +408,8 @@ private fun FaderStrip(
             fontWeight = FontWeight.Bold,
             letterSpacing = 2.sp,
         )
+        Spacer(modifier = Modifier.height(4.dp))
+        FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT, fader)
         Text(
             text = valueText,
             color = valueColor,
@@ -426,11 +432,9 @@ private fun GroupStrip(
     val multiplier = faderToGain(gain)
     // Muted shows on the chip too; silent (from solo or partial mutes) only dims the strip.
     val dim = muted || silent
-    val pulseAlpha = if (dim) 0.1f else (0.3f + meterLevel * 0.7f).coerceAtMost(1f)
     FaderStrip(
         label = accent.label,
         labelColor = accent.color.copy(alpha = if (dim) 0.4f else 1f),
-        pulseColor = accent.color.copy(alpha = pulseAlpha),
         // Live amplitude multiplier (0.75 fader → "1.00x"). Color smoothly
         // transitions yellow → green → red across unity. Muted bands keep
         // the accent-tinted dim look.
@@ -461,6 +465,7 @@ private fun DistStrip(
     drive: Float,
     peak: Float,
     onDriveChange: (Float) -> Unit,
+    reserveToggleSlot: Boolean = false,
     flexible: Boolean = false,
 ) {
     val accent = OrpheusColors.seahawksGrey
@@ -468,9 +473,9 @@ private fun DistStrip(
     FaderStrip(
         label = "GAIN",
         labelColor = accent,
-        pulseColor = accent.copy(alpha = (0.3f + peakFraction * 0.7f).coerceAtMost(1f)),
         valueText = formatTwoDp(drive),
         valueColor = accent.copy(alpha = 0.55f),
+        reserveToggleSlot = reserveToggleSlot,
         flexible = flexible,
         fader = { height ->
             MixerFader(
