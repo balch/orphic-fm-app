@@ -7,7 +7,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.vibes.BlackCatVibe
 import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
-import org.balch.orpheus.features.pulsar.vibes.OdysseusLoreVibe
+import org.balch.orpheus.features.pulsar.vibes.OrphicLoreVibe
 import org.balch.orpheus.features.pulsar.vibes.RustBeltVibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
 import kotlin.test.Test
@@ -46,7 +46,7 @@ class DeadStaticToneAudit {
         "BlackCat" to BlackCatVibe().vibe,
         "RustBelt" to RustBeltVibe().vibe,
         "FireSky" to FireSkyVibe().vibe,
-        "OdysseusLore" to OdysseusLoreVibe().vibe,
+        "OrphicLore" to OrphicLoreVibe().vibe,
     )
 
     // engineId is required but irrelevant here: these defaults are compile-time constants

@@ -75,6 +75,7 @@ class AlbumCatalog(
                     VibeNames.RUST_BELT,
                     VibeNames.LOST_IN_SPACE,
                     VibeNames.STAY_ASLEEP,
+                    VibeNames.ORPHIC_LORE,
                 ),
             ),
             // STEALTH holds every other cataloged vibe in VibeCatalog order; list one under STEALTH to put it first.

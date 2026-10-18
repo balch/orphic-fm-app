@@ -2,7 +2,7 @@ package org.balch.orpheus.features.pulsar.models
 
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
-import org.balch.orpheus.features.pulsar.vibes.OdysseusLoreVibe
+import org.balch.orpheus.features.pulsar.vibes.OrphicLoreVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -88,19 +88,19 @@ class WahAnomalyTest {
     // discovers every VibeProvider on the classpath instead of trusting a list.
 
     @Test
-    fun odysseusLoreIsTheShippedTakeoverCase() {
+    fun orphicLoreIsTheShippedTakeoverCase() {
         // The takeover path (anomaly displaces a track's standing wah instead of stacking a
         // second bandpass) has exactly one shipped vibe exercising it. If this breaks, that path
         // loses its ear test.
-        val vibe = OdysseusLoreVibe().vibe
+        val vibe = OrphicLoreVibe().vibe
         assertNotNull(vibe.lickWah, "the takeover path needs a standing lickWah voice to take over")
 
         val eligible = eligibleWahTracks(vibe)
         assertEquals(
-            // 4 = wah lead, 6 = granular swirl, 7 = harmony guitar. The bass (3) is excluded
-            // by the bass-channel clause even though it now carries its own standing wah.
-            setOf(4, 6, 7), eligible,
-            "these are the tracks Odysseus Lore's wah anomaly actually filters. If you changed a " +
+            // 4 = wah lead. The bass (3) is excluded by the bass-channel clause; the Sirens (5)
+            // read the bass line; the organ (6) and the bell (7) are Chordal.
+            setOf(4), eligible,
+            "these are the tracks Orphic Lore's wah anomaly actually filters. If you changed a " +
                 "track's role or lickSource, update this expectation and re-ear-test.",
         )
 

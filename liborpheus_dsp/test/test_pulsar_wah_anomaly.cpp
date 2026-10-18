@@ -799,7 +799,7 @@ static bool test_armed_duration_two_leads_still_decrements_once_per_block() {
 
 // ═══════════════════════════════════════════════════════════════════════
 // The mask covers EVERY eligible lead, and each runs its own voice.
-// Shaped like the shipped Odysseus Lore layout: one wah'd lead (takeover) plus a
+// Shaped like an earlier Orphic Lore layout: one wah'd lead (takeover) plus a
 // second bare melodic lead (fresh voice), a melodic BASS-channel track, a chordal
 // track, and drums. Expected mask = tracks 4 and 6 = 0b01010000 = 0x50.
 // ═══════════════════════════════════════════════════════════════════════
