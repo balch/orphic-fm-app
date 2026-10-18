@@ -227,6 +227,86 @@ enum class PulsarSymbol(
     TRACK_6_FM_FREE_HZ("track_6_fm_free_hz"),
     TRACK_7_FM_FREE_HZ("track_7_fm_free_hz"),
 
+    // Per-track Mist grain engine: how a note becomes grains (8 entries, EDM slot)
+    TRACK_0_GRAIN_MODE("track_0_grain_mode"),
+    TRACK_1_GRAIN_MODE("track_1_grain_mode"),
+    TRACK_2_GRAIN_MODE("track_2_grain_mode"),
+    TRACK_3_GRAIN_MODE("track_3_grain_mode"),
+    TRACK_4_GRAIN_MODE("track_4_grain_mode"),
+    TRACK_5_GRAIN_MODE("track_5_grain_mode"),
+    TRACK_6_GRAIN_MODE("track_6_grain_mode"),
+    TRACK_7_GRAIN_MODE("track_7_grain_mode"),
+
+    // Per-track Mist grain engine: where scattered grains land (8 entries, EDM slot)
+    TRACK_0_GRAIN_SCATTER_MODE("track_0_grain_scatter_mode"),
+    TRACK_1_GRAIN_SCATTER_MODE("track_1_grain_scatter_mode"),
+    TRACK_2_GRAIN_SCATTER_MODE("track_2_grain_scatter_mode"),
+    TRACK_3_GRAIN_SCATTER_MODE("track_3_grain_scatter_mode"),
+    TRACK_4_GRAIN_SCATTER_MODE("track_4_grain_scatter_mode"),
+    TRACK_5_GRAIN_SCATTER_MODE("track_5_grain_scatter_mode"),
+    TRACK_6_GRAIN_SCATTER_MODE("track_6_grain_scatter_mode"),
+    TRACK_7_GRAIN_SCATTER_MODE("track_7_grain_scatter_mode"),
+
+    // Per-track Mist grain engine: scatter reach (8 entries, EDM slot)
+    TRACK_0_GRAIN_SCATTER("track_0_grain_scatter"),
+    TRACK_1_GRAIN_SCATTER("track_1_grain_scatter"),
+    TRACK_2_GRAIN_SCATTER("track_2_grain_scatter"),
+    TRACK_3_GRAIN_SCATTER("track_3_grain_scatter"),
+    TRACK_4_GRAIN_SCATTER("track_4_grain_scatter"),
+    TRACK_5_GRAIN_SCATTER("track_5_grain_scatter"),
+    TRACK_6_GRAIN_SCATTER("track_6_grain_scatter"),
+    TRACK_7_GRAIN_SCATTER("track_7_grain_scatter"),
+
+    // Per-track Mist grain engine: grain rate, or clock divider/probability (8 entries, EDM slot)
+    TRACK_0_GRAIN_RATE("track_0_grain_rate"),
+    TRACK_1_GRAIN_RATE("track_1_grain_rate"),
+    TRACK_2_GRAIN_RATE("track_2_grain_rate"),
+    TRACK_3_GRAIN_RATE("track_3_grain_rate"),
+    TRACK_4_GRAIN_RATE("track_4_grain_rate"),
+    TRACK_5_GRAIN_RATE("track_5_grain_rate"),
+    TRACK_6_GRAIN_RATE("track_6_grain_rate"),
+    TRACK_7_GRAIN_RATE("track_7_grain_rate"),
+
+    // Per-track Mist grain engine: random grain timing flag (8 entries, EDM slot)
+    TRACK_0_GRAIN_RANDOM_TIMING("track_0_grain_random_timing"),
+    TRACK_1_GRAIN_RANDOM_TIMING("track_1_grain_random_timing"),
+    TRACK_2_GRAIN_RANDOM_TIMING("track_2_grain_random_timing"),
+    TRACK_3_GRAIN_RANDOM_TIMING("track_3_grain_random_timing"),
+    TRACK_4_GRAIN_RANDOM_TIMING("track_4_grain_random_timing"),
+    TRACK_5_GRAIN_RANDOM_TIMING("track_5_grain_random_timing"),
+    TRACK_6_GRAIN_RANDOM_TIMING("track_6_grain_random_timing"),
+    TRACK_7_GRAIN_RANDOM_TIMING("track_7_grain_random_timing"),
+
+    // Per-track Mist grain engine: grain envelope shape (8 entries, EDM slot)
+    TRACK_0_GRAIN_SHAPE("track_0_grain_shape"),
+    TRACK_1_GRAIN_SHAPE("track_1_grain_shape"),
+    TRACK_2_GRAIN_SHAPE("track_2_grain_shape"),
+    TRACK_3_GRAIN_SHAPE("track_3_grain_shape"),
+    TRACK_4_GRAIN_SHAPE("track_4_grain_shape"),
+    TRACK_5_GRAIN_SHAPE("track_5_grain_shape"),
+    TRACK_6_GRAIN_SHAPE("track_6_grain_shape"),
+    TRACK_7_GRAIN_SHAPE("track_7_grain_shape"),
+
+    // Per-track Mist grain engine: oscillator to grain blend (8 entries, EDM slot)
+    TRACK_0_GRAIN_BLEND("track_0_grain_blend"),
+    TRACK_1_GRAIN_BLEND("track_1_grain_blend"),
+    TRACK_2_GRAIN_BLEND("track_2_grain_blend"),
+    TRACK_3_GRAIN_BLEND("track_3_grain_blend"),
+    TRACK_4_GRAIN_BLEND("track_4_grain_blend"),
+    TRACK_5_GRAIN_BLEND("track_5_grain_blend"),
+    TRACK_6_GRAIN_BLEND("track_6_grain_blend"),
+    TRACK_7_GRAIN_BLEND("track_7_grain_blend"),
+
+    // Per-track Mist grain engine: which tone a scattered grain takes (8 entries, EDM slot)
+    TRACK_0_GRAIN_VOICING("track_0_grain_voicing"),
+    TRACK_1_GRAIN_VOICING("track_1_grain_voicing"),
+    TRACK_2_GRAIN_VOICING("track_2_grain_voicing"),
+    TRACK_3_GRAIN_VOICING("track_3_grain_voicing"),
+    TRACK_4_GRAIN_VOICING("track_4_grain_voicing"),
+    TRACK_5_GRAIN_VOICING("track_5_grain_voicing"),
+    TRACK_6_GRAIN_VOICING("track_6_grain_voicing"),
+    TRACK_7_GRAIN_VOICING("track_7_grain_voicing"),
+
     // Vibe step count
     STEP_COUNT("step_count"),
 
@@ -1391,6 +1471,86 @@ enum class PulsarSymbol(
     TRACK_5_FM_FREE_HZ_SPACE("track_5_fm_free_hz_space"),
     TRACK_6_FM_FREE_HZ_SPACE("track_6_fm_free_hz_space"),
     TRACK_7_FM_FREE_HZ_SPACE("track_7_fm_free_hz_space"),
+
+    // Per-track Mist grain engine: how a note becomes grains (8 entries, SPACE slot)
+    TRACK_0_GRAIN_MODE_SPACE("track_0_grain_mode_space"),
+    TRACK_1_GRAIN_MODE_SPACE("track_1_grain_mode_space"),
+    TRACK_2_GRAIN_MODE_SPACE("track_2_grain_mode_space"),
+    TRACK_3_GRAIN_MODE_SPACE("track_3_grain_mode_space"),
+    TRACK_4_GRAIN_MODE_SPACE("track_4_grain_mode_space"),
+    TRACK_5_GRAIN_MODE_SPACE("track_5_grain_mode_space"),
+    TRACK_6_GRAIN_MODE_SPACE("track_6_grain_mode_space"),
+    TRACK_7_GRAIN_MODE_SPACE("track_7_grain_mode_space"),
+
+    // Per-track Mist grain engine: where scattered grains land (8 entries, SPACE slot)
+    TRACK_0_GRAIN_SCATTER_MODE_SPACE("track_0_grain_scatter_mode_space"),
+    TRACK_1_GRAIN_SCATTER_MODE_SPACE("track_1_grain_scatter_mode_space"),
+    TRACK_2_GRAIN_SCATTER_MODE_SPACE("track_2_grain_scatter_mode_space"),
+    TRACK_3_GRAIN_SCATTER_MODE_SPACE("track_3_grain_scatter_mode_space"),
+    TRACK_4_GRAIN_SCATTER_MODE_SPACE("track_4_grain_scatter_mode_space"),
+    TRACK_5_GRAIN_SCATTER_MODE_SPACE("track_5_grain_scatter_mode_space"),
+    TRACK_6_GRAIN_SCATTER_MODE_SPACE("track_6_grain_scatter_mode_space"),
+    TRACK_7_GRAIN_SCATTER_MODE_SPACE("track_7_grain_scatter_mode_space"),
+
+    // Per-track Mist grain engine: scatter reach (8 entries, SPACE slot)
+    TRACK_0_GRAIN_SCATTER_SPACE("track_0_grain_scatter_space"),
+    TRACK_1_GRAIN_SCATTER_SPACE("track_1_grain_scatter_space"),
+    TRACK_2_GRAIN_SCATTER_SPACE("track_2_grain_scatter_space"),
+    TRACK_3_GRAIN_SCATTER_SPACE("track_3_grain_scatter_space"),
+    TRACK_4_GRAIN_SCATTER_SPACE("track_4_grain_scatter_space"),
+    TRACK_5_GRAIN_SCATTER_SPACE("track_5_grain_scatter_space"),
+    TRACK_6_GRAIN_SCATTER_SPACE("track_6_grain_scatter_space"),
+    TRACK_7_GRAIN_SCATTER_SPACE("track_7_grain_scatter_space"),
+
+    // Per-track Mist grain engine: grain rate, or clock divider/probability (8 entries, SPACE slot)
+    TRACK_0_GRAIN_RATE_SPACE("track_0_grain_rate_space"),
+    TRACK_1_GRAIN_RATE_SPACE("track_1_grain_rate_space"),
+    TRACK_2_GRAIN_RATE_SPACE("track_2_grain_rate_space"),
+    TRACK_3_GRAIN_RATE_SPACE("track_3_grain_rate_space"),
+    TRACK_4_GRAIN_RATE_SPACE("track_4_grain_rate_space"),
+    TRACK_5_GRAIN_RATE_SPACE("track_5_grain_rate_space"),
+    TRACK_6_GRAIN_RATE_SPACE("track_6_grain_rate_space"),
+    TRACK_7_GRAIN_RATE_SPACE("track_7_grain_rate_space"),
+
+    // Per-track Mist grain engine: random grain timing flag (8 entries, SPACE slot)
+    TRACK_0_GRAIN_RANDOM_TIMING_SPACE("track_0_grain_random_timing_space"),
+    TRACK_1_GRAIN_RANDOM_TIMING_SPACE("track_1_grain_random_timing_space"),
+    TRACK_2_GRAIN_RANDOM_TIMING_SPACE("track_2_grain_random_timing_space"),
+    TRACK_3_GRAIN_RANDOM_TIMING_SPACE("track_3_grain_random_timing_space"),
+    TRACK_4_GRAIN_RANDOM_TIMING_SPACE("track_4_grain_random_timing_space"),
+    TRACK_5_GRAIN_RANDOM_TIMING_SPACE("track_5_grain_random_timing_space"),
+    TRACK_6_GRAIN_RANDOM_TIMING_SPACE("track_6_grain_random_timing_space"),
+    TRACK_7_GRAIN_RANDOM_TIMING_SPACE("track_7_grain_random_timing_space"),
+
+    // Per-track Mist grain engine: grain envelope shape (8 entries, SPACE slot)
+    TRACK_0_GRAIN_SHAPE_SPACE("track_0_grain_shape_space"),
+    TRACK_1_GRAIN_SHAPE_SPACE("track_1_grain_shape_space"),
+    TRACK_2_GRAIN_SHAPE_SPACE("track_2_grain_shape_space"),
+    TRACK_3_GRAIN_SHAPE_SPACE("track_3_grain_shape_space"),
+    TRACK_4_GRAIN_SHAPE_SPACE("track_4_grain_shape_space"),
+    TRACK_5_GRAIN_SHAPE_SPACE("track_5_grain_shape_space"),
+    TRACK_6_GRAIN_SHAPE_SPACE("track_6_grain_shape_space"),
+    TRACK_7_GRAIN_SHAPE_SPACE("track_7_grain_shape_space"),
+
+    // Per-track Mist grain engine: oscillator to grain blend (8 entries, SPACE slot)
+    TRACK_0_GRAIN_BLEND_SPACE("track_0_grain_blend_space"),
+    TRACK_1_GRAIN_BLEND_SPACE("track_1_grain_blend_space"),
+    TRACK_2_GRAIN_BLEND_SPACE("track_2_grain_blend_space"),
+    TRACK_3_GRAIN_BLEND_SPACE("track_3_grain_blend_space"),
+    TRACK_4_GRAIN_BLEND_SPACE("track_4_grain_blend_space"),
+    TRACK_5_GRAIN_BLEND_SPACE("track_5_grain_blend_space"),
+    TRACK_6_GRAIN_BLEND_SPACE("track_6_grain_blend_space"),
+    TRACK_7_GRAIN_BLEND_SPACE("track_7_grain_blend_space"),
+
+    // Per-track Mist grain engine: which tone a scattered grain takes (8 entries, SPACE slot)
+    TRACK_0_GRAIN_VOICING_SPACE("track_0_grain_voicing_space"),
+    TRACK_1_GRAIN_VOICING_SPACE("track_1_grain_voicing_space"),
+    TRACK_2_GRAIN_VOICING_SPACE("track_2_grain_voicing_space"),
+    TRACK_3_GRAIN_VOICING_SPACE("track_3_grain_voicing_space"),
+    TRACK_4_GRAIN_VOICING_SPACE("track_4_grain_voicing_space"),
+    TRACK_5_GRAIN_VOICING_SPACE("track_5_grain_voicing_space"),
+    TRACK_6_GRAIN_VOICING_SPACE("track_6_grain_voicing_space"),
+    TRACK_7_GRAIN_VOICING_SPACE("track_7_grain_voicing_space"),
 
     // Pulsar dedicated effect parameters (pushed on vibe change)
     PULSAR_DELAY_TIME_A("pulsar_delay_time_a"),

@@ -791,6 +791,38 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_fm_free_hz[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "fm_free_hz_space") == 0)
                 engine->pulsar_track_fm_free_hz_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_mode") == 0)
+                engine->pulsar_track_grain_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_mode_space") == 0)
+                engine->pulsar_track_grain_mode_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_scatter_mode") == 0)
+                engine->pulsar_track_grain_scatter_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_scatter_mode_space") == 0)
+                engine->pulsar_track_grain_scatter_mode_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_scatter") == 0)
+                engine->pulsar_track_grain_scatter[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_scatter_space") == 0)
+                engine->pulsar_track_grain_scatter_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_rate") == 0)
+                engine->pulsar_track_grain_rate[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_rate_space") == 0)
+                engine->pulsar_track_grain_rate_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_random_timing") == 0)
+                engine->pulsar_track_grain_random_timing[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_random_timing_space") == 0)
+                engine->pulsar_track_grain_random_timing_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_shape") == 0)
+                engine->pulsar_track_grain_shape[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_shape_space") == 0)
+                engine->pulsar_track_grain_shape_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_blend") == 0)
+                engine->pulsar_track_grain_blend[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_blend_space") == 0)
+                engine->pulsar_track_grain_blend_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_voicing") == 0)
+                engine->pulsar_track_grain_voicing[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_voicing_space") == 0)
+                engine->pulsar_track_grain_voicing_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics") == 0)
                 engine->pulsar_track_pin_harmonics[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics_space") == 0)

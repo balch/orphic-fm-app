@@ -71,14 +71,26 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
     @SerialName("HEN") HEN(203, "Chaos · Hénon"),
     @SerialName("CHU") CHU(204, "Chaos · Chua"),
 
-    // OSC must come LAST so it doesn't shift any prior ordinal.
+    // OSC was added last so it did not shift any prior ordinal. Anything newer goes
+    // after it for the same reason.
     // id=-1 is the sentinel for OSC mode — C++ voice routing checks engine_index < 0.
     @SerialName("OSC") OSC(-1, "OSC"),
+
+    // Grain wavetable engine (id 300). Pulsar tracks only: the panel voice path has
+    // no branch for it.
+    @SerialName("MST") MST(300, "Grain Mist"),
     ;
 
     /** True for engines with no Kotlin DSP fallback (v1.2 + future Braids). */
     val isNativeOnly: Boolean
         get() = this in NATIVE_ONLY
+
+    /**
+     * True for engines that exist only as Pulsar track engines. The panel voices
+     * (drum slots, main voice) cannot play them, so panel pickers must leave them out.
+     */
+    val isPulsarOnly: Boolean
+        get() = this in PULSAR_ONLY
 
     /** True for the Braids triple-oscillator chord shapes. */
     val isChordEngine: Boolean
@@ -104,7 +116,10 @@ enum class OrpheusEngineId(val id: Int, val displayName: String) {
             TRIPLE_SINE, TRIPLE_RING_MOD,
             CSAW, TOY, VOWEL_FOF, QUESTION_MARK,
             LRZ, ROS, DUF, HEN, CHU,
+            MST,
         )
+
+        private val PULSAR_ONLY = setOf(MST)
 
         private val CHORD_ENGINES = setOf(
             TRIPLE_SAW, TRIPLE_SQUARE, TRIPLE_TRIANGLE,

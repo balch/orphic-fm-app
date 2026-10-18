@@ -23,6 +23,8 @@
 // `TEST_SUITE_RETURN(pass, fail);`.
 extern int g_suite_passes;
 extern int g_suite_fails;
+// True when suites were named on the command line; manual suites that write files read it.
+extern bool g_filtered_run;
 
 // do-while(0) makes the macro a single statement so it can be used inside
 // an unbraced `if`/`else`. The inner `return` ends function expansion before
@@ -581,6 +583,9 @@ bool run_engine_slot_tests();
 bool run_graph_swap_tests();
 bool run_osc_tests();
 bool run_pulsar_osc_tests();
+bool run_mist_tests();
+bool run_mist_samples();
+bool run_pulsar_mist_tests();
 bool run_pulsar_lick_growth_tests();
 bool run_pulsar_complexity_calm_tests();
 bool run_pulsar_speech_tests();

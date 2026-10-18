@@ -5,6 +5,7 @@
 
 #include "orpheus_unit_pulsar.h"
 #include "pulsar_pattern_gen.h"
+#include <algorithm>
 
 constexpr int kKrakenHome = -1;
 constexpr int kKrakenTargetCount = 4;
@@ -95,4 +96,27 @@ inline int kraken_apply(int note, int home_root, int home_scale, int target) {
         return quantize_to_scale(note + shift.root_offset, static_cast<uint8_t>(to_root), to);
     }
     return note + shift.root_offset;  // a passing tone keeps its distance from the tonic
+}
+
+// What Mist's scattered grains snap to: the scale and the bar's chord in the key kraken_apply
+// leaves the notes in, so the tonic moves with the scale. `transpose` is a further whole-band
+// offset in semitones. The register is the track's, floored at the engine's lowest note.
+inline mist::PitchContext mist_key_context(int target, int home_root, int home_scale,
+                                           int chord_degree, int transpose,
+                                           int range_lo, int range_hi) {
+    home_scale = kraken_clamp_scale(home_scale);
+    int root = home_root + transpose;
+    int scale_index = home_scale;
+    if (target >= 0 && target < kKrakenTargetCount) {
+        const KrakenShift shift = kraken_shift_for(target, home_scale);
+        root += shift.root_offset;
+        scale_index = shift.scale_index;
+    }
+    const PulsarScale& sc = kPulsarScales[scale_index];
+    mist::PitchContext c;
+    c.scale_mask = mist::pitch_class_mask(root, sc.degrees, sc.count);
+    c.chord_mask = mist::chord_mask(root, chord_degree, sc.degrees, sc.count);
+    c.note_lo = std::max(range_lo, static_cast<int>(kMistModRange.note_min));
+    c.note_hi = std::max(range_hi, c.note_lo);
+    return c;
 }

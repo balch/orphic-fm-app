@@ -845,6 +845,25 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_fm_shape_space[8]{};
     std::atomic<float> pulsar_track_fm_free_hz[8]{};
     std::atomic<float> pulsar_track_fm_free_hz_space[8]{};
+    // Mist grain engine, per track, per engine slot. Read by the engine id 300 branch
+    // in unit_process_pulsar; ignored by every other engine. rate, shape and blend
+    // are seeded non-zero in orpheus_engine_create.
+    std::atomic<int>   pulsar_track_grain_mode[8]{};
+    std::atomic<int>   pulsar_track_grain_mode_space[8]{};
+    std::atomic<int>   pulsar_track_grain_scatter_mode[8]{};
+    std::atomic<int>   pulsar_track_grain_scatter_mode_space[8]{};
+    std::atomic<float> pulsar_track_grain_scatter[8]{};
+    std::atomic<float> pulsar_track_grain_scatter_space[8]{};
+    std::atomic<float> pulsar_track_grain_rate[8]{};
+    std::atomic<float> pulsar_track_grain_rate_space[8]{};
+    std::atomic<int>   pulsar_track_grain_random_timing[8]{};
+    std::atomic<int>   pulsar_track_grain_random_timing_space[8]{};
+    std::atomic<float> pulsar_track_grain_shape[8]{};
+    std::atomic<float> pulsar_track_grain_shape_space[8]{};
+    std::atomic<float> pulsar_track_grain_blend[8]{};
+    std::atomic<float> pulsar_track_grain_blend_space[8]{};
+    std::atomic<int>   pulsar_track_grain_voicing[8]{};
+    std::atomic<int>   pulsar_track_grain_voicing_space[8]{};
     // Per-track pin flags (one per param per slot). 0 = not pinned (default,
     // current macroMap-driven behavior); non-zero = use ts.harmonics/timbre/morph
     // verbatim, bypassing macros/evolution/accent/LFO. See orpheus_unit_pulsar.cpp.
@@ -878,6 +897,9 @@ struct OrpheusEngine {
     // Same peek for the post-playability-floor note, so a test can see the
     // octave fold an engine's note_min applies.
     std::atomic<float> pulsar_track_note_debug[8]{};
+    // Test-only override of mist::kWidth, so a test can render the same block with
+    // and without the side channel.
+    std::atomic<float> pulsar_mist_width_debug{mist::kWidth};
 #endif
     std::atomic<int>   pulsar_track_envelope[8]{};
     std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL

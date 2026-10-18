@@ -791,6 +791,15 @@ class PulsarViewModel(
     private val trackFmFreeHzIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ.ordinal + i].controlId)
     }
+    // Per-track Mist grain engine (EDM slot). Effective only when the track's engine is MST.
+    private val trackGrainModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_MODE.ordinal + it].controlId) }
+    private val trackGrainScatterModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_MODE.ordinal + it].controlId) }
+    private val trackGrainScatterIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER.ordinal + it].controlId) }
+    private val trackGrainRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RATE.ordinal + it].controlId) }
+    private val trackGrainRandomTimingIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RANDOM_TIMING.ordinal + it].controlId) }
+    private val trackGrainShapeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE.ordinal + it].controlId) }
+    private val trackGrainBlendIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND.ordinal + it].controlId) }
+    private val trackGrainVoicingIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING.ordinal + it].controlId) }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val openingNoteFloorId = synthController.controlFlow(PulsarSymbol.OPENING_NOTE_FLOOR.controlId)
     private val trackMacroIds = (0..7).map { t ->
@@ -969,6 +978,14 @@ class PulsarViewModel(
     private val trackFmRatioSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_RATIO_SPACE.ordinal + it].controlId) }
     private val trackFmShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_SHAPE_SPACE.ordinal + it].controlId) }
     private val trackFmFreeHzSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ_SPACE.ordinal + it].controlId) }
+    private val trackGrainModeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_MODE_SPACE.ordinal + it].controlId) }
+    private val trackGrainScatterModeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_MODE_SPACE.ordinal + it].controlId) }
+    private val trackGrainScatterSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_SPACE.ordinal + it].controlId) }
+    private val trackGrainRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RATE_SPACE.ordinal + it].controlId) }
+    private val trackGrainRandomTimingSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RANDOM_TIMING_SPACE.ordinal + it].controlId) }
+    private val trackGrainShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE_SPACE.ordinal + it].controlId) }
+    private val trackGrainBlendSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND_SPACE.ordinal + it].controlId) }
+    private val trackGrainVoicingSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING_SPACE.ordinal + it].controlId) }
 
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
@@ -1615,6 +1632,23 @@ class PulsarViewModel(
             trackFmShapeSpaceIds[i].value = FloatValue(spa.fmShape)
             trackFmFreeHzIds[i].value = FloatValue(edm.fmFreeHz)
             trackFmFreeHzSpaceIds[i].value = FloatValue(spa.fmFreeHz)
+            // Mist grain engine. Both slots, always: C++ reads whichever is live.
+            trackGrainModeIds[i].value = IntValue(edm.grainMode.id)
+            trackGrainModeSpaceIds[i].value = IntValue(spa.grainMode.id)
+            trackGrainScatterModeIds[i].value = IntValue(edm.grainScatterMode.id)
+            trackGrainScatterModeSpaceIds[i].value = IntValue(spa.grainScatterMode.id)
+            trackGrainScatterIds[i].value = FloatValue(edm.grainScatter)
+            trackGrainScatterSpaceIds[i].value = FloatValue(spa.grainScatter)
+            trackGrainRateIds[i].value = FloatValue(edm.grainRate)
+            trackGrainRateSpaceIds[i].value = FloatValue(spa.grainRate)
+            trackGrainRandomTimingIds[i].value = IntValue(if (edm.grainRandomTiming) 1 else 0)
+            trackGrainRandomTimingSpaceIds[i].value = IntValue(if (spa.grainRandomTiming) 1 else 0)
+            trackGrainShapeIds[i].value = FloatValue(edm.grainShape)
+            trackGrainShapeSpaceIds[i].value = FloatValue(spa.grainShape)
+            trackGrainBlendIds[i].value = FloatValue(edm.grainBlend)
+            trackGrainBlendSpaceIds[i].value = FloatValue(spa.grainBlend)
+            trackGrainVoicingIds[i].value = IntValue(edm.grainVoicing.id)
+            trackGrainVoicingSpaceIds[i].value = IntValue(spa.grainVoicing.id)
             // Effective pin: vibe-author opt-in OR engine-enforced (DX-family
             // harmonics is a quantized 32-step patch selector — never let the
             // macro range slide between patches).

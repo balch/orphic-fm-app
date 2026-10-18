@@ -102,6 +102,67 @@ class PulsarPluginLickPortsTest {
         }
     }
 
+    private val grainFamilies = listOf(
+        "GRAIN_MODE", "GRAIN_SCATTER_MODE", "GRAIN_SCATTER", "GRAIN_RATE",
+        "GRAIN_RANDOM_TIMING", "GRAIN_SHAPE", "GRAIN_BLEND", "GRAIN_VOICING",
+    )
+
+    @Test
+    fun `plugin registers every track Mist grain symbol on both engine slots`() {
+        // An engine recreation zeroes the C++ atomics and syncNativeBridgeState replays
+        // declared ports alone, so an undeclared grain port would reset mid-session.
+        val plugin = PulsarPlugin()
+        val registered = plugin.ports.map { it.symbol }
+        for (family in grainFamilies) {
+            for (suffix in listOf("", "_SPACE")) {
+                val symbols = PulsarSymbol.entries.filter {
+                    it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))
+                }
+                assertEquals(8, symbols.size, "expected 8 TRACK_n_$family$suffix symbols")
+                symbols.forEachIndexed { t, sym ->
+                    assertEquals("track_${t}_${family.lowercase()}${suffix.lowercase()}", sym.symbol)
+                }
+                val missing = symbols.filterNot { it.symbol in registered }
+                assertTrue(
+                    missing.isEmpty(),
+                    "missing ${missing.size} $family$suffix ports: ${missing.map { it.symbol }}"
+                )
+                // A second registration shadows the first, and find-first then loses writes.
+                symbols.forEach { sym ->
+                    assertEquals(1, registered.count { it == sym.symbol }, "${sym.symbol} registered twice")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `every Mist grain port stores a written value for the boot sync to replay`() {
+        val plugin = PulsarPlugin()
+        val floats = PulsarSymbol.entries.filter {
+            it.name.matches(Regex("TRACK_[0-7]_GRAIN_(SCATTER|RATE|SHAPE|BLEND)(_SPACE)?"))
+        }
+        val ints = PulsarSymbol.entries.filter {
+            it.name.matches(Regex("TRACK_[0-7]_GRAIN_(MODE|SCATTER_MODE|RANDOM_TIMING|VOICING)(_SPACE)?"))
+        }
+        assertEquals(64, floats.size, "expected 4 float families x 2 slots x 8 tracks")
+        assertEquals(64, ints.size, "expected 4 int families x 2 slots x 8 tracks")
+        // Distinct values, so a stride that shadows a neighbour shows up.
+        floats.forEachIndexed { i, sym ->
+            assertTrue(plugin.setPortValue(sym.symbol, PortValue.FloatValue((i + 1) * 0.01f)),
+                "setPortValue(${sym.symbol}) rejected")
+        }
+        ints.forEachIndexed { i, sym ->
+            assertTrue(plugin.setPortValue(sym.symbol, PortValue.IntValue(i % 3)),
+                "setPortValue(${sym.symbol}) rejected")
+        }
+        floats.forEachIndexed { i, sym ->
+            assertEquals((i + 1) * 0.01f, plugin.getPortValue(sym.symbol)?.asFloat(), sym.symbol)
+        }
+        ints.forEachIndexed { i, sym ->
+            assertEquals(i % 3, plugin.getPortValue(sym.symbol)?.asInt(), sym.symbol)
+        }
+    }
+
     @Test
     fun `plugin registers every track macro-map symbol with the declared stride`() {
         val macroBlock = PulsarSymbol.entries.filter { it.name.matches(Regex("TRACK_[0-7]_MACRO_.*")) }

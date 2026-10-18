@@ -58,13 +58,15 @@ private val PULSAR_V3_RING = listOf(
 
 val PULSAR_V3_PICKER = PickerConfig(PULSAR_V3_RING, "CHD", -1)
 
-// Chaos / fractal engines (extended ring, ids 200..204).
+// Chaos / fractal engines (extended ring, ids 200..204), plus the Mist grain engine
+// (id 300), which shares the ring until there are enough new engines for a fifth.
 private val PULSAR_V4_RING = listOf(
     PickerEntry("LRZ", 200, OrpheusColors.engineBlue),
     PickerEntry("ROS", 201, OrpheusColors.synthGreen),
     PickerEntry("DUF", 202, OrpheusColors.warmGlow),
     PickerEntry("HEN", 203, OrpheusColors.engineYellow),
     PickerEntry("CHU", 204, OrpheusColors.neonMagenta),
+    PickerEntry("MST", 300, OrpheusColors.engineGreen),
 )
 
 val PULSAR_V4_PICKER = PickerConfig(PULSAR_V4_RING, "CHA", -1)

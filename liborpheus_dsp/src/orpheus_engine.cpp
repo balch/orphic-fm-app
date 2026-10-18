@@ -32,6 +32,17 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     for (int i = 0; i < OrpheusEngine::kMaxLickPool * OrpheusEngine::kMaxLickSteps; i++)
         engine->pulsar_lick_pool_hit_prob[i] = 1.0f;
 
+    // Mist defaults mirror OrpheusEngine.kt. A zero blend would be all oscillator and
+    // a zero rate one grain per note, neither of which is the unpushed sound.
+    for (int t = 0; t < 8; t++) {
+        engine->pulsar_track_grain_rate[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_grain_rate_space[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_grain_shape[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_grain_shape_space[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_grain_blend[t].store(1.0f, std::memory_order_relaxed);
+        engine->pulsar_track_grain_blend_space[t].store(1.0f, std::memory_order_relaxed);
+    }
+
     // Initialize all Plaits voices (OrpheusVoice: direct engine render)
     for (int i = 0; i < kNumVoices; i++) {
         stmlib::BufferAllocator allocator(

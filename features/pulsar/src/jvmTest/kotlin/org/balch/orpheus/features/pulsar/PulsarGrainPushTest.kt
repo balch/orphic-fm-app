@@ -1,0 +1,200 @@
+package org.balch.orpheus.features.pulsar
+
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.dsp.AudioEngine
+import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.engagement.DefaultEngagementTracker
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PulsarPlaybackMode
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
+import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.core.preferences.AppPreferences
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.features.pulsar.models.GenreProfile
+import org.balch.orpheus.features.pulsar.models.GrainMode
+import org.balch.orpheus.features.pulsar.models.GrainScatterMode
+import org.balch.orpheus.features.pulsar.models.GrainVoicing
+import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.RhythmPattern
+import org.balch.orpheus.features.pulsar.models.RootNote
+import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.TrackRole
+import org.balch.orpheus.features.pulsar.models.TrackVoice
+import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.VibeName
+import org.balch.orpheus.features.pulsar.models.VibeProvider
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+/**
+ * Pins the applyVibe push of the Mist grain fields. C++ picks the EDM or SPACE port by
+ * the live engine slot, so a field pushed to only one is dropped whenever the other
+ * slot is playing. Each slot here carries different values to catch a crossed write.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class PulsarGrainPushTest {
+
+    private val testDispatcher = StandardTestDispatcher()
+    private val ports = mutableMapOf<String, PortValue>()
+
+    @BeforeTest fun setUp() { Dispatchers.setMain(testDispatcher) }
+    @AfterTest fun tearDown() { Dispatchers.resetMain() }
+
+    private fun makeViewModel(vibe: Vibe): PulsarViewModel {
+        val controller = SynthController().apply {
+            setDelegates(
+                setter = { id, value ->
+                    ports["${id.uri}:${id.symbol}"] = value
+                    true
+                },
+                getter = { id -> ports["${id.uri}:${id.symbol}"] },
+            )
+        }
+        val tempo = GlobalTempo(GrainTestAudioEngine())
+        val engine = SongEndingStubSynthEngine()
+        return PulsarViewModel(
+            synthController = controller,
+            synthEngine = engine,
+            pulsarSession = PulsarSession(engine, makeAppCoroutineScope(testDispatcher), GrainTestDispatchers(testDispatcher)),
+            globalTempo = tempo,
+            appPreferencesRepository = GrainTestPrefs(),
+            presetLoader = PresetLoader(PortRegistry(emptySet()), tempo, controller),
+            dispatcherProvider = GrainTestDispatchers(testDispatcher),
+            scope = FeatureCoroutineScope(),
+            vibeProviders = setOf(GrainTestVibeProvider(vibe)),
+            playbackMode = PulsarPlaybackMode.EXPLICIT,
+            songEndingPreferences = StubSongEndingPreferences(),
+            transitionPreferences = StubTransitionPreferences(),
+            transitionRunner = StubTransitionRunner(),
+            songEndingEventSource = StubSongEndingEventSource(),
+            engagementTracker = DefaultEngagementTracker(),
+            musicPulseSource = MusicPulseSource.Silent,
+        )
+    }
+
+    private fun int(symbol: String): Int? = (ports["$PULSAR_URI:$symbol"] as? IntValue)?.value
+    private fun float(symbol: String): Float? = (ports["$PULSAR_URI:$symbol"] as? FloatValue)?.value
+
+    @Test
+    fun `grain fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(
+            engineId = OrpheusEngineId.MST,
+            grainMode = GrainMode.CONTINUOUS, grainScatterMode = GrainScatterMode.SCALE,
+            grainVoicing = GrainVoicing.RISING,
+            grainScatter = 0.4f, grainRate = 0.9f, grainRandomTiming = true,
+            grainShape = 0.2f, grainBlend = 0.7f,
+        )
+        val space = OrpheusEngine(
+            engineId = OrpheusEngineId.MST,
+            grainMode = GrainMode.SINGLE, grainScatterMode = GrainScatterMode.RAW,
+            grainVoicing = GrainVoicing.CENTERED,
+            grainScatter = 0.1f, grainRate = 0.3f, grainRandomTiming = false,
+            grainShape = 0.8f, grainBlend = 0.25f,
+        )
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(300, int("track_4_engine_edm"), "the Mist engine id must reach the EDM slot")
+        assertEquals(300, int("track_4_engine_space"), "the Mist engine id must reach the SPACE slot")
+        assertEquals(2, int("track_4_grain_mode"))
+        assertEquals(1, int("track_4_grain_mode_space"))
+        assertEquals(1, int("track_4_grain_scatter_mode"))
+        assertEquals(2, int("track_4_grain_scatter_mode_space"))
+        assertEquals(2, int("track_4_grain_voicing"))
+        assertEquals(1, int("track_4_grain_voicing_space"))
+        assertEquals(0.4f, float("track_4_grain_scatter"))
+        assertEquals(0.1f, float("track_4_grain_scatter_space"))
+        assertEquals(0.9f, float("track_4_grain_rate"))
+        assertEquals(0.3f, float("track_4_grain_rate_space"))
+        assertEquals(1, int("track_4_grain_random_timing"))
+        assertEquals(0, int("track_4_grain_random_timing_space"))
+        assertEquals(0.2f, float("track_4_grain_shape"))
+        assertEquals(0.8f, float("track_4_grain_shape_space"))
+        assertEquals(0.7f, float("track_4_grain_blend"))
+        assertEquals(0.25f, float("track_4_grain_blend_space"))
+    }
+
+    @Test
+    fun `a non-Mist track pushes the grain defaults`() = runTest(testDispatcher) {
+        val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
+        val vibe = grainTestVibe(va, va)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0, int("track_0_grain_mode"))
+        assertEquals(0, int("track_0_grain_voicing"))
+        assertEquals(0.5f, float("track_0_grain_rate"))
+        assertEquals(0.5f, float("track_0_grain_rate_space"))
+        assertEquals(1f, float("track_0_grain_blend"))
+        assertEquals(1f, float("track_0_grain_blend_space"))
+    }
+}
+
+// ─── Test fixtures ────────────────────────────────────────────────────────────
+
+private fun grainTestVibe(track4Edm: OrpheusEngine, track4Space: OrpheusEngine): Vibe = Vibe(
+    name = "Grain Push Test",
+    bpm = 120f,
+    rootNote = RootNote.C,
+    scaleType = ScaleType.MINOR,
+    genre = GenreProfile(
+        swingAmount = 0f, ghostProbability = 0f,
+        noteRangeLow = 36, noteRangeHigh = 72,
+        rhythmDensity = RhythmPattern.SPARSE.density,
+    ),
+    tracks = List(8) {
+        TrackVoice(
+            engineEdm = if (it == 4) track4Edm else OrpheusEngine(engineId = OrpheusEngineId.VA),
+            engineSpace = if (it == 4) track4Space else OrpheusEngine(engineId = OrpheusEngineId.VA),
+            role = if (it == 4) TrackRole.Melodic() else TrackRole.Percussive,
+        )
+    },
+)
+
+private class GrainTestVibeProvider(override val vibe: Vibe) : VibeProvider {
+    override val name = VibeName(vibe.name)
+}
+
+private class GrainTestAudioEngine : AudioEngine {
+    override fun start() {}
+    override fun stop() {}
+    override val isRunning: Boolean = false
+    override val sampleRate: Int = 44100
+    override fun getCpuLoad(): Float = 0f
+    override fun getCurrentTime(): Double = 0.0
+}
+
+private class GrainTestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
+    override val main get() = d
+    override val io get() = d
+    override val default get() = d
+    override val unconfined get() = d
+}
+
+private class GrainTestPrefs : AppPreferencesRepository {
+    private var prefs = AppPreferences()
+    override suspend fun load() = prefs
+    override suspend fun save(preferences: AppPreferences) { prefs = preferences }
+    override suspend fun update(transform: (AppPreferences) -> AppPreferences) {
+        prefs = transform(prefs)
+    }
+}

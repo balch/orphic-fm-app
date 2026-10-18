@@ -166,6 +166,7 @@ Use the `let` parameter name to label the track's role (`kick`, `bass`, `keys`, 
   - Pad: `ENS` (string ensemble), `STR` (string model), `GRN` (granular), `CHD` (chord engine), `ADD` (additive), `DX3` (FM cinematic pads).
   - Texture/FX: `MOD` (modal/metallic), `PAR` (particles), `SPK` (speech), `SWM` (swarm), `NES` (chiptune), `TRN` (wave terrain).
   - Bass / keys / lead, 2-op FM: `OSC` — the Orpheus panel's own triangle/square oscillator rather than a Plaits engine. See the OSC subsection below.
+  - Grain cloud / glass skank / rising texture: `MST` (Mist, id 300), a granular wavetable voice for Pulsar tracks only. See the MST subsection below.
   - **Important**: `DX` / `DX2` / `DX3` share a 6-op FM voice but load different 32-patch sysex banks. `harmonics` is a **patch selector** (quantized to 32 zones), not a tone control. **See `references/fm_patches.md`** for the bank tables before using a DX engine.
 - **`volume`** (default `0.8`): Track volume. Start ~0.8 for leads, 0.3-0.5 for texture.
 - **`harmonics` / `timbre` / `morph`** (default `0.5`): Plaits engine knobs, meaning varies per engine. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md`.** Always set explicitly on DX engines. **On `OSC`, `morph` is FM depth and is capped differently — see the OSC subsection below.**
@@ -196,6 +197,30 @@ Not a Plaits engine: a triangle/square oscillator with self-feedback, the same v
 
 - `harmonics` is **capped at 0.35**. Above that, self-feedback exceeds the carrier at low pitches and the oscillator freezes into a thump instead of a tone. Write `harmonics <= 0.35` so what you author is what you hear.
 - Notes below **40** are folded up an octave. Keep `noteRangeLow >= 40`, or the step grid will show a pitch the track does not play.
+
+#### `OrpheusEngineId.MST` (Mist, the grain cloud)
+
+**MST (Grain Mist, id 300).** A cloud of wavetable grains. `harmonics` picks one of 12
+wavetable banks (pin it to hold one), `timbre` moves through the bank, `morph` is grain
+length from a blip to four seconds. Eight fields shape it, all on `OrpheusEngine`:
+`grainMode` (BURST sprays while the note is held, SINGLE is one grain per note,
+CONTINUOUS follows the step clock and ignores rests), `grainScatterMode` (CHORD, SCALE,
+RAW), `grainScatter` (reach, 1 = two octaves), `grainRate`, `grainRandomTiming`,
+`grainShape`, `grainBlend` (0 = steady oscillator, 1 = grains), and `grainVoicing`
+(EVEN spreads scattered grains over every tone in reach, CENTERED clusters them on the
+played note, RISING uses only the played note and tones above it).
+
+Things to know:
+
+- Grains only spread across the stereo field when something is random, so a track with `grainScatter = 0` and even timing sits in the centre.
+- Mist is Pulsar-only. Panel voices and score parts cannot play it (they would play a hi-hat), and the drum slot pickers leave it out.
+- `grainRate` follows Beads' steep density curve. From 0 to about 0.04 is a dead zone: CONTINUOUS is silent and BURST behaves like SINGLE. Below about 0.5, a BURST note one 16th long gets only one grain.
+- In CONTINUOUS at `grainRate` 1.0, even and random timing sound identical, because every tick fires. Random timing matters below about 0.97.
+- Pin `harmonics` to hold one wavetable bank. Unpinned, the accent boost and the macros can move it by more than one of the 12 bank steps, so grains hop banks.
+- `morph` (grain length) is only honoured when `pinMorph = true`. Unpinned it follows the SPACE macro and the authored value is ignored (the `DeadStaticToneAudit` test enforces this on clean vibes).
+- On a CHORDAL track, Mist has no native chord, so the default `arpMode` AUTO arpeggiates. With SINGLE mode only the first arp note reliably gets a grain. Use BURST, or `arpMode = ArpMode.NEVER` with CHORD scatter to let the grains supply the chord.
+- CONTINUOUS follows the global swung 16th clock, rests included, and ignores the track's own note gating. On track 7 (the FX slot) the texture volume curve, not the probability gate, decides when it is heard. A section that sets the track's density to 0 still mutes a CONTINUOUS cloud (by volume), but a low non-zero density does not thin it. The clock divider is not locked to the bar, so a division of 4 or 8 keeps whatever phase it had when the track entered Mist.
+- Track 4 is the only slot with no ducking. Tracks 5 to 7 take the texture notch unless they carry a lick.
 
 #### `TrackVoice` (track-level)
 

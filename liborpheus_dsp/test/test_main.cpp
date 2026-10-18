@@ -21,6 +21,7 @@
 #include <vector>
 
 // ── Per-suite counting globals (declared in test_harness.h) ─────────
+bool g_filtered_run = false;
 int g_suite_passes = 0;
 int g_suite_fails  = 0;
 
@@ -125,6 +126,9 @@ static TestSuite suites[] = {
     {"graph-swap",      run_graph_swap_tests,      true},
     {"osc",             run_osc_tests,             true},
     {"pulsar_osc",      run_pulsar_osc_tests,      true},
+    {"mist",            run_mist_tests,            true},
+    {"mist_samples",    run_mist_samples,          false},  // manual: writes WAV files
+    {"pulsar_mist",     run_pulsar_mist_tests,     true},
     {"pulsar_lick_growth", run_pulsar_lick_growth_tests, true},
     {"pulsar_complexity_calm", run_pulsar_complexity_calm_tests, true},
     {"pulsar_speech",   run_pulsar_speech_tests,   true},
@@ -205,6 +209,7 @@ int main(int argc, char* argv[]) {
     }
 
     bool filtered = argc > 1;
+    g_filtered_run = filtered;
     bool all_pass = true;
     std::vector<SuiteResult> results;
 

@@ -76,6 +76,14 @@ set(CLOUDS_SRC
     "${EURORACK_DIR}/clouds/resources.cc"
 )
 
+# ── Beads sources (Mist grain engine) ─────────────
+# Only the trigger generator and the tables are compiled; the grain player and
+# wavetable voice are header-only. The tape processor is not built.
+set(BEADS_SRC
+    "${EURORACK_DIR}/beads/dsp/trigger_generator.cc"
+    "${EURORACK_DIR}/beads/resources.cc"
+)
+
 # ── Warps sources ─────────────────────────────────
 set(WARPS_SRC
     "${EURORACK_DIR}/warps/dsp/modulator.cc"
@@ -193,6 +201,7 @@ add_library(orpheus_dsp STATIC
     ${STMLIB_SRC}
     ${PLAITS_SRC}
     ${CLOUDS_SRC}
+    ${BEADS_SRC}
     ${WARPS_SRC}
     ${MARBLES_SRC}
     ${STREAMS_SRC}
@@ -360,6 +369,9 @@ if(BUILD_TESTS)
         test/test_master_cut.cpp
         test/test_osc.cpp
         test/test_pulsar_osc.cpp
+        test/test_mist.cpp
+        test/test_mist_samples.cpp
+        test/test_pulsar_mist.cpp
         test/test_pulsar_lick_growth.cpp
         test/test_pulsar_complexity_calm.cpp
         test/test_pulsar_speech.cpp

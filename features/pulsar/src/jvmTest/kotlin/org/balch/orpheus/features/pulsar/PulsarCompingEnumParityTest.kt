@@ -4,6 +4,9 @@ import org.balch.orpheus.features.pulsar.models.ArpDirection
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.FillType
+import org.balch.orpheus.features.pulsar.models.GrainMode
+import org.balch.orpheus.features.pulsar.models.GrainScatterMode
+import org.balch.orpheus.features.pulsar.models.GrainVoicing
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.VoicingType
 import java.io.File
@@ -93,6 +96,25 @@ class PulsarCompingEnumParityTest {
     @Test
     fun `ArpMode matches ArpModeId`() {
         assertOrdinalParity("ArpModeId", ArpMode.entries.map { it.name }, wireNote)
+    }
+
+    @Test
+    fun `GrainMode matches GrainModeId`() {
+        assertOrdinalParity("GrainModeId", GrainMode.entries.map { it.name }, wireNote)
+    }
+
+    @Test
+    fun `GrainScatterMode matches GrainScatterModeId`() {
+        assertOrdinalParity(
+            "GrainScatterModeId",
+            GrainScatterMode.entries.map { it.name },
+            wireNote,
+        )
+    }
+
+    @Test
+    fun `GrainVoicing matches GrainVoicingId`() {
+        assertOrdinalParity("GrainVoicingId", GrainVoicing.entries.map { it.name }, wireNote)
     }
 
     @Test

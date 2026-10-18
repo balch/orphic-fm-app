@@ -48,6 +48,14 @@ set(CLOUDS_SRC
     "${EURORACK_DIR}/clouds/resources.cc"
 )
 
+# ── Beads sources (Mist grain engine) ─────────────
+# Only the trigger generator and the tables are compiled; the grain player and
+# wavetable voice are header-only. The tape processor is not built.
+set(BEADS_SRC
+    "${EURORACK_DIR}/beads/dsp/trigger_generator.cc"
+    "${EURORACK_DIR}/beads/resources.cc"
+)
+
 # ── Rings sources ─────────────────────────────────
 set(RINGS_SRC
     "${EURORACK_DIR}/rings/dsp/fm_voice.cc"
@@ -130,6 +138,7 @@ add_executable(orpheus_dsp
     ${STMLIB_SRC}
     ${PLAITS_SRC}
     ${CLOUDS_SRC}
+    ${BEADS_SRC}
     ${RINGS_SRC}
     ${WARPS_SRC}
     ${MARBLES_SRC}

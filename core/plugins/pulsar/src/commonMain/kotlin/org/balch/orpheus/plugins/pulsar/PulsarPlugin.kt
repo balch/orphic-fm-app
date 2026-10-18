@@ -78,6 +78,23 @@ class PulsarPlugin : DspPlugin {
     private var _trackFmShapeSpace = FloatArray(8) { 0f }
     private var _trackFmFreeHz = FloatArray(8) { 0f }
     private var _trackFmFreeHzSpace = FloatArray(8) { 0f }
+    // Mist grain engine, both slots. Defaults mirror OrpheusEngine.kt.
+    private var _trackGrainMode = IntArray(8) { 0 }
+    private var _trackGrainModeSpace = IntArray(8) { 0 }
+    private var _trackGrainScatterMode = IntArray(8) { 0 }
+    private var _trackGrainScatterModeSpace = IntArray(8) { 0 }
+    private var _trackGrainScatter = FloatArray(8) { 0f }
+    private var _trackGrainScatterSpace = FloatArray(8) { 0f }
+    private var _trackGrainRate = FloatArray(8) { 0.5f }
+    private var _trackGrainRateSpace = FloatArray(8) { 0.5f }
+    private var _trackGrainRandomTiming = IntArray(8) { 0 }
+    private var _trackGrainRandomTimingSpace = IntArray(8) { 0 }
+    private var _trackGrainShape = FloatArray(8) { 0.5f }
+    private var _trackGrainShapeSpace = FloatArray(8) { 0.5f }
+    private var _trackGrainBlend = FloatArray(8) { 1f }
+    private var _trackGrainBlendSpace = FloatArray(8) { 1f }
+    private var _trackGrainVoicing = IntArray(8) { 0 }
+    private var _trackGrainVoicingSpace = IntArray(8) { 0 }
     private var _trackHarmonicsModulation = FloatArray(8) { 0f }
     // Default source = 4 (MOOD) so an opt-in user only has to set the range.
     private var _trackHarmonicsMacroSource = IntArray(8) { 4 }
@@ -320,6 +337,96 @@ class PulsarPlugin : DspPlugin {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FM_FREE_HZ_SPACE.ordinal + t]) {
                 floatType { default = 0f; min = 0f; max = 2000f
                     get { _trackFmFreeHzSpace[t] }; set { _trackFmFreeHzSpace[t] = it } }
+            }
+        }
+        // Mist grain engine. Declared for the same reason as the FM families above:
+        // only declared and stored ports are replayed after an engine recreation.
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_MODE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainMode[t] }; set { _trackGrainMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_MODE_SPACE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainModeSpace[t] }; set { _trackGrainModeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_MODE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainScatterMode[t] }; set { _trackGrainScatterMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_MODE_SPACE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainScatterModeSpace[t] }; set { _trackGrainScatterModeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackGrainScatter[t] }; set { _trackGrainScatter[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SCATTER_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackGrainScatterSpace[t] }; set { _trackGrainScatterSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RATE.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackGrainRate[t] }; set { _trackGrainRate[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RATE_SPACE.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackGrainRateSpace[t] }; set { _trackGrainRateSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RANDOM_TIMING.ordinal + t]) {
+                intType { default = 0; get { _trackGrainRandomTiming[t] }; set { _trackGrainRandomTiming[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_RANDOM_TIMING_SPACE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainRandomTimingSpace[t] }; set { _trackGrainRandomTimingSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackGrainShape[t] }; set { _trackGrainShape[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE_SPACE.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackGrainShapeSpace[t] }; set { _trackGrainShapeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND.ordinal + t]) {
+                floatType { default = 1f; min = 0f; max = 1f
+                    get { _trackGrainBlend[t] }; set { _trackGrainBlend[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND_SPACE.ordinal + t]) {
+                floatType { default = 1f; min = 0f; max = 1f
+                    get { _trackGrainBlendSpace[t] }; set { _trackGrainBlendSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING.ordinal + t]) {
+                intType { default = 0; get { _trackGrainVoicing[t] }; set { _trackGrainVoicing[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING_SPACE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainVoicingSpace[t] }; set { _trackGrainVoicingSpace[t] = it } }
             }
         }
         // Per-track pin flags (EDM slot). Space-slot equivalents flow through

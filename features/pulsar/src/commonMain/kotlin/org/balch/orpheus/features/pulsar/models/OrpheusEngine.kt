@@ -111,10 +111,34 @@ data class OrpheusEngine(
      * Timbre then changes with every note, which is why ratio mode is default.
      */
     val fmFreeHz: Float = 0f,
+    /**
+     * Mist ([OrpheusEngineId.MST]) only; inert on every other engine. On a Mist track
+     * [harmonics] picks the wavetable bank, [timbre] the position in it, and [morph]
+     * the grain length from a blip to four seconds. Each grain latches all of these
+     * when it starts, so a sweep leaves a trail instead of moving the whole sound.
+     */
+    val grainMode: GrainMode = GrainMode.BURST,
+    val grainScatterMode: GrainScatterMode = GrainScatterMode.CHORD,
+    /** Which tone a scattered grain takes; ignored in [GrainScatterMode.RAW]. */
+    val grainVoicing: GrainVoicing = GrainVoicing.EVEN,
+    /** How far grains wander from the played note: 1 is two octaves either side. */
+    val grainScatter: Float = 0f,
+    /** Grain rate, up to 130 per second. See [GrainMode.CONTINUOUS] for its other meaning. */
+    val grainRate: Float = 0.5f,
+    /** Random grain spacing. Also widens the stereo spread. */
+    val grainRandomTiming: Boolean = false,
+    /** Grain envelope, from a click at 0 to a slow swell at 1. */
+    val grainShape: Float = 0.5f,
+    /** 0 is a steady wavetable oscillator, 1 is all grains. */
+    val grainBlend: Float = 1f,
 ) {
     init {
         require(fmRatio in 0f..16f) { "fmRatio must be 0..16, was $fmRatio" }
         require(fmShape in 0f..1f) { "fmShape must be 0..1, was $fmShape" }
         require(fmFreeHz in 0f..2000f) { "fmFreeHz must be 0..2000, was $fmFreeHz" }
+        require(grainScatter in 0f..1f) { "grainScatter must be 0..1, was $grainScatter" }
+        require(grainRate in 0f..1f) { "grainRate must be 0..1, was $grainRate" }
+        require(grainShape in 0f..1f) { "grainShape must be 0..1, was $grainShape" }
+        require(grainBlend in 0f..1f) { "grainBlend must be 0..1, was $grainBlend" }
     }
 }

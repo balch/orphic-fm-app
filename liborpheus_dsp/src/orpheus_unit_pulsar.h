@@ -6,6 +6,7 @@
 #include "orpheus_voice.h"
 #include "orpheus_unit_chaos.h"
 #include "pulsar_osc.h"
+#include "pulsar_mist.h"
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
 #include "pulsar_street.h"
@@ -125,6 +126,25 @@ enum class CompingStyleId : uint8_t {
 
 enum class ArpModeId : uint8_t { AUTO = 0, ALWAYS = 1, NEVER = 2 };
 enum class ArpDirectionId : uint8_t { UP = 0, DOWN = 1, UP_DOWN = 2, RANDOM = 3 };
+
+// Mirror GrainMode, GrainScatterMode and GrainVoicing in GrainEngine.kt. The ints cross
+// the wire bare, and the kernel reads them as mist::Mode, mist::ScatterMode and mist::Voicing.
+enum class GrainModeId : uint8_t { BURST = 0, SINGLE = 1, CONTINUOUS = 2 };
+enum class GrainScatterModeId : uint8_t { CHORD = 0, SCALE = 1, RAW = 2 };
+enum class GrainVoicingId : uint8_t { EVEN = 0, CENTERED = 1, RISING = 2 };
+static_assert(static_cast<int>(GrainModeId::BURST) == mist::kModeBurst
+              && static_cast<int>(GrainModeId::SINGLE) == mist::kModeSingle
+              && static_cast<int>(GrainModeId::CONTINUOUS) == mist::kModeContinuous,
+              "GrainModeId must match mist::Mode");
+static_assert(static_cast<int>(GrainScatterModeId::CHORD) == mist::kScatterChord
+              && static_cast<int>(GrainScatterModeId::SCALE) == mist::kScatterScale
+              && static_cast<int>(GrainScatterModeId::RAW) == mist::kScatterRaw,
+              "GrainScatterModeId must match mist::ScatterMode");
+static_assert(static_cast<int>(GrainVoicingId::EVEN) == mist::kVoicingEven
+              && static_cast<int>(GrainVoicingId::CENTERED) == mist::kVoicingCentered
+              && static_cast<int>(GrainVoicingId::RISING) == mist::kVoicingRising,
+              "GrainVoicingId must match mist::Voicing");
+static_assert(mist::kMaxBlock >= kMaxFrames, "the Mist kernel must render a whole Pulsar block");
 
 enum class FillTypeId : uint8_t {
     NONE = 0,
@@ -270,6 +290,17 @@ struct PulsarTrackState {
     float fm_ratio = 0.0f;
     float fm_shape = 0.0f;
     float fm_free_hz = 0.0f;
+    // Mist params resolved per block from the active engine slot.
+    int   grain_mode = 0;
+    int   grain_scatter_mode = 0;
+    int   grain_voicing = 0;
+    float grain_scatter = 0.0f;
+    float grain_rate = 0.5f;
+    bool  grain_random_timing = false;
+    float grain_shape = 0.5f;
+    float grain_blend = 1.0f;
+    // Whether this track rendered Mist last block; a false-to-true edge clears grains.
+    bool  mist_prev_active = false;
     PulsarStep steps[kMaxPulsarSteps];
     int step_count;
     int playhead;
@@ -650,6 +681,12 @@ struct TensionParams {
     float track_evo_weight[8] = {-1,-1,-1,-1,-1,-1,-1,-1};
     float spurt_chance = 0.0f;  // per-bar random spurt probability (0 = tension-only)
 };
+
+// Semitones the climax key shift adds to a firing note. One predicate for the fire
+// site and for Mist's pitch snap, so the grains' key cannot drift from the notes'.
+inline int tension_key_offset(int key_shift, float intensity) {
+    return intensity > 0.7f ? key_shift : 0;
+}
 
 // ── Section system parameters ───────────────────────────────────────
 
@@ -1082,6 +1119,9 @@ static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 
 struct PulsarState {
     PulsarTrackState tracks[kNumPulsarTracks];
+    // Mist voices, one per track. Beside the tracks, not inside them: Beads classes
+    // are not copyable. Each self-initialises on its first render.
+    PulsarMistState mist[kNumPulsarTracks];
     double clock_accumulator;   // fractional sample counter for step grid
     // Armed by load_vibe: the next AUDIBLE playing block fires a step boundary
     // at sample 0 so the new vibe's downbeat sounds at the load instant.

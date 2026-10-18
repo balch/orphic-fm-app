@@ -37,6 +37,13 @@ class DrumPlugin(
 
     companion object {
         const val URI = DRUM_URI
+
+        /**
+         * Engines a drum slot may pick. Slots store entry ordinals, so this must stay a
+         * prefix of [OrpheusEngineId.entries] (Pulsar-only engines are appended last).
+         */
+        internal val SELECTABLE_ENGINES = OrpheusEngineId.entries.filterNot { it.isPulsarOnly }
+
         /** Default engines for each slot */
         val DEFAULT_ENGINES = arrayOf(
             OrpheusEngineId.BD,
@@ -166,8 +173,8 @@ class DrumPlugin(
         controlPort(DrumSymbol.BD_ENGINE) {
             intType {
                 default = DEFAULT_ENGINES[0].ordinal
-                min = 0; max = OrpheusEngineId.entries.size - 1
-                options = OrpheusEngineId.entries.map { it.displayName }
+                min = 0; max = SELECTABLE_ENGINES.size - 1
+                options = SELECTABLE_ENGINES.map { it.displayName }
                 get { engineSlotIndices[0] }
                 set { setSlotEngine(0, it) }
             }
@@ -175,8 +182,8 @@ class DrumPlugin(
         controlPort(DrumSymbol.SD_ENGINE) {
             intType {
                 default = DEFAULT_ENGINES[1].ordinal
-                min = 0; max = OrpheusEngineId.entries.size - 1
-                options = OrpheusEngineId.entries.map { it.displayName }
+                min = 0; max = SELECTABLE_ENGINES.size - 1
+                options = SELECTABLE_ENGINES.map { it.displayName }
                 get { engineSlotIndices[1] }
                 set { setSlotEngine(1, it) }
             }
@@ -184,8 +191,8 @@ class DrumPlugin(
         controlPort(DrumSymbol.HH_ENGINE) {
             intType {
                 default = DEFAULT_ENGINES[2].ordinal
-                min = 0; max = OrpheusEngineId.entries.size - 1
-                options = OrpheusEngineId.entries.map { it.displayName }
+                min = 0; max = SELECTABLE_ENGINES.size - 1
+                options = SELECTABLE_ENGINES.map { it.displayName }
                 get { engineSlotIndices[2] }
                 set { setSlotEngine(2, it) }
             }
@@ -296,8 +303,7 @@ class DrumPlugin(
 
     /** [engineSlotIndex] is the OrpheusEngineId entry ordinal (NOT a canonical engine id). */
     private fun setSlotEngine(slot: Int, engineSlotIndex: Int) {
-        val entries = OrpheusEngineId.entries
-        if (engineSlotIndex !in entries.indices) return
+        if (engineSlotIndex !in SELECTABLE_ENGINES.indices) return
         engineSlotIndices[slot] = engineSlotIndex
     }
 }
