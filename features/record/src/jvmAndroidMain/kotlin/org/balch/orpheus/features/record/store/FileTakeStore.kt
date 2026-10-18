@@ -1,8 +1,5 @@
 package org.balch.orpheus.features.record.store
 
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesBinding
-import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.presets.PresetJson
@@ -10,16 +7,9 @@ import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.features.record.telemetry.TakeTelemetry
 import org.balch.orpheus.features.record.telemetry.TelemetryJson
 import java.io.File
-import java.io.RandomAccessFile
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 /** Takes live in `<root>/<take-id>/{audio.wav,preset.json,telemetry.json}`. */
-@ContributesBinding(AppScope::class)
 class FileTakeStore(private val root: File) : TakeStore {
-
-    @Inject
-    constructor() : this(File(System.getProperty("user.home"), ".config/orpheus/recordings"))
 
     override suspend fun list(): List<TakeInfo> = withContext(Dispatchers.IO) {
         val dirs = root.listFiles { f -> f.isDirectory } ?: return@withContext emptyList()
@@ -52,15 +42,8 @@ class FileTakeStore(private val root: File) : TakeStore {
         TelemetryJson.decodeFromString<TakeTelemetry>(File(dir, TELEMETRY_FILE).readText()).durationSec
     }.getOrNull()
 
-    private fun wavDuration(wav: File): Float? = runCatching {
-        RandomAccessFile(wav, "r").use { raf ->
-            if (raf.length() < WAV_HEADER_BYTES) return null
-            val header = ByteArray(WAV_HEADER_BYTES).also { raf.readFully(it) }
-            val rate = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN).getInt(24)
-            if (rate <= 0) return null
-            (raf.length() - WAV_HEADER_BYTES) / BYTES_PER_FRAME.toFloat() / rate
-        }
-    }.getOrNull()
+    private fun wavDuration(wav: File): Float? =
+        WavHeader.read(wav)?.let { it.frames / it.sampleRate.toFloat() }
 
     /** writeAudio is guarded by the WAV writer's lock; finish and abort are mutually exclusive and run once. */
     private class FileTakeWriter(private val dir: File, private val wav: WavFileWriter) : TakeWriter {
@@ -90,7 +73,5 @@ class FileTakeStore(private val root: File) : TakeStore {
         const val AUDIO_FILE = "audio.wav"
         const val PRESET_FILE = "preset.json"
         const val TELEMETRY_FILE = "telemetry.json"
-        const val WAV_HEADER_BYTES = 44
-        const val BYTES_PER_FRAME = 8
     }
 }
