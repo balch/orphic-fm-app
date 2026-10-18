@@ -37,6 +37,16 @@ class OboeAudioBridge : NativeDspBridge {
     external fun nativeLibraryPath(): String
     external override fun nativeGetXRunCount(): Int
 
+    // ── Output recording ─────────────────────────
+    // Returns the stream sample rate the take records at, or 0 when there is no stream.
+    external fun nativeStartRecording(): Int
+    external fun nativeStopRecording()
+
+    // False once the engine disarmed the ring itself, e.g. on a sample rate change.
+    external fun nativeIsRecording(): Boolean
+    external fun nativeDrainRecording(out: FloatArray): Int
+    external fun nativeRecordDroppedFrames(): Long
+
     // ── Parameter control (called from UI thread) ─
     external override fun nativeSetPort(uri: String, symbol: String, value: Float)
     external override fun nativeGetPort(uri: String, symbol: String): Float

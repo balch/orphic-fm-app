@@ -118,6 +118,22 @@ int32_t OboeEngine::getFramesPerBuffer() const {
 double OboeEngine::getCpuLoad() const { return mCpuLoad.load(); }
 int32_t OboeEngine::getXRunCount() const { return mXRunCount.load(std::memory_order_relaxed); }
 
+int32_t OboeEngine::startRecording() {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
+    record_ring_.discard();
+    record_ring_.arm();
+    return mStream ? mStream->getSampleRate() : 0;
+}
+void OboeEngine::stopRecording() {
+    record_ring_.disarm();
+}
+int OboeEngine::drainRecording(float* out, int maxFrames) {
+    return record_ring_.read(out, maxFrames);
+}
+uint64_t OboeEngine::recordDroppedFrames() const {
+    return record_ring_.dropped_frames();
+}
+
 oboe::DataCallbackResult OboeEngine::onAudioReady(
         oboe::AudioStream* stream, void* audioData, int32_t numFrames) {
     OrpheusEngine* engine = engine_.audio_thread_engine();
@@ -130,6 +146,7 @@ oboe::DataCallbackResult OboeEngine::onAudioReady(
 
     // Direct C++ DSP — no JNI, no Kotlin, no GC
     orpheus_engine_process(engine, static_cast<float*>(audioData), numFrames);
+    record_ring_.write(static_cast<float*>(audioData), numFrames);
 
     auto end = std::chrono::steady_clock::now();
     double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -224,6 +241,8 @@ void OboeEngine::reopenLocked(bool* engineRecreated) {
     // replace() waits out JNI calls still inside it (scope, spectrum, setPort...).
     if (new_sr != old_sr) {
         LOGI("Sample rate changed %d → %d — recreating DSP engine", old_sr, new_sr);
+        // A take must not mix sample rates, so it ends at the route change.
+        record_ring_.disarm();
         engine_.replace(nullptr);
         engine_.publish(orpheus_engine_create(static_cast<float>(new_sr)));
         mCreatedSampleRate = new_sr;

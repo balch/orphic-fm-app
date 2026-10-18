@@ -1,5 +1,6 @@
-// Lock-free SPSC stereo ring for desktop recording. The audio thread writes, one consumer thread
-// reads. Indices are free-running uint32 (capacity is a power of two, so wrap is a mask).
+// Lock-free SPSC stereo ring for desktop and Android recording. The audio thread writes, one
+// consumer thread reads. Indices are free-running uint32 (capacity is a power of two, so wrap is
+// a mask).
 #pragma once
 
 #include <algorithm>

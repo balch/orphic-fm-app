@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "OboeEngine.h"
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <mutex>
@@ -329,6 +330,51 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetScope(
     const int result = sEngine.getScope(points, n, windowMs);
     if (result >= 0) env->SetFloatArrayRegion(out, 0, n, points);
     return result;
+}
+
+// -- Recording ----------------------------------------------------------------
+
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeStartRecording(
+        JNIEnv *env, jobject thiz) {
+    return sEngine.startRecording();
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeStopRecording(
+        JNIEnv *env, jobject thiz) {
+    sEngine.stopRecording();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeIsRecording(
+        JNIEnv *env, jobject thiz) {
+    return sEngine.isRecording() ? JNI_TRUE : JNI_FALSE;
+}
+
+// Drains through a stack chunk and SetFloatArrayRegion, like nativeGetScope: no pinning.
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeDrainRecording(
+        JNIEnv *env, jobject thiz, jfloatArray out) {
+    constexpr int kChunkFrames = 4096;
+    float chunk[kChunkFrames * 2];
+    const jsize maxFrames = env->GetArrayLength(out) / 2;
+    jsize total = 0;
+    while (total < maxFrames) {
+        const int want = std::min<jsize>(kChunkFrames, maxFrames - total);
+        const int got = sEngine.drainRecording(chunk, want);
+        if (got <= 0) break;
+        env->SetFloatArrayRegion(out, total * 2, got * 2, chunk);
+        total += got;
+        if (got < want) break;
+    }
+    return total;
+}
+
+JNIEXPORT jlong JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeRecordDroppedFrames(
+        JNIEnv *env, jobject thiz) {
+    return static_cast<jlong>(sEngine.recordDroppedFrames());
 }
 
 JNIEXPORT void JNICALL

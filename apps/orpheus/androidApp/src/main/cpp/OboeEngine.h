@@ -4,6 +4,7 @@
 #include <oboe/Oboe.h>
 #include "orpheus_dsp.h"
 #include "orpheus_engine_slot.h"
+#include "../../../../../../liborpheus_dsp/src/orpheus_record_ring.h"
 #include <atomic>
 #include <chrono>
 #include <mutex>
@@ -71,6 +72,15 @@ public:
     void stopTts();
     int  isTtsPlaying();
 
+    // Output recording: the audio thread feeds a lock-free ring, a JVM thread drains it.
+    // Arms under the lifecycle lock so a route change cannot slip between the rate and the arm.
+    // Returns the stream sample rate the take will use, or 0 when there is no stream.
+    int32_t  startRecording();
+    void     stopRecording();
+    bool     isRecording() const { return record_ring_.armed(); }
+    int      drainRecording(float* out, int maxFrames);
+    uint64_t recordDroppedFrames() const;
+
     // Oboe callbacks
     oboe::DataCallbackResult onAudioReady(
         oboe::AudioStream* stream, void* audioData, int32_t numFrames) override;
@@ -111,6 +121,7 @@ private:
     // (AudioFlinger never sees them), so this is the sole source of truth.
     std::atomic<int32_t> mXRunCount{0};
     std::atomic<void (*)()> mEngineRecreatedCallback{nullptr};
+    orpheus::RecordRing record_ring_{1 << 18};  // about 5.5 s at 48 kHz
 };
 
 #endif
