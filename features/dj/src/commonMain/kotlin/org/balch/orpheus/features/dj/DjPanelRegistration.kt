@@ -1,7 +1,7 @@
 package org.balch.orpheus.features.dj
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -33,9 +33,10 @@ class DjPanelRegistration(
         onExpandedChange: (Boolean) -> Unit,
         onDialogActiveChange: (Boolean) -> Unit,
     ) {
-        // Start/stop turntable viz polling based on panel expansion
-        LaunchedEffect(isExpanded) {
+        // Viz polling follows expansion and stops when a closed slot removes the panel.
+        DisposableEffect(isExpanded) {
             synthEngine.setTurntableVizEnabled(isExpanded)
+            onDispose { synthEngine.setTurntableVizEnabled(false) }
         }
 
         DjPanel(
