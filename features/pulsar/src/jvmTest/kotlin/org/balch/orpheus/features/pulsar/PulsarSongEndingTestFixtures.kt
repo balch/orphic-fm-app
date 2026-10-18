@@ -129,8 +129,12 @@ internal class FakePulsarFeature(
      */
     var onVibeApplied: () -> Unit = {}
 
+    /** Ticks on every [applyVibe], same vibe included, like the real feature. */
+    override val vibeLoadCount: MutableStateFlow<Int> = MutableStateFlow(0)
+
     override fun applyVibe(vibe: Vibe) {
         vibeFlow.value = vibe
+        vibeLoadCount.value++
         onVibeApplied()
     }
     override fun applyVibeByName(name: String): Boolean {
