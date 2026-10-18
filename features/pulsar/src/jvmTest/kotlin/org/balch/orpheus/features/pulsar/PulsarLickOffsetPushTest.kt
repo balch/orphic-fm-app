@@ -105,6 +105,21 @@ class PulsarLickOffsetPushTest {
         assertEquals(0, intPort("track_0_lick_degree_offset"),
             "percussive track should push 0 (no offset)")
     }
+
+    @Test
+    fun `melodic textureLine reaches controller per track and defaults off`() = runTest(testDispatcher) {
+        val vibe = offsetTestVibe(
+            track4 = TrackRole.Melodic(lickMode = LickMode.Fill),
+            track5 = TrackRole.Melodic(lickMode = LickMode.Fill, textureLine = true),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(1, intPort("track_5_texture_line"), "opted-in track should push 1")
+        assertEquals(0, intPort("track_4_texture_line"), "default melodic track should push 0")
+        assertEquals(0, intPort("track_0_texture_line"), "percussive track should push 0")
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────

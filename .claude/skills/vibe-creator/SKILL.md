@@ -224,6 +224,7 @@ Things to know:
 - On a CHORDAL track, Mist has no native chord, so the default `arpMode` AUTO arpeggiates. With SINGLE mode only the first arp note reliably gets a grain. Use BURST, or `arpMode = ArpMode.NEVER` with CHORD scatter to let the grains supply the chord.
 - CONTINUOUS follows the global swung 16th clock, rests included, and ignores the track's own note gating. On track 7 (the FX slot) the texture volume curve, not the probability gate, decides when it is heard. A section that sets the track's density to 0 still mutes a CONTINUOUS cloud (by volume), but a low non-zero density does not thin it. The clock divider is not locked to the bar, so a division of 4 or 8 keeps whatever phase it had when the track entered Mist.
 - Track 4 is the only slot with no ducking. Tracks 5 to 7 take the texture notch unless they carry a lick.
+- `TrackRole.Melodic(textureLine = true)` keeps a lick line on tracks 5 to 7 inside the texture fade (it skips the lick lift), and on track 7 it is never dropped by the FX note gate. Off by default.
 
 #### `TrackVoice` (track-level)
 

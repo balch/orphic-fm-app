@@ -41,6 +41,11 @@ sealed class TrackRole {
          */
         val lickDegreeOffset: Int = 0,
         /**
+         * A lick line on tracks 5-7 that still takes the texture-curve fade instead of the
+         * lick-line lift; on track 7 it is also never dropped by the FX note gate. Off by default.
+         */
+        val textureLine: Boolean = false,
+        /**
          * When true, this track's rendered audio is filtered through a per-track
          * tempo-synced bandpass wah ([Vibe.lickWah]) before it accumulates into the
          * mix: a standing timbral insert. While the wah anomaly is armed on this

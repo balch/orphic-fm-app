@@ -115,6 +115,7 @@ import org.balch.orpheus.features.pulsar.models.chordComping
 import org.balch.orpheus.features.pulsar.models.chordFollow
 import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
 import org.balch.orpheus.features.pulsar.models.lickMode
+import org.balch.orpheus.features.pulsar.models.textureLine
 import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
 import org.balch.orpheus.features.pulsar.playback.SectionQueue
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
@@ -901,6 +902,7 @@ class PulsarViewModel(
     private val trackGlideRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE.ordinal + it].controlId) }
     private val trackLickModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_MODE.ordinal + it].controlId) }
     private val trackLickDegreeOffsetIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_DEGREE_OFFSET.ordinal + it].controlId) }
+    private val trackTextureLineIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_TEXTURE_LINE.ordinal + it].controlId) }
     private val trackCompingStyleIds = (0..7).map {
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_COMPING_STYLE.ordinal + it].controlId)
     }
@@ -1736,6 +1738,7 @@ class PulsarViewModel(
                 is LickMode.Fill -> 2
             })
             trackLickDegreeOffsetIds[i].value = IntValue(tv.lickDegreeOffset)
+            trackTextureLineIds[i].value = IntValue(if (tv.textureLine) 1 else 0)
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "track_lick_source_$i"),
                 FloatValue(

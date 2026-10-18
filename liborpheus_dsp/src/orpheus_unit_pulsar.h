@@ -315,6 +315,9 @@ struct PulsarTrackState {
     float harmonics_rise = 0.0f;
     float harmonics_rise_time = 2.0f;
     float harmonics_rise_progress = 0.0f;
+    // Melodic lick line that keeps the texture-curve fade and escapes track 7's FX note
+    // gate. Resolved per block from the track-level atomic.
+    bool  texture_line = false;
     // Whether this track rendered Mist last block; a false-to-true edge clears grains.
     bool  mist_prev_active = false;
     PulsarStep steps[kMaxPulsarSteps];

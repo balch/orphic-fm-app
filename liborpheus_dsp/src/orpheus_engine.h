@@ -915,6 +915,8 @@ struct OrpheusEngine {
     // Same peek for the post-playability-floor note, so a test can see the
     // octave fold an engine's note_min applies.
     std::atomic<float> pulsar_track_note_debug[8]{};
+    // Final per-track volume after the texture curve, band gains and mute.
+    std::atomic<float> pulsar_track_volume_debug[8]{};
     // Test-only override of mist::kWidth, so a test can render the same block with
     // and without the side channel.
     std::atomic<float> pulsar_mist_width_debug{mist::kWidth};
@@ -1253,6 +1255,9 @@ struct OrpheusEngine {
     // lick (parallel harmony vs the lead, e.g. -2 = a fourth below in a 7-note
     // scale). Sounding notes only; rests are unaffected.
     std::atomic<int>   pulsar_track_lick_degree_offset[8] = {};
+    // Opt-in lick line on tracks 5-7 that still takes the texture-curve fade; on track 7
+    // it is also never dropped by the FX note gate. Per track, melodic role only.
+    std::atomic<int>   pulsar_track_texture_line[8] = {};
     // Which authored channel a lick track renders: 0 = LEAD (pulsar_lick,
     // rotation/anomaly capable), 1 = BASS (pulsar_bass_line).
     std::atomic<int>   pulsar_track_lick_source[8] = {};

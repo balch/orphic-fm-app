@@ -171,6 +171,7 @@ class PulsarPlugin : DspPlugin {
     private val _glideRate = FloatArray(8) { 0f }
     private val _trackLickMode = IntArray(8) { 0 }
     private val _trackLickDegreeOffset = IntArray(8) { 0 }
+    private val _trackTextureLine = IntArray(8) { 0 }
     private val _trackEvoRhythmic = IntArray(8) { 0 }
     private val _trackEvoTensionResp = FloatArray(8) { 1.0f }
     private val _trackEvoNoteFollow = IntArray(8) { 0 }
@@ -804,6 +805,11 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_DEGREE_OFFSET.ordinal + t]) {
                 intType { default = 0; get { _trackLickDegreeOffset[t] }; set { _trackLickDegreeOffset[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_TEXTURE_LINE.ordinal + t]) {
+                intType { default = 0; get { _trackTextureLine[t] }; set { _trackTextureLine[t] = it } }
             }
         }
         for (t in 0..7) {

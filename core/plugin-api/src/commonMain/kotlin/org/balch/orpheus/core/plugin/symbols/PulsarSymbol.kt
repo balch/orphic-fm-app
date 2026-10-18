@@ -1069,6 +1069,16 @@ enum class PulsarSymbol(
     TRACK_5_LICK_DEGREE_OFFSET("track_5_lick_degree_offset"),
     TRACK_6_LICK_DEGREE_OFFSET("track_6_lick_degree_offset"),
     TRACK_7_LICK_DEGREE_OFFSET("track_7_lick_degree_offset"),
+    // Per-track opt-in (0/1): a melodic lick line on tracks 5-7 that still takes the texture
+    // fade; on track 7 it is also never dropped by the FX note gate.
+    TRACK_0_TEXTURE_LINE("track_0_texture_line"),
+    TRACK_1_TEXTURE_LINE("track_1_texture_line"),
+    TRACK_2_TEXTURE_LINE("track_2_texture_line"),
+    TRACK_3_TEXTURE_LINE("track_3_texture_line"),
+    TRACK_4_TEXTURE_LINE("track_4_texture_line"),
+    TRACK_5_TEXTURE_LINE("track_5_texture_line"),
+    TRACK_6_TEXTURE_LINE("track_6_texture_line"),
+    TRACK_7_TEXTURE_LINE("track_7_texture_line"),
     // Per-track evolution: tension response (float 0-1)
     TRACK_0_EVO_TENSION_RESP("track_0_evo_tension_resp"),
     TRACK_1_EVO_TENSION_RESP("track_1_evo_tension_resp"),

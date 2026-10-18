@@ -55,6 +55,10 @@ val TrackVoice.lickMode: LickMode
 val TrackVoice.lickDegreeOffset: Int
     get() = (role as? TrackRole.Melodic)?.lickDegreeOffset ?: 0
 
+/** Convenience: [TrackRole.Melodic.textureLine] if melodic, else false. */
+val TrackVoice.textureLine: Boolean
+    get() = (role as? TrackRole.Melodic)?.textureLine ?: false
+
 /** Convenience: chord-follow mode — [ChordFollow.FOLLOW] for percussive tracks. */
 val TrackVoice.chordFollow: ChordFollow
     get() = when (val r = role) {

@@ -3339,6 +3339,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Atomic-cheap; lets Kotlin push per-section overrides without a vibe reload.
         ts.envelope_profile = static_cast<PulsarEnvelopeProfile>(
             engine->pulsar_track_envelope[t].load(std::memory_order_relaxed));
+        ts.texture_line = ts.role == TrackRole::MELODIC
+            && engine->pulsar_track_texture_line[t].load(std::memory_order_relaxed) != 0;
 
         // ── Apply engine selection from atomics (immediate UI response) ──
         {
@@ -3473,7 +3475,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // the time, not only while soloing, so they sit fully lifted: a riff double on 6
         // or an organ on 5 must not land 26 dB under the lead on 4 at mid energy. The
         // notch is left for what it was written for: percussive hits and lick-less
-        // melodic pads and drones.
+        // melodic pads and drones, plus lick lines that opt back in with texture_line.
         if (t >= 5) {
             float curve = texture_energy_curve(energy);
             if (ts.role != TrackRole::PERCUSSIVE) {
@@ -3481,7 +3483,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 const bool lick_line = ts.role == TrackRole::MELODIC
                     && static_cast<LickMode>(engine->pulsar_track_lick_mode[t].load(
                            std::memory_order_relaxed)) != LickMode::NONE;
-                if (lick_line || ts.role == TrackRole::CHORDAL) lift = 1.0f;
+                // texture_line opts a lick line back into the fade (solo lift still applies).
+                if ((lick_line && !ts.texture_line) || ts.role == TrackRole::CHORDAL) lift = 1.0f;
                 curve += (1.0f - curve) * lift;
             }
             track_volume *= curve;
@@ -3510,6 +3513,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0
                            || ts.section_density_out;
         if (track_muted) track_volume = 0.0f;
+#ifdef ORPHEUS_TESTING
+        engine->pulsar_track_volume_debug[t].store(track_volume, std::memory_order_relaxed);
+#endif
 
         // ── Pan gains ──
         float pan_l, pan_r;
@@ -4732,7 +4738,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         // just above zero, which must not un-gate this slot.
                         float lift = (ts.role != TrackRole::PERCUSSIVE)
                             ? clamp01(ts.solo_volume_mod_current / kSoloLiftFull) : 0.0f;
-                        if (fx_prob <= 0.001f && lift <= 0.001f) {
+                        if (fx_prob <= 0.001f && lift <= 0.001f && !ts.texture_line) {
                             ts.prev_step_gated = false;
                             ts.in_hold = false;
                             ts.suppress_hold_tail = step.hold;
