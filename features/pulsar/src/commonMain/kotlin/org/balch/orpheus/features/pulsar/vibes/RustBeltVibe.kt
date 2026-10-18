@@ -692,6 +692,7 @@ class RustBeltVibe : VibeProvider {
                             comping = ChordComping(
                                 style = CompingStyle.PAD,
                                 arpMode = ArpMode.NEVER,  // root-tone bed — organ pedal, no ripple
+                                restrikeOnChordChange = true,   // the pedal follows the chorus and jam chords
                                 sectionInversion = SectionInversion.ROOT_POSITION,
                                 humanization = CompingHumanization(
                                     dropProbability = 0.10f,
