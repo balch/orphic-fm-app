@@ -253,6 +253,8 @@ target_compile_options(orpheus_dsp PRIVATE
     -Wno-char-subscripts
     -Wno-tautological-compare
     -Wno-implicit-const-int-float-conversion
+    # Beads' trigger_generator.cc sizes a stack array by its block-size argument.
+    -Wno-vla-extension
     # RelWithDebInfo too, not just Release: AGP builds Android release natives as
     # RelWithDebInfo, so a Release-only gate silently shipped Android at -O2 with no
     # fast-math while desktop, iOS and the test suite all ran -O3 -ffast-math. Android was

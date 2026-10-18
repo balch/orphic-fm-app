@@ -128,12 +128,20 @@ actual class MediaSessionManager(
     private fun backgroundLaunchOptions(): android.os.Bundle? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ActivityOptions.makeBasic()
-                .setPendingIntentCreatorBackgroundActivityStartMode(
-                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-                )
+                .setPendingIntentCreatorBackgroundActivityStartMode(creatorStartMode())
                 .toBundle()
         } else {
             null
+        }
+
+    // API 36 split the single ALLOWED mode into ALLOW_ALWAYS / ALLOW_IF_VISIBLE and
+    // deprecated the old constant; older platforms only know the old one.
+    @Suppress("DEPRECATION")
+    private fun creatorStartMode(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+        } else {
+            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
         }
 
     actual fun activate() {
