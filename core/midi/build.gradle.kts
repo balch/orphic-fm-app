@@ -25,6 +25,10 @@ kotlin {
             // Coroutines (MidiController, MidiMappingStateHolder)
             implementation(libs.kotlinx.coroutines.core)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
         jvmMain.dependencies {
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)

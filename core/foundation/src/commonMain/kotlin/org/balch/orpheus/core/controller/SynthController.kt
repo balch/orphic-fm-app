@@ -48,6 +48,14 @@ data class HoldEvent(
     val origin: ControlEventOrigin = ControlEventOrigin.UI
 )
 
+/** Raw MIDI note, published before voice mapping so recorders can log what was played. */
+data class MidiNoteEvent(
+    val note: Int,
+    val velocity: Int,
+    val on: Boolean,
+    val voice: Int?
+)
+
 /**
  * Generic controller for routing synth parameter events.
  * 
@@ -93,11 +101,18 @@ class SynthController() {
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
+    private val _onMidiNote = MutableSharedFlow<MidiNoteEvent>(
+        replay = 0,
+        extraBufferCapacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
     // Public read-only flows for ViewModels to subscribe
     val onPulseStart: Flow<Int> = _onPulseStart.asSharedFlow()
     val onPulseEnd: Flow<Int> = _onPulseEnd.asSharedFlow()
     val onControlChange: Flow<ControlEvent> = _onControlChange.asSharedFlow()
     val onBendChange: Flow<Float> = _onBendChange.asSharedFlow()
+    val onMidiNote: Flow<MidiNoteEvent> = _onMidiNote.asSharedFlow()
     val onHoldChange: Flow<HoldEvent> = _onHoldChange.asSharedFlow()
 
     // ═══════════════════════════════════════════════════════════
@@ -331,6 +346,11 @@ class SynthController() {
     // ═══════════════════════════════════════════════════════════
     // LEGACY CONTROL EVENT METHODS
     // ═══════════════════════════════════════════════════════════
+
+    /** Publish a raw MIDI note event. Called by the MIDI input handler. */
+    fun emitMidiNote(event: MidiNoteEvent) {
+        _onMidiNote.tryEmit(event)
+    }
 
     /**
      * Emit a pulse start event for a voice.

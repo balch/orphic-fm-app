@@ -4,6 +4,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.MidiNoteEvent
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
@@ -41,7 +42,11 @@ class MidiInputHandler(
         if (stateHolder.tryLearnNote(note)) {
             return
         }
-        
+
+        synthController.emitMidiNote(
+            MidiNoteEvent(note, velocity, on = true, voice = stateHolder.getVoiceForNote(note))
+        )
+
         // Voice trigger
         stateHolder.getVoiceForNote(note)?.let { voiceIndex ->
             synthController.emitPulseStart(voiceIndex)
@@ -60,6 +65,9 @@ class MidiInputHandler(
     }
 
     override fun onNoteOff(note: Int) {
+        synthController.emitMidiNote(
+            MidiNoteEvent(note, 0, on = false, voice = stateHolder.getVoiceForNote(note))
+        )
         stateHolder.getVoiceForNote(note)?.let { voiceIndex ->
             synthController.emitPulseEnd(voiceIndex)
         }
