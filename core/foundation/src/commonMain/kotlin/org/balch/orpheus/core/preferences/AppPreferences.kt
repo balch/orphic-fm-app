@@ -27,6 +27,8 @@ data class AppPreferences(
     val lastPulsarJson: String? = null,
     /** Serialized panel expansion overrides: Map of panelId -> expanded. */
     val lastExpandedPanelsJson: String? = null,
+    /** Desktop panel slots: open, pinned and recent panels. Null means never saved, so migrate. */
+    val panelSlots: PanelSlotsPrefs? = null,
     /**
      * DJ TV-mode docked panels, by route label, in the order the user switched them on.
      * Null means never configured (fall back to the default pair); an empty list means the

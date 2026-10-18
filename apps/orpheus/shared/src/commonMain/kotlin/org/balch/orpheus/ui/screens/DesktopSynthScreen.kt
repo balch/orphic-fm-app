@@ -10,14 +10,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
@@ -35,7 +42,11 @@ import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.HeaderFeature
-import org.balch.orpheus.ui.panels.HeaderPanel
+import org.balch.orpheus.ui.panels.slots.PanelNavigationLayout
+import org.balch.orpheus.ui.panels.slots.PanelSearchOverlay
+import org.balch.orpheus.ui.panels.slots.isSearchShortcut
+import org.balch.orpheus.ui.panels.slots.rememberPanelNavCatalog
+import org.balch.orpheus.ui.panels.slots.rememberPanelNavState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
@@ -57,7 +68,12 @@ fun DesktopSynthScreen(
     val voiceFeature: VoicesFeature = registry.feature<VoicesFeature>()
     val midiFeature: MidiFeature = registry.feature<MidiFeature>()
     val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeFeature>()
-    val panels = remember { headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen) }
+    val panels = remember(headerFeature) {
+        headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen).associateBy { it.panelId }
+    }
+    val headerState by headerFeature.stateFlow.collectAsStateWithLifecycle()
+    val navCatalog = rememberPanelNavCatalog(panels)
+    val nav = rememberPanelNavState(headerState, headerFeature.actions)
     val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
     val rightQuad = voiceState.selectedRightQuad
     val leftPanel = voiceState.selectedLeftPanel
@@ -76,22 +92,30 @@ fun DesktopSynthScreen(
                 .focusRequester(focusRequester)
                 .focusable()
                 .onPreviewKeyEvent { event ->
+                    val searchOpen = nav.searchRequest != null
+                    // Both halves of Cmd/Ctrl+K are eaten so the K gate never fires; once search is
+                    // open the keys belong to it.
+                    if (!searchOpen && isSearchShortcut(event.key, event.isMetaPressed, event.isCtrlPressed)) {
+                        if (event.type == KeyEventType.KeyDown) nav.openSearch(autoFocus = true)
+                        return@onPreviewKeyEvent true
+                    }
                     SynthKeyboardHandler.handleKeyEvent(
                         keyEvent = event,
-                        isDialogActive = isDialogActive,
+                        isDialogActive = isDialogActive || searchOpen,
                         keyActions = keyActions,
                     )
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
-            // Header panel
-            HeaderPanel(
+            PanelNavigationLayout(
+                panels = panels,
+                state = headerState,
+                actions = headerFeature.actions,
+                nav = nav,
+                onDialogActiveChange = onDialogActiveChange,
                 modifier = Modifier.fillMaxWidth()
                     .weight(0.75f),
-                headerFeature = headerFeature,
-                panels = panels,
-                onDialogActiveChange = onDialogActiveChange,
             )
 
             // Main content area
@@ -154,6 +178,32 @@ fun DesktopSynthScreen(
                     effects = effects,
                 )
             }
+        }
+
+        // A sibling of the focusable Column, so keys typed into search never reach the synth handler.
+        nav.searchRequest?.let { request ->
+            val closeSearch: () -> Unit = {
+                nav.closeSearch()
+                // The overlay held focus; without this the synth keys go dead after a search.
+                focusRequester.requestFocus()
+            }
+            val currentOnDialogActiveChange by rememberUpdatedState(onDialogActiveChange)
+            // Raised for exactly as long as the overlay is composed, so synth keys stay quiet.
+            DisposableEffect(Unit) {
+                currentOnDialogActiveChange(true)
+                onDispose { currentOnDialogActiveChange(false) }
+            }
+            PanelSearchOverlay(
+                candidates = navCatalog.candidates,
+                colors = navCatalog.colors,
+                autoFocus = request.autoFocus,
+                onPick = { id ->
+                    nav.open(id)
+                    closeSearch()
+                },
+                onDismiss = closeSearch,
+                modifier = Modifier.matchParentSize(),
+            )
         }
     }
 }
