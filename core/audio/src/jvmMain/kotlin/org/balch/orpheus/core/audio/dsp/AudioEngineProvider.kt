@@ -18,4 +18,8 @@ object AudioEngineModule {
         log.info { "Using NativeDspAudioEngine (C++ DSP)" }
         return NativeDspAudioEngine()
     }
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideOutputCapture(): OutputCapture = NativeOutputCapture()
 }

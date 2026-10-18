@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "DesktopEngine.h"
+#include <algorithm>
 #include <cstring>
 
 static DesktopEngine sEngine;
@@ -252,6 +253,37 @@ JNI_FN(nativeGetScope)(JNIEnv *env, jobject thiz, jfloatArray out, jfloat window
     const int result = sEngine.getScope(points, n, windowMs);
     if (result >= 0) env->SetFloatArrayRegion(out, 0, n, points);
     return result;
+}
+
+// -- Recording ----------------------------------------------------------------
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeStartRecording)(JNIEnv *env, jobject thiz) { sEngine.startRecording(); }
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeStopRecording)(JNIEnv *env, jobject thiz) { sEngine.stopRecording(); }
+
+// Drains through a stack chunk and SetFloatArrayRegion, like nativeGetScope: no pinning.
+JNIEXPORT jint JNICALL
+JNI_FN(nativeDrainRecording)(JNIEnv *env, jobject thiz, jfloatArray out) {
+    constexpr int kChunkFrames = 4096;
+    float chunk[kChunkFrames * 2];
+    const jsize maxFrames = env->GetArrayLength(out) / 2;
+    jsize total = 0;
+    while (total < maxFrames) {
+        const int want = std::min<jsize>(kChunkFrames, maxFrames - total);
+        const int got = sEngine.drainRecording(chunk, want);
+        if (got <= 0) break;
+        env->SetFloatArrayRegion(out, total * 2, got * 2, chunk);
+        total += got;
+        if (got < want) break;
+    }
+    return total;
+}
+
+JNIEXPORT jlong JNICALL
+JNI_FN(nativeRecordDroppedFrames)(JNIEnv *env, jobject thiz) {
+    return static_cast<jlong>(sEngine.recordDroppedFrames());
 }
 
 JNIEXPORT void JNICALL

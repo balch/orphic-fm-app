@@ -278,6 +278,7 @@ if(BUILD_TESTS)
         test/test_lfo.cpp
         test/test_spectrum.cpp
         test/test_scope.cpp
+        test/test_record_ring.cpp
         test/test_engine_slot.cpp
         test/test_control_routing.cpp
         test/test_snapshots.cpp

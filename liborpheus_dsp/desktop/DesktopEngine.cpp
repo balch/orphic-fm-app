@@ -38,6 +38,7 @@ void DesktopEngine::process(float* outputBuffer, int numFrames) {
     auto start = std::chrono::steady_clock::now();
 
     orpheus_engine_process(dsp_engine_, outputBuffer, numFrames);
+    record_ring_.write(outputBuffer, numFrames);
 
     auto end = std::chrono::steady_clock::now();
     double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -177,6 +178,19 @@ int DesktopEngine::getSpectrum(float* bands, int numBands) {
 }
 int DesktopEngine::getScope(float* out, int numPoints, float windowMs) {
     return dsp_engine_ ? orpheus_engine_get_scope(dsp_engine_, out, numPoints, windowMs) : -1;
+}
+void DesktopEngine::startRecording() {
+    record_ring_.discard();
+    record_ring_.arm();
+}
+void DesktopEngine::stopRecording() {
+    record_ring_.disarm();
+}
+int DesktopEngine::drainRecording(float* out, int maxFrames) {
+    return record_ring_.read(out, maxFrames);
+}
+uint64_t DesktopEngine::recordDroppedFrames() const {
+    return record_ring_.dropped_frames();
 }
 void DesktopEngine::getTurntableViz(int deck, float* outBuf) {
     if (dsp_engine_) orpheus_engine_get_turntable_viz(dsp_engine_, deck, outBuf);

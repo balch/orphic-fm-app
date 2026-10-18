@@ -3,7 +3,9 @@
 
 #include "orpheus_dsp.h"
 #include "miniaudio.h"
+#include "../src/orpheus_record_ring.h"
 #include <atomic>
+#include <cstdint>
 
 /**
  * Simplified DSP engine wrapper for JVM desktop (no Oboe).
@@ -63,6 +65,12 @@ public:
     int   isTtsPlaying();
     void  loadPulsarClip(int slot, const float* samples, int count, int sampleRate);
 
+    // Output recording: the audio thread feeds a lock-free ring, a JVM thread drains it.
+    void     startRecording();
+    void     stopRecording();
+    int      drainRecording(float* out, int maxFrames);
+    uint64_t recordDroppedFrames() const;
+
     void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void  getPulsarActiveEngines(int* out);
     void  getPulsarArrangement(int* out);
@@ -74,6 +82,7 @@ private:
     std::atomic<double> cpu_load_{0.0};
     ma_device audio_device_{};
     std::atomic<bool> audio_device_initialized_{false};
+    orpheus::RecordRing record_ring_{1 << 18};  // about 5.5 s at 48 kHz
 };
 
 #endif

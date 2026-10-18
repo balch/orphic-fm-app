@@ -576,6 +576,7 @@ bool run_master_swell_tests();
 bool run_master_cut_tests();
 bool run_spectrum_tests();
 bool run_scope_tests();
+bool run_record_ring_tests();
 bool run_engine_slot_tests();
 bool run_graph_swap_tests();
 bool run_osc_tests();

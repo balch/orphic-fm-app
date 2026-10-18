@@ -110,6 +110,11 @@ class DesktopDspBridge {
     external fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     external fun nativeGetSpectrum(bands: FloatArray): Int
     external fun nativeGetScope(out: FloatArray, windowMs: Float): Int
+    external fun nativeStartRecording()
+    external fun nativeStopRecording()
+    /** Copies up to out.size / 2 interleaved stereo frames; returns frames copied. */
+    external fun nativeDrainRecording(out: FloatArray): Int
+    external fun nativeRecordDroppedFrames(): Long
     external fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     external fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
     external fun nativeClearAutomation(target: Int, voiceIndex: Int)
