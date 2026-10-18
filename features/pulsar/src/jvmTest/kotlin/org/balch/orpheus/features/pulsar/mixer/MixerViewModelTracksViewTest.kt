@@ -141,7 +141,8 @@ class MixerViewModelTracksViewTest {
 
         assertEquals(0.75f, bass())
         assertEquals(0.30f, drive())
-        assertEquals(false, vm.stateFlow.value.tracksView)
+        // The view is a session choice: only an app start puts it back on BAND.
+        assertEquals(true, vm.stateFlow.value.tracksView)
     }
 
     @Test

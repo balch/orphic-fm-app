@@ -228,7 +228,6 @@ class MixerViewModel(
         fxGainId.value = FloatValue(UNITY_FADER)
         driveId.value = FloatValue(DEFAULT_DRIVE)
         mixId.value = FloatValue(DEFAULT_DRIVE)
-        tracksViewChanges.tryEmit(MixerIntent.TracksViewChange(false))
     }
 
     private fun onGroupGainChanged(group: MixerGroup, value: Float) {
