@@ -1,6 +1,6 @@
 package org.balch.orpheus
 
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -9,6 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.diamondedge.logging.logging
 import kotlinx.coroutines.Dispatchers
@@ -83,28 +86,34 @@ fun SynthScreen(
             selectedControlId = (midiState.mappingState.learnTarget as? LearnTarget.Control)?.controlId,
             onSelectControl = { id -> midiFeature.actions.selectControlForLearning(id) },
         ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val layoutMode = determineLayoutMode(maxWidth.value, maxHeight.value)
+            var measured by remember { mutableStateOf(IntSize.Zero) }
+            val density = LocalDensity.current
+            // Decided from the previous frame's size: switching screens mid-measure (as
+            // BoxWithConstraints does) can dispose a dialog layer and crash the desktop scene.
+            Box(modifier = Modifier.fillMaxSize().onSizeChanged { measured = it }) {
+                if (measured == IntSize.Zero) return@Box
+                val widthDp = with(density) { measured.width.toDp() }
+                val heightDp = with(density) { measured.height.toDp() }
 
-            when (layoutMode) {
-                LayoutMode.CompactLandscape -> {
-                    CompactLandscapeScreen(
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-                LayoutMode.CompactPortrait -> {
-                    CompactPortraitScreen(
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-                LayoutMode.Desktop -> {
-                    DesktopSynthScreen(
-                        isDialogActive = isDialogActive,
-                        onDialogActiveChange = { isDialogActive = it },
-                    )
+                when (determineLayoutMode(widthDp.value, heightDp.value)) {
+                    LayoutMode.CompactLandscape -> {
+                        CompactLandscapeScreen(
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    LayoutMode.CompactPortrait -> {
+                        CompactPortraitScreen(
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    LayoutMode.Desktop -> {
+                        DesktopSynthScreen(
+                            isDialogActive = isDialogActive,
+                            onDialogActiveChange = { isDialogActive = it },
+                        )
+                    }
                 }
             }
         }
-    }
     }
 }
