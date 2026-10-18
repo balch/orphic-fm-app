@@ -41,6 +41,9 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->pulsar_track_grain_shape_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_grain_blend[t].store(1.0f, std::memory_order_relaxed);
         engine->pulsar_track_grain_blend_space[t].store(1.0f, std::memory_order_relaxed);
+        // Grain FX stays off (zero-init); its size default is mid-range.
+        engine->pulsar_track_grain_size[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_grain_size_space[t].store(0.5f, std::memory_order_relaxed);
     }
 
     // Vibrato rate mirrors OrpheusEngine.kt; depth stays 0 (off).

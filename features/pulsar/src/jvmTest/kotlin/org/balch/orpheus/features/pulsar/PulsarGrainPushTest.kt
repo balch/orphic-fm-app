@@ -149,6 +149,35 @@ class PulsarGrainPushTest {
     }
 
     @Test
+    fun `grain FX fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(engineId = OrpheusEngineId.VA, grainFx = true, grainSize = 0.3f)
+        val space = OrpheusEngine(engineId = OrpheusEngineId.VA, grainFx = false, grainSize = 0.8f)
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(1, int("track_4_grain_fx"))
+        assertEquals(0, int("track_4_grain_fx_space"))
+        assertEquals(0.3f, float("track_4_grain_size"))
+        assertEquals(0.8f, float("track_4_grain_size_space"))
+    }
+
+    @Test
+    fun `a track without grain FX pushes fx 0 at the default size`() = runTest(testDispatcher) {
+        val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
+        val vibe = grainTestVibe(va, va)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0, int("track_0_grain_fx"))
+        assertEquals(0, int("track_0_grain_fx_space"))
+        assertEquals(0.5f, float("track_0_grain_size"))
+        assertEquals(0.5f, float("track_0_grain_size_space"))
+    }
+
+    @Test
     fun `vibrato fields reach both engine slots of their track`() = runTest(testDispatcher) {
         val edm = OrpheusEngine(engineId = OrpheusEngineId.MST, vibratoDepth = 35f, vibratoRate = 6.5f)
         val space = OrpheusEngine(engineId = OrpheusEngineId.MST, vibratoDepth = 12f, vibratoRate = 3f)

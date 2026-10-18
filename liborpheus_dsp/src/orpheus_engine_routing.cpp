@@ -819,6 +819,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_grain_blend[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "grain_blend_space") == 0)
                 engine->pulsar_track_grain_blend_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_fx") == 0)
+                engine->pulsar_track_grain_fx[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_fx_space") == 0)
+                engine->pulsar_track_grain_fx_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_size") == 0)
+                engine->pulsar_track_grain_size[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "grain_size_space") == 0)
+                engine->pulsar_track_grain_size_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "grain_voicing") == 0)
                 engine->pulsar_track_grain_voicing[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "grain_voicing_space") == 0)

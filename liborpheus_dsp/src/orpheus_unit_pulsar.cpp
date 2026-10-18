@@ -1710,6 +1710,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.voice_active = false;
         // The old vibe's grains are in its key and bank; the next Mist block drops them.
         ts.mist_prev_active = false;
+        // Likewise grain FX: the next block clears the old vibe's recorded voice.
+        ts.grain_fx_prev_active = false;
         ts.vibrato_phase = 0.0f;
         ts.vibrato_onset = 0.0f;
         ts.pitch_rise_progress = 0.0f;
@@ -3292,8 +3294,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     // ── Per-track: advance sequencer + render voice ──
     float track_buffer[kMaxFrames];
-    // Mist's grain layer for the track being rendered. mid joins track_buffer after
-    // the envelope; side joins at the stereo mix. Both are only read when mist_track
+    // The grain layer (Mist or grain FX) for the track being rendered. mid joins track_buffer
+    // after the envelope; side joins at the stereo mix. Both are only read when grain_track
     // is set, so they are left uninitialised.
     float mist_mid[kMaxFrames];
     float mist_side[kMaxFrames];
@@ -3326,7 +3328,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
         const PulsarTrackMacroMap& mm = ts.macro_map;
-        bool mist_track = false;
+        bool grain_track = false;
 
         // Reset per-block trigger-timing scratch and capture the pre-boundary
         // gate so the split render can keep the old note's tail intact for
@@ -3389,6 +3391,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.grain_random_timing = PULSAR_PICK(grain_random_timing) != 0;
             ts.grain_shape         = PULSAR_PICK(grain_shape);
             ts.grain_blend         = PULSAR_PICK(grain_blend);
+            ts.grain_fx            = PULSAR_PICK(grain_fx) != 0;
+            ts.grain_size          = PULSAR_PICK(grain_size);
             ts.vibrato_depth       = PULSAR_PICK(vibrato_depth);
             ts.vibrato_rate        = PULSAR_PICK(vibrato_rate);
             ts.pitch_rise          = PULSAR_PICK(pitch_rise);
@@ -5515,6 +5519,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Render voice ──
         // The active slot's LPG mode; see active_track_lpg_mode for the slot rule.
         const int active_lpg_mode = active_track_lpg_mode(engine, ts, t);
+        // The grain kernels' per-sample gate. Taken here because the envelope below
+        // consumes pending_retrig before grain FX runs.
+        mist::Gate grain_gate;
+        grain_gate.trig_off = ts.trigger_offset;
+        grain_gate.gate_pre = ts.gate_pre_boundary;
+        grain_gate.gate_post = gate_for_render != 0;
+        grain_gate.note_on = ts.pending_retrig;
+        grain_gate.ticks = step_boundary_samples;
+        grain_gate.tick_count = num_boundaries;
         // Braids range (100..199) → MacroOscillator wrapper.
         // Otherwise → OrpheusVoice (Plaits engines + LPG).
         // Braids' MacroOscillator silently clamps unknown indices to its last
@@ -5594,16 +5607,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             mp.random_timing = ts.grain_random_timing;
             mp.shape = ts.grain_shape;
             mp.blend = ts.grain_blend;
-            mist::Gate mg;
-            mg.trig_off = ts.trigger_offset;
-            mg.gate_pre = ts.gate_pre_boundary;
-            mg.gate_post = gate_for_render != 0;
-            mg.note_on = ts.pending_retrig;
-            mg.ticks = step_boundary_samples;
-            mg.tick_count = num_boundaries;
-            mist::process_mist_block(ms, mp, mg, mist_pitch_context(engine, state, ts, t),
+            mist::process_mist_block(ms, mp, grain_gate, mist_pitch_context(engine, state, ts, t),
                                      sample_rate, track_buffer, mist_mid, mist_side, num_frames);
-            mist_track = true;
+            grain_track = true;
         } else if (ts.engine_index < 0) {
             // OSC: split at the intra-block step boundary like the chaos and
             // OrpheusVoice paths, so the onset lands on the true boundary
@@ -5699,7 +5705,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ts.pending_retrig
             );
         }
-        ts.mist_prev_active = mist_track;
+        ts.mist_prev_active = (ts.engine_index == kMistEngineId);
 
         // ── Apply Tides envelope ──
         // Self-enveloped engines bypass: 19-23 (String, Modal, BD, SD, HH), 2-4 (SixOp).
@@ -5827,9 +5833,36 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
-        // Mist's grains carry their own envelopes, so they join after Pulsar's. The
-        // oscillator layer already in track_buffer took the envelope above.
-        if (mist_track) {
+        // Grain FX records the enveloped voice, so the cloud swells and fades with it.
+        // MST ignores the flag: Mist is already a grain engine.
+        const bool grain_fx_active = ts.grain_fx && ts.engine_index != kMistEngineId;
+        if (grain_fx_active) {
+            PulsarGrainFxState& gs = state->grainfx[t];
+            if (!ts.grain_fx_prev_active) {
+                grainfx::wake(gs);
+                // Per-track seed, on a different constant from Mist's.
+                gs.rng = 0x47524658u ^ (static_cast<uint32_t>(t + 1) * 0x9E3779B9u);
+            }
+            grainfx::Params gp;
+            gp.note = note_for_render;
+            gp.mode = ts.grain_mode;
+            gp.scatter_mode = ts.grain_scatter_mode;
+            gp.voicing = ts.grain_voicing;
+            gp.scatter = ts.grain_scatter;
+            gp.rate = ts.grain_rate;
+            gp.random_timing = ts.grain_random_timing;
+            gp.shape = ts.grain_shape;
+            gp.blend = ts.grain_blend;
+            gp.size = ts.grain_size;
+            grainfx::process_block(gs, gp, grain_gate, mist_pitch_context(engine, state, ts, t),
+                                   sample_rate, track_buffer, mist_mid, mist_side, num_frames);
+            grain_track = true;
+        }
+        ts.grain_fx_prev_active = grain_fx_active;
+
+        // Grains carry their own envelopes, so they join after Pulsar's. The voice
+        // already in track_buffer took the envelope above.
+        if (grain_track) {
             for (int i = 0; i < num_frames; i++) track_buffer[i] += mist_mid[i];
         }
 
@@ -5897,7 +5930,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 const float breathe = orpheus::breathe_gain(env, floor_gain);
                 track_buffer[i] *= breathe;
                 // The spread sinks with the centre.
-                if (mist_track) mist_side[i] *= breathe;
+                if (grain_track) mist_side[i] *= breathe;
             }
             state->breathe_env[t] = env;
         }
@@ -5949,9 +5982,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             float a = std::fabs(s);
             if (a > track_peak) track_peak = a;
         }
-        // Mist's side signal: added left, subtracted right. Left plus right is
+        // The grains' side signal: added left, subtracted right. Left plus right is
         // unchanged, so a mono fold-down is the sound without it.
-        if (mist_track) {
+        if (grain_track) {
             for (int i = 0; i < num_frames; i++) {
                 const float sd = mist_side[i] * vol * void_gain_buf[i] * mist_width;
                 out_l[i] += sd;
@@ -5972,7 +6005,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (reverb_brightness <= 0.001f) reverb_brightness = 0.5f;  // default if unset
         float rb_lp_coeff = 0.1f + reverb_brightness * 0.9f;  // 0=dark(0.1), 1=bright/bypass(1.0)
 
-        if ((delay_send_amt > 0.001f || reverb_send_amt > 0.001f) && mist_track) {
+        if ((delay_send_amt > 0.001f || reverb_send_amt > 0.001f) && grain_track) {
             // Separate from the loop below because fast-math can reassociate a zero side
             // term, and other engines' sends must stay bit-identical. Keep in step with
             // it: the two differ only by the side, which enters ahead of the reverb filter.
@@ -5993,7 +6026,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
             }
         } else if (delay_send_amt > 0.001f || reverb_send_amt > 0.001f) {
-            // Keep in step with the Mist sends loop above: the two differ only by the side term.
+            // Keep in step with the grain sends loop above: the two differ only by the side term.
             for (int i = 0; i < num_frames; i++) {
                 float s = track_buffer[i] * vol * void_gain_buf[i];
                 if (delay_send_amt > 0.001f) {

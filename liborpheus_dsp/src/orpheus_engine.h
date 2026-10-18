@@ -862,6 +862,11 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_grain_shape_space[8]{};
     std::atomic<float> pulsar_track_grain_blend[8]{};
     std::atomic<float> pulsar_track_grain_blend_space[8]{};
+    // Grain FX over any non-MST engine: the 0/1 flag, and grain length seeded to 0.5.
+    std::atomic<int>   pulsar_track_grain_fx[8]{};
+    std::atomic<int>   pulsar_track_grain_fx_space[8]{};
+    std::atomic<float> pulsar_track_grain_size[8]{};
+    std::atomic<float> pulsar_track_grain_size_space[8]{};
     std::atomic<int>   pulsar_track_grain_voicing[8]{};
     std::atomic<int>   pulsar_track_grain_voicing_space[8]{};
     // Per-track pitch vibrato: peak depth in cents (0 = off) and rate in Hz. The rate is

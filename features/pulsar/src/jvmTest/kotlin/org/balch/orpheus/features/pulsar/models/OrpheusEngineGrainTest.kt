@@ -36,6 +36,8 @@ class OrpheusEngineGrainTest {
         assertEquals(false, e.grainRandomTiming)
         assertEquals(0.5f, e.grainShape)
         assertEquals(1f, e.grainBlend)
+        assertEquals(false, e.grainFx)
+        assertEquals(0.5f, e.grainSize)
     }
 
     @Test
@@ -54,6 +56,7 @@ class OrpheusEngineGrainTest {
             grainVoicing = GrainVoicing.RISING,
             grainScatter = 0.4f, grainRate = 0.9f, grainRandomTiming = true,
             grainShape = 0.1f, grainBlend = 0.6f,
+            grainFx = true, grainSize = 0.2f,
         )
         assertEquals(e, json.decodeFromString<OrpheusEngine>(json.encodeToString(e)))
     }
@@ -66,6 +69,8 @@ class OrpheusEngineGrainTest {
         assertEquals(GrainMode.BURST, e.grainMode)
         assertEquals(GrainVoicing.EVEN, e.grainVoicing)
         assertEquals(1f, e.grainBlend)
+        assertEquals(false, e.grainFx)
+        assertEquals(0.5f, e.grainSize)
     }
 
     @Test
@@ -81,6 +86,12 @@ class OrpheusEngineGrainTest {
         }
         assertFailsWith<IllegalArgumentException> {
             OrpheusEngine(engineId = OrpheusEngineId.MST, grainBlend = -1f)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            OrpheusEngine(engineId = OrpheusEngineId.VA, grainSize = 1.5f)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            OrpheusEngine(engineId = OrpheusEngineId.VA, grainSize = -0.1f)
         }
     }
 

@@ -112,7 +112,7 @@ data class OrpheusEngine(
      */
     val fmFreeHz: Float = 0f,
     /**
-     * Mist ([OrpheusEngineId.MST]) only; inert on every other engine. On a Mist track
+     * Mist ([OrpheusEngineId.MST]), or any engine with [grainFx]; otherwise inert. On a Mist track
      * [harmonics] picks the wavetable bank, [timbre] the position in it, and [morph]
      * the grain length from a blip to four seconds. Each grain latches all of these
      * when it starts, so a sweep leaves a trail instead of moving the whole sound.
@@ -129,8 +129,18 @@ data class OrpheusEngine(
     val grainRandomTiming: Boolean = false,
     /** Grain envelope, from a click at 0 to a slow swell at 1. */
     val grainShape: Float = 0.5f,
-    /** 0 is a steady wavetable oscillator, 1 is all grains. */
+    /** 0 is a steady wavetable oscillator (with [grainFx], the dry voice), 1 is all grains. */
     val grainBlend: Float = 1f,
+    /**
+     * Grain the track's own voice: its output is recorded and replayed as a Beads cloud, using the
+     * grain* fields and [grainSize]. Inert on MST, which grains its wavetable.
+     */
+    val grainFx: Boolean = false,
+    /**
+     * Grain FX only: grain length on an exponential curve, from a blip at 0 through about 28 ms
+     * at 0.25, 117 ms at 0.5 and 0.48 s at 0.75, to two seconds at 1.
+     */
+    val grainSize: Float = 0.5f,
     /** Peak pitch wobble in cents while a note holds. 0 is off. */
     val vibratoDepth: Float = 0f,
     /** Vibrato speed in Hz. Fades in over 0.3 s after each note-on. */
@@ -152,6 +162,7 @@ data class OrpheusEngine(
         require(grainRate in 0f..1f) { "grainRate must be 0..1, was $grainRate" }
         require(grainShape in 0f..1f) { "grainShape must be 0..1, was $grainShape" }
         require(grainBlend in 0f..1f) { "grainBlend must be 0..1, was $grainBlend" }
+        require(grainSize in 0f..1f) { "grainSize must be 0..1, was $grainSize" }
         require(vibratoDepth in 0f..100f) { "vibratoDepth must be 0..100 cents, was $vibratoDepth" }
         require(vibratoRate in 0.5f..12f) { "vibratoRate must be 0.5..12 Hz, was $vibratoRate" }
         require(pitchRise in 0f..1200f) { "pitchRise must be 0..1200 cents, was $pitchRise" }

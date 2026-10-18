@@ -801,6 +801,8 @@ class PulsarViewModel(
     private val trackGrainShapeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE.ordinal + it].controlId) }
     private val trackGrainBlendIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND.ordinal + it].controlId) }
     private val trackGrainVoicingIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING.ordinal + it].controlId) }
+    private val trackGrainFxIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_FX.ordinal + it].controlId) }
+    private val trackGrainSizeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SIZE.ordinal + it].controlId) }
     private val trackVibratoDepthIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_DEPTH.ordinal + it].controlId) }
     private val trackVibratoRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_RATE.ordinal + it].controlId) }
     private val trackPitchRiseIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE.ordinal + it].controlId) }
@@ -994,6 +996,8 @@ class PulsarViewModel(
     private val trackGrainShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE_SPACE.ordinal + it].controlId) }
     private val trackGrainBlendSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND_SPACE.ordinal + it].controlId) }
     private val trackGrainVoicingSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING_SPACE.ordinal + it].controlId) }
+    private val trackGrainFxSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_FX_SPACE.ordinal + it].controlId) }
+    private val trackGrainSizeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SIZE_SPACE.ordinal + it].controlId) }
     private val trackVibratoDepthSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_DEPTH_SPACE.ordinal + it].controlId) }
     private val trackVibratoRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_RATE_SPACE.ordinal + it].controlId) }
     private val trackPitchRiseSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_SPACE.ordinal + it].controlId) }
@@ -1663,6 +1667,10 @@ class PulsarViewModel(
             trackGrainBlendSpaceIds[i].value = FloatValue(spa.grainBlend)
             trackGrainVoicingIds[i].value = IntValue(edm.grainVoicing.id)
             trackGrainVoicingSpaceIds[i].value = IntValue(spa.grainVoicing.id)
+            trackGrainFxIds[i].value = IntValue(if (edm.grainFx) 1 else 0)
+            trackGrainFxSpaceIds[i].value = IntValue(if (spa.grainFx) 1 else 0)
+            trackGrainSizeIds[i].value = FloatValue(edm.grainSize)
+            trackGrainSizeSpaceIds[i].value = FloatValue(spa.grainSize)
             trackVibratoDepthIds[i].value = FloatValue(edm.vibratoDepth)
             trackVibratoDepthSpaceIds[i].value = FloatValue(spa.vibratoDepth)
             trackVibratoRateIds[i].value = FloatValue(edm.vibratoRate)

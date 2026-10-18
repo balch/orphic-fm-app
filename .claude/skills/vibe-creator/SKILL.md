@@ -205,7 +205,8 @@ Not a Plaits engine: a triangle/square oscillator with self-feedback, the same v
 
 **MST (Grain Mist, id 300).** A cloud of wavetable grains. `harmonics` picks one of 12
 wavetable banks (pin it to hold one), `timbre` moves through the bank, `morph` is grain
-length from a blip to four seconds. Eight fields shape it, all on `OrpheusEngine`:
+length from a blip to four seconds. Eight `grain*` fields shape it, all on `OrpheusEngine`
+(the same fields drive `grainFx` on other engines, see the last bullet below):
 `grainMode` (BURST sprays while the note is held, SINGLE is one grain per note,
 CONTINUOUS follows the step clock and ignores rests), `grainScatterMode` (CHORD, SCALE,
 RAW), `grainScatter` (reach, 1 = two octaves), `grainRate`, `grainRandomTiming`,
@@ -225,6 +226,7 @@ Things to know:
 - CONTINUOUS follows the global swung 16th clock, rests included, and ignores the track's own note gating. On track 7 (the FX slot) the texture volume curve, not the probability gate, decides when it is heard. A section that sets the track's density to 0 still mutes a CONTINUOUS cloud (by volume), but a low non-zero density does not thin it. The clock divider is not locked to the bar, so a division of 4 or 8 keeps whatever phase it had when the track entered Mist.
 - Track 4 is the only slot with no ducking. Tracks 5 to 7 take the texture notch unless they carry a lick.
 - `TrackRole.Melodic(textureLine = true)` keeps a lick line on tracks 5 to 7 inside the texture fade (it skips the lick lift), and on track 7 it is never dropped by the FX note gate. Off by default.
+- `grainFx` grains the track's own voice (any engine but MST): the voice is recorded and replayed as a Beads cloud through the same `grain*` fields. `grainSize` is the grain length there, on an exponential curve: 0.25 is about 28 ms, 0.5 about 117 ms, 0.75 about 0.48 s, 1 is 2 s. `grainBlend` is dry/wet. At the defaults a blend-1 cloud sits within about 1 dB of the dry voice; dense clouds (fast rate, long grains) meet a limiter and can sit lower. A slow `grainShape` lets the first grain speak sooner (up to an 80 ms hold at clicky shapes). Keep `grainScatter` small (0.02 to 0.05) on voices, since playback-rate pitch also moves formants. Upward-pitched grains start further back so they never catch the recording: a long grain pitched up is an echo of earlier notes (a 2 s grain a fourth up starts about 670 ms back).
 
 #### `TrackVoice` (track-level)
 

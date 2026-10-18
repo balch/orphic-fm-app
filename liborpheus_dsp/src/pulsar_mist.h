@@ -236,20 +236,11 @@ inline void set_param(beads::RandomizedParameter& rp, float base) {
     rp.has_cv = false;
 }
 
-// Renders one block. osc_out is the steady layer, which the caller envelopes;
-// grain_mid and grain_side are the self-enveloped grain layer as (l+r)/2 and (l-r)/2.
-inline void process_mist_block(PulsarMistState& st, const Params& p, const Gate& g,
-                               const PitchContext& pc, float sample_rate,
-                               float* osc_out, float* grain_mid, float* grain_side,
-                               int num_frames) {
-    if (num_frames <= 0) return;
-    if (num_frames > kMaxBlock) num_frames = kMaxBlock;
-    if (st.sample_rate != sample_rate) st.Init(sample_rate);
-
-    const float note = clamp_note(p.note);
-    const bool continuous = (p.mode == kModeContinuous);
-    const float rate = clamp_unit(p.rate);
-    const float scatter = clamp_unit(p.scatter);
+// The trigger stream both grain kernels share. `rate` is already clamped to 0..1.
+inline void render_triggers(beads::TriggerGenerator& gen, bool& prev_gate, const Gate& g,
+                            int mode, float rate, bool random_timing,
+                            beads::TriggerGenerator::Output* triggers, int num_frames) {
+    const bool continuous = (mode == kModeContinuous);
 
     // Gate stream. The pulse-train path re-derives edges from the HIGH bit alone, so a
     // legato note-on is one LOW sample. The divider path reads RISING directly and leaves
@@ -266,23 +257,41 @@ inline void process_mist_block(PulsarMistState& st, const Params& p, const Gate&
         const int off = (g.trig_off > 0 && g.trig_off < num_frames) ? g.trig_off : 0;
         for (int i = 0; i < num_frames; i++) {
             bool high = (i < off) ? g.gate_pre : g.gate_post;
-            if (g.note_on && i == off && st.prev_gate) high = false;
+            if (g.note_on && i == off && prev_gate) high = false;
             flags[i] = high ? stmlib::GATE_FLAG_HIGH : stmlib::GATE_FLAG_LOW;
-            st.prev_gate = high;
+            prev_gate = high;
         }
     }
 
     // grainRate and grainRandomTiming are Beads' one bipolar DENSITY knob: below centre
     // is even, above is random. Centre is one grain per trigger when gated and silence
     // when clocked.
-    const float density = (p.mode == kModeSingle)
+    const float density = (mode == kModeSingle)
         ? kSingleDensity
-        : (p.random_timing ? 0.5f + 0.5f * rate : 0.5f - 0.5f * rate);
+        : (random_timing ? 0.5f + 0.5f * rate : 0.5f - 0.5f * rate);
     const beads::SeedButtonState seed =
         continuous ? beads::SEED_BUTTON_STATE_LOCKED : beads::SEED_BUTTON_STATE_OFF;
 
+    gen.Render(seed, flags, density, 0.0f, 0.0f, triggers, num_frames);
+}
+
+// Renders one block. osc_out is the steady layer, which the caller envelopes;
+// grain_mid and grain_side are the self-enveloped grain layer as (l+r)/2 and (l-r)/2.
+inline void process_mist_block(PulsarMistState& st, const Params& p, const Gate& g,
+                               const PitchContext& pc, float sample_rate,
+                               float* osc_out, float* grain_mid, float* grain_side,
+                               int num_frames) {
+    if (num_frames <= 0) return;
+    if (num_frames > kMaxBlock) num_frames = kMaxBlock;
+    if (st.sample_rate != sample_rate) st.Init(sample_rate);
+
+    const float note = clamp_note(p.note);
+    const float rate = clamp_unit(p.rate);
+    const float scatter = clamp_unit(p.scatter);
+
     beads::TriggerGenerator::Output triggers[kMaxBlock];
-    st.trigger.Render(seed, flags, density, 0.0f, 0.0f, triggers, num_frames);
+    render_triggers(st.trigger, st.prev_gate, g, p.mode, rate, p.random_timing,
+                    triggers, num_frames);
 
     beads::Parameters bp;
     // Below 1: at exactly 1.0 Beads interpolates toward a wave row that does not exist for

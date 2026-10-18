@@ -307,6 +307,26 @@ enum class PulsarSymbol(
     TRACK_6_GRAIN_VOICING("track_6_grain_voicing"),
     TRACK_7_GRAIN_VOICING("track_7_grain_voicing"),
 
+    // Per-track grain FX: grain the track's own voice, 0 or 1 (8 entries, EDM slot)
+    TRACK_0_GRAIN_FX("track_0_grain_fx"),
+    TRACK_1_GRAIN_FX("track_1_grain_fx"),
+    TRACK_2_GRAIN_FX("track_2_grain_fx"),
+    TRACK_3_GRAIN_FX("track_3_grain_fx"),
+    TRACK_4_GRAIN_FX("track_4_grain_fx"),
+    TRACK_5_GRAIN_FX("track_5_grain_fx"),
+    TRACK_6_GRAIN_FX("track_6_grain_fx"),
+    TRACK_7_GRAIN_FX("track_7_grain_fx"),
+
+    // Per-track grain FX: grain length (8 entries, EDM slot)
+    TRACK_0_GRAIN_SIZE("track_0_grain_size"),
+    TRACK_1_GRAIN_SIZE("track_1_grain_size"),
+    TRACK_2_GRAIN_SIZE("track_2_grain_size"),
+    TRACK_3_GRAIN_SIZE("track_3_grain_size"),
+    TRACK_4_GRAIN_SIZE("track_4_grain_size"),
+    TRACK_5_GRAIN_SIZE("track_5_grain_size"),
+    TRACK_6_GRAIN_SIZE("track_6_grain_size"),
+    TRACK_7_GRAIN_SIZE("track_7_grain_size"),
+
     // Per-track pitch vibrato: peak depth in cents, 0 is off (8 entries, EDM slot)
     TRACK_0_VIBRATO_DEPTH("track_0_vibrato_depth"),
     TRACK_1_VIBRATO_DEPTH("track_1_vibrato_depth"),
@@ -1621,6 +1641,26 @@ enum class PulsarSymbol(
     TRACK_5_GRAIN_VOICING_SPACE("track_5_grain_voicing_space"),
     TRACK_6_GRAIN_VOICING_SPACE("track_6_grain_voicing_space"),
     TRACK_7_GRAIN_VOICING_SPACE("track_7_grain_voicing_space"),
+
+    // Per-track grain FX: grain the track's own voice, 0 or 1 (8 entries, SPACE slot)
+    TRACK_0_GRAIN_FX_SPACE("track_0_grain_fx_space"),
+    TRACK_1_GRAIN_FX_SPACE("track_1_grain_fx_space"),
+    TRACK_2_GRAIN_FX_SPACE("track_2_grain_fx_space"),
+    TRACK_3_GRAIN_FX_SPACE("track_3_grain_fx_space"),
+    TRACK_4_GRAIN_FX_SPACE("track_4_grain_fx_space"),
+    TRACK_5_GRAIN_FX_SPACE("track_5_grain_fx_space"),
+    TRACK_6_GRAIN_FX_SPACE("track_6_grain_fx_space"),
+    TRACK_7_GRAIN_FX_SPACE("track_7_grain_fx_space"),
+
+    // Per-track grain FX: grain length (8 entries, SPACE slot)
+    TRACK_0_GRAIN_SIZE_SPACE("track_0_grain_size_space"),
+    TRACK_1_GRAIN_SIZE_SPACE("track_1_grain_size_space"),
+    TRACK_2_GRAIN_SIZE_SPACE("track_2_grain_size_space"),
+    TRACK_3_GRAIN_SIZE_SPACE("track_3_grain_size_space"),
+    TRACK_4_GRAIN_SIZE_SPACE("track_4_grain_size_space"),
+    TRACK_5_GRAIN_SIZE_SPACE("track_5_grain_size_space"),
+    TRACK_6_GRAIN_SIZE_SPACE("track_6_grain_size_space"),
+    TRACK_7_GRAIN_SIZE_SPACE("track_7_grain_size_space"),
 
     // Per-track pitch vibrato: peak depth in cents, 0 is off (8 entries, SPACE slot)
     TRACK_0_VIBRATO_DEPTH_SPACE("track_0_vibrato_depth_space"),

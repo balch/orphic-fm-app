@@ -95,6 +95,10 @@ class PulsarPlugin : DspPlugin {
     private var _trackGrainBlendSpace = FloatArray(8) { 1f }
     private var _trackGrainVoicing = IntArray(8) { 0 }
     private var _trackGrainVoicingSpace = IntArray(8) { 0 }
+    private var _trackGrainFx = IntArray(8) { 0 }
+    private var _trackGrainFxSpace = IntArray(8) { 0 }
+    private var _trackGrainSize = FloatArray(8) { 0.5f }
+    private var _trackGrainSizeSpace = FloatArray(8) { 0.5f }
     private var _trackVibratoDepth = FloatArray(8) { 0f }
     private var _trackVibratoDepthSpace = FloatArray(8) { 0f }
     private var _trackVibratoRate = FloatArray(8) { 5.5f }
@@ -440,6 +444,28 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING_SPACE.ordinal + t]) {
                 intType { default = 0; get { _trackGrainVoicingSpace[t] }; set { _trackGrainVoicingSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_FX.ordinal + t]) {
+                intType { default = 0; get { _trackGrainFx[t] }; set { _trackGrainFx[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_FX_SPACE.ordinal + t]) {
+                intType { default = 0; get { _trackGrainFxSpace[t] }; set { _trackGrainFxSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SIZE.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackGrainSize[t] }; set { _trackGrainSize[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SIZE_SPACE.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackGrainSizeSpace[t] }; set { _trackGrainSizeSpace[t] = it } }
             }
         }
         for (t in 0..7) {

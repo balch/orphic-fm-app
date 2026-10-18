@@ -7,6 +7,7 @@
 #include "orpheus_unit_chaos.h"
 #include "pulsar_osc.h"
 #include "pulsar_mist.h"
+#include "pulsar_grain_fx.h"
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
 #include "pulsar_street.h"
@@ -299,6 +300,9 @@ struct PulsarTrackState {
     bool  grain_random_timing = false;
     float grain_shape = 0.5f;
     float grain_blend = 1.0f;
+    // Grain FX over a non-MST engine, resolved per block from the active slot.
+    bool  grain_fx = false;
+    float grain_size = 0.5f;
     // Vibrato: depth (cents) and rate (Hz) resolved per block from the active slot, plus
     // the LFO phase (cycles) and the 0..1 onset ramp that restarts on every note-on.
     float vibrato_depth = 0.0f;
@@ -320,6 +324,8 @@ struct PulsarTrackState {
     bool  texture_line = false;
     // Whether this track rendered Mist last block; a false-to-true edge clears grains.
     bool  mist_prev_active = false;
+    // Whether grain FX ran last block; a false-to-true edge clears its recording.
+    bool  grain_fx_prev_active = false;
     PulsarStep steps[kMaxPulsarSteps];
     int step_count;
     int playhead;
@@ -1141,6 +1147,8 @@ struct PulsarState {
     // Mist voices, one per track. Beside the tracks, not inside them: Beads classes
     // are not copyable. Each self-initialises on its first render.
     PulsarMistState mist[kNumPulsarTracks];
+    // Grain FX recordings, one per track, beside mist[] for the same reason.
+    PulsarGrainFxState grainfx[kNumPulsarTracks];
     double clock_accumulator;   // fractional sample counter for step grid
     // Armed by load_vibe: the next AUDIBLE playing block fires a step boundary
     // at sample 0 so the new vibe's downbeat sounds at the load instant.

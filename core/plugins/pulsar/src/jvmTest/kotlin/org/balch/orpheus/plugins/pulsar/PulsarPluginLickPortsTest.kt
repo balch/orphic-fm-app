@@ -204,6 +204,7 @@ class PulsarPluginLickPortsTest {
     private val grainFamilies = listOf(
         "GRAIN_MODE", "GRAIN_SCATTER_MODE", "GRAIN_SCATTER", "GRAIN_RATE",
         "GRAIN_RANDOM_TIMING", "GRAIN_SHAPE", "GRAIN_BLEND", "GRAIN_VOICING",
+        "GRAIN_FX", "GRAIN_SIZE",
     )
 
     @Test
@@ -238,13 +239,13 @@ class PulsarPluginLickPortsTest {
     fun `every Mist grain port stores a written value for the boot sync to replay`() {
         val plugin = PulsarPlugin()
         val floats = PulsarSymbol.entries.filter {
-            it.name.matches(Regex("TRACK_[0-7]_GRAIN_(SCATTER|RATE|SHAPE|BLEND)(_SPACE)?"))
+            it.name.matches(Regex("TRACK_[0-7]_GRAIN_(SCATTER|RATE|SHAPE|BLEND|SIZE)(_SPACE)?"))
         }
         val ints = PulsarSymbol.entries.filter {
-            it.name.matches(Regex("TRACK_[0-7]_GRAIN_(MODE|SCATTER_MODE|RANDOM_TIMING|VOICING)(_SPACE)?"))
+            it.name.matches(Regex("TRACK_[0-7]_GRAIN_(MODE|SCATTER_MODE|RANDOM_TIMING|VOICING|FX)(_SPACE)?"))
         }
-        assertEquals(64, floats.size, "expected 4 float families x 2 slots x 8 tracks")
-        assertEquals(64, ints.size, "expected 4 int families x 2 slots x 8 tracks")
+        assertEquals(80, floats.size, "expected 5 float families x 2 slots x 8 tracks")
+        assertEquals(80, ints.size, "expected 5 int families x 2 slots x 8 tracks")
         // Distinct values, so a stride that shadows a neighbour shows up.
         floats.forEachIndexed { i, sym ->
             assertTrue(plugin.setPortValue(sym.symbol, PortValue.FloatValue((i + 1) * 0.01f)),
