@@ -4,12 +4,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
-import org.balch.orpheus.core.plugin.PortValue
 import java.io.File
 
 /**
@@ -22,17 +17,7 @@ class JvmSynthPresetRepository : SynthPresetRepository {
     private val log = logging("JvmSynthPresetRepository")
 
 
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        serializersModule = SerializersModule {
-            polymorphic(PortValue::class) {
-                subclass(PortValue.FloatValue::class)
-                subclass(PortValue.IntValue::class)
-                subclass(PortValue.BoolValue::class)
-            }
-        }
-    }
+    private val json = PresetJson
 
     private val presetsDir: File by lazy {
         val userHome = System.getProperty("user.home")
