@@ -48,6 +48,9 @@ static_assert(sizeof(OrpheusEngine::pulsar_lick_wah_data) /
 
 static constexpr float kTidesNorm = 0.125f;
 
+// Vibrato depth fades in over this long after each note-on.
+static constexpr float kVibratoOnsetSeconds = 0.3f;
+
 // Lowest note the pattern generator may write for a track's engine. OSC
 // (engine_index < 0) cannot index kEngineModRanges, and without its floor here
 // the generator writes below note_min and the render-time clamp folds the note
@@ -1707,6 +1710,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.voice_active = false;
         // The old vibe's grains are in its key and bank; the next Mist block drops them.
         ts.mist_prev_active = false;
+        ts.vibrato_phase = 0.0f;
+        ts.vibrato_onset = 0.0f;
+        ts.pitch_rise_progress = 0.0f;
+        ts.harmonics_rise_progress = 0.0f;
         ts.swing_offset = 0.0;
         ts.repick_live = false;
         ts.beat_origin = ts.head_origin = 0.0;
@@ -3380,6 +3387,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.grain_random_timing = PULSAR_PICK(grain_random_timing) != 0;
             ts.grain_shape         = PULSAR_PICK(grain_shape);
             ts.grain_blend         = PULSAR_PICK(grain_blend);
+            ts.vibrato_depth       = PULSAR_PICK(vibrato_depth);
+            ts.vibrato_rate        = PULSAR_PICK(vibrato_rate);
+            ts.pitch_rise          = PULSAR_PICK(pitch_rise);
+            ts.pitch_rise_time     = PULSAR_PICK(pitch_rise_time);
+            ts.harmonics_rise      = PULSAR_PICK(harmonics_rise);
+            ts.harmonics_rise_time = PULSAR_PICK(harmonics_rise_time);
         }
 
         // ── Apply macro modulation ──
@@ -5455,6 +5468,42 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (mr.note_min > 0 && note_for_render < mr.note_min) {
                 while (note_for_render < mr.note_min) note_for_render += 12.0f;
             }
+        }
+
+        // ── Vibrato ──
+        // Opt-in sine wobble on the pitch handed to every engine. Block rate, like glide
+        // and the note itself. Depth 0 skips all of it, state included.
+        if (ts.vibrato_depth > 0.0f) {
+            if (ts.pending_retrig) {            // note-on: the singer starts straight
+                ts.vibrato_phase = 0.0f;
+                ts.vibrato_onset = 0.0f;
+            }
+            ts.vibrato_phase += ts.vibrato_rate * static_cast<float>(num_frames) / sample_rate;
+            ts.vibrato_phase -= std::floor(ts.vibrato_phase);
+            note_for_render += ts.vibrato_depth * 0.01f
+                * std::sin(6.2831853f * ts.vibrato_phase) * ts.vibrato_onset;
+            ts.vibrato_onset = std::min(1.0f, ts.vibrato_onset
+                + static_cast<float>(num_frames) / (kVibratoOnsetSeconds * sample_rate));
+        }
+
+        // ── Pitch rise ──
+        // Opt-in siren climb: each note-on restarts a 0..1 ramp that lifts the pitch handed
+        // to every engine, then holds at the top. Block rate. Rise 0 skips it, state included.
+        if (ts.pitch_rise > 0.0f) {
+            if (ts.pending_retrig) ts.pitch_rise_progress = 0.0f;
+            note_for_render += ts.pitch_rise * 0.01f * ts.pitch_rise_progress;
+            ts.pitch_rise_progress = std::min(1.0f, ts.pitch_rise_progress
+                + static_cast<float>(num_frames) / (sample_rate * ts.pitch_rise_time));
+        }
+
+        // ── Harmonics rise ──
+        // Opt-in vowel swell: each note-on restarts a 0..1 ramp that adds to harmonics after
+        // every other modulation and floor, then holds. Block rate. Rise 0 skips it, state included.
+        if (ts.harmonics_rise != 0.0f) {
+            if (ts.pending_retrig) ts.harmonics_rise_progress = 0.0f;
+            mod_harmonics += ts.harmonics_rise * ts.harmonics_rise_progress;
+            ts.harmonics_rise_progress = std::min(1.0f, ts.harmonics_rise_progress
+                + static_cast<float>(num_frames) / (sample_rate * ts.harmonics_rise_time));
         }
 
         // ── Render voice ──

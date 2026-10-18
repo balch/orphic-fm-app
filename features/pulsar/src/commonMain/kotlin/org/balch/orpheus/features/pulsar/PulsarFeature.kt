@@ -800,6 +800,12 @@ class PulsarViewModel(
     private val trackGrainShapeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE.ordinal + it].controlId) }
     private val trackGrainBlendIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND.ordinal + it].controlId) }
     private val trackGrainVoicingIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING.ordinal + it].controlId) }
+    private val trackVibratoDepthIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_DEPTH.ordinal + it].controlId) }
+    private val trackVibratoRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_RATE.ordinal + it].controlId) }
+    private val trackPitchRiseIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE.ordinal + it].controlId) }
+    private val trackPitchRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_TIME.ordinal + it].controlId) }
+    private val trackHarmonicsRiseIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE.ordinal + it].controlId) }
+    private val trackHarmonicsRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME.ordinal + it].controlId) }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val openingNoteFloorId = synthController.controlFlow(PulsarSymbol.OPENING_NOTE_FLOOR.controlId)
     private val trackMacroIds = (0..7).map { t ->
@@ -986,6 +992,12 @@ class PulsarViewModel(
     private val trackGrainShapeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_SHAPE_SPACE.ordinal + it].controlId) }
     private val trackGrainBlendSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_BLEND_SPACE.ordinal + it].controlId) }
     private val trackGrainVoicingSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING_SPACE.ordinal + it].controlId) }
+    private val trackVibratoDepthSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_DEPTH_SPACE.ordinal + it].controlId) }
+    private val trackVibratoRateSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_RATE_SPACE.ordinal + it].controlId) }
+    private val trackPitchRiseSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_SPACE.ordinal + it].controlId) }
+    private val trackPitchRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_TIME_SPACE.ordinal + it].controlId) }
+    private val trackHarmonicsRiseSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_SPACE.ordinal + it].controlId) }
+    private val trackHarmonicsRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME_SPACE.ordinal + it].controlId) }
 
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
@@ -1649,6 +1661,18 @@ class PulsarViewModel(
             trackGrainBlendSpaceIds[i].value = FloatValue(spa.grainBlend)
             trackGrainVoicingIds[i].value = IntValue(edm.grainVoicing.id)
             trackGrainVoicingSpaceIds[i].value = IntValue(spa.grainVoicing.id)
+            trackVibratoDepthIds[i].value = FloatValue(edm.vibratoDepth)
+            trackVibratoDepthSpaceIds[i].value = FloatValue(spa.vibratoDepth)
+            trackVibratoRateIds[i].value = FloatValue(edm.vibratoRate)
+            trackVibratoRateSpaceIds[i].value = FloatValue(spa.vibratoRate)
+            trackPitchRiseIds[i].value = FloatValue(edm.pitchRise)
+            trackPitchRiseSpaceIds[i].value = FloatValue(spa.pitchRise)
+            trackPitchRiseTimeIds[i].value = FloatValue(edm.pitchRiseTime)
+            trackPitchRiseTimeSpaceIds[i].value = FloatValue(spa.pitchRiseTime)
+            trackHarmonicsRiseIds[i].value = FloatValue(edm.harmonicsRise)
+            trackHarmonicsRiseSpaceIds[i].value = FloatValue(spa.harmonicsRise)
+            trackHarmonicsRiseTimeIds[i].value = FloatValue(edm.harmonicsRiseTime)
+            trackHarmonicsRiseTimeSpaceIds[i].value = FloatValue(spa.harmonicsRiseTime)
             // Effective pin: vibe-author opt-in OR engine-enforced (DX-family
             // harmonics is a quantized 32-step patch selector — never let the
             // macro range slide between patches).

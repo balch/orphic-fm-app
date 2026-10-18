@@ -307,6 +307,66 @@ enum class PulsarSymbol(
     TRACK_6_GRAIN_VOICING("track_6_grain_voicing"),
     TRACK_7_GRAIN_VOICING("track_7_grain_voicing"),
 
+    // Per-track pitch vibrato: peak depth in cents, 0 is off (8 entries, EDM slot)
+    TRACK_0_VIBRATO_DEPTH("track_0_vibrato_depth"),
+    TRACK_1_VIBRATO_DEPTH("track_1_vibrato_depth"),
+    TRACK_2_VIBRATO_DEPTH("track_2_vibrato_depth"),
+    TRACK_3_VIBRATO_DEPTH("track_3_vibrato_depth"),
+    TRACK_4_VIBRATO_DEPTH("track_4_vibrato_depth"),
+    TRACK_5_VIBRATO_DEPTH("track_5_vibrato_depth"),
+    TRACK_6_VIBRATO_DEPTH("track_6_vibrato_depth"),
+    TRACK_7_VIBRATO_DEPTH("track_7_vibrato_depth"),
+
+    // Per-track pitch vibrato: rate in Hz (8 entries, EDM slot)
+    TRACK_0_VIBRATO_RATE("track_0_vibrato_rate"),
+    TRACK_1_VIBRATO_RATE("track_1_vibrato_rate"),
+    TRACK_2_VIBRATO_RATE("track_2_vibrato_rate"),
+    TRACK_3_VIBRATO_RATE("track_3_vibrato_rate"),
+    TRACK_4_VIBRATO_RATE("track_4_vibrato_rate"),
+    TRACK_5_VIBRATO_RATE("track_5_vibrato_rate"),
+    TRACK_6_VIBRATO_RATE("track_6_vibrato_rate"),
+    TRACK_7_VIBRATO_RATE("track_7_vibrato_rate"),
+
+    // Per-track pitch rise: cents the note climbs, 0 is off (8 entries, EDM slot)
+    TRACK_0_PITCH_RISE("track_0_pitch_rise"),
+    TRACK_1_PITCH_RISE("track_1_pitch_rise"),
+    TRACK_2_PITCH_RISE("track_2_pitch_rise"),
+    TRACK_3_PITCH_RISE("track_3_pitch_rise"),
+    TRACK_4_PITCH_RISE("track_4_pitch_rise"),
+    TRACK_5_PITCH_RISE("track_5_pitch_rise"),
+    TRACK_6_PITCH_RISE("track_6_pitch_rise"),
+    TRACK_7_PITCH_RISE("track_7_pitch_rise"),
+
+    // Per-track pitch rise: seconds to reach the full rise (8 entries, EDM slot)
+    TRACK_0_PITCH_RISE_TIME("track_0_pitch_rise_time"),
+    TRACK_1_PITCH_RISE_TIME("track_1_pitch_rise_time"),
+    TRACK_2_PITCH_RISE_TIME("track_2_pitch_rise_time"),
+    TRACK_3_PITCH_RISE_TIME("track_3_pitch_rise_time"),
+    TRACK_4_PITCH_RISE_TIME("track_4_pitch_rise_time"),
+    TRACK_5_PITCH_RISE_TIME("track_5_pitch_rise_time"),
+    TRACK_6_PITCH_RISE_TIME("track_6_pitch_rise_time"),
+    TRACK_7_PITCH_RISE_TIME("track_7_pitch_rise_time"),
+
+    // Per-track harmonics rise: amount added to harmonics over the note, 0 is off (8 entries, EDM slot)
+    TRACK_0_HARMONICS_RISE("track_0_harmonics_rise"),
+    TRACK_1_HARMONICS_RISE("track_1_harmonics_rise"),
+    TRACK_2_HARMONICS_RISE("track_2_harmonics_rise"),
+    TRACK_3_HARMONICS_RISE("track_3_harmonics_rise"),
+    TRACK_4_HARMONICS_RISE("track_4_harmonics_rise"),
+    TRACK_5_HARMONICS_RISE("track_5_harmonics_rise"),
+    TRACK_6_HARMONICS_RISE("track_6_harmonics_rise"),
+    TRACK_7_HARMONICS_RISE("track_7_harmonics_rise"),
+
+    // Per-track harmonics rise: seconds to reach the full rise (8 entries, EDM slot)
+    TRACK_0_HARMONICS_RISE_TIME("track_0_harmonics_rise_time"),
+    TRACK_1_HARMONICS_RISE_TIME("track_1_harmonics_rise_time"),
+    TRACK_2_HARMONICS_RISE_TIME("track_2_harmonics_rise_time"),
+    TRACK_3_HARMONICS_RISE_TIME("track_3_harmonics_rise_time"),
+    TRACK_4_HARMONICS_RISE_TIME("track_4_harmonics_rise_time"),
+    TRACK_5_HARMONICS_RISE_TIME("track_5_harmonics_rise_time"),
+    TRACK_6_HARMONICS_RISE_TIME("track_6_harmonics_rise_time"),
+    TRACK_7_HARMONICS_RISE_TIME("track_7_harmonics_rise_time"),
+
     // Vibe step count
     STEP_COUNT("step_count"),
 
@@ -1551,6 +1611,66 @@ enum class PulsarSymbol(
     TRACK_5_GRAIN_VOICING_SPACE("track_5_grain_voicing_space"),
     TRACK_6_GRAIN_VOICING_SPACE("track_6_grain_voicing_space"),
     TRACK_7_GRAIN_VOICING_SPACE("track_7_grain_voicing_space"),
+
+    // Per-track pitch vibrato: peak depth in cents, 0 is off (8 entries, SPACE slot)
+    TRACK_0_VIBRATO_DEPTH_SPACE("track_0_vibrato_depth_space"),
+    TRACK_1_VIBRATO_DEPTH_SPACE("track_1_vibrato_depth_space"),
+    TRACK_2_VIBRATO_DEPTH_SPACE("track_2_vibrato_depth_space"),
+    TRACK_3_VIBRATO_DEPTH_SPACE("track_3_vibrato_depth_space"),
+    TRACK_4_VIBRATO_DEPTH_SPACE("track_4_vibrato_depth_space"),
+    TRACK_5_VIBRATO_DEPTH_SPACE("track_5_vibrato_depth_space"),
+    TRACK_6_VIBRATO_DEPTH_SPACE("track_6_vibrato_depth_space"),
+    TRACK_7_VIBRATO_DEPTH_SPACE("track_7_vibrato_depth_space"),
+
+    // Per-track pitch vibrato: rate in Hz (8 entries, SPACE slot)
+    TRACK_0_VIBRATO_RATE_SPACE("track_0_vibrato_rate_space"),
+    TRACK_1_VIBRATO_RATE_SPACE("track_1_vibrato_rate_space"),
+    TRACK_2_VIBRATO_RATE_SPACE("track_2_vibrato_rate_space"),
+    TRACK_3_VIBRATO_RATE_SPACE("track_3_vibrato_rate_space"),
+    TRACK_4_VIBRATO_RATE_SPACE("track_4_vibrato_rate_space"),
+    TRACK_5_VIBRATO_RATE_SPACE("track_5_vibrato_rate_space"),
+    TRACK_6_VIBRATO_RATE_SPACE("track_6_vibrato_rate_space"),
+    TRACK_7_VIBRATO_RATE_SPACE("track_7_vibrato_rate_space"),
+
+    // Per-track pitch rise: cents the note climbs, 0 is off (8 entries, SPACE slot)
+    TRACK_0_PITCH_RISE_SPACE("track_0_pitch_rise_space"),
+    TRACK_1_PITCH_RISE_SPACE("track_1_pitch_rise_space"),
+    TRACK_2_PITCH_RISE_SPACE("track_2_pitch_rise_space"),
+    TRACK_3_PITCH_RISE_SPACE("track_3_pitch_rise_space"),
+    TRACK_4_PITCH_RISE_SPACE("track_4_pitch_rise_space"),
+    TRACK_5_PITCH_RISE_SPACE("track_5_pitch_rise_space"),
+    TRACK_6_PITCH_RISE_SPACE("track_6_pitch_rise_space"),
+    TRACK_7_PITCH_RISE_SPACE("track_7_pitch_rise_space"),
+
+    // Per-track pitch rise: seconds to reach the full rise (8 entries, SPACE slot)
+    TRACK_0_PITCH_RISE_TIME_SPACE("track_0_pitch_rise_time_space"),
+    TRACK_1_PITCH_RISE_TIME_SPACE("track_1_pitch_rise_time_space"),
+    TRACK_2_PITCH_RISE_TIME_SPACE("track_2_pitch_rise_time_space"),
+    TRACK_3_PITCH_RISE_TIME_SPACE("track_3_pitch_rise_time_space"),
+    TRACK_4_PITCH_RISE_TIME_SPACE("track_4_pitch_rise_time_space"),
+    TRACK_5_PITCH_RISE_TIME_SPACE("track_5_pitch_rise_time_space"),
+    TRACK_6_PITCH_RISE_TIME_SPACE("track_6_pitch_rise_time_space"),
+    TRACK_7_PITCH_RISE_TIME_SPACE("track_7_pitch_rise_time_space"),
+
+    // Per-track harmonics rise: amount added to harmonics over the note, 0 is off (8 entries, SPACE slot)
+    TRACK_0_HARMONICS_RISE_SPACE("track_0_harmonics_rise_space"),
+    TRACK_1_HARMONICS_RISE_SPACE("track_1_harmonics_rise_space"),
+    TRACK_2_HARMONICS_RISE_SPACE("track_2_harmonics_rise_space"),
+    TRACK_3_HARMONICS_RISE_SPACE("track_3_harmonics_rise_space"),
+    TRACK_4_HARMONICS_RISE_SPACE("track_4_harmonics_rise_space"),
+    TRACK_5_HARMONICS_RISE_SPACE("track_5_harmonics_rise_space"),
+    TRACK_6_HARMONICS_RISE_SPACE("track_6_harmonics_rise_space"),
+    TRACK_7_HARMONICS_RISE_SPACE("track_7_harmonics_rise_space"),
+
+    // Per-track harmonics rise: seconds to reach the full rise (8 entries, SPACE slot)
+    TRACK_0_HARMONICS_RISE_TIME_SPACE("track_0_harmonics_rise_time_space"),
+    TRACK_1_HARMONICS_RISE_TIME_SPACE("track_1_harmonics_rise_time_space"),
+    TRACK_2_HARMONICS_RISE_TIME_SPACE("track_2_harmonics_rise_time_space"),
+    TRACK_3_HARMONICS_RISE_TIME_SPACE("track_3_harmonics_rise_time_space"),
+    TRACK_4_HARMONICS_RISE_TIME_SPACE("track_4_harmonics_rise_time_space"),
+    TRACK_5_HARMONICS_RISE_TIME_SPACE("track_5_harmonics_rise_time_space"),
+    TRACK_6_HARMONICS_RISE_TIME_SPACE("track_6_harmonics_rise_time_space"),
+    TRACK_7_HARMONICS_RISE_TIME_SPACE("track_7_harmonics_rise_time_space"),
 
     // Pulsar dedicated effect parameters (pushed on vibe change)
     PULSAR_DELAY_TIME_A("pulsar_delay_time_a"),

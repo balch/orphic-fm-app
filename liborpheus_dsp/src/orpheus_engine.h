@@ -864,6 +864,24 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_grain_blend_space[8]{};
     std::atomic<int>   pulsar_track_grain_voicing[8]{};
     std::atomic<int>   pulsar_track_grain_voicing_space[8]{};
+    // Per-track pitch vibrato: peak depth in cents (0 = off) and rate in Hz. The rate is
+    // seeded to 5.5 in orpheus_engine_create; depth stays 0 so no vibe changes by default.
+    std::atomic<float> pulsar_track_vibrato_depth[8]{};
+    std::atomic<float> pulsar_track_vibrato_depth_space[8]{};
+    std::atomic<float> pulsar_track_vibrato_rate[8]{};
+    std::atomic<float> pulsar_track_vibrato_rate_space[8]{};
+    // Per-track pitch rise: cents the note climbs after each note-on (0 = off) and the
+    // seconds to get there. The time is seeded to 2.0 in orpheus_engine_create.
+    std::atomic<float> pulsar_track_pitch_rise[8]{};
+    std::atomic<float> pulsar_track_pitch_rise_space[8]{};
+    std::atomic<float> pulsar_track_pitch_rise_time[8]{};
+    std::atomic<float> pulsar_track_pitch_rise_time_space[8]{};
+    // Per-track harmonics rise: amount added to harmonics over the note (-1..1, 0 = off)
+    // and the seconds to get there. The time is seeded to 2.0 in orpheus_engine_create.
+    std::atomic<float> pulsar_track_harmonics_rise[8]{};
+    std::atomic<float> pulsar_track_harmonics_rise_space[8]{};
+    std::atomic<float> pulsar_track_harmonics_rise_time[8]{};
+    std::atomic<float> pulsar_track_harmonics_rise_time_space[8]{};
     // Per-track pin flags (one per param per slot). 0 = not pinned (default,
     // current macroMap-driven behavior); non-zero = use ts.harmonics/timbre/morph
     // verbatim, bypassing macros/evolution/accent/LFO. See orpheus_unit_pulsar.cpp.

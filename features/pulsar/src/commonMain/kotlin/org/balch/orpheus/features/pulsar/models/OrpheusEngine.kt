@@ -131,6 +131,18 @@ data class OrpheusEngine(
     val grainShape: Float = 0.5f,
     /** 0 is a steady wavetable oscillator, 1 is all grains. */
     val grainBlend: Float = 1f,
+    /** Peak pitch wobble in cents while a note holds. 0 is off. */
+    val vibratoDepth: Float = 0f,
+    /** Vibrato speed in Hz. Fades in over 0.3 s after each note-on. */
+    val vibratoRate: Float = 5.5f,
+    /** Cents each note climbs after its note-on, siren style, then holds. 0 is off. */
+    val pitchRise: Float = 0f,
+    /** Seconds the climb takes to reach the full [pitchRise]. */
+    val pitchRiseTime: Float = 2f,
+    /** Amount added to harmonics over each note, -1..1, then held. 0 is off. */
+    val harmonicsRise: Float = 0f,
+    /** Seconds the swell takes to reach the full [harmonicsRise]. */
+    val harmonicsRiseTime: Float = 2f,
 ) {
     init {
         require(fmRatio in 0f..16f) { "fmRatio must be 0..16, was $fmRatio" }
@@ -140,5 +152,11 @@ data class OrpheusEngine(
         require(grainRate in 0f..1f) { "grainRate must be 0..1, was $grainRate" }
         require(grainShape in 0f..1f) { "grainShape must be 0..1, was $grainShape" }
         require(grainBlend in 0f..1f) { "grainBlend must be 0..1, was $grainBlend" }
+        require(vibratoDepth in 0f..100f) { "vibratoDepth must be 0..100 cents, was $vibratoDepth" }
+        require(vibratoRate in 0.5f..12f) { "vibratoRate must be 0.5..12 Hz, was $vibratoRate" }
+        require(pitchRise in 0f..1200f) { "pitchRise must be 0..1200 cents, was $pitchRise" }
+        require(pitchRiseTime in 0.1f..8f) { "pitchRiseTime must be 0.1..8 s, was $pitchRiseTime" }
+        require(harmonicsRise in -1f..1f) { "harmonicsRise must be -1..1, was $harmonicsRise" }
+        require(harmonicsRiseTime in 0.1f..8f) { "harmonicsRiseTime must be 0.1..8 s, was $harmonicsRiseTime" }
     }
 }

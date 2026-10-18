@@ -83,4 +83,55 @@ class OrpheusEngineGrainTest {
             OrpheusEngine(engineId = OrpheusEngineId.MST, grainBlend = -1f)
         }
     }
+
+    @Test
+    fun `vibrato defaults to off at 5_5 Hz`() {
+        val e = OrpheusEngine(engineId = OrpheusEngineId.MST)
+        assertEquals(0f, e.vibratoDepth)
+        assertEquals(5.5f, e.vibratoRate)
+    }
+
+    @Test
+    fun `out of range vibrato values are rejected at construction`() {
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, vibratoDepth = -1f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, vibratoDepth = 100.5f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, vibratoRate = 0.4f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, vibratoRate = 12.5f) }
+        OrpheusEngine(engineId = OrpheusEngineId.VA, vibratoDepth = 100f, vibratoRate = 12f)
+        OrpheusEngine(engineId = OrpheusEngineId.VA, vibratoDepth = 0f, vibratoRate = 0.5f)
+    }
+
+    @Test
+    fun `pitch rise defaults to off with a 2 second time`() {
+        val e = OrpheusEngine(engineId = OrpheusEngineId.MST)
+        assertEquals(0f, e.pitchRise)
+        assertEquals(2f, e.pitchRiseTime)
+    }
+
+    @Test
+    fun `out of range pitch rise values are rejected at construction`() {
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, pitchRise = -1f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, pitchRise = 1200.5f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, pitchRiseTime = 0.05f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, pitchRiseTime = 8.5f) }
+        OrpheusEngine(engineId = OrpheusEngineId.VA, pitchRise = 1200f, pitchRiseTime = 8f)
+        OrpheusEngine(engineId = OrpheusEngineId.VA, pitchRise = 0f, pitchRiseTime = 0.1f)
+    }
+
+    @Test
+    fun `harmonics rise defaults to off with a 2 second time`() {
+        val e = OrpheusEngine(engineId = OrpheusEngineId.MST)
+        assertEquals(0f, e.harmonicsRise)
+        assertEquals(2f, e.harmonicsRiseTime)
+    }
+
+    @Test
+    fun `out of range harmonics rise values are rejected at construction`() {
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, harmonicsRise = -1.1f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, harmonicsRise = 1.1f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, harmonicsRiseTime = 0.05f) }
+        assertFailsWith<IllegalArgumentException> { OrpheusEngine(engineId = OrpheusEngineId.VA, harmonicsRiseTime = 8.5f) }
+        OrpheusEngine(engineId = OrpheusEngineId.VA, harmonicsRise = 1f, harmonicsRiseTime = 8f)
+        OrpheusEngine(engineId = OrpheusEngineId.VA, harmonicsRise = -1f, harmonicsRiseTime = 0.1f)
+    }
 }

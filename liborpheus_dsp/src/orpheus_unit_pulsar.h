@@ -299,6 +299,22 @@ struct PulsarTrackState {
     bool  grain_random_timing = false;
     float grain_shape = 0.5f;
     float grain_blend = 1.0f;
+    // Vibrato: depth (cents) and rate (Hz) resolved per block from the active slot, plus
+    // the LFO phase (cycles) and the 0..1 onset ramp that restarts on every note-on.
+    float vibrato_depth = 0.0f;
+    float vibrato_rate = 5.5f;
+    float vibrato_phase = 0.0f;
+    float vibrato_onset = 0.0f;
+    // Pitch rise: cents and seconds resolved per block from the active slot, plus the
+    // 0..1 progress that restarts on every note-on.
+    float pitch_rise = 0.0f;
+    float pitch_rise_time = 2.0f;
+    float pitch_rise_progress = 0.0f;
+    // Harmonics rise: amount and seconds resolved per block from the active slot, plus the
+    // 0..1 progress that restarts on every note-on.
+    float harmonics_rise = 0.0f;
+    float harmonics_rise_time = 2.0f;
+    float harmonics_rise_progress = 0.0f;
     // Whether this track rendered Mist last block; a false-to-true edge clears grains.
     bool  mist_prev_active = false;
     PulsarStep steps[kMaxPulsarSteps];

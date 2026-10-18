@@ -43,6 +43,17 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->pulsar_track_grain_blend_space[t].store(1.0f, std::memory_order_relaxed);
     }
 
+    // Vibrato rate mirrors OrpheusEngine.kt; depth stays 0 (off).
+    for (int t = 0; t < 8; t++) {
+        engine->pulsar_track_vibrato_rate[t].store(5.5f, std::memory_order_relaxed);
+        engine->pulsar_track_vibrato_rate_space[t].store(5.5f, std::memory_order_relaxed);
+        // Pitch rise time mirrors OrpheusEngine.kt; the rise itself stays 0 (off).
+        engine->pulsar_track_pitch_rise_time[t].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_track_pitch_rise_time_space[t].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_track_harmonics_rise_time[t].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_track_harmonics_rise_time_space[t].store(2.0f, std::memory_order_relaxed);
+    }
+
     // Initialize all Plaits voices (OrpheusVoice: direct engine render)
     for (int i = 0; i < kNumVoices; i++) {
         stmlib::BufferAllocator allocator(

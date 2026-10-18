@@ -372,6 +372,9 @@ if(BUILD_TESTS)
         test/test_mist.cpp
         test/test_mist_samples.cpp
         test/test_pulsar_mist.cpp
+        test/test_pulsar_vibrato.cpp
+        test/test_pulsar_pitch_rise.cpp
+        test/test_pulsar_harmonics_rise.cpp
         test/test_pulsar_lick_growth.cpp
         test/test_pulsar_complexity_calm.cpp
         test/test_pulsar_speech.cpp

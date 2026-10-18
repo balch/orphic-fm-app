@@ -129,6 +129,9 @@ static TestSuite suites[] = {
     {"mist",            run_mist_tests,            true},
     {"mist_samples",    run_mist_samples,          false},  // manual: writes WAV files
     {"pulsar_mist",     run_pulsar_mist_tests,     true},
+    {"pulsar_vibrato",  run_pulsar_vibrato_tests,  true},
+    {"pulsar_pitch_rise", run_pulsar_pitch_rise_tests, true},
+    {"pulsar_harmonics_rise", run_pulsar_harmonics_rise_tests, true},
     {"pulsar_lick_growth", run_pulsar_lick_growth_tests, true},
     {"pulsar_complexity_calm", run_pulsar_complexity_calm_tests, true},
     {"pulsar_speech",   run_pulsar_speech_tests,   true},

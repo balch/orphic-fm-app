@@ -147,6 +147,93 @@ class PulsarGrainPushTest {
         assertEquals(1f, float("track_0_grain_blend"))
         assertEquals(1f, float("track_0_grain_blend_space"))
     }
+
+    @Test
+    fun `vibrato fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(engineId = OrpheusEngineId.MST, vibratoDepth = 35f, vibratoRate = 6.5f)
+        val space = OrpheusEngine(engineId = OrpheusEngineId.MST, vibratoDepth = 12f, vibratoRate = 3f)
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(35f, float("track_4_vibrato_depth"))
+        assertEquals(12f, float("track_4_vibrato_depth_space"))
+        assertEquals(6.5f, float("track_4_vibrato_rate"))
+        assertEquals(3f, float("track_4_vibrato_rate_space"))
+    }
+
+    @Test
+    fun `a track with no vibrato pushes depth 0 at the default rate`() = runTest(testDispatcher) {
+        val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
+        val vibe = grainTestVibe(va, va)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0f, float("track_0_vibrato_depth"))
+        assertEquals(0f, float("track_0_vibrato_depth_space"))
+        assertEquals(5.5f, float("track_0_vibrato_rate"))
+        assertEquals(5.5f, float("track_0_vibrato_rate_space"))
+    }
+
+    @Test
+    fun `pitch rise fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(engineId = OrpheusEngineId.MST, pitchRise = 350f, pitchRiseTime = 6.5f)
+        val space = OrpheusEngine(engineId = OrpheusEngineId.MST, pitchRise = 120f, pitchRiseTime = 3f)
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(350f, float("track_4_pitch_rise"))
+        assertEquals(120f, float("track_4_pitch_rise_space"))
+        assertEquals(6.5f, float("track_4_pitch_rise_time"))
+        assertEquals(3f, float("track_4_pitch_rise_time_space"))
+    }
+
+    @Test
+    fun `a track with no pitch rise pushes 0 at the default time`() = runTest(testDispatcher) {
+        val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
+        val vibe = grainTestVibe(va, va)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0f, float("track_0_pitch_rise"))
+        assertEquals(0f, float("track_0_pitch_rise_space"))
+        assertEquals(2f, float("track_0_pitch_rise_time"))
+        assertEquals(2f, float("track_0_pitch_rise_time_space"))
+    }
+
+    @Test
+    fun `harmonics rise fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(engineId = OrpheusEngineId.MST, harmonicsRise = 0.4f, harmonicsRiseTime = 6.5f)
+        val space = OrpheusEngine(engineId = OrpheusEngineId.MST, harmonicsRise = -0.3f, harmonicsRiseTime = 3f)
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0.4f, float("track_4_harmonics_rise"))
+        assertEquals(-0.3f, float("track_4_harmonics_rise_space"))
+        assertEquals(6.5f, float("track_4_harmonics_rise_time"))
+        assertEquals(3f, float("track_4_harmonics_rise_time_space"))
+    }
+
+    @Test
+    fun `a track with no harmonics rise pushes 0 at the default time`() = runTest(testDispatcher) {
+        val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
+        val vibe = grainTestVibe(va, va)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0f, float("track_0_harmonics_rise"))
+        assertEquals(0f, float("track_0_harmonics_rise_space"))
+        assertEquals(2f, float("track_0_harmonics_rise_time"))
+        assertEquals(2f, float("track_0_harmonics_rise_time_space"))
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────

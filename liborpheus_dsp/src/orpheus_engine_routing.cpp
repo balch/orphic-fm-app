@@ -823,6 +823,30 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_grain_voicing[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "grain_voicing_space") == 0)
                 engine->pulsar_track_grain_voicing_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "vibrato_depth") == 0)
+                engine->pulsar_track_vibrato_depth[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "vibrato_depth_space") == 0)
+                engine->pulsar_track_vibrato_depth_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "vibrato_rate") == 0)
+                engine->pulsar_track_vibrato_rate[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "vibrato_rate_space") == 0)
+                engine->pulsar_track_vibrato_rate_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "pitch_rise") == 0)
+                engine->pulsar_track_pitch_rise[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "pitch_rise_space") == 0)
+                engine->pulsar_track_pitch_rise_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "pitch_rise_time") == 0)
+                engine->pulsar_track_pitch_rise_time[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "pitch_rise_time_space") == 0)
+                engine->pulsar_track_pitch_rise_time_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_rise") == 0)
+                engine->pulsar_track_harmonics_rise[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_rise_space") == 0)
+                engine->pulsar_track_harmonics_rise_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_rise_time") == 0)
+                engine->pulsar_track_harmonics_rise_time[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "harmonics_rise_time_space") == 0)
+                engine->pulsar_track_harmonics_rise_time_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics") == 0)
                 engine->pulsar_track_pin_harmonics[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics_space") == 0)

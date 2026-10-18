@@ -102,6 +102,105 @@ class PulsarPluginLickPortsTest {
         }
     }
 
+    @Test
+    fun `plugin registers every track vibrato port once and each holds its value`() {
+        val plugin = PulsarPlugin()
+        val registered = plugin.ports.map { it.symbol }
+        var n = 0
+        for (family in listOf("VIBRATO_DEPTH", "VIBRATO_RATE")) {
+            for (suffix in listOf("", "_SPACE")) {
+                val symbols = PulsarSymbol.entries.filter {
+                    it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))
+                }
+                assertEquals(8, symbols.size, "expected 8 TRACK_n_$family$suffix symbols")
+                symbols.forEachIndexed { t, sym ->
+                    assertEquals("track_${t}_${family.lowercase()}${suffix.lowercase()}", sym.symbol)
+                    assertEquals(1, registered.count { it == sym.symbol }, "${sym.symbol} registered once")
+                    // Distinct values, so a stride that shadows a neighbour shows up.
+                    n++
+                    assertTrue(plugin.setPortValue(sym.symbol, PortValue.FloatValue(n * 0.5f)),
+                        "setPortValue(${sym.symbol}) rejected")
+                }
+            }
+        }
+        n = 0
+        for (family in listOf("VIBRATO_DEPTH", "VIBRATO_RATE")) {
+            for (suffix in listOf("", "_SPACE")) {
+                PulsarSymbol.entries.filter { it.name.matches(Regex("TRACK_[0-7]_$family$suffix")) }
+                    .forEach { sym ->
+                        n++
+                        assertEquals(n * 0.5f, plugin.getPortValue(sym.symbol)?.asFloat(), sym.symbol)
+                    }
+            }
+        }
+    }
+
+    @Test
+    fun `plugin registers every track pitch rise port once and each holds its value`() {
+        val plugin = PulsarPlugin()
+        val registered = plugin.ports.map { it.symbol }
+        var n = 0
+        for (family in listOf("PITCH_RISE", "PITCH_RISE_TIME")) {
+            for (suffix in listOf("", "_SPACE")) {
+                val symbols = PulsarSymbol.entries.filter {
+                    it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))
+                }
+                assertEquals(8, symbols.size, "expected 8 TRACK_n_$family$suffix symbols")
+                symbols.forEachIndexed { t, sym ->
+                    assertEquals("track_${t}_${family.lowercase()}${suffix.lowercase()}", sym.symbol)
+                    assertEquals(1, registered.count { it == sym.symbol }, "${sym.symbol} registered once")
+                    // Distinct values, so a stride that shadows a neighbour shows up.
+                    n++
+                    assertTrue(plugin.setPortValue(sym.symbol, PortValue.FloatValue(n * 0.5f)),
+                        "setPortValue(${sym.symbol}) rejected")
+                }
+            }
+        }
+        n = 0
+        for (family in listOf("PITCH_RISE", "PITCH_RISE_TIME")) {
+            for (suffix in listOf("", "_SPACE")) {
+                PulsarSymbol.entries.filter { it.name.matches(Regex("TRACK_[0-7]_$family$suffix")) }
+                    .forEach { sym ->
+                        n++
+                        assertEquals(n * 0.5f, plugin.getPortValue(sym.symbol)?.asFloat(), sym.symbol)
+                    }
+            }
+        }
+    }
+
+    @Test
+    fun `plugin registers every track harmonics rise port once and each holds its value`() {
+        val plugin = PulsarPlugin()
+        val registered = plugin.ports.map { it.symbol }
+        var n = 0
+        for (family in listOf("HARMONICS_RISE", "HARMONICS_RISE_TIME")) {
+            for (suffix in listOf("", "_SPACE")) {
+                val symbols = PulsarSymbol.entries.filter {
+                    it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))
+                }
+                assertEquals(8, symbols.size, "expected 8 TRACK_n_$family$suffix symbols")
+                symbols.forEachIndexed { t, sym ->
+                    assertEquals("track_${t}_${family.lowercase()}${suffix.lowercase()}", sym.symbol)
+                    assertEquals(1, registered.count { it == sym.symbol }, "${sym.symbol} registered once")
+                    // Distinct values, so a stride that shadows a neighbour shows up.
+                    n++
+                    assertTrue(plugin.setPortValue(sym.symbol, PortValue.FloatValue(n * 0.5f)),
+                        "setPortValue(${sym.symbol}) rejected")
+                }
+            }
+        }
+        n = 0
+        for (family in listOf("HARMONICS_RISE", "HARMONICS_RISE_TIME")) {
+            for (suffix in listOf("", "_SPACE")) {
+                PulsarSymbol.entries.filter { it.name.matches(Regex("TRACK_[0-7]_$family$suffix")) }
+                    .forEach { sym ->
+                        n++
+                        assertEquals(n * 0.5f, plugin.getPortValue(sym.symbol)?.asFloat(), sym.symbol)
+                    }
+            }
+        }
+    }
+
     private val grainFamilies = listOf(
         "GRAIN_MODE", "GRAIN_SCATTER_MODE", "GRAIN_SCATTER", "GRAIN_RATE",
         "GRAIN_RANDOM_TIMING", "GRAIN_SHAPE", "GRAIN_BLEND", "GRAIN_VOICING",

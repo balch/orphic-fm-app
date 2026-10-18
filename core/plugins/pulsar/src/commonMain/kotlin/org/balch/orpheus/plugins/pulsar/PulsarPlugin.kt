@@ -95,6 +95,18 @@ class PulsarPlugin : DspPlugin {
     private var _trackGrainBlendSpace = FloatArray(8) { 1f }
     private var _trackGrainVoicing = IntArray(8) { 0 }
     private var _trackGrainVoicingSpace = IntArray(8) { 0 }
+    private var _trackVibratoDepth = FloatArray(8) { 0f }
+    private var _trackVibratoDepthSpace = FloatArray(8) { 0f }
+    private var _trackVibratoRate = FloatArray(8) { 5.5f }
+    private var _trackVibratoRateSpace = FloatArray(8) { 5.5f }
+    private var _trackPitchRise = FloatArray(8) { 0f }
+    private var _trackPitchRiseSpace = FloatArray(8) { 0f }
+    private var _trackPitchRiseTime = FloatArray(8) { 2f }
+    private var _trackPitchRiseTimeSpace = FloatArray(8) { 2f }
+    private var _trackHarmonicsRise = FloatArray(8) { 0f }
+    private var _trackHarmonicsRiseSpace = FloatArray(8) { 0f }
+    private var _trackHarmonicsRiseTime = FloatArray(8) { 2f }
+    private var _trackHarmonicsRiseTimeSpace = FloatArray(8) { 2f }
     private var _trackHarmonicsModulation = FloatArray(8) { 0f }
     // Default source = 4 (MOOD) so an opt-in user only has to set the range.
     private var _trackHarmonicsMacroSource = IntArray(8) { 4 }
@@ -427,6 +439,78 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GRAIN_VOICING_SPACE.ordinal + t]) {
                 intType { default = 0; get { _trackGrainVoicingSpace[t] }; set { _trackGrainVoicingSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_DEPTH.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 100f
+                    get { _trackVibratoDepth[t] }; set { _trackVibratoDepth[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_DEPTH_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 100f
+                    get { _trackVibratoDepthSpace[t] }; set { _trackVibratoDepthSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_RATE.ordinal + t]) {
+                floatType { default = 5.5f; min = 0.5f; max = 12f
+                    get { _trackVibratoRate[t] }; set { _trackVibratoRate[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_VIBRATO_RATE_SPACE.ordinal + t]) {
+                floatType { default = 5.5f; min = 0.5f; max = 12f
+                    get { _trackVibratoRateSpace[t] }; set { _trackVibratoRateSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1200f
+                    get { _trackPitchRise[t] }; set { _trackPitchRise[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1200f
+                    get { _trackPitchRiseSpace[t] }; set { _trackPitchRiseSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_TIME.ordinal + t]) {
+                floatType { default = 2f; min = 0.1f; max = 8f
+                    get { _trackPitchRiseTime[t] }; set { _trackPitchRiseTime[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_TIME_SPACE.ordinal + t]) {
+                floatType { default = 2f; min = 0.1f; max = 8f
+                    get { _trackPitchRiseTimeSpace[t] }; set { _trackPitchRiseTimeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE.ordinal + t]) {
+                floatType { default = 0f; min = -1f; max = 1f
+                    get { _trackHarmonicsRise[t] }; set { _trackHarmonicsRise[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = -1f; max = 1f
+                    get { _trackHarmonicsRiseSpace[t] }; set { _trackHarmonicsRiseSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME.ordinal + t]) {
+                floatType { default = 2f; min = 0.1f; max = 8f
+                    get { _trackHarmonicsRiseTime[t] }; set { _trackHarmonicsRiseTime[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME_SPACE.ordinal + t]) {
+                floatType { default = 2f; min = 0.1f; max = 8f
+                    get { _trackHarmonicsRiseTimeSpace[t] }; set { _trackHarmonicsRiseTimeSpace[t] = it } }
             }
         }
         // Per-track pin flags (EDM slot). Space-slot equivalents flow through
