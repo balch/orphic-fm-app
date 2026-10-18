@@ -34,6 +34,7 @@ import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.panels.HeaderPanelActions
 import org.balch.orpheus.ui.panels.HeaderPanelUiState
+import org.balch.orpheus.ui.panels.shrinksToScroll
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import java.io.File
@@ -199,7 +200,30 @@ class SlotsRenderHarness {
             }
         }
 
+    /** The live-code shape after the fix: a toolbar above a scroller marked [shrinksToScroll]. */
+    private fun markedEditorPanel(id: PanelId, label: String, color: Color): FeaturePanel =
+        featurePanelPreview(panelId = id, label = label, color = color) { modifier, isExpanded, onExpandedChange, _ ->
+            CollapsibleColumnPanel(
+                modifier = modifier,
+                title = label,
+                expandedTitle = label,
+                color = color,
+                isExpanded = isExpanded,
+                onExpandedChange = onExpandedChange,
+            ) {
+                Text("TOOLBAR stays put", color = color, fontSize = 12.sp)
+                Box(Modifier.shrinksToScroll(96.dp).fillMaxSize().background(Color.Black)) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(4.dp)) {
+                        Text("TOP of the code", color = color, fontSize = 12.sp)
+                        repeat(40) { Text("d${it + 2} \$ gates:4 5 6 7", color = Color.White, fontSize = 12.sp) }
+                        Text("BOTTOM of the code", color = color, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
     private val panels: Map<PanelId, FeaturePanel> = listOf(
+        markedEditorPanel(PanelId.TIMER, "Marked", OrpheusColors.aiRepl),
         fakePanel(PanelId.PULSAR, "Pulsar", OrpheusColors.cosmicPurple),
         fakePanel(PanelId.DISTORTION, "Volume", OrpheusColors.warmGlow),
         fakePanel(PanelId.DELAY, "Delay", OrpheusColors.electricBlue),
@@ -366,6 +390,20 @@ class SlotsRenderHarness {
             capacity = 2,
         ),
         scrollAt = Offset(625f, 150f),
+        rethrowLayoutErrors = true,
+    )
+
+    /** A marked scroller fits the slot, so its toolbar stays while the inner list scrolls. */
+    @Test
+    fun markedScrollerKeepsToolbar() = render(
+        name = "marked-scroller-keeps-toolbar",
+        widthDp = 850,
+        heightDp = 250,
+        slots = PanelSlots(
+            open = listOf(OpenPanel(PanelId.CODE, 1), OpenPanel(PanelId.TIMER, 1)),
+            capacity = 2,
+        ),
+        scrollAt = Offset(625f, 170f),
         rethrowLayoutErrors = true,
     )
 

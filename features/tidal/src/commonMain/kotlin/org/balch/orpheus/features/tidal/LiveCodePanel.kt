@@ -70,6 +70,7 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.panels.shrinksToScroll
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.proportional
@@ -422,7 +423,8 @@ private fun CodeEditorSection(
 
     // Code editor with AI loading overlay
     Card(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.shrinksToScroll(96.dp)
+            .fillMaxSize()
             .padding(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape = RoundedCornerShape(8.dp),

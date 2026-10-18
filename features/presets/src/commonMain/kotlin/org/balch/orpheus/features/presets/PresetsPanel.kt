@@ -36,6 +36,7 @@ import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.panels.shrinksToScroll
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.dialogs.ConfirmDialog
@@ -195,6 +196,7 @@ private fun PresetList(
 ) {
     Row(
         modifier = Modifier
+            .shrinksToScroll(64.dp)
             .widthIn(min = 240.dp)
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(6.dp))
