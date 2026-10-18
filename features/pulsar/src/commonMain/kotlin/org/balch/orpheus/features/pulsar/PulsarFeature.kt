@@ -911,6 +911,9 @@ class PulsarViewModel(
     private val trackArpModeIds = (0..7).map {
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_MODE.ordinal + it].controlId)
     }
+    private val trackRestrikeOnChordChangeIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_RESTRIKE_ON_CHORD_CHANGE.ordinal + it].controlId)
+    }
     private val trackArpSpeedIds = (0..7).map {
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_SPEED.ordinal + it].controlId)
     }
@@ -1754,6 +1757,8 @@ class PulsarViewModel(
                 ))
             trackCompingStyleIds[i].value = IntValue(compingStyleToInt(tv.chordComping?.style))
             trackArpModeIds[i].value = IntValue(tv.chordComping?.arpMode?.ordinal ?: 0)
+            trackRestrikeOnChordChangeIds[i].value =
+                IntValue(if (tv.chordComping?.restrikeOnChordChange == true) 1 else 0)
             trackArpSpeedIds[i].value = FloatValue(tv.chordComping?.arpSpeed ?: 0.2f)
             trackArpDirectionIds[i].value = IntValue(tv.chordComping?.arpDirection?.ordinal ?: 0)
             trackInversionIds[i].value = IntValue(tv.chordComping?.sectionInversion?.ordinal ?: 0)

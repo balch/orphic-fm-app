@@ -1154,6 +1154,15 @@ enum class PulsarSymbol(
     TRACK_5_ARP_MODE("track_5_arp_mode"),
     TRACK_6_ARP_MODE("track_6_arp_mode"),
     TRACK_7_ARP_MODE("track_7_arp_mode"),
+    // Per-track opt-in (0/1): a CHORDAL PAD track re-strikes its held note on each new chord.
+    TRACK_0_RESTRIKE_ON_CHORD_CHANGE("track_0_restrike_on_chord_change"),
+    TRACK_1_RESTRIKE_ON_CHORD_CHANGE("track_1_restrike_on_chord_change"),
+    TRACK_2_RESTRIKE_ON_CHORD_CHANGE("track_2_restrike_on_chord_change"),
+    TRACK_3_RESTRIKE_ON_CHORD_CHANGE("track_3_restrike_on_chord_change"),
+    TRACK_4_RESTRIKE_ON_CHORD_CHANGE("track_4_restrike_on_chord_change"),
+    TRACK_5_RESTRIKE_ON_CHORD_CHANGE("track_5_restrike_on_chord_change"),
+    TRACK_6_RESTRIKE_ON_CHORD_CHANGE("track_6_restrike_on_chord_change"),
+    TRACK_7_RESTRIKE_ON_CHORD_CHANGE("track_7_restrike_on_chord_change"),
     // Per-track arp speed: float 0-1
     TRACK_0_ARP_SPEED("track_0_arp_speed"),
     TRACK_1_ARP_SPEED("track_1_arp_speed"),

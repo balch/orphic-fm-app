@@ -1805,6 +1805,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.prev_step_gated = false;
         ts.suppress_hold_tail = false;
         ts.last_chord_index = -1;
+        ts.restrike_degree_seen = -1;
         ts.mod_poly_lfo.Init();
         ts.mod_slope.Init();
         ts.drone_lfo.Init();
@@ -3414,6 +3415,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             engine->pulsar_track_envelope[t].load(std::memory_order_relaxed));
         ts.texture_line = ts.role == TrackRole::MELODIC
             && engine->pulsar_track_texture_line[t].load(std::memory_order_relaxed) != 0;
+        ts.restrike_on_chord = ts.role == TrackRole::CHORDAL
+            && engine->pulsar_track_restrike_on_chord_change[t].load(std::memory_order_relaxed) != 0;
 
         // ── Apply engine selection from atomics (immediate UI response) ──
         {
@@ -4819,6 +4822,21 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             const PulsarStep& step = effective_step(ts, t, ts.playhead, pinned_scratch);
             const bool pinned_hit = ts.section_hits != 0 && step.gate;
 
+            // Opt-in PAD restrike: the first step on a new chord degree is a fresh head (and
+            // clears a lost head's latch), so the held bed re-resolves to the new root. It
+            // skips the density roll (forced below). FIXED pitch never moves, so it holds.
+            bool chord_restrike = false;
+            if (step.gate && ts.restrike_on_chord && ts.comping_style == CompingStyleId::PAD
+                && ts.chord_follow != ChordFollowMode::FIXED) {
+                const int deg = state->chord_state.progression[state->chord_state.chord_index];
+                if (deg != ts.restrike_degree_seen) {
+                    ts.restrike_degree_seen = deg;
+                    chord_restrike = true;
+                    ts.in_hold = false;
+                    ts.suppress_hold_tail = false;
+                }
+            }
+
             if (step.gate) {
                 // Void Anomaly floor: mute new note-ons (sounding voices ring on).
                 if (state->void_state.suppress_note_ons) {
@@ -4950,7 +4968,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             || (t == 0 && ts.playhead == 0 && state->speech_kick_now)
                             || (t >= 5 && energy < 0.4f) || step.from_lick
                             // A section's pinned hit is authored, like a lick step.
-                            || pinned_hit;
+                            || pinned_hit || chord_restrike;
                         bool fires = prob_roll < fire_prob || forced_fire;
 
                         // TEXTURE/FX at low energy: always fire so hold chains work

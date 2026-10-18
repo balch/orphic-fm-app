@@ -322,6 +322,8 @@ struct PulsarTrackState {
     // Melodic lick line that keeps the texture-curve fade and escapes track 7's FX note
     // gate. Resolved per block from the track-level atomic.
     bool  texture_line = false;
+    // CHORDAL opt-in: a PAD hold re-strikes on each new chord. Resolved per block.
+    bool  restrike_on_chord = false;
     // Whether this track rendered Mist last block; a false-to-true edge clears grains.
     bool  mist_prev_active = false;
     // Whether grain FX ran last block; a false-to-true edge clears its recording.
@@ -397,6 +399,8 @@ struct PulsarTrackState {
     // the trigger path as fresh onsets. Cleared by the last step of the chain.
     bool suppress_hold_tail = false;
     int last_chord_index = -1;   // track chord-change edges for per-chord glide
+    // Chord degree the restrike check last saw; -1 after a load.
+    int restrike_degree_seen = -1;
     BarStrategy bar_strategy;
 
     // Solo/ducking state (applied per-frame)

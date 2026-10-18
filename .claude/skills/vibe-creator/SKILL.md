@@ -330,6 +330,7 @@ Use when a track should play chord voicings. See `CompLabVibe.kt` for a matrix o
 
 - `style`: `PAD`, `FUNK_STABS`, `ROCK_DOWNBEATS`, `SKA_UPSTROKES`, `BLUES_SHUFFLE`, `JAZZ_COMP`, `REGGAE_SKANK`, `GOSPEL_STABS`. Each has a preset 16-step velocity pattern.
 - `arpMode`: `AUTO` (CHD engine = native chord, others = arp), `ALWAYS` (always arp), `NEVER` (root only).
+- `restrikeOnChordChange` (default false): `PAD` strikes once and holds that first note across every chord change. Set true for a held bed (organ, strings) that follows the progression: it re-strikes on the first step of each new chord degree, seams included. Repeated degrees and `ChordFollow.FIXED` still hold.
 - `arpSpeed` (0-1): slow roll (0.1) vs near-simultaneous stab (0.95).
 - `arpDirection`: `UP`, `DOWN`, `UP_DOWN`, `RANDOM`.
 - `sectionInversion`: `ROOT_POSITION`, `FIRST_INVERSION`, `SECOND_INVERSION`, `OPEN_VOICING`, `FOLLOW_STYLE`.

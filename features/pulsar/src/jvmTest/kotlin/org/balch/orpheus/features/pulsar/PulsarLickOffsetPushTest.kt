@@ -23,6 +23,7 @@ import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -119,6 +120,21 @@ class PulsarLickOffsetPushTest {
         assertEquals(1, intPort("track_5_texture_line"), "opted-in track should push 1")
         assertEquals(0, intPort("track_4_texture_line"), "default melodic track should push 0")
         assertEquals(0, intPort("track_0_texture_line"), "percussive track should push 0")
+    }
+
+    @Test
+    fun `chordal restrikeOnChordChange reaches controller per track and defaults off`() = runTest(testDispatcher) {
+        val vibe = offsetTestVibe(
+            track4 = TrackRole.Chordal(),
+            track5 = TrackRole.Chordal(comping = ChordComping(restrikeOnChordChange = true)),
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(1, intPort("track_5_restrike_on_chord_change"), "opted-in track should push 1")
+        assertEquals(0, intPort("track_4_restrike_on_chord_change"), "default chordal track should push 0")
+        assertEquals(0, intPort("track_0_restrike_on_chord_change"), "percussive track should push 0")
     }
 }
 

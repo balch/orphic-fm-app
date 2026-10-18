@@ -183,6 +183,7 @@ class PulsarPlugin : DspPlugin {
     private val _trackEvoVoicingTension = FloatArray(8) { 1.0f }
     private val _trackCompingStyle = IntArray(8) { 0 }  // 0 = PAD
     private val _trackArpMode = IntArray(8) { 0 }           // AUTO
+    private val _trackRestrikeOnChordChange = IntArray(8) { 0 }
     private val _trackArpSpeed = FloatArray(8) { 0.2f }
     private val _trackArpDirection = IntArray(8) { 0 }      // UP
     private val _trackInversion = IntArray(8) { 0 }         // FOLLOW_STYLE
@@ -866,6 +867,11 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_MODE.ordinal + t]) {
                 intType { default = 0; get { _trackArpMode[t] }; set { _trackArpMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_RESTRIKE_ON_CHORD_CHANGE.ordinal + t]) {
+                intType { default = 0; get { _trackRestrikeOnChordChange[t] }; set { _trackRestrikeOnChordChange[t] = it } }
             }
         }
         for (t in 0..7) {

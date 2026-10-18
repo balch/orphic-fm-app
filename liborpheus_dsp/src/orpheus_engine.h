@@ -1268,6 +1268,8 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_track_lick_source[8] = {};
     std::atomic<int>   pulsar_track_comping_style[8] = {};  // CompingStyleId: 0=PAD, 1=FUNK, 2=ROCK, 3=CUSTOM
     std::atomic<int>   pulsar_track_arp_mode[8] = {};       // ArpModeId: 0=AUTO, 1=ALWAYS, 2=NEVER
+    // Opt-in (0/1): a CHORDAL PAD track re-strikes its held note on each new chord.
+    std::atomic<int>   pulsar_track_restrike_on_chord_change[8] = {};
     std::atomic<float> pulsar_track_arp_speed[8] = {};      // 0.0-1.0
     std::atomic<int>   pulsar_track_arp_direction[8] = {};  // ArpDirectionId: 0=UP, 1=DOWN, 2=UP_DOWN, 3=RANDOM
     std::atomic<int>   pulsar_track_inversion[8] = {};      // SectionInversionId: 0=FOLLOW, 1=ROOT, 2=FIRST, 3=SECOND, 4=OPEN

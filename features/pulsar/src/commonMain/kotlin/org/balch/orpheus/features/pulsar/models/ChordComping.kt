@@ -167,4 +167,6 @@ data class ChordComping(
     val sectionInversion: SectionInversion = SectionInversion.FOLLOW_STYLE,
     val humanization: CompingHumanization = CompingHumanization(),
     val fills: CompingFills = CompingFills(),
+    /** PAD only: re-strike the held note when the chord changes, so a sustained bed follows the progression. */
+    val restrikeOnChordChange: Boolean = false,
 )

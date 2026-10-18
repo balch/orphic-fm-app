@@ -591,6 +591,7 @@ bool run_pulsar_vibrato_tests();
 bool run_pulsar_pitch_rise_tests();
 bool run_pulsar_harmonics_rise_tests();
 bool run_pulsar_texture_line_tests();
+bool run_pulsar_pad_restrike_tests();
 bool run_pulsar_grain_fx_tests();
 bool run_pulsar_lick_growth_tests();
 bool run_pulsar_complexity_calm_tests();

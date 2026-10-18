@@ -959,6 +959,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_comping_style[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "arp_mode") == 0)
                 engine->pulsar_track_arp_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "restrike_on_chord_change") == 0)
+                engine->pulsar_track_restrike_on_chord_change[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "arp_speed") == 0)
                 engine->pulsar_track_arp_speed[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "arp_direction") == 0)
