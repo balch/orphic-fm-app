@@ -12,6 +12,7 @@ object FactoryPanelSets {
 
     private val All = factoryPanelSet("All") {
         collapse(PanelId.PRESETS)
+        collapse(PanelId.RECORD)
         collapse(PanelId.TIMER)
         collapse(PanelId.MIDI)
         collapse(PanelId.EVO)

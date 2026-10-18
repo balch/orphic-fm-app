@@ -136,6 +136,7 @@ include(":features:dj")
 include(":features:tides")
 include(":features:pulsar")
 include(":features:timer")
+include(":features:record")
 include(":tools:vibe-codegen")
 
 // Local scratch modules, when present.

@@ -119,6 +119,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
+            // Desktop only: OutputCapture and FileTakeStore are bound in JVM.
+            api(project(":features:record"))
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
             implementation(libs.ktmidi.jvm.desktop)

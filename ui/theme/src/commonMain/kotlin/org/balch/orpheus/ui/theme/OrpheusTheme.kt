@@ -148,6 +148,7 @@ object OrpheusColors {
     val seahawksGrey = Color(0xFFA5ACAF)
     val ninersRed = Color(0xFFFF5252)
     val ninersGold = Color(0xFFFFD740)
+    val recordRed = Color(0xFFFF4D5E)
 
     /** The Kraken pad's deep-sea accent, kept apart from VIBE's purple anomaly tint. */
     val krakenTeal = Color(0xFF1DE9B6)

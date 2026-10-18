@@ -43,6 +43,7 @@ value class PanelId(val id: String) {
         val PULSAR = PanelId("pulsar")
         val TIMER = PanelId("timer")
         val VIBE_CREATE = PanelId("vibe_create")
+        val RECORD = PanelId("record")
     }
 }
 
