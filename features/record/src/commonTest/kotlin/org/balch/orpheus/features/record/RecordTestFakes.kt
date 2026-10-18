@@ -11,7 +11,11 @@ import org.balch.orpheus.features.record.store.TakeWriter
 import org.balch.orpheus.features.record.telemetry.TakeTelemetry
 
 internal class FakeOutputCapture : OutputCapture {
-    override val sampleRate = 48_000
+    override var sampleRate = 48_000
+    override var isCapturing = true
+
+    /** When set, [start] moves the live rate to this, like a route change during the arm. */
+    var rateAfterStart: Int? = null
     val chunks = ArrayDeque<Int>()
     var dropped = 0L
     var running = false
@@ -28,7 +32,11 @@ internal class FakeOutputCapture : OutputCapture {
         }
     }
 
-    override fun start() { running = true; startCount++ }
+    override fun start() {
+        running = true
+        startCount++
+        rateAfterStart?.let { sampleRate = it }
+    }
     override fun stop() { running = false; stopCount++ }
     override fun drain(into: FloatArray): Int {
         val frames = minOf(chunks.removeFirstOrNull() ?: return 0, into.size / 2)
@@ -65,6 +73,7 @@ internal class FakeTakeStore : TakeStore {
     var throwOnOpen = false
     val existingIds = mutableSetOf<String>()
     val openAttempts = mutableListOf<String>()
+    val openedRates = mutableListOf<Int>()
 
     override suspend fun list(): List<TakeInfo> = takes.toList()
     override suspend fun delete(takeId: String) {
@@ -73,6 +82,7 @@ internal class FakeTakeStore : TakeStore {
     }
     override fun open(takeId: String, sampleRate: Int): TakeWriter {
         openAttempts += takeId
+        openedRates += sampleRate
         if (throwOnOpen || takeId in existingIds) error("take folder exists")
         openedId = takeId
         takes.add(0, TakeInfo(takeId, 0f, 0L, "/takes/$takeId/audio.wav"))

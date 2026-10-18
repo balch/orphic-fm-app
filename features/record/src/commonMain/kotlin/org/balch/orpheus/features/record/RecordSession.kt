@@ -81,6 +81,7 @@ class RecordSession internal constructor(
 
     private class ActiveTake(
         val takeId: String,
+        val sampleRate: Int,
         val writer: TakeWriter,
         val startPreset: SynthPreset,
         val startSnapshot: TakeSnapshot,
@@ -146,17 +147,20 @@ class RecordSession internal constructor(
         var writer: TakeWriter? = null
         var captureStarted = false
         try {
+            // Read once: stop() may clear the capture's pinned rate, and a route change can move it.
+            val sampleRate = capture.sampleRate
             val baseId = takeIdFor(clock.now().toLocalDateTime(TimeZone.currentSystemDefault()))
-            val (takeId, opened) = openTake(baseId)
+            val (takeId, opened) = openTake(baseId, sampleRate)
             writer = opened
             val preset = presets.capture("rec-$takeId")
             presets.save(preset)
             val baseline = capture.droppedFrames()
             capture.start()
             captureStarted = true
+            if (capture.sampleRate != sampleRate) error("Output rate changed while the take opened")
             recorder.start()
 
-            val take = ActiveTake(takeId, writer, preset, snapshotOf(preset), baseline)
+            val take = ActiveTake(takeId, sampleRate, writer, preset, snapshotOf(preset), baseline)
             active = take
             _state.value = RecordState.Recording(takeId, 0f)
             take.job = scope.launch { runDrainLoop(take) }
@@ -172,12 +176,12 @@ class RecordSession internal constructor(
     }
 
     /** The store refuses an existing folder, so a same-second restart retries as `-2`, `-3`, ... */
-    private fun openTake(baseId: String): Pair<String, TakeWriter> {
+    private fun openTake(baseId: String, sampleRate: Int): Pair<String, TakeWriter> {
         var failure: IllegalStateException? = null
         for (attempt in 1..MAX_OPEN_ATTEMPTS) {
             val id = if (attempt == 1) baseId else "$baseId-$attempt"
             try {
-                return id to store.open(id, capture.sampleRate)
+                return id to store.open(id, sampleRate)
             } catch (e: IllegalStateException) {
                 failure = e
             }
@@ -193,9 +197,11 @@ class RecordSession internal constructor(
     }
 
     private suspend fun runDrainLoop(take: ActiveTake) {
-        val capFrames = MAX_SECONDS.toLong() * capture.sampleRate
+        val capFrames = MAX_SECONDS.toLong() * take.sampleRate
         while (true) {
             delay(DRAIN_INTERVAL_MS)
+            // Read before the drain so frames written just before the platform stopped are kept.
+            val stillCapturing = capture.isCapturing
             try {
                 drainAll(take)
             } catch (e: CancellationException) {
@@ -204,8 +210,8 @@ class RecordSession internal constructor(
                 mutex.withLock { if (active === take) abortLocked(take, e) }
                 return
             }
-            _state.value = RecordState.Recording(take.takeId, take.framesWritten.toFloat() / capture.sampleRate)
-            if (take.framesWritten >= capFrames) {
+            _state.value = RecordState.Recording(take.takeId, take.framesWritten.toFloat() / take.sampleRate)
+            if (take.framesWritten >= capFrames || !stillCapturing) {
                 mutex.withLock { if (active === take) finishLocked(take) }
                 return
             }
@@ -249,8 +255,8 @@ class RecordSession internal constructor(
             try {
                 val telemetry = TakeTelemetry(
                     takeId = take.takeId,
-                    sampleRate = capture.sampleRate,
-                    durationSec = take.framesWritten.toFloat() / capture.sampleRate,
+                    sampleRate = take.sampleRate,
+                    durationSec = take.framesWritten.toFloat() / take.sampleRate,
                     droppedFrames = capture.droppedFrames() - take.droppedBaseline,
                     start = take.startSnapshot,
                     end = endSnapshot,

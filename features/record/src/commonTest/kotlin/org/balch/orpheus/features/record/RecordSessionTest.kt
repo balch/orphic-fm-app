@@ -79,6 +79,23 @@ class RecordSessionTest {
     }
 
     @Test
+    fun takeKeepsTheRateReadAtStartWhenTheLiveRateChanges() = runTest {
+        val rig = Rig(this)
+        rig.capture.sampleRate = 44_100
+        rig.capture.chunks += 441
+        rig.session.start()
+        // A route change after the take began: the live rate is no longer the take's rate.
+        rig.capture.sampleRate = 48_000
+        advanceTimeBy(200)
+        runCurrent()
+        rig.session.stop()
+
+        assertEquals(listOf(44_100), rig.store.openedRates)
+        assertEquals(44_100, rig.store.writer.telemetry!!.sampleRate)
+        assertEquals(441 / 44_100f, rig.store.writer.telemetry!!.durationSec)
+    }
+
+    @Test
     fun liveGateJustBeforeStartIsNotRecorded() = runTest {
         val rig = Rig(this)
         rig.controller.emitPulseStart(1)
@@ -157,6 +174,33 @@ class RecordSessionTest {
         assertEquals(RecordState.Idle, rig.session.state.value)
         assertEquals(listOf("take-2026-10-17-132431"), finished)
         assertEquals(RecordSession.MAX_SECONDS.toFloat(), rig.store.writer.telemetry!!.durationSec)
+    }
+
+    @Test
+    fun finishesTheTakeWhenCaptureStopsFeeding() = runTest {
+        val rig = Rig(this)
+        rig.capture.queueFrames(1000)
+        rig.session.start()
+        rig.capture.isCapturing = false
+        advanceTimeBy(RecordSession.DRAIN_INTERVAL_MS + 1)
+        runCurrent()
+
+        assertEquals(RecordState.Idle, rig.session.state.value)
+        assertEquals(1000, rig.store.writer.frames)
+        assertEquals(1000 / 48_000f, rig.store.writer.telemetry!!.durationSec)
+        assertTrue(!rig.capture.running)
+    }
+
+    @Test
+    fun rateChangeWhileOpeningAbortsTheTake() = runTest {
+        val rig = Rig(this)
+        rig.capture.rateAfterStart = 44_100
+        rig.session.start()
+
+        assertEquals(RecordState.Idle, rig.session.state.value)
+        assertTrue(rig.store.writer.aborted)
+        assertTrue(!rig.capture.running)
+        assertEquals(null, rig.store.writer.telemetry)
     }
 
     @Test
