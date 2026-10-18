@@ -71,6 +71,7 @@ object FactoryPanelSets {
         expand(PanelId.DJ)
         expand(PanelId.CODE)
         expand(PanelId.LOOPER)
+        expand(PanelId.RECORD)
 //                    expand(PanelId.SPEECH)
         expand(PanelId.PULSAR)
         expand(PanelId.ASL_MAESTRO)

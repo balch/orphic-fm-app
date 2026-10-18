@@ -32,6 +32,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.media3.session)
             implementation(libs.androidx.profileinstaller)
+            api(project(":features:record"))
         }
         commonMain.dependencies {
             api(project(":core:audio"))
@@ -119,7 +120,7 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
-            // Desktop only: OutputCapture and FileTakeStore are bound in JVM.
+            // Desktop and Android only: REC needs a platform OutputCapture and TakeStore.
             api(project(":features:record"))
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
