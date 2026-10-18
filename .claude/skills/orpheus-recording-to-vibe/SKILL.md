@@ -1,6 +1,6 @@
 ---
 name: orpheus-recording-to-vibe
-description: Turn a take recorded in the Orpheus desktop Record panel into a Pulsar vibe track. Use when the user says "use my recording", "grab my last take", "turn this take into a vibe", "capture from Orpheus", or wants a hand-tuned Orpheus voice copied onto a vibe track. Reads ~/.config/orpheus/recordings/<take-id>/ (audio.wav, preset.json, telemetry.json), explains the sound in plain words, fills an OrpheusEngine, and names what Pulsar cannot reproduce. Hands off to vibe-creator for everything after the track is written.
+description: Turn a take recorded in the Orpheus desktop or Android Record panel into a Pulsar vibe track. Use when the user says "use my recording", "grab my last take", "turn this take into a vibe", "capture from Orpheus", or wants a hand-tuned Orpheus voice copied onto a vibe track. Reads ~/.config/orpheus/recordings/<take-id>/ (audio.wav, preset.json, telemetry.json), explains the sound in plain words, fills an OrpheusEngine, and names what Pulsar cannot reproduce. Hands off to vibe-creator for everything after the track is written.
 ---
 
 # Orpheus Recording to Vibe
@@ -20,9 +20,28 @@ Takes live in `~/.config/orpheus/recordings/<take-id>/`, one folder each, id `ta
 ls -1t ~/.config/orpheus/recordings/        # newest first
 ```
 
-Use the newest folder unless the user names one. The preset is also saved as `rec-<take-id>` in
-`~/.config/orpheus/presets/`. An empty or missing folder means nothing has been recorded on this
+Use the newest folder unless the user names one. The take's own `preset.json` is the source of
+truth (on desktop the preset is also saved as `rec-<take-id>` in `~/.config/orpheus/presets/`; on a
+phone that copy stays on the device). An empty or missing folder means nothing has been recorded on this
 machine yet. For finding app output on disk in general, see the `grab-ai-vibes` skill.
+
+### On Android
+
+The Android app keeps takes in its private `files/recordings/` folder, same layout. Pull the newest
+one into the desktop folder, then carry on from the desktop path above. `run-as` needs a debug
+(debuggable) build; a release build refuses it. Debug builds carry an `.debug` applicationId suffix,
+so the package is `org.balch.orpheus.debug`. Use `ls -1`: on-device `ls` prints columns even
+when piped (see `grab-ai-vibes`).
+
+```bash
+mkdir -p ~/.config/orpheus/recordings
+PKG=org.balch.orpheus.debug
+TAKE=$(adb exec-out run-as "$PKG" ls -1t files/recordings 2>&1 | head -1 | tr -d '\r')
+case "$TAKE" in
+  take-*) adb exec-out run-as "$PKG" tar -cf - -C files/recordings "$TAKE" | tar -xf - -C ~/.config/orpheus/recordings ;;
+  *) echo "No take found for $PKG (got: ${TAKE:-nothing}). Is the debug build installed and a take recorded?" ;;
+esac
+```
 
 ## 2. Explain it
 
