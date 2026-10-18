@@ -89,7 +89,6 @@ import org.balch.orpheus.features.pulsar.PulsarGridHeight
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarSelectors
 import org.balch.orpheus.features.pulsar.PulsarViewModel
-import org.balch.orpheus.features.pulsar.mixer.MixerPanel
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerPanel
@@ -265,6 +264,7 @@ fun DjAppScreen(
                         when (route) {
                             PulsarTab -> PulsarPanel(
                                 pulsar = pulsarFeature,
+                                trackEditing = LocalShowTrackEdit.current,
                                 vizFlow = synthEngine.pulsarVizFlow,
                                 trackVizFlows = synthEngine.pulsarTrackVizFlows,
                                 modifier = panelModifier,
@@ -300,14 +300,11 @@ fun DjAppScreen(
                                 fillHeight = fill,
                             )
                             MixTab -> Column(modifier = panelModifier) {
-                                MixerPanel(
+                                DjMixPanel(
                                     feature = mixerFeature,
                                     trackVizFlows = synthEngine.pulsarTrackVizFlows,
                                     masterOutVizFlow = synthEngine.masterOutVizFlow,
                                     modifier = Modifier.fillMaxWidth(),
-                                    isExpanded = true,
-                                    onExpandedChange = {},
-                                    showCollapsedHeader = false,
                                     showExpandedTitle = showTitle,
                                     fillHeight = fill,
                                 )
@@ -599,6 +596,7 @@ internal fun DjAppMainContent(
                             .onSizeChanged { pulsarSlotPx = it.height }
                             .panelIdleFade(fade),
                         pulsar = pulsarFeature,
+                        trackEditing = LocalShowTrackEdit.current,
                         vizFlow = synthEngine.pulsarVizFlow,
                         trackVizFlows = synthEngine.pulsarTrackVizFlows,
                         isExpanded = true,
@@ -646,6 +644,7 @@ internal fun DjAppMainContent(
                     }
                     PulsarPanel(
                         pulsar = pulsarFeature,
+                        trackEditing = LocalShowTrackEdit.current,
                         vizFlow = synthEngine.pulsarVizFlow,
                         trackVizFlows = synthEngine.pulsarTrackVizFlows,
                         modifier = Modifier
@@ -691,6 +690,7 @@ internal fun DjAppMainContent(
                         }
                         PulsarPanel(
                             pulsar = pulsarFeature,
+                            trackEditing = LocalShowTrackEdit.current,
                             vizFlow = synthEngine.pulsarVizFlow,
                             trackVizFlows = synthEngine.pulsarTrackVizFlows,
                             modifier = mod
@@ -1107,6 +1107,7 @@ private fun DjAppPreviewLayout(
         Row(modifier = modifier.fillMaxSize()) {
             PulsarPanel(
                 pulsar = pulsarFeature,
+                trackEditing = LocalShowTrackEdit.current,
                 vizFlow = emptyPulsarVizFlow,
                 trackVizFlows = emptyTrackVizFlows,
                 modifier = Modifier.weight(.5f).fillMaxHeight(),
@@ -1129,6 +1130,7 @@ private fun DjAppPreviewLayout(
             )
             PulsarPanel(
                 pulsar = pulsarFeature,
+                trackEditing = LocalShowTrackEdit.current,
                 vizFlow = emptyPulsarVizFlow,
                 trackVizFlows = emptyTrackVizFlows,
                 modifier = Modifier.weight(.6f).fillMaxWidth(),
@@ -1170,12 +1172,10 @@ private fun DjTabPreview() {
 private fun MixTabPreview() {
     OrpheusTheme {
         DjAppPreviewLayout(selectedTab = MixTab) { mod ->
-            MixerPanel(
+            DjMixPanel(
                 feature = MixerViewModel.previewFeature(),
+                trackVizFlows = emptyTrackVizFlows,
                 modifier = mod,
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
                 showExpandedTitle = false,
             )
         }
@@ -1309,12 +1309,10 @@ private fun DjTabLandscapePreview() {
 private fun MixTabLandscapePreview() {
     OrpheusTheme {
         DjAppPreviewLayout(selectedTab = MixTab, landscape = true) { mod ->
-            MixerPanel(
+            DjMixPanel(
                 feature = MixerViewModel.previewFeature(),
+                trackVizFlows = emptyTrackVizFlows,
                 modifier = mod,
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
                 showExpandedTitle = false,
             )
         }

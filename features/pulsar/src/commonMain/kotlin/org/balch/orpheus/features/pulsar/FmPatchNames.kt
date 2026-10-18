@@ -1,4 +1,4 @@
-package org.balch.orpheus.djapp.vibeinfo
+package org.balch.orpheus.features.pulsar
 
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import kotlin.math.floor
@@ -28,7 +28,7 @@ import kotlin.math.floor
  * by subtracting the hysteresis, which is why the `- 0.005f` below is not decoration. Without it
  * the lookup names the patch one too high for edge values just above a boundary.
  */
-internal object FmPatchNames {
+object FmPatchNames {
 
     // bank index = engineId.id - 2  →  DX(2)=0, DX2(3)=1, DX3(4)=2
     private val BANKS: Array<Array<String>> = arrayOf(

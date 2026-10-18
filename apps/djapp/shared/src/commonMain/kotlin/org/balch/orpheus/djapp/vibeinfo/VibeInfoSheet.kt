@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
+import org.balch.orpheus.features.pulsar.ActiveEngineStabilizer
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
 import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
@@ -184,26 +185,12 @@ fun VibeInfoPanel(
 }
 
 /**
- * Number of consecutive polls a new per-track active-engine id must persist
- * before it is committed for display. Derived from the ~400ms hold window and
- * SynthEngineMonitor's `VIZ_POLL_INTERVAL_MS` (16ms, ~60fps): ceil(400 / 16) = 25.
- * That constant is private to SynthEngineMonitor, so the value is inlined here.
- */
-private const val HOLD_FRAMES = 25
-
-/**
- * Per-track hysteresis state for [rememberStableViz]. Mutated in place across
- * recompositions — held in [remember], no [androidx.compose.runtime.mutableStateOf].
+ * Hysteresis state for [rememberStableViz]. Mutated in place across recompositions, held in
+ * [remember], no [androidx.compose.runtime.mutableStateOf].
  */
 private class VizStabilizer {
-    val committed = IntArray(org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS) { -1 }
-    val candidate = IntArray(org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS) { -1 }
-    val counter = IntArray(org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS)
-
-    // Immutable snapshot of [committed], re-copied only when the committed set
-    // actually changes — so recompositions that don't move the committed engines
-    // reuse the same array instead of allocating one per frame.
-    var committedSnapshot: IntArray = committed.copyOf()
+    val engines = ActiveEngineStabilizer()
+    var committedSnapshot: IntArray = engines.advance(IntArray(0))
 
     // The raw viz object the hysteresis last advanced against. Guards the
     // per-poll counter so it advances once per new poll sample, not once per
@@ -219,7 +206,7 @@ private class VizStabilizer {
  * while the DSP re-rolls the active engine per audio block in the crossfade zone.
  *
  * Per track: when the incoming id differs from the committed id and matches the
- * pending candidate, increment a counter; once it reaches [HOLD_FRAMES] the
+ * pending candidate, increment a counter; once it reaches [ActiveEngineStabilizer.HOLD_FRAMES] the
  * candidate is committed. A different id resets the candidate + counter. Only the
  * committed ids feed the mapper. Returns [viz] with a stabilized `activeEngines`.
  */
@@ -231,38 +218,11 @@ private fun rememberStableViz(viz: PulsarVizData): PulsarVizData {
     // viz StateFlow conflates by structural equality, so each distinct object
     // reference collectAsStateWithLifecycle observes is a genuinely new sample; recompositions
     // driven by other state (e.g. the energy knob) reuse the same viz object.
-    // Guarding on reference identity keeps the ~400ms (HOLD_FRAMES) hysteresis
+    // Guarding on reference identity keeps the ~400ms (ActiveEngineStabilizer.HOLD_FRAMES) hysteresis
     // tied to real polls, so it can't collapse and reintroduce label flicker.
     if (viz !== state.lastProcessed) {
         state.lastProcessed = viz
-        val committed = state.committed
-        var committedChanged = false
-        for (t in committed.indices) {
-            val incoming = viz.activeEngines.getOrElse(t) { -1 }
-            when {
-                incoming == committed[t] -> {
-                    // Already showing this — clear any pending candidate.
-                    state.candidate[t] = incoming
-                    state.counter[t] = 0
-                }
-                incoming == state.candidate[t] -> {
-                    if (++state.counter[t] >= HOLD_FRAMES) {
-                        committed[t] = incoming
-                        state.counter[t] = 0
-                        committedChanged = true
-                    }
-                }
-                else -> {
-                    // New candidate — restart the hold count.
-                    state.candidate[t] = incoming
-                    state.counter[t] = 1
-                }
-            }
-        }
-        // Re-copy the committed set only when it actually moved.
-        if (committedChanged) {
-            state.committedSnapshot = committed.copyOf()
-        }
+        state.committedSnapshot = state.engines.advance(viz.activeEngines)
         // Derive the stabilized view once per poll and cache it, so non-poll
         // recompositions return the same object (stable memoization key).
         state.result = viz.copy(activeEngines = state.committedSnapshot)

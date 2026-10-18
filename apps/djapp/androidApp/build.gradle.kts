@@ -109,6 +109,16 @@ if (providers.gradleProperty("showKraken").orNull.toBoolean()) {
     }
 }
 
+// The same for the Pulsar grid's track editing (see :apps:djapp:shared's trackEdit).
+if (providers.gradleProperty("trackEdit").orNull.toBoolean()) {
+    val playPreBuild = Regex("pre(Og|Ai)ReleaseBuild")
+    tasks.configureEach {
+        if (playPreBuild.matches(name)) {
+            doFirst { throw GradleException("-PtrackEdit=true is for local builds; drop it to build a release.") }
+        }
+    }
+}
+
 // Google Play Developer API publishing (Gradle Play Publisher).
 // Run: ./gradlew :apps:djapp:androidApp:publishReleaseBundle
 play {

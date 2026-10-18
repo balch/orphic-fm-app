@@ -52,7 +52,6 @@ import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.SongStory
 import org.balch.orpheus.features.pulsar.VibeNavState
-import org.balch.orpheus.features.pulsar.mixer.MixerPanel
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
 import org.balch.orpheus.features.reverb.ReverbPanel
 import org.balch.orpheus.features.reverb.ReverbViewModel
@@ -257,7 +256,7 @@ class DjLayoutRenderHarness {
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 pair.forEach { route ->
-                                    PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
+                                    PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight(), docked = false)
                                 }
                             }
                         }
@@ -328,7 +327,7 @@ class DjLayoutRenderHarness {
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
                                         panels.forEach { route ->
-                                            PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
+                                            PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight(), docked = false)
                                         }
                                     }
                                 }
@@ -407,7 +406,7 @@ class DjLayoutRenderHarness {
                                         bottom = { mod ->
                                             Row(mod, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 case.panels.forEach { route ->
-                                                    PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
+                                                    PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight(), docked = false)
                                                 }
                                             }
                                         },
@@ -521,7 +520,7 @@ class DjLayoutRenderHarness {
                 val scene = ImageComposeScene(466, height, Density(1f)) {
                     OrpheusTheme {
                         Box(Modifier.fillMaxSize().background(Color(0xFF14141F))) {
-                            PreviewRoutePanel(route, Modifier.fillMaxSize())
+                            PreviewRoutePanel(route, Modifier.fillMaxSize(), docked = false)
                         }
                     }
                 }
@@ -590,7 +589,7 @@ class DjLayoutRenderHarness {
                                             displayHeight = hornDisplayHeightFor(205.dp, HornDisplayHeight),
                                         )
                                     } else {
-                                        PreviewRoutePanel(route, Modifier.weight(.4f).fillMaxWidth())
+                                        PreviewRoutePanel(route, Modifier.weight(.4f).fillMaxWidth(), docked = false)
                                     }
                                 }
                             }
@@ -1665,9 +1664,12 @@ private fun DockChrome(docked: List<DjRoute>, tvHardware: Boolean) {
     )
 }
 
-/** Renders one route with its preview feature, titles on, as the dock shows it. */
+/**
+ * Renders one route with its preview feature, titles on, as the dock shows it. A non-[docked] Mix
+ * fills its slot as a nav destination does, so its content gets the same height as in the app.
+ */
 @Composable
-internal fun PreviewRoutePanel(route: DjRoute, modifier: Modifier) {
+internal fun PreviewRoutePanel(route: DjRoute, modifier: Modifier, docked: Boolean = true) {
     when (route) {
         PulsarTab -> PulsarPanel(
             pulsar = PulsarViewModel.previewFeature(),
@@ -1695,16 +1697,13 @@ internal fun PreviewRoutePanel(route: DjRoute, modifier: Modifier) {
             fillHeight = false,
         )
         // Docked, Mix is the mixer alone — no reverb strip. Mirrors DjAppScreen.
-        MixTab -> MixerPanel(
+        MixTab -> DjMixPanel(
             feature = MixerViewModel.previewFeature(),
             trackVizFlows = emptyTrackVizFlows,
             masterOutVizFlow = emptyVizFlow,
             modifier = modifier,
-            isExpanded = true,
-            onExpandedChange = {},
-            showCollapsedHeader = false,
             showExpandedTitle = false,
-            fillHeight = false,
+            fillHeight = !docked,
         )
         HornTab -> HornPanel(
             feature = HornViewModel.previewFeature(),
@@ -1770,14 +1769,11 @@ private fun NavDestinationPanel(route: DjRoute, modifier: Modifier) {
                 showCollapsedHeader = false,
                 showExpandedTitle = false,
             )
-            MixerPanel(
+            DjMixPanel(
                 feature = MixerViewModel.previewFeature(),
                 trackVizFlows = emptyTrackVizFlows,
                 masterOutVizFlow = emptyVizFlow,
                 modifier = Modifier.fillMaxWidth(),
-                isExpanded = true,
-                onExpandedChange = {},
-                showCollapsedHeader = false,
                 showExpandedTitle = false,
             )
         }

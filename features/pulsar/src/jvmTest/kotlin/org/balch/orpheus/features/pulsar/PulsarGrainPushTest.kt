@@ -91,6 +91,28 @@ class PulsarGrainPushTest {
     private fun int(symbol: String): Int? = (ports["$PULSAR_URI:$symbol"] as? IntValue)?.value
     private fun float(symbol: String): Float? = (ports["$PULSAR_URI:$symbol"] as? FloatValue)?.value
 
+    // The Mixer may never be composed (DJ app, Mix tab closed): the load itself resets the engine.
+    @Test
+    fun vibeLoadResetsEngineGainsWithoutMixer() = runTest(testDispatcher) {
+        val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
+        val vibe = grainTestVibe(va, va)
+        val vm = makeViewModel(vibe)
+        advanceUntilIdle()
+        for (t in 0..7) ports["$PULSAR_URI:track_${t}_audition_gain"] = FloatValue(0f)
+        val before = vm.vibeLoadCount.value
+
+        vm.actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        for (t in 0..7) assertEquals(1f, float("track_${t}_audition_gain"), "track $t")
+        assertEquals(before + 1, vm.vibeLoadCount.value)
+
+        // Reloading the same vibe counts too.
+        vm.actions.setVibe(vibe)
+        advanceUntilIdle()
+        assertEquals(before + 2, vm.vibeLoadCount.value)
+    }
+
     @Test
     fun `grain fields reach both engine slots of their track`() = runTest(testDispatcher) {
         val edm = OrpheusEngine(

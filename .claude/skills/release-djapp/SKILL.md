@@ -322,7 +322,7 @@ The tooling lives in `apps/djapp/store-listings/capture/`. Its README holds the 
 **Order within a release.** Capture and stage the screenshots, land them on `main`, then tag. The
 binaries do not depend on them, but the App Store screenshots belong to the version record, so they
 must be attached before that version is submitted. Build captures from `ogDebugRelease` and the iOS
-Release configuration only (debuggable builds list WIP vibes), and never with `-PshowKraken=true`.
+Release configuration only (debuggable builds list WIP vibes), and never with `-PshowKraken=true` or `-PtrackEdit=true`.
 
 **Publishing them.**
 - Play: `publishOgReleaseListing`. Listing-only and global, so it never touches a track.

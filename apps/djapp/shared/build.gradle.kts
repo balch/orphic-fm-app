@@ -9,12 +9,19 @@ plugins {
 // -PshowKraken=true puts the Kraken pad in the UI (DjBuildKonfig.SHOW_KRAKEN). Local builds only:
 // the store builds' tasks here, in :apps:djapp:androidApp and in :apps:djapp:ai refuse it.
 val showKraken = providers.gradleProperty("showKraken").orNull.toBoolean()
+// The Mix tab's TRACKS view ships on (DjBuildKonfig.SHOW_TUNING); -PshowTuning=false is the kill switch.
+val showTuning = providers.gradleProperty("showTuning").orNull?.toBoolean() ?: true
+// -PtrackEdit=true lets the Pulsar grid select a track and open its detail strip
+// (DjBuildKonfig.SHOW_TRACK_EDIT). Local builds only, refused by the same store tasks as showKraken.
+val trackEdit = providers.gradleProperty("trackEdit").orNull.toBoolean()
 
 buildkonfig {
     packageName = "org.balch.orpheus.djapp"
     objectName = "DjBuildKonfig"
     defaultConfigs {
         buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_KRAKEN", showKraken.toString())
+        buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_TUNING", showTuning.toString())
+        buildConfigField(FieldSpec.Type.BOOLEAN, "SHOW_TRACK_EDIT", trackEdit.toString())
     }
 }
 
@@ -120,6 +127,9 @@ listOf("IosArm64" to "iosArm64", "IosSimulatorArm64" to "iosSimulatorArm64")
                 // The App Store archive links the release framework.
                 if (buildType == "Release" && showKraken) {
                     doFirst { throw GradleException("-PshowKraken=true is for local builds; drop it to link a release framework.") }
+                }
+                if (buildType == "Release" && trackEdit) {
+                    doFirst { throw GradleException("-PtrackEdit=true is for local builds; drop it to link a release framework.") }
                 }
             }
         }

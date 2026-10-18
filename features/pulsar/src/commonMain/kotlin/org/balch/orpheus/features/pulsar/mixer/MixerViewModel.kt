@@ -6,6 +6,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -40,6 +41,8 @@ private sealed interface MixerIntent {
     data class PeakChange(val value: Float) : MixerIntent
     data class MuteListChange(val perGroup: List<Boolean>) : MixerIntent
     data class PlayingChange(val playing: Boolean) : MixerIntent
+    data class TuningChange(val tuning: TrackTuning) : MixerIntent
+    data class TracksViewChange(val tracks: Boolean) : MixerIntent
 }
 
 /**
@@ -83,10 +86,22 @@ class MixerViewModel(
     private val keysGainId = synthController.controlFlow(PulsarSymbol.KEYS_GAIN.controlId)
     private val fxGainId   = synthController.controlFlow(PulsarSymbol.FX_GAIN.controlId)
 
+    private val tuning = TrackTuningController(synthController, pulsarFeature.vibeLoadCount, scope)
+
     override val actions = MixerPanelActions(
         setGroupGain = ::onGroupGainChanged,
         setDrive = ::onDriveChanged,
+        toggleTrackMute = tuning::toggleMute,
+        toggleTrackSolo = tuning::toggleSolo,
+        setTrackLevel = tuning::setLevel,
+        resetTracks = tuning::reset,
+        toggleTuningBusMute = tuning::toggleBusMute,
+        setTracksView = { tracksViewChanges.tryEmit(MixerIntent.TracksViewChange(it)) },
     )
+
+    private val tuningIntents = tuning.state.map { MixerIntent.TuningChange(it) }
+
+    private val tracksViewChanges = MutableSharedFlow<MixerIntent.TracksViewChange>(extraBufferCapacity = 4)
 
     // Peak monitoring (existing flow, same source as DistortionPanel today).
     private val peakIntents = engine.peakFlow.map { MixerIntent.PeakChange(it) }
@@ -138,6 +153,8 @@ class MixerViewModel(
             fxMixIntents,
             muteIntents,
             playingIntents,
+            tuningIntents,
+            tracksViewChanges,
         )
             .scan(MixerUiState()) { state, intent -> reduce(state, intent) }
             .flowOn(dispatcherProvider.io)
@@ -215,6 +232,11 @@ class MixerViewModel(
             is MixerIntent.PeakChange -> state.copy(peak = intent.value)
             is MixerIntent.MuteListChange -> state.copy(groupMuted = intent.perGroup)
             is MixerIntent.PlayingChange -> state.copy(playing = intent.playing)
+            is MixerIntent.TuningChange -> state.copy(
+                tuning = intent.tuning,
+                tuningBusMuted = MixerGroup.entries.map { intent.tuning.isBusMuted(it.tracks.toList()) },
+            )
+            is MixerIntent.TracksViewChange -> state.copy(tracksView = intent.tracks)
         }
 
     companion object {

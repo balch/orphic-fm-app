@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
@@ -311,6 +312,13 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
         get() = emptyList()
 
     val vibeFlow: StateFlow<Vibe>
+
+    /**
+     * Counts every vibe load ([applyVibe], so a reload of the same vibe too), at the load itself.
+     * Stub default for previews and fakes.
+     */
+    val vibeLoadCount: StateFlow<Int>
+        get() = EmptyVibeLoadCount
 
     /** Previous/next/progress for the navigator chrome. Stub default for previews and fakes. */
     val vibeNavFlow: StateFlow<VibeNavState>
@@ -1030,6 +1038,8 @@ class PulsarViewModel(
     // write into PulsarSession, whose flow stays null until this first push (see setVibe).
     private val _vibeFlow = MutableStateFlow(curatedProviders.first().vibe)
     override val vibeFlow: StateFlow<Vibe> = _vibeFlow.asStateFlow()
+    private val _vibeLoadCount = MutableStateFlow(0)
+    override val vibeLoadCount: StateFlow<Int> = _vibeLoadCount.asStateFlow()
 
     override val vibeNavFlow: StateFlow<VibeNavState> =
         combine(vibeFlow, pulsarSession.progressFlow, rotationFlow) { vibe, progress, rotation ->
@@ -1624,6 +1634,12 @@ class PulsarViewModel(
         for (i in 0 until 8) {
             synthController.setPluginControl(muteSymbols[i].controlId, FloatValue(0f))
         }
+        // Clear any TRACKS-view mute/solo/level in the engine whether or not a Mixer exists, then announce.
+        for (i in 0 until 8) {
+            val gainId = PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + i].controlId
+            synthController.setPluginControl(gainId, FloatValue(1f))
+        }
+        _vibeLoadCount.update { it + 1 }
 
         // Push per-track voice params.
         // Engine character knobs (volume, harmonics, timbre, morph, mod LFO, holds,

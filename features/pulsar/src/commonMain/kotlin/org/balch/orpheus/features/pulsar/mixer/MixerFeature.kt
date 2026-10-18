@@ -2,6 +2,7 @@ package org.balch.orpheus.features.pulsar.mixer
 
 import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
@@ -37,12 +38,24 @@ data class MixerUiState(
     val groupMuted: List<Boolean> = listOf(false, false, false, false),
     /** Mirrors PulsarFeature.playing — used to gate the meter loop so meters fall to 0 on stop. */
     val playing: Boolean = false,
+    /** Debug TRACKS view: session-only mute/solo/level, never persisted. */
+    @Transient val tuning: TrackTuning = TrackTuning(),
+    /** True per [MixerGroup] when every track in it is muted in [tuning]; the BUS view mirrors it. */
+    @Transient val tuningBusMuted: List<Boolean> = List(MixerGroup.entries.size) { false },
+    /** DJ app Mix view: true for TRACKS. Kept for the session so tab switches return to it; a launch opens on BAND. */
+    @Transient val tracksView: Boolean = false,
 )
 
 @Immutable
 data class MixerPanelActions(
     val setGroupGain: (MixerGroup, Float) -> Unit,
     val setDrive: (Float) -> Unit,
+    val toggleTrackMute: (Int) -> Unit = {},
+    val toggleTrackSolo: (Int) -> Unit = {},
+    val setTrackLevel: (Int, Float) -> Unit = { _, _ -> },
+    val resetTracks: () -> Unit = {},
+    val toggleTuningBusMute: (MixerGroup) -> Unit = {},
+    val setTracksView: (Boolean) -> Unit = {},
 ) {
     companion object {
         val EMPTY = MixerPanelActions({ _, _ -> }, {})

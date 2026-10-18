@@ -56,3 +56,6 @@ internal fun vibeNavStateOf(rotation: VibeRotation, current: String, progress: P
         lockedAtMs = timed?.lockedAtMs,
     )
 }
+
+/** Shared never-changing stub for [PulsarFeature.vibeLoadCount] in previews and fakes. */
+internal val EmptyVibeLoadCount: StateFlow<Int> = MutableStateFlow(0).asStateFlow()

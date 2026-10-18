@@ -72,6 +72,9 @@ import org.balch.orpheus.ui.widgets.LabeledDropdown
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.time.Duration.Companion.milliseconds
 
+// The grid tap handler when track editing is off: taps do nothing.
+private val NoTrackSelection: (Int?) -> Unit = {}
+
 /**
  * Index lists for the ROOT and SCALE dropdowns.
  *
@@ -135,6 +138,8 @@ fun PulsarPanel(
     // A host with a short slot (closed iPhone Duo, a Fold's cover screen sideways) passes less so
     // the knob labels stay inside.
     gridHeight: Dp = PulsarGridHeight,
+    // False (the DJ app by default) makes grid taps no-ops and keeps the detail strip hidden.
+    trackEditing: Boolean = true,
 ) {
     // Held as State, not unwrapped: the flow emits every 16ms during playback, and the grid
     // reads it in its draw phase. The one field this panel reads in composition goes through
@@ -164,6 +169,7 @@ fun PulsarPanel(
                 .distinctUntilChanged()
         }.collectAsStateWithLifecycle(initialValue = pulsar.arrangementStateFlow.value.copy(scoreTick = 0, scoreHeld = false))
         val actions = pulsar.actions
+        val selectedTrack = state.selectedTrack.takeIf { trackEditing }
 
         // Gated on TV hardware, not LargeScreen: a tablet or fullscreen desktop is LargeScreen
         // too and must keep this row. VIBE is duplicated in the TV top bar, ROOT/SCALE/ENV are
@@ -209,15 +215,17 @@ fun PulsarPanel(
             actions = actions,
             arrangementState = arrangementState,
             gridHeight = gridHeight,
+            selectedTrack = selectedTrack,
+            trackEditing = trackEditing,
         )
 
         // Voice detail strip. Auto-dismisses after 10s idle, suppressed while a picker is open.
         AnimatedVisibility(
-            visible = state.selectedTrack != null,
+            visible = selectedTrack != null,
             enter = fadeIn(tween(300)) + expandVertically(tween(300)),
             exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
         ) {
-            val selected = state.selectedTrack ?: return@AnimatedVisibility
+            val selected = selectedTrack ?: return@AnimatedVisibility
             var pickerOpen by remember { mutableStateOf(false) }
             val edmEngine = state.trackEnginesEdm[selected]
             val spaceEngine = state.trackEnginesSpace[selected]
@@ -492,6 +500,8 @@ private fun PulsarStepGridSection(
     actions: PulsarPanelActions,
     arrangementState: PulsarArrangementState,
     gridHeight: Dp,
+    selectedTrack: Int?,
+    trackEditing: Boolean,
 ) {
     val activeTransition by actions.activeTransition.collectAsStateWithLifecycle()
     val finalSectionIndex by actions.finalSectionIndex.collectAsStateWithLifecycle()
@@ -508,8 +518,8 @@ private fun PulsarStepGridSection(
             space = state.space,
             complexity = state.complexity,
             mood = state.mood,
-            selectedTrack = state.selectedTrack,
-            onTrackSelected = actions.selectTrack,
+            selectedTrack = selectedTrack,
+            onTrackSelected = if (trackEditing) actions.selectTrack else NoTrackSelection,
             arrangementState = arrangementState,
             arrangement = state.vibe.arrangement,
             activeTransition = activeTransition,

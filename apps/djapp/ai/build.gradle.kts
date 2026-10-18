@@ -39,3 +39,12 @@ if (providers.gradleProperty("showKraken").orNull.toBoolean()) {
         }
     }
 }
+
+// Nor the Pulsar grid's track editing (see :apps:djapp:shared's trackEdit).
+if (providers.gradleProperty("trackEdit").orNull.toBoolean()) {
+    tasks.configureEach {
+        if (name.startsWith("linkReleaseFrameworkIos")) {
+            doFirst { throw GradleException("-PtrackEdit=true is for local builds; drop it to link a release framework.") }
+        }
+    }
+}

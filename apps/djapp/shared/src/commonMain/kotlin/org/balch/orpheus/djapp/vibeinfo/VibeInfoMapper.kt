@@ -4,7 +4,7 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.PULSAR_NOTE_NAMES
 import org.balch.orpheus.features.pulsar.PULSAR_SCALE_NAMES
-import org.balch.orpheus.features.pulsar.PULSAR_TRACK_NAMES
+import org.balch.orpheus.features.pulsar.trackLabel
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.playback.SectionQueue
@@ -52,26 +52,16 @@ fun mapVibeInfo(
     } ?: emptyList()
 
     val tracks = vibe.tracks.mapIndexed { i, trackVoice ->
-        // Prefer the live active-engine id the DSP is actually playing; only fall back
-        // to the energy threshold when it doesn't match either of the track's slots
-        // (e.g. -1 unset, or short/default activeEngines array).
-        val liveEngineId = viz.activeEngines.getOrElse(i) { -1 }
-        val activeEngine = when (liveEngineId) {
-            trackVoice.engineEdm.engineId.id -> trackVoice.engineEdm
-            trackVoice.engineSpace.engineId.id -> trackVoice.engineSpace
-            else -> if (energy >= 0.5f) trackVoice.engineEdm else trackVoice.engineSpace
-        }
+        // Prefer the live active-engine id; trackLabel falls back to energy when it is unset.
+        val label = trackLabel(vibe, i, viz.activeEngines.getOrElse(i) { -1 }, energy)
         VibeInfoTrack(
-            label = PULSAR_TRACK_NAMES[i],
+            label = label.name,
             role = when (trackVoice.role) {
                 is TrackRole.Percussive -> "Drums/Perc"
                 is TrackRole.Melodic   -> "Lead/Melodic"
                 is TrackRole.Chordal   -> "Chords"
             },
-            // SixOp FM engines (DX/DX2/DX3) load a specific patch selected by `harmonics` —
-            // show that patch name ("Xylophone", "Br trumpet", …) instead of the generic bank name.
-            instrument = FmPatchNames.patchNameFor(activeEngine.engineId, activeEngine.harmonics)
-                ?: activeEngine.engineId.displayName,
+            instrument = label.instrument,
             isPlaying = viz.trackLevels.getOrElse(i) { 0f } > trackLevelThreshold,
         )
     }

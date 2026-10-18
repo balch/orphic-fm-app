@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.mixer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +18,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,13 +48,13 @@ import kotlin.math.roundToInt
 // per-frame multiplier; rate ≈ ln(10) / time_to_10_percent_seconds. The C++ viz
 // ring already gives us ~640ms of peak history; band meters need a snappy
 // release so transients feel "alive" without strobing to 0 between sparse hits.
-private const val BAND_RELEASE_RATE = 18f     // band meters: ~130ms to 10% — punchy
+internal const val BAND_RELEASE_RATE = 18f     // band meters: ~130ms to 10% — punchy
 private const val PEAK_RELEASE_RATE = 12f     // ~190ms to 10% — smooths the 5Hz peak source
-private const val STOPPED_RELEASE_RATE = 35f  // not playing: ~65ms to silent — snap to 0
+internal const val STOPPED_RELEASE_RATE = 35f  // not playing: ~65ms to silent — snap to 0
 // Attack rate (per-second), scaled by dt and clamped to 1.0. At 250/s, even a
 // 120Hz refresh (dt ≈ 8ms) produces attack = 1.0, so transients hit the new
 // peak in a single frame at any practical display rate.
-private const val ATTACK_RATE = 250f
+internal const val ATTACK_RATE = 250f
 // Band meter floor sits 12 dB below the DIST peak floor: vibes with sparse or
 // quiet auxiliary tracks (low track volume × naturally quiet engine output)
 // land around -25 to -32 dB post-volume, which would read dead at -24. -36 dB
@@ -75,7 +79,17 @@ private val GROUP_ACCENTS = listOf(
 private const val GROUP_COUNT = 4
 
 // Hoisted to avoid per-frame allocation on the elvis fallback in the meter loop.
-private val EMPTY_FLOAT_ARRAY = FloatArray(0)
+internal val EMPTY_FLOAT_ARRAY = FloatArray(0)
+
+// MixerFader's own track height and LED count; a flexible strip shrinks both together.
+private const val FULL_FADER_HEIGHT = 140
+private const val MIN_FADER_HEIGHT = 32
+private const val FULL_FADER_LEDS = 18
+
+private fun ledCountFor(height: Int) = (FULL_FADER_LEDS * height / FULL_FADER_HEIGHT).coerceAtLeast(4)
+
+/** Test seam: called once per frame by the BUS meter loop, so a test can tell whether it runs. Null in the app. */
+val LocalBusMeterFrameProbe = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 @Composable
 fun MixerPanel(
@@ -88,6 +102,8 @@ fun MixerPanel(
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
     fillHeight: Boolean = true,
+    showTuning: Boolean = false,
+    startOnTracks: Boolean = false,
 ) {
     val uiState by feature.stateFlow.collectAsStateWithLifecycle()
     val actions = feature.actions
@@ -109,12 +125,20 @@ fun MixerPanel(
     // reads as continuous motion rather than dipping to 0 between updates.
     val smoothedPeak = remember { mutableFloatStateOf(0f) }
 
-    MeterDecayEffect(
-        feature = feature,
-        trackVizFlows = trackVizFlows,
-        decayedLevels = decayedLevels,
-        smoothedPeak = smoothedPeak,
-    )
+    // The DJ app (showTuning, on by default there) adds per-track strips. The VM keeps the view
+    // for the session; the local copy lets static preview features toggle too.
+    var tracksView by remember(uiState.tracksView) { mutableStateOf(uiState.tracksView || startOnTracks) }
+    val tracksShowing = showTuning && tracksView
+
+    // The bus meters are hidden while TRACKS shows; its own loop drives the strips, so skip this one.
+    if (!tracksShowing) {
+        MeterDecayEffect(
+            feature = feature,
+            trackVizFlows = trackVizFlows,
+            decayedLevels = decayedLevels,
+            smoothedPeak = smoothedPeak,
+        )
+    }
 
     CollapsibleColumnPanel(
         title = "MIX",
@@ -127,12 +151,51 @@ fun MixerPanel(
         showCollapsedHeader = showCollapsedHeader,
         fillHeight = fillHeight,
     ) {
-        MixerStripsRow(
-            uiState = uiState,
-            actions = actions,
-            decayedLevels = decayedLevels,
-            smoothedPeak = smoothedPeak,
-        )
+        if (showTuning) {
+            // In a short slot the faders give up height first; with no height limit they keep it all.
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val flexible = constraints.hasBoundedHeight
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    TuningViewToggle(
+                        tracksView = tracksView,
+                        onTracksViewChange = {
+                            tracksView = it
+                            actions.setTracksView(it)
+                        },
+                        resetEnabled = uiState.tuning.isTouched,
+                        onReset = actions.resetTracks,
+                    )
+                    Box(modifier = if (flexible) Modifier.weight(1f, fill = false) else Modifier) {
+                        if (tracksShowing) {
+                            TrackTuningStrips(
+                                uiState = uiState,
+                                actions = actions,
+                                trackVizFlows = trackVizFlows,
+                                playing = { feature.stateFlow.value.playing },
+                                flexible = flexible,
+                            )
+                        } else {
+                            MixerStripsRow(
+                                uiState = uiState,
+                                actions = actions,
+                                decayedLevels = decayedLevels,
+                                smoothedPeak = smoothedPeak,
+                                busMutesDriveTracks = true,
+                                flexible = flexible,
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            MixerStripsRow(
+                uiState = uiState,
+                actions = actions,
+                decayedLevels = decayedLevels,
+                smoothedPeak = smoothedPeak,
+                busMutesDriveTracks = false,
+            )
+        }
     }
 }
 
@@ -150,6 +213,7 @@ private fun MeterDecayEffect(
     decayedLevels: Array<MutableFloatState>,
     smoothedPeak: MutableFloatState,
 ) {
+    val frameProbe = LocalBusMeterFrameProbe.current
     LaunchedEffect(trackVizFlows) {
         // Frame-clocked meter loop. withFrameNanos suspends until the Compose
         // choreographer requests a frame, so we only update when the screen is
@@ -164,6 +228,7 @@ private fun MeterDecayEffect(
         var prevNanos = 0L
         while (true) {
             val nanos = withFrameNanos { it }
+            frameProbe?.invoke()
             if (prevNanos == 0L) {
                 prevNanos = nanos
                 continue
@@ -237,6 +302,8 @@ private fun MixerStripsRow(
     actions: MixerPanelActions,
     decayedLevels: Array<MutableFloatState>,
     smoothedPeak: MutableFloatState,
+    busMutesDriveTracks: Boolean,
+    flexible: Boolean = false,
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
         Row(
@@ -253,25 +320,39 @@ private fun MixerStripsRow(
             val onKeysChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.KEYS, v) } }
             val onFxChange   = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.FX,   v) } }
             val onChange = arrayOf(onPercChange, onBassChange, onKeysChange, onFxChange)
+            val onMute = remember(actions) {
+                Array(GROUP_COUNT) { { actions.toggleTuningBusMute(MixerGroup.entries[it]) } }
+            }
 
             for (idx in 0 until GROUP_COUNT) {
                 val accent = GROUP_ACCENTS[idx]
                 val linearLevel = decayedLevels[idx].floatValue
                 val displayFraction = levelToDisplayFraction(linearLevel)
                 val gain = uiState.groupGains.getOrElse(idx) { 1f }
-                val muted = uiState.groupMuted.getOrElse(idx) { false }
+                // With TRACKS enabled the BUS mute is a shortcut into TrackTuning, not TRACK_N_MUTE.
+                val muted = if (busMutesDriveTracks) {
+                    uiState.tuningBusMuted.getOrElse(idx) { false }
+                } else {
+                    uiState.groupMuted.getOrElse(idx) { false }
+                }
+                // A TRACKS mute or solo can silence a whole bus; dim it so BAND shows what TRACKS did.
+                val silent = busMutesDriveTracks && uiState.tuning.isBusSilent(accent.group.tracks)
                 GroupStrip(
                     accent = accent,
                     gain = gain,
                     meterLevel = displayFraction,
                     muted = muted,
+                    silent = silent,
                     onGainChange = onChange[idx],
+                    onMuteToggle = if (busMutesDriveTracks) onMute[idx] else null,
+                    flexible = flexible,
                 )
             }
             DistStrip(
                 drive = uiState.drive,
                 peak = smoothedPeak.floatValue,
                 onDriveChange = actions.setDrive,
+                flexible = flexible,
             )
         }
     }
@@ -298,9 +379,15 @@ private fun FaderStrip(
     pulseColor: Color,
     valueText: String,
     valueColor: Color,
-    fader: @Composable () -> Unit,
+    muteToggle: (@Composable () -> Unit)? = null,
+    flexible: Boolean = false,
+    fader: @Composable (trackHeight: Int) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        if (muteToggle != null) {
+            muteToggle()
+            Spacer(modifier = Modifier.height(4.dp))
+        }
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -308,7 +395,7 @@ private fun FaderStrip(
                 .background(pulseColor),
         )
         Spacer(modifier = Modifier.height(6.dp))
-        fader()
+        FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT, fader)
         Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
@@ -332,26 +419,37 @@ private fun GroupStrip(
     meterLevel: Float,
     muted: Boolean,
     onGainChange: (Float) -> Unit,
+    onMuteToggle: (() -> Unit)? = null,
+    flexible: Boolean = false,
+    silent: Boolean = false,
 ) {
     val multiplier = faderToGain(gain)
-    val pulseAlpha = if (muted) 0.1f else (0.3f + meterLevel * 0.7f).coerceAtMost(1f)
+    // Muted shows on the chip too; silent (from solo or partial mutes) only dims the strip.
+    val dim = muted || silent
+    val pulseAlpha = if (dim) 0.1f else (0.3f + meterLevel * 0.7f).coerceAtMost(1f)
     FaderStrip(
         label = accent.label,
-        labelColor = accent.color.copy(alpha = if (muted) 0.4f else 1f),
+        labelColor = accent.color.copy(alpha = if (dim) 0.4f else 1f),
         pulseColor = accent.color.copy(alpha = pulseAlpha),
         // Live amplitude multiplier (0.75 fader → "1.00x"). Color smoothly
         // transitions yellow → green → red across unity. Muted bands keep
         // the accent-tinted dim look.
         valueText = formatMultiplier(multiplier),
-        valueColor = if (muted) accent.color.copy(alpha = 0.3f) else multiplierColor(multiplier),
-        fader = {
+        valueColor = if (dim) accent.color.copy(alpha = 0.3f) else multiplierColor(multiplier),
+        flexible = flexible,
+        muteToggle = onMuteToggle?.let { toggle ->
+            { StripToggle("M", "Mute ${accent.label} band", muted, OrpheusColors.mixerDistRed, toggle) }
+        },
+        fader = { height ->
             MixerFader(
                 value = gain,
                 onValueChange = onGainChange,
+                trackHeight = height,
+                ledCount = ledCountFor(height),
                 accentColor = accent.color,
-                meterLevel = if (muted) 0f else meterLevel,
-                glowIntensity = if (muted) 0f else (meterLevel * gain).coerceIn(0f, 1f),
-                dimmed = muted,
+                meterLevel = if (dim) 0f else meterLevel,
+                glowIntensity = if (dim) 0f else (meterLevel * gain).coerceIn(0f, 1f),
+                dimmed = dim,
                 unityTravel = UNITY_TRAVEL,
             )
         },
@@ -363,6 +461,7 @@ private fun DistStrip(
     drive: Float,
     peak: Float,
     onDriveChange: (Float) -> Unit,
+    flexible: Boolean = false,
 ) {
     val accent = OrpheusColors.seahawksGrey
     val peakFraction = peakToDisplayFraction(peak)
@@ -372,10 +471,13 @@ private fun DistStrip(
         pulseColor = accent.copy(alpha = (0.3f + peakFraction * 0.7f).coerceAtMost(1f)),
         valueText = formatTwoDp(drive),
         valueColor = accent.copy(alpha = 0.55f),
-        fader = {
+        flexible = flexible,
+        fader = { height ->
             MixerFader(
                 value = drive,
                 onValueChange = onDriveChange,
+                trackHeight = height,
+                ledCount = ledCountFor(height),
                 accentColor = accent,
                 meterLevel = peakFraction,
                 glowIntensity = (peakFraction * drive).coerceIn(0f, 1f),
@@ -399,7 +501,7 @@ private fun DistStrip(
 private const val PEAK_WINDOW_ENTRIES = 16
 
 /** Peak (max abs entry) over the tail of the per-block ring buffer; returns 0 for empty buffers. */
-private fun bufferPeak(buf: FloatArray, tailEntries: Int = PEAK_WINDOW_ENTRIES): Float {
+internal fun bufferPeak(buf: FloatArray, tailEntries: Int = PEAK_WINDOW_ENTRIES): Float {
     if (buf.isEmpty()) return 0f
     val start = (buf.size - tailEntries).coerceAtLeast(0)
     var peak = 0f
@@ -416,7 +518,7 @@ private fun bufferPeak(buf: FloatArray, tailEntries: Int = PEAK_WINDOW_ENTRIES):
  * linear=0.25 → ~0.67, linear=0.1 → ~0.44, linear=0.025 → ~0.11,
  * linear<=0.0158 (-36dB) → 0.
  */
-private fun levelToDisplayFraction(linearLevel: Float): Float {
+internal fun levelToDisplayFraction(linearLevel: Float): Float {
     if (linearLevel <= 0.0001f) return 0f
     val db = 20f * log10(linearLevel.coerceIn(0.0001f, 1f))
     return ((db - METER_FLOOR_DB) / -METER_FLOOR_DB).coerceIn(0f, 1f)

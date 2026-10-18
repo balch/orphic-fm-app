@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -35,10 +36,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -46,6 +52,11 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -61,6 +72,7 @@ import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.infrastructure.raisedAccentSurface
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Tolerance (in fader travel units) for the unity snap detent. ±0.025 ≈ 2.5%
@@ -100,6 +112,15 @@ private const val FADER_KEY_STEP = 0.025f
  * @param unityTravel If non-null, draws a horizontal tick across the track at
  *   this travel position (0..1) — the unity (0 dB) reference for console-style
  *   band faders. DIST leaves it null since drive has no unity convention.
+ * @param glass False drops the liquid glass over the LED ladder (the debug TRACKS strips).
+ * @param onDoubleTap If non-null, a double tap calls it instead of moving the thumb.
+ * @param meterProvider If non-null, the LED ladder and thumb glow read the live meter fraction from it
+ *   inside the draw/layer phase, so a changing meter never recomposes; [meterLevel] and
+ *   [glowIntensity] are then ignored.
+ * @param stepsLandOnUnity When true, a D-pad step that crosses [unityTravel] lands exactly on it,
+ *   so a TV user can return to unity.
+ * @param semanticsLabel If non-null, exposes the fader to accessibility services as a slider with
+ *   this description and [semanticsRange] units (travel 0..1 maps onto the range).
  */
 @Composable
 internal fun MixerFader(
@@ -121,6 +142,12 @@ internal fun MixerFader(
     glassTint: Color = accentColor,
     glassTintAlpha: Float = 0.15f,
     unityTravel: Float? = null,
+    glass: Boolean = true,
+    onDoubleTap: (() -> Unit)? = null,
+    meterProvider: (() -> Float)? = null,
+    stepsLandOnUnity: Boolean = false,
+    semanticsLabel: String? = null,
+    semanticsRange: ClosedFloatingPointRange<Float> = 0f..1f,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // null (the default, used by every real call site) means "use live focus state" below.
     previewFocused: Boolean? = null,
@@ -132,6 +159,7 @@ internal fun MixerFader(
     val usableRange = trackHeightPx - thumbHeightPx
 
     val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
 
@@ -149,9 +177,10 @@ internal fun MixerFader(
     val thumbY = (usableRange - thumbBottomPx).roundToInt()
 
     val effectiveAlpha = if (dimmed) 0.4f else 1f
+    val thumbShape = remember { RoundedCornerShape(6.dp) }
     val glowDp = (4 + glowIntensity * 14).dp
 
-    val litCount = if (dimmed) 0
+    val litCount = if (dimmed || meterProvider != null) 0
         else (meterLevel.coerceIn(0f, 1f) * ledCount).toInt().coerceAtMost(ledCount)
     val unlitColor = Color(0xFF15101A)
 
@@ -206,6 +235,19 @@ internal fun MixerFader(
         modifier = modifier
             .width((thumbWidth + 16).dp)
             .height(trackHeight.dp)
+            .then(
+                if (semanticsLabel == null) Modifier else Modifier.semantics {
+                    contentDescription = semanticsLabel
+                    progressBarRangeInfo = ProgressBarRangeInfo(
+                        current = value.coerceIn(0f, 1f) * semanticsRange.endInclusive,
+                        range = semanticsRange,
+                    )
+                    setProgress { target ->
+                        currentOnValueChange((target / semanticsRange.endInclusive).coerceIn(0f, 1f))
+                        true
+                    }
+                }
+            )
             .onFocusChanged {
                 liveFocused = it.isFocused
                 if (!it.isFocused) liveAdjusting = false
@@ -230,7 +272,13 @@ internal fun MixerFader(
                     Key.DirectionDown, Key.DirectionLeft -> -FADER_KEY_STEP
                     else -> return@onKeyEvent false
                 }
-                val next = (value + step).coerceIn(0f, 1f)
+                var next = (value + step).coerceIn(0f, 1f)
+                val unity = unityTravel
+                if (stepsLandOnUnity && unity != null && abs(value - unity) > 1e-4f &&
+                    (value - unity) * (next - unity) <= 0f
+                ) {
+                    next = unity
+                }
                 if (next != value) currentOnValueChange(next)
                 true
             }
@@ -261,20 +309,35 @@ internal fun MixerFader(
                     return if (kotlin.math.abs(raw - snapTo) <= UNITY_SNAP_TOLERANCE) snapTo else raw
                 }
 
+                // Up time of the last tap that did not drag; a second down soon after is a double tap.
+                var lastTapUpMs = 0L
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    val doubleTap = currentOnDoubleTap
+                    if (doubleTap != null && lastTapUpMs != 0L &&
+                        down.uptimeMillis - lastTapUpMs <= viewConfiguration.doubleTapTimeoutMillis
+                    ) {
+                        lastTapUpMs = 0L
+                        down.consume()
+                        doubleTap()
+                        drag(down.id) { it.consume() }
+                        return@awaitEachGesture
+                    }
                     dragging = true
                     val downTravel = travelFromY(down.position.y)
                     dragOffset = downTravel * usableRange
                     currentOnValueChange(downTravel)
                     down.consume()
 
+                    var dragged = false
                     drag(down.id) { change ->
                         change.consume()
+                        if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) dragged = true
                         val travel = travelFromY(change.position.y)
                         dragOffset = travel * usableRange
                         currentOnValueChange(travel)
                     }
+                    lastTapUpMs = if (dragged) 0L else currentEvent.changes.firstOrNull()?.uptimeMillis ?: 0L
                     dragging = false
                 }
             }
@@ -310,7 +373,7 @@ internal fun MixerFader(
                 .align(Alignment.Center)
                 .width(trackWidth.dp)
                 .height(trackHeight.dp)
-                .liquefiableVizEffects(faderLiquidState)
+                .then(if (glass) Modifier.liquefiableVizEffects(faderLiquidState) else Modifier)
                 .clip(RoundedCornerShape(5.dp))
                 .background(
                     Brush.verticalGradient(
@@ -323,36 +386,52 @@ internal fun MixerFader(
                 .border(1.dp, Color.White.copy(alpha = 0.05f * effectiveAlpha), RoundedCornerShape(5.dp))
                 .padding(horizontal = 2.dp, vertical = 2.dp),
         ) {
-            // Top-down: index 0 is top of ladder.
-            for (i in 0 until ledCount) {
-                val ladderIndex = ledCount - 1 - i  // bottom-up lighting count
-                val isLit = ladderIndex < litCount
-                val isHotZone = i < hotZoneCount
-                // Bottom of ladder reads dimmer; top reads brighter — like a real meter where
-                // quiet activity sits low and loud peaks dominate visually.
-                val positionFraction = ladderIndex.toFloat() / (ledCount - 1).coerceAtLeast(1)
-                val ledAlpha = effectiveAlpha * (0.4f + positionFraction * 0.6f)
-                val color = when {
-                    !isLit -> unlitColor
-                    peakStyle -> stoplightAt(positionFraction).copy(alpha = ledAlpha)
-                    alwaysHot -> accentColor.copy(alpha = ledAlpha)
-                    isHotZone -> OrpheusColors.mixerDistRed.copy(alpha = ledAlpha)
-                    else -> accentColor.copy(alpha = ledAlpha)
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(color),
+            if (meterProvider != null) {
+                // One draw pass reads the live meter; nothing recomposes as it moves.
+                Spacer(
+                    Modifier.fillMaxSize().drawBehind {
+                        val lit = if (dimmed) 0 else (meterProvider().coerceIn(0f, 1f) * ledCount).toInt().coerceAtMost(ledCount)
+                        val gap = 1.dp.toPx()
+                        val ledHeight = (size.height - gap * (ledCount - 1)) / ledCount
+                        val corner = CornerRadius(2.dp.toPx())
+                        for (i in 0 until ledCount) {
+                            val ladderIndex = ledCount - 1 - i
+                            val color = ledColor(
+                                ladderIndex < lit, i < hotZoneCount, ladderIndex, ledCount,
+                                effectiveAlpha, accentColor, alwaysHot, peakStyle, unlitColor,
+                            )
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(0f, i * (ledHeight + gap)),
+                                size = Size(size.width, ledHeight),
+                                cornerRadius = corner,
+                            )
+                        }
+                    }
                 )
+            } else {
+                // Top-down: index 0 is top of ladder.
+                for (i in 0 until ledCount) {
+                    val ladderIndex = ledCount - 1 - i  // bottom-up lighting count
+                    val color = ledColor(
+                        ladderIndex < litCount, i < hotZoneCount, ladderIndex, ledCount,
+                        effectiveAlpha, accentColor, alwaysHot, peakStyle, unlitColor,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(color),
+                    )
+                }
             }
         }
 
         // 3. Glass overlay — sibling of the liquefiable source. Sits over the
         //    track and refracts/tints the LEDs beneath. Same shape/size as the
         //    track; thumb passes over this and remains visually crisp.
-        Box(
+        if (glass) Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .width(trackWidth.dp)
@@ -380,11 +459,25 @@ internal fun MixerFader(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset { IntOffset(0, thumbY) }
-                .shadow(
-                    elevation = glowDp,
-                    shape = RoundedCornerShape(6.dp),
-                    ambientColor = accentColor,
-                    spotColor = accentColor,
+                .then(
+                    if (meterProvider != null) {
+                        // Same glow as shadow(), but its elevation is read at layer time.
+                        Modifier.graphicsLayer {
+                            val glow = if (dimmed) 0f else meterProvider().coerceIn(0f, 1f)
+                            shadowElevation = (4 + glow * 14).dp.toPx()
+                            shape = thumbShape
+                            clip = false
+                            ambientShadowColor = accentColor
+                            spotShadowColor = accentColor
+                        }
+                    } else {
+                        Modifier.shadow(
+                            elevation = glowDp,
+                            shape = thumbShape,
+                            ambientColor = accentColor,
+                            spotColor = accentColor,
+                        )
+                    }
                 )
                 .size(thumbWidth.dp, thumbHeight.dp)
                 .clip(RoundedCornerShape(6.dp))
@@ -398,6 +491,31 @@ internal fun MixerFader(
                 )
                 .border(1.dp, Color.White.copy(alpha = 0.25f * effectiveAlpha), RoundedCornerShape(6.dp))
         )
+    }
+}
+
+/** Colour of one LED: unlit chip, or the accent / hot-zone / stoplight shade by ladder position. */
+private fun ledColor(
+    isLit: Boolean,
+    isHotZone: Boolean,
+    ladderIndex: Int,
+    ledCount: Int,
+    effectiveAlpha: Float,
+    accentColor: Color,
+    alwaysHot: Boolean,
+    peakStyle: Boolean,
+    unlitColor: Color,
+): Color {
+    // Bottom of ladder reads dimmer; top reads brighter, like a real meter where
+    // quiet activity sits low and loud peaks dominate visually.
+    val positionFraction = ladderIndex.toFloat() / (ledCount - 1).coerceAtLeast(1)
+    val ledAlpha = effectiveAlpha * (0.4f + positionFraction * 0.6f)
+    return when {
+        !isLit -> unlitColor
+        peakStyle -> stoplightAt(positionFraction).copy(alpha = ledAlpha)
+        alwaysHot -> accentColor.copy(alpha = ledAlpha)
+        isHotZone -> OrpheusColors.mixerDistRed.copy(alpha = ledAlpha)
+        else -> accentColor.copy(alpha = ledAlpha)
     }
 }
 
