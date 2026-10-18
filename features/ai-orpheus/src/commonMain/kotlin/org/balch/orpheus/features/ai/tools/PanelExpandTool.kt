@@ -53,9 +53,10 @@ class PanelExpandTool(
         Expand or collapse UI panels in the synthesizer interface.
         Use this to show relevant panels before performing actions,
         like expanding the CODE panel before inserting REPL patterns.
-        Available panels: presets, midi, viz, evo, lfo, delay, reverb,
-        distortion, resonator, code, ai, beats, drums, grains, looper,
-        warps, flux, flux_triggers, speech, tweaks.
+        Available panels: presets, midi, viz, evo, lfo, tides, delay,
+        reverb, distortion, horn, resonator, grains, warps, dj, flux,
+        flux_triggers, drums, beats, bass, code, vibe_create, looper,
+        speech, mediapipe, pulsar, timer, record, ai.
     """.trimIndent()
         ) {
             override suspend fun execute(args: PanelExpandArgs): PanelExpandResult {
