@@ -315,6 +315,7 @@ if(BUILD_TESTS)
         test/test_pulsar_tension.cpp
         test/test_pulsar_solos.cpp
         test/test_pulsar_sections.cpp
+        test/test_pulsar_section_seams.cpp
         test/test_pulsar_void.cpp
         test/test_wah_core.cpp
         test/test_pulsar_lick_wah.cpp

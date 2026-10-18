@@ -424,6 +424,17 @@ inline int jam_step_note(int degree, int step_index, int root, const PulsarScale
                                  note_low, note_high);
 }
 
+// Move a jam note `delta` scale degrees and fit it to a track's register, so a sibling
+// lick track can echo the lead's ornament a lickDegreeOffset away.
+inline int shift_jam_note_degrees(int note, int delta, int root, const PulsarScale& scale,
+                                  int note_low, int note_high) {
+    if (scale.count <= 0) return fit_jam_note_to_range(note, note_low, note_high);
+    const int deg = midi_to_lick_degree(note, root, scale) + delta;
+    const int d = ((deg % scale.count) + scale.count) % scale.count;
+    const int oct = (deg - d) / scale.count;   // exact since deg-d is a multiple of count
+    return fit_jam_note_to_range(root + oct * 12 + scale.degrees[d], note_low, note_high);
+}
+
 // Create-mode: generate a fresh chord-anchored improvised line into steps[] for the
 // Jam lead, recording the phrase for cross-soloist carryover.
 inline void generate_jam_solo_line(SoloBehaviorParam& behavior, BandSoloState& solo_state,

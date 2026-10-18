@@ -524,6 +524,7 @@ bool run_pulsar_signal_tests();
 bool run_pulsar_tension_tests();
 bool run_pulsar_solos_tests();
 bool run_pulsar_sections_tests();
+bool run_pulsar_section_seams_tests();
 bool run_pulsar_void_tests();
 bool run_wah_core_tests();
 bool run_pulsar_lick_wah_tests();
