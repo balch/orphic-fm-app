@@ -62,9 +62,10 @@ class PanelSetTool(
         - "list": Show all available panel sets and their panels.
         - "apply": Activate an existing panel set by name.
         - "create": Create a new panel set from a list of panel IDs, then activate it.
-        Available panel IDs: presets, midi, viz, evo, lfo, delay, reverb,
-        distortion, resonator, code, ai, beats, drums, grains, looper,
-        warps, flux, flux_triggers, speech, tweaks.
+        Available panel IDs: presets, midi, viz, evo, lfo, tides, delay,
+        reverb, distortion, horn, resonator, grains, warps, dj, flux,
+        flux_triggers, drums, beats, bass, code, vibe_create, looper,
+        speech, mediapipe, pulsar, timer, record, ai.
     """.trimIndent()
         ) {
             override suspend fun execute(args: PanelSetArgs): PanelSetResult {
