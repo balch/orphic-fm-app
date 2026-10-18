@@ -29,16 +29,8 @@ class VizStage {
         private set
 
     /**
-     * A band of chrome drawn inside [bounds] that never fades with the panels. Only the tabletop
-     * layout has one: its header sits between the folded halves, so the picture spans it while
-     * taps on it still have to land.
-     */
-    var chromeBand: Rect? by mutableStateOf(null)
-        private set
-
-    /**
      * Chrome from outside [bounds] that reaches into it and never fades: the phone bar's raised
-     * dome. Independent of [chromeBand], since the tabletop layout has both.
+     * dome.
      */
     var chromeOverhang: Rect? by mutableStateOf(null)
         private set
@@ -46,11 +38,6 @@ class VizStage {
     /** onGloballyPositioned fires on every layout pass, so only a real move is published. */
     fun report(rect: Rect) {
         if (rect != bounds) bounds = rect
-    }
-
-    /** Null in every layout whose chrome already sits outside [bounds]. */
-    fun reportChromeBand(rect: Rect?) {
-        if (rect != chromeBand) chromeBand = rect
     }
 
     /** Null wherever no chrome reaches into [bounds]. */
@@ -68,10 +55,6 @@ val LocalVizStage = compositionLocalOf<VizStage?> { null }
 /** Reports this node's root bounds as the stage. */
 fun Modifier.vizStage(stage: VizStage?): Modifier =
     if (stage == null) this else onGloballyPositioned { stage.report(it.boundsInRoot()) }
-
-/** Reports this node as the strip of never-fading chrome sitting inside the stage. */
-fun Modifier.vizStageChrome(stage: VizStage?): Modifier =
-    if (stage == null) this else onGloballyPositioned { stage.reportChromeBand(it.boundsInRoot()) }
 
 /**
  * Reports this node as chrome reaching into the stage from outside it. Its whole rect, unclipped,

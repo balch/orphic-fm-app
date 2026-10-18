@@ -376,45 +376,50 @@ class DjLayoutRenderHarness {
                                 timerFeature = TimerViewModel.previewFeature(),
                                 onTogglePlayback = {},
                             ) {
-                                DjTabletopLayout(
-                                    hinge = hinge,
-                                    top = { mod ->
-                                        PulsarPanel(
-                                            pulsar = PulsarViewModel.previewFeature(),
-                                            vizFlow = emptyPulsarVizFlow,
-                                            trackVizFlows = emptyTrackVizFlows,
-                                            modifier = mod,
-                                            isExpanded = true,
-                                            onExpandedChange = {},
-                                            showCollapsedHeader = false,
-                                            showExpandedTitle = false,
-                                        )
-                                    },
-                                    bottom = { mod ->
-                                        Column(mod) {
-                                            DjAppHeaderRow(
-                                                vizFeature = VizViewModel.previewFeature(),
-                                                onInfoClick = {},
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                Column(Modifier.fillMaxSize()) {
+                                    DjAppHeaderRow(
+                                        vizFeature = VizViewModel.previewFeature(),
+                                        onInfoClick = {},
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    )
+                                    DjTabletopLayout(
+                                        hinge = hinge,
+                                        modifier = Modifier.weight(1f),
+                                        top = { mod ->
+                                            var slotPx by remember { mutableIntStateOf(0) }
+                                            val gridHeight = if (slotPx == 0) PulsarGridHeight else {
+                                                pulsarGridHeightFor(slotPx.dp, PulsarGridHeight)
+                                            }
+                                            PulsarPanel(
+                                                pulsar = PulsarViewModel.previewFeature(),
+                                                vizFlow = emptyPulsarVizFlow,
+                                                trackVizFlows = emptyTrackVizFlows,
+                                                modifier = mod.onSizeChanged { slotPx = it.height },
+                                                isExpanded = true,
+                                                onExpandedChange = {},
+                                                showCollapsedHeader = false,
+                                                showExpandedTitle = false,
+                                                gridHeight = gridHeight,
                                             )
-                                            Row(
-                                                Modifier.weight(1f).fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            ) {
+                                        },
+                                        bottom = { mod ->
+                                            Row(mod, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 case.panels.forEach { route ->
                                                     PreviewRoutePanel(route, Modifier.weight(1f).fillMaxHeight())
                                                 }
                                             }
-                                        }
-                                    },
-                                )
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
                 }
                 try {
+                    // The halves and the grid flex both size from what the previous frame measured.
+                    scene.render()
                     File(outDir, "tabletop-${case.name}.png")
                         .writeBytes(scene.render().encodeToData()!!.bytes)
                 } finally {

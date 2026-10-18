@@ -29,7 +29,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -120,7 +119,6 @@ import org.balch.orpheus.ui.viz.PanelIdleFadeWatcher
 import org.balch.orpheus.ui.viz.PanelWakeOverlay
 import org.balch.orpheus.ui.viz.panelIdleFade
 import org.balch.orpheus.ui.viz.vizStage
-import org.balch.orpheus.ui.viz.vizStageChrome
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -521,7 +519,7 @@ internal fun sheetAfterBarTab(activeSheet: DjRoute?, tapped: DjRoute): DjRoute? 
 internal fun anyTurntableUp(state: DjUiState): Boolean = state.wetA > 0f || state.wetB > 0f
 
 /**
- * The stage for each [DjLayout]; tabletop puts Pulsar above the hinge and everything else below.
+ * The stage for each [DjLayout]; tabletop puts the header and Pulsar above the hinge, the panels below.
  *
  * Internal rather than private so `DjAppMainContentWiringTest` can drive the real thing: the stage
  * report and the idle fade are per-branch modifiers, and a test on a stand-in layout would pass
@@ -666,46 +664,49 @@ internal fun DjAppMainContent(
             }
         }
         is DjLayout.Tabletop -> {
-            // Pulsar alone fills the upright half. The header's title and viz picker are touch
-            // controls, so they sit on the flat half with the panels (render sweep: no room above).
-            //
-            // Its header is the one that sits INSIDE the reported stage, between the two halves,
-            // so it is reported separately and the wake overlay leaves it live. Cleared on the way
-            // out, or the next layout would keep a hole where this header used to be.
-            DisposableEffect(stage) { onDispose { stage?.reportChromeBand(null) } }
-            DjTabletopLayout(
-                hinge = layout.hinge,
-                // The whole folded region is the stage: the hinge splits the panels, not the
-                // picture, and the set is happier spanning it than squeezed into one half.
-                modifier = Modifier.vizStage(stage),
-                top = { mod ->
-                    PulsarPanel(
-                        pulsar = pulsarFeature,
-                        vizFlow = synthEngine.pulsarVizFlow,
-                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                        modifier = mod.panelIdleFade(fade),
-                        isExpanded = true,
-                        onExpandedChange = {},
-                        showCollapsedHeader = false,
-                        showExpandedTitle = false,
-                        selectors = djVibeSelectors(),
-                    )
-                },
-                bottom = { mod ->
-                    Column(mod) {
-                        DjAppHeaderRow(
-                            vizFeature = vizFeature,
-                            onInfoClick = onShowVibeInfo,
-                            // Reported first in the chain, so the live band covers the padding too.
-                            modifier = Modifier
-                                .vizStageChrome(stage)
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+            // Header across the top of the upright half, outside the stage as in portrait, then
+            // Pulsar down to the hinge and the panels on the flat half. DjTabletopLayout measures
+            // its own window offset, so the header's height comes off Pulsar's half alone.
+            Column(modifier = Modifier.fillMaxSize()) {
+                DjAppHeaderRow(
+                    vizFeature = vizFeature,
+                    onInfoClick = onShowVibeInfo,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    insetSides = WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                )
+                DjTabletopLayout(
+                    hinge = layout.hinge,
+                    // The whole folded region is the stage: the hinge splits the panels, not the
+                    // picture, and the set is happier spanning it than squeezed into one half.
+                    modifier = Modifier.weight(1f).vizStage(stage),
+                    top = { mod ->
+                        // Sharing the half with the header leaves Pulsar short of a full grid on
+                        // a low crease, so it flexes as portrait does.
+                        var pulsarSlotPx by remember { mutableIntStateOf(0) }
+                        val density = LocalDensity.current
+                        val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
+                            pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
+                        }
+                        PulsarPanel(
+                            pulsar = pulsarFeature,
+                            vizFlow = synthEngine.pulsarVizFlow,
+                            trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                            modifier = mod
+                                .onSizeChanged { pulsarSlotPx = it.height }
+                                .panelIdleFade(fade),
+                            isExpanded = true,
+                            onExpandedChange = {},
+                            showCollapsedHeader = false,
+                            showExpandedTitle = false,
+                            gridHeight = gridHeight,
+                            selectors = djVibeSelectors(),
                         )
-                        lowerPanels(Modifier.weight(1f).fillMaxWidth().panelIdleFade(fade))
-                    }
-                },
-            )
+                    },
+                    bottom = { mod -> lowerPanels(mod.panelIdleFade(fade)) },
+                )
+            }
         }
     }
 }

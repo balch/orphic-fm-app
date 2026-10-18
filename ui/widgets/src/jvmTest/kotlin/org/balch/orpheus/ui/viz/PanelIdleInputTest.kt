@@ -150,7 +150,7 @@ class PanelIdleInputTest {
         )
     }
 
-    /** Tabletop with the bar: the header band and the dome, each applied to what the other left. */
+    /** Two holes, each applied to what the other left. */
     @Test
     fun `a band and a dome together leave both live`() {
         val stage = Rect(0f, 0f, 400f, 800f)

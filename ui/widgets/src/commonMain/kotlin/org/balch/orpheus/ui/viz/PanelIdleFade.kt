@@ -186,7 +186,7 @@ fun PanelWakeOverlay(fade: PanelIdleFade?, stage: VizStage?, enabled: Boolean) {
     val covering by remember(fade) { derivedStateOf { fade.alpha.value < 1f } }
     val bounds = stage.bounds
     if (!covering || bounds == null || bounds.isEmpty) return
-    wakeBlockers(bounds, listOf(stage.chromeBand, stage.chromeOverhang)).forEach { rect -> WakeBlocker(rect) }
+    wakeBlockers(bounds, listOf(stage.chromeOverhang)).forEach { rect -> WakeBlocker(rect) }
 }
 
 /**

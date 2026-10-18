@@ -78,8 +78,8 @@ class DjAppMainContentWiringTest {
                 "${case.name}: the stage $stage escapes the content area ${shot.content}",
             )
 
-            // Nothing inside the stage may be painted: everything there wears the fade. The
-            // tabletop header and the phone bar's raised dome are the chrome inside it, and keep drawing.
+            // Nothing inside the stage may be painted: everything there wears the fade. The phone
+            // bar's raised dome is the chrome inside it, and keeps drawing.
             val faded = stage.deflate(EdgeSlack)
             val painted = shot.paintedIn(faded, except = case.chromeInStage(shot))
             assertTrue(
@@ -284,7 +284,6 @@ class DjAppMainContentWiringTest {
     /** One rendered frame plus what the layout reported while producing it. */
     private class Shot(
         val stage: Rect?,
-        val chromeBand: Rect?,
         /** The vibe transport's bounds, ring and name: the phone bar's ring rises into the stage. */
         val transport: Rect?,
         val content: Rect,
@@ -340,29 +339,12 @@ class DjAppMainContentWiringTest {
         /** Whether a header of this layout's own sits between the content top and the stage. */
         val headerAboveStage: Boolean = true,
     ) {
-        /** Tabletop reports the band its header occupies, and the phone bar's ring rises over the stage's bottom edge. */
+        /** The phone bar's ring rises over the stage's bottom edge. */
         fun chromeInStage(shot: Shot): List<Rect> = listOfNotNull(
-            if (layout is DjLayout.Tabletop) shot.chromeBand?.deflate(-EdgeSlack) else null,
             if (!layout.usesLandscapeChrome()) shot.transport?.deflate(-EdgeSlack) else null,
         )
 
         fun assertHeader(shot: Shot, stage: Rect) {
-            if (layout is DjLayout.Tabletop) {
-                val band = assertNotNull(
-                    shot.chromeBand,
-                    "$name: the header between the folded halves was never reported, so the " +
-                        "wake overlay would cover it",
-                )
-                assertTrue(
-                    stage.contains(band, slack = 1f),
-                    "$name: the chrome band $band is not inside the stage $stage",
-                )
-                assertTrue(
-                    shot.paintedIn(band.deflate(EdgeSlack)) > 0,
-                    "$name: the header band painted nothing, so the case proves nothing",
-                )
-                return
-            }
             if (!headerAboveStage) return
             val above = Rect(shot.content.left, shot.content.top, shot.content.right, stage.top)
             assertTrue(
@@ -428,7 +410,6 @@ class DjAppMainContentWiringTest {
                 .toPixelMap()
             Shot(
                 stage = stage.bounds,
-                chromeBand = stage.chromeBand,
                 transport = scene.semanticsOwners.firstNotNullOfOrNull { it.rootSemanticsNode.findTransport() }?.boundsInRoot,
                 content = content,
                 width = case.width,
