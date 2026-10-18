@@ -942,6 +942,16 @@ enum class PulsarSymbol(
     TRACK_6_MUTE("track_6_mute"),
     TRACK_7_MUTE("track_7_mute"),
 
+    // Debug audition gain (DJ app TRACKS view): mute/solo/level as one multiplier, 1.0 = untouched
+    TRACK_0_AUDITION_GAIN("track_0_audition_gain"),
+    TRACK_1_AUDITION_GAIN("track_1_audition_gain"),
+    TRACK_2_AUDITION_GAIN("track_2_audition_gain"),
+    TRACK_3_AUDITION_GAIN("track_3_audition_gain"),
+    TRACK_4_AUDITION_GAIN("track_4_audition_gain"),
+    TRACK_5_AUDITION_GAIN("track_5_audition_gain"),
+    TRACK_6_AUDITION_GAIN("track_6_audition_gain"),
+    TRACK_7_AUDITION_GAIN("track_7_audition_gain"),
+
     // Per-track mod LFO parameters
     TRACK_0_MOD_LFO_RATE("track_0_mod_lfo_rate"),
     TRACK_1_MOD_LFO_RATE("track_1_mod_lfo_rate"),

@@ -2757,6 +2757,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->seed_counter = static_cast<uint32_t>(
             std::chrono::duration_cast<std::chrono::microseconds>(now).count());
         state->mutation_seed = state->seed_counter ^ 0xDEADBEEF;
+        // A rebuilt engine starts on its audition gains rather than fading to them.
+        for (int t = 0; t < kNumPulsarTracks; t++)
+            state->audition_gain[t] = std::max(0.0f,
+                engine->pulsar_track_audition_gain[t].load(std::memory_order_relaxed));
         state->loop_count = 0;
         state->loops_since_reset = 0;
         std::memset(state->voice_alloc_buffers, 0, sizeof(state->voice_alloc_buffers));
@@ -3185,6 +3189,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     double void_cursor_start = state->void_state.cursor;
     state->void_state.cursor += static_cast<double>(num_frames) / samples_per_step;
 
+    // Audition gain smoothing: 5 ms time constant whatever the block size.
+    const float audition_coeff = 1.0f - std::exp(-static_cast<float>(num_frames) / (0.005f * sample_rate));
+
     // ── Zero output buffers ──
     std::memset(out_l, 0, num_frames * sizeof(float));
     std::memset(out_r, 0, num_frames * sizeof(float));
@@ -3591,6 +3598,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         bool track_muted = engine->pulsar_track_mute[t].load(std::memory_order_relaxed) != 0
                            || ts.section_density_out;
         if (track_muted) track_volume = 0.0f;
+        // Debug audition gain: a ~5 ms per-block one-pole, snapping onto its target. While it
+        // moves, the buffer is ramped per sample below; a steady gain folds into the volume
+        // here, and the default 1.0 multiplies by exactly 1.0f.
+        const float aud_start = state->audition_gain[t];
+        float aud_end = aud_start;
+        {
+            const float aud_target = std::max(0.0f,
+                engine->pulsar_track_audition_gain[t].load(std::memory_order_relaxed));
+            aud_end += (aud_target - aud_end) * audition_coeff;
+            if (std::fabs(aud_target - aud_end) < 1e-4f) aud_end = aud_target;
+            state->audition_gain[t] = aud_end;
+            if (aud_end == aud_start) track_volume *= aud_end;
+        }
 #ifdef ORPHEUS_TESTING
         engine->pulsar_track_volume_debug[t].store(track_volume, std::memory_order_relaxed);
 #endif
@@ -6080,6 +6100,18 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if (grain_track) mist_side[i] *= breathe;
             }
             state->breathe_env[t] = env;
+        }
+
+        // ── Audition gain ramp ──
+        // Only while the gain moves: a linear ramp across the block on the rendered buffer,
+        // so the dry mix, sends and Mist side term all follow without a seam.
+        if (aud_end != aud_start) {
+            const float step = (aud_end - aud_start) / static_cast<float>(num_frames);
+            for (int i = 0; i < num_frames; i++) {
+                const float g = aud_start + step * static_cast<float>(i + 1);
+                track_buffer[i] *= g;
+                if (grain_track) mist_side[i] *= g;
+            }
         }
 
         // ── Mix to stereo with constant-power pan ──

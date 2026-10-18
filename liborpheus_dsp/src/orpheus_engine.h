@@ -1231,6 +1231,9 @@ struct OrpheusEngine {
 
     // Track mute (0=enabled, 1=muted) — UI toggle, not persisted
     std::atomic<int>   pulsar_track_mute[8] = {};
+    // Debug audition gain (DJ app TRACKS view), multiplies the final track volume. Default 1.0
+    // is set in orpheus_engine_create; mute and solo arrive here as 0.
+    std::atomic<float> pulsar_track_audition_gain[8] = {};
 
     // Per-track delay/reverb sends — per-engine
     std::atomic<float> pulsar_track_delay_send[8] = {};

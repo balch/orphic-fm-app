@@ -46,6 +46,10 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->pulsar_track_grain_size_space[t].store(0.5f, std::memory_order_relaxed);
     }
 
+    // Audition gain is a multiplier, so unity is the untouched mix.
+    for (int t = 0; t < 8; t++)
+        engine->pulsar_track_audition_gain[t].store(1.0f, std::memory_order_relaxed);
+
     // Vibrato rate mirrors OrpheusEngine.kt; depth stays 0 (off).
     for (int t = 0; t < 8; t++) {
         engine->pulsar_track_vibrato_rate[t].store(5.5f, std::memory_order_relaxed);

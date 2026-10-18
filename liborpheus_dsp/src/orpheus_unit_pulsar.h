@@ -1390,6 +1390,9 @@ struct PulsarState {
     float    breathe_floor[kNumPulsarTracks] = {};
     float    breathe_span[kNumPulsarTracks] = {};
 
+    // Smoothed audition gain actually applied, chasing pulsar_track_audition_gain per block.
+    float    audition_gain[kNumPulsarTracks] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
+
     uint32_t master_anomaly_seed = 0;   // play-scoped RNG for Master* anomaly rolls/durations
     bool force_lick_anomaly = false;    // one-shot: force the OG lick anomaly at the next resolve
     float section_total_steps = 0.0f;   // drawn section length in steps, snapshot at entry

@@ -158,6 +158,7 @@ class PulsarPlugin : DspPlugin {
     private var _tensionEvoAttackPoint = 0.5f
     private var _tensionEvoReleaseSpeed = 0.3f
     private var _trackEvoWeight = floatArrayOf(-1f, -1f, -1f, -1f, -1f, -1f, -1f, -1f)
+    private val _trackAuditionGain = FloatArray(8) { 1f }
     private val _modLfoRate = FloatArray(8) { 0.2f }
     private val _modLfoDepth = FloatArray(8) { 0f }
     private val _modLfoShape = FloatArray(8) { 0.3f }
@@ -741,6 +742,16 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_WEIGHT.ordinal + t]) {
                 floatType { default = -1f; min = -1f; max = 1f; get { _trackEvoWeight[t] }; set { _trackEvoWeight[t] = it } }
+            }
+        }
+
+        // Debug audition gain. Session state from the TRACKS view: never saved in a preset.
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + t]) {
+                floatType {
+                    default = 1f; min = 0f; max = 1.5f; excludeFromPresets = true
+                    get { _trackAuditionGain[t] }; set { _trackAuditionGain[t] = it }
+                }
             }
         }
 
