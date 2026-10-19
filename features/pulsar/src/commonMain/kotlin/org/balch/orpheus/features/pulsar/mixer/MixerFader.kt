@@ -112,7 +112,6 @@ private const val FADER_KEY_STEP = 0.025f
  * @param unityTravel If non-null, draws a horizontal tick across the track at
  *   this travel position (0..1) — the unity (0 dB) reference for console-style
  *   band faders. DIST leaves it null since drive has no unity convention.
- * @param glass False drops the liquid glass over the LED ladder (the debug TRACKS strips).
  * @param onDoubleTap If non-null, a double tap calls it instead of moving the thumb.
  * @param meterProvider If non-null, the LED ladder and thumb glow read the live meter fraction from it
  *   inside the draw/layer phase, so a changing meter never recomposes; [meterLevel] and
@@ -142,7 +141,6 @@ internal fun MixerFader(
     glassTint: Color = accentColor,
     glassTintAlpha: Float = 0.15f,
     unityTravel: Float? = null,
-    glass: Boolean = true,
     onDoubleTap: (() -> Unit)? = null,
     meterProvider: (() -> Float)? = null,
     stepsLandOnUnity: Boolean = false,
@@ -373,7 +371,7 @@ internal fun MixerFader(
                 .align(Alignment.Center)
                 .width(trackWidth.dp)
                 .height(trackHeight.dp)
-                .then(if (glass) Modifier.liquefiableVizEffects(faderLiquidState) else Modifier)
+                .liquefiableVizEffects(faderLiquidState)
                 .clip(RoundedCornerShape(5.dp))
                 .background(
                     Brush.verticalGradient(
@@ -431,7 +429,7 @@ internal fun MixerFader(
         // 3. Glass overlay — sibling of the liquefiable source. Sits over the
         //    track and refracts/tints the LEDs beneath. Same shape/size as the
         //    track; thumb passes over this and remains visually crisp.
-        if (glass) Box(
+        Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .width(trackWidth.dp)

@@ -226,7 +226,6 @@ private fun TrackStrip(
                 ledCount = ledCountFor(height),
                 hotZoneCount = 3,
                 unityTravel = TRACK_UNITY_TRAVEL,
-                glass = false,
                 onDoubleTap = { actions.setTrackLevel(track, TrackTuning.UNITY) },
             )
         }
