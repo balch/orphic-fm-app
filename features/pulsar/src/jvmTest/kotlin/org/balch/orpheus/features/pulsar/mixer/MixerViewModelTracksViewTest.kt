@@ -120,15 +120,18 @@ class MixerViewModelTracksViewTest {
     private fun bass() = ports[PulsarSymbol.BASS_GAIN.symbol]?.asFloat()
     private fun drive() = ports[DistortionSymbol.DRIVE.symbol]?.asFloat()
 
-    /** Pulls BASS and DIST off their defaults and flips to TRACKS. */
+    private fun perc() = ports[PulsarSymbol.PERC_MIX.symbol]?.asFloat()
+
+    /** Pulls BASS, PERC and DIST off their defaults and flips to TRACKS. */
     private fun MixerViewModel.dialIn() {
         actions.setGroupGain(MixerGroup.BASS, 0.2f)
+        actions.setGroupGain(MixerGroup.PERC, 0.4f)
         actions.setDrive(0.9f)
         actions.setTracksView(true)
     }
 
     @Test
-    fun switchingToADifferentVibeResetsTheDesk() = runTest(testDispatcher) {
+    fun switchingToADifferentVibeResetsTheFadersButKeepsDistAndPerc() = runTest(testDispatcher) {
         pulsar.applyVibe(vibe) // the startup restore
         val vm = makeViewModel()
         backgroundScope.launch { vm.stateFlow.collect {} }
@@ -140,7 +143,9 @@ class MixerViewModelTracksViewTest {
         advanceUntilIdle()
 
         assertEquals(0.75f, bass())
-        assertEquals(0.30f, drive())
+        assertEquals(0.4f, perc())
+        assertEquals(0.9f, drive())
+        assertEquals(0.9f, ports[DistortionSymbol.MIX.symbol]?.asFloat())
         // The view is a session choice: only an app start puts it back on BAND.
         assertEquals(true, vm.stateFlow.value.tracksView)
     }

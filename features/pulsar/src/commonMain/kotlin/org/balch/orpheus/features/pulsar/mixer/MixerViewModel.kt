@@ -204,9 +204,9 @@ class MixerViewModel(
         driveId.value = FloatValue(DEFAULT_DRIVE)
         mixId.value = FloatValue(DEFAULT_DRIVE)
 
-        // DJ app only: switching to a different vibe starts from a clean desk, faders at unity
-        // and DIST at its default. Same-vibe re-applies (launch restore, preset reload, engine
-        // rebuild) keep the mix. Orpheus never resets: its Distortion panel shares DRIVE/MIX.
+        // DJ app only: switching to a different vibe puts BASS/KEYS/FX back at unity; DIST and PERC
+        // are the listener's taste and carry over. Same-vibe re-applies (launch restore, preset
+        // reload, engine rebuild) keep the mix. Orpheus never resets: its Distortion panel shares DRIVE/MIX.
         if (playbackMode == PulsarPlaybackMode.EXPLICIT) {
             // Count 0 means the startup restore has not run yet; its load seats the name silently.
             var seenVibe = pulsarFeature.vibeFlow.value.name.takeIf { pulsarFeature.vibeLoadCount.value > 0 }
@@ -222,12 +222,9 @@ class MixerViewModel(
     }
 
     private fun resetMix() {
-        percMixId.value = FloatValue(UNITY_FADER)
         bassGainId.value = FloatValue(UNITY_FADER)
         keysGainId.value = FloatValue(UNITY_FADER)
         fxGainId.value = FloatValue(UNITY_FADER)
-        driveId.value = FloatValue(DEFAULT_DRIVE)
-        mixId.value = FloatValue(DEFAULT_DRIVE)
     }
 
     private fun onGroupGainChanged(group: MixerGroup, value: Float) {
