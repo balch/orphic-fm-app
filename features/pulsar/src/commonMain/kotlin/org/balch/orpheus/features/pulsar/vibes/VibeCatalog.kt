@@ -90,7 +90,6 @@ object VibeCatalog {
 
     /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
     private val entryList: List<Pair<VibeName, CatalogEntry>> = listOf(
-        VibeNames.ORPHIC_LORE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "wah", "psych")),
         VibeNames.RUST_BELT to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
         VibeNames.DOG_HOUSE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
         VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
@@ -100,6 +99,7 @@ object VibeCatalog {
         VibeNames.SPACE_AND_DRUMS to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
         VibeNames.TECHNO_WOBBLE to CatalogEntry(VibeStatus.LIVE, tags = listOf("club")),
         VibeNames.VELVET_LEASH to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock")),
+        VibeNames.ORPHIC_LORE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "wah", "psych")),
         VibeNames.VOLTAGE_STRUT to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         VibeNames.LOST_IN_SPACE to CatalogEntry(VibeStatus.LIVE, tags = listOf("ambient")),
         VibeNames.STAY_ASLEEP to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff", "blues", "minimal", "cinematic")),

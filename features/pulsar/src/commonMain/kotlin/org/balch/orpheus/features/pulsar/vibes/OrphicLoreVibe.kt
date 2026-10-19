@@ -227,28 +227,6 @@ class OrphicLoreVibe : VibeProvider {
 
 
     private val peakLick = funkSketch
-/*
-    generateMainLick(
-        override1 = LickStepOverride(
-            hitProbability = 0.8f,
-            glideRate = 0.8f,
-        ),
-        override2 = LickStepOverride(
-            hitProbability = 0.8f,
-            glideRate = 0.8f,
-        ),
-        override3 = LickStepOverride(
-            hitProbability = 0.8f,
-            glideRate = 0.8f,
-        ),
-        override4 = LickStepOverride(
-            hitProbability = 0.8f,
-            glideRate = 0.8f,
-        )
-    )
-
- */
-
     private val lickPool = listOf(descent, verseLick, riseLick, vampLick, peakLick)
 
     override val vibe: Vibe by lazy {
@@ -468,7 +446,7 @@ class OrphicLoreVibe : VibeProvider {
                 // (rise, vamp, peak) the brighter B3-style "60s organ". The vibrato stands in for
                 // the Leslie: a slow chorale on the Hammond, the fast rotor on the B3.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX3, volume = 0.5f,
+                    engineId = OrpheusEngineId.DX3, volume = 0.4f,
                     harmonics = 0.107f,                       // DX3 idx 3 "60s organ" (auto-pinned)
                     vibratoDepth = 12f, vibratoRate = 6.5f,   // fast rotor
                     noteRangeLow = 50, noteRangeHigh = 74,    // D3 to D5, under the guitar
@@ -612,6 +590,7 @@ class OrphicLoreVibe : VibeProvider {
                             2 to TrackSectionOverride(density = 0f),
                             4 to TrackSectionOverride(density = 0f),  // guitar and organ out
                             6 to TrackSectionOverride(density = 0f),
+                            7 to TrackSectionOverride(density = 0f),
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
@@ -624,7 +603,9 @@ class OrphicLoreVibe : VibeProvider {
                         lickIndex = 1,
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
-                            5 to TrackSectionOverride(breatheBars = 2, breatheFloor = 0.55f),                        ),
+                            5 to TrackSectionOverride(breatheBars = 2, breatheFloor = 0.55f),
+                            7 to TrackSectionOverride(density = 0f),
+                        ),
                         transitions = listOf(SectionTransition(2, 1f, transitionBars = 1)),
                     ),
                     // 2 RISE: the band leans in over the descent; the lead re-picks the off 8ths.
@@ -647,13 +628,18 @@ class OrphicLoreVibe : VibeProvider {
                     ),
                     // 3 HOMECOMING: the bass and lead come home to the intro's descent, two loops,
                     // a breath before the jam. No solo here, so the vamp starts a fresh one.
+                    // energy 0.55*0.7 = 0.385 drops under the FX slot's low gate (< 0.4), so the
+                    // bell tolls here; density is a no-op on a Chordal track, so volume carries it.
                     Section(
                         name = "homecoming",
                         barsMin = 4, barsMax = 4,
                         lickIndex = 0,
+                        macroOverrides = MacroOverrides(energy = 0.7f),
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
-                            5 to TrackSectionOverride(volume = 0.3f, breatheBars = 2, breatheFloor = 0.55f),                        ),
+                            5 to TrackSectionOverride(volume = 0.3f, breatheBars = 2, breatheFloor = 0.55f),
+                            7 to TrackSectionOverride(volume = .5f, reverbSend = .65f),
+                        ),
                         transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
                     ),
                     // 4 VAMP: a slow i-iv lament vamp (Dm, Gm, four bars each) under the vamp lick;
