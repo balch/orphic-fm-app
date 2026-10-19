@@ -2733,6 +2733,10 @@ static inline mist::PitchContext mist_pitch_context(
         nr.lo, nr.hi);
 }
 
+void pulsar_state_free(PulsarState* state) {
+    delete state;
+}
+
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate) {
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
 

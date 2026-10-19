@@ -65,6 +65,8 @@
 // Forward-declared, not included: the engine only holds a pointer, and every Pulsar header edit
 // would otherwise recompile each TU that includes this one. Include orpheus_unit_pulsar.h directly.
 struct PulsarState;
+// Defined beside the `new` in orpheus_unit_pulsar.cpp; a delete here would skip ~PulsarState.
+void pulsar_state_free(PulsarState* state);
 #include "orpheus_unit_chaos.h"
 #include "orpheus_master_fader.h"
 #include "orpheus_master_tape_stop.h"

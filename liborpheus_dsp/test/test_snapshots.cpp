@@ -571,7 +571,7 @@ bool run_snapshot_tests() {
                 // Fill input buffer with noise excitation (only first 64 samples of first block)
                 for (int i = 0; i < chunk; i++) {
                     unit.inputs[IPORT_INPUT].buffer[i] = (off == 0 && i < 64)
-                        ? ((float)rand() / RAND_MAX * 2.0f - 1.0f) * 0.5f : 0.0f;
+                        ? ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f) * 0.5f : 0.0f;
                 }
                 unit.inputs[IPORT_INPUT].num_sources = 1;
 
