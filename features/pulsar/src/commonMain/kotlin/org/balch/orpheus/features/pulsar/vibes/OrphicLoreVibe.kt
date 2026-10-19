@@ -66,9 +66,10 @@ import org.balch.orpheus.features.pulsar.models.row
  * the wah lead doubles two octaves up while the organ comps the chords; all come
  * home to the descent in the homecoming and return sections (each is two loops). The Sirens
  * sing a third above the descent as a grain choir; the ship's bell rings in pairs in the
- * intro, the storm and the outro, smeared by the wind only in the storm. Structure
- * breathes verse -> rise -> homecoming -> Dm vamp -> free-improv peak -> return; the jam
- * is the centerpiece.
+ * intro, the storm and the outro, smeared by the wind only in the storm. The sections
+ * follow the Odyssey in order: libation (intro) -> sail (verse) -> winds (rise) ->
+ * shades (homecoming) -> sirens (Dm vamp) -> storm (free-improv peak) -> ithaca (return)
+ * -> ashore (outro); the jam is the centerpiece.
  *
  * Per-track wah voicing: the bass rocks a
  * slow pedal low in the spectrum while the lead works a quarter-note pedal up in the
@@ -595,12 +596,12 @@ class OrphicLoreVibe : VibeProvider {
                     // Lengths are section bars (32 steps = two musical bars) and all even: the
                     // descent is 64 steps, so an odd count would start a homecoming on its Bb.
 
-                    // 0 INTRO: the bass states the lament with the Sirens singing it far above.
+                    // 0 LIBATION (intro): the bass states the lament with the Sirens singing it far above.
                     // It opens soft and sparse and swells into the verse: energy, complexity,
                     // space and the whole mix glide to the verse's level by the last step,
                     // while a RISE arc lifts the velocities bar by bar.
                     Section(
-                        name = "intro",
+                        name = "libation",
                         barsMin = 4, barsMax = 4,
                         lickIndex = 0,
                         macroOverrides = introSoft,
@@ -618,11 +619,11 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
-                    // 1 VERSE: slow full-band groove; the lead states the funky hook. From here to
+                    // 1 SAIL (verse): slow full-band groove; the lead states the funky hook. From here to
                     // the return, the Sirens breathe every 2 section bars and the bass every 3:
                     // they start together, drift into counter-motion, and meet again every 6.
                     Section(
-                        name = "verse",
+                        name = "sail",
                         barsMin = 4, barsMax = 6, barStep = 2,
                         lickIndex = 1,
                         trackOverrides = mapOf(
@@ -632,10 +633,10 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(2, 1f, transitionBars = 1)),
                     ),
-                    // 2 RISE: the band leans in over the descent; the lead re-picks the off 8ths.
+                    // 2 WINDS (rise): the band leans in over the descent; the lead re-picks the off 8ths.
                     // Solo probability 0.95 because the roll happens ONCE per section entry.
                     Section(
-                        name = "rise",
+                        name = "winds",
                         barsMin = 6, barsMax = 8, barStep = 2,
                         lickIndex = 2,
                         macroOverrides = MacroOverrides(
@@ -652,12 +653,12 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(3, 1f, transitionBars = 1)),
                     ),
-                    // 3 HOMECOMING: the bass and lead come home to the intro's descent, two loops,
+                    // 3 SHADES (homecoming): the bass and lead come home to the intro's descent, two loops,
                     // a breath before the jam. No solo here, so the vamp starts a fresh one.
                     // energy 0.55*0.7 = 0.385 drops under the FX slot's low gate (< 0.4), so the
                     // bell tolls here; density is a no-op on a Chordal track, so volume carries it.
                     Section(
-                        name = "homecoming",
+                        name = "shades",
                         barsMin = 4, barsMax = 4,
                         lickIndex = 0,
                         macroOverrides = MacroOverrides(energy = 0.7f),
@@ -668,11 +669,11 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
                     ),
-                    // 4 VAMP: a slow i-iv lament vamp (Dm, Gm, four bars each) under the vamp lick;
+                    // 4 SIRENS (vamp): a slow i-iv lament vamp (Dm, Gm, four bars each) under the vamp lick;
                     // the bass and lead stay FIXED on their figures, only the organ and bell follow.
                     // No chordFollow override on the bass: transposition would flatten its solos.
                     Section(
-                        name = "vamp",
+                        name = "sirens",
                         barsMin = 8, barsMax = 10, barStep = 2,
                         lickIndex = 3,
                         jamCarry = true,
@@ -690,11 +691,11 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(5, 1f, transitionBars = 2)),
                     ),
-                    // 5 PEAK: free improv over the vamp. complexity 0.4*1.8 = 0.72 plus energy
+                    // 5 STORM (peak): free improv over the vamp. complexity 0.4*1.8 = 0.72 plus energy
                     // 0.55*1.5 = 0.83 opens track 7's FX gate, so the bell rings through the
                     // storm. innerBars 8 keeps the sawtooth peak above the auto-spurt threshold.
                     Section(
-                        name = "peak",
+                        name = "storm",
                         barsMin = 8, barsMax = 12, barStep = 2,
                         lickIndex = 4,
                         // No jamCarry: the jam starts fresh here and builds through the storm.
@@ -736,9 +737,9 @@ class OrphicLoreVibe : VibeProvider {
                         // Hard cut home: the biggest bar slams into the descent.
                         transitions = listOf(SectionTransition(6, 1f, transitionBars = 0)),
                     ),
-                    // 6 RETURN: the descent again, two loops, then back to the verse
+                    // 6 ITHACA (return): the descent again, two loops, then back to the verse
                     Section(
-                        name = "return",
+                        name = "ithaca",
                         barsMin = 4, barsMax = 4,
                         lickIndex = 0,
                         trackOverrides = mapOf(
@@ -747,13 +748,13 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
-                    // 7 OUTRO: the intro in reverse (terminal; reached only when armed). It
+                    // 7 ASHORE (outro): the intro in reverse (terminal; reached only when armed). It
                     // enters at the verse's level and glides back to the intro's soft opening,
                     // with a FALL arc easing the velocities down, while the mix fades out:
                     // 40% as bar 5 starts, 15% as bar 6 starts, silent from its middle on
                     // (and through the loop the song hands off in).
                     Section(
-                        name = "outro",
+                        name = "ashore",
                         barsMin = 6, barsMax = 6,
                         lickIndex = 0,
                         macroOverrides = verseLevel.copy(volume = null),
