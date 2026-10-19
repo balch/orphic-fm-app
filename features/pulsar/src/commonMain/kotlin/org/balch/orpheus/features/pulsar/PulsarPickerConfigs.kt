@@ -105,6 +105,9 @@ val PULSAR_TRACK_PICKERS = listOf(
 /** Track display names */
 val PULSAR_TRACK_NAMES = listOf("KICK", "PERC", "HIHAT", "BASS", "KEYS", "PAD", "TEXTURE", "FX")
 
+/** [PULSAR_TRACK_NAMES] short enough for a mixer strip, where TEXTURE would ellipsize. */
+val PULSAR_TRACK_STRIP_NAMES = listOf("KICK", "PERC", "HIHAT", "BASS", "KEYS", "PAD", "TEXT", "FX")
+
 /** Engine index to short label for display */
 fun pulsarEngineLabel(engineIndex: Int): String = when (engineIndex) {
     0 -> "VCF"; 1 -> "PD"; 2 -> "DX"; 3 -> "DX2"; 4 -> "DX3"; 5 -> "TRN"

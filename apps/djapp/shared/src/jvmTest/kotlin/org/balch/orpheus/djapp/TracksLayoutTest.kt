@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.PULSAR_TRACK_NAMES
+import org.balch.orpheus.features.pulsar.PULSAR_TRACK_STRIP_NAMES
 import org.balch.orpheus.features.pulsar.mixer.LocalBusMeterFrameProbe
 import org.balch.orpheus.features.pulsar.mixer.MixerFeature
 import org.balch.orpheus.features.pulsar.mixer.MixerPanelActions
@@ -53,7 +54,7 @@ class TracksLayoutTest {
     private val levels = mutableListOf<Pair<Int, Float>>()
     private var resets = 0
 
-    private val names = PULSAR_TRACK_NAMES
+    private val names = PULSAR_TRACK_STRIP_NAMES
 
     private fun feature(
         tuning: TrackTuning = TrackTuning().withLevel(0, 1.0f),
@@ -406,7 +407,8 @@ class TracksLayoutTest {
                     seen += n.description().firstOrNull() ?: n.text()
                 }
             }
-            for (name in names) {
+            // Semantics keep the full track names; only the visible strip label is short.
+            for (name in PULSAR_TRACK_NAMES) {
                 assertTrue("Mute $name" in seen, "M of $name unreachable: $seen")
                 assertTrue("Solo $name" in seen, "S of $name unreachable")
                 assertTrue("Level $name" in seen, "fader of $name unreachable")

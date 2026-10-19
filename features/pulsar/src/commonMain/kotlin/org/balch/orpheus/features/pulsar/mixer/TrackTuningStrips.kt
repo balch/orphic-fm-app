@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.features.pulsar.PULSAR_TRACK_NAMES
+import org.balch.orpheus.features.pulsar.PULSAR_TRACK_STRIP_NAMES
 import org.balch.orpheus.features.pulsar.PulsarTrackColors
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -231,7 +232,7 @@ private fun TrackStrip(
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            text = who,
+            text = PULSAR_TRACK_STRIP_NAMES[track],
             color = color.copy(alpha = if (silent) 0.4f else 1f),
             fontSize = 8.sp,
             fontWeight = FontWeight.Bold,
