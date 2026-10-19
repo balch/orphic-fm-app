@@ -61,12 +61,16 @@ val buildDesktopNative = tasks.register<Exec>("buildDesktopNative") {
     // every time; an unchanged dylib hashes the same and processResources stays up to date.
     outputs.dir(outDir)
     outputs.upToDateWhen { false }
+    // Makefiles build one TU at a time without an explicit job count. CMAKE_GENERATOR only
+    // applies when a build dir is first configured, so an existing Makefiles dir keeps working.
+    val jobs = Runtime.getRuntime().availableProcessors()
     workingDir = desktopDir
     commandLine("bash", "-c",
+        "{ command -v ninja >/dev/null && export CMAKE_GENERATOR=Ninja; true; } && " +
         // Own build dir, not just an own flag: all three desktop apps share liborpheus_dsp/desktop,
         // so a cached ORPHEUS_WITH_GRIDS=OFF here would silently strip Grids from Orpheus.
         "cmake -B build-nogrids -DCMAKE_BUILD_TYPE=Release -DORPHEUS_WITH_GRIDS=OFF -DEURORACK_DIR=$eurorackDir && " +
-        "cmake --build build-nogrids --config Release && " +
+        "cmake --build build-nogrids --config Release --parallel $jobs && " +
         "rm -f ${legacyDir.absolutePath}/*/liborpheus_desktop.* && " +
         "mkdir -p ${targetDir.absolutePath} && cp build-nogrids/$libName ${targetDir.absolutePath}/$libName"
     )

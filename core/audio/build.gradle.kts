@@ -63,13 +63,14 @@ tasks.register<Exec>("buildIosSimNative") {
 
     workingDir = iosDir
     commandLine("bash", "-c",
+        "{ command -v ninja >/dev/null && export CMAKE_GENERATOR=Ninja; true; } && " +
         "cmake -B build-sim " +
         "-DCMAKE_SYSTEM_NAME=iOS " +
         "-DCMAKE_OSX_SYSROOT=iphonesimulator " +
         "-DCMAKE_OSX_ARCHITECTURES=arm64 " +
         "-DCMAKE_BUILD_TYPE=Release " +
         "-DEURORACK_DIR=$eurorackDir && " +
-        "cmake --build build-sim --config Release"
+        "cmake --build build-sim --config Release --parallel ${Runtime.getRuntime().availableProcessors()}"
     )
 }
 
@@ -84,13 +85,14 @@ tasks.register<Exec>("buildIosDeviceNative") {
 
     workingDir = iosDir
     commandLine("bash", "-c",
+        "{ command -v ninja >/dev/null && export CMAKE_GENERATOR=Ninja; true; } && " +
         "cmake -B build-device " +
         "-DCMAKE_SYSTEM_NAME=iOS " +
         "-DCMAKE_OSX_SYSROOT=iphoneos " +
         "-DCMAKE_OSX_ARCHITECTURES=arm64 " +
         "-DCMAKE_BUILD_TYPE=Release " +
         "-DEURORACK_DIR=$eurorackDir && " +
-        "cmake --build build-device --config Release"
+        "cmake --build build-device --config Release --parallel ${Runtime.getRuntime().availableProcessors()}"
     )
 }
 

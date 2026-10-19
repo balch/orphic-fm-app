@@ -46,7 +46,7 @@ val buildWasmNative = tasks.register<Exec>("buildWasmNative") {
     workingDir = wasmDir
     commandLine("bash", "-c",
         "${emcmake.absolutePath} cmake -B build -DCMAKE_BUILD_TYPE=Release -DEURORACK_DIR=$eurorackDir && " +
-        "cmake --build build --config Release"
+        "cmake --build build --config Release --parallel ${Runtime.getRuntime().availableProcessors()}"
     )
 }
 

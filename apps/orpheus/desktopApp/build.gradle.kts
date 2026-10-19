@@ -86,9 +86,14 @@ val buildDesktopNative = tasks.register<Exec>("buildDesktopNative") {
     outputs.dir(outDir)
     outputs.upToDateWhen { false }
 
+    // Makefiles build one TU at a time without an explicit job count. CMAKE_GENERATOR only
+    // applies when a build dir is first configured, so an existing Makefiles dir keeps working.
+    val jobs = Runtime.getRuntime().availableProcessors()
     workingDir = desktopDir
     commandLine("bash", "-c",
-        "cmake -B build -DCMAKE_BUILD_TYPE=Release -DEURORACK_DIR=$eurorackDir && cmake --build build --config Release && " +
+        "{ command -v ninja >/dev/null && export CMAKE_GENERATOR=Ninja; true; } && " +
+        "cmake -B build -DCMAKE_BUILD_TYPE=Release -DEURORACK_DIR=$eurorackDir && " +
+        "cmake --build build --config Release --parallel $jobs && " +
         "rm -f ${legacyDir.absolutePath}/*/liborpheus_desktop.* && " +
         "mkdir -p ${targetDir.absolutePath} && cp build/$libName ${targetDir.absolutePath}/$libName"
     )
