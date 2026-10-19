@@ -758,6 +758,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 // for one block). unit_process_pulsar republishes this every
                 // block thereafter.
                 engine->pulsar_track_active_engine[t].store(v, std::memory_order_relaxed);
+                engine->pulsar_track_active_space_slot[t].store(0, std::memory_order_relaxed);
             }
             else if (std::strcmp(param, "engine_space") == 0)
                 engine->pulsar_track_engine_space[t].store(static_cast<int>(value), std::memory_order_relaxed);

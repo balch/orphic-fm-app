@@ -351,6 +351,9 @@ struct PulsarTrackState {
     // Deferred rather than assigned directly because the section handler runs during
     // track 0's boundary, before this track has advanced for the same step.
     bool resync_pending = false;
+    // Which slot is active, chosen by energy. engine_index follows it, but a track with
+    // the same engine in both slots needs this flag to tell its slots apart.
+    bool space_slot = false;
     int engine_index;
     float volume;
     float pan;

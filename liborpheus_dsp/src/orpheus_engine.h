@@ -827,6 +827,9 @@ struct OrpheusEngine {
     // assigns the EDM slot, so downstream units (e.g. pulsar_delay) never
     // read a stale 0 on the first audio block after a vibe load.
     std::atomic<int> pulsar_track_active_engine[8]{};
+    // 1 while the track plays its SPACE slot. Published beside the engine id because
+    // a track with the same engine in both slots still has two sets of params.
+    std::atomic<int> pulsar_track_active_space_slot[8]{};
 
     // Per-track voice params (set by Kotlin on vibe load).
     // Most params have an _edm + _space pair so the two engine slots

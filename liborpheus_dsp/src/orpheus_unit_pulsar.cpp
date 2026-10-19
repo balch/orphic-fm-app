@@ -1519,6 +1519,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         // engine_note_floor) -- otherwise the floor comes from whichever engine
         // the track played last vibe, not the one this load is switching to.
         ts.engine_index = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+        ts.space_slot = false;
 
         // Read per-track voice config from atomics
         ts.volume = engine->pulsar_track_volume[t].load(std::memory_order_relaxed);
@@ -2647,16 +2648,12 @@ static void resolve_breathe_block(PulsarState* state, float sample_rate) {
 
 // ── Main process function ────────────────────────────────────────────
 
-// The LPG mode this block renders with: the EDM slot's while the EDM engine is
-// active, the SPACE slot's otherwise. ts.engine_index is chosen per block by the
-// energy threshold (EDM above 0.6, SPACE below 0.4); comparing against the EDM
-// engine also covers edm == spa, where both slots hold the same mode anyway.
+// The LPG mode this block renders with: the active slot's (ts.space_slot, chosen per
+// block by energy: EDM above 0.6, SPACE below 0.4).
 // Shared by the render and by the hold path, which reads it for PLUCK_REPEAT.
-static inline int active_track_lpg_mode(const OrpheusEngine* engine,
-                                        const PulsarTrackState& ts, int t) {
+static inline int active_track_lpg_mode(const PulsarTrackState& ts) {
     if (ts.section_lpg_mode >= 0) return ts.section_lpg_mode;  // a section override covers both slots
-    const int edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
-    return (ts.engine_index == edm) ? ts.lpg_mode : ts.lpg_mode_space;
+    return ts.space_slot ? ts.lpg_mode_space : ts.lpg_mode;
 }
 
 // Whether a held note re-picks on a hold step at this beat position (playhead % 4:
@@ -2780,6 +2777,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.step_count = 0;
             ts.playhead = 0;
             ts.engine_index = 0;
+            ts.space_slot = false;
             ts.volume = 0.0f;
             ts.pan = 0.0f;
             ts.harmonics = 0.0f;
@@ -3401,9 +3399,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     // Pick the EDM-slot atomic when use_edm is true, else the *_space twin.
     // Used by all per-engine field reads inside the per-track loop. Each call
-    // site computes its own `use_edm` from the current ts.engine_index — the
+    // site computes its own `use_edm` from the current ts.space_slot — the
     // mid-loop section-advance block (gated by t==0 + bar boundary) can flip
-    // engine_index, so we re-derive use_edm at each consumer rather than cache
+    // the slot, so we re-derive use_edm at each consumer rather than cache
     // it once at the top of the loop.
     #define PULSAR_PICK(field) (use_edm \
         ? engine->pulsar_track_##field[t].load(std::memory_order_relaxed) \
@@ -3434,26 +3432,28 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         {
             int edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
             int spa = engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed);
-            if (edm == spa || energy > 0.6f) {
-                ts.engine_index = edm;
+            if (energy > 0.6f) {
+                ts.space_slot = false;
             } else if (energy < 0.4f) {
-                ts.engine_index = spa;
+                ts.space_slot = true;
             }
             // In crossfade zone (0.4-0.6): keep current — probabilistic pick at loop boundary.
+            // The slot, not the engine id, picks the params: edm == spa still has two slots.
+            ts.engine_index = ts.space_slot ? spa : edm;
             // Publish active slot unconditionally (even when edm == spa or the
             // crossfade zone left ts.engine_index untouched) so downstream units
             // never see a stale value across vibe transitions.
             engine->pulsar_track_active_engine[t].store(ts.engine_index, std::memory_order_relaxed);
+            engine->pulsar_track_active_space_slot[t].store(ts.space_slot ? 1 : 0, std::memory_order_relaxed);
         }
 
         // ── Resolve per-engine character knobs based on the active slot ──
         // Each TrackVoice has two OrpheusEngine instances (engineEdm/engineSpace).
-        // When ts.engine_index matches the EDM slot, we use the *_edm atomics;
-        // otherwise we fall through to *_space. This mirrors the lpg_mode/lpg_mode_space
-        // selection already done at render time below.
+        // While ts.space_slot is clear we use the *_edm atomics; otherwise
+        // we fall through to *_space, even when both slots hold the same engine.
+        // This mirrors the lpg_mode/lpg_mode_space selection at render time below.
         {
-            const bool use_edm = (ts.engine_index ==
-                engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed));
+            const bool use_edm = !ts.space_slot;
             ts.volume     = PULSAR_PICK(volume);
             ts.harmonics  = PULSAR_PICK(harmonics);
             ts.timbre     = PULSAR_PICK(timbre);
@@ -3648,7 +3648,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // Close the triplet clock's segment for the step this boundary ends, then
             // clear what the new step has to re-establish.
             const int boundary_at = step_boundary_samples[b];
-            if (active_track_lpg_mode(engine, ts, t) == LPG_PLUCK_REPEAT_TRIPLET)
+            if (active_track_lpg_mode(ts) == LPG_PLUCK_REPEAT_TRIPLET)
                 schedule_triplet_repick(ts, repick_seg_start, boundary_at, samples_per_step);
             repick_seg_start = boundary_at;
             ts.repick_live = false;
@@ -4686,25 +4686,28 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
 
                 // Voice crossfade: select EDM or space engine per track based on energy
-                // Soloists lock to one engine (prefer EDM) to avoid timbre flipping mid-solo
+                // Soloists lock to one engine (prefer EDM) to avoid timbre flipping mid-solo.
+                // Same-engine tracks skip the roll (it would shift mutation_seed for every
+                // vibe) and keep their slot between 0.4 and 0.6.
                 for (int vt = 0; vt < kNumPulsarTracks; vt++) {
                     int edm = engine->pulsar_track_engine_edm[vt].load(std::memory_order_relaxed);
                     int spa = engine->pulsar_track_engine_space[vt].load(std::memory_order_relaxed);
                     if (edm == spa) continue;
 
-                    bool soloing = state->tracks[vt].is_soloist;
-                    if (soloing) {
+                    PulsarTrackState& vts = state->tracks[vt];
+                    if (vts.is_soloist) {
                         // Soloists: lock to EDM unless energy is clearly low
-                        state->tracks[vt].engine_index = (energy < 0.25f) ? spa : edm;
+                        vts.space_slot = (energy < 0.25f);
                     } else if (energy > 0.6f) {
-                        state->tracks[vt].engine_index = edm;
+                        vts.space_slot = false;
                     } else if (energy < 0.4f) {
-                        state->tracks[vt].engine_index = spa;
+                        vts.space_slot = true;
                     } else {
                         float p_edm = (energy - 0.4f) / 0.2f;
                         float roll = rand01(state->mutation_seed);
-                        state->tracks[vt].engine_index = (roll < p_edm) ? edm : spa;
+                        vts.space_slot = !(roll < p_edm);
                     }
+                    vts.engine_index = vts.space_slot ? spa : edm;
                 }
 
                 // Update drunk timing targets
@@ -4896,7 +4899,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     // every mode when its gate timer underran between hold steps
                     // (7819cbd05 stopped that: Tides re-attacked, PLUCK re-bloomed);
                     // this keeps the double-picked riff for the tracks that ask.
-                    if (pluck_repeat_fires(active_track_lpg_mode(engine, ts, t), ts.playhead % 4)) {
+                    if (pluck_repeat_fires(active_track_lpg_mode(ts), ts.playhead % 4)) {
                         ts.trigger_offset = step_boundary_samples[b];
                         ts.pending_retrig = true;
                     }
@@ -5214,8 +5217,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             //   1) Per-lick-step glide (step.glide_rate >= 0)
                             //   2) Per-chord glide on chord-transition edge (one-shot)
                             //   3) Per-track default (per-engine: EDM vs Space slot)
-                            const bool use_edm = (ts.engine_index ==
-                                engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed));
+                            const bool use_edm = !ts.space_slot;
                             float track_glide = PULSAR_PICK(glide_rate);
                             float step_glide = step.glide_rate;
                             float chord_glide = -1.0f;
@@ -5273,7 +5275,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // The triplet clock's last segment runs to the block end; then its origins rebase
         // onto the next block. A frozen timeline freezes them too.
         if (!timeline_hold) {
-            if (active_track_lpg_mode(engine, ts, t) == LPG_PLUCK_REPEAT_TRIPLET)
+            if (active_track_lpg_mode(ts) == LPG_PLUCK_REPEAT_TRIPLET)
                 schedule_triplet_repick(ts, repick_seg_start, num_frames, samples_per_step);
             ts.beat_origin -= num_frames;
             ts.head_origin -= num_frames;
@@ -5408,8 +5410,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Dual LFO modulation for TEXTURE/FX tracks (5-7) and DRONE profile ──
         if ((t >= 5 || ts.envelope_profile == ENV_PROFILE_DRONE) && ts.mod_lfo_initialized) {
             // Mod LFO is per-engine: pick EDM vs Space slot.
-            const bool use_edm = (ts.engine_index ==
-                engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed));
+            const bool use_edm = !ts.space_slot;
             float lfo_rate     = PULSAR_PICK(mod_lfo_rate);
             float lfo_depth    = PULSAR_PICK(mod_lfo_depth);
             float lfo_shape    = PULSAR_PICK(mod_lfo_shape);
@@ -5690,7 +5691,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         // ── Render voice ──
         // The active slot's LPG mode; see active_track_lpg_mode for the slot rule.
-        const int active_lpg_mode = active_track_lpg_mode(engine, ts, t);
+        const int active_lpg_mode = active_track_lpg_mode(ts);
         // The grain kernels' per-sample gate. Taken here because the envelope below
         // consumes pending_retrig before grain FX runs.
         mist::Gate grain_gate;
@@ -6181,8 +6182,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         engine->viz_rings[VIZ_PULSAR_TRACK_0 + t].write(track_peak);
 
         // Sends + reverb brightness are per-engine: pick EDM vs Space slot.
-        const bool use_edm = (ts.engine_index ==
-            engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed));
+        const bool use_edm = !ts.space_slot;
         float delay_send_amt    = PULSAR_PICK(delay_send);
         float reverb_send_amt   = PULSAR_PICK(reverb_send);
         float reverb_brightness = PULSAR_PICK(reverb_brightness);

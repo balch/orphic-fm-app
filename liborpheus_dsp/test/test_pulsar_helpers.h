@@ -22,10 +22,14 @@ static void setup_fixture_baseline(OrpheusEngine* engine) {
         engine->pulsar_track_engine_edm[t].store(edm[t], std::memory_order_relaxed);
         engine->pulsar_track_engine_space[t].store(space[t], std::memory_order_relaxed);
         engine->pulsar_track_volume[t].store(volumes[t], std::memory_order_relaxed);
+        engine->pulsar_track_volume_space[t].store(volumes[t], std::memory_order_relaxed);
         engine->pulsar_track_pan[t].store(pans[t], std::memory_order_relaxed);
         engine->pulsar_track_harmonics[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_harmonics_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_timbre_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
+        engine->pulsar_track_morph_space[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
         engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
@@ -59,10 +63,14 @@ static void setup_fixture_sparse_slow(OrpheusEngine* engine) {
         engine->pulsar_track_engine_edm[t].store(edm[t], std::memory_order_relaxed);
         engine->pulsar_track_engine_space[t].store(space[t], std::memory_order_relaxed);
         engine->pulsar_track_volume[t].store(volumes[t], std::memory_order_relaxed);
+        engine->pulsar_track_volume_space[t].store(volumes[t], std::memory_order_relaxed);
         engine->pulsar_track_pan[t].store(pans[t], std::memory_order_relaxed);
         engine->pulsar_track_harmonics[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_harmonics_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_timbre_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
+        engine->pulsar_track_morph_space[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
         engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
@@ -97,10 +105,14 @@ static void setup_fixture_blues(OrpheusEngine* engine) {
         engine->pulsar_track_engine_edm[t].store(edm[t], std::memory_order_relaxed);
         engine->pulsar_track_engine_space[t].store(space[t], std::memory_order_relaxed);
         engine->pulsar_track_volume[t].store(volumes[t], std::memory_order_relaxed);
+        engine->pulsar_track_volume_space[t].store(volumes[t], std::memory_order_relaxed);
         engine->pulsar_track_pan[t].store(pans[t], std::memory_order_relaxed);
         engine->pulsar_track_harmonics[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_harmonics_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_timbre_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
+        engine->pulsar_track_morph_space[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
         engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
@@ -136,10 +148,14 @@ static void setup_fixture_dense_fast(OrpheusEngine* engine) {
         engine->pulsar_track_engine_edm[t].store(edm[t], std::memory_order_relaxed);
         engine->pulsar_track_engine_space[t].store(space[t], std::memory_order_relaxed);
         engine->pulsar_track_volume[t].store(volumes[t], std::memory_order_relaxed);
+        engine->pulsar_track_volume_space[t].store(volumes[t], std::memory_order_relaxed);
         engine->pulsar_track_pan[t].store(pans[t], std::memory_order_relaxed);
         engine->pulsar_track_harmonics[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_harmonics_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
+        engine->pulsar_track_timbre_space[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
+        engine->pulsar_track_morph_space[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
         engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
@@ -167,8 +183,10 @@ static void solo_track(OrpheusEngine* engine, int track_index) {
     for (int t = 0; t < 8; t++) {
         if (t == track_index) {
             engine->pulsar_track_volume[t].store(1.0f, std::memory_order_relaxed);
+            engine->pulsar_track_volume_space[t].store(1.0f, std::memory_order_relaxed);
         } else {
             engine->pulsar_track_volume[t].store(0.0f, std::memory_order_relaxed);
+            engine->pulsar_track_volume_space[t].store(0.0f, std::memory_order_relaxed);
         }
     }
 }
