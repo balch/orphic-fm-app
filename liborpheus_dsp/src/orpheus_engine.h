@@ -1182,7 +1182,7 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_section_chords_per_bar[kMaxSections] = {};
 
     // --- Per-section tension override ---
-    // 0 = no override, 1 = read from pulsar_section_tension_data[s*21..].
+    // 0 = no override, 1 = read from pulsar_section_tension_data[s*kSectionTensionFields..].
     std::atomic<int>   pulsar_section_tension_active[kMaxSections] = {};
     // Field layout mirrors the vibe-level pulsar_tension_* scalars:
     //   0=inner_bars, 1=outer_bars, 2=outer_depth, 3=volume, 4=timing,
@@ -1190,7 +1190,7 @@ struct OrpheusEngine {
     //   9=evo_timbre_low, 10=evo_timbre_high, 11=evo_timbre_prob,
     //   12=evo_morph_low, 13=evo_morph_high, 14=evo_morph_prob,
     //   15=evo_harm_low, 16=evo_harm_high, 17=evo_harm_prob,
-    //   18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
+    //   18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance, 21=arc
     std::atomic<float> pulsar_section_tension_data[kMaxSections * kSectionDataFields] = {};
 
     // --- Per-section comping humanization override (for ALL CHORDAL tracks) ---

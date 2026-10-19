@@ -126,6 +126,9 @@ private fun requirePaired(name: String, low: Float, high: Float) {
  *   grid. 0 = none, 0.2 = subtle.
  * @param tonal Pitch/scale tension (octave shifts, chromatic passing tones).
  * @param evolution Timbre evolution over the tension cycle (harmonics/timbre/morph drift).
+ * @param arc How intensity moves. [TensionArc.LOOP] is the inner/outer cycle; RISE and FALL
+ *   run once across the section's own bars and only take effect in a
+ *   [Section.tensionOverride] (the vibe-level profile always loops).
  */
 @Serializable
 data class TensionProfile(
@@ -137,4 +140,16 @@ data class TensionProfile(
     val timing: Float = 0.2f,
     val evolution: EvolutionTension = EvolutionTension(),
     val spurtChance: Float = 0.0f,  // per-bar random spurt probability (0 = tension-only)
+    val arc: TensionArc = TensionArc.LOOP,
 )
+
+/** How tension intensity moves through a section. Wire ids mirror `kTensionArc*` in C++. */
+@Serializable
+enum class TensionArc(val engineId: Int) {
+    /** The free-running inner/outer sawtooth, which spans section boundaries. */
+    LOOP(0),
+    /** 0 on the section's first bar up to 1 on its last (a 1-bar section sits at 1). */
+    RISE(1),
+    /** 1 on the section's first bar down to 0 on its last (a 1-bar section sits at 0). */
+    FALL(2),
+}

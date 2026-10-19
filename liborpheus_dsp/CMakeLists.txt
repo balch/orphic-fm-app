@@ -397,6 +397,7 @@ if(BUILD_TESTS)
         test/test_pulsar_pitch_rise.cpp
         test/test_pulsar_harmonics_rise.cpp
         test/test_pulsar_slot.cpp
+        test/test_pulsar_section_ramp.cpp
         test/test_pulsar_texture_line.cpp
         test/test_pulsar_pad_restrike.cpp
         test/test_pulsar_audition_gain.cpp

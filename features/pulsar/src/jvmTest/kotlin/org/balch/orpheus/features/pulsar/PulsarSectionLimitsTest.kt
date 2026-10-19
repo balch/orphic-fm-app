@@ -6,6 +6,7 @@ import org.balch.orpheus.features.pulsar.models.HalfLick
 import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.NotatedScore
 import org.balch.orpheus.features.pulsar.models.SpeechCue
+import org.balch.orpheus.features.pulsar.models.TensionArc
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.VibeSpeech
 import java.io.File
@@ -148,11 +149,38 @@ class PulsarSectionLimitsTest {
             constant(limitsHeader, "kSectionDataFields"),
             Arrangement.SECTION_DATA_FIELDS,
             "This is the per-section float stride pulsar_section_data (weather on slots " +
-                "21-25, the pinned lick on 26) is written and read with. If they disagree, " +
-                "sections read each other's fields. NOTE: pulsar_section_tension_data shares " +
-                "this constant only for C++-side array sizing — its own indexing stride is " +
-                "independently fixed at 21 and must NOT be pinned to this constant.",
+                "21-25, the pinned lick on 26, volume and rampTo on 31-36) is written and read " +
+                "with. If they disagree, sections read each other's fields. NOTE: " +
+                "pulsar_section_tension_data shares this constant only for C++-side array " +
+                "sizing; its indexing stride is TENSION_DATA_FIELDS.",
         )
+    }
+
+    @Test
+    fun `TENSION_DATA_FIELDS matches kSectionTensionFields`() {
+        assertEquals(
+            constant(limitsHeader, "kSectionTensionFields"),
+            Arrangement.TENSION_DATA_FIELDS,
+            "The per-section stride of pulsar_section_tension_data. If they disagree, a " +
+                "section's tension override reads the previous section's fields.",
+        )
+    }
+
+    @Test
+    fun `MAX_VOLUME_POINTS matches kMaxSectionVolumePoints`() {
+        assertEquals(
+            constant(limitsHeader, "kMaxSectionVolumePoints"),
+            Arrangement.MAX_VOLUME_POINTS,
+            "Section.volumeEnvelope points per section; past the C++ cap they are dropped.",
+        )
+    }
+
+    @Test
+    fun `TensionArc ids match kTensionArc`() {
+        TensionArc.entries.forEach { arc ->
+            val name = "kTensionArc" + arc.name.lowercase().replaceFirstChar { it.uppercase() }
+            assertEquals(constant(pulsarHeader, name), arc.engineId, "TensionArc.${arc.name} vs $name")
+        }
     }
 
     @Test

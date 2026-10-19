@@ -151,6 +151,13 @@ overrides toward the next section over that many bars before the cut, creating a
 instead of a hard switch. Use this on chorus→breakdown (energy needs a few bars to come down) and
 on verse→chorus (build-up anticipation). Name the bar count after its musical role, not the number.
 
+A section can also move on its own: rampTo (another macroOverrides block) glides the section's
+macros from macroOverrides to rampTo across its bars, e.g. an intro that swells into the verse.
+macroOverrides.volume scales the whole mix for the section, and volumeEnvelope (a list of
+{bar, level} points, bars counted from the section start) shapes the mix volume over time, e.g. an
+outro that fades to silence: [{bar:0,level:1},{bar:4,level:0.4},{bar:5.5,level:0}]. Both need at
+least two sections, and an envelope's last point must not pass the section's barsMin.
+
 soloMode on a section activates the band's soloist: Jam(probability) for free improvisation,
 LickBuilder(probability, mutationRate) for melodic construction, LongFill for extended fills.
 

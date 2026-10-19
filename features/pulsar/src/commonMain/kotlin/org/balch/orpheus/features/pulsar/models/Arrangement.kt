@@ -159,6 +159,21 @@ data class TrackSectionOverride(
 }
 
 /**
+ * One point of a [Section.volumeEnvelope].
+ *
+ * @param bar Bars from the section's start, in [Section.barsMin] units; fractions allowed
+ *   (5.5 = the middle of the sixth bar).
+ * @param level Mix volume multiplier there, 0-2 (1 = unchanged, 0 = silent).
+ */
+@Serializable
+data class VolumePoint(val bar: Float, val level: Float) {
+    init {
+        require(bar >= 0f) { "VolumePoint.bar must be >= 0, got $bar" }
+        require(level in 0f..2f) { "VolumePoint.level must be 0-2, got $level" }
+    }
+}
+
+/**
  * One section in an [Arrangement] — a distinct musical phase like verse, chorus, or solo.
  *
  * @param name Display name (e.g., "groove", "verse", "chorus", "solo", "breakdown").
@@ -179,6 +194,11 @@ data class TrackSectionOverride(
  *   section visits (1/2, then 2/3, ...), so it is counted in visits, not bars.
  * @param macroOverrides Multiply macro values during this section.
  *   e.g., `MacroOverrides(energy = 1.4f)` boosts energy 40% during this section.
+ * @param rampTo Where [macroOverrides] glide to by the section's last step, each macro
+ *   linearly across the section's bars (a null field holds its override). Starts from 1.0
+ *   for a macro with no override. Works on a terminal outro, and an outgoing pre-roll
+ *   blends from wherever the ramp has got to. e.g. an intro at `MacroOverrides(energy =
+ *   0.5f, volume = 0.6f)` with `rampTo = MacroOverrides(energy = 1f, volume = 1f)` swells in.
  * @param tensionOverride Replace the vibe's tension profile for this section.
  * @param soloMode Solo mode for this section (null = no solos).
  * @param trackOverrides Per-track parameter overrides specific to this section.
@@ -194,6 +214,7 @@ data class Section(
     val transitions: List<SectionTransition> = emptyList(),
     val recencyDecay: Float = 0.5f,
     val macroOverrides: MacroOverrides? = null,
+    val rampTo: MacroOverrides? = null,
     val tensionOverride: TensionProfile? = null,
     val soloMode: SoloMode? = null,
     val trackOverrides: Map<Int, TrackSectionOverride>? = null,
@@ -270,8 +291,29 @@ data class Section(
     val speech: List<SpeechCue> = emptyList(),
     /** Footsteps and train under this section (slots 27-30). Null = no street. */
     val street: SectionStreet? = null,
+    /**
+     * The section's mix volume as straight lines between [VolumePoint]s, holding the first
+     * level before the first point and the last after the last (slots 37-49). Replaces
+     * [macroOverrides]/[rampTo] volume, which must then be null. An armed or terminal outro
+     * that loops holds its last level, so an envelope ending at 0 stays silent for the
+     * song handoff. Empty = no envelope.
+     */
+    val volumeEnvelope: List<VolumePoint> = emptyList(),
 ) {
     init {
+        require(volumeEnvelope.size <= Arrangement.MAX_VOLUME_POINTS) {
+            "Section.volumeEnvelope holds at most ${Arrangement.MAX_VOLUME_POINTS} points, got ${volumeEnvelope.size}"
+        }
+        require(volumeEnvelope.zipWithNext().all { (a, b) -> b.bar >= a.bar }) {
+            "Section.volumeEnvelope points must be in bar order, got $volumeEnvelope"
+        }
+        require(volumeEnvelope.isEmpty() || (macroOverrides?.volume == null && rampTo?.volume == null)) {
+            "Section.volumeEnvelope replaces macroOverrides.volume and rampTo.volume; set one or the other"
+        }
+        // The shortest draw has to reach the last point, or a fade never finishes.
+        require(volumeEnvelope.isEmpty() || volumeEnvelope.last().bar <= barsMin) {
+            "Section.volumeEnvelope's last point (bar ${volumeEnvelope.last().bar}) must be <= barsMin ($barsMin)"
+        }
         customProgression?.let { validateProgression(it, "Section.customProgression") }
         chordsPerBar?.let {
             require(it in 1..4) { "Section.chordsPerBar must be 1..4, got $it" }
@@ -371,6 +413,10 @@ data class Arrangement(
         require(sections.size <= MAX_SECTIONS) {
             "Arrangement sections size ${sections.size} exceeds MAX_SECTIONS=$MAX_SECTIONS"
         }
+        // A one-section arrangement never counts its bars down, so nothing could move these.
+        require(sections.size > 1 || sections.none { it.rampTo != null || it.volumeEnvelope.isNotEmpty() }) {
+            "Section.rampTo and Section.volumeEnvelope need an arrangement of at least two sections"
+        }
         require(minVibeSeconds in 15..1800) {
             "Arrangement.minVibeSeconds must be 15..1800, got $minVibeSeconds"
         }
@@ -427,6 +473,9 @@ data class Arrangement(
          */
         const val MAX_SECTIONS = 12
 
+        /** Points per [Section.volumeEnvelope]. Mirrors `kMaxSectionVolumePoints`. */
+        const val MAX_VOLUME_POINTS = 6
+
         /**
          * Outgoing transitions per section, and the stride this side writes with. MUST
          * equal `kMaxSectionTransitions`. Distinct from [MAX_SECTIONS]: they were both 8
@@ -441,11 +490,16 @@ data class Arrangement(
          * `PulsarSectionLimitsTest` parses the header and fails if these drift apart.
          *
          * NOT shared with the co-located `pulsar_section_tension_data` bank: that array
-         * reuses this constant only for its C++-side allocation size, but its own
-         * per-section stride is independently fixed at 21 (see the `tBase`/`tb` literals
-         * in `PulsarFeature.pushArrangement` and `orpheus_unit_pulsar.cpp`) — tension never
-         * grew the 5 weather slots, so bumping this constant again must NOT touch those.
+         * reuses this constant only for its C++-side allocation size; its per-section
+         * stride is [TENSION_DATA_FIELDS].
          */
-        const val SECTION_DATA_FIELDS = 31
+        const val SECTION_DATA_FIELDS = 50
+
+        /**
+         * Per-section stride of `pulsar_section_tension_data`: the 21 tension fields plus
+         * [TensionProfile.arc]. Mirrors `kSectionTensionFields` in `pulsar_limits.h`;
+         * `PulsarSectionLimitsTest` pins the pair.
+         */
+        const val TENSION_DATA_FIELDS = 22
     }
 }

@@ -37,10 +37,17 @@ static constexpr int kMaxSectionTransitions = 8;
 // Per-section wire strides (floats/ints per section in each array). Governs allocation
 // size for BOTH arrays below, but only pulsar_section_data's own indexing uses the full
 // width (slots 21-25 are SectionWeather, slot 26 is the pinned lick, slots 27-30 are
-// SectionStreet) — pulsar_section_tension_data's indexing stays independently fixed at 21
-// (see the tb/tBase literals in orpheus_unit_pulsar.cpp and PulsarFeature.pushArrangement);
-// it never grew those slots.
-static constexpr int kSectionDataFields = 31;   // pulsar_section_data, pulsar_section_tension_data
+// SectionStreet, slot 31 the section volume, slots 32-36 the rampTo macros, slot 37 the
+// volume envelope's point count and 38.. its (bar, level) pairs) —
+// pulsar_section_tension_data is indexed by its own kSectionTensionFields stride.
+static constexpr int kMaxSectionVolumePoints = 6;
+static constexpr int kSectionDataFields = 50;   // pulsar_section_data, pulsar_section_tension_data
+static_assert(kSectionDataFields == 38 + kMaxSectionVolumePoints * 2,
+              "slot 37 is the volume envelope count, its pairs fill the rest");
+// pulsar_section_tension_data's stride: the 21 vibe-level tension fields plus the arc.
+static constexpr int kSectionTensionFields = 22;
+static_assert(kSectionTensionFields <= kSectionDataFields,
+              "pulsar_section_tension_data is sized by kSectionDataFields");
 static constexpr int kSectionProgressionSlots = 12;  // degrees + glides
 static constexpr int kSectionCompingHumanFields = 4;
 

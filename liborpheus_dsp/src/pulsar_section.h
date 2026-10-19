@@ -129,6 +129,7 @@ inline bool apply_section_request(SectionState& state, const ArrangementParams& 
     state.next_complexity     = -1.0f;
     state.next_space          = -1.0f;
     state.next_mood           = -1.0f;
+    state.next_volume         = -1.0f;
     return true;
 }
 
@@ -139,10 +140,12 @@ inline void init_section_state(SectionState& state, const ArrangementParams& arr
     state.target_complexity = -1.0f;
     state.target_space = -1.0f;
     state.target_mood = -1.0f;
+    state.target_volume = -1.0f;
     state.next_energy = -1.0f;
     state.next_complexity = -1.0f;
     state.next_space = -1.0f;
     state.next_mood = -1.0f;
+    state.next_volume = -1.0f;
     state.next_section_planned = -1;
     state.next_section_trans_bars = 0;
     state.pending_section_request = -1;
@@ -199,6 +202,7 @@ inline bool advance_section(
             state.next_complexity = dst.complexity;
             state.next_space      = dst.space;
             state.next_mood       = dst.mood;
+            state.next_volume     = dst.volume;
         }
         // Linear progress 0 -> 1 across N bars: when bars_remaining == N-1 the
         // first bar of the ramp has just elapsed so progress = 1/N; at
@@ -239,6 +243,11 @@ inline bool advance_section(
     }
     state.visits_since_visit[state.current_section] = 0;
 
+    // Armed counts only for the outro itself: the arm latches even on a vibe with no
+    // outro, where a self-looping groove must keep restarting its ramp.
+    const bool armed_outro = state.outro_triggered && next == arr.outro_index;
+    state.hold_ramp_end = (next == state.current_section)
+        && (armed_outro || arr.sections[next].transition_count == 0);
     state.current_section     = next;
     state.transition_target   = -1;
     state.transition_progress = 0.0f;
@@ -249,6 +258,7 @@ inline bool advance_section(
     state.next_complexity   = -1.0f;
     state.next_space        = -1.0f;
     state.next_mood         = -1.0f;
+    state.next_volume       = -1.0f;
     state.bars_remaining = randomize_section_bars(arr.sections[next], seed);
     state.bars_total = state.bars_remaining;
 

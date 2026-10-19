@@ -844,9 +844,8 @@ static bool test_tension_override_then_inherit() {
     //   8=chromatic_passing, 9..11=evo_timbre_low/high/prob, 12..14=evo_morph_*,
     //   15..17=evo_harm_*, 18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
     engine->pulsar_section_tension_active[1].store(1, std::memory_order_relaxed);
-    // Tension's own fixed stride, NOT pulsar_section_data's kSectionDataFields, which
-    // has been widened repeatedly (weather, then the pinned lick) -- see pulsar_limits.h.
-    constexpr int kSectionStride = 21;
+    // Tension's own stride, NOT pulsar_section_data's kSectionDataFields -- see pulsar_limits.h.
+    constexpr int kSectionStride = kSectionTensionFields;
     const int tb = 1 * kSectionStride;
     // Valid, non-silly defaults so the override struct isn't garbage.
     engine->pulsar_section_tension_data[tb + 0].store(4.0f, std::memory_order_relaxed);  // inner_bars
@@ -952,9 +951,8 @@ static bool test_initial_section_tension_override_applied_on_load() {
     // Override on the INITIAL section (0) with distinctive volume = 0.9. Before the
     // fix, load_vibe left the intro on the vibe base (0.3) until the first transition.
     engine->pulsar_section_tension_active[0].store(1, std::memory_order_relaxed);
-    // Tension's own fixed stride, NOT pulsar_section_data's kSectionDataFields, which
-    // has been widened repeatedly (weather, then the pinned lick) -- see pulsar_limits.h.
-    constexpr int kSectionStride = 21;
+    // Tension's own stride, NOT pulsar_section_data's kSectionDataFields -- see pulsar_limits.h.
+    constexpr int kSectionStride = kSectionTensionFields;
     const int tb = 0 * kSectionStride;
     engine->pulsar_section_tension_data[tb + 0].store(4.0f, std::memory_order_relaxed);  // inner_bars
     engine->pulsar_section_tension_data[tb + 1].store(0.0f, std::memory_order_relaxed);  // outer_bars

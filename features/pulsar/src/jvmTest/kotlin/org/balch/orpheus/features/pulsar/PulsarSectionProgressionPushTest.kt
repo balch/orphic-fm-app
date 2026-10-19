@@ -48,6 +48,7 @@ import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
+import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.RhythmPattern
 import org.balch.orpheus.features.pulsar.models.RootNote
@@ -61,6 +62,8 @@ import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.SpeechCue
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
 import org.balch.orpheus.features.pulsar.models.TapeStopEffect
+import org.balch.orpheus.features.pulsar.models.TensionArc
+import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TrackRole
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
@@ -68,6 +71,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
 import org.balch.orpheus.features.pulsar.models.VibeSpeech
+import org.balch.orpheus.features.pulsar.models.VolumePoint
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -232,6 +236,71 @@ class PulsarSectionProgressionPushTest {
 
         assertEquals(0f, floatPort("section_data_${0 * Arrangement.SECTION_DATA_FIELDS + 16}"))
         assertEquals(1f, floatPort("section_data_${1 * Arrangement.SECTION_DATA_FIELDS + 16}"))
+    }
+
+    @Test
+    fun `section volume and rampTo push value plus one, 0 when unset`() = runTest(testDispatcher) {
+        val sections = listOf(
+            Section(name = "intro", barsMin = 4, barsMax = 4,
+                macroOverrides = MacroOverrides(energy = 0.5f, volume = 0.6f),
+                rampTo = MacroOverrides(energy = 1f, mood = 0.8f, volume = 1f),
+                transitions = listOf(SectionTransition(1, 1f))),
+            Section(name = "verse", barsMin = 2, barsMax = 2,
+                transitions = listOf(SectionTransition(0, 1f))),
+        )
+        val vibe = pushTestVibe(sections = sections)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        fun slot(s: Int, f: Int) = floatPort("section_data_${s * Arrangement.SECTION_DATA_FIELDS + f}")!!
+        assertEquals(1.6f, slot(0, 31), 1e-6f)   // volume
+        assertEquals(2f, slot(0, 32))            // ramp energy
+        assertEquals(0f, slot(0, 33))            // ramp complexity unset
+        assertEquals(0f, slot(0, 34))            // ramp space unset
+        assertEquals(1.8f, slot(0, 35), 1e-6f)   // ramp mood
+        assertEquals(2f, slot(0, 36))            // ramp volume
+        for (f in 31..36) assertEquals(0f, slot(1, f), "verse slot $f")
+    }
+
+    @Test
+    fun `volume envelope pushes its count and points, zero-filling the rest`() = runTest(testDispatcher) {
+        val sections = listOf(
+            Section(name = "verse", barsMin = 2, barsMax = 2,
+                transitions = listOf(SectionTransition(1, 1f))),
+            Section(name = "outro", barsMin = 6, barsMax = 6,
+                volumeEnvelope = listOf(VolumePoint(0f, 1f), VolumePoint(4f, 0.4f), VolumePoint(5.5f, 0f))),
+        )
+        val vibe = pushTestVibe(sections = sections)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        fun slot(s: Int, f: Int) = floatPort("section_data_${s * Arrangement.SECTION_DATA_FIELDS + f}")!!
+        assertEquals(0f, slot(0, 37))
+        assertEquals(3f, slot(1, 37))
+        assertEquals(listOf(0f, 1f, 4f, 0.4f, 5.5f, 0f, 0f, 0f), (38..45).map { slot(1, it) })
+    }
+
+    @Test
+    fun `tension arc is pushed on its own stride`() = runTest(testDispatcher) {
+        val sections = listOf(
+            Section(name = "intro", barsMin = 4, barsMax = 4,
+                tensionOverride = TensionProfile(innerBars = 4, arc = TensionArc.RISE),
+                transitions = listOf(SectionTransition(1, 1f))),
+            Section(name = "outro", barsMin = 4, barsMax = 4,
+                tensionOverride = TensionProfile(innerBars = 4, arc = TensionArc.FALL),
+                transitions = listOf(SectionTransition(0, 1f))),
+        )
+        val vibe = pushTestVibe(sections = sections)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val stride = Arrangement.TENSION_DATA_FIELDS
+        assertEquals(4f, floatPort("section_tension_data_${1 * stride + 0}"))   // outro inner bars
+        assertEquals(1f, floatPort("section_tension_data_${0 * stride + 21}"))  // RISE
+        assertEquals(2f, floatPort("section_tension_data_${1 * stride + 21}"))  // FALL
     }
 
     /**

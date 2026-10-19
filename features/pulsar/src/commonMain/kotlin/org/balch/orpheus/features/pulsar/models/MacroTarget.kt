@@ -80,14 +80,23 @@ data class TrackMacroMap(
     }
 }
 
-/** Macro multipliers: 1.0=no change, >1=boost, <1=cut, null=inactive. */
+/**
+ * Macro multipliers: 1.0=no change, >1=boost, <1=cut, null=inactive.
+ *
+ * @param volume Multiplies the whole Pulsar mix while the section plays, 0-2.
+ */
 @Serializable
 data class MacroOverrides(
     val energy: Float? = null,
     val complexity: Float? = null,
     val space: Float? = null,
     val mood: Float? = null,
-)
+    val volume: Float? = null,
+) {
+    init {
+        require(volume == null || volume in 0f..2f) { "MacroOverrides.volume must be 0-2, got $volume" }
+    }
+}
 
 /**
  * Which live macro knob drives a parameter-walk (e.g., DX patch selection

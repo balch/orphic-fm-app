@@ -182,6 +182,34 @@ static inline float lick_render_mutation(const PulsarState* state, float mutatio
                                          static_cast<lick_calm::Zone>(state->lick_zone));
 }
 
+// A RISE/FALL section arc: tension 0..1 from the section's first bar to its last
+// (reversed for FALL), plus any held conductor drive. LOOP leaves the sawtooth alone.
+static inline void apply_section_tension_arc(PulsarState* state) {
+    if (state->tension.arc == kTensionArcLoop) return;
+    const SectionState& ss = state->section_state;
+    const float phase = (ss.bars_total > 1 && !ss.hold_ramp_end)
+        ? clamp01(static_cast<float>(ss.bars_total - ss.bars_remaining)
+                  / static_cast<float>(ss.bars_total - 1))
+        : 1.0f;
+    const float arc = (state->tension.arc == kTensionArcFall) ? 1.0f - phase : phase;
+    state->tension_intensity = clamp01(arc + state->tension_drive_held);
+}
+
+// A section's volume envelope at `bars` into it: straight lines between its points,
+// holding the first level before the first point and the last after the last.
+static inline float volume_envelope_at(const SectionParam& sec, float bars) {
+    const int n = sec.volume_point_count;
+    if (bars <= sec.volume_point_bar[0]) return sec.volume_point_level[0];
+    for (int i = 1; i < n; i++) {
+        if (bars <= sec.volume_point_bar[i]) {
+            const float b0 = sec.volume_point_bar[i - 1], b1 = sec.volume_point_bar[i];
+            const float l0 = sec.volume_point_level[i - 1], l1 = sec.volume_point_level[i];
+            return (b1 > b0) ? l0 + (l1 - l0) * (bars - b0) / (b1 - b0) : l1;
+        }
+    }
+    return sec.volume_point_level[n - 1];
+}
+
 // Bars between deja-vu resets at a given effective complexity.
 static inline int dejavu_interval(float complexity) {
     return std::max(8, static_cast<int>(32.0f * (1.0f - complexity)));
@@ -201,7 +229,11 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
 
     // ── Compute tension intensity from inner/outer cycle phases ──
     int inner = state->tension.inner_bars;
-    if (inner > 0) {
+    if (state->tension.arc != kTensionArcLoop) {
+        // Section arc: set after the section advance, once this bar's section is known,
+        // so the evolution smoother below reads the arc one bar late.
+        tension_drive_step(state, engine);
+    } else if (inner > 0) {
         float inner_phase = static_cast<float>(state->loop_count % inner) / static_cast<float>(inner);
         float outer_scale = 1.0f;
         int outer = state->tension.outer_bars;
@@ -277,7 +309,9 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             }
         } else {
             bool trigger = false;
-            if (state->tension_intensity > 0.85f) {
+            // Only the looping sawtooth's peak forces a spurt: a RISE/FALL arc reaches 1 as
+            // its section's full level, not a climax, and would spurt an intro's or outro's edge.
+            if (state->tension.arc == kTensionArcLoop && state->tension_intensity > 0.85f) {
                 trigger = true;
             } else if (state->tension.spurt_chance > 0.001f) {
                 uint32_t rng = state->mutation_seed;
@@ -764,6 +798,7 @@ static void reload_vibe_tension(OrpheusEngine* engine, PulsarState* state) {
     state->tension.evo_attack_point  = engine->pulsar_tension_evo_attack_point.load(std::memory_order_relaxed);
     state->tension.evo_release_speed = engine->pulsar_tension_evo_release_speed.load(std::memory_order_relaxed);
     state->tension.spurt_chance      = engine->pulsar_tension_spurt_chance.load(std::memory_order_relaxed);
+    state->tension.arc               = kTensionArcLoop;  // RISE/FALL are section-only
     for (int i = 0; i < 8; i++)
         state->tension.track_evo_weight[i] = engine->pulsar_track_evo_weight[i].load(std::memory_order_relaxed);
 }
@@ -1947,6 +1982,33 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             sec.street.echo = clamp01(engine->pulsar_section_data[base + 29].load(std::memory_order_relaxed));
             sec.street.train = clamp01(engine->pulsar_section_data[base + 30].load(std::memory_order_relaxed));
 
+            // Slot 31: section volume; slots 32-36: rampTo energy, complexity, space, mood, volume.
+            // Each carries value + 1 so an unwritten 0 reads as unset (-1), like slot 26.
+            {
+                auto P = [&](int f) {
+                    const float wire = engine->pulsar_section_data[base + f].load(std::memory_order_relaxed);
+                    return (wire > 0.0f) ? wire - 1.0f : -1.0f;
+                };
+                sec.macro_overrides.volume = P(31);
+                sec.macro_ramp.energy      = P(32);
+                sec.macro_ramp.complexity  = P(33);
+                sec.macro_ramp.space       = P(34);
+                sec.macro_ramp.mood        = P(35);
+                sec.macro_ramp.volume      = P(36);
+            }
+            // Slot 37: volume envelope point count; 38..: (bar, level) pairs.
+            {
+                int n = static_cast<int>(engine->pulsar_section_data[base + 37].load(std::memory_order_relaxed));
+                n = std::max(0, std::min(n, kMaxSectionVolumePoints));
+                sec.volume_point_count = n;
+                for (int i = 0; i < n; i++) {
+                    sec.volume_point_bar[i] =
+                        engine->pulsar_section_data[base + 38 + i * 2].load(std::memory_order_relaxed);
+                    sec.volume_point_level[i] = std::max(0.0f, std::min(2.0f,
+                        engine->pulsar_section_data[base + 39 + i * 2].load(std::memory_order_relaxed)));
+                }
+            }
+
             // Per-track section overrides; -1 = no override (per-track wins over section-level)
             {
                 int tbase = s * kNumPulsarTracks;
@@ -2005,9 +2067,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     std::memory_order_relaxed);
                 sec.has_tension_override = (tension_active == 1);
                 if (sec.has_tension_override) {
-                    // Tension's OWN fixed stride -- NOT kSectionDataFields (25). It never
-                    // grew the 4 weather slots pulsar_section_data added.
-                    int tb = s * 21;
+                    // Tension's OWN stride, not kSectionDataFields.
+                    int tb = s * kSectionTensionFields;
                     auto L = [&](int f) {
                         return engine->pulsar_section_tension_data[tb + f].load(
                             std::memory_order_relaxed);
@@ -2034,6 +2095,9 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     sec.tension_override.evo_attack_point   = L(18);
                     sec.tension_override.evo_release_speed  = L(19);
                     sec.tension_override.spurt_chance       = L(20);
+                    const int arc = static_cast<int>(L(21));
+                    sec.tension_override.arc = (arc == kTensionArcRise || arc == kTensionArcFall)
+                        ? arc : kTensionArcLoop;
                 }
             }
 
@@ -2141,6 +2205,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 // is already loaded, so only replace it when this section overrides it.
                 if (sec.has_tension_override) {
                     state->tension = sec.tension_override;
+                    apply_section_tension_arc(state);  // a FALL opens at full tension
                 }
 
                 // Apply the opening section's per-track DENSITY overrides. The patterns
@@ -2567,6 +2632,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             state->section_state.target_complexity = sec.macro_overrides.complexity;
             state->section_state.target_space      = sec.macro_overrides.space;
             state->section_state.target_mood       = sec.macro_overrides.mood;
+            state->section_state.target_volume     = sec.macro_overrides.volume;
 
             // No jam_carry check: load_vibe already memset band_solo_state, so
             // there is never an in-flight jam to walk across this seam.
@@ -2968,17 +3034,22 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     //
     // `progress` is hoisted out of the block because the storm's weather bed
     // crossfades on this same ramp, and it renders after the track loop.
+    //
+    // A section with a rampTo glides its own overrides from macro_overrides to macro_ramp
+    // over its whole length (same continuous phase); a pre-roll then blends from wherever
+    // the ramp has got to. section_volume is the MacroOverrides.volume the output gain uses.
     float progress = 0.0f;
+    float section_volume = 1.0f;
     if (state->arrangement.active) {
         const SectionState& ss = state->section_state;
         bool in_transition = ss.transition_target >= 0;
         progress = ss.transition_progress;
+        const PulsarTrackState& t0 = state->tracks[0];
+        const float bar_phase = (t0.step_count > 0)
+            ? static_cast<float>(t0.playhead) / static_cast<float>(t0.step_count)
+            : 0.0f;
         if (in_transition && ss.next_section_trans_bars > 0) {
             int N = ss.next_section_trans_bars;
-            const PulsarTrackState& t0 = state->tracks[0];
-            float bar_phase = (t0.step_count > 0)
-                ? static_cast<float>(t0.playhead) / static_cast<float>(t0.step_count)
-                : 0.0f;
             // bars_remaining counts whole bars LEFT in the source section. As
             // we move through the current bar, the continuous remainder shrinks
             // from bars_remaining toward bars_remaining - 1.
@@ -2991,19 +3062,44 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (progress > 1.0f) progress = 1.0f;
         }
 
+        // Bars into the section (continuous) and the same as 0..1 of its length. A held
+        // outro sits at its end; a one-section arrangement never counts its bars down,
+        // so it has no ramp.
+        float elapsed_bars = 0.0f;
+        float section_phase = 0.0f;
+        if (ss.hold_ramp_end) {
+            elapsed_bars = static_cast<float>(ss.bars_total);
+            section_phase = 1.0f;
+        } else if (ss.bars_total > 0 && state->arrangement.section_count > 1) {
+            elapsed_bars = static_cast<float>(ss.bars_total - ss.bars_remaining) + bar_phase;
+            section_phase = clamp01(elapsed_bars / static_cast<float>(ss.bars_total));
+        }
+        const SectionParam& cur_sec = state->arrangement.sections[ss.current_section];
+        const MacroOverridesParam& ramp = cur_sec.macro_ramp;
+        auto ramped = [&](float start_ov, float end_ov) -> float {
+            if (end_ov < 0.0f) return start_ov;
+            const float from = (start_ov >= 0.0f) ? start_ov : 1.0f;
+            return from + (end_ov - from) * section_phase;
+        };
+        auto multiplier = [&](float cur_ov, float nxt_ov) -> float {
+            if (in_transition) return section_macro_value(1.0f, cur_ov, nxt_ov, progress);
+            return (cur_ov >= 0.0f) ? cur_ov : 1.0f;
+        };
         auto apply = [&](float base, float cur_ov, float nxt_ov) -> float {
-            if (in_transition) {
-                if (cur_ov < 0.0f && nxt_ov < 0.0f) return base;
-                float mult = section_macro_value(1.0f, cur_ov, nxt_ov, progress);
-                return clamp01(base * mult);
-            }
-            return (cur_ov >= 0.0f) ? clamp01(base * cur_ov) : base;
+            if (cur_ov < 0.0f && (!in_transition || nxt_ov < 0.0f)) return base;
+            return clamp01(base * multiplier(cur_ov, nxt_ov));
         };
 
-        energy     = apply(energy,     ss.target_energy,     ss.next_energy);
-        complexity = apply(complexity, ss.target_complexity, ss.next_complexity);
-        space      = apply(space,      ss.target_space,      ss.next_space);
-        mood       = apply(mood,       ss.target_mood,       ss.next_mood);
+        energy     = apply(energy,     ramped(ss.target_energy, ramp.energy),         ss.next_energy);
+        complexity = apply(complexity, ramped(ss.target_complexity, ramp.complexity), ss.next_complexity);
+        space      = apply(space,      ramped(ss.target_space, ramp.space),           ss.next_space);
+        mood       = apply(mood,       ramped(ss.target_mood, ramp.mood),             ss.next_mood);
+        // A held outro sits on the envelope's last point: its re-drawn length could stop short of it.
+        const float own_volume = (cur_sec.volume_point_count > 0)
+            ? (ss.hold_ramp_end ? cur_sec.volume_point_level[cur_sec.volume_point_count - 1]
+                                : volume_envelope_at(cur_sec, elapsed_bars))
+            : ramped(ss.target_volume, ramp.volume);
+        section_volume = std::max(0.0f, std::min(2.0f, multiplier(own_volume, ss.next_volume)));
     }
 
     // Complexity and space are used below for swing, variation, morph, etc.
@@ -3893,6 +3989,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         state->section_state.target_complexity = sec.macro_overrides.complexity;
                         state->section_state.target_space = sec.macro_overrides.space;
                         state->section_state.target_mood = sec.macro_overrides.mood;
+                        state->section_state.target_volume = sec.macro_overrides.volume;
 
                         // Always restart the chord progression at section entry.
                         // Uses the section's override when set, else the vibe's
@@ -4240,6 +4337,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             }
                         }
                     }
+
+                    // A RISE/FALL arc runs over the section's own bars, so it is set here,
+                    // after the flip has applied this section's tension override.
+                    apply_section_tension_arc(state);
 
                     // Fire Sky .5f lick resolve for a bar that is not a seam; a seam resolves
                     // inside the section-changed block, ahead of the solo start.
@@ -6425,11 +6526,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // Slight overdrive (3.3x vs old 3.0x) pushes more signal into tanh saturation
     // zone, generating harmonics in the 80-250Hz "feel" range.
     static constexpr float kPulsarOutputGain = 3.3f;
-    float output_gain = mix * kPulsarOutputGain;
+    // The section volume ramps across the block from the last block's value.
+    const float vol_from = state->section_volume_gain;
+    const float vol_step = (section_volume - vol_from) / static_cast<float>(num_frames);
     for (int i = 0; i < num_frames; i++) {
+        const float output_gain = mix * kPulsarOutputGain * (vol_from + vol_step * static_cast<float>(i + 1));
         out_l[i] *= output_gain;
         out_r[i] *= output_gain;
     }
+    state->section_volume_gain = section_volume;
 
     // Bus limiter: soft-clip the boosted 8-track sum to prevent digital overs.
     // soft_limit is linear below 0.5, tanh saturation above — natural bus compression.

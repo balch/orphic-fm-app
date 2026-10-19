@@ -691,6 +691,11 @@ struct PulsarChordState {
     float   progression_glides[kMaxProgressionLength] = {};
 };
 
+// TensionProfile.arc wire values.
+static constexpr int kTensionArcLoop = 0;
+static constexpr int kTensionArcRise = 1;
+static constexpr int kTensionArcFall = 2;
+
 // ── Tension system parameters (loaded from engine atomics on vibe reload) ──
 struct TensionParams {
     int inner_bars = 4;
@@ -711,6 +716,9 @@ struct TensionParams {
     float evo_release_speed = 0.3f;
     float track_evo_weight[8] = {-1,-1,-1,-1,-1,-1,-1,-1};
     float spurt_chance = 0.0f;  // per-bar random spurt probability (0 = tension-only)
+    // How intensity moves: the free-running inner/outer sawtooth, or across the section's
+    // own bars from 0 to 1 (RISE) or 1 to 0 (FALL). Only a section override sets RISE/FALL.
+    int arc = kTensionArcLoop;
 };
 
 // Semitones the climax key shift adds to a firing note. One predicate for the fire
@@ -735,6 +743,7 @@ struct MacroOverridesParam {
     float complexity = -1.0f;
     float space = -1.0f;
     float mood = -1.0f;
+    float volume = -1.0f;  // multiplies the Pulsar mix output
 };
 
 struct SoloBehaviorParam {
@@ -815,6 +824,13 @@ struct SectionParam {
     int transition_count = 0;
     float recency_decay = 0.5f;
     MacroOverridesParam macro_overrides;
+    // Where macro_overrides glide to by the section's last step (-1 = that macro holds).
+    MacroOverridesParam macro_ramp;
+    // Piecewise-linear section volume over (bar, level) points; replaces the volume above
+    // when volume_point_count > 0. Bars count from the section start, fractions allowed.
+    int volume_point_count = 0;
+    float volume_point_bar[kMaxSectionVolumePoints] = {};
+    float volume_point_level[kMaxSectionVolumePoints] = {};
     bool has_tension_override = false;
     TensionParams tension_override;
     SoloModeId solo_mode = SoloModeId::NONE;
@@ -909,16 +925,19 @@ struct SectionState {
     // -1 = none. Consumed at the boundary.
     int pending_section_request = -1;
     float target_energy = -1.0f, target_complexity = -1.0f;
-    float target_space = -1.0f, target_mood = -1.0f;
+    float target_space = -1.0f, target_mood = -1.0f, target_volume = -1.0f;
     // Destination overrides during a transition crossfade. Populated when a
     // transition stages, reset back to -1 when the transition completes.
     float next_energy = -1.0f, next_complexity = -1.0f;
-    float next_space = -1.0f, next_mood = -1.0f;
+    float next_space = -1.0f, next_mood = -1.0f, next_volume = -1.0f;
     // Pre-roll model: the next section is selected the moment the current
     // section becomes active, and its incoming edge's transition_bars determines
     // how many of the LAST bars of the current section are the ramp zone.
     int next_section_planned = -1;
     int next_section_trans_bars = 0;
+    // An ending outro looping into itself (armed, or a terminal section) holds its
+    // rampTo end and arc end instead of restarting them under the song handoff.
+    bool hold_ramp_end = false;
 };
 
 // ── Band-based solo system ──────────────────────────────────────────
@@ -1248,6 +1267,9 @@ struct PulsarState {
     // Tension system
     TensionParams tension;
     float tension_intensity = 0.0f;
+    // Section volume (MacroOverrides.volume and its ramp) the output gain last rendered
+    // with; each block ramps from here to the new value so a hard cut cannot click.
+    float section_volume_gain = 1.0f;
     float tension_evo_smooth = 0.0f;
     // Conductor's live tension nudge (see tension_drive_step in orpheus_unit_pulsar.cpp).
     float tension_drive_held = 0.0f;

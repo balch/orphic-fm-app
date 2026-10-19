@@ -2196,7 +2196,10 @@ class PulsarViewModel(
      *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override,
      *   21=weather_rain, 22=weather_rumble, 23=weather_strike_chance, 24=weather_distance,
      *   25=weather_rain_level (SectionWeather; all-zero when [Section.weather] is null),
-     *   26=lick_index+1 (0=no override)
+     *   26=lick_index+1 (0=no override),
+     *   27=street_footsteps, 28=street_run, 29=street_footstep_echo, 30=street_train,
+     *   31=volume+1, 32..36=rampTo energy/complexity/space/mood/volume +1 (0 = unset),
+     *   37=volumeEnvelope point count, 38..49=(bar, level) pairs
      *
      * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
      *   0=targetIndex, 1=weight, 2=transitionBars
@@ -2299,7 +2302,9 @@ class PulsarViewModel(
             // [4]=transition_count, [5]=energy, [6]=complexity, [7]=space, [8]=mood,
             // [9..17]=solo data (format depends on new vs legacy system),
             // [18]=comping_style_override, [19]=comping_inversion_override,
-            // [20]=chord_follow_override, [21]=lick_index+1 (0 = no override)
+            // [20]=chord_follow_override, [21..25]=weather, [26]=lick_index+1 (0 = no
+            // override), [27..30]=street, [31]=volume+1, [32..36]=rampTo+1 (0 = unset),
+            // [37]=volumeEnvelope count, [38..49]=its (bar, level) pairs
             setSection(0, section.barsMin.toFloat())
             setSection(1, section.barsMax.toFloat())
             setSection(2, section.barStep.toFloat())
@@ -2368,6 +2373,26 @@ class PulsarViewModel(
             setSection(28, if (street?.pace == FootstepPace.RUN) 1f else 0f)
             setSection(29, street?.footstepEcho ?: 0f)
             setSection(30, street?.train ?: 0f)
+
+            // Slot 31: section volume; 32-36: rampTo energy, complexity, space, mood, volume.
+            // Each is value + 1 so the zero-initialised ports read as unset, like slot 26.
+            fun plusOne(v: Float?) = if (v != null) v + 1f else 0f
+            val ramp = section.rampTo
+            setSection(31, plusOne(mo?.volume))
+            setSection(32, plusOne(ramp?.energy))
+            setSection(33, plusOne(ramp?.complexity))
+            setSection(34, plusOne(ramp?.space))
+            setSection(35, plusOne(ramp?.mood))
+            setSection(36, plusOne(ramp?.volume))
+
+            // Slot 37: volume envelope point count; 38..49: (bar, level) pairs, zero-filled.
+            val envelope = section.volumeEnvelope
+            setSection(37, envelope.size.toFloat())
+            for (i in 0 until Arrangement.MAX_VOLUME_POINTS) {
+                val point = envelope.getOrNull(i)
+                setSection(38 + i * 2, point?.bar ?: 0f)
+                setSection(39 + i * 2, point?.level ?: 0f)
+            }
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.
@@ -2508,9 +2533,8 @@ class PulsarViewModel(
                 IntValue(if (to != null) 1 else 0)
             )
             if (to != null) {
-                // Tension's OWN fixed stride — independent of Arrangement.SECTION_DATA_FIELDS.
-                // It never grew the 4 weather slots, so this literal must stay 21.
-                val tBase = s * 21
+                // Tension's OWN stride, independent of Arrangement.SECTION_DATA_FIELDS.
+                val tBase = s * Arrangement.TENSION_DATA_FIELDS
                 fun setTension(field: Int, v: Float) =
                     synthController.setPluginControl(
                         PluginControlId(PULSAR_URI, "section_tension_data_${tBase + field}"),
@@ -2537,6 +2561,7 @@ class PulsarViewModel(
                 setTension(18, to.evolution.attackPoint)
                 setTension(19, to.evolution.releaseSpeed)
                 setTension(20, to.spurtChance)
+                setTension(21, to.arc.engineId.toFloat())
             }
 
             // --- Per-section comping humanization override ---
