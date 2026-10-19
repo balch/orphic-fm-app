@@ -42,6 +42,7 @@ import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.SoloMode
 import org.balch.orpheus.features.pulsar.models.StrikeEffect
+import org.balch.orpheus.features.pulsar.models.TensionArc
 import org.balch.orpheus.features.pulsar.models.TensionProfile
 import org.balch.orpheus.features.pulsar.models.TrackMacroMap
 import org.balch.orpheus.features.pulsar.models.TrackRole
@@ -51,6 +52,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VolumePoint
 import org.balch.orpheus.features.pulsar.models.WahParams
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
@@ -229,6 +231,10 @@ class OrphicLoreVibe : VibeProvider {
 
     private val peakLick = funkSketch
     private val lickPool = listOf(descent, verseLick, riseLick, vampLick, peakLick)
+
+    // The intro swells from introSoft to verseLevel; the outro glides back the other way.
+    private val introSoft = MacroOverrides(energy = 0.45f, complexity = 0.6f, space = 1.2f, volume = 0.55f)
+    private val verseLevel = MacroOverrides(energy = 1f, complexity = 1f, space = 1f, volume = 1f)
 
     override val vibe: Vibe by lazy {
         Vibe(
@@ -589,12 +595,19 @@ class OrphicLoreVibe : VibeProvider {
                     // Lengths are section bars (32 steps = two musical bars) and all even: the
                     // descent is 64 steps, so an odd count would start a homecoming on its Bb.
 
-                    // 0 INTRO: the bass states the lament with the Sirens singing it far above
+                    // 0 INTRO: the bass states the lament with the Sirens singing it far above.
+                    // It opens soft and sparse and swells into the verse: energy, complexity,
+                    // space and the whole mix glide to the verse's level by the last step,
+                    // while a RISE arc lifts the velocities bar by bar.
                     Section(
                         name = "intro",
-                        barsMin = 2, barsMax = 2,
+                        barsMin = 4, barsMax = 4,
                         lickIndex = 0,
-                        macroOverrides = MacroOverrides(energy = 0.7f, space = 1.2f),
+                        macroOverrides = introSoft,
+                        rampTo = verseLevel,
+                        tensionOverride = TensionProfile(
+                            innerBars = 4, volume = 1f, timing = 0.1f, arc = TensionArc.RISE,
+                        ),
                         trackOverrides = mapOf(
                             0 to TrackSectionOverride(density = 0.15f),
                             1 to TrackSectionOverride(density = 0f),
@@ -610,7 +623,7 @@ class OrphicLoreVibe : VibeProvider {
                     // they start together, drift into counter-motion, and meet again every 6.
                     Section(
                         name = "verse",
-                        barsMin = 2, barsMax = 4, barStep = 2,
+                        barsMin = 4, barsMax = 6, barStep = 2,
                         lickIndex = 1,
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
@@ -734,12 +747,26 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
-                    // 7 OUTRO: the lament dissolves (terminal; reached only when armed)
+                    // 7 OUTRO: the intro in reverse (terminal; reached only when armed). It
+                    // enters at the verse's level and glides back to the intro's soft opening,
+                    // with a FALL arc easing the velocities down, while the mix fades out:
+                    // 40% as bar 5 starts, 15% as bar 6 starts, silent from its middle on
+                    // (and through the loop the song hands off in).
                     Section(
                         name = "outro",
-                        barsMin = 2, barsMax = 2,
+                        barsMin = 6, barsMax = 6,
                         lickIndex = 0,
-                        macroOverrides = MacroOverrides(energy = 0.55f, space = 1.5f),
+                        macroOverrides = verseLevel.copy(volume = null),
+                        rampTo = introSoft.copy(volume = null),
+                        volumeEnvelope = listOf(
+                            VolumePoint(bar = 0f, level = 1f),
+                            VolumePoint(bar = 4f, level = 0.4f),
+                            VolumePoint(bar = 5f, level = 0.15f),
+                            VolumePoint(bar = 5.5f, level = 0f),
+                        ),
+                        tensionOverride = TensionProfile(
+                            innerBars = 6, volume = 1f, timing = 0.1f, arc = TensionArc.FALL,
+                        ),
                         trackOverrides = mapOf(
                             5 to TrackSectionOverride(volume = 0.3f),
                         ),
