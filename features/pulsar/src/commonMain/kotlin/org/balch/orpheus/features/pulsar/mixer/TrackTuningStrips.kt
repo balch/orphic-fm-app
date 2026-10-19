@@ -63,6 +63,7 @@ private val STRIP_WIDTH = 42.dp
 
 /** M/S chip size. */
 internal val STRIP_TOGGLE_SIZE = 18.dp
+private val STRIP_CHIP_GAP = 12.dp
 
 /**
  * Holds a fader of [full] dp, or in a [flexible] strip whatever height is left in the slot
@@ -198,16 +199,7 @@ private fun TrackStrip(
         modifier = Modifier.width(STRIP_WIDTH).semantics { contentDescription = "Strip $who" },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            StripToggle("M", "Mute $who", muted, OrpheusColors.mixerDistRed) {
-                actions.toggleTrackMute(track)
-            }
-            StripToggle("S", "Solo $who", soloed, OrpheusColors.mixerFxAmber) {
-                actions.toggleTrackSolo(track)
-            }
-        }
-        Spacer(Modifier.height(4.dp))
-        // The fader takes whatever height the chips, name and value leave, up to its full height.
+        // The fader takes whatever height the name, value and chips leave, up to its full height.
         FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT) { height ->
             MixerFader(
                 value = level / TrackTuning.MAX_LEVEL,
@@ -245,6 +237,16 @@ private fun TrackStrip(
             color = if (level == TrackTuning.UNITY) OrpheusColors.synthGreen else OrpheusColors.mixerFxAmber,
             fontSize = 9.sp,
         )
+        // M/S sit at the very bottom, well clear of the fader so a drag that overshoots can't toggle them.
+        Spacer(Modifier.height(STRIP_CHIP_GAP))
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            StripToggle("M", "Mute $who", muted, OrpheusColors.mixerDistRed) {
+                actions.toggleTrackMute(track)
+            }
+            StripToggle("S", "Solo $who", soloed, OrpheusColors.mixerFxAmber) {
+                actions.toggleTrackSolo(track)
+            }
+        }
     }
 }
 

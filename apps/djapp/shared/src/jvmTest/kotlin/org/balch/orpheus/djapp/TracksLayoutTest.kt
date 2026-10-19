@@ -454,17 +454,17 @@ class TracksLayoutTest {
     }
 
     @Test
-    fun downFromMuteAndSoloReachesTheFader() {
+    fun upFromMuteAndSoloReachesTheFader() {
         val scene = scene(360, 360, tv = true) { panel -> TvRemote(panel) }
         try {
             scene.render()
             scene.focusOn("Mute KICK")
-            scene.key(Key.DirectionDown)
-            assertEquals("Level KICK", scene.focusedKey())
             scene.key(Key.DirectionUp)
+            assertEquals("Level KICK", scene.focusedKey())
+            scene.key(Key.DirectionDown)
             assertEquals("Mute KICK", scene.focusedKey())
             scene.focusOn("Solo KICK")
-            scene.key(Key.DirectionDown)
+            scene.key(Key.DirectionUp)
             assertEquals("Level KICK", scene.focusedKey())
         } finally {
             scene.close()
