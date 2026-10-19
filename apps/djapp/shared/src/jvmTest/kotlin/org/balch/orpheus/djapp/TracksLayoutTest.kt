@@ -34,7 +34,6 @@ import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.PULSAR_TRACK_NAMES
 import org.balch.orpheus.features.pulsar.mixer.LocalBusMeterFrameProbe
 import org.balch.orpheus.features.pulsar.mixer.MixerFeature
-import org.balch.orpheus.features.pulsar.mixer.MixerGroup
 import org.balch.orpheus.features.pulsar.mixer.MixerPanelActions
 import org.balch.orpheus.features.pulsar.mixer.MixerUiState
 import org.balch.orpheus.features.pulsar.mixer.TrackTuning
@@ -52,7 +51,6 @@ import kotlin.test.assertTrue
 class TracksLayoutTest {
     private val mutes = mutableListOf<Int>()
     private val levels = mutableListOf<Pair<Int, Float>>()
-    private val busMutes = mutableListOf<MixerGroup>()
     private var resets = 0
 
     private val names = PULSAR_TRACK_NAMES
@@ -68,7 +66,6 @@ class TracksLayoutTest {
             toggleTrackMute = { mutes += it },
             setTrackLevel = { t, v -> levels += t to v },
             resetTracks = { resets++ },
-            toggleTuningBusMute = { busMutes += it },
         )
     }
 
@@ -180,7 +177,8 @@ class TracksLayoutTest {
     /** Every labelled node sits whole inside a [height]dp slot: nothing below the edge or squeezed flat. */
     private fun ImageComposeScene.assertNothingClips(height: Int, what: String) {
         val labelled = nodes().filter { it.text().isNotBlank() || it.description().isNotEmpty() }
-        assertTrue(labelled.size > 15, "$what: only ${labelled.size} labelled nodes")
+        // BAND is the smaller view: 5 strips' labels and values, faders and the view toggle.
+        assertTrue(labelled.size > 10, "$what: only ${labelled.size} labelled nodes")
         for (n in labelled) {
             val b = n.boundsInRoot
             val name = n.text().ifBlank { n.description().first() }
@@ -621,24 +619,7 @@ class TracksLayoutTest {
     }
 
     @Test
-    fun busChipsAreDescribedAndTappable() {
-        val scene = scene(360, 360)
-        try {
-            scene.render()
-            scene.tap(scene.nodes().first { it.text() == "BAND" })
-            // A bus chip never shares an announcement with a track chip ("Mute PERC" is track 1).
-            val chip = scene.nodes().first { it.description().contains("Mute PERC band") }
-            assertEquals("off", chip.config.getOrNull(SemanticsProperties.StateDescription))
-            assertTrue(scene.nodes().none { it.description().contains("Mute PERC") })
-            scene.tap(chip)
-            assertEquals(listOf(MixerGroup.PERC), busMutes)
-        } finally {
-            scene.close()
-        }
-    }
-
-    @Test
-    fun trackAndBusMuteNeverShareAnAnnouncement() {
+    fun muteChipsLiveOnTracksOnly() {
         val scene = scene(360, 360)
         try {
             scene.render()
@@ -646,8 +627,7 @@ class TracksLayoutTest {
             scene.tap(scene.nodes().first { it.text() == "BAND" })
             val onBus = scene.nodes().flatMap { it.description() }.filter { it.startsWith("Mute ") }
             assertEquals(8, onTracks.size)
-            assertEquals(4, onBus.size)
-            assertTrue(onTracks.intersect(onBus.toSet()).isEmpty(), "shared: ${onTracks.intersect(onBus.toSet())}")
+            assertTrue(onBus.isEmpty(), "BAND shows mute chips: $onBus")
         } finally {
             scene.close()
         }

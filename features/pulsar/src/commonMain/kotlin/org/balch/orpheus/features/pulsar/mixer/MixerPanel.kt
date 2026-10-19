@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -195,7 +194,7 @@ fun MixerPanel(
                                 actions = actions,
                                 decayedLevels = decayedLevels,
                                 smoothedPeak = smoothedPeak,
-                                busMutesDriveTracks = true,
+                                tuningActive = true,
                                 flexible = flexible,
                             )
                         }
@@ -208,7 +207,7 @@ fun MixerPanel(
                 actions = actions,
                 decayedLevels = decayedLevels,
                 smoothedPeak = smoothedPeak,
-                busMutesDriveTracks = false,
+                tuningActive = false,
             )
         }
     }
@@ -317,10 +316,12 @@ private fun MixerStripsRow(
     actions: MixerPanelActions,
     decayedLevels: Array<MutableFloatState>,
     smoothedPeak: MutableFloatState,
-    busMutesDriveTracks: Boolean,
+    tuningActive: Boolean,
     flexible: Boolean = false,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)) {
+    // Under the BAND | TRACKS toggle the labels get a little extra air.
+    val top = if (tuningActive) 10.dp else 6.dp
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = top, bottom = 6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -335,23 +336,15 @@ private fun MixerStripsRow(
             val onKeysChange = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.KEYS, v) } }
             val onFxChange   = remember(actions) { { v: Float -> actions.setGroupGain(MixerGroup.FX,   v) } }
             val onChange = arrayOf(onPercChange, onBassChange, onKeysChange, onFxChange)
-            val onMute = remember(actions) {
-                Array(GROUP_COUNT) { { actions.toggleTuningBusMute(MixerGroup.entries[it]) } }
-            }
 
             for (idx in 0 until GROUP_COUNT) {
                 val accent = GROUP_ACCENTS[idx]
                 val linearLevel = decayedLevels[idx].floatValue
                 val displayFraction = levelToDisplayFraction(linearLevel)
                 val gain = uiState.groupGains.getOrElse(idx) { 1f }
-                // With TRACKS enabled the BUS mute is a shortcut into TrackTuning, not TRACK_N_MUTE.
-                val muted = if (busMutesDriveTracks) {
-                    uiState.tuningBusMuted.getOrElse(idx) { false }
-                } else {
-                    uiState.groupMuted.getOrElse(idx) { false }
-                }
-                // A TRACKS mute or solo can silence a whole bus; dim it so BAND shows what TRACKS did.
-                val silent = busMutesDriveTracks && uiState.tuning.isBusSilent(accent.group.tracks)
+                // With TRACKS enabled, mutes live there: BAND only dims a bus TRACKS has silenced.
+                val muted = !tuningActive && uiState.groupMuted.getOrElse(idx) { false }
+                val silent = tuningActive && uiState.tuning.isBusSilent(accent.group.tracks)
                 GroupStrip(
                     accent = accent,
                     gain = gain,
@@ -359,7 +352,6 @@ private fun MixerStripsRow(
                     muted = muted,
                     silent = silent,
                     onGainChange = onChange[idx],
-                    onMuteToggle = if (busMutesDriveTracks) onMute[idx] else null,
                     flexible = flexible,
                 )
             }
@@ -367,7 +359,6 @@ private fun MixerStripsRow(
                 drive = uiState.drive,
                 peak = smoothedPeak.floatValue,
                 onDriveChange = actions.setDrive,
-                reserveToggleSlot = busMutesDriveTracks,
                 flexible = flexible,
             )
         }
@@ -377,13 +368,10 @@ private fun MixerStripsRow(
 
 /**
  * Shared layout shell for every channel in the mixer (PERC/BASS/KEYS/FX + DIST).
- * Owns the mute → label → fader → value stack, the same order as the TRACKS strips, so the
- * columns line up across the strip and across both views. Per-channel data (fader behavior,
- * value formatting, color logic) arrives via parameters and the [fader] slot.
- *
- * [reserveToggleSlot] keeps an empty chip-sized gap on a strip with no mute (DIST) so its label
- * sits on the same line as its neighbours'. Spacers stay explicit because the parent Row sets
- * verticalAlignment = Alignment.Bottom, so Arrangement.SpaceBetween would spread its slack.
+ * Owns the label → fader → value stack. Per-channel data (fader behavior, value formatting,
+ * color logic) arrives via parameters and the [fader] slot. Spacers stay explicit because the
+ * parent Row sets verticalAlignment = Alignment.Bottom, so Arrangement.SpaceBetween would spread
+ * its slack.
  */
 @Composable
 private fun FaderStrip(
@@ -391,16 +379,10 @@ private fun FaderStrip(
     labelColor: Color,
     valueText: String,
     valueColor: Color,
-    muteToggle: (@Composable () -> Unit)? = null,
-    reserveToggleSlot: Boolean = false,
     flexible: Boolean = false,
     fader: @Composable (trackHeight: Int) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (muteToggle != null || reserveToggleSlot) {
-            if (muteToggle != null) muteToggle() else Spacer(modifier = Modifier.size(STRIP_TOGGLE_SIZE))
-            Spacer(modifier = Modifier.height(3.dp))
-        }
         Text(
             text = label,
             color = labelColor,
@@ -425,12 +407,11 @@ private fun GroupStrip(
     meterLevel: Float,
     muted: Boolean,
     onGainChange: (Float) -> Unit,
-    onMuteToggle: (() -> Unit)? = null,
     flexible: Boolean = false,
     silent: Boolean = false,
 ) {
     val multiplier = faderToGain(gain)
-    // Muted shows on the chip too; silent (from solo or partial mutes) only dims the strip.
+    // Muted (engine group mute) or silent (TRACKS mutes and solos) both dim the strip.
     val dim = muted || silent
     FaderStrip(
         label = accent.label,
@@ -441,9 +422,6 @@ private fun GroupStrip(
         valueText = formatMultiplier(multiplier),
         valueColor = if (dim) accent.color.copy(alpha = 0.3f) else multiplierColor(multiplier),
         flexible = flexible,
-        muteToggle = onMuteToggle?.let { toggle ->
-            { StripToggle("M", "Mute ${accent.label} band", muted, OrpheusColors.mixerDistRed, toggle) }
-        },
         fader = { height ->
             MixerFader(
                 value = gain,
@@ -465,7 +443,6 @@ private fun DistStrip(
     drive: Float,
     peak: Float,
     onDriveChange: (Float) -> Unit,
-    reserveToggleSlot: Boolean = false,
     flexible: Boolean = false,
 ) {
     val accent = OrpheusColors.seahawksGrey
@@ -475,7 +452,6 @@ private fun DistStrip(
         labelColor = accent,
         valueText = formatTwoDp(drive),
         valueColor = accent.copy(alpha = 0.55f),
-        reserveToggleSlot = reserveToggleSlot,
         flexible = flexible,
         fader = { height ->
             MixerFader(

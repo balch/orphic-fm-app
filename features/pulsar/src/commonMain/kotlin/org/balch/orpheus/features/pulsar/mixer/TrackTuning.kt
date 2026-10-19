@@ -34,17 +34,8 @@ data class TrackTuning(
 
     fun toggleSolo(t: Int) = copy(soloed = soloed.toggled(t))
 
-    /** True when every track in [tracks] is muted. */
-    fun isBusMuted(tracks: List<Int>): Boolean = tracks.isNotEmpty() && tracks.all { muted[it] }
-
     /** True when no track in [tracks] makes sound, by mute or by another track's solo. */
     fun isBusSilent(tracks: IntArray): Boolean = tracks.isNotEmpty() && tracks.all { gain(it) == 0f }
-
-    /** Mutes every track in [tracks], or unmutes them all when they are already all muted. */
-    fun toggleBusMute(tracks: List<Int>): TrackTuning {
-        val target = !isBusMuted(tracks)
-        return copy(muted = muted.toMutableList().also { m -> tracks.forEach { m[it] = target } })
-    }
 
     fun withLevel(t: Int, level: Float) =
         copy(levels = levels.toMutableList().also { it[t] = level.coerceIn(0f, MAX_LEVEL) })
@@ -96,8 +87,6 @@ class TrackTuningController(
     fun toggleMute(t: Int) = update { it.toggleMute(t) }
 
     fun toggleSolo(t: Int) = update { it.toggleSolo(t) }
-
-    fun toggleBusMute(group: MixerGroup) = update { it.toggleBusMute(group.tracks.toList()) }
 
     fun setLevel(t: Int, level: Float) = update { it.withLevel(t, level) }
 

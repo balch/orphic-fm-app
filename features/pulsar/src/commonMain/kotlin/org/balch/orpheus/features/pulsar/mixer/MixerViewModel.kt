@@ -101,7 +101,6 @@ class MixerViewModel(
         toggleTrackSolo = tuning::toggleSolo,
         setTrackLevel = tuning::setLevel,
         resetTracks = tuning::reset,
-        toggleTuningBusMute = tuning::toggleBusMute,
         setTracksView = { tracksViewChanges.tryEmit(MixerIntent.TracksViewChange(it)) },
     )
 
@@ -260,10 +259,7 @@ class MixerViewModel(
             is MixerIntent.PeakChange -> state.copy(peak = intent.value)
             is MixerIntent.MuteListChange -> state.copy(groupMuted = intent.perGroup)
             is MixerIntent.PlayingChange -> state.copy(playing = intent.playing)
-            is MixerIntent.TuningChange -> state.copy(
-                tuning = intent.tuning,
-                tuningBusMuted = MixerGroup.entries.map { intent.tuning.isBusMuted(it.tracks.toList()) },
-            )
+            is MixerIntent.TuningChange -> state.copy(tuning = intent.tuning)
             is MixerIntent.TracksViewChange -> state.copy(tracksView = intent.tracks)
         }
 

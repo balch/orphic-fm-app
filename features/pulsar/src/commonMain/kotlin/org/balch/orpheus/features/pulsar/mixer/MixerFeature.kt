@@ -40,8 +40,6 @@ data class MixerUiState(
     val playing: Boolean = false,
     /** Debug TRACKS view: session-only mute/solo/level, never persisted. */
     @Transient val tuning: TrackTuning = TrackTuning(),
-    /** True per [MixerGroup] when every track in it is muted in [tuning]; the BUS view mirrors it. */
-    @Transient val tuningBusMuted: List<Boolean> = List(MixerGroup.entries.size) { false },
     /** DJ app Mix view: true for TRACKS. Kept for the session so tab switches return to it; a launch opens on BAND. */
     @Transient val tracksView: Boolean = false,
 )
@@ -54,7 +52,6 @@ data class MixerPanelActions(
     val toggleTrackSolo: (Int) -> Unit = {},
     val setTrackLevel: (Int, Float) -> Unit = { _, _ -> },
     val resetTracks: () -> Unit = {},
-    val toggleTuningBusMute: (MixerGroup) -> Unit = {},
     val setTracksView: (Boolean) -> Unit = {},
 ) {
     companion object {

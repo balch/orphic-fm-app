@@ -104,39 +104,6 @@ class TrackTuningTest {
     }
 
     @Test
-    fun busMuteMutesEveryTrackWhenPartlyMuted() {
-        val perc = MixerGroup.PERC.tracks.toList()
-        val tuning = TrackTuning().toggleMute(1).toggleBusMute(perc)
-        assertEquals(listOf(true, true, true), perc.map { tuning.muted[it] })
-        assertTrue(tuning.isBusMuted(perc))
-        assertFalse(tuning.muted[3])
-    }
-
-    @Test
-    fun busMuteUnmutesWhenAllMuted() {
-        val perc = MixerGroup.PERC.tracks.toList()
-        val tuning = TrackTuning().toggleBusMute(perc).toggleBusMute(perc)
-        assertFalse(tuning.isBusMuted(perc))
-        assertEquals(TrackTuning(), tuning)
-    }
-
-    @Test
-    fun busMuteBeatsSolo() {
-        val tuning = TrackTuning().toggleSolo(1).toggleBusMute(MixerGroup.PERC.tracks.toList())
-        assertEquals(0f, tuning.gain(1))
-    }
-
-    @Test
-    fun controllerBusMutePushesOnlyTheGainsThatChange() {
-        val c = controller()
-        c.toggleMute(0)
-        writes.clear()
-        c.toggleBusMute(MixerGroup.PERC)
-        assertEquals(listOf(1 to 0f, 2 to 0f), writes)
-        assertTrue(c.state.value.isBusMuted(MixerGroup.PERC.tracks.toList()))
-    }
-
-    @Test
     fun aBusIsSilentWhenEveryTrackInItMakesNoSound() {
         val perc = MixerGroup.PERC.tracks
         assertFalse(TrackTuning().isBusSilent(perc))
