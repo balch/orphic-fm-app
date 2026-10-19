@@ -145,8 +145,9 @@ fun DjAppScreen(
         djFeature.stateFlow.map(::anyTurntableUp).distinctUntilChanged()
     }.collectAsStateWithLifecycle(initialValue = anyTurntableUp(djFeature.stateFlow.value))
 
-    // Nav3 back stack: single-level tab switching
-    val backStack = remember { NavBackStack<DjRoute>(DjTab) }
+    // Nav3 back stack: single-level tab switching. rememberSaveable: Android rotation recreates the
+    // activity, and a plain remember snapped the bottom panel back to DJ.
+    val backStack = rememberSaveable(saver = BottomTabBackStackSaver) { NavBackStack<DjRoute>(DjTab) }
     val currentRoute = backStack.lastOrNull() ?: DjTab
     val tabs = remember(tabContributions) { mergeTabContributions(djTabs, tabContributions) }
 
@@ -510,6 +511,18 @@ internal fun sheetAfterBarTab(activeSheet: DjRoute?, tapped: DjRoute): DjRoute? 
     tapped.opensAsSheet -> if (activeSheet == tapped) null else tapped
     activeSheet == PlaylistRoute -> null
     else -> activeSheet
+}
+
+/**
+ * Saves the bottom panel's tab by label. The stack only ever holds one route, and only the in-place
+ * destinations NavDisplay has entries for can be restored.
+ */
+internal val BottomTabBackStackSaver: Saver<NavBackStack<DjRoute>, String> = run {
+    val byLabel = listOf(DjTab, TimerTab, MixTab, HornTab).associateBy { it.label }
+    Saver(
+        save = { stack -> stack.lastOrNull()?.label ?: DjTab.label },
+        restore = { label -> NavBackStack<DjRoute>(byLabel[label] ?: DjTab) },
+    )
 }
 
 /** Either deck's level fader above the floor. */
