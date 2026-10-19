@@ -107,9 +107,9 @@ class PulsarSectionLimitsTest {
     @Test
     fun `MAX_HIT_STEPS matches kMaxPulsarSteps`() {
         assertEquals(
-            constant(pulsarHeader, "kMaxPulsarSteps"),
+            constant(limitsHeader, "kMaxPulsarSteps"),
             TrackSectionOverride.MAX_HIT_STEPS,
-            "TrackSectionOverride.MAX_HIT_STEPS must equal kMaxPulsarSteps in orpheus_unit_pulsar.h. " +
+            "TrackSectionOverride.MAX_HIT_STEPS must equal kMaxPulsarSteps in pulsar_limits.h. " +
                 "The pinned-hit mask is that wide, and a step past it never fires.",
         )
     }

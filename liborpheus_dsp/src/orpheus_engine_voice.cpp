@@ -1,4 +1,5 @@
 #include "orpheus_engine.h"
+#include "orpheus_unit_pulsar.h"
 #include "orpheus_viz.h"
 #include "orpheus_turntable.h"
 #include <algorithm>

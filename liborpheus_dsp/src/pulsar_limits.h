@@ -22,6 +22,10 @@
 
 static constexpr int kNumPulsarTracks = 8;
 
+// Sequencer and lick step cap. Here rather than orpheus_unit_pulsar.h so orpheus_engine.h can
+// size PulsarViz without pulling in the whole Pulsar unit.
+static constexpr int kMaxPulsarSteps = 64;
+
 // Sections per arrangement.
 static constexpr int kMaxSections = 12;
 

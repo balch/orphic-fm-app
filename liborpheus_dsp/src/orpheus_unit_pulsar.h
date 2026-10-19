@@ -20,7 +20,6 @@
 #include "pulsar_score_clock.h"
 #include "score_voice_alloc.h"
 
-static constexpr int kMaxPulsarSteps = 64;
 static constexpr int kMarkovIntervals = 15;
 static constexpr int kMaxSoloPhrase = 8;
 // Track 3 is hard-wired to the bass bus in every scene regardless of engine (see the

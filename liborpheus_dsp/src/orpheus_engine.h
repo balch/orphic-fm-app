@@ -61,8 +61,10 @@
 #include "streams/lorenz_generator.h"
 
 #include "orpheus_unit_bass.h"
-#include "orpheus_unit_pulsar.h"
 #include "orpheus_turntable.h"
+// Forward-declared, not included: the engine only holds a pointer, and every Pulsar header edit
+// would otherwise recompile each TU that includes this one. Include orpheus_unit_pulsar.h directly.
+struct PulsarState;
 #include "orpheus_unit_chaos.h"
 #include "orpheus_master_fader.h"
 #include "orpheus_master_tape_stop.h"
@@ -923,8 +925,8 @@ struct OrpheusEngine {
     // Final per-track volume after the texture curve, band gains and mute.
     std::atomic<float> pulsar_track_volume_debug[8]{};
     // Test-only override of mist::kWidth, so a test can render the same block with
-    // and without the side channel.
-    std::atomic<float> pulsar_mist_width_debug{mist::kWidth};
+    // and without the side channel. Negative means unset: the render uses mist::kWidth.
+    std::atomic<float> pulsar_mist_width_debug{-1.0f};
 #endif
     std::atomic<int>   pulsar_track_envelope[8]{};
     std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL

@@ -152,7 +152,7 @@ data class TrackSectionOverride(
     companion object {
         /**
          * Width of the pinned-hit step mask. MUST equal `kMaxPulsarSteps` in
-         * `orpheus_unit_pulsar.h`; it crosses as four 16-bit words. `PulsarSectionLimitsTest` pins it.
+         * `pulsar_limits.h`; it crosses as four 16-bit words. `PulsarSectionLimitsTest` pins it.
          */
         const val MAX_HIT_STEPS = 64
     }

@@ -3379,7 +3379,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     float mist_mid[kMaxFrames];
     float mist_side[kMaxFrames];
 #ifdef ORPHEUS_TESTING
-    const float mist_width = engine->pulsar_mist_width_debug.load(std::memory_order_relaxed);
+    const float mist_width_debug = engine->pulsar_mist_width_debug.load(std::memory_order_relaxed);
+    const float mist_width = mist_width_debug < 0.0f ? mist::kWidth : mist_width_debug;
 #else
     const float mist_width = mist::kWidth;
 #endif

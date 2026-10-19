@@ -6,6 +6,7 @@
 // may differ in volumes, engines, and other parameters.
 
 #include "../src/orpheus_engine.h"
+#include "../src/orpheus_unit_pulsar.h"
 #include "test_harness.h"
 #include <cstring>
 
