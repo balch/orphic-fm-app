@@ -686,8 +686,12 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.45f, breatheBars = 2, breatheFloor = 0.55f),
-                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
+                            // The Sirens dominate their section: twice the base level, a shallow
+                            // breath, drier so they sit in front; the organ steps back for them.
+                            5 to TrackSectionOverride(
+                                volume = 0.8f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
+                            ),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.45f),
                         ),
                         transitions = listOf(SectionTransition(5, 1f, transitionBars = 2)),
                     ),
@@ -769,7 +773,7 @@ class OrphicLoreVibe : VibeProvider {
                             innerBars = 6, volume = 1f, timing = 0.1f, arc = TensionArc.FALL,
                         ),
                         trackOverrides = mapOf(
-                            5 to TrackSectionOverride(volume = 0.3f),
+                            5 to TrackSectionOverride(volume = 0.5f),  // the Sirens sing it ashore
                         ),
                         transitions = emptyList(),
                     ),
