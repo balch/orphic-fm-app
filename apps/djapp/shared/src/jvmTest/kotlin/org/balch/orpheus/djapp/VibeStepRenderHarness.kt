@@ -18,7 +18,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import java.io.File
 import kotlin.test.Test
 
-/** ./gradlew :apps:djapp:shared:jvmTest --tests '*VibeStepRenderHarness*' --rerun */
+/** ./gradlew :apps:djapp:shared:jvmTest --tests '*VibeStepRenderHarness*' --rerun -PrenderHarness */
 class VibeStepRenderHarness {
     private val short = VibeNavState("Rust Belt", "Dog House", "Stay Asleep", progress = 0.62f)
     private val long = VibeNavState("Ouroboros Bloom", "Kaleidoscope Drift", "Vanished Skyline", progress = 0.1f, previousRestarts = true)

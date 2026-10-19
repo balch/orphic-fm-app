@@ -83,7 +83,7 @@ import kotlin.time.Duration.Companion.seconds
  * Writes to build/djapp-render/ and asserts nothing: a headless machine without skia natives
  * must not fail the build over a diagnostic.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*DjLayoutRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*DjLayoutRenderHarness*' --rerun -PrenderHarness
  */
 class DjLayoutRenderHarness {
 

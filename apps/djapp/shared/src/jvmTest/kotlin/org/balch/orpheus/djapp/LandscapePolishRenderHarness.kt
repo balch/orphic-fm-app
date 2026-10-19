@@ -24,7 +24,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import java.io.File
 import kotlin.test.Test
 
-/** The user's 737x606dp and 747x612dp desktop windows in Landscape. ./gradlew :apps:djapp:shared:jvmTest --tests '*LandscapePolishRenderHarness*' --rerun */
+/** The user's 737x606dp and 747x612dp desktop windows in Landscape. ./gradlew :apps:djapp:shared:jvmTest --tests '*LandscapePolishRenderHarness*' --rerun -PrenderHarness */
 class LandscapePolishRenderHarness {
     @Test
     fun renderLandscapeWindow() {

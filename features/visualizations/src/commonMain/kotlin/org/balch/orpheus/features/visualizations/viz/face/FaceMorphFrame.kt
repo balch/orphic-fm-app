@@ -13,7 +13,7 @@ internal data class StageBlend(val stage: Int, val t: Float)
 /**
  * How far into the final keyframe pair the turn is allowed to go; 1 shows the last keyframe whole.
  * [buildLastStageBiasMap] turns the jaw first and the eyes last, so holding short of 1 ends on the
- * new teeth while the eyes are still arriving. FaceMorphRenderHarness renders the candidates.
+ * new teeth while the eyes are still arriving. FaceMorphRenderTest renders the candidates.
  */
 internal const val LAST_STAGE_CAP = 0.8f
 

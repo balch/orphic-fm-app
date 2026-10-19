@@ -61,7 +61,7 @@ import kotlin.test.Test
  * chrome's stage at each layout (the stage panel under the phone bar in portrait, the side sheet on the
  * rail and dock), open as after a reveal: the 8-ball in the ring and its phrase as the caption.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*PlaylistSheetRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*PlaylistSheetRenderHarness*' --rerun -PrenderHarness
  */
 class PlaylistSheetRenderHarness {
     private val outDir = File("build/djapp-render")

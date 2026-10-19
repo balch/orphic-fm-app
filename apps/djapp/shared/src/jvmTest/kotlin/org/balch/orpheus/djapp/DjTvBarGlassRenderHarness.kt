@@ -58,7 +58,7 @@ import kotlin.test.Test
  * Asserts nothing — a headless machine without skia natives must not fail the build over a
  * diagnostic.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*DjTvBarGlassRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*DjTvBarGlassRenderHarness*' --rerun -PrenderHarness
  */
 class DjTvBarGlassRenderHarness {
 

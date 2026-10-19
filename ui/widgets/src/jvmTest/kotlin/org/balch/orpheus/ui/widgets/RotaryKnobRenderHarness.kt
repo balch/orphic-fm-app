@@ -22,7 +22,7 @@ import kotlin.test.Test
  * asserts nothing, and swallows every throwable so a headless box without skia natives can't
  * fail the build. Run:
  *
- *   ./gradlew :ui:widgets:jvmTest --tests '*RotaryKnobRenderHarness*' --rerun
+ *   ./gradlew :ui:widgets:jvmTest --tests '*RotaryKnobRenderHarness*' --rerun -PrenderHarness
  */
 class RotaryKnobRenderHarness {
 

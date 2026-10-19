@@ -91,3 +91,13 @@ allprojects {
         dependsOn(rootProject.tasks.named("checkPrivateIsolation"))
     }
 }
+
+// *RenderHarness classes write PNGs to look at and assert nothing, and they cost two thirds of the
+// djapp suite (~4.5 of ~7 min). They run only with -PrenderHarness, e.g.
+// ./gradlew :apps:djapp:shared:jvmTest --tests '*DockRenderHarness*' -PrenderHarness
+val runRenderHarnesses = providers.gradleProperty("renderHarness").isPresent
+allprojects {
+    tasks.withType<Test>().configureEach {
+        if (!runRenderHarnesses) filter { excludeTestsMatching("*RenderHarness") }
+    }
+}

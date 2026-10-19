@@ -27,7 +27,7 @@ import kotlin.test.Test
  * ImageComposeScene.render(nanoTime) drives the grid's withFrameNanos loop.
  * Writes to build/grid-render/ and asserts nothing, like DjLayoutRenderHarness.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*PulsarGridRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*PulsarGridRenderHarness*' --rerun -PrenderHarness
  * The allocation test is most of the runtime. Its numbers land in
  * build/test-results/jvmTest/TEST-*.PulsarGridRenderHarness.xml, not on the console.
  */

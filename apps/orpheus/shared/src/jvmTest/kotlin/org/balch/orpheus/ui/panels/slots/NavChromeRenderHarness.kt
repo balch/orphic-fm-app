@@ -23,7 +23,7 @@ import kotlin.test.Test
  * Renders the recents strip, handle, rail and search overlay to PNGs for visual inspection.
  * Asserts nothing: a headless machine without skia natives must not fail the build.
  *
- * ./gradlew :apps:orpheus:shared:jvmTest --tests '*NavChromeRenderHarness*' --rerun
+ * ./gradlew :apps:orpheus:shared:jvmTest --tests '*NavChromeRenderHarness*' --rerun -PrenderHarness
  */
 class NavChromeRenderHarness {
 

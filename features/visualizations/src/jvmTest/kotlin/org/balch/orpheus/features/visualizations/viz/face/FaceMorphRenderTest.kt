@@ -36,9 +36,9 @@ import kotlin.test.assertTrue
  * the pixels are not just a black screen (a broken shader still compiles and renders black).
  * Output: features/visualizations/build/face-morph-render/
  *
- * ./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderHarness*' --rerun
+ * ./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderTest*' --rerun
  */
-class FaceMorphRenderHarness {
+class FaceMorphRenderTest {
     private val width = 1280
     private val height = 800
 

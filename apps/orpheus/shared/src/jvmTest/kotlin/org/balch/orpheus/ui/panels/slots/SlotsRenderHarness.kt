@@ -44,7 +44,7 @@ import kotlin.test.Test
  * Renders [PanelSlotsArea] with fake panels to PNGs for visual inspection. Asserts nothing, so a
  * headless machine without skia natives cannot fail the build.
  *
- * ./gradlew :apps:orpheus:shared:jvmTest --tests '*SlotsRenderHarness*' --rerun
+ * ./gradlew :apps:orpheus:shared:jvmTest --tests '*SlotsRenderHarness*' --rerun -PrenderHarness
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class SlotsRenderHarness {

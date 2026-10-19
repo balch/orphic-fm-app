@@ -32,7 +32,7 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 
-/** ./gradlew :apps:djapp:shared:jvmTest --tests '*NavTransportRenderHarness*' --rerun */
+/** ./gradlew :apps:djapp:shared:jvmTest --tests '*NavTransportRenderHarness*' --rerun -PrenderHarness */
 class NavTransportRenderHarness {
     // A fifth tab stands in for the AI edition's tab, which lives in another module.
     private val withAi = djTabs + VibeInfoTab

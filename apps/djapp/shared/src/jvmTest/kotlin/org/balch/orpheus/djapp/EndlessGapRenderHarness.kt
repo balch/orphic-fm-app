@@ -30,7 +30,7 @@ import kotlin.test.Test
  * Filmstrips of an endless song's blazing gap, on the ring and the song band, playing, frames 150ms
  * apart, next to a song that will still end (plain dim gap) for comparison.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*EndlessGapRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*EndlessGapRenderHarness*' --rerun -PrenderHarness
  */
 class EndlessGapRenderHarness {
     private val scale = 4f

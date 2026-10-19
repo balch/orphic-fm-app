@@ -18,7 +18,7 @@ import kotlin.test.Test
 /**
  * The 8-ball's faces at the dome's, the reveal's and the sheet header's sizes.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*EightBallRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*EightBallRenderHarness*' --rerun -PrenderHarness
  */
 class EightBallRenderHarness {
     private val outDir = File("build/djapp-render")

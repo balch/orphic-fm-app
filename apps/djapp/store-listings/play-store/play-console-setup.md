@@ -183,7 +183,7 @@ Re-submitted 2026-09-20 for v2.2.x. The "Stay Asleep" vibe has its own visualiza
 (`FaceMorphViz`): a photorealistic face that morphs into a skull-like visage inside an old-TV
 news inset, with "OBEY" / "STAY ASLEEP" captions. It is the only ratings-relevant content in the
 app, so the old "No to all" answers no longer hold. To see it without a device:
-`./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderHarness*'`.
+`./gradlew :features:visualizations:jvmTest --tests '*FaceMorphRenderTest*'`.
 
 Policy > App content > Content ratings > **Start new questionnaire**. Sections unlock one at a
 time, and **Next** stays disabled until you click **Save** (a draft save).

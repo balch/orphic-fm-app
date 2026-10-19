@@ -14,7 +14,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import java.io.File
 import kotlin.test.Test
 
-/** Pulsar under each [PulsarSelectors] row. ./gradlew :apps:djapp:shared:jvmTest --tests '*DockedPulsarRenderHarness*' --rerun */
+/** Pulsar under each [PulsarSelectors] row. ./gradlew :apps:djapp:shared:jvmTest --tests '*DockedPulsarRenderHarness*' --rerun -PrenderHarness */
 class DockedPulsarRenderHarness {
     @Test
     fun renderPulsarSelectorRows() {

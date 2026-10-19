@@ -63,7 +63,7 @@ private val demoBeats = List(160) { i ->
 internal val BreakdownDropStory = SongStory(demoBeats, elapsedMs = 160 * 469L)
 internal val BreakdownDropNav = VibeNavState("Rust Belt", "Dog House", "Stay Asleep", progress = 0.62f)
 
-/** ./gradlew :apps:djapp:shared:jvmTest --tests '*MusicWaveRenderHarness*' --rerun */
+/** ./gradlew :apps:djapp:shared:jvmTest --tests '*MusicWaveRenderHarness*' --rerun -PrenderHarness */
 class MusicWaveRenderHarness {
     private val wavePhase = 1f
     private val story = BreakdownDropStory

@@ -36,7 +36,7 @@ import kotlin.test.Test
  * Renders [PanelNavigationLayout] with fake panels and a live reducer to PNGs for visual
  * inspection. Asserts nothing, so a headless machine without skia natives cannot fail the build.
  *
- * ./gradlew :apps:orpheus:shared:jvmTest --tests '*NavigationLayoutRenderHarness*' --rerun
+ * ./gradlew :apps:orpheus:shared:jvmTest --tests '*NavigationLayoutRenderHarness*' --rerun -PrenderHarness
  */
 class NavigationLayoutRenderHarness {
 

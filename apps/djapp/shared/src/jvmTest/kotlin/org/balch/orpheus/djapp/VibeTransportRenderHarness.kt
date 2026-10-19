@@ -21,7 +21,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import java.io.File
 import kotlin.test.Test
 
-/** ./gradlew :apps:djapp:shared:jvmTest --tests '*VibeTransportRenderHarness*' --rerun */
+/** ./gradlew :apps:djapp:shared:jvmTest --tests '*VibeTransportRenderHarness*' --rerun -PrenderHarness */
 class VibeTransportRenderHarness {
     // A mid-wave phase so one frame shows the travelling wave; a paused ring holds the same shape.
     private val wavePhase = 1f

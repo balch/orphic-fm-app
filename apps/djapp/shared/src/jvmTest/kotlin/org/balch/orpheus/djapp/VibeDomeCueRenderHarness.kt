@@ -27,7 +27,7 @@ import kotlin.test.Test
 /**
  * Filmstrips of the phone bar's dome moving by itself, each frame a crop around the transport at 3x.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*VibeDomeCueRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*VibeDomeCueRenderHarness*' --rerun -PrenderHarness
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VibeDomeCueRenderHarness {

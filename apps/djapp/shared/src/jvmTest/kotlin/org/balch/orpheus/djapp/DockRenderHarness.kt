@@ -63,7 +63,7 @@ import kotlin.test.Test
  *
  * Writes build/djapp-render/dock-*.png and asserts nothing.
  *
- * ./gradlew :apps:djapp:shared:jvmTest --tests '*DockRenderHarness*' --rerun
+ * ./gradlew :apps:djapp:shared:jvmTest --tests '*DockRenderHarness*' --rerun -PrenderHarness
  */
 class DockRenderHarness {
     private val density = 2f
