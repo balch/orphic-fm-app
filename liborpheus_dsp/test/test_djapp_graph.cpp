@@ -501,8 +501,8 @@ static bool test_djapp_horn_doppler_lr() {
 
         // Export WAV for the deep config so you can listen
         if (c == 3) {  // fast+deep
-            const char* wav_path = TEST_DATA_DIR "/../output/djapp_horn_doppler.wav";
-            write_wav(wav_path, r.buffer.data(), r.num_frames, 48000);
+            const std::string wav_path = test_data_path("/../output/djapp_horn_doppler.wav");
+            write_wav(wav_path.c_str(), r.buffer.data(), r.num_frames, 48000);
         }
 
         orpheus_engine_destroy(engine);
@@ -562,8 +562,8 @@ static bool test_djapp_full_chain() {
            (has_output && bounded) ? "PASS" : "FAIL");
 
     // Export WAV for manual listening
-    const char* wav_path = TEST_DATA_DIR "/../output/djapp_full_chain.wav";
-    write_wav(wav_path, r.buffer.data(), r.num_frames, 48000);
+    const std::string wav_path = test_data_path("/../output/djapp_full_chain.wav");
+    write_wav(wav_path.c_str(), r.buffer.data(), r.num_frames, 48000);
 
     orpheus_engine_destroy(engine);
     return has_output && bounded;

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <vector>
 #include <cmath>
 #include <algorithm>
@@ -25,6 +26,11 @@ extern int g_suite_passes;
 extern int g_suite_fails;
 // True when suites were named on the command line; manual suites that write files read it.
 extern bool g_filtered_run;
+
+// test/data joined with `relative` ("/x.odwg"). Lives in test_paths.cpp, the one TU whose command
+// line carries the absolute path, so every other test TU compiles the same in each worktree and
+// ccache can share it.
+std::string test_data_path(const char* relative);
 
 // do-while(0) makes the macro a single statement so it can be used inside
 // an unbraced `if`/`else`. The inner `return` ends function expansion before
@@ -294,7 +300,8 @@ inline void setup_voice_unit(GraphUnit* unit, int voice_idx) {
 // Loads the production ODWG graph descriptor (exported by Gradle task)
 // via orpheus_engine_load_patch. Returns true on success.
 inline bool load_production_graph(OrpheusEngine* engine) {
-    const char* path = TEST_DATA_DIR "/default_graph.odwg";
+    const std::string path_str = test_data_path("/default_graph.odwg");
+    const char* path = path_str.c_str();
     FILE* f = fopen(path, "rb");
     if (!f) {
         fprintf(stderr, "Cannot open production graph: %s\n", path);

@@ -15,6 +15,24 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "orpheus_dsp: defaulting CMAKE_BUILD_TYPE to Release")
 endif()
 
+# ── ccache (used when installed) ──────────────────
+# base_dir is the main checkout, which holds every .claude/worktrees/* tree, so ccache rewrites
+# each tree's paths to the same relative form and worktrees share hits. eurorack lives outside it
+# and stays absolute, which is identical everywhere too. Needs ccache 4.8+ for inline settings.
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    execute_process(COMMAND git rev-parse --path-format=absolute --git-common-dir
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE ORPHEUS_GIT_COMMON_DIR OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(ORPHEUS_GIT_COMMON_DIR)
+        get_filename_component(ORPHEUS_CCACHE_BASE "${ORPHEUS_GIT_COMMON_DIR}" DIRECTORY)
+    else()
+        get_filename_component(ORPHEUS_CCACHE_BASE "${CMAKE_CURRENT_SOURCE_DIR}" DIRECTORY)
+    endif()
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" "base_dir=${ORPHEUS_CCACHE_BASE}" hash_dir=false)
+    message(STATUS "orpheus_dsp: ccache on (base_dir=${ORPHEUS_CCACHE_BASE})")
+endif()
+
 # ── Eurorack source location ──────────────────────
 # Set EURORACK_DIR to the path of the eurorack repo.
 # Default: sibling directory or environment variable.
@@ -387,14 +405,22 @@ if(BUILD_TESTS)
         test/test_pulsar_speech.cpp
         test/test_pulsar_street.cpp
         test/test_pulsar_str_lick.cpp
+        test/test_paths.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
+
+    # Absolute paths go on single files, never the whole target: ccache's base_dir doesn't rewrite
+    # -D values, so a target-wide path makes every test TU miss in every other worktree.
+    set_source_files_properties(test/test_paths.cpp PROPERTIES
+        COMPILE_DEFINITIONS "TEST_DATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/test/data\"")
 
     # Extra suites, when the directory exists. Absent is the normal case.
     set(NOOP_TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../noop/liborpheus_dsp/test")
     file(GLOB NOOP_TEST_SRC "${NOOP_TEST_DIR}/*.cpp")
     if(NOOP_TEST_SRC)
         target_sources(orpheus_dsp_test PRIVATE ${NOOP_TEST_SRC})
+        set_source_files_properties(${NOOP_TEST_SRC} PROPERTIES
+            COMPILE_DEFINITIONS "NOOP_TEST_DATA_DIR=\"${NOOP_TEST_DIR}/data\"")
     endif()
 
     target_include_directories(orpheus_dsp_test PRIVATE
@@ -406,8 +432,6 @@ if(BUILD_TESTS)
     target_compile_definitions(orpheus_dsp_test PRIVATE
         TEST
         ORPHEUS_TESTING
-        TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
-        NOOP_TEST_DATA_DIR="${NOOP_TEST_DIR}/data"
     )
 
     # Re-export the production graph from Kotlin before running tests.
@@ -426,14 +450,12 @@ if(BUILD_TESTS)
     add_executable(orpheus_fm_test
         test/test_fm_main.cpp
         test/test_fm_compare.cpp
+        test/test_paths.cpp
     )
     target_link_libraries(orpheus_fm_test orpheus_dsp)
     target_include_directories(orpheus_fm_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${EURORACK_DIR}"
     )
-    target_compile_definitions(orpheus_fm_test PRIVATE
-        TEST
-        TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
-    )
+    target_compile_definitions(orpheus_fm_test PRIVATE TEST)
 endif()

@@ -186,7 +186,8 @@ static const char* engine_name(int id) {
 
 // Load the DJ app wiring graph from test data directory.
 static bool load_dj_graph(OrpheusEngine* engine) {
-    const char* path = TEST_DATA_DIR "/dj_graph.odwg";
+    const std::string path_str = test_data_path("/dj_graph.odwg");
+    const char* path = path_str.c_str();
     FILE* f = fopen(path, "rb");
     if (!f) { fprintf(stderr, "Cannot open DJ graph: %s\n", path); return false; }
     fseek(f, 0, SEEK_END);
