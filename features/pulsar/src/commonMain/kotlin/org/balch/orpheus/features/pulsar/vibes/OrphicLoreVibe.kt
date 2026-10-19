@@ -16,6 +16,7 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingFills
 import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.CompingStyle
+import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.FillType
@@ -441,21 +442,22 @@ class OrphicLoreVibe : VibeProvider {
                         macroMap = TrackMacroMap.EFFECT.copy(energyDensity = MacroTarget(1f, 1f)),
                     )
                 },
-                // 6 — the organ: a held bed under everything, following the chords (the descent,
-                // the vamp's Dm-Gm, the peak's climb). Low energy is the warm Hammond; high energy
-                // (rise, vamp, peak) the brighter B3-style "60s organ". The vibrato stands in for
-                // the Leslie: a slow chorale on the Hammond, the fast rotor on the B3.
+                // 6 — the Hammond, following the chords (the descent, the vamp's Dm-Gm, the
+                // peak's climb): a held bed in the verse, homecoming and return, FUNK_STABS
+                // comping in the rise, vamp and peak. The vibrato stands in for the Leslie: the
+                // fast rotor at high energy, a slow chorale below 0.4 (homecoming, outro).
+                // A held organ note reads far louder than a 44 ms stab at the same gain, so the
+                // bed sits at 0.28 and the stab sections lift the track to 0.6.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX3, volume = 0.4f,
-                    harmonics = 0.107f,                       // DX3 idx 3 "60s organ" (auto-pinned)
+                    engineId = OrpheusEngineId.DX3, volume = 0.28f,
+                    harmonics = 0.046f,                       // DX3 idx 1 "Hammond" (auto-pinned)
                     vibratoDepth = 12f, vibratoRate = 6.5f,   // fast rotor
                     noteRangeLow = 50, noteRangeHigh = 74,    // D3 to D5, under the guitar
                     delaySend = 0.18f, reverbSend = 0.34f,
-                ).let { b3 ->
+                ).let { hammond ->
                     TrackVoice(
-                        engineEdm = b3,
-                        engineSpace = b3.copy(
-                            harmonics = 0.046f,                   // DX3 idx 1 "Hammond"
+                        engineEdm = hammond,
+                        engineSpace = hammond.copy(
                             vibratoDepth = 8f, vibratoRate = 0.8f,   // slow chorale
                         ),
                         role = TrackRole.Chordal(
@@ -482,7 +484,16 @@ class OrphicLoreVibe : VibeProvider {
                         density = 0.7f,
                         barStrategy = BarStrategy.REPEAT,
                         envelopeProfile = EnvelopeProfile.EFFECT,
-                        macroMap = TrackMacroMap.MELODIC,
+                        // Every stab fires: MELODIC's energy roll dropped 10-20% of them.
+                        macroMap = TrackMacroMap.MELODIC.copy(energyDensity = MacroTarget(1f, 1f)),
+                        // The rise, vamp and peak are jam solos, so the organ comps behind a
+                        // soloist there: keep every stab and most fills, at nearly full velocity.
+                        duckingProfile = DuckingProfile(
+                            volumeReduction = 0.05f,
+                            densityReduction = 0f,
+                            fillSuppression = 0.2f,
+                            simplify = false,
+                        ),
                     )
                 },
                 // 7 — the ship's bell in the wind: an FM tubular bell struck on 1 and 3, each strike
@@ -623,7 +634,9 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_8TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.35f, breatheBars = 2, breatheFloor = 0.55f),                        ),
+                            5 to TrackSectionOverride(volume = 0.35f, breatheBars = 2, breatheFloor = 0.55f),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
+                        ),
                         transitions = listOf(SectionTransition(3, 1f, transitionBars = 1)),
                     ),
                     // 3 HOMECOMING: the bass and lead come home to the intro's descent, two loops,
@@ -659,7 +672,9 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.45f, breatheBars = 2, breatheFloor = 0.55f),                        ),
+                            5 to TrackSectionOverride(volume = 0.45f, breatheBars = 2, breatheFloor = 0.55f),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
+                        ),
                         transitions = listOf(SectionTransition(5, 1f, transitionBars = 2)),
                     ),
                     // 5 PEAK: free improv over the vamp. complexity 0.4*1.8 = 0.72 plus energy
@@ -701,6 +716,7 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
                             5 to TrackSectionOverride(volume = 0.6f),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
                             // The bell swings hard in the storm.
                             7 to TrackSectionOverride(volume = 0.6f),
                         ),
