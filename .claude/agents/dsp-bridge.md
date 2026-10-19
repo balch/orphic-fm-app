@@ -50,10 +50,10 @@ When reviewing ANY signal path change, run this pipeline:
 # Step 2: Build C++ tests with fresh ODWG (from the repo root; EURORACK_DIR as in CLAUDE.md Build)
 cmake -S liborpheus_dsp -B liborpheus_dsp/build-desktop \
   -DEURORACK_DIR=$EURORACK_DIR -DBUILD_TESTS=ON
-cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test -j8
+cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test -j$(sysctl -n hw.ncpu)
 
-# Step 3: Run tests (from build dir for WAV output paths)
-cd liborpheus_dsp/build-desktop && ./orpheus_dsp_test
+# Step 3: Run tests (from build dir for WAV output paths; -j runs one process per suite)
+cd liborpheus_dsp/build-desktop && ./orpheus_dsp_test -j
 
 # Step 4: Check specific results
 # - "Wet/Dry isolation analysis" — all algorithms must be > -12dB

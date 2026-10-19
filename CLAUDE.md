@@ -38,12 +38,29 @@ See `.claude/skills/dsp-implementation/` for C++ unit creation, engine atomics, 
 - JVM compile check: `./gradlew compileKotlinJvm`
 - WASM production build: `./gradlew :apps:orpheus:webApp:wasmJsBrowserDistribution`
 - WASM dev server: `./gradlew :apps:orpheus:webApp:wasmJsBrowserDevelopmentRun` (serves on localhost:8080)
-- C++ tests: `cmake -S liborpheus_dsp -B liborpheus_dsp/build-desktop -DEURORACK_DIR=$EURORACK_DIR -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test && liborpheus_dsp/build-desktop/orpheus_dsp_test`
+- C++ tests: `CMAKE_GENERATOR=Ninja cmake -S liborpheus_dsp -B liborpheus_dsp/build-desktop -DEURORACK_DIR=$EURORACK_DIR -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test -j$(sysctl -n hw.ncpu) && liborpheus_dsp/build-desktop/orpheus_dsp_test -j`
+  - Always pass `-j` to both the build and the runner. Without them Makefiles compile one file at a time and the runner runs suites in sequence (~90s + ~105s, versus ~15s + ~20s).
+  - `CMAKE_GENERATOR` only applies to a new build dir; an existing Makefiles dir keeps its generator. Delete the dir once to switch it to Ninja.
+  - ccache is picked up automatically when installed, with hits shared across worktrees. Keep absolute paths off target-wide compile definitions (ccache doesn't rewrite `-D` values): put them on one source file, as `test_paths.cpp` does for `TEST_DATA_DIR`.
   - (Release is the CMake default for this project; pass `-DCMAKE_BUILD_TYPE=Debug` to override.)
-  - Run specific suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test tides bass warps`
+  - Run specific suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test tides bass warps` (add `-j` for one process per suite)
   - List suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test --list`
   - Diagnose graph wiring: `ORPHEUS_DUMP_GRAPH=1 liborpheus_dsp/build-desktop/orpheus_dsp_test graph` — prints full exec order for every graph load. Silent by default to keep test output readable.
   - AddressSanitizer (opt-in, use a separate build dir): add `-DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug` to the cmake command above, e.g. `cmake -S liborpheus_dsp -B liborpheus_dsp/build-asan -DEURORACK_DIR=$EURORACK_DIR -DBUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON`. Default is OFF with zero effect on normal builds.
+
+## Which Tests When
+
+| Changed | Run |
+|---|---|
+| Kotlin in one module | `./gradlew :<module>:jvmTest` |
+| Kotlin across modules, before committing | `./gradlew jvmTest` (~30s warm) |
+| C++ DSP | the suites you touched, then `orpheus_dsp_test -j` |
+| A C++ header that Kotlin tests parse (`pulsar_limits.h`, `orpheus_unit_pulsar.h`, `orpheus_engine.h`) | the C++ suite plus `./gradlew :features:pulsar:jvmTest` |
+| Before merging to main, or code touching iOS/Android/wasm source sets | `./gradlew allTests` |
+
+`allTests` is ~8,400 tasks: it reruns the shared `commonTest` code on every target, including a Kotlin/Native iOS test link per module. Don't use it as the everyday loop.
+
+`orpheus_engine.h` forward-declares `PulsarState` instead of including `orpheus_unit_pulsar.h`, so Pulsar header edits rebuild ~57 TUs instead of ~140. A TU that needs Pulsar types includes `orpheus_unit_pulsar.h` (tests: `test_pulsar_helpers.h`) itself.
 
 ## Generated C++ Test Fixtures
 
