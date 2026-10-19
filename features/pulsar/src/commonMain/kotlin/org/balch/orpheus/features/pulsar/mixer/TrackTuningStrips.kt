@@ -60,7 +60,7 @@ private const val TRACK_UNITY_TRAVEL = TrackTuning.UNITY / TrackTuning.MAX_LEVEL
 private val UnlitChip = Color(0xFF15101A)
 private val STRIP_WIDTH = 42.dp
 
-/** M/S chip size, also the gap a mute-less BAND strip keeps so its label stays in line. */
+/** M/S chip size. */
 internal val STRIP_TOGGLE_SIZE = 18.dp
 
 /**
@@ -205,18 +205,8 @@ private fun TrackStrip(
                 actions.toggleTrackSolo(track)
             }
         }
-        Spacer(Modifier.height(3.dp))
-        Text(
-            text = who,
-            color = color.copy(alpha = if (silent) 0.4f else 1f),
-            fontSize = 8.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-        )
         Spacer(Modifier.height(4.dp))
-        // The fader takes whatever height the chips and name leave, up to its full height.
+        // The fader takes whatever height the chips, name and value leave, up to its full height.
         FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT) { height ->
             MixerFader(
                 value = level / TrackTuning.MAX_LEVEL,
@@ -240,6 +230,16 @@ private fun TrackStrip(
                 onDoubleTap = { actions.setTrackLevel(track, TrackTuning.UNITY) },
             )
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = who,
+            color = color.copy(alpha = if (silent) 0.4f else 1f),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
         Text(
             text = ((level * 100f).roundToInt() / 100.0).toString(),
             color = if (level == TrackTuning.UNITY) OrpheusColors.synthGreen else OrpheusColors.mixerFxAmber,

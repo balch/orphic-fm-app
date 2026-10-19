@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.pulsar.mixer
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,6 +27,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
@@ -319,7 +323,7 @@ private fun MixerStripsRow(
     tuningActive: Boolean,
     flexible: Boolean = false,
 ) {
-    // Under the BAND | TRACKS toggle the labels get a little extra air.
+    // Under the BAND | TRACKS toggle the dots get a little extra air.
     val top = if (tuningActive) 10.dp else 6.dp
     Column(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = top, bottom = 6.dp)) {
         Row(
@@ -368,21 +372,26 @@ private fun MixerStripsRow(
 
 /**
  * Shared layout shell for every channel in the mixer (PERC/BASS/KEYS/FX + DIST).
- * Owns the label → fader → value stack. Per-channel data (fader behavior, value formatting,
- * color logic) arrives via parameters and the [fader] slot. Spacers stay explicit because the
- * parent Row sets verticalAlignment = Alignment.Bottom, so Arrangement.SpaceBetween would spread
- * its slack.
+ * Owns the pulse-dot → fader → label → value stack, the same fader → name → value order as the
+ * TRACKS strips. Per-channel data (fader behavior, value formatting, color logic) arrives via
+ * parameters and the [fader] slot. Spacers stay explicit because the parent Row sets
+ * verticalAlignment = Alignment.Bottom, so Arrangement.SpaceBetween would spread its slack.
  */
 @Composable
 private fun FaderStrip(
     label: String,
     labelColor: Color,
+    pulseColor: Color,
     valueText: String,
     valueColor: Color,
     flexible: Boolean = false,
     fader: @Composable (trackHeight: Int) -> Unit,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(pulseColor))
+        Spacer(modifier = Modifier.height(6.dp))
+        FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT, fader)
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,
             color = labelColor,
@@ -390,8 +399,6 @@ private fun FaderStrip(
             fontWeight = FontWeight.Bold,
             letterSpacing = 2.sp,
         )
-        Spacer(modifier = Modifier.height(4.dp))
-        FlexibleFader(flexible, FULL_FADER_HEIGHT, MIN_FADER_HEIGHT, fader)
         Text(
             text = valueText,
             color = valueColor,
@@ -413,9 +420,12 @@ private fun GroupStrip(
     val multiplier = faderToGain(gain)
     // Muted (engine group mute) or silent (TRACKS mutes and solos) both dim the strip.
     val dim = muted || silent
+    // The dot brightens with the bus meter, so a sounding bus reads at a glance.
+    val pulseAlpha = if (dim) 0.1f else (0.3f + meterLevel * 0.7f).coerceAtMost(1f)
     FaderStrip(
         label = accent.label,
         labelColor = accent.color.copy(alpha = if (dim) 0.4f else 1f),
+        pulseColor = accent.color.copy(alpha = pulseAlpha),
         // Live amplitude multiplier (0.75 fader → "1.00x"). Color smoothly
         // transitions yellow → green → red across unity. Muted bands keep
         // the accent-tinted dim look.
@@ -450,6 +460,7 @@ private fun DistStrip(
     FaderStrip(
         label = "GAIN",
         labelColor = accent,
+        pulseColor = accent.copy(alpha = (0.3f + peakFraction * 0.7f).coerceAtMost(1f)),
         valueText = formatTwoDp(drive),
         valueColor = accent.copy(alpha = 0.55f),
         flexible = flexible,
