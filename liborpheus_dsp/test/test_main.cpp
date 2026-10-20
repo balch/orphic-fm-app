@@ -141,6 +141,7 @@ static TestSuite suites[] = {
     {"pulsar_osc",      run_pulsar_osc_tests,      true},
     {"mist",            run_mist_tests,            true},
     {"mist_samples",    run_mist_samples,          false},  // manual: writes WAV files
+    {"vibe_record",     run_vibe_record,           false},  // manual: writes WAV files
     {"pulsar_mist",     run_pulsar_mist_tests,     true},
     {"pulsar_vibrato",  run_pulsar_vibrato_tests,  true},
     {"pulsar_pitch_rise", run_pulsar_pitch_rise_tests, true},

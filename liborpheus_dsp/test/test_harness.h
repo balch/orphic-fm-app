@@ -593,6 +593,7 @@ bool run_osc_tests();
 bool run_pulsar_osc_tests();
 bool run_mist_tests();
 bool run_mist_samples();
+bool run_vibe_record();
 bool run_pulsar_mist_tests();
 bool run_pulsar_vibrato_tests();
 bool run_pulsar_pitch_rise_tests();
