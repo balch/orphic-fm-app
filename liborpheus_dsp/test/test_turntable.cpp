@@ -165,62 +165,36 @@ static bool test_turntable_viz_snapshot() {
     return has_waveform && playhead_ok;
 }
 
-// Simulates Bluetooth chunked callbacks (e.g. 960 = 512 + 448) and verifies
-// that the turntable buffer doesn't contain stale samples from unequal chunks.
-static bool test_turntable_chunked_capture_no_stale_tail() {
-    printf("\n=== Test: Chunked capture has no stale tail ===\n");
-    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-
-    // Fill bass source buffer with a known signal for chunk 1 (512 frames)
-    float tone_a = 0.1f;
-    for (int i = 0; i < kMaxFrames; i++) {
-        engine->warps_source_buffers[9][i] = tone_a;
-    }
-
-    // Simulate graph_process double-buffer swap + zero for chunk 1 (512 frames)
-    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
-                kMaxFrames * sizeof(float));
-    // With the fix, this zeros kMaxFrames; without it, only num_frames
-    std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float));
-
-    // Bass voice writes 512 samples for chunk 1
-    float tone_b = 0.2f;
-    for (int i = 0; i < 512; i++) {
-        engine->warps_source_buffers[9][i] = tone_b;
-    }
-
-    // Simulate graph_process for chunk 2 (448 frames) — smaller chunk
-    int chunk2 = 448;
-    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
-                chunk2 * sizeof(float));
-    // With fix: zeros full kMaxFrames, clearing tail
-    // Without fix: only zeros 448, leaving samples 448-511 = tone_b (stale)
-    std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float));
-
-    // Bass voice writes 448 samples for chunk 2
-    float tone_c = 0.3f;
-    for (int i = 0; i < chunk2; i++) {
-        engine->warps_source_buffers[9][i] = tone_c;
-    }
-
-    // Now simulate NEXT callback, chunk 1 (512 frames) — reads full 512
-    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
-                512 * sizeof(float));
-
-    // Check: samples 448-511 should be ZERO (properly cleared), not stale tone_b
-    bool tail_clean = true;
-    for (int i = chunk2; i < 512; i++) {
-        if (engine->warps_bass_read[i] != 0.0f) {
-            printf("  FAIL: warps_bass_read[%d] = %.4f (expected 0, stale data)\n",
-                   i, engine->warps_bass_read[i]);
-            tail_clean = false;
-            break;
+// Bluetooth splits 882-frame callbacks into 512 + 370. Pushing a ramp through the
+// hand-off in those blocks must read back as the same unbroken ramp, after one block
+// of start-up silence, with no samples dropped, padded or repeated.
+static bool test_source_handoff_seamless_uneven_blocks() {
+    printf("\n=== Test: Source hand-off is seamless across uneven blocks ===\n");
+    SourceHandoff h;
+    float block[kMaxFrames];
+    float next_in = 1.0f;
+    float expect = 1.0f;
+    int pads = 0;
+    bool seamless = true;
+    for (int b = 0; b < 200 && seamless; b++) {
+        const int n = (b % 2 == 0) ? 512 : 370;
+        h.pop(block, n);
+        for (int i = 0; i < n; i++) {
+            if (block[i] == 0.0f && expect == 1.0f) { pads++; continue; }
+            if (block[i] != expect) {
+                printf("  FAIL: block %d sample %d = %.0f, expected %.0f\n", b, i, block[i], expect);
+                seamless = false;
+                break;
+            }
+            expect += 1.0f;
         }
+        for (int i = 0; i < n; i++) block[i] = next_in++;
+        h.push(block, n);
     }
-
-    orpheus_engine_destroy(engine);
-    printf("  Tail samples clean: %s\n", tail_clean ? "PASS" : "FAIL");
-    return tail_clean;
+    const bool one_block_latency = pads == 512;
+    printf("  Seamless ramp: %s, start-up padding %d samples: %s\n",
+           seamless ? "PASS" : "FAIL", pads, one_block_latency ? "PASS" : "FAIL");
+    return seamless && one_block_latency;
 }
 
 // Helper used by drop-kind tests (Tasks 5–8).
@@ -591,7 +565,7 @@ bool run_turntable_tests() {
     tally(test_turntable_freeze_stops_capture());
     tally(test_turntable_crossfader());
     tally(test_turntable_viz_snapshot());
-    tally(test_turntable_chunked_capture_no_stale_tail());
+    tally(test_source_handoff_seamless_uneven_blocks());
     tally(test_beat_phase_freerun_when_pulsar_idle());
     tally(test_drop_filter_attenuates_highs());
     tally(test_drop_brake_decays_to_silence());

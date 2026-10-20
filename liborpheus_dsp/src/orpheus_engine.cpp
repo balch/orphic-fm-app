@@ -608,17 +608,6 @@ void orpheus_engine_process(OrpheusEngine* engine,
     // Scope tap: the whole callback as the listener hears it (post-limiter, TTS included).
     engine->scope_ring.write_stereo(output_buffer, num_frames);
 
-    // Save the LAST chunk's master output (mono downmix) for turntable "master" source.
-    // turntable_prev_master is float[kMaxFrames]; the turntable unit reads up to kMaxFrames
-    // per chunk. For BT callbacks > kMaxFrames, offset into the final chunk so the turntable
-    // reads the most recent audio, not stale data from the first chunk.
-    int master_frames = num_frames < kMaxFrames ? num_frames : kMaxFrames;
-    int last_chunk_offset = num_frames - master_frames;
-    for (int i = 0; i < master_frames; i++) {
-        int src = (last_chunk_offset + i) * 2;
-        engine->turntable_prev_master[i] = (output_buffer[src] + output_buffer[src + 1]) * 0.5f;
-    }
-
     // CPU load: elapsed time / audio buffer duration
     auto t1 = std::chrono::steady_clock::now();
     float elapsed_us = std::chrono::duration<float, std::micro>(t1 - t0).count();

@@ -8,6 +8,7 @@
 #include "pulsar_speech.h"
 #include "orpheus_graph.h"
 #include "braids_resampler.h"
+#include "source_handoff.h"
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
 #include "orpheus_voice.h"
@@ -733,7 +734,7 @@ struct OrpheusEngine {
     float warps_bass_read[kMaxFrames] = {};
     bool  bass_voice_in_graph{false};  // audio thread only; set per block from the graph
 
-    // Previous frame's master output for turntable "master" source
+    // Earlier master output (mono) for the turntable "master" source; see source_handoff
     float turntable_prev_master[kMaxFrames] = {};
 
     // ── Warps double-buffer (at end to avoid shifting field offsets) ──
@@ -1452,4 +1453,10 @@ struct OrpheusEngine {
 
     // ── Scope tap: the final output of every callback, read by orpheus_engine_get_scope ──
     ScopeRing scope_ring;
+
+    // ── Block-to-block hand-off of the buses read via warps_*_read / turntable_prev_master ──
+    // orpheus_graph_process pops each read buffer before the graph runs and pushes the
+    // bus after, so readers get a seamless stream at any mix of block sizes.
+    enum { kHandoffSynth, kHandoffDrums, kHandoffRepl, kHandoffBass, kHandoffMaster, kHandoffCount };
+    SourceHandoff source_handoff[kHandoffCount];
 };

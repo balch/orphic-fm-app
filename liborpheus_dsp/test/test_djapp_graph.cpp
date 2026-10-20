@@ -845,6 +845,88 @@ static bool test_djapp_turntable_bt_chunking() {
     return ok;
 }
 
+// ── Test 12b: BT turntable capture is a seamless stream ─────────────
+//
+// Android BT runs at 44.1 kHz with 882-frame callbacks, which the engine splits into
+// 512 + 370. RMS can't see a few ms of dropped or repeated audio per callback, so this
+// looks at the deck's captured buffer itself: a held bass note must contain no runs of
+// exact zeros (inserted padding) and no exactly repeated windows (replayed audio).
+
+namespace {
+
+struct CaptureFlaws { int zero_runs; int repeats; };
+
+CaptureFlaws scan_capture(const TurntableDeck& deck, int frames) {
+    std::vector<float> s(frames);
+    for (int i = 0; i < frames; i++) {
+        int idx = ((deck.write_pos - frames + i) % kTurntableBufSize + kTurntableBufSize) % kTurntableBufSize;
+        s[i] = deck.buffer[idx];
+    }
+    CaptureFlaws f{0, 0};
+    int run = 0;
+    for (float v : s) {
+        run = (v == 0.0f) ? run + 1 : 0;
+        if (run == 32) f.zero_runs++;
+    }
+    // A 64-sample window that reappears verbatim within the next 1024 samples.
+    constexpr int kWin = 64;
+    for (int i = 0; i + kWin < frames; i += kWin) {
+        for (int lag = kWin; lag <= 1024 && i + lag + kWin <= frames; lag++) {
+            if (std::memcmp(&s[i], &s[i + lag], kWin * sizeof(float)) == 0) { f.repeats++; break; }
+        }
+    }
+    return f;
+}
+
+CaptureFlaws capture_bass_held(int source, int callback_frames) {
+    OrpheusEngine* e = orpheus_engine_create(44100.0f);
+    if (!load_production_graph(e)) { orpheus_engine_destroy(e); return {-1, -1}; }
+    e->pulsar_playing.store(0);
+    e->horn_mix.store(0.0f);
+    e->drive_mix.store(0.0f);
+    e->reverb_bypass.store(1);
+    e->delay_bypass.store(1);
+    e->bass_mix.store(1.0f);
+    orpheus_engine_set_voice_active(e, 12, 1);
+    orpheus_engine_set_voice_tune(e, 12, 48.0f);
+    orpheus_engine_set_voice_gate(e, 12, 1);
+    orpheus_engine_set_voice_engine(e, 12, 8);
+    orpheus_engine_set_voice_harmonics(e, 12, 0.5f);
+    orpheus_engine_set_voice_timbre(e, 12, 0.5f);
+    orpheus_engine_set_voice_morph(e, 12, 0.5f);
+    e->turntable_wet_a.store(1.0f);
+    e->turntable_wet_b.store(0.0f);
+    e->turntable_source_a.store(source);
+    e->turntable_frozen_a.store(0);
+
+    std::vector<float> buf(static_cast<size_t>(callback_frames) * 2);
+    for (int done = 0; done < 44100; done += callback_frames)
+        orpheus_engine_process(e, buf.data(), callback_frames);
+    CaptureFlaws f = scan_capture(e->turntable_decks[0], 22050);
+    orpheus_engine_destroy(e);
+    return f;
+}
+
+}  // namespace
+
+static bool test_djapp_turntable_bt_capture_seamless() {
+    printf("\n=== Test: Turntable BT capture is seamless (44.1 kHz, 882 vs 96 frames) ===\n");
+    bool ok = true;
+    const struct { int source; const char* name; } kSources[] = {
+        {TT_SOURCE_BASS, "bass"}, {TT_SOURCE_MASTER, "master"},
+    };
+    for (const auto& src : kSources) {
+        for (int cb : {96, 882}) {
+            CaptureFlaws f = capture_bass_held(src.source, cb);
+            const bool pass = f.zero_runs == 0 && f.repeats == 0;
+            printf("  [%s] %-6s %3d-frame callbacks: zero runs %d, repeated windows %d\n",
+                   pass ? "OK" : "FAIL", src.name, cb, f.zero_runs, f.repeats);
+            ok &= pass;
+        }
+    }
+    return ok;
+}
+
 // ── Test 13: Dedicated Pulsar delay produces output and tail ────────
 
 static bool test_djapp_pulsar_dedicated_delay() {
@@ -1278,6 +1360,7 @@ bool run_djapp_graph_tests() {
     tally(test_djapp_drive_sweep());
     tally(test_djapp_distortion_mix());
     tally(test_djapp_turntable_bt_chunking());
+    tally(test_djapp_turntable_bt_capture_seamless());
     tally(test_djapp_pulsar_dedicated_delay());
     tally(test_djapp_pulsar_dedicated_reverb());
     tally(test_djapp_pulsar_effects_independent());

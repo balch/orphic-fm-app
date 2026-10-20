@@ -343,13 +343,12 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
     float sr = graph->sample_rate;
 
-    // Double-buffer for Warps: copy PREVIOUS frame's completed source data
-    // to read buffers BEFORE zeroing for the current frame's accumulation.
-    // This ensures Warps always reads a full buffer regardless of execution order.
-    std::memcpy(engine->warps_synth_read, engine->warps_source_buffers[0],
-                num_frames * sizeof(float));
-    std::memcpy(engine->warps_drums_read, engine->warps_source_buffers[1],
-                num_frames * sizeof(float));
+    // Readers see earlier blocks' completed buses, so Warps and the turntable read a full
+    // buffer regardless of execution order. The hand-off keeps that stream seamless when
+    // block sizes differ (Bluetooth splits 882 frames into 512 + 370).
+    auto* handoff = engine->source_handoff;
+    handoff[OrpheusEngine::kHandoffSynth].pop(engine->warps_synth_read, num_frames);
+    handoff[OrpheusEngine::kHandoffDrums].pop(engine->warps_drums_read, num_frames);
     // Viz: drum bus peak (from previous frame's completed buffer)
     {
         float peak = 0.0f;
@@ -359,16 +358,11 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         }
         engine->viz_rings[VIZ_DRUM_OUT].write(peak);
     }
-    std::memcpy(engine->warps_repl_read, engine->warps_source_buffers[2],
-                num_frames * sizeof(float));
-    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
-                num_frames * sizeof(float));
+    handoff[OrpheusEngine::kHandoffRepl].pop(engine->warps_repl_read, num_frames);
+    handoff[OrpheusEngine::kHandoffBass].pop(engine->warps_bass_read, num_frames);
+    handoff[OrpheusEngine::kHandoffMaster].pop(engine->turntable_prev_master, num_frames);
 
-    // Zero the FULL kMaxFrames extent of each source buffer, not just num_frames.
-    // When Bluetooth callbacks are chunked (e.g. 960 = 512 + 448), a smaller chunk
-    // leaves stale samples in the [num_frames..kMaxFrames) tail.  The next larger
-    // chunk then copies/reads those stale samples, injecting periodic glitches
-    // into the turntable capture buffer (audible as "mud", especially on bass).
+    // Zero the FULL kMaxFrames extent so no stale tail survives a smaller block.
     std::memset(engine->warps_source_buffers[0], 0, kMaxFrames * sizeof(float)); // SYNTH
     std::memset(engine->warps_source_buffers[1], 0, kMaxFrames * sizeof(float)); // DRUMS
     std::memset(engine->warps_source_buffers[2], 0, kMaxFrames * sizeof(float)); // REPL
@@ -611,6 +605,18 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     // Warps LFO source (3): copy final muxed+attenuated output
     std::memcpy(engine->warps_source_buffers[3], engine->lfo_output_buffer,
                 num_frames * sizeof(float));
+
+    // Hand this block's buses to the next block's readers.
+    handoff[OrpheusEngine::kHandoffSynth].push(engine->warps_source_buffers[0], num_frames);
+    handoff[OrpheusEngine::kHandoffDrums].push(engine->warps_source_buffers[1], num_frames);
+    handoff[OrpheusEngine::kHandoffRepl].push(engine->warps_source_buffers[2], num_frames);
+    handoff[OrpheusEngine::kHandoffBass].push(engine->warps_source_buffers[9], num_frames);
+    {
+        float master_mono[kMaxFrames];
+        for (int i = 0; i < num_frames; i++)
+            master_mono[i] = (output_buffer[i * 2] + output_buffer[i * 2 + 1]) * 0.5f;
+        handoff[OrpheusEngine::kHandoffMaster].push(master_mono, num_frames);
+    }
 
     // Viz: write final LFO output (after mux + range)
     engine->viz_rings[VIZ_LFO_OUTPUT].write(engine->lfo_output_value);
