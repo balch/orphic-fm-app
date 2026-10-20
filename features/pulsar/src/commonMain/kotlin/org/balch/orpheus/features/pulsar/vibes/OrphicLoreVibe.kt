@@ -693,15 +693,16 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
                     ),
-                    // 4 SIRENS (vamp): a slow i-iv lament vamp (Dm, Gm, four bars each) under the vamp lick;
-                    // the bass and lead stay FIXED on their figures, only the organ and bell follow.
+                    // 4 SIRENS (vamp): a slow bVI-bVII climb (Bb, C) that pulls toward a D it never
+                    // reaches, under the vamp lick. The Sirens keep F E D C, so their E is a #11 over Bb.
+                    // The bass and lead stay FIXED on their figures, only the organ and bell follow.
                     // No chordFollow override on the bass: transposition would flatten its solos.
                     Section(
                         name = "sirens",
                         barsMin = 8, barsMax = 10, barStep = 2,
                         lickIndex = 3,
                         jamCarry = true,
-                        customProgression = chords(0, 3),
+                        customProgression = chords(5, 6),
                         chordsPerBar = 1,
                         macroOverrides = MacroOverrides(
                             energy = 1.25f, complexity = 1.3f, space = 1.1f, mood = 1.1f,

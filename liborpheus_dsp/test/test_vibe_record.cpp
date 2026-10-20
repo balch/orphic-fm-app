@@ -118,6 +118,7 @@ bool record(const PortDump& d, int solo, int seconds, const std::string& wav, co
         if (now != section) {
             // Kotlin's per-section re-push, applied on the flip instead of after its 5 Hz poll.
             section = now;
+            if (solo < 0) printf("    section %d at %.3f s\n", section, static_cast<double>(b) * kBlock / kSr);
             auto it = d.sections.find(section);
             if (it != d.sections.end()) apply(e, it->second);
             apply(e, d.overrides);
