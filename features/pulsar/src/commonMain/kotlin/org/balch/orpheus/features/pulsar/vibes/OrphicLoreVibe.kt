@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.models.FillType
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.GrainMode
 import org.balch.orpheus.features.pulsar.models.GrainScatterMode
+import org.balch.orpheus.features.pulsar.models.GrainVoicing
 import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickRotation
@@ -83,7 +84,7 @@ class OrphicLoreVibe : VibeProvider {
     // The intro's walkdown: four descending anchors (D C Bb A), one per bar, each on the
     // downbeat with a 16th pickup that slurs into the next. glideRate lives on the anchor:
     // the engine slides INTO the step carrying the rate, and a rest would cancel the glide.
-    // Pool slot 0 (intro, homecomings, outro) and Vibe.bassLine, which only the Sirens read.
+    // Pool slot 0 (intro, homecomings, outro).
     private val descent = Lick(
         steps = listOf(
             LickStep(7, 3.75f, 0.95f, glideRate = 0.5f),   // D
@@ -96,6 +97,19 @@ class OrphicLoreVibe : VibeProvider {
             LickStep(4, 0.25f, 0.45f),
         ),
         loopLength = 16,  // 16 beats = the full 64-step pattern, no padding
+    )
+
+    // The Sirens' descent: the same anchors held a full bar each, without the bass's pickups,
+    // which re-struck each sung note a 16th before the next. Vibe.bassLine, which only the
+    // Sirens read.
+    private val sirensDescent = Lick(
+        steps = listOf(
+            LickStep(7, 4f, 0.95f, glideRate = 0.5f),   // D
+            LickStep(6, 4f, 0.90f, glideRate = 0.5f),   // C
+            LickStep(5, 4f, 0.90f, glideRate = 0.5f),   // Bb
+            LickStep(4, 4f, 0.95f, glideRate = 0.5f),   // A
+        ),
+        loopLength = 16,
     )
 
     private data class LickStepOverride(
@@ -269,7 +283,7 @@ class OrphicLoreVibe : VibeProvider {
             lickMutation = 0.05f,   // written notes stay written; solos keep their own mutationRate
             lickOctave = 2,          // explicit: degree 7 = D2, the bass register
 
-            bassLine = descent,
+            bassLine = sirensDescent,
             bassLineMutation = 0.2f,     // pinned while dialing in; raise once it sounds right
             bassLineOctave = 2,        // the Sirens add 23 degrees to this (F5 to C5)
 
@@ -408,30 +422,35 @@ class OrphicLoreVibe : VibeProvider {
                 // line, so the texture notch leaves it alone. lickDegreeOffset 23 = +3 octaves and a
                 // third (FIXED skips the octave pin). Grain FX turns the one voice into a choir.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.SPK,
-                    volume = 0.4f,  // enters as a faint hum
+                    engineId = OrpheusEngineId.VOWEL_FOF,
+                    volume = 0.3f,  // enters as a faint hum
+                    // VOWEL_FOF: harmonics is the vowel (0 a, .25 e, .5 i, .75 o, 1 u); morph is the
+                    // voice type and, unpinned, follows Space.
                     harmonics = 0.25f, pinHarmonics = true,
-                    // SPK: harmonics below 0.33 is the sung-formant model; morph picks the vowel and,
-                    // unpinned, follows Space. (On VOWEL_FOF: harmonics = vowel, morph = voice type.)
                     pinMorph = false,
                     // Each sung note climbs a quarter tone over 2 s while DRONE swells it in.
                     pitchRise = 50f, pitchRiseTime = 2f,
-                    // ...and opens its vowel from "eh" to "ah" over the same 2 s.
-                    harmonicsRise = -0.25f, harmonicsRiseTime = 2f,
+                    // ...and opens its vowel from "eh" to "ah" over 1.5 s.
+                    harmonicsRise = -0.25f, harmonicsRiseTime = 1.5f,
                     // A singer's waver on top, fading in 0.3 s after each note starts.
                     vibratoDepth = 25f, vibratoRate = 5.5f,
-                    // The choir: grains of the voice itself, each a hair off pitch and placed
-                    // wide, blooming in slowly. Blend keeps the lead singer in front.
+                    // The choir: grains of the voice itself landing on chord tones within about a
+                    // third either side, clustered on the sung note, so the Sirens sing in harmony.
+                    // Long slow-attack grains make each note open as one voice; the harmony swells
+                    // in under the "ah" (its nearest third rises from 14 dB to 7 dB under the note).
                     grainFx = true,
                     grainMode = GrainMode.BURST,
-                    grainScatterMode = GrainScatterMode.RAW,
-                    grainScatter = 0.03f,
+                    grainScatterMode = GrainScatterMode.CHORD,
+                    grainVoicing = GrainVoicing.CENTERED,
+                    grainScatter = 0.15f,
                     grainRate = 0.6f,
                     grainRandomTiming = true,
-                    grainShape = 0.85f,
-                    grainSize = 0.6f,
-                    grainBlend = 0.45f,
-                    noteRangeLow = 69, noteRangeHigh = 81,
+                    grainShape = 1f,
+                    grainSize = 0.75f,
+                    grainBlend = 0.55f,
+                    // The choir's grains stay inside this range. Capped at F5, the highest sung note:
+                    // an upward grain is the voice sped up, formants and all, and above F5 it squeaks.
+                    noteRangeLow = 69, noteRangeHigh = 77,
                     reverbSend = 0.6f, delaySend = 0.2f,
                     reverbBrightness = 0.5f,
                 ).let { sirens ->
