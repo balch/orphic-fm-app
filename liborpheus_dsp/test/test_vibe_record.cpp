@@ -7,6 +7,7 @@
 //   VIBE_TRACKS=mix,5 VIBE_SECONDS=60 orpheus_dsp_test vibe_record
 //
 // VIBE_SR / VIBE_BLOCK change the render rate and callback size (default 48000 / 256).
+// VIBE_OUTRO_AT=<seconds> arms the outro at that time.
 //
 // VIBE_SET=track_5_grain_fx=0,track_5_vibrato_depth=0 overrides Pulsar ports after the load
 // and after every section flip, so a stage can be switched off without re-dumping; VIBE_TAG
@@ -100,12 +101,16 @@ bool record(const PortDump& d, int solo, int seconds, const std::string& wav, co
     }
 
     const int blocks = seconds * kSr / kBlock;
+    // VIBE_OUTRO_AT=<seconds> arms the outro then, as the song-length timer does in the app.
+    const char* env_outro = std::getenv("VIBE_OUTRO_AT");
+    const int outro_block = env_outro ? static_cast<int>(std::atof(env_outro) * kSr / kBlock) : -1;
     std::vector<float> pcm;
     pcm.reserve(static_cast<size_t>(blocks) * kBlock * 2);
     std::vector<float> buf(static_cast<size_t>(kBlock) * 2);
     int section = -1;
     float peak = 0.0f;
     for (int b = 0; b < blocks; b++) {
+        if (b == outro_block) orpheus_engine_set_port(e, kPulsarUri, "arrangement_outro_request", 1.0f);
         orpheus_engine_process(e, buf.data(), kBlock);
         pcm.insert(pcm.end(), buf.begin(), buf.end());
         double sum = 0.0;
