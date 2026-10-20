@@ -1,7 +1,7 @@
-A cleaner UI with a Big Fat Vibe Picker
+Orphic Lore sails the Odyssey, and Bluetooth earbuds behave
 
-• Enjoy the big Play button with Vibe title above
-• Swipe for Prev/Next vibe
-• Progress rings the Play button and syncs with the music
-• Stay Asleep gets new faces and a snare that brackets the song
-• New Playlist and Shuffle functionality
+• Orphic Lore follows the Odyssey, from the libation to the Sirens' song and the shore, with a sung harmony choir and a longer 4 to 5 minute arc
+• Fixes a crash on start with Bluetooth earbuds
+• Turntable scratching and Warps sources sound clean over Bluetooth
+• Hand tracking stays on through rotate and unfold
+• Per-track mixer polish
