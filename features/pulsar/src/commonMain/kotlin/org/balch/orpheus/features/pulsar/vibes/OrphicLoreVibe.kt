@@ -112,7 +112,7 @@ class OrphicLoreVibe : VibeProvider {
             LickStep(7, 4f, 0.95f, glideRate = 0.5f),   // D
             LickStep(6, 4f, 0.90f, glideRate = 0.5f),   // C
             LickStep(5, 4f, 0.90f, glideRate = 0.5f),   // Bb
-            LickStep(4, 4f, 0.95f, glideRate = 0.5f),   // A
+            LickStep(4, 4f, 0.95f, glideRate = 0.25f),   // A
         ),
         loopLength = 16,
     )
@@ -441,18 +441,18 @@ class OrphicLoreVibe : VibeProvider {
                     vibratoDepth = 25f, vibratoRate = 5.5f,
                     // The choir: grains of the voice itself landing on chord tones within about a
                     // third either side, clustered on the sung note, so the Sirens sing in harmony.
-                    // Long slow-attack grains make each note open as one voice; the harmony swells
-                    // in under the "ah" (its nearest third rises from 14 dB to 7 dB under the note).
+                    // Long slow-attack grains carry across the note changes, so the harmony stays
+                    // about 3 dB under the sung note; blend 0.45 keeps the dry singer on top.
                     grainFx = true,
                     grainMode = GrainMode.BURST,
                     grainScatterMode = GrainScatterMode.CHORD,
                     grainVoicing = GrainVoicing.CENTERED,
-                    grainScatter = 0.15f,
+                    grainScatter = 0.20f,
                     grainRate = 0.6f,
                     grainRandomTiming = true,
                     grainShape = 1f,
                     grainSize = 0.75f,
-                    grainBlend = 0.55f,
+                    grainBlend = 0.45f,
                     // The choir's grains stay inside this range. Capped at F5, the highest sung note:
                     // an upward grain is the voice sped up, formants and all, and above F5 it squeaks.
                     noteRangeLow = 69, noteRangeHigh = 77,
