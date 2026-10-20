@@ -777,16 +777,19 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         transitions = listOf(SectionTransition(1, 1f, transitionBars = 1)),
                     ),
-                    // 7 ASHORE (outro): the intro in reverse (terminal; reached only when armed). It
-                    // enters at the verse's level and glides back to the intro's soft opening,
-                    // with a FALL arc easing the velocities down, while the mix fades out:
-                    // 40% as bar 5 starts, 15% as bar 6 starts, silent from its middle on
-                    // (and through the loop the song hands off in).
+                    // 7 ASHORE (outro): the Sirens' Bb-C climb returns and the song fades out still
+                    // climbing (terminal; reached only when armed). It glides from just under the
+                    // verse's level to the intro's soft opening, with a FALL arc easing the
+                    // velocities down, while the mix fades out: 40% as bar 5 starts, 15% as bar 6
+                    // starts, silent from its middle on (and through the loop the song hands off in).
+                    // Energy 0.75 (0.55 * 0.75 = 0.41) drops under the bell's gate (< 0.4) within a
+                    // bar, so it tolls across the water almost from the start; at 1.0 it waited 3 bars.
                     Section(
                         name = "ashore",
                         barsMin = 6, barsMax = 6,
+                        customProgression = chords(5, 6),
                         lickIndex = 0,
-                        macroOverrides = verseLevel.copy(volume = null),
+                        macroOverrides = verseLevel.copy(volume = null, energy = 0.75f),
                         rampTo = introSoft.copy(volume = null),
                         volumeEnvelope = listOf(
                             VolumePoint(bar = 0f, level = 1f),
@@ -798,7 +801,16 @@ class OrphicLoreVibe : VibeProvider {
                             innerBars = 6, volume = 1f, timing = 0.1f, arc = TensionArc.FALL,
                         ),
                         trackOverrides = mapOf(
-                            5 to TrackSectionOverride(volume = 0.5f),  // the Sirens sing it ashore
+                            5 to TrackSectionOverride(  // the Sirens sing it ashore
+                                volume = 0.75f,
+                                reverbSend = .7f,
+                                delaySend = 0.15f
+                            ),
+                            7 to TrackSectionOverride( // across water
+                                density = .5f,
+                                reverbSend = 0.95f,
+                                delaySend = 0.55f,
+                            ),
                         ),
                         transitions = emptyList(),
                     ),
