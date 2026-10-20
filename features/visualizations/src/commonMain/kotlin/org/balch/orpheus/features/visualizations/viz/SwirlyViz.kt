@@ -3,6 +3,7 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.ContributesIntoSet
@@ -25,6 +27,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.visualizations.viz.shader.SWIRLY_ARM_COUNT
+import org.balch.orpheus.features.visualizations.viz.shader.SwirlyArms
+import org.balch.orpheus.features.visualizations.viz.shader.SwirlyRenderer
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -189,6 +194,9 @@ class SwirlyViz(
         }
 
         val path = remember { Path() }
+        val arms = remember { SwirlyArms() }
+        val renderer = remember { SwirlyRenderer() }
+        DisposableEffect(renderer) { onDispose { renderer.dispose() } }
 
         Canvas(modifier = modifier.fillMaxSize()) {
             // Read inside drawScope so per-frame _uiState writes only invalidate
@@ -215,54 +223,34 @@ class SwirlyViz(
                 center = Offset(cx, cy)
             )
 
-            val spiralTightness = 2f + _depthKnob * 4f
-            val armCount = 6
-
-            for (arm in 0 until armCount) {
-                val armAngleOffset = (arm.toFloat() / armCount) * 2f * PI.toFloat()
-
+            val lfoShift = (lfo + 1f) / 2f
+            arms.time = time
+            arms.lfo = lfo
+            arms.sweep = (2f + _depthKnob * 4f) * 2f * PI.toFloat()
+            for (arm in 0 until SWIRLY_ARM_COUNT) {
                 val voiceIdx = arm % 4
                 val voiceEnergy = (state.voiceLevels.getOrElse(voiceIdx * 2) { 0f } +
                                    state.voiceLevels.getOrElse(voiceIdx * 2 + 1) { 0f }) / 2f
 
                 val armColor = spiralColors[arm % spiralColors.size]
-
-                path.reset()
-                val segments = 60
-
-                for (i in 0..segments) {
-                    val t = i.toFloat() / segments
-                    val radius = maxRadius * (1f - t * 0.95f)
-                    val spiralAngle = armAngleOffset + time + t * spiralTightness * 2f * PI.toFloat()
-                    val wobble = sin(t * 8f + time * 2f) * lfo * 0.03f * radius
-
-                    val x = cx + (radius + wobble) * cos(spiralAngle)
-                    val y = cy + (radius + wobble) * sin(spiralAngle)
-
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                }
-
-                val baseAlpha = 0.1f + voiceEnergy * 0.5f + energy * 0.4f
-                val strokeWidth = 8f + energy * 5f + voiceEnergy * 7f
-
-                val lfoShift = (lfo + 1f) / 2f
                 val shiftedColor = if (lfoShift > 0.5f) {
                     lerpColor(armColor, Color(0xFFAA5599), (lfoShift - 0.5f) * 0.4f)
                 } else {
                     lerpColor(armColor, Color(0xFF5599AA), (0.5f - lfoShift) * 0.4f)
                 }
 
-                drawPath(
-                    path = path,
-                    color = shiftedColor.copy(alpha = baseAlpha.coerceIn(0f, 1f)),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
+                arms.colors[arm * 4] = shiftedColor.red
+                arms.colors[arm * 4 + 1] = shiftedColor.green
+                arms.colors[arm * 4 + 2] = shiftedColor.blue
+                arms.colors[arm * 4 + 3] = (0.1f + voiceEnergy * 0.5f + energy * 0.4f).coerceIn(0f, 1f)
+                arms.widths[arm] = 8f + energy * 5f + voiceEnergy * 7f
+            }
 
-                drawPath(
-                    path = path,
-                    color = shiftedColor.copy(alpha = (baseAlpha * 0.25f).coerceIn(0f, 1f)),
-                    style = Stroke(width = strokeWidth * 2.5f, cap = StrokeCap.Round)
-                )
+            val brush = renderer.brush(w, h, arms)
+            if (brush != null) {
+                drawRect(brush = brush)
+            } else {
+                drawArmPaths(path, arms, cx, cy, maxRadius)
             }
 
             drawCircle(
@@ -273,6 +261,40 @@ class SwirlyViz(
                 ),
                 radius = maxRadius * 0.15f,
                 center = Offset(cx, cy)
+            )
+        }
+    }
+
+    /** Android 12 and below: the stroked paths the shader replaces, from the same [arms] values. */
+    private fun DrawScope.drawArmPaths(path: Path, arms: SwirlyArms, cx: Float, cy: Float, maxRadius: Float) {
+        for (arm in 0 until SWIRLY_ARM_COUNT) {
+            val armAngleOffset = (arm.toFloat() / SWIRLY_ARM_COUNT) * 2f * PI.toFloat()
+            path.reset()
+            val segments = 60
+            for (i in 0..segments) {
+                val t = i.toFloat() / segments
+                val radius = maxRadius * (1f - t * 0.95f)
+                val spiralAngle = armAngleOffset + arms.time + t * arms.sweep
+                val wobble = sin(t * 8f + arms.time * 2f) * arms.lfo * 0.03f * radius
+
+                val x = cx + (radius + wobble) * cos(spiralAngle)
+                val y = cy + (radius + wobble) * sin(spiralAngle)
+
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+
+            val color = Color(arms.colors[arm * 4], arms.colors[arm * 4 + 1], arms.colors[arm * 4 + 2])
+            val alpha = arms.colors[arm * 4 + 3]
+            val strokeWidth = arms.widths[arm]
+            drawPath(
+                path = path,
+                color = color.copy(alpha = alpha),
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+            drawPath(
+                path = path,
+                color = color.copy(alpha = (alpha * 0.25f).coerceIn(0f, 1f)),
+                style = Stroke(width = strokeWidth * 2.5f, cap = StrokeCap.Round)
             )
         }
     }
