@@ -7,6 +7,7 @@
 #include "pulsar_transition_fx.h"
 #include "pulsar_speech.h"
 #include "orpheus_graph.h"
+#include "braids_resampler.h"
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
 #include "orpheus_voice.h"
@@ -330,10 +331,9 @@ struct OrpheusEngine {
     // ── Per-voice Braids MacroOscillator ──────────────
     // Used when engine_index >= 100 (Braids range). Init'd in orpheus_engine_create.
     braids::MacroOscillator braids_voices[kNumVoices];
-    // Resampler residue: fractional source-sample offset where the next host block's
-    // output sample 0 begins. Keeps the 96k→host linear-interp path phase-continuous
-    // across host blocks at non-48k host rates. Reset to 0 when oscillator re-Init'd.
-    float braids_src_phase[kNumVoices] = {};
+    // Keeps the 96k→host linear-interp path phase-continuous across host blocks at
+    // non-48k host rates. Reset when the oscillator is re-Init'd.
+    BraidsResampler braids_resampler[kNumVoices] = {};
 
 
     // Per-voice hold level (0.0-1.0, raw from UI before scaling)

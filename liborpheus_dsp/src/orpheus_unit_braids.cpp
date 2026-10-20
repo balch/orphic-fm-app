@@ -51,7 +51,9 @@ constexpr float kBraidsOutGain = 0.65f;
 // Braids' native render rate.
 constexpr float kBraidsNativeRate = 96000.0f;
 
-// MacroOscillator::Render must be called with chunk size <= 24.
+// MacroOscillator::Render must be called with chunk size <= 24, and with an even size:
+// VOW and the other digital shapes write two samples per pass and `size -= 2` a size_t,
+// so an odd size wraps and writes until the stack runs out.
 constexpr int kBraidsInternalBlock = 24;
 
 // Stack-buffer overhead for oversample. 96k / 32k = 3, +1 for safety.
@@ -61,7 +63,7 @@ constexpr int kBraidsOversampleMax = 4;
 }  // anonymous namespace
 
 void unit_process_braids(braids::MacroOscillator& osc,
-                         float& src_phase,
+                         BraidsResampler& rs,
                          int engine_id,
                          float pitch_midi,
                          float harmonics, float timbre, float morph,
@@ -97,17 +99,20 @@ void unit_process_braids(braids::MacroOscillator& osc,
     // across blocks (and the moving average gives a touch of anti-aliasing).
     //
     // General path (other rates): linear interpolation, with a per-voice
-    // fractional source-sample residue (`src_phase`) carried across host
-    // blocks so the oscillator phase stays continuous at block boundaries.
-    // Each block renders enough source samples to cover all output positions
-    // src_phase + i*ratio (i ∈ [0, num_frames)), then advances src_phase by
-    // num_frames*ratio − rendered_count, which keeps it bounded near [0, 2).
+    // fractional source position (`rs.src_phase`) carried across host blocks
+    // so the oscillator phase stays continuous at block boundaries. Each block
+    // renders an even count of source samples covering every output position
+    // src_phase + i*ratio, then advances src_phase by num_frames*ratio − rendered.
+    // Rounding up to even can overshoot by one sample, so the next block may
+    // start behind its first new sample; the last kCarry samples sit in front
+    // of staging for that.
     //
     // Sample-rate floor: at host rates < ~24 kHz, oversample_frames clamps
     // to kStagingMax and the resampler degrades (audio is bounded but glitchy).
     // Orpheus runs at 44.1k or 48k in practice.
     constexpr int kStagingMax = kMaxFrames * kBraidsOversampleMax;
-    int16_t staging[kStagingMax];
+    constexpr int kCarry = BraidsResampler::kCarry;
+    int16_t staging[kCarry + kStagingMax];
     uint8_t sync_buffer[kStagingMax];
 
     constexpr float kInt16Scale = 1.0f / 32767.0f;
@@ -133,49 +138,45 @@ void unit_process_braids(braids::MacroOscillator& osc,
             float sample = (s0 + s1) * 0.5f * kBraidsOutGain;
             out_buffer[i] = soft_limit(sample);
         }
-        // Fast path is phase-locked at ratio=2.0; src_phase stays 0.
-        src_phase = 0.0f;
+        // Fast path is phase-locked at ratio=2.0; the resampler stays reset.
+        rs = {};
     } else {
         // ── General path: arbitrary host sample rate, linear interpolation ──
-        // Last output sample's source position: src_phase + (num_frames-1)*ratio.
-        // Need staging[idx] and staging[idx+1] for that, so render
-        // floor(src_phase + (num_frames-1)*ratio) + 2 source samples.
+        // Output i reads source position src_phase + i*ratio, counted from the first
+        // new sample, which sits at staging[kCarry]. The last output needs the samples
+        // at floor(last_src_pos) and the one after it.
+        const float src_phase = std::max(rs.src_phase, -static_cast<float>(kCarry));
         const float last_src_pos = src_phase + (num_frames - 1) * ratio;
         int oversample_frames = static_cast<int>(std::floor(last_src_pos)) + 2;
-        if (oversample_frames > kStagingMax) {
-            oversample_frames = kStagingMax;
-        }
+        oversample_frames = std::clamp(oversample_frames, 2, kStagingMax);
+        oversample_frames = (oversample_frames + 1) & ~1;
+        int16_t* fresh = staging + kCarry;
+        std::memcpy(staging, rs.carry, sizeof(rs.carry));
         std::memset(sync_buffer, 0, oversample_frames * sizeof(uint8_t));
 
         int rendered = 0;
         while (rendered < oversample_frames) {
             int chunk = std::min(kBraidsInternalBlock, oversample_frames - rendered);
-            osc.Render(sync_buffer + rendered, staging + rendered,
+            osc.Render(sync_buffer + rendered, fresh + rendered,
                        static_cast<size_t>(chunk));
             rendered += chunk;
         }
 
-        const int last_valid = rendered - 1;
+        const int last_valid = kCarry + rendered - 1;
         for (int i = 0; i < num_frames; i++) {
-            float src = src_phase + i * ratio;
+            float src = kCarry + src_phase + i * ratio;
             int idx = static_cast<int>(src);
             float frac = src - idx;
-            // Defensive clamp — only triggers if oversample_frames was clamped at
-            // very low host rates (< ~24 kHz). Bounded but produces glitchy audio.
+            // Only when kStagingMax clamped the render (host rates below ~24 kHz):
+            // bounded but glitchy.
             if (idx >= last_valid) { idx = last_valid - 1; frac = 1.0f; }
-            if (idx < 0) { idx = 0; frac = 0.0f; }
             float s0 = staging[idx]     * kInt16Scale;
             float s1 = staging[idx + 1] * kInt16Scale;
             float sample = (s0 + (s1 - s0) * frac) * kBraidsOutGain;
             out_buffer[i] = soft_limit(sample);
         }
 
-        // Carry residue: oscillator advanced by `rendered` source samples this call.
-        // Next block's i=0 logical source position = src_phase + num_frames*ratio,
-        // expressed relative to the new staging[0] (which is `rendered` samples ahead).
-        src_phase = src_phase + num_frames * ratio - rendered;
-        // Defensive: if src_phase drifted negative (shouldn't, since rendered is the
-        // floor + 2 and ratio > 1), clamp to 0 to avoid negative idx on the next block.
-        if (src_phase < 0.0f) src_phase = 0.0f;
+        std::memcpy(rs.carry, fresh + rendered - kCarry, sizeof(rs.carry));
+        rs.src_phase = src_phase + num_frames * ratio - rendered;
     }
 }

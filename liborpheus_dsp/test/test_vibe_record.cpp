@@ -6,6 +6,8 @@
 //   VIBE_PORTS=features/pulsar/build/vibe-recordings/orphic_lore.ports \
 //   VIBE_TRACKS=mix,5 VIBE_SECONDS=60 orpheus_dsp_test vibe_record
 //
+// VIBE_SR / VIBE_BLOCK change the render rate and callback size (default 48000 / 256).
+//
 // VIBE_SET=track_5_grain_fx=0,track_5_vibrato_depth=0 overrides Pulsar ports after the load
 // and after every section flip, so a stage can be switched off without re-dumping; VIBE_TAG
 // suffixes the file names so an A/B keeps both takes.
@@ -27,8 +29,6 @@
 
 namespace {
 
-constexpr int kSr = 48000;
-constexpr int kBlock = 256;
 constexpr const char* kDefaultPorts = "features/pulsar/build/vibe-recordings/orphic_lore.ports";
 constexpr const char* kPulsarUri = "org.balch.orpheus.plugins.pulsar";
 
@@ -68,6 +68,15 @@ void apply(OrpheusEngine* e, const std::vector<PortWrite>& ws) {
     for (const PortWrite& w : ws) orpheus_engine_set_port(e, w.uri.c_str(), w.symbol.c_str(), w.value);
 }
 
+int env_int(const char* name, int fallback) {
+    const char* v = std::getenv(name);
+    return v ? std::atoi(v) : fallback;
+}
+
+// VIBE_SR and VIBE_BLOCK mimic another output stream, e.g. 44100 / 882 for Bluetooth on Android.
+const int kSr = env_int("VIBE_SR", 48000);
+const int kBlock = env_int("VIBE_BLOCK", 256);
+
 // solo < 0 records the mix. A solo mutes the other tracks with the TRACKS mixer's mute,
 // which leaves the arrangement and the band rolling exactly as in the mix.
 bool record(const PortDump& d, int solo, int seconds, const std::string& wav, const std::string& csv) {
@@ -93,12 +102,12 @@ bool record(const PortDump& d, int solo, int seconds, const std::string& wav, co
     const int blocks = seconds * kSr / kBlock;
     std::vector<float> pcm;
     pcm.reserve(static_cast<size_t>(blocks) * kBlock * 2);
-    float buf[kBlock * 2];
+    std::vector<float> buf(static_cast<size_t>(kBlock) * 2);
     int section = -1;
     float peak = 0.0f;
     for (int b = 0; b < blocks; b++) {
-        orpheus_engine_process(e, buf, kBlock);
-        pcm.insert(pcm.end(), buf, buf + kBlock * 2);
+        orpheus_engine_process(e, buf.data(), kBlock);
+        pcm.insert(pcm.end(), buf.begin(), buf.end());
         double sum = 0.0;
         for (int i = 0; i < kBlock * 2; i++) {
             sum += static_cast<double>(buf[i]) * buf[i];
@@ -129,11 +138,6 @@ bool record(const PortDump& d, int solo, int seconds, const std::string& wav, co
     write_wav(wav.c_str(), pcm.data(), static_cast<int>(pcm.size() / 2), kSr);
     printf("  %s peak %.4f\n", wav.c_str(), peak);
     return peak > 1e-4f;
-}
-
-int env_int(const char* name, int fallback) {
-    const char* v = std::getenv(name);
-    return v ? std::atoi(v) : fallback;
 }
 
 }  // namespace

@@ -551,7 +551,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // reaches the Braids macro params (parameter_[0/1]).
         if (engine_index >= 100 && engine_index < 200) {
             unit_process_braids(engine->braids_voices[idx],
-                                engine->braids_src_phase[idx],
+                                engine->braids_resampler[idx],
                                 engine_index,
                                 note, harmonics, timbre, morph,
                                 sr, out, num_frames);

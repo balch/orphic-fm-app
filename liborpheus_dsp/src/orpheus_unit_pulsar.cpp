@@ -5860,7 +5860,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 #endif
 
         if (ts.engine_index >= 100 && ts.engine_index < 200) {
-            unit_process_braids(ts.braids_voice, ts.braids_src_phase,
+            unit_process_braids(ts.braids_voice, ts.braids_resampler,
                                 ts.engine_index,
                                 note_for_render,
                                 clamp01(mod_harmonics),

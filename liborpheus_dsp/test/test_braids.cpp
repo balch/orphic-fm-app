@@ -38,7 +38,7 @@ static bool test_braids_all_engines_produce_sound() {
             int n = std::min(BLOCK, FRAMES - i);
             auto& vp = engine->voice_params[0];
             unit_process_braids(engine->braids_voices[0],
-                                engine->braids_src_phase[0],
+                                engine->braids_resampler[0],
                                 vp.engine_index.load(),
                                 vp.tune.load(),
                                 vp.harmonics.load(),
@@ -107,7 +107,7 @@ static bool test_braids_chord_responds_to_harmonics() {
             int n = std::min(BLOCK, FRAMES - i);
             auto& vp = engine->voice_params[0];
             unit_process_braids(engine->braids_voices[0],
-                                engine->braids_src_phase[0],
+                                engine->braids_resampler[0],
                                 vp.engine_index.load(),
                                 vp.tune.load(),
                                 vp.harmonics.load(),
@@ -180,7 +180,7 @@ static bool test_braids_pitch_sanity() {
         int n = std::min(BLOCK, FRAMES - i);
         auto& vp2 = engine->voice_params[0];
         unit_process_braids(engine->braids_voices[0],
-                            engine->braids_src_phase[0],
+                            engine->braids_resampler[0],
                             vp2.engine_index.load(),
                             vp2.tune.load(),
                             vp2.harmonics.load(),
@@ -246,7 +246,7 @@ static bool test_braids_44k_block_continuity() {
 
     for (int b = 0; b < N_BLOCKS; b++) {
         unit_process_braids(engine->braids_voices[0],
-                            engine->braids_src_phase[0],
+                            engine->braids_resampler[0],
                             vp.engine_index.load(),
                             vp.tune.load(),
                             vp.harmonics.load(),
@@ -289,11 +289,52 @@ static bool test_braids_44k_block_continuity() {
     return ok;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Test 5: Every engine survives 44.1 kHz Bluetooth callbacks.
+//         Android BT streams deliver 882 frames, which the engine splits into
+//         512 + 370. Those ask the resampler for an odd number of 96 kHz samples,
+//         and VOW and the other digital shapes render in pairs, so an odd request
+//         used to wrap their size_t counter and write past the staging buffer.
+// ═══════════════════════════════════════════════════════════════════
+static bool test_braids_44k_bluetooth_blocks() {
+    printf("\n=== Test: Braids 44.1 kHz Bluetooth block sizes ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(44100);
+    constexpr int kBlocks[] = {512, 370, 511, 1, 64, 255};
+    std::vector<float> buf(512);
+
+    bool ok = true;
+    for (int id = 100; id <= 108; id++) {
+        engine->braids_voices[0].Init();
+        engine->braids_resampler[0] = {};
+        float peak = 0.0f;
+        bool finite = true;
+        for (int rep = 0; rep < 40; rep++) {
+            for (int n : kBlocks) {
+                unit_process_braids(engine->braids_voices[0], engine->braids_resampler[0],
+                                    id, 69.0f, 0.5f, 0.0f, 0.5f, 44100.0f, buf.data(), n);
+                for (int i = 0; i < n; i++) {
+                    finite &= std::isfinite(buf[i]);
+                    peak = std::max(peak, std::fabs(buf[i]));
+                }
+            }
+        }
+        const bool engine_ok = finite && peak > 1e-3f && peak <= 1.0f;
+        printf("  [%s] id %d peak %.3f\n", engine_ok ? "OK" : "FAIL", id, peak);
+        ok &= engine_ok;
+    }
+
+    orpheus_engine_destroy(engine);
+    g_suite_passes += ok ? 1 : 0;
+    g_suite_fails  += ok ? 0 : 1;
+    return ok;
+}
+
 bool run_braids_tests() {
     bool ok = true;
     ok &= test_braids_all_engines_produce_sound();
     ok &= test_braids_chord_responds_to_harmonics();
     ok &= test_braids_pitch_sanity();
     ok &= test_braids_44k_block_continuity();
+    ok &= test_braids_44k_bluetooth_blocks();
     return ok;
 }
