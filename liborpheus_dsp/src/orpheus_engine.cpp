@@ -59,6 +59,8 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->pulsar_track_pitch_rise_time_space[t].store(2.0f, std::memory_order_relaxed);
         engine->pulsar_track_harmonics_rise_time[t].store(2.0f, std::memory_order_relaxed);
         engine->pulsar_track_harmonics_rise_time_space[t].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_track_morph_rise_time[t].store(2.0f, std::memory_order_relaxed);
+        engine->pulsar_track_morph_rise_time_space[t].store(2.0f, std::memory_order_relaxed);
     }
 
     // Initialize all Plaits voices (OrpheusVoice: direct engine render)

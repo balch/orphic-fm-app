@@ -111,6 +111,10 @@ class PulsarPlugin : DspPlugin {
     private val _trackHarmonicsRiseSpace = FloatArray(8) { 0f }
     private val _trackHarmonicsRiseTime = FloatArray(8) { 2f }
     private val _trackHarmonicsRiseTimeSpace = FloatArray(8) { 2f }
+    private val _trackMorphRise = FloatArray(8) { 0f }
+    private val _trackMorphRiseSpace = FloatArray(8) { 0f }
+    private val _trackMorphRiseTime = FloatArray(8) { 2f }
+    private val _trackMorphRiseTimeSpace = FloatArray(8) { 2f }
     private val _trackHarmonicsModulation = FloatArray(8) { 0f }
     // Default source = 4 (MOOD) so an opt-in user only has to set the range.
     private val _trackHarmonicsMacroSource = IntArray(8) { 4 }
@@ -540,6 +544,30 @@ class PulsarPlugin : DspPlugin {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME_SPACE.ordinal + t]) {
                 floatType { default = 2f; min = 0.1f; max = 8f
                     get { _trackHarmonicsRiseTimeSpace[t] }; set { _trackHarmonicsRiseTimeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE.ordinal + t]) {
+                floatType { default = 0f; min = -1f; max = 1f
+                    get { _trackMorphRise[t] }; set { _trackMorphRise[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = -1f; max = 1f
+                    get { _trackMorphRiseSpace[t] }; set { _trackMorphRiseSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME.ordinal + t]) {
+                floatType { default = 2f; min = 0.1f; max = 8f
+                    get { _trackMorphRiseTime[t] }; set { _trackMorphRiseTime[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME_SPACE.ordinal + t]) {
+                floatType { default = 2f; min = 0.1f; max = 8f
+                    get { _trackMorphRiseTimeSpace[t] }; set { _trackMorphRiseTimeSpace[t] = it } }
             }
         }
         // Per-track pin flags (EDM slot). Space-slot equivalents flow through

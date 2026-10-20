@@ -894,6 +894,10 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_harmonics_rise_space[8]{};
     std::atomic<float> pulsar_track_harmonics_rise_time[8]{};
     std::atomic<float> pulsar_track_harmonics_rise_time_space[8]{};
+    std::atomic<float> pulsar_track_morph_rise[8]{};
+    std::atomic<float> pulsar_track_morph_rise_space[8]{};
+    std::atomic<float> pulsar_track_morph_rise_time[8]{};
+    std::atomic<float> pulsar_track_morph_rise_time_space[8]{};
     // Per-track pin flags (one per param per slot). 0 = not pinned (default,
     // current macroMap-driven behavior); non-zero = use ts.harmonics/timbre/morph
     // verbatim, bypassing macros/evolution/accent/LFO. See orpheus_unit_pulsar.cpp.

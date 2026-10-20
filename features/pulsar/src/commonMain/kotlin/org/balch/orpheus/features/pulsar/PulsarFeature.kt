@@ -817,6 +817,8 @@ class PulsarViewModel(
     private val trackPitchRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_TIME.ordinal + it].controlId) }
     private val trackHarmonicsRiseIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE.ordinal + it].controlId) }
     private val trackHarmonicsRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME.ordinal + it].controlId) }
+    private val trackMorphRiseIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE.ordinal + it].controlId) }
+    private val trackMorphRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME.ordinal + it].controlId) }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val openingNoteFloorId = synthController.controlFlow(PulsarSymbol.OPENING_NOTE_FLOOR.controlId)
     private val trackMacroIds = (0..7).map { t ->
@@ -1015,6 +1017,8 @@ class PulsarViewModel(
     private val trackPitchRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PITCH_RISE_TIME_SPACE.ordinal + it].controlId) }
     private val trackHarmonicsRiseSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_SPACE.ordinal + it].controlId) }
     private val trackHarmonicsRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME_SPACE.ordinal + it].controlId) }
+    private val trackMorphRiseSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_SPACE.ordinal + it].controlId) }
+    private val trackMorphRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME_SPACE.ordinal + it].controlId) }
 
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
@@ -1702,6 +1706,10 @@ class PulsarViewModel(
             trackHarmonicsRiseSpaceIds[i].value = FloatValue(spa.harmonicsRise)
             trackHarmonicsRiseTimeIds[i].value = FloatValue(edm.harmonicsRiseTime)
             trackHarmonicsRiseTimeSpaceIds[i].value = FloatValue(spa.harmonicsRiseTime)
+            trackMorphRiseIds[i].value = FloatValue(edm.morphRise)
+            trackMorphRiseSpaceIds[i].value = FloatValue(spa.morphRise)
+            trackMorphRiseTimeIds[i].value = FloatValue(edm.morphRiseTime)
+            trackMorphRiseTimeSpaceIds[i].value = FloatValue(spa.morphRiseTime)
             // Effective pin: vibe-author opt-in OR engine-enforced (DX-family
             // harmonics is a quantized 32-step patch selector — never let the
             // macro range slide between patches).

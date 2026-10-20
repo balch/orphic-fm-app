@@ -387,6 +387,26 @@ enum class PulsarSymbol(
     TRACK_6_HARMONICS_RISE_TIME("track_6_harmonics_rise_time"),
     TRACK_7_HARMONICS_RISE_TIME("track_7_harmonics_rise_time"),
 
+    // Per-track morph rise: amount added to morph over the note, 0 is off (8 entries, EDM slot)
+    TRACK_0_MORPH_RISE("track_0_morph_rise"),
+    TRACK_1_MORPH_RISE("track_1_morph_rise"),
+    TRACK_2_MORPH_RISE("track_2_morph_rise"),
+    TRACK_3_MORPH_RISE("track_3_morph_rise"),
+    TRACK_4_MORPH_RISE("track_4_morph_rise"),
+    TRACK_5_MORPH_RISE("track_5_morph_rise"),
+    TRACK_6_MORPH_RISE("track_6_morph_rise"),
+    TRACK_7_MORPH_RISE("track_7_morph_rise"),
+
+    // Per-track morph rise: seconds to reach the full rise (8 entries, EDM slot)
+    TRACK_0_MORPH_RISE_TIME("track_0_morph_rise_time"),
+    TRACK_1_MORPH_RISE_TIME("track_1_morph_rise_time"),
+    TRACK_2_MORPH_RISE_TIME("track_2_morph_rise_time"),
+    TRACK_3_MORPH_RISE_TIME("track_3_morph_rise_time"),
+    TRACK_4_MORPH_RISE_TIME("track_4_morph_rise_time"),
+    TRACK_5_MORPH_RISE_TIME("track_5_morph_rise_time"),
+    TRACK_6_MORPH_RISE_TIME("track_6_morph_rise_time"),
+    TRACK_7_MORPH_RISE_TIME("track_7_morph_rise_time"),
+
     // Vibe step count
     STEP_COUNT("step_count"),
 
@@ -1740,6 +1760,26 @@ enum class PulsarSymbol(
     TRACK_5_HARMONICS_RISE_TIME_SPACE("track_5_harmonics_rise_time_space"),
     TRACK_6_HARMONICS_RISE_TIME_SPACE("track_6_harmonics_rise_time_space"),
     TRACK_7_HARMONICS_RISE_TIME_SPACE("track_7_harmonics_rise_time_space"),
+
+    // Per-track morph rise: amount added to morph over the note, 0 is off (8 entries, SPACE slot)
+    TRACK_0_MORPH_RISE_SPACE("track_0_morph_rise_space"),
+    TRACK_1_MORPH_RISE_SPACE("track_1_morph_rise_space"),
+    TRACK_2_MORPH_RISE_SPACE("track_2_morph_rise_space"),
+    TRACK_3_MORPH_RISE_SPACE("track_3_morph_rise_space"),
+    TRACK_4_MORPH_RISE_SPACE("track_4_morph_rise_space"),
+    TRACK_5_MORPH_RISE_SPACE("track_5_morph_rise_space"),
+    TRACK_6_MORPH_RISE_SPACE("track_6_morph_rise_space"),
+    TRACK_7_MORPH_RISE_SPACE("track_7_morph_rise_space"),
+
+    // Per-track morph rise: seconds to reach the full rise (8 entries, SPACE slot)
+    TRACK_0_MORPH_RISE_TIME_SPACE("track_0_morph_rise_time_space"),
+    TRACK_1_MORPH_RISE_TIME_SPACE("track_1_morph_rise_time_space"),
+    TRACK_2_MORPH_RISE_TIME_SPACE("track_2_morph_rise_time_space"),
+    TRACK_3_MORPH_RISE_TIME_SPACE("track_3_morph_rise_time_space"),
+    TRACK_4_MORPH_RISE_TIME_SPACE("track_4_morph_rise_time_space"),
+    TRACK_5_MORPH_RISE_TIME_SPACE("track_5_morph_rise_time_space"),
+    TRACK_6_MORPH_RISE_TIME_SPACE("track_6_morph_rise_time_space"),
+    TRACK_7_MORPH_RISE_TIME_SPACE("track_7_morph_rise_time_space"),
 
     // Pulsar dedicated effect parameters (pushed on vibe change)
     PULSAR_DELAY_TIME_A("pulsar_delay_time_a"),

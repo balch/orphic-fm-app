@@ -153,6 +153,13 @@ data class OrpheusEngine(
     val harmonicsRise: Float = 0f,
     /** Seconds the swell takes to reach the full [harmonicsRise]. */
     val harmonicsRiseTime: Float = 2f,
+    /**
+     * Amount added to morph over each note, -1..1, then held. 0 is off. On SPK and VOWEL_FOF
+     * morph picks the vowel, so this sweeps it within each note. A note-on glides back over 80 ms.
+     */
+    val morphRise: Float = 0f,
+    /** Seconds the sweep takes to reach the full [morphRise]. */
+    val morphRiseTime: Float = 2f,
 ) {
     init {
         require(fmRatio in 0f..16f) { "fmRatio must be 0..16, was $fmRatio" }
@@ -169,5 +176,7 @@ data class OrpheusEngine(
         require(pitchRiseTime in 0.1f..8f) { "pitchRiseTime must be 0.1..8 s, was $pitchRiseTime" }
         require(harmonicsRise in -1f..1f) { "harmonicsRise must be -1..1, was $harmonicsRise" }
         require(harmonicsRiseTime in 0.1f..8f) { "harmonicsRiseTime must be 0.1..8 s, was $harmonicsRiseTime" }
+        require(morphRise in -1f..1f) { "morphRise must be -1..1, was $morphRise" }
+        require(morphRiseTime in 0.1f..8f) { "morphRiseTime must be 0.1..8 s, was $morphRiseTime" }
     }
 }

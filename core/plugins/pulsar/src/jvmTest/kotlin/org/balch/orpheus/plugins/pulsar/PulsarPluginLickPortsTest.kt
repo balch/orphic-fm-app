@@ -169,11 +169,11 @@ class PulsarPluginLickPortsTest {
     }
 
     @Test
-    fun `plugin registers every track harmonics rise port once and each holds its value`() {
+    fun `plugin registers every track harmonics and morph rise port once and each holds its value`() {
         val plugin = PulsarPlugin()
         val registered = plugin.ports.map { it.symbol }
         var n = 0
-        for (family in listOf("HARMONICS_RISE", "HARMONICS_RISE_TIME")) {
+        for (family in listOf("HARMONICS_RISE", "HARMONICS_RISE_TIME", "MORPH_RISE", "MORPH_RISE_TIME")) {
             for (suffix in listOf("", "_SPACE")) {
                 val symbols = PulsarSymbol.entries.filter {
                     it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))
@@ -190,7 +190,7 @@ class PulsarPluginLickPortsTest {
             }
         }
         n = 0
-        for (family in listOf("HARMONICS_RISE", "HARMONICS_RISE_TIME")) {
+        for (family in listOf("HARMONICS_RISE", "HARMONICS_RISE_TIME", "MORPH_RISE", "MORPH_RISE_TIME")) {
             for (suffix in listOf("", "_SPACE")) {
                 PulsarSymbol.entries.filter { it.name.matches(Regex("TRACK_[0-7]_$family$suffix")) }
                     .forEach { sym ->

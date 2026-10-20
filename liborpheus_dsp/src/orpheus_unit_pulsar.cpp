@@ -51,9 +51,30 @@ static constexpr float kTidesNorm = 0.125f;
 // Vibrato depth fades in over this long after each note-on.
 static constexpr float kVibratoOnsetSeconds = 0.3f;
 
-// A note-on that lands while the voice still sounds glides the harmonics rise back over
-// this long. Snapping it in one block clicks on engines whose harmonics swap models (SPK).
-static constexpr float kHarmonicsRiseReturnSeconds = 0.08f;
+// A note-on that lands while the voice still sounds glides a harmonics or morph rise back
+// over this long. Snapping it in one block clicks on engines whose harmonics swap models (SPK).
+static constexpr float kRiseReturnSeconds = 0.08f;
+
+// One block of a per-note rise: a 0..1 ramp over `time` seconds that restarts on a note-on,
+// reached by gliding from the last note's offset for kRiseReturnSeconds. Returns the offset.
+static float advance_note_rise(float rise, float time, bool retrig, float& progress, float& offset,
+                               float& return_from, float& return_progress, int num_frames,
+                               float sample_rate) {
+    if (retrig) {
+        progress = 0.0f;
+        return_from = offset;
+        return_progress = 0.0f;
+    }
+    float out = rise * progress;
+    if (return_progress < 1.0f) {
+        out = return_from + (out - return_from) * return_progress;
+        return_progress = std::min(1.0f, return_progress
+            + static_cast<float>(num_frames) / (sample_rate * kRiseReturnSeconds));
+    }
+    offset = out;
+    progress = std::min(1.0f, progress + static_cast<float>(num_frames) / (sample_rate * time));
+    return out;
+}
 
 // Lowest note the pattern generator may write for a track's engine. OSC
 // (engine_index < 0) cannot index kEngineModRanges, and without its floor here
@@ -1829,6 +1850,9 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.harmonics_rise_progress = 0.0f;
         ts.harmonics_rise_offset = 0.0f;
         ts.harmonics_rise_return_progress = 1.0f;
+        ts.morph_rise_progress = 0.0f;
+        ts.morph_rise_offset = 0.0f;
+        ts.morph_rise_return_progress = 1.0f;
         ts.swing_offset = 0.0;
         ts.repick_live = false;
         ts.beat_origin = ts.head_origin = 0.0;
@@ -3587,6 +3611,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.pitch_rise_time     = PULSAR_PICK(pitch_rise_time);
             ts.harmonics_rise      = PULSAR_PICK(harmonics_rise);
             ts.harmonics_rise_time = PULSAR_PICK(harmonics_rise_time);
+            ts.morph_rise          = PULSAR_PICK(morph_rise);
+            ts.morph_rise_time     = PULSAR_PICK(morph_rise_time);
         }
 
         // ── Apply macro modulation ──
@@ -5790,22 +5816,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Opt-in vowel swell: each note-on restarts a 0..1 ramp that adds to harmonics after
         // every other modulation and floor, then holds. Block rate. Rise 0 skips it, state included.
         if (ts.harmonics_rise != 0.0f) {
-            if (ts.pending_retrig) {
-                ts.harmonics_rise_progress = 0.0f;
-                ts.harmonics_rise_return_from = ts.harmonics_rise_offset;
-                ts.harmonics_rise_return_progress = 0.0f;
-            }
-            float offset = ts.harmonics_rise * ts.harmonics_rise_progress;
-            if (ts.harmonics_rise_return_progress < 1.0f) {
-                offset = ts.harmonics_rise_return_from
-                       + (offset - ts.harmonics_rise_return_from) * ts.harmonics_rise_return_progress;
-                ts.harmonics_rise_return_progress = std::min(1.0f, ts.harmonics_rise_return_progress
-                    + static_cast<float>(num_frames) / (sample_rate * kHarmonicsRiseReturnSeconds));
-            }
-            ts.harmonics_rise_offset = offset;
-            mod_harmonics += offset;
-            ts.harmonics_rise_progress = std::min(1.0f, ts.harmonics_rise_progress
-                + static_cast<float>(num_frames) / (sample_rate * ts.harmonics_rise_time));
+            mod_harmonics += advance_note_rise(ts.harmonics_rise, ts.harmonics_rise_time, ts.pending_retrig,
+                                               ts.harmonics_rise_progress, ts.harmonics_rise_offset,
+                                               ts.harmonics_rise_return_from, ts.harmonics_rise_return_progress,
+                                               num_frames, sample_rate);
+        }
+
+        // ── Morph rise ──
+        // The same per-note ramp on morph: on SPK and VOWEL_FOF morph picks the vowel, so a
+        // rise sweeps it within each note. Added after every morph modulation, pinned or not.
+        if (ts.morph_rise != 0.0f) {
+            mod_morph += advance_note_rise(ts.morph_rise, ts.morph_rise_time, ts.pending_retrig,
+                                           ts.morph_rise_progress, ts.morph_rise_offset,
+                                           ts.morph_rise_return_from, ts.morph_rise_return_progress,
+                                           num_frames, sample_rate);
         }
 
         // ── Render voice ──

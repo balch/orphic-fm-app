@@ -273,6 +273,23 @@ class PulsarGrainPushTest {
     }
 
     @Test
+    fun `morph rise fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(engineId = OrpheusEngineId.SPK, morphRise = 0.25f, morphRiseTime = 1.5f)
+        val space = OrpheusEngine(engineId = OrpheusEngineId.SPK, morphRise = -0.2f, morphRiseTime = 4f)
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(0.25f, float("track_4_morph_rise"))
+        assertEquals(-0.2f, float("track_4_morph_rise_space"))
+        assertEquals(1.5f, float("track_4_morph_rise_time"))
+        assertEquals(4f, float("track_4_morph_rise_time_space"))
+        assertEquals(0f, float("track_0_morph_rise"), "a track without one pushes 0")
+        assertEquals(2f, float("track_0_morph_rise_time"))
+    }
+
+    @Test
     fun `a track with no harmonics rise pushes 0 at the default time`() = runTest(testDispatcher) {
         val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
         val vibe = grainTestVibe(va, va)

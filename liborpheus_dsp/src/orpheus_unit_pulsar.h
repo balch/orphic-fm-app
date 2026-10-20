@@ -322,6 +322,13 @@ struct PulsarTrackState {
     float harmonics_rise_offset = 0.0f;
     float harmonics_rise_return_from = 0.0f;
     float harmonics_rise_return_progress = 1.0f;
+    // Morph rise: the same per-note ramp and note-on return, added to morph.
+    float morph_rise = 0.0f;
+    float morph_rise_time = 2.0f;
+    float morph_rise_progress = 0.0f;
+    float morph_rise_offset = 0.0f;
+    float morph_rise_return_from = 0.0f;
+    float morph_rise_return_progress = 1.0f;
     // Melodic lick line that keeps the texture-curve fade and escapes track 7's FX note
     // gate. Resolved per block from the track-level atomic.
     bool  texture_line = false;
