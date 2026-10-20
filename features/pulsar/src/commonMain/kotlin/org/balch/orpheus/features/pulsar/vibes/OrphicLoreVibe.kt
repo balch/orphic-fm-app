@@ -82,19 +82,24 @@ class OrphicLoreVibe : VibeProvider {
     override val name: VibeName = VibeNames.ORPHIC_LORE
 
     // The intro's walkdown: four descending anchors (D C Bb A), one per bar, each on the
-    // downbeat with a 16th pickup that slurs into the next. glideRate lives on the anchor:
-    // the engine slides INTO the step carrying the rate, and a rest would cancel the glide.
+    // downbeat, then a 16th breath and a 16th pickup that slurs into the next. glideRate lives
+    // on the anchor: the engine slides INTO the step carrying the rate, and a rest right before
+    // it would cancel the glide, so the breath sits before the pickup, never before an anchor.
     // Pool slot 0 (intro, homecomings, outro).
     private val descent = Lick(
         steps = listOf(
-            LickStep(7, 3.75f, 0.95f, glideRate = 0.5f),   // D
+            LickStep(7, 3.5f, 0.95f, glideRate = 0.5f),   // D
+            LickStep(-1, 0.25f, 0.45f),                     //   breath
             LickStep(7, 0.25f, 0.45f),                      //   pickup, lifts into C
-            LickStep(6, 3.75f, 0.90f, glideRate = 0.5f),   // C
-            LickStep(6, 0.25f, 0.45f),
-            LickStep(5, 3.75f, 0.90f, glideRate = 0.5f),   // Bb
-            LickStep(5, 0.25f, 0.45f),
-            LickStep(4, 3.75f, 0.95f, glideRate = 0.5f),   // A, holds the bar
-            LickStep(4, 0.25f, 0.45f),
+            LickStep(6, 3.5f, 0.90f, glideRate = 0.5f),   // C
+            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            LickStep(6, 0.25f, 0.45f),                      //   pickup, into Bb
+            LickStep(5, 3.5f, 0.90f, glideRate = 0.5f),   // Bb
+            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            LickStep(5, 0.25f, 0.45f),                      //   pickup, into A
+            LickStep(4, 3.5f, 0.95f, glideRate = 0.5f),   // A, holds the bar
+            LickStep(-1, 0.25f, 0.45f),                     //   breath
+            LickStep(4, 0.25f, 0.45f),                      //   pickup, back to D
         ),
         loopLength = 16,  // 16 beats = the full 64-step pattern, no padding
     )
@@ -610,7 +615,7 @@ class OrphicLoreVibe : VibeProvider {
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = 7,
-                lengthSeconds = 360..420,
+                lengthSeconds = 240..300,
                 sections = listOf(
                     // Lengths are section bars (32 steps = two musical bars) and all even: the
                     // descent is 64 steps, so an odd count would start a homecoming on its Bb.
