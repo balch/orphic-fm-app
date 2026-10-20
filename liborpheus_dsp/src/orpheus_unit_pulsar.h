@@ -314,10 +314,14 @@ struct PulsarTrackState {
     float pitch_rise_time = 2.0f;
     float pitch_rise_progress = 0.0f;
     // Harmonics rise: amount and seconds resolved per block from the active slot, plus the
-    // 0..1 progress that restarts on every note-on.
+    // 0..1 progress that restarts on every note-on. A note-on glides from the offset the
+    // last note reached (return_from) back onto the fresh ramp as return_progress runs 0..1.
     float harmonics_rise = 0.0f;
     float harmonics_rise_time = 2.0f;
     float harmonics_rise_progress = 0.0f;
+    float harmonics_rise_offset = 0.0f;
+    float harmonics_rise_return_from = 0.0f;
+    float harmonics_rise_return_progress = 1.0f;
     // Melodic lick line that keeps the texture-curve fade and escapes track 7's FX note
     // gate. Resolved per block from the track-level atomic.
     bool  texture_line = false;

@@ -51,6 +51,10 @@ static constexpr float kTidesNorm = 0.125f;
 // Vibrato depth fades in over this long after each note-on.
 static constexpr float kVibratoOnsetSeconds = 0.3f;
 
+// A note-on that lands while the voice still sounds glides the harmonics rise back over
+// this long. Snapping it in one block clicks on engines whose harmonics swap models (SPK).
+static constexpr float kHarmonicsRiseReturnSeconds = 0.08f;
+
 // Lowest note the pattern generator may write for a track's engine. OSC
 // (engine_index < 0) cannot index kEngineModRanges, and without its floor here
 // the generator writes below note_min and the render-time clamp folds the note
@@ -1823,6 +1827,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.vibrato_onset = 0.0f;
         ts.pitch_rise_progress = 0.0f;
         ts.harmonics_rise_progress = 0.0f;
+        ts.harmonics_rise_offset = 0.0f;
+        ts.harmonics_rise_return_progress = 1.0f;
         ts.swing_offset = 0.0;
         ts.repick_live = false;
         ts.beat_origin = ts.head_origin = 0.0;
@@ -5784,8 +5790,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Opt-in vowel swell: each note-on restarts a 0..1 ramp that adds to harmonics after
         // every other modulation and floor, then holds. Block rate. Rise 0 skips it, state included.
         if (ts.harmonics_rise != 0.0f) {
-            if (ts.pending_retrig) ts.harmonics_rise_progress = 0.0f;
-            mod_harmonics += ts.harmonics_rise * ts.harmonics_rise_progress;
+            if (ts.pending_retrig) {
+                ts.harmonics_rise_progress = 0.0f;
+                ts.harmonics_rise_return_from = ts.harmonics_rise_offset;
+                ts.harmonics_rise_return_progress = 0.0f;
+            }
+            float offset = ts.harmonics_rise * ts.harmonics_rise_progress;
+            if (ts.harmonics_rise_return_progress < 1.0f) {
+                offset = ts.harmonics_rise_return_from
+                       + (offset - ts.harmonics_rise_return_from) * ts.harmonics_rise_return_progress;
+                ts.harmonics_rise_return_progress = std::min(1.0f, ts.harmonics_rise_return_progress
+                    + static_cast<float>(num_frames) / (sample_rate * kHarmonicsRiseReturnSeconds));
+            }
+            ts.harmonics_rise_offset = offset;
+            mod_harmonics += offset;
             ts.harmonics_rise_progress = std::min(1.0f, ts.harmonics_rise_progress
                 + static_cast<float>(num_frames) / (sample_rate * ts.harmonics_rise_time));
         }

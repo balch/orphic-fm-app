@@ -130,7 +130,7 @@ static bool test_hrise_zero_leaves_harmonics_alone() {
 }
 
 static bool test_hrise_climbs_then_holds() {
-    printf("\n=== Test: +0.4 over 1 s from a pinned 0.2 starts at 0.2, is 0.4 at 0.5 s, then holds at 0.6 ===\n");
+    printf("\n=== Test: +0.4 over 1 s from a pinned 0.2 continues the last note, is 0.4 at 0.5 s, then holds at 0.6 ===\n");
     HRiseSetup on;
     on.rise_edm = on.rise_space = 0.4f;
     const HRiseRun rise = run_hrise(on);
@@ -138,15 +138,16 @@ static bool test_hrise_climbs_then_holds() {
     bool ok = longest_hold(hrise_note_ons(rise), &start, &length);
     printf("  longest hold starts at block %d, %d blocks\n", start, length);
     if (ok) {
-        const float first = rise.harmonics[start];
+        // The note-on block carries on from the last note; the return glide is over long before 0.5 s.
+        const float step = std::fabs(rise.harmonics[start] - rise.harmonics[start - 1]);
         const float mid = rise.harmonics[start + 47];   // 47 blocks = 0.50 s
         float lo = 9.0f, hi = -9.0f;
         for (int i = start + 95; i < start + length; i++) {
             lo = std::min(lo, rise.harmonics[i]);
             hi = std::max(hi, rise.harmonics[i]);
         }
-        printf("  first=%.4f mid=%.4f top range %.4f..%.4f\n", first, mid, lo, hi);
-        ok &= std::fabs(first - 0.2f) < 0.01f;
+        printf("  note-on step=%.4f mid=%.4f top range %.4f..%.4f\n", step, mid, lo, hi);
+        ok &= step < 0.07f;
         ok &= std::fabs(mid - 0.4f) < 0.01f;
         ok &= (lo > 0.5995f) && (hi < 0.6005f);
     }
@@ -163,11 +164,11 @@ static bool test_hrise_negative_moves_down() {
     int start, length;
     bool ok = longest_hold(hrise_note_ons(rise), &start, &length);
     if (ok) {
-        const float first = rise.harmonics[start];
+        const float step = std::fabs(rise.harmonics[start] - rise.harmonics[start - 1]);
         const float mid = rise.harmonics[start + 47];
         const float end = rise.harmonics[start + length - 1];
-        printf("  first=%.4f mid=%.4f end=%.4f\n", first, mid, end);
-        ok &= std::fabs(first - 0.5f) < 0.01f;
+        printf("  note-on step=%.4f mid=%.4f end=%.4f\n", step, mid, end);
+        ok &= step < 0.07f;
         ok &= std::fabs(mid - 0.35f) < 0.01f;
         ok &= std::fabs(end - 0.2f) < 0.0005f;
     }
@@ -175,24 +176,48 @@ static bool test_hrise_negative_moves_down() {
     return ok;
 }
 
+// 80 ms of 512-frame blocks at 48 kHz, rounded up: the return glide is over by then.
+static constexpr int kReturnBlocks = 8;
+
 static bool test_hrise_restarts_on_each_note() {
-    printf("\n=== Test: each note-on restarts the rise from the pinned value ===\n");
+    printf("\n=== Test: each note-on glides back onto a restarted rise from the pinned value ===\n");
     HRiseSetup on;
     on.rise_edm = on.rise_space = 0.4f;
     const HRiseRun rise = run_hrise(on);
     const std::vector<int> ons = hrise_note_ons(rise);
     bool ok = ons.size() >= 3;
-    float worst_start = 0.0f;
+    float worst = 0.0f;
     int reached_top = 0;
     for (size_t k = 0; k < ons.size(); k++) {
-        worst_start = std::max(worst_start, std::fabs(rise.harmonics[ons[k]] - 0.2f));
+        // Past the glide the note is on the fresh ramp: pinned plus rise times elapsed.
+        const int at = ons[k] + kReturnBlocks;
+        if (k + 1 < ons.size() && at >= ons[k + 1]) continue;
+        if (at >= static_cast<int>(rise.harmonics.size())) continue;
+        const float ramp = 0.2f + 0.4f * std::min(1.0f, (kReturnBlocks + 1) * kBlockFrames / 48000.0f);
+        worst = std::max(worst, std::fabs(rise.harmonics[at] - ramp));
         if (k + 1 < ons.size() && ons[k + 1] - ons[k] > 100 &&
             rise.harmonics[ons[k + 1] - 1] > 0.5995f) reached_top++;
     }
-    printf("  note-ons=%zu worst deviation on a note-on block=%.4f, holds that reached 0.6: %d\n",
-           ons.size(), worst_start, reached_top);
-    ok &= (worst_start < 0.01f) && (reached_top >= 1);
+    printf("  note-ons=%zu worst deviation from the fresh ramp after the glide=%.4f, holds that reached 0.6: %d\n",
+           ons.size(), worst, reached_top);
+    ok &= (worst < 0.01f) && (reached_top >= 1);
     printf("Harmonics rise restart: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_hrise_note_on_never_jumps() {
+    printf("\n=== Test: a note-on mid-sound glides harmonics back instead of jumping (no click) ===\n");
+    HRiseSetup on;
+    on.rise_edm = on.rise_space = 0.4f;
+    const HRiseRun rise = run_hrise(on);
+    // The old reset dropped a held 0.6 to 0.2 in one block. The glide spreads 0.4 over
+    // about 7.5 blocks, about 0.053 each; the climb itself moves under 0.005 a block.
+    float worst = 0.0f;
+    for (size_t i = 1; i < rise.harmonics.size(); i++)
+        worst = std::max(worst, std::fabs(rise.harmonics[i] - rise.harmonics[i - 1]));
+    printf("  largest block-to-block harmonics step=%.4f\n", worst);
+    const bool ok = hrise_note_ons(rise).size() >= 3 && worst < 0.07f;
+    printf("Harmonics rise no jump: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -235,6 +260,7 @@ bool run_pulsar_harmonics_rise_tests() {
     if (test_hrise_climbs_then_holds()) suite_pass++; else suite_fail++;
     if (test_hrise_negative_moves_down()) suite_pass++; else suite_fail++;
     if (test_hrise_restarts_on_each_note()) suite_pass++; else suite_fail++;
+    if (test_hrise_note_on_never_jumps()) suite_pass++; else suite_fail++;
     if (test_hrise_follows_the_active_slot()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
