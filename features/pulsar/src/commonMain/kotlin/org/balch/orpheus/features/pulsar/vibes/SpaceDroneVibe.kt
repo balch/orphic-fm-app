@@ -253,7 +253,7 @@ class SpaceDroneVibe : VibeProvider {
                 // 0 Timpani roll — tuned-low filtered noise standing in for soft mallet hits.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.BD,
-                    volume = 0.78f,
+                    volume = 0.55f,
                     noteRangeLow = 36, noteRangeHigh = 48,
                     reverbBrightness = 0.35f, reverbSend = 0.30f, delaySend = 0.2f,
                     holdProbability = 0.4f, holdLengthMin = 2, holdLengthMax = 6,
