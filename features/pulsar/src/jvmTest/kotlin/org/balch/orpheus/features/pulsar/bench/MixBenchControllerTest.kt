@@ -129,10 +129,53 @@ class MixBenchControllerTest {
     }
 
     @Test
-    fun macroGoesThroughActions() = runTest {
+    fun macroNeverReachesTheSavedState() = runTest {
+        val saved = feature.stateFlow.value
         val c = started()
         c.setMacro(Macro.ENERGY, 0.7f)
-        assertEquals("energy" to 0.7f, feature.macroWrites.last())
+        assertEquals(mapOf(Macro.ENERGY to 0.7f), feature.benchMacroWrites.last())
+        assertTrue(feature.macroWrites.isEmpty(), "no persisted knob action")
+        assertEquals(saved, feature.stateFlow.value)
+    }
+
+    @Test
+    fun macroBaselineIsTheLiveKnob() = runTest {
+        // The app restored 0.8 over the file's 0.3: an untouched section plays the 0.8.
+        feature.applyVibe(vibe.copy(energy = 0.3f))
+        feature.stateFlow.value = feature.stateFlow.value.copy(energy = 0.8f)
+        section(2)
+        val c = started()
+        c.setScope(Scope.SECTION)
+        c.setMacro(Macro.ENERGY, 0.2f)
+        assertEquals(mapOf(Macro.ENERGY to 0.2f), feature.benchMacroWrites.last())
+        section(1); runCurrent()
+        assertEquals(mapOf(Macro.ENERGY to 0.8f), feature.benchMacroWrites.last())
+        // Capture still writes file values: the section multiplier is over the file's 0.3.
+        val row = capture(feature.vibeFlow.value, c.layers.value).single { it.field == CaptureField.MACRO }
+        assertEquals(1f, row.old, 1e-6f)
+        assertEquals(0.2f / 0.3f, row.new, 1e-5f)
+    }
+
+    @Test
+    fun untouchedMacroCapturesNothingWhenTheKnobDiffersFromTheFile() = runTest {
+        feature.stateFlow.value = feature.stateFlow.value.copy(mood = 0.9f)
+        val c = started()
+        c.setLevelDb(0, -3f)
+        assertTrue(capture(vibe, c.layers.value).none { it.field == CaptureField.MACRO })
+        assertTrue(feature.benchMacroWrites.all { it.isEmpty() })
+    }
+
+    @Test
+    fun stopReleasesMacrosToThePreBenchKnob() = runTest {
+        feature.stateFlow.value = feature.stateFlow.value.copy(space = 0.65f)
+        val saved = feature.stateFlow.value
+        val c = started()
+        c.setMacro(Macro.SPACE, 0.1f)
+        c.stop()
+        // An empty map hands every macro back to macroKnob, which the bench never wrote.
+        assertEquals(emptyMap(), feature.benchMacroWrites.last())
+        assertEquals(saved, feature.stateFlow.value)
+        assertEquals(0.65f, feature.macroKnob(Macro.SPACE))
     }
 
     @Test

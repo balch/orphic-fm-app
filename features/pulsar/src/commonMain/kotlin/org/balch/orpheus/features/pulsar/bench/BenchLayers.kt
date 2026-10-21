@@ -59,32 +59,38 @@ internal fun MacroOverrides?.multiplier(m: Macro): Float? = when (m) {
     Macro.SPACE -> this?.space
 }
 
-/** Energy the bench plays in [section]: heard override, else (knob or vibe energy) x section multiplier. */
-internal fun BenchLayers.heardEnergy(vibe: Vibe, section: Int): Float {
+/**
+ * Energy the bench plays in [section]: heard override, else (knob or [baseEnergy]) x section multiplier.
+ * [baseEnergy] is the app's live knob for what plays now, and the file's energy for a capture.
+ */
+internal fun BenchLayers.heardEnergy(vibe: Vibe, section: Int, baseEnergy: Float = vibe.energy): Float {
     sections[section]?.macrosHeard?.get(Macro.ENERGY)?.let { return it.coerceIn(0f, 1f) }
     val mult = vibe.arrangement?.sections?.getOrNull(section)?.macroOverrides?.energy ?: 1f
-    return ((this.vibe.macros[Macro.ENERGY] ?: vibe.energy) * mult).coerceIn(0f, 1f)
+    return ((this.vibe.macros[Macro.ENERGY] ?: baseEnergy) * mult).coerceIn(0f, 1f)
 }
 
 /** The voice a section plays: EDM when its heard energy is at least 0.5, else Space. */
-internal fun BenchLayers.activeEngine(vibe: Vibe, section: Int, t: Int) =
-    if (heardEnergy(vibe, section) >= 0.5f) vibe.tracks[t].engineEdm else vibe.tracks[t].engineSpace
+internal fun BenchLayers.activeEngine(vibe: Vibe, section: Int, t: Int, baseEnergy: Float = vibe.energy) =
+    if (heardEnergy(vibe, section, baseEnergy) >= 0.5f) vibe.tracks[t].engineEdm else vibe.tracks[t].engineSpace
 
 /** Where a track's sends start: the section override, else the slot the section plays. */
-private fun BenchLayers.sectionBase(vibe: Vibe, section: Int, t: Int, reverb: Boolean): Float {
+private fun BenchLayers.sectionBase(vibe: Vibe, section: Int, t: Int, reverb: Boolean, baseEnergy: Float): Float {
     val o = vibe.arrangement?.sections?.getOrNull(section)?.trackOverrides?.get(t)
-    val track = activeEngine(vibe, section, t)
+    val track = activeEngine(vibe, section, t, baseEnergy)
     return if (reverb) o?.reverbSend ?: track.reverbSend else o?.delaySend ?: track.delaySend
 }
 
-/** Vibe/section base combined with the layers; sends follow the [overlay] rule and the active slot's send. */
-fun BenchLayers.effective(vibe: Vibe, section: Int, t: Int): EffectiveTrack {
+/**
+ * Vibe/section base combined with the layers; sends follow the [overlay] rule and the active slot's send.
+ * [liveEnergy] is the app's energy knob, which picks the slot when the bench has not moved energy.
+ */
+fun BenchLayers.effective(vibe: Vibe, section: Int, t: Int, liveEnergy: Float = vibe.energy): EffectiveTrack {
     val ov = overlay(vibe)
     return EffectiveTrack(
         levelDb = vibeDb(t) + (sections[section]?.levelDb?.getOrNull(t) ?: 0f),
         pan = ov.pan(t, vibe.tracks[t].pan),
-        reverbSend = ov.reverbSend(t, section, sectionBase(vibe, section, t, reverb = true)),
-        delaySend = ov.delaySend(t, section, sectionBase(vibe, section, t, reverb = false)),
+        reverbSend = ov.reverbSend(t, section, sectionBase(vibe, section, t, reverb = true, liveEnergy)),
+        delaySend = ov.delaySend(t, section, sectionBase(vibe, section, t, reverb = false, liveEnergy)),
     )
 }
 
@@ -115,9 +121,12 @@ fun BenchLayers.overlay(vibe: Vibe): MixOverlay = object : MixOverlay {
     }
 }
 
-/** Base port value so that base x the section's multiplier equals the heard value. */
-fun BenchLayers.macroPortValue(vibe: Vibe, section: Int, m: Macro): Float {
-    val knob = this.vibe.macros[m] ?: m.vibeDefault(vibe)
+/**
+ * Base port value so that base x the section's multiplier equals the heard value. [live] is the
+ * app's knob, which plays wherever no layer moved [m]; it can differ from the vibe file.
+ */
+fun BenchLayers.macroPortValue(vibe: Vibe, section: Int, m: Macro, live: Float = m.vibeDefault(vibe)): Float {
+    val knob = this.vibe.macros[m] ?: live
     val heard = sections[section]?.macrosHeard?.get(m) ?: return knob
     val mult = vibe.arrangement?.sections?.getOrNull(section)?.macroOverrides.multiplier(m) ?: 1f
     return if (mult == 0f) knob else heard / mult

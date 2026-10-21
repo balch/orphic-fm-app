@@ -24,7 +24,9 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 
 /**
  * Applies Mix Bench edits to the live Pulsar engine and turns [MixBenchTap] summaries into [meters].
- * While running it owns `track_N_audition_gain`: do not use the app's TRACKS mixer at the same time.
+ * While running it owns `track_N_audition_gain` and any macro it moved: do not use the app's TRACKS
+ * mixer or macro knobs at the same time. Its macro baseline is the app's knob ([PulsarFeature.macroKnob]),
+ * which can differ from the vibe file, and bench macros never reach the app's saved state.
  * Every state change and engine write runs under one lock, so nothing the bench pushes lands after [stop].
  */
 class MixBenchController(
@@ -87,10 +89,10 @@ class MixBenchController(
         }
         pushGains()
         pushOverlay()
-        pushMacros(touched(_layers.value))
+        pushMacros()
     }
 
-    /** Waits out the followers and poll, releases the engine to the file mix and disables the tap (~100 ms). */
+    /** Waits out the followers and poll, releases the engine to the file mix and the app's knobs, and disables the tap (~100 ms). */
     suspend fun stop() = lock.withLock {
         if (!running) return@withLock
         running = false
@@ -100,8 +102,7 @@ class MixBenchController(
         tap.setEnabled(false)
         for (t in 0 until TRACKS) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         pulsar.setMixOverlay(null)
-        val v = vibe
-        for (m in touched(_layers.value)) macroSetter(m)(m.vibeDefault(v))
+        pulsar.setBenchMacros(emptyMap())
     }
 
     /** Fader in dB: the whole vibe, or the playing section's offset on top of it in [Scope.SECTION]. */
@@ -146,7 +147,7 @@ class MixBenchController(
             val unit = l.copy(
                 vibe = if (reverb) l.vibe.copy(reverbRatio = l.vibe.reverbRatio.with(t, 1f))
                 else l.vibe.copy(delayRatio = l.vibe.delayRatio.with(t, 1f)),
-            ).effective(vibe, section, t)
+            ).effective(vibe, section, t, pulsar.macroKnob(Macro.ENERGY))
             val base = if (reverb) unit.reverbSend else unit.delaySend
             if (base < MIN_SEND) return@withLock false
             setSend(t, v.coerceIn(0f, 1f) / base, reverb)
@@ -167,7 +168,7 @@ class MixBenchController(
     /** As [setReverb], for the delay send. */
     suspend fun setDelay(t: Int, v: Float) = edit(t) { setSend(t, v, reverb = false) }
 
-    /** [Scope.VIBE]: the knob value. [Scope.SECTION]: the value heard in the playing section. */
+    /** [Scope.VIBE]: the knob value. [Scope.SECTION]: the value heard in the playing section. Never saved by the app. */
     suspend fun setMacro(m: Macro, v: Float) = lock.withLock {
         val value = v.coerceIn(0f, 1f)
         val s = editSection()
@@ -175,7 +176,7 @@ class MixBenchController(
         _layers.value =
             if (s == null) l.copy(vibe = l.vibe.copy(macros = l.vibe.macros + (m to value)))
             else l.withSection(s) { it.copy(macrosHeard = it.macrosHeard + (m to value)) }
-        pushMacros(setOf(m))
+        pushMacros()
     }
 
     suspend fun toggleMute(t: Int) = edit(t) {
@@ -204,11 +205,10 @@ class MixBenchController(
 
     /** Drops every layer edit and plays the file's mix. Mutes and solos stay. */
     suspend fun resetToFile() = lock.withLock {
-        val old = _layers.value
         _layers.value = BenchLayers()
         pushGains()
         pushOverlay()
-        pushMacros(touched(old))
+        pushMacros()
     }
 
     // Touches only the meters and the tap's reader side, so it runs outside the lock.
@@ -232,7 +232,7 @@ class MixBenchController(
             lock.withLock {
                 if (!running) return@withLock
                 pushGains()
-                pushMacros(touched(_layers.value))
+                pushMacros()
                 val loop = _loopSection.value
                 if (loop != null && s >= 0 && s != loop) pulsar.jumpToSection(loop)
             }
@@ -250,6 +250,7 @@ class MixBenchController(
                 tap.setEnabled(true)
                 pushGains()
                 pushOverlay()
+                pushMacros()
             }
         }
     }
@@ -308,19 +309,13 @@ class MixBenchController(
         if (running) pulsar.setMixOverlay(_layers.value.overlay(vibe))
     }
 
-    private fun pushMacros(macros: Set<Macro>) {
+    // Every macro a layer moved, over the app's knob; the rest play the knob again.
+    private fun pushMacros() {
         if (!running) return
         val l = _layers.value
         val v = vibe
         val s = section
-        for (m in macros) macroSetter(m)(l.macroPortValue(v, s, m))
-    }
-
-    private fun macroSetter(m: Macro): (Float) -> Unit = when (m) {
-        Macro.ENERGY -> pulsar.actions.setEnergy
-        Macro.COMPLEXITY -> pulsar.actions.setComplexity
-        Macro.MOOD -> pulsar.actions.setMood
-        Macro.SPACE -> pulsar.actions.setSpace
+        pulsar.setBenchMacros(touched(l).associateWith { l.macroPortValue(v, s, it, pulsar.macroKnob(it)) })
     }
 
     private companion object {
@@ -331,7 +326,7 @@ class MixBenchController(
 
         fun requireTrack(t: Int) = require(t in 0 until TRACKS) { "track $t out of range" }
 
-        /** Macros any layer sets, so moving off them re-pushes the knob value. */
+        /** Macros any layer sets: the ones the bench plays over the app's knobs. */
         fun touched(l: BenchLayers): Set<Macro> =
             l.vibe.macros.keys + l.sections.values.flatMap { it.macrosHeard.keys }
 

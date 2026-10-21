@@ -44,7 +44,14 @@ private fun unitRow(
     return if (abs(new - old) <= EPS) null else CaptureRow(scope, section, name, t, field, null, old, new)
 }
 
-/** Turns the layers into field changes: VIBE rows first, then sections in index order. */
+/**
+ * Turns the layers into field changes: VIBE rows first, then sections in index order.
+ *
+ * Rows hold file values, never the app's knob, which is user data and can differ from the file.
+ * A VIBE macro row is old = the file's default, new = the knob the user set on the bench, so an
+ * untouched macro writes no row. A SECTION macro row keeps what was heard over the default the
+ * file will hold: the captured knob if the whole-vibe macro moved, else the file's default.
+ */
 fun capture(vibe: Vibe, layers: BenchLayers): List<CaptureRow> {
     val rows = mutableListOf<CaptureRow>()
     val vl = layers.vibe

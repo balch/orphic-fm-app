@@ -299,12 +299,14 @@
       const k = knobs[m], mm = state.macros[m];
       if (busy("macro-" + m)) continue;
       const v = knobValue(m);
-      const changed = sectionScope() ? Math.abs(mm.heard - Math.min(1, mm.file * mm.mult)) > 1e-3
-        : Math.abs(mm.knob - mm.file) > 1e-3;
+      // Moved on the bench, not merely off the file: the app's own knob can differ from the file.
+      const changed = sectionScope() ? mm.heardMoved : mm.knobMoved;
       drawKnob(k.c, v, changed);
       k.val.textContent = changed ? f2(v) + " ← " + f2(sectionScope() ? Math.min(1, mm.file * mm.mult) : mm.file) : f2(v);
       k.val.classList.toggle("ch", changed);
-      k.sub.textContent = sectionScope() ? "heard here" : (Math.abs(mm.mult - 1) > 1e-3 ? "heard " + f2(mm.heard) + " (×" + f2(mm.mult) + ")" : "");
+      k.sub.textContent = sectionScope() ? "heard here"
+        : Math.abs(mm.mult - 1) > 1e-3 ? "heard " + f2(mm.heard) + " (×" + f2(mm.mult) + ")"
+        : !changed && Math.abs(mm.live - mm.file) > 1e-3 ? "app knob; file " + f2(mm.file) : "";
     }
     const stale = $("stale");
     stale.hidden = !state.stale;

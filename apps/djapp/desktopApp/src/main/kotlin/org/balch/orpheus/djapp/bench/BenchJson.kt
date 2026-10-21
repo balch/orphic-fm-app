@@ -39,6 +39,8 @@ internal data class BenchView(
     val overviewStatus: String,
     val stale: Boolean,
     val source: String?,
+    /** The app's macro knobs, what plays wherever the bench has not moved a macro. */
+    val knobs: Map<Macro, Float> = emptyMap(),
 )
 
 internal object BenchJson {
@@ -61,7 +63,7 @@ internal object BenchJson {
         putJsonArray("tracks") {
             for (t in v.vibe.tracks.indices) {
                 val track = v.vibe.tracks[t]
-                val e = v.layers.effective(v.vibe, v.section, t)
+                val e = v.layers.effective(v.vibe, v.section, t, v.knobs[Macro.ENERGY] ?: v.vibe.energy)
                 add(buildJsonObject {
                     put("name", BenchMeters.CHANNEL_NAMES.getOrElse(t) { "T$t" })
                     put("engine", "${track.engineEdm.engineId.name}/${track.engineSpace.engineId.name}")
@@ -78,14 +80,18 @@ internal object BenchJson {
         putJsonObject("macros") {
             for (m in Macro.entries) {
                 val file = fileMacro(v.vibe, m)
+                val live = v.knobs[m] ?: file
                 val mult = sectionMultiplier(v.vibe, v.section, m)
-                val knob = v.layers.vibe.macros[m] ?: file
-                val heard = v.layers.sections[v.section]?.macrosHeard?.get(m) ?: (knob * mult).coerceIn(0f, 1f)
+                val knob = v.layers.vibe.macros[m] ?: live
+                val sectionHeard = v.layers.sections[v.section]?.macrosHeard?.get(m)
                 putJsonObject(m.name) {
                     put("file", r3(file))
+                    put("live", r3(live))
                     put("knob", r3(knob))
                     put("mult", r3(mult))
-                    put("heard", r3(heard))
+                    put("heard", r3(sectionHeard ?: (knob * mult).coerceIn(0f, 1f)))
+                    put("knobMoved", m in v.layers.vibe.macros)
+                    put("heardMoved", sectionHeard != null)
                 }
             }
         }

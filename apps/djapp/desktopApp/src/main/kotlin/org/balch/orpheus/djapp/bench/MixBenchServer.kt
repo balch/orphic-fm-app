@@ -33,6 +33,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
+import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.Overview
 import org.balch.orpheus.features.pulsar.bench.OverviewCache
@@ -216,6 +217,8 @@ class MixBenchServer(
         scope.launch { controller.loopSection.collect(tick) }
         scope.launch { transport.playing.collect(tick) }
         scope.launch { pulsar.arrangementStateFlow.map { it.sectionIndex }.distinctUntilChanged().collect(tick) }
+        // The app's knobs are the bench's macro baseline; a load or restore moves them after the load count.
+        scope.launch { pulsar.stateFlow.map { listOf(it.energy, it.complexity, it.mood, it.space) }.distinctUntilChanged().collect(tick) }
         scope.launch { pulsar.vibeLoadCount.collect { guard("vibe load") { onVibeLoad() } } }
         // Meters at 20 Hz, only while someone listens.
         scope.launch {
@@ -320,6 +323,7 @@ class MixBenchServer(
             },
             stale = stale,
             source = source(vibe.name)?.name,
+            knobs = Macro.entries.associateWith(pulsar::macroKnob),
         )
     }
 

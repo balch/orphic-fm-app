@@ -161,6 +161,12 @@ internal class FakePulsarFeature(
     var overlay: org.balch.orpheus.features.pulsar.bench.MixOverlay? = null
         private set
     override fun setMixOverlay(overlay: org.balch.orpheus.features.pulsar.bench.MixOverlay?) { this.overlay = overlay }
+
+    /** Every [setBenchMacros] map, in order. [macroKnob] reads [stateFlow], the state the app saves. */
+    val benchMacroWrites = mutableListOf<Map<org.balch.orpheus.features.pulsar.bench.Macro, Float>>()
+    override fun setBenchMacros(values: Map<org.balch.orpheus.features.pulsar.bench.Macro, Float>) {
+        benchMacroWrites += values
+    }
 }
 
 internal class FixturesDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {

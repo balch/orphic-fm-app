@@ -23,6 +23,7 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.pulsar.FixturesDispatchers
 import org.balch.orpheus.features.pulsar.MusicPulseSource
 import org.balch.orpheus.features.pulsar.PulsarSession
+import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.SongEndingStubSynthEngine
 import org.balch.orpheus.features.pulsar.StubSongEndingEventSource
@@ -32,6 +33,7 @@ import org.balch.orpheus.features.pulsar.StubTransitionRunner
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
+import kotlinx.serialization.json.Json
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -132,7 +134,50 @@ class MixOverlayPushTest {
         assertEquals(0.35f, overlaid.last { it.first == "track_5_pan" }.second)
     }
 
-    private fun TestScope.makeViewModel(engine: SongEndingStubSynthEngine, vibe: Vibe, scope: FeatureCoroutineScope): PulsarViewModel {
+    @Test
+    fun benchMacrosReachTheEngineButNeverTheSavedState() = runTest(testDispatcher) {
+        writes.clear()
+        val prefs = MemoryPrefs()
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), lore, scope, prefs)
+        vm.actions.setVibe(lore)
+        advanceUntilIdle()           // the graph-ready re-apply resets the knobs to the vibe's
+        vm.actions.setDeep(0.5f)
+        vm.actions.setEnergy(0.8f)
+        advanceUntilIdle()
+        val track = (0 until 8).first { t -> writes.last { it.first == "track_${t}_reverb_send" }.second > 0f }
+        fun send() = writes.last { it.first == "track_${track}_reverb_send" }.second
+        val sendAtKnob = send()
+
+        vm.setBenchMacros(mapOf(Macro.ENERGY to 0.2f, Macro.SPACE to 0f))
+        advanceUntilIdle()
+        assertEquals(0.2f, writes.last { it.first == "energy" }.second)
+        assertEquals(0f, writes.last { it.first == "space" }.second)
+        // SPACE scales the sends in Kotlin, so the bench value has to reach them too.
+        val floor = lore.effects.deepFloor
+        assertEquals(sendAtKnob * floor / (floor + lore.space * (1f - floor)), send(), 1e-6f)
+        // The knob, the UI state and the saved blob all keep the app's values.
+        assertEquals(0.8f, vm.macroKnob(Macro.ENERGY))
+        assertEquals(0.8f, vm.stateFlow.value.energy)
+        val saved = Json { ignoreUnknownKeys = true }
+            .decodeFromString(PulsarUiState.serializer(), prefs.load().lastPulsarJson!!)
+        assertEquals(0.8f, saved.energy)
+        assertEquals(lore.space, saved.space)
+
+        vm.setBenchMacros(emptyMap())
+        advanceUntilIdle()
+        assertEquals(0.8f, writes.last { it.first == "energy" }.second)
+        assertEquals(lore.space, writes.last { it.first == "space" }.second)
+        assertEquals(sendAtKnob, send(), 1e-6f)
+        scope.cancel()
+    }
+
+    private fun TestScope.makeViewModel(
+        engine: SongEndingStubSynthEngine,
+        vibe: Vibe,
+        scope: FeatureCoroutineScope,
+        prefs: AppPreferencesRepository = MemoryPrefs(),
+    ): PulsarViewModel {
         val provider = VibeCatalogScan.allProviders().first { it.vibe.name == vibe.name }
         val controller = SynthController().apply {
             setDelegates(
@@ -156,7 +201,7 @@ class MixOverlayPushTest {
             synthEngine = engine,
             pulsarSession = PulsarSession(engine, makeAppCoroutineScope(testDispatcher), dispatchers),
             globalTempo = tempo,
-            appPreferencesRepository = MemoryPrefs(),
+            appPreferencesRepository = prefs,
             presetLoader = PresetLoader(PortRegistry(emptySet()), tempo, controller),
             dispatcherProvider = dispatchers,
             scope = scope,

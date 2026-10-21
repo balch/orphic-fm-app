@@ -76,6 +76,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixOverlay
 import org.balch.orpheus.features.pulsar.kraken.KRAKEN_TARGET_COUNT
 import org.balch.orpheus.features.pulsar.kraken.KrakenGesture
@@ -419,6 +420,25 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
      * A no-op default for preview and stub implementations.
      */
     fun setMixOverlay(overlay: MixOverlay?) {}
+
+    /**
+     * The macro knob value the app plays and saves, which the Mix Bench treats as its baseline.
+     * Previews and fakes read it from [stateFlow].
+     */
+    fun macroKnob(m: Macro): Float = stateFlow.value.let {
+        when (m) {
+            Macro.ENERGY -> it.energy
+            Macro.COMPLEXITY -> it.complexity
+            Macro.MOOD -> it.mood
+            Macro.SPACE -> it.space
+        }
+    }
+
+    /**
+     * Mix Bench macro values, written to the engine only: never to [stateFlow] or preferences.
+     * A macro left out plays [macroKnob] again. A no-op default for preview and stub implementations.
+     */
+    fun setBenchMacros(values: Map<Macro, Float>) {}
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -1119,6 +1139,9 @@ class PulsarViewModel(
     /** Bench edits over pans and sends; null in every normal run. */
     @Volatile private var mixOverlay: MixOverlay? = null
 
+    /** Bench macro values the engine plays over the knobs; empty in every normal run. */
+    @Volatile private var benchMacros: Map<Macro, Float> = emptyMap()
+
     /** Section whose sends were last pushed; -1 before one is known. */
     @Volatile private var pushedSection = -1
 
@@ -1674,6 +1697,8 @@ class PulsarViewModel(
             PulsarSymbol.VIBE_GAIN.controlId,
             FloatValue(10f.pow(vibe.levelDb / 20f)),
         )
+        // A load plays the new vibe's knobs; the bench drops its macros when it sees the count.
+        benchMacros = emptyMap()
         _vibeLoadCount.update { it + 1 }
 
         // Push per-track voice params.
@@ -2227,12 +2252,31 @@ class PulsarViewModel(
         pushEffectiveSends(deepId.value.asFloat())
     }
 
+    private fun macroSymbol(m: Macro) = when (m) {
+        Macro.ENERGY -> PulsarSymbol.ENERGY
+        Macro.COMPLEXITY -> PulsarSymbol.COMPLEXITY
+        Macro.MOOD -> PulsarSymbol.MOOD
+        Macro.SPACE -> PulsarSymbol.SPACE
+    }
+
+    override fun macroKnob(m: Macro): Float = synthController.controlFlow(macroSymbol(m).controlId).value.asFloat()
+
+    // Bypasses the control flows: they feed PulsarUiState, which saveState persists, and they
+    // keep the knob values, so a released macro writes its knob back to the engine.
+    override fun setBenchMacros(values: Map<Macro, Float>) {
+        val touched = benchMacros.keys + values.keys
+        benchMacros = values
+        val write = synthController.pluginPortSetter ?: return
+        for (m in touched) write(macroSymbol(m).controlId, FloatValue(values[m] ?: macroKnob(m)))
+        if (Macro.SPACE in touched) pushEffectiveSends(deepId.value.asFloat())
+    }
+
     /** The bench overlay sees the section's pan as the vibe's, so a drift and a bench pan compose. */
     private fun effectivePan(track: Int, vibePan: Float): Float = mixOverlay?.pan(track, vibePan) ?: vibePan
 
     private fun pushEffectiveSends(deep: Float) {
         val vibe = vibeFlow.value
-        val space = spaceId.value.asFloat()
+        val space = benchMacros[Macro.SPACE] ?: spaceId.value.asFloat()
         val floor = vibe.effects.deepFloor
         // SPACE boosts DEEP with a per-vibe floor: effectiveDeep = deep * (floor + space * (1 - floor))
         val effectiveDeep = deep * (floor + space * (1.0f - floor))

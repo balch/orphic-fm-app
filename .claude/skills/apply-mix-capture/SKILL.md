@@ -33,6 +33,7 @@ Check the enum names in `features/pulsar/src/commonMain/kotlin/org/balch/orpheus
 
 Notes:
 - `new` is the value to write. `old` is what the source held, so use it to find the spot and to confirm the file matches.
+- Macro rows are file values too. The bench auditions over the app's saved knob, which can differ from the file, but a VIBE MACRO row is always file default → knob the user set, and a macro the user never moved has no row.
 - A section volume row for a track with no existing override means you add a `TrackSectionOverride(volume = ...)` for that track. Keep any other override fields.
 - `clampedDb` greater than 0 means the user heard a gain above 1.0 and the volume was clamped to 1.0. The written value is quieter than what they heard by that many dB. Tell the user for every such row. Do not invent a fix; offer to lower the other tracks instead.
 
