@@ -143,7 +143,7 @@ class VoltageStrutVibe : VibeProvider {
                 // 0: electronic kick — locked 4-on-floor, REPEAT (the anchor).
                 OrpheusEngine(
                     engineId = OrpheusEngineId.FM,
-                    volume = 0.95f,
+                    volume = 0.80f,
                     timbre = 0.35f,
                     morph = 0.30f,
                 ).let { kick ->
@@ -161,7 +161,7 @@ class VoltageStrutVibe : VibeProvider {
                 // 1: electronic snare — funky backbeat with mutation, clappy edge.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
-                    volume = 0.70f,
+                    volume = 0.56f,
                     harmonics = 0.55f,
                     timbre = 0.55f,
                     morph = 0.45f,
@@ -178,7 +178,7 @@ class VoltageStrutVibe : VibeProvider {
                     )
                 },
                 // 2: dense hats — busy 16ths with ghosts, MUTATE for funk variation.
-                OrpheusEngine(engineId = OrpheusEngineId.PAR, volume = 0.65f).let { hat ->
+                OrpheusEngine(engineId = OrpheusEngineId.PAR, volume = 0.37f).let { hat ->
                     TrackVoice(
                         engineEdm = hat,
                         engineSpace = hat,
@@ -193,7 +193,7 @@ class VoltageStrutVibe : VibeProvider {
                 // 3: MAIN BASS — waveshaping hook, plays the lick, follows the chord root.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.80f,
+                    volume = 0.67f,
                     harmonics = 0.55f,
                     timbre = 0.55f,
                     morph = 0.45f,
