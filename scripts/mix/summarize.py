@@ -25,7 +25,7 @@ def flags(v):
     if bus["over_knee_pct"] > 10:
         notes.append(f"{bus['over_knee_pct']:.0f}% of samples past the clipper knee")
     if bus["hpf_loss_db"] < -1:
-        notes.append(f"55 Hz HPF removes {-bus['hpf_loss_db']:.1f} dB")
+        notes.append(f"35 Hz HPF removes {-bus['hpf_loss_db']:.1f} dB")
     if out["correlation"] > 0.95:
         notes.append(f"near mono (correlation {out['correlation']:.2f})")
     kick, bass = tracks[0]["rel_lu"], tracks[3]["rel_lu"]
@@ -34,12 +34,13 @@ def flags(v):
         notes.append(f"{louder} {abs(kick - bass):.1f} LU over the other")
     for t in tracks:
         if t["sub_pct"] > 20:
-            notes.append(f"{t['name']} {t['sub_pct']:.0f}% below 40 Hz, which the 55 Hz HPF removes")
+            notes.append(f"{t['name']} {t['sub_pct']:.0f}% below 40 Hz, rumble the 35 Hz HPF only partly removes")
         if t["track"] not in (0, 3) and t["low_pct"] > 40 and t["rel_lu"] > -20:
             notes.append(f"{t['name']} {t['low_pct']:.0f}% in 40-120 Hz, crowding kick and bass")
         if t["audible_pct"] < 15 and t["rel_lu"] > -60:
             notes.append(f"{t['name']} audible only {t['audible_pct']:.0f}% of the time")
-    if out["peak_dbfs"] > -6:
+    # Peaks run near -4.5 dBFS at master 1.0; the master limiter starts at -0.9.
+    if out["peak_dbfs"] > -2:
         notes.append(f"output spike {out['peak_dbfs']:.1f} dBFS at {out['peak_at_s']:.1f} s")
     lufs = [s["out"]["lufs"] for s in v["sections"] if s["seconds"] > 4 and s["out"]["lufs"] > -60]
     if lufs and max(lufs) - min(lufs) > 8:

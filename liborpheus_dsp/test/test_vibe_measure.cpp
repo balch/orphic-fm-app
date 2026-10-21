@@ -1,7 +1,7 @@
 // Headless mix harness: replays a vibe's Kotlin port dump (VibePortDumpRenderHarness) into the
 // DJ graph and reads it like a mix engineer reads meters. For the whole render and for each
 // section: loudness (LUFS), peak, crest, stereo balance and correlation, how hard the Pulsar bus
-// clipper works, what the 55 Hz HPF takes, and each track's loudness against the dry mix, its
+// clipper works, what the 35 Hz HPF takes, and each track's loudness against the dry mix, its
 // pan, its low-end share and how often it is audible. Writes <dir>/<slug>.json, prints a table.
 // Manual suite: runs only when named or VIBE_PORTS is set.
 //
@@ -9,6 +9,7 @@
 //
 // VIBE_SECONDS (240), VIBE_OUTRO_AT, VIBE_SR / VIBE_BLOCK as in vibe_record.
 // VIBE_DIST: the DJ mixer's DIST fader (drive and mix together), 0.30 as the app ships.
+// VIBE_MASTER: the master fader, 1.0 as the DJ app plays (the main Orpheus app's default is 0.7).
 // VIBE_SET=symbol=value,...  Pulsar port overrides, re-applied after every section flip.
 // VIBE_TRIM=3:-2.6,2:-4.4  per-track dB on the TRACKS fader (audition gain, capped at +3.5 dB).
 // VIBE_TAG suffixes the output name. VIBE_WAV=1 also writes the mix WAV next to the JSON.
@@ -171,6 +172,8 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
     const char* kDist = "org.balch.orpheus.plugins.distortion";
     orpheus_engine_set_port(e, kDist, "drive", dist);
     orpheus_engine_set_port(e, kDist, "mix", dist);
+    // The app's master: the DJ app starts at unity and every transition returns there.
+    orpheus_engine_set_port(e, "org.balch.orpheus.plugins.stereo", "master_vol", env_float("VIBE_MASTER", 1.0f));
     auto trim = [&] {
         for (int t = 0; t < kTracks; t++)
             e->pulsar_track_audition_gain[t].store(
