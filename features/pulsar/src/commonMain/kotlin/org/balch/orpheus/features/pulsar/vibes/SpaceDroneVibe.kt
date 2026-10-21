@@ -185,7 +185,7 @@ class SpaceDroneVibe : VibeProvider {
             space = 0.80f,
             mood = 0.60f,
             deep = 0.65f,
-            levelDb = 1.7f,  // loudness match to -19 LUFS
+            levelDb = 3.5f,  // loudness match to -16 LUFS
             stepCount = 32,
             progressionAnchor = ProgressionAnchor.EVERY_8,
             progressionDriftRange = 0.2f,
@@ -254,7 +254,7 @@ class SpaceDroneVibe : VibeProvider {
                 // 0 Timpani roll — tuned-low filtered noise standing in for soft mallet hits.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.BD,
-                    volume = 0.55f,
+                    volume = 0.35f,
                     noteRangeLow = 36, noteRangeHigh = 48,
                     reverbBrightness = 0.35f, reverbSend = 0.30f, delaySend = 0.2f,
                     holdProbability = 0.4f, holdLengthMin = 2, holdLengthMax = 6,
@@ -276,7 +276,7 @@ class SpaceDroneVibe : VibeProvider {
                 // 1 Mallet bloom — MOD modal resonator, tuned-tom-on-vibraphone bloom.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.GRN,
-                    volume = 0.70f,
+                    volume = 1.0f,
                     noteRangeLow = 42, noteRangeHigh = 60,
                     reverbBrightness = 0.5f, reverbSend = 0.45f, delaySend = 0.3f,
                     holdProbability = 0.35f, holdLengthMin = 2, holdLengthMax = 5,
@@ -295,7 +295,7 @@ class SpaceDroneVibe : VibeProvider {
                 // 2 Cymbal swell — particle scatter for reversed-cymbal/wind feel.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PAR,
-                    volume = 0.75f,
+                    volume = 1.0f,
                     harmonics = 0.85f,
                     timbre = 0.7f,
                     morph = 1f,
@@ -331,7 +331,7 @@ class SpaceDroneVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
                     harmonicsMacroRange = .2f,
-                    volume = 0.65f,
+                    volume = 1.0f,
                     noteRangeLow = 28, noteRangeHigh = 40,
                     reverbBrightness = 0.35f, reverbSend = 0.25f, delaySend = 0.2f,
                     glideRate = 0.0f,
@@ -420,7 +420,7 @@ class SpaceDroneVibe : VibeProvider {
                 // 6 Mellotron pad — STR drone for low strings/Mellotron texture.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.STR,
-                    volume = 0.50f,
+                    volume = 0.80f,
                     harmonics = 0.55f,
                     timbre = 0.4f,
                     morph = 0.2f,
