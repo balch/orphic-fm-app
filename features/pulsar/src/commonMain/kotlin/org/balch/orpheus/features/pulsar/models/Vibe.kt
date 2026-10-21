@@ -117,6 +117,10 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param space Starting space level 0-1. Higher = longer decays, more reverb/delay sends.
  * @param mood Starting mood 0-1. Affects harmonics and timbre across tracks.
  * @param deep Starting depth 0-1. Controls wet/dry mix for vibe effects (delay + reverb).
+ * @param levelDb Whole-vibe level trim in dB, -12..12, applied to every track (sends included)
+ *   so vibes play at matching loudness. Set it from `scripts/mix/measure.sh` so the vibe's
+ *   240 s integrated loudness lands at -19 LUFS (±0.5); it is a loudness match, not a mix move,
+ *   so balance the tracks first.
  * @param stepCount Steps per pattern. 16 = standard, 32 = double-length phrases,
  *   64 = quad-length phrases (max).
  * @param openingNoteFloor Optional floor for the load-time generated pattern only, combined
@@ -161,6 +165,7 @@ data class Vibe(
     val space: Float = 0.4f,
     val mood: Float = 0.5f,
     val deep: Float = 0.5f,
+    val levelDb: Float = 0f,
     val stepCount: Int = 16,
     val openingNoteFloor: Int? = null,
     val tension: TensionProfile = TensionProfile(),
@@ -176,6 +181,7 @@ data class Vibe(
         require(tracks.size == 8) {
             "Vibe requires exactly 8 tracks, got ${tracks.size}"
         }
+        require(levelDb in -12f..12f) { "levelDb must be -12..12 dB, got $levelDb" }
         require(openingNoteFloor == null || openingNoteFloor in 0..127) {
             "openingNoteFloor must be 0-127 (MIDI note range), got $openingNoteFloor"
         }

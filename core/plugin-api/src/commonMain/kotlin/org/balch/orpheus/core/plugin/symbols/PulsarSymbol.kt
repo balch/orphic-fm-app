@@ -25,6 +25,7 @@ enum class PulsarSymbol(
     BASS_GAIN("bass_gain", displayName = "Bass Gain"),
     KEYS_GAIN("keys_gain", displayName = "Keys Gain"),
     FX_GAIN("fx_gain", displayName = "FX Gain"),
+    VIBE_GAIN("vibe_gain", displayName = "Vibe Gain"),
     ENVELOPE_MODE("envelope_mode", displayName = "Envelope Mode"),
     SEED("seed"),
     LICK_MUTATION("lick_mutation"),

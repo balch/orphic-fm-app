@@ -57,6 +57,7 @@ class PulsarPlugin : DspPlugin {
     private var _bassGain = 0.75f
     private var _keysGain = 0.75f
     private var _fxGain = 0.75f
+    private var _vibeGain = 1.0f
     private var _envelopeMode = 0  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     private var _seed = 0
     private var _lickMutation = 0.5f
@@ -272,6 +273,10 @@ class PulsarPlugin : DspPlugin {
         }
         controlPort(PulsarSymbol.FX_GAIN) {
             floatType { default = 0.75f; min = 0f; max = 1f; get { _fxGain }; set { _fxGain = it } }
+        }
+        // Linear gain from Vibe.levelDb, multiplied into every track so vibes play level.
+        controlPort(PulsarSymbol.VIBE_GAIN) {
+            floatType { default = 1.0f; min = 0f; max = 4f; get { _vibeGain }; set { _vibeGain = it } }
         }
         controlPort(PulsarSymbol.ENVELOPE_MODE) {
             intType { default = 0; get { _envelopeMode }; set { _envelopeMode = it } }

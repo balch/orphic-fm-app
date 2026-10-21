@@ -139,6 +139,7 @@ import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogPolicy
 import kotlin.concurrent.Volatile
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.pow
 import kotlin.time.TimeSource
 import kotlin.time.Duration.Companion.seconds
 
@@ -1666,6 +1667,10 @@ class PulsarViewModel(
             val gainId = PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + i].controlId
             synthController.setPluginControl(gainId, FloatValue(1f))
         }
+        synthController.setPluginControl(
+            PulsarSymbol.VIBE_GAIN.controlId,
+            FloatValue(10f.pow(vibe.levelDb / 20f)),
+        )
         _vibeLoadCount.update { it + 1 }
 
         // Push per-track voice params.

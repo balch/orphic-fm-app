@@ -821,6 +821,7 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_bass_gain{0.75f}; // BASS (track 3) fader travel
     std::atomic<float> pulsar_keys_gain{0.75f}; // KEYS (track 4) fader travel
     std::atomic<float> pulsar_fx_gain{0.75f};   // FX (tracks 5-7) fader travel
+    std::atomic<float> pulsar_vibe_gain{1.0f};  // linear, from Vibe.levelDb: levels vibes against each other
     std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend
     std::atomic<int> pulsar_track_engine_edm[8]{};
     std::atomic<int> pulsar_track_engine_space[8]{};
