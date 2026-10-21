@@ -76,6 +76,7 @@ Outside those two conditions nothing changes. A vibe that references a modern ba
 4. **Compile.** Run `./gradlew :features:pulsar:compileKotlinJvm` (fast — Pulsar only). Fix any type errors. If any section sets a `soloMode`, the vibe needs a `band` — `BandPresets.quartet(...)` is the one-liner (see the `Band` section).
 5. **Run it live.** Build the JVM desktop app and load the vibe from the picker. A/B against `DogHouseVibe`.
 6. **Tune by ear.** The file should change first, not any wider code. If you find yourself wanting to change Pulsar DSP, stop — the DogHouseVibe benchmark exists to catch regressions, and vibes should only tune what the schema exposes.
+7. **Measure the mix, then level-match.** Balance the tracks with the headless harness, then set `levelDb` so the vibe plays at -19 LUFS like every other live vibe. See "Mixing and level matching" under Testing.
 
 ## The Vibe schema — parameter-by-parameter
 
@@ -93,6 +94,7 @@ All of this is in the `models/` package (one file per type — see "Where vibes 
 | `scaleType` | Scale | `MINOR` / `PHRYGIAN` / `HARMONIC_MINOR` for dark, `MAJOR` / `MIXOLYDIAN` for bright, `IN_SEN` / `HIRAJOSHI` for exotic. |
 | `energy` / `complexity` / `space` / `mood` | Starting macro positions (0-1) | These are the user's starting knob positions. Lean slightly toward what the vibe wants to be — users will dial from there. |
 | `deep` | Starting effect send (0-1) | 0.4-0.7 for wet vibes, 0.2-0.3 for dry/punchy. |
+| `levelDb` | Whole-vibe loudness trim (-12..12 dB) | Set last, from the harness, so the vibe measures -19 LUFS (±0.5). Never use it to balance tracks. |
 | `stepCount` | 16 or 32 | 16 for short repetitive patterns, 32 for 2-bar phrases. |
 
 ### `GenreProfile` (groove DNA)
@@ -664,6 +666,21 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
    - `progressionDriftRange` too high (chord wandering feels aimless).
    - `density` too high on texture tracks (crowds out the groove).
 5. **Regression-check on `DogHouseVibe`**: If you ended up changing anything under `models/` or further down (you should not have — vibes are data), load `DogHouseVibe` and confirm it still sounds great. This is the benchmark the project holds to.
+6. **Mix and level-match** (below).
+
+### Mixing and level matching
+
+`scripts/mix/measure.sh "<Vibe Name>"` dumps the vibe's port writes from Kotlin, replays 240 s through the C++ DJ graph and writes `liborpheus_dsp/test/output/vibe_measure/summary.md` (LUFS, clipper load, per-track LU against the dry mix, per section). Use the exact display name ("Lost In Space", not "Lost in Space"): a wrong name fails the dump, and a redirected run hides that. `NO_DUMP=1` reuses the dump when no vibe file changed; `VIBE_TRIM=3:-2.6` tries a per-track dB move without editing (capped at +3.5 dB).
+
+Mix first:
+- Aim for the kick and bass within about 3-5 LU of each other, unless the genre says otherwise (a reggae or "the bass is the song" vibe can run the bass hotter). Keep "past knee" under ~10%; above that the bus clipper is shaping the mix.
+- A section `volume` REPLACES the base volume. To move a track by N dB, scale its base and every section override for it by the same factor.
+- The EDM and space slots can differ a lot in loudness at the same `volume` (engine trims and patches differ; Fire Sky's riff measured 9 dB apart). Compare a track's `rms_dbfs` in a high-energy section against a low-energy one in the JSON, and set the two slot volumes so it doesn't jump.
+- Track volume tops out at 1.0. If a track needs more, pull the others down.
+- Sends are post-fader and the harness meters dry tracks, so reverb/delay changes don't show in the numbers. Check those by ear.
+- Pan the layers: keep kick, bass and the lead centred, and give each side an equal share of the rest. The summary's pan table catches a lopsided or mono mix (all-zero pans read as correlation ~1.0).
+
+Then level-match: with the balance settled, set `levelDb = -19 - LUFS` (rounded to 0.1), re-measure, and nudge it until the vibe reads -19 ±0.5 LUFS. Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track, sends included, so it changes loudness, not balance; the storm, rain and street voices are not scaled.
 
 ## When things go wrong
 
