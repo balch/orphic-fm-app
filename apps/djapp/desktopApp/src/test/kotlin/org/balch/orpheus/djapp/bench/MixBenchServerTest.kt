@@ -97,6 +97,17 @@ class MixBenchServerTest {
     }
 
     @Test
+    fun keyIs32RandomBytesAndOneCharOffFails() {
+        assertTrue(key().matches(Regex("[0-9a-f]{64}")), "key ${key()}")
+        val last = key().last()
+        val near = key().dropLast(1) + (if (last == '0') '1' else '0')
+        val c = URI(base() + "?key=" + near).toURL().openConnection() as HttpURLConnection
+        assertEquals(403, c.responseCode)
+        val prefix = URI(base() + "?key=" + key().dropLast(1)).toURL().openConnection() as HttpURLConnection
+        assertEquals(403, prefix.responseCode)
+    }
+
+    @Test
     fun secondClientGetsSnapshot() {
         val a = openEvents()
         val b = openEvents()

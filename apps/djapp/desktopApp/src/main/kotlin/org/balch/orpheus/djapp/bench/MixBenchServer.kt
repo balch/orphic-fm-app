@@ -8,6 +8,7 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URLDecoder
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -64,7 +65,9 @@ class MixBenchServer(
     private val uiDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val log = logging("MixBenchServer")
-    private val key = ByteArray(16).also(SecureRandom()::nextBytes).joinToString("") { "%02x".format(it) }
+    // 32 random bytes as 64 hex chars, compared in constant time.
+    private val key = ByteArray(32).also(SecureRandom()::nextBytes).joinToString("") { "%02x".format(it) }
+    private val keyBytes = key.toByteArray()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val clients = mutableSetOf<SseClient>()
     private val stateTicks = Channel<Unit>(Channel.CONFLATED)
@@ -110,7 +113,8 @@ class MixBenchServer(
 
     private fun handle(ex: HttpExchange) {
         try {
-            if (query(ex)["key"] != key) return send(ex, 403, "text/plain", "forbidden")
+            val given = query(ex)["key"]?.toByteArray() ?: ByteArray(0)
+            if (!MessageDigest.isEqual(given, keyBytes)) return send(ex, 403, "text/plain", "forbidden")
             val path = ex.requestURI.path
             when {
                 ex.requestMethod == "GET" && path == "/" -> page(ex)
