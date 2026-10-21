@@ -255,7 +255,7 @@ class SpaceDroneVibe : VibeProvider {
                     engineId = OrpheusEngineId.BD,
                     volume = 0.78f,
                     noteRangeLow = 36, noteRangeHigh = 48,
-                    reverbBrightness = 0.35f, reverbSend = 0.55f, delaySend = 0.2f,
+                    reverbBrightness = 0.35f, reverbSend = 0.30f, delaySend = 0.2f,
                     holdProbability = 0.4f, holdLengthMin = 2, holdLengthMax = 6,
                 ).let { timpani ->
                     TrackVoice(
@@ -390,7 +390,7 @@ class SpaceDroneVibe : VibeProvider {
                     harmonicsModulation = .1f,
                     harmonicsMacroRange = .04f,
                     noteRangeLow = 60, noteRangeHigh = 80,
-                    reverbBrightness = 0.6f, reverbSend = 0.45f, delaySend = 0.4f,
+                    reverbBrightness = 0.6f, reverbSend = 0.30f, delaySend = 0.30f,
                     glideRate = 0.0f,
                     holdProbability = 0.75f, holdLengthMin = 3, holdLengthMax = 10,
                     lpgMode = LpgMode.SUSTAINED,
