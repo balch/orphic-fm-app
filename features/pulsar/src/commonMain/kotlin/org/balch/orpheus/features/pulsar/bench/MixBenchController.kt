@@ -24,9 +24,8 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 
 /**
  * Applies Mix Bench edits to the live Pulsar engine and turns [MixBenchTap] summaries into [meters].
- * While running it owns `track_N_audition_gain` and any macro it moved: do not use the app's TRACKS
- * mixer or macro knobs at the same time. Its macro baseline is the app's knob ([PulsarFeature.macroKnob]),
- * which can differ from the vibe file, and bench macros never reach the app's saved state.
+ * Idle it writes nothing: a track's audition gain is written only after a level, mute or solo edit to it,
+ * and the tap runs only for [meterIdleMs] after a [readMeters]. Whole-vibe macros move the app's real knobs.
  * Every state change and engine write runs under one lock, so nothing the bench pushes lands after [stop].
  */
 class MixBenchController(
@@ -35,6 +34,7 @@ class MixBenchController(
     private val tap: MixBenchTap,
     scope: CoroutineScope,
     sampleRate: Float = 48_000f,
+    private val meterIdleMs: Long = 10_000,
 ) {
     private val launcher = scope
     private val lock = Mutex()
@@ -49,6 +49,7 @@ class MixBenchController(
     val scope: StateFlow<Scope> = _scope.asStateFlow()
 
     private val _meters = MutableStateFlow(benchMeters.snapshot())
+    /** The last poll's meters; they go stale once metering idles off. Call [readMeters] to keep them live. */
     val meters: StateFlow<MeterSnapshot> = _meters.asStateFlow()
 
     private val _muted = MutableStateFlow(emptySet<Int>())
@@ -61,52 +62,87 @@ class MixBenchController(
     private val _loopSection = MutableStateFlow<Int?>(null)
     val loopSection: StateFlow<Int?> = _loopSection.asStateFlow()
 
-    // Written only under [lock]; volatile for [isRunning] and the poll.
+    // Written only under [lock]; volatile for [isRunning], [isMetering] and the poll.
     @Volatile private var running = false
+    @Volatile private var metering = false
     @Volatile private var resetMeters = false
     private var job: Job? = null
+    private var meterJob: Job? = null
+    private var watchdog: Job? = null
+    /** Bumped by every [readMeters], so a watchdog a later read replaced never turns metering off. */
+    private var meterReads = 0
     /** The last vibeLoadCount the layers belong to, so edits for another vibe never come back. */
     private var loadsApplied = -1
 
+    // Ownership, all under [lock]: what the controller writes over the app.
+    private val owned = mutableSetOf<Int>()
+    private var overlayOwned = false
+    /** Macros a section's heard value holds on the real knob: the whole-vibe value to restore, and what was written. */
+    private val held = mutableMapOf<Macro, Held>()
+
+    private class Held(val whole: Float, val wrote: Float)
+
     val isRunning: Boolean get() = running
+
+    /** True while the tap is on and the poll runs. */
+    val isMetering: Boolean get() = metering
 
     private val vibe get() = pulsar.vibeFlow.value
     private val section get() = pulsar.arrangementStateFlow.value.sectionIndex
 
-    /** Enables the tap, polls it every 33 ms and takes over audition gain, overlay and touched macros. */
+    /** Starts the section and vibe-load followers. Writes nothing on a first start; a restart plays what it still owns. */
     suspend fun start() = lock.withLock {
         if (running) return@withLock
         running = true
-        tap.setEnabled(true)
-        resetMeters = true
         val loads = pulsar.vibeLoadCount.value
         if (loadsApplied >= 0 && loadsApplied != loads) clearForNewVibe()
         loadsApplied = loads
         job = launcher.launch {
-            launch { poll() }
             launch { followSections() }
             launch { followVibeLoads() }
         }
         pushGains()
-        pushOverlay()
-        pushMacros()
+        if (overlayOwned) pushOverlay()
+        applySectionMacros()
     }
 
-    /** Waits out the followers and poll, releases the engine to the file mix and the app's knobs, and disables the tap (~100 ms). */
+    /** Releases owned gains, the overlay and held section macros, and stops followers and metering (~100 ms). */
     suspend fun stop() = lock.withLock {
         if (!running) return@withLock
         running = false
         job?.cancelAndJoin()
         job = null
+        stopMetering()
         _loopSection.value = null
-        tap.setEnabled(false)
-        for (t in 0 until TRACKS) synthController.setPluginControl(gainIds[t], FloatValue(1f))
-        pulsar.setMixOverlay(null)
-        pulsar.setBenchMacros(emptyMap())
+        for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
+        if (overlayOwned) pulsar.setMixOverlay(null)
+        restoreHeldMacros()
+    }
+
+    /**
+     * The meters now. The first read enables the tap and the 33 ms poll, so it returns empty meters;
+     * each read keeps metering on for [meterIdleMs] more. Does nothing before [start] or after [stop].
+     */
+    suspend fun readMeters(): MeterSnapshot = lock.withLock {
+        if (running) {
+            if (!metering) startMetering()
+            val read = ++meterReads
+            watchdog?.cancel()
+            watchdog = launcher.launch {
+                delay(meterIdleMs)
+                lock.withLock {
+                    if (read != meterReads) return@withLock
+                    watchdog = null
+                    stopMetering()
+                }
+            }
+        }
+        _meters.value
     }
 
     /** Fader in dB: the whole vibe, or the playing section's offset on top of it in [Scope.SECTION]. */
     suspend fun setLevelDb(t: Int, db: Float) = edit(t) {
+        owned += t
         val s = editSection()
         _layers.value = _layers.value.let { l ->
             if (s == null) l.copy(vibe = l.vibe.copy(levelDb = l.vibe.levelDb.with(t, db)))
@@ -120,6 +156,7 @@ class MixBenchController(
      * Reads and writes under one lock, so a scope change or section flip can't split the two.
      */
     suspend fun setHeardLevelDb(t: Int, db: Float) = edit(t) {
+        owned += t
         val s = editSection()
         _layers.value = _layers.value.let { l ->
             if (s == null) {
@@ -168,23 +205,34 @@ class MixBenchController(
     /** As [setReverb], for the delay send. */
     suspend fun setDelay(t: Int, v: Float) = edit(t) { setSend(t, v, reverb = false) }
 
-    /** [Scope.VIBE]: the knob value. [Scope.SECTION]: the value heard in the playing section. Never saved by the app. */
+    /**
+     * [Scope.VIBE]: moves the app's knob, saved like the user's own. [Scope.SECTION]: the value heard in the
+     * playing section, set on the knob while that section plays and handed back to the whole-vibe value after.
+     */
     suspend fun setMacro(m: Macro, v: Float) = lock.withLock {
         val value = v.coerceIn(0f, 1f)
         val s = editSection()
         val l = _layers.value
-        _layers.value =
-            if (s == null) l.copy(vibe = l.vibe.copy(macros = l.vibe.macros + (m to value)))
-            else l.withSection(s) { it.copy(macrosHeard = it.macrosHeard + (m to value)) }
-        pushMacros()
+        if (s == null) {
+            _layers.value = l.copy(vibe = l.vibe.copy(macros = l.vibe.macros + (m to value)))
+            // A section holding the knob keeps its heard value; leaving it plays this one.
+            val h = held[m]
+            if (h != null) held[m] = Held(value, h.wrote) else if (running) setKnob(m, value)
+        } else {
+            _layers.value = l.withSection(s) { it.copy(macrosHeard = it.macrosHeard + (m to value)) }
+            applySectionMacros()
+        }
     }
 
     suspend fun toggleMute(t: Int) = edit(t) {
+        owned += t
         _muted.value = _muted.value.let { if (t in it) it - t else it + t }
         pushGains()
     }
 
+    /** A solo silences every other track, so it owns all of them. */
     suspend fun toggleSolo(t: Int) = edit(t) {
+        owned += 0 until TRACKS
         _soloed.value = _soloed.value.let { if (t in it) it - t else it + t }
         pushGains()
     }
@@ -203,12 +251,19 @@ class MixBenchController(
         _loopSection.value = if (on) section.takeIf { it >= 0 } else null
     }
 
-    /** Drops every layer edit: tracks play the file's mix, macros the app's knobs. Mutes and solos stay. */
+    /**
+     * Drops every layer edit and hands their tracks, the overlay and held section macros back to the app.
+     * Mutes and solos stay, with the tracks they need. Whole-vibe macro moves stay on the app's knobs.
+     */
     suspend fun resetToFile() = lock.withLock {
         _layers.value = BenchLayers()
+        val keep = if (_soloed.value.isNotEmpty()) owned.toSet() else owned intersect _muted.value
+        val released = owned - keep
+        owned.retainAll(keep)
+        if (running) for (t in released) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         pushGains()
-        pushOverlay()
-        pushMacros()
+        releaseOverlay()
+        restoreHeldMacros()
     }
 
     // Touches only the meters and the tap's reader side, so it runs outside the lock.
@@ -232,7 +287,7 @@ class MixBenchController(
             lock.withLock {
                 if (!running) return@withLock
                 pushGains()
-                pushMacros()
+                applySectionMacros()
                 val loop = _loopSection.value
                 if (loop != null && s >= 0 && s != loop) pulsar.jumpToSection(loop)
             }
@@ -240,19 +295,37 @@ class MixBenchController(
     }
 
     // PulsarViewModel.applyVibe and TrackTuningController reset audition gain to 1.0 on every load,
-    // and an engine rebuilt under the feature re-applies the vibe with the bench off.
+    // and an engine rebuilt under the feature re-applies the vibe with the tap off.
     private suspend fun followVibeLoads() {
         pulsar.vibeLoadCount.collect { count ->
             lock.withLock {
                 if (!running || count == loadsApplied) return@withLock
                 loadsApplied = count
                 clearForNewVibe()
-                tap.setEnabled(true)
-                pushGains()
-                pushOverlay()
-                pushMacros()
+                if (metering) tap.setEnabled(true)
             }
         }
+    }
+
+    private fun startMetering() {
+        tap.setEnabled(true)
+        // The poll is stopped here, so the meters can be reset without racing it.
+        benchMeters.reset()
+        resetMeters = false
+        _meters.value = benchMeters.snapshot()
+        metering = true
+        meterJob = launcher.launch { poll() }
+    }
+
+    // The idle watchdog clears [watchdog] before calling this, so it never cancels itself mid-teardown.
+    private suspend fun stopMetering() {
+        watchdog?.cancel()
+        watchdog = null
+        val j = meterJob ?: return
+        meterJob = null
+        metering = false
+        j.cancelAndJoin()
+        tap.setEnabled(false)
     }
 
     private suspend inline fun edit(t: Int, crossinline body: () -> Unit) {
@@ -260,12 +333,17 @@ class MixBenchController(
         lock.withLock { body() }
     }
 
+    // The load already set the new vibe's knobs, so held section macros are dropped, not restored.
     private fun clearForNewVibe() {
         _layers.value = BenchLayers()
         _muted.value = emptySet()
         _soloed.value = emptySet()
         _loopSection.value = null
         resetMeters = true
+        if (running) for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
+        owned.clear()
+        releaseOverlay()
+        held.clear()
     }
 
     private fun setSend(t: Int, v: Float, reverb: Boolean) {
@@ -302,20 +380,55 @@ class MixBenchController(
 
     private fun pushGains() {
         if (!running) return
-        for (t in 0 until TRACKS) synthController.setPluginControl(gainIds[t], FloatValue(gain(t)))
+        for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(gain(t)))
     }
 
     private fun pushOverlay() {
+        overlayOwned = true
         if (running) pulsar.setMixOverlay(_layers.value.overlay(vibe))
     }
 
-    // Every macro a layer moved, over the app's knob; the rest play the knob again.
-    private fun pushMacros() {
+    private fun releaseOverlay() {
+        if (!overlayOwned) return
+        overlayOwned = false
+        if (running) pulsar.setMixOverlay(null)
+    }
+
+    /** Puts each heard macro of the playing section on the real knob and hands the rest back. */
+    private fun applySectionMacros() {
         if (!running) return
         val l = _layers.value
-        val v = vibe
         val s = section
-        pulsar.setBenchMacros(touched(l).associateWith { l.macroPortValue(v, s, it, pulsar.macroKnob(it)) })
+        val heard = l.sections[s]?.macrosHeard.orEmpty()
+        for (m in Macro.entries) {
+            val h = held[m]
+            if (m in heard) {
+                val whole = h?.whole ?: pulsar.macroKnob(m)
+                val v = l.macroPortValue(vibe, s, m, whole)
+                held[m] = Held(whole, v)
+                if (h?.wrote != v) setKnob(m, v)
+            } else if (h != null) {
+                held.remove(m)
+                restore(m, h)
+            }
+        }
+    }
+
+    private fun restoreHeldMacros() {
+        for ((m, h) in held) restore(m, h)
+        held.clear()
+    }
+
+    // A knob moved since the bench wrote it stays where it was put.
+    private fun restore(m: Macro, h: Held) {
+        if (pulsar.macroKnob(m) == h.wrote) setKnob(m, h.whole)
+    }
+
+    private fun setKnob(m: Macro, v: Float) = when (m) {
+        Macro.ENERGY -> pulsar.actions.setEnergy(v)
+        Macro.COMPLEXITY -> pulsar.actions.setComplexity(v)
+        Macro.MOOD -> pulsar.actions.setMood(v)
+        Macro.SPACE -> pulsar.actions.setSpace(v)
     }
 
     private companion object {
@@ -325,10 +438,6 @@ class MixBenchController(
         const val MIN_SEND = 1e-4f
 
         fun requireTrack(t: Int) = require(t in 0 until TRACKS) { "track $t out of range" }
-
-        /** Macros any layer sets: the ones the bench plays over the app's knobs. */
-        fun touched(l: BenchLayers): Set<Macro> =
-            l.vibe.macros.keys + l.sections.values.flatMap { it.macrosHeard.keys }
 
         fun <T> List<T>.with(i: Int, v: T): List<T> = toMutableList().also { it[i] = v }
 

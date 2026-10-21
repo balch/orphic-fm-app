@@ -22,6 +22,7 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.FakePulsarFeature
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import org.balch.orpheus.features.pulsar.models.Arrangement
+import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.Section
 import kotlin.math.pow
 import kotlin.test.Test
@@ -52,8 +53,17 @@ private class FakeTap : MixBenchTap {
 @OptIn(ExperimentalCoroutinesApi::class)
 class MixBenchControllerTest {
     private val ports = ConcurrentHashMap<String, PortValue>()
+    /** Every audition gain write, as (port symbol, value). */
+    private val gainWrites = mutableListOf<Pair<String, Float>>()
     private val synth = SynthController().apply {
-        setDelegates(setter = { id, v -> ports[id.symbol] = v; true }, getter = { ports[it.symbol] })
+        setDelegates(
+            setter = { id, v ->
+                ports[id.symbol] = v
+                if (id.symbol.endsWith("_audition_gain")) gainWrites += id.symbol to (v as PortValue.FloatValue).value
+                true
+            },
+            getter = { ports[it.symbol] },
+        )
     }
     private val vibe = mkMinimalVibe("bench").copy(
         arrangement = Arrangement(sections = listOf(Section("a"), Section("b"), Section("c"), Section("d"))),
@@ -61,17 +71,146 @@ class MixBenchControllerTest {
     private val feature = FakePulsarFeature(listOf(vibe), vibe)
     private val tap = FakeTap()
 
-    private fun gain(t: Int) = (ports["track_${t}_audition_gain"] as PortValue.FloatValue).value
+    /** The track's audition gain; an unwritten port plays the engine default, 1. */
+    private fun gain(t: Int) = (ports["track_${t}_audition_gain"] as PortValue.FloatValue?)?.value ?: 1f
+
+    private fun summary(lufs: Double = -20.0) = FloatArray(BenchSummaryLayout.FLOATS).also { a ->
+        a[BenchSummaryLayout.FRAMES] = 512f
+        a[BenchSummaryLayout.channel(BenchSummaryLayout.OUT) + BenchSummaryLayout.K_ENERGY] =
+            (10.0.pow((lufs + 0.691) / 10.0) * 512).toFloat()
+    }
 
     private fun section(s: Int) {
         feature.arrangement.value = PulsarArrangementState(s, 0, 0, false, -1, 0)
     }
 
-    private suspend fun TestScope.started(): MixBenchController =
-        MixBenchController(feature, synth, tap, backgroundScope).also {
+    private suspend fun TestScope.started(meterIdleMs: Long = 10_000): MixBenchController =
+        MixBenchController(feature, synth, tap, backgroundScope, meterIdleMs = meterIdleMs).also {
             it.start()
             runCurrent()
         }
+
+    @Test
+    fun idleControllerWritesNothing() = runTest {
+        section(1)
+        started()
+        advanceTimeBy(1_000)
+        section(2); runCurrent()
+        feature.applyVibe(vibe); runCurrent()
+        assertTrue(gainWrites.isEmpty(), "audition gain writes: $gainWrites")
+        assertFalse(tap.on)
+        assertEquals(0, tap.enables)
+        assertNull(feature.overlay)
+        assertTrue(feature.macroWrites.isEmpty())
+    }
+
+    @Test
+    fun readMetersEnablesThenIdlesOff() = runTest {
+        val c = started(meterIdleMs = 500)
+        c.readMeters()
+        assertTrue(tap.on)
+        c.setLevelDb(2, -6f)
+        c.toggleMute(5)
+        advanceTimeBy(300); runCurrent()
+        // A read pushes the deadline: off 500 ms after the last read, not the first.
+        c.readMeters()
+        advanceTimeBy(450); runCurrent()
+        assertTrue(tap.on)
+        advanceTimeBy(100); runCurrent()
+        assertFalse(tap.on)
+        // The poll stopped with the tap.
+        tap.queue += summary()
+        advanceTimeBy(100); runCurrent()
+        assertEquals(1, tap.queue.size)
+        // Edits outlive metering.
+        assertEquals(-6f, c.layers.value.vibe.levelDb[2])
+        assertEquals(setOf(5), c.muted.value)
+        assertEquals(0f, gain(5))
+        // The next read starts it again.
+        c.readMeters()
+        runCurrent()
+        assertTrue(tap.on)
+        assertEquals(2, tap.enables)
+        assertTrue(tap.queue.isEmpty())
+    }
+
+    @Test
+    fun editOwnsOnlyThatTrack() = runTest {
+        section(1)
+        val c = started()
+        c.setHeardLevelDb(2, -6f)
+        assertEquals(setOf("track_2_audition_gain"), gainWrites.map { it.first }.toSet())
+        section(2); runCurrent()
+        assertEquals(setOf("track_2_audition_gain"), gainWrites.map { it.first }.toSet())
+        c.setPan(4, 0.5f)
+        assertEquals(setOf("track_2_audition_gain"), gainWrites.map { it.first }.toSet())
+    }
+
+    @Test
+    fun soloOwnsAll() = runTest {
+        val c = started()
+        c.toggleSolo(3)
+        assertEquals((0 until 8).map { "track_${it}_audition_gain" }.toSet(), gainWrites.map { it.first }.toSet())
+        for (t in 0 until 8) assertEquals(if (t == 3) 1f else 0f, gain(t), "track $t")
+        c.toggleSolo(3)
+        for (t in 0 until 8) assertEquals(1f, gain(t), "track $t")
+    }
+
+    @Test
+    fun resetReleasesOwnership() = runTest {
+        section(1)
+        val c = started()
+        c.setLevelDb(2, -6f)
+        c.setPan(3, 0.5f)
+        c.toggleMute(5)
+        c.resetToFile()
+        assertEquals(1f, gain(2))
+        assertEquals(BenchLayers(), c.layers.value)
+        assertNull(feature.overlay)
+        // Mutes stay, so the muted track stays owned; the released one is never written again.
+        assertEquals(0f, gain(5))
+        gainWrites.clear()
+        section(2); runCurrent()
+        assertEquals(setOf("track_5_audition_gain"), gainWrites.map { it.first }.toSet())
+    }
+
+    @Test
+    fun vibeMacroMovesRealKnob() = runTest {
+        val c = started()
+        c.setMacro(Macro.ENERGY, 0.7f)
+        assertEquals(listOf("energy" to 0.7f), feature.macroWrites)
+        assertEquals(0.7f, feature.macroKnob(Macro.ENERGY))
+        assertEquals(0.7f, feature.stateFlow.value.energy)
+        assertEquals(0.7f, c.layers.value.vibe.macros[Macro.ENERGY])
+    }
+
+    @Test
+    fun sectionMacroSetsKnobOnEntryAndRestoresOnExit() = runTest {
+        // Section 2 plays energy x 0.5, so a heard 0.2 needs a knob of 0.4 there.
+        val halved = vibe.copy(
+            arrangement = Arrangement(
+                sections = vibe.arrangement!!.sections.mapIndexed { i, s ->
+                    if (i == 2) s.copy(macroOverrides = MacroOverrides(energy = 0.5f)) else s
+                },
+            ),
+        )
+        feature.applyVibe(halved)
+        feature.stateFlow.value = feature.stateFlow.value.copy(energy = 0.8f)
+        section(2)
+        val c = started()
+        c.setScope(Scope.SECTION)
+        c.setMacro(Macro.ENERGY, 0.2f)
+        assertEquals(0.2f, c.layers.value.sections.getValue(2).macrosHeard[Macro.ENERGY])
+        assertEquals("energy" to 0.4f, feature.macroWrites.last())
+        section(1); runCurrent()
+        assertEquals("energy" to 0.8f, feature.macroWrites.last())
+        assertEquals(0.8f, feature.macroKnob(Macro.ENERGY))
+        section(2); runCurrent()
+        assertEquals("energy" to 0.4f, feature.macroWrites.last())
+        section(3); runCurrent()
+        assertEquals(0.8f, feature.macroKnob(Macro.ENERGY))
+        assertEquals(listOf(0.4f, 0.8f, 0.4f, 0.8f), feature.macroWrites.map { it.second })
+    }
 
     @Test
     fun levelGoesToAuditionGain() = runTest {
@@ -129,16 +268,6 @@ class MixBenchControllerTest {
     }
 
     @Test
-    fun macroNeverReachesTheSavedState() = runTest {
-        val saved = feature.stateFlow.value
-        val c = started()
-        c.setMacro(Macro.ENERGY, 0.7f)
-        assertEquals(mapOf(Macro.ENERGY to 0.7f), feature.benchMacroWrites.last())
-        assertTrue(feature.macroWrites.isEmpty(), "no persisted knob action")
-        assertEquals(saved, feature.stateFlow.value)
-    }
-
-    @Test
     fun macroBaselineIsTheLiveKnob() = runTest {
         // The app restored 0.8 over the file's 0.3: an untouched section plays the 0.8.
         feature.applyVibe(vibe.copy(energy = 0.3f))
@@ -147,9 +276,9 @@ class MixBenchControllerTest {
         val c = started()
         c.setScope(Scope.SECTION)
         c.setMacro(Macro.ENERGY, 0.2f)
-        assertEquals(mapOf(Macro.ENERGY to 0.2f), feature.benchMacroWrites.last())
+        assertEquals("energy" to 0.2f, feature.macroWrites.last())
         section(1); runCurrent()
-        assertEquals(mapOf(Macro.ENERGY to 0.8f), feature.benchMacroWrites.last())
+        assertEquals("energy" to 0.8f, feature.macroWrites.last())
         // Capture still writes file values: the section multiplier is over the file's 0.3.
         val row = capture(feature.vibeFlow.value, c.layers.value).single { it.field == CaptureField.MACRO }
         assertEquals(1f, row.old, 1e-6f)
@@ -162,20 +291,22 @@ class MixBenchControllerTest {
         val c = started()
         c.setLevelDb(0, -3f)
         assertTrue(capture(vibe, c.layers.value).none { it.field == CaptureField.MACRO })
-        assertTrue(feature.benchMacroWrites.all { it.isEmpty() })
+        assertTrue(feature.macroWrites.isEmpty())
     }
 
     @Test
-    fun stopReleasesMacrosToThePreBenchKnob() = runTest {
+    fun stopRestoresSectionMacrosAndKeepsVibeKnobMoves() = runTest {
         feature.stateFlow.value = feature.stateFlow.value.copy(space = 0.65f)
-        val saved = feature.stateFlow.value
+        section(1)
         val c = started()
+        c.setMacro(Macro.MOOD, 0.3f)
+        c.setScope(Scope.SECTION)
         c.setMacro(Macro.SPACE, 0.1f)
+        assertEquals(0.1f, feature.macroKnob(Macro.SPACE))
         c.stop()
-        // An empty map hands every macro back to macroKnob, which the bench never wrote.
-        assertEquals(emptyMap(), feature.benchMacroWrites.last())
-        assertEquals(saved, feature.stateFlow.value)
+        // The section's heard SPACE hands the knob back; a whole-vibe move is the app's knob now.
         assertEquals(0.65f, feature.macroKnob(Macro.SPACE))
+        assertEquals(0.3f, feature.macroKnob(Macro.MOOD))
     }
 
     @Test
@@ -209,17 +340,13 @@ class MixBenchControllerTest {
     @Test
     fun pollFeedsMetersAndStopReleases() = runTest {
         val c = started()
+        c.readMeters()
         assertTrue(tap.on)
-        val p = 10.0.pow((-20.0 + 0.691) / 10.0)
-        repeat(20) {
-            tap.queue += FloatArray(BenchSummaryLayout.FLOATS).also { a ->
-                a[BenchSummaryLayout.FRAMES] = 512f
-                a[BenchSummaryLayout.channel(BenchSummaryLayout.OUT) + BenchSummaryLayout.K_ENERGY] = (p * 512).toFloat()
-            }
-        }
+        repeat(20) { tap.queue += summary() }
         advanceTimeBy(40)
         runCurrent()
         assertTrue(tap.queue.isEmpty())
+        assertEquals(-20.0, c.readMeters().lufsShort, 0.2)
         assertEquals(-20.0, c.meters.value.lufsShort, 0.2)
         c.setLevelDb(0, -6f)
         c.stop()
@@ -294,8 +421,9 @@ class MixBenchControllerTest {
     }
 
     @Test
-    fun vibeLoadReenablesTap() = runTest {
-        started()
+    fun vibeLoadReenablesTapWhileMetering() = runTest {
+        val c = started()
+        c.readMeters()
         // A rebuilt engine starts with the bench off; the feature re-applies the vibe on it.
         tap.on = false
         feature.applyVibe(vibe)

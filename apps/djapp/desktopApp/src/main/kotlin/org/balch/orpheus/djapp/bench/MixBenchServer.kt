@@ -224,12 +224,12 @@ class MixBenchServer(
         // The app's knobs are the bench's macro baseline; a load or restore moves them after the load count.
         scope.launch { pulsar.stateFlow.map { listOf(it.energy, it.complexity, it.mood, it.space) }.distinctUntilChanged().collect(tick) }
         scope.launch { pulsar.vibeLoadCount.collect { guard("vibe load") { onVibeLoad() } } }
-        // Meters at 20 Hz, only while someone listens.
+        // Meters at 20 Hz, only while someone listens; each read keeps the controller metering, so it idles off when the page closes.
         scope.launch {
             while (isActive) {
                 guard("meters push") {
                     if (synchronized(clients) { clients.isNotEmpty() }) {
-                        val body = BenchJson.meters(controller.meters.value, pulsar.arrangementStateFlow.value)
+                        val body = BenchJson.meters(controller.readMeters(), pulsar.arrangementStateFlow.value)
                         broadcast(event("meters", body), droppable = true)
                     }
                 }

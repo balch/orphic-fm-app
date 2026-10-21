@@ -134,8 +134,9 @@ class MixOverlayPushTest {
         assertEquals(0.35f, overlaid.last { it.first == "track_5_pan" }.second)
     }
 
+    // The bench moves macros through these actions, so its moves must play, rescale sends and save like a hand.
     @Test
-    fun benchMacrosReachTheEngineButNeverTheSavedState() = runTest(testDispatcher) {
+    fun macroActionsReachTheEngineTheSendsAndTheSavedState() = runTest(testDispatcher) {
         writes.clear()
         val prefs = MemoryPrefs()
         val scope = FeatureCoroutineScope()
@@ -143,32 +144,26 @@ class MixOverlayPushTest {
         vm.actions.setVibe(lore)
         advanceUntilIdle()           // the graph-ready re-apply resets the knobs to the vibe's
         vm.actions.setDeep(0.5f)
-        vm.actions.setEnergy(0.8f)
         advanceUntilIdle()
         val track = (0 until 8).first { t -> writes.last { it.first == "track_${t}_reverb_send" }.second > 0f }
         fun send() = writes.last { it.first == "track_${track}_reverb_send" }.second
         val sendAtKnob = send()
 
-        vm.setBenchMacros(mapOf(Macro.ENERGY to 0.2f, Macro.SPACE to 0f))
+        vm.actions.setEnergy(0.2f)
+        vm.actions.setSpace(0f)
         advanceUntilIdle()
         assertEquals(0.2f, writes.last { it.first == "energy" }.second)
         assertEquals(0f, writes.last { it.first == "space" }.second)
-        // SPACE scales the sends in Kotlin, so the bench value has to reach them too.
+        // SPACE scales the sends in Kotlin, so the knob move has to reach them too.
         val floor = lore.effects.deepFloor
         assertEquals(sendAtKnob * floor / (floor + lore.space * (1f - floor)), send(), 1e-6f)
-        // The knob, the UI state and the saved blob all keep the app's values.
-        assertEquals(0.8f, vm.macroKnob(Macro.ENERGY))
-        assertEquals(0.8f, vm.stateFlow.value.energy)
+        assertEquals(0.2f, vm.macroKnob(Macro.ENERGY))
+        assertEquals(0f, vm.macroKnob(Macro.SPACE))
+        assertEquals(0.2f, vm.stateFlow.value.energy)
         val saved = Json { ignoreUnknownKeys = true }
             .decodeFromString(PulsarUiState.serializer(), prefs.load().lastPulsarJson!!)
-        assertEquals(0.8f, saved.energy)
-        assertEquals(lore.space, saved.space)
-
-        vm.setBenchMacros(emptyMap())
-        advanceUntilIdle()
-        assertEquals(0.8f, writes.last { it.first == "energy" }.second)
-        assertEquals(lore.space, writes.last { it.first == "space" }.second)
-        assertEquals(sendAtKnob, send(), 1e-6f)
+        assertEquals(0.2f, saved.energy)
+        assertEquals(0f, saved.space)
         scope.cancel()
     }
 
