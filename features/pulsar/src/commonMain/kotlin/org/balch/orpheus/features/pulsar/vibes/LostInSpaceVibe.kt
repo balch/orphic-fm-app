@@ -276,7 +276,7 @@ public class LostInSpaceVibe : VibeProvider {
         TrackVoice(
           engineEdm = OrpheusEngine(
             engineId = OrpheusEngineId.PAR,
-            volume = 0.72f,
+            volume = 0.95f,
             harmonics = 0.8f,
             timbre = 0.65f,
             morph = 0.9f,
@@ -306,7 +306,7 @@ public class LostInSpaceVibe : VibeProvider {
           ),
           engineSpace = OrpheusEngine(
             engineId = OrpheusEngineId.PAR,
-            volume = 0.72f,
+            volume = 0.95f,
             harmonics = 0.8f,
             timbre = 0.65f,
             morph = 0.9f,
@@ -383,7 +383,7 @@ public class LostInSpaceVibe : VibeProvider {
         TrackVoice(
           engineEdm = OrpheusEngine(
             engineId = OrpheusEngineId.PD,
-            volume = 0.68f,
+            volume = 0.43f,
             harmonics = 0.3f,
             timbre = 0.4f,
             morph = 0.35f,
@@ -413,7 +413,7 @@ public class LostInSpaceVibe : VibeProvider {
           ),
           engineSpace = OrpheusEngine(
             engineId = OrpheusEngineId.PD,
-            volume = 0.68f,
+            volume = 0.43f,
             harmonics = 0.3f,
             timbre = 0.4f,
             morph = 0.35f,
@@ -706,7 +706,7 @@ public class LostInSpaceVibe : VibeProvider {
         TrackVoice(
           engineEdm = OrpheusEngine(
             engineId = OrpheusEngineId.STR,
-            volume = 0.55f,
+            volume = 1.0f,
             harmonics = 0.5f,
             timbre = 0.4f,
             morph = 0.25f,
@@ -736,7 +736,7 @@ public class LostInSpaceVibe : VibeProvider {
           ),
           engineSpace = OrpheusEngine(
             engineId = OrpheusEngineId.STR,
-            volume = 0.55f,
+            volume = 1.0f,
             harmonics = 0.5f,
             timbre = 0.4f,
             morph = 0.25f,
@@ -813,7 +813,7 @@ public class LostInSpaceVibe : VibeProvider {
         TrackVoice(
           engineEdm = OrpheusEngine(
             engineId = OrpheusEngineId.SWM,
-            volume = 0.5f,
+            volume = 0.71f,
             harmonics = 0.7f,
             timbre = 0.5f,
             morph = 0.8f,
@@ -843,7 +843,7 @@ public class LostInSpaceVibe : VibeProvider {
           ),
           engineSpace = OrpheusEngine(
             engineId = OrpheusEngineId.SWM,
-            volume = 0.5f,
+            volume = 0.71f,
             harmonics = 0.7f,
             timbre = 0.5f,
             morph = 0.8f,
@@ -1091,7 +1091,7 @@ public class LostInSpaceVibe : VibeProvider {
       space = 0.85f,
       mood = 0.55f,
       deep = 0.7f,
-      levelDb = 0.4f,  // loudness match to -19 LUFS
+      levelDb = 2.6f,  // loudness match to -16 LUFS
       stepCount = 32,
       tension = TensionProfile(
         innerBars = 8,
