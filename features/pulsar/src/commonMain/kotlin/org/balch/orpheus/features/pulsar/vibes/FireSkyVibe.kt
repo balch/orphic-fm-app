@@ -576,7 +576,7 @@ private class FireSkyVibeBase(
                 // Track 3 — Bass (WSH grit / STR warmth on space), ROOT_ONLY, doubles the riff root.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.80f,
+                    volume = 1.0f,
                     noteRangeLow = 31,        // G1
                     noteRangeHigh = 50,       // D3
                     reverbBrightness = 0.26f,
@@ -603,7 +603,7 @@ private class FireSkyVibeBase(
                 // it FIXED (see sections).
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.58f,
+                    volume = 0.70f,
                     noteRangeLow = 50,        // D3
                     noteRangeHigh = 69,       // A4 — low-mid guitar register
                     reverbSend = 0.16f,
@@ -619,7 +619,7 @@ private class FireSkyVibeBase(
                     TrackVoice(
                         engineEdm = lead,
                         engineSpace = lead.copy(
-                            volume = .78f,
+                            volume = .40f,  // the Hammond reads ~9 dB hotter than WSH at equal volume
                             engineId = OrpheusEngineId.DX3,
                             harmonics = 0.031f,       // DX3 idx 1 "Hammond" (auto-pinned)
                             lpgMode = LpgMode.SUSTAINED
@@ -744,7 +744,7 @@ private class FireSkyVibeBase(
                         engineEdm = fx,
                         engineSpace = fx.copy(engineId = OrpheusEngineId.PAR),
                         role = TrackRole.Percussive,
-                        pan = -0.30f,
+                        pan = 0.30f,
                         density = 0.12f,
                         envelopeProfile = EnvelopeProfile.EFFECT,
                         macroMap = TrackMacroMap.EFFECT,
