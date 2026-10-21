@@ -385,7 +385,7 @@ class BellTollsVibe : VibeProvider {
                 // Bass is prominent in reggae — mixed loud, center, deep register with slide.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
-                    volume = 0.95f,
+                    volume = 0.67f,
                     harmonics = 0.18f, timbre = 0.22f, morph = 0.12f,  // darker, rounder dub tone
                     noteRangeLow = 28, noteRangeHigh = 45,  // E1-A2, the solo folds into this now
                     // EAR-TUNE(user owns after ear test): the slide. 0.55 was a half-second
