@@ -323,6 +323,7 @@ class BellTollsVibe : VibeProvider {
             complexity = 0.45f,
             space = 0.6f,     // reggae has space — don't crowd the mix
             mood = 0.7f,      // warm, uplifting
+            levelDb = -0.4f,  // loudness match to -19 LUFS
             genre = GenreProfile(
                 swingAmount = 0.05f,   // straight feel — reggae swings via articulation, not timing
                 ghostProbability = 0.12f,

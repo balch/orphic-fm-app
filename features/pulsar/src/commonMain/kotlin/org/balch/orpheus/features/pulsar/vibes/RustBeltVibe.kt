@@ -474,6 +474,7 @@ class RustBeltVibe : VibeProvider {
             space = 0.34f,
             mood = 0.62f,
             deep = 0.30f,
+            levelDb = -2.2f,  // loudness match to -19 LUFS
             // --- THE HOOK (track 3 bass plays it as LickMode.Fill) ---
             // DORIAN degrees: 0=D(root), 1=E(2), 2=F(b3), 3=G(4), 4=A(5), 5=B(6), 6=C(b7), 7=D(oct).
             // Copyright-safe rewrite: keeps the swampy D-Dorian pocket (scale, low register,

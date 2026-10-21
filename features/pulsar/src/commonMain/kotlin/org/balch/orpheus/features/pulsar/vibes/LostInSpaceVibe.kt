@@ -1091,6 +1091,7 @@ public class LostInSpaceVibe : VibeProvider {
       space = 0.85f,
       mood = 0.55f,
       deep = 0.7f,
+      levelDb = 0.4f,  // loudness match to -19 LUFS
       stepCount = 32,
       tension = TensionProfile(
         innerBars = 8,

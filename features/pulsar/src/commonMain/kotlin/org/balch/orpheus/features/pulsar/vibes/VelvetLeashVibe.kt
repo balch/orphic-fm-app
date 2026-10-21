@@ -260,6 +260,7 @@ class VelvetLeashVibe : VibeProvider {
             space = 0.5f,   // Dryish 60s production
             mood = 0.40f,    // Sly / slightly dark — minor key with a smirk
             deep = 0.75f,
+            levelDb = 3.6f,  // loudness match to -19 LUFS
             genre = GenreProfile(
                 swingAmount = 0.10f,         // Charlie-Watts-ish laid-back lean
                 ghostProbability = 0.20f,

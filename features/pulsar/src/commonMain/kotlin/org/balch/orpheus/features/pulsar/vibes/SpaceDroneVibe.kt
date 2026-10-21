@@ -185,6 +185,7 @@ class SpaceDroneVibe : VibeProvider {
             space = 0.80f,
             mood = 0.60f,
             deep = 0.65f,
+            levelDb = 1.7f,  // loudness match to -19 LUFS
             stepCount = 32,
             progressionAnchor = ProgressionAnchor.EVERY_8,
             progressionDriftRange = 0.2f,

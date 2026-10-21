@@ -376,6 +376,7 @@ class StayAsleepVibe : VibeProvider {
             space = 0.45f,
             mood = 0.40f,
             deep = 0.50f,
+            levelDb = 0.9f,  // loudness match to -19 LUFS
             // With lickRotation set, the pool is what the gesture actually plays and this
             // is the load-time fallback seed. Keep the two in sync: it is slot 0.
             lick = lickPool.firstOrNull(),

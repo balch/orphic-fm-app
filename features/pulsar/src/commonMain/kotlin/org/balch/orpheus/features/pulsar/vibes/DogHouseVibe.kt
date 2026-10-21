@@ -268,6 +268,7 @@ class DogHouseVibe : VibeProvider {
             complexity = 0.4f,
             space = 0.4f,
             mood = 0.5f,
+            levelDb = 3.4f,  // loudness match to -19 LUFS
             genre = GenreProfile(
                 swingAmount = 0.10f,
                 ghostProbability = 0.25f,

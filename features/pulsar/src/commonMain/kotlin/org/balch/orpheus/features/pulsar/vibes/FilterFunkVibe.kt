@@ -216,6 +216,7 @@ class FilterFunkVibe : VibeProvider {
             complexity = 0.35f,
             space = 0.4f,
             mood = 0.45f,
+            levelDb = 2.2f,  // loudness match to -19 LUFS
             genre = GenreProfile(
                 swingAmount = 0.03f,
                 ghostProbability = 0.15f,
