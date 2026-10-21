@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -36,16 +37,19 @@ class CaptureWriterTest {
         val root = fakeRepo()
         val w = CaptureWriter(root)
         val src = findVibeSource(File(root, "features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes"), "Orphic Lore")!!
-        val fresh = Json.parseToJsonElement(w.write(vibe, listOf(row), sha256(src)).readText()).toString()
-        assertTrue("\"stale\":false" in fresh)
-        val stale = Json.parseToJsonElement(w.write(vibe, listOf(row), "deadbeef").readText()).toString()
-        assertTrue("\"stale\":true" in stale)
+        val fresh = w.write(vibe, listOf(row), sha256(src))
+        assertTrue("\"stale\":false" in Json.parseToJsonElement(fresh.file.readText()).toString())
+        assertFalse(fresh.capture.stale)
+        val stale = w.write(vibe, listOf(row), "deadbeef")
+        assertTrue("\"stale\":true" in Json.parseToJsonElement(stale.file.readText()).toString())
+        assertTrue(stale.capture.stale)
     }
 
     @Test fun rowsRoundTrip() {
         val root = fakeRepo()
-        val file = CaptureWriter(root).write(vibe, listOf(row), "x")
-        val back = Json { ignoreUnknownKeys = true }.decodeFromString(CaptureFile.serializer(), file.readText())
+        val written = CaptureWriter(root).write(vibe, listOf(row), "x")
+        val back = Json { ignoreUnknownKeys = true }.decodeFromString(CaptureFile.serializer(), written.file.readText())
+        assertEquals(written.capture, back)
         assertEquals(listOf(row), back.rows)
         assertEquals("orphic_lore", back.slug)
         assertEquals("features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/OrphicLoreVibe.kt", back.source)
@@ -53,7 +57,7 @@ class CaptureWriterTest {
 
     @Test fun sameSecondCapturesDoNotOverwrite() {
         val w = CaptureWriter(fakeRepo())
-        val files = (1..3).map { w.write(vibe, listOf(row), "x") }
+        val files = (1..3).map { w.write(vibe, listOf(row), "x").file }
         assertEquals(3, files.map { it.name }.toSet().size)
         assertNotEquals(files[0], files[1])
     }

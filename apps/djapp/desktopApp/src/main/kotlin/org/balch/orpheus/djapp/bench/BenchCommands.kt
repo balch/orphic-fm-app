@@ -10,7 +10,6 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.float
 import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.balch.orpheus.features.pulsar.PulsarFeature
@@ -74,14 +73,13 @@ internal class BenchCommands(
     private fun capture(): JsonObject {
         val vibe = pulsar.vibeFlow.value
         val rows = capture(vibe, controller.layers.value)
-        val file = captures.write(vibe, rows, baselineHash() ?: "")
-        lastCapture = file
-        val written = BenchJson.json.parseToJsonElement(file.readText()).jsonObject
+        val written = captures.write(vibe, rows, baselineHash() ?: "")
+        lastCapture = written.file
         return buildJsonObject {
             put("ok", true)
-            put("file", file.absolutePath)
+            put("file", written.file.absolutePath)
             put("rows", BenchJson.rows(rows))
-            put("stale", written["stale"]?.jsonPrimitive?.boolean ?: false)
+            put("stale", written.capture.stale)
         }
     }
 

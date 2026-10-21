@@ -41,13 +41,16 @@ data class CaptureFile(
     val rows: List<CaptureRow>,
 )
 
+/** A capture on disk: where it went and what it holds, so callers need not read it back. */
+data class WrittenCapture(val file: File, val capture: CaptureFile)
+
 /** Writes `build/mix-bench/captures/<slug>-<timestamp>.json` under [repoRoot]. */
 class CaptureWriter(private val repoRoot: File) {
     private val json = Json { prettyPrint = true; encodeDefaults = true }
     private val vibesDir = File(repoRoot, "features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes")
 
     /** [baselineHash] is the source hash when the bench loaded the vibe; stale means the file changed since. */
-    fun write(vibe: Vibe, rows: List<CaptureRow>, baselineHash: String): File {
+    fun write(vibe: Vibe, rows: List<CaptureRow>, baselineHash: String): WrittenCapture {
         val src = findVibeSource(vibesDir, vibe.name)
         val currentHash = src?.let(::sha256)
         val slug = vibe.name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
@@ -68,6 +71,6 @@ class CaptureWriter(private val repoRoot: File) {
         var n = 2
         while (!out.createNewFile()) out = File(dir, "$slug-$stamp-${n++}.json")
         out.writeText(json.encodeToString(CaptureFile.serializer(), body))
-        return out
+        return WrittenCapture(out, body)
     }
 }
