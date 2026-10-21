@@ -2187,7 +2187,7 @@ class PulsarViewModel(
             trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(o?.volume ?: spa.volume)
             // The C++ glides pan toward this, so a section pan drifts in and back out.
-            trackPanIds[i].value = FloatValue(o?.pan ?: tv.pan)
+            trackPanIds[i].value = FloatValue(effectivePan(i, o?.pan ?: tv.pan))
             // A section morph only survives if it is pinned: unpinned, the render loop
             // recomputes morph as lerp_macro(space, spaceDecay) every block and the
             // override is never heard. Pin for the override's duration, restore on exit.
@@ -2208,11 +2208,16 @@ class PulsarViewModel(
 
     override fun setMixOverlay(overlay: MixOverlay?) {
         mixOverlay = overlay
-        vibeFlow.value.tracks.forEachIndexed { i, tv ->
-            trackPanIds[i].value = FloatValue(overlay?.pan(i, tv.pan) ?: tv.pan)
+        val vibe = vibeFlow.value
+        val overrides = vibe.arrangement?.sections?.getOrNull(pushedSection)?.trackOverrides
+        vibe.tracks.forEachIndexed { i, tv ->
+            trackPanIds[i].value = FloatValue(effectivePan(i, overrides?.get(i)?.pan ?: tv.pan))
         }
         pushEffectiveSends(deepId.value.asFloat())
     }
+
+    /** The bench overlay sees the section's pan as the vibe's, so a drift and a bench pan compose. */
+    private fun effectivePan(track: Int, vibePan: Float): Float = mixOverlay?.pan(track, vibePan) ?: vibePan
 
     private fun pushEffectiveSends(deep: Float) {
         val vibe = vibeFlow.value
