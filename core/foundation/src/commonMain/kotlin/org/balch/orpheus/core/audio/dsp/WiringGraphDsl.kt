@@ -155,6 +155,10 @@ class UnitParamBuilder internal constructor() {
     var driveAmount: Float
         get() = error("Write-only")
         set(v) { params.add(PARAM_DRIVE to v) }
+    /** Pulsar only: how hard its bus clipper is driven; the unit makes up the rest of its 3.3x. */
+    var clipDrive: Float
+        get() = error("Write-only")
+        set(v) { params.add(PARAM_DRIVE to v) }
     var inputA: Float
         get() = error("Write-only")
         set(v) { params.add(PARAM_INPUT_A to v) }

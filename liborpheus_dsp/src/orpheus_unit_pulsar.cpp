@@ -6602,16 +6602,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             (engine->pulsar_reverb_send_l[i] + engine->pulsar_reverb_send_r[i]) * 0.5f;
     }
 
-    // ── Sub-bass cleanup: 55Hz high-pass (24dB/oct Linkwitz-Riley) ──
+    // ── Sub-bass cleanup: 35Hz high-pass (24dB/oct Linkwitz-Riley) ──
     // Two cascaded 12dB/oct Butterworth stages = 24dB/oct rolloff.
-    // 55Hz cutoff keeps fundamentals above E2 (82Hz) clean while
-    // aggressively cutting sub-bass mud from PAR/PD sub-harmonics.
+    // 35Hz keeps kick fundamentals (40-60Hz) and bass down to E1 while cutting
+    // rumble and DC. At 55Hz it took 26-40% of the energy of the BD kicks.
     if (!state->output_hpf_initialized) {
         state->output_hpf_l.Init();
         state->output_hpf_r.Init();
         state->output_hpf2_l.Init();
         state->output_hpf2_r.Init();
-        float hpf_f = 55.0f / sample_rate;
+        float hpf_f = 35.0f / sample_rate;
         state->output_hpf_l.set_f_q<stmlib::FREQUENCY_EXACT>(hpf_f, 0.707f);
         state->output_hpf_r.set_f_q<stmlib::FREQUENCY_EXACT>(hpf_f, 0.707f);
         state->output_hpf2_l.set_f_q<stmlib::FREQUENCY_EXACT>(hpf_f, 0.707f);
@@ -6635,14 +6635,19 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     }
 
     // Apply mix gain BEFORE bus limiter so soft_limit catches the boosted peaks.
-    // Slight overdrive (3.3x vs old 3.0x) pushes more signal into tanh saturation
-    // zone, generating harmonics in the 80-250Hz "feel" range.
+    // kPulsarOutputGain is the net small-signal gain. A graph can drive the clipper
+    // less (the PARAM_DRIVE param on the pulsar unit, e.g. 1.65 in the DJ graph) and the
+    // rest is made up after it, so the level holds and only the peaks get more room.
+    // Unset (0) keeps the full 3.3x overdrive, the main app's tanh "feel".
     static constexpr float kPulsarOutputGain = 3.3f;
+    const float graph_drive = u->inputs[IPORT_DRIVE].constant;
+    const float pre_clip_gain = graph_drive > 0.0f ? graph_drive : kPulsarOutputGain;
+    const float makeup_gain = kPulsarOutputGain / pre_clip_gain;
     // The section volume ramps across the block from the last block's value.
     const float vol_from = state->section_volume_gain;
     const float vol_step = (section_volume - vol_from) / static_cast<float>(num_frames);
     for (int i = 0; i < num_frames; i++) {
-        const float output_gain = mix * kPulsarOutputGain * (vol_from + vol_step * static_cast<float>(i + 1));
+        const float output_gain = mix * pre_clip_gain * (vol_from + vol_step * static_cast<float>(i + 1));
         out_l[i] *= output_gain;
         out_r[i] *= output_gain;
     }
@@ -6657,8 +6662,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // The slight overdrive above means more content enters the tanh zone, adding
     // subtle warmth and harmonic density.
     for (int i = 0; i < num_frames; i++) {
-        out_l[i] = soft_limit(out_l[i]);
-        out_r[i] = soft_limit(out_r[i]);
+        out_l[i] = soft_limit(out_l[i]) * makeup_gain;
+        out_r[i] = soft_limit(out_r[i]) * makeup_gain;
     }
 
     // ── Publish beat_phase for master-bus stutter sync ──

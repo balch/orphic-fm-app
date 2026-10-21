@@ -12,7 +12,8 @@ package org.balch.orpheus.core.audio.dsp
  * Reverb and delay are purely send-based — zero send = zero effect.
  */
 fun buildDjAppWiringGraph(): ByteArray = wiringGraph {
-    val pulsarUnit = pulsar("pulsar")
+    // Half the 3.3x into the bus clipper, made up after it: same level, 6 dB more peak room.
+    val pulsarUnit = pulsar("pulsar") { clipDrive = 1.65f }
     val turntableUnit = turntable("turntable")
     val hornUnit = horn("horn")
     val delay = dualDelay("delay")

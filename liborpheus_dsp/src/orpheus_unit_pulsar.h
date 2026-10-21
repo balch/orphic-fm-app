@@ -1455,7 +1455,7 @@ struct PulsarState {
     std::atomic<int> arr_viz_solo_track{-1};
     std::atomic<int> arr_viz_solo_mode{0};
 
-    // Output stage: sub-bass high-pass filter (55Hz, 24dB/oct Linkwitz-Riley)
+    // Output stage: sub-bass high-pass filter (35Hz, 24dB/oct Linkwitz-Riley)
     // Two cascaded SVF stages for steep rolloff
     stmlib::Svf output_hpf_l;
     stmlib::Svf output_hpf_r;

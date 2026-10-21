@@ -277,7 +277,7 @@ static constexpr float kRumbleSlowestHz    = 0.12f;   // 8.3 s; octaves double u
 static constexpr float kRumbleUndulationDepth = 0.9f; // troughs land 20 dB under the crests
 static constexpr float kRumbleUndulationSwing = 1.7f; // widens the fractal sum before clipping
 static constexpr float kRumbleBaseHz       = 90.0f;
-// Distance darkens the roll, but the pulsar's output high-pass sits at 55 Hz: a deeper
+// Distance darkens the roll, but the pulsar's output high-pass sits at 35 Hz: a deeper
 // tilt would push a far strike's whole band under it and simply delete the thunder.
 static constexpr float kRumbleDistDarken   = 0.35f;
 static constexpr float kRumbleQ            = 1.5f;
@@ -297,7 +297,7 @@ static constexpr float kRumbleShortDecayHz = 0.046f;
 static constexpr float kRumbleTailDecayHz  = 0.966f;
 
 // EAR-TUNE(thunder-body): the roll's BODY. The sub path alone (90 Hz low-pass, above a
-// 55 Hz output high-pass) is a one-octave hum that consumer speakers barely reproduce,
+// 35 Hz output high-pass) is a low hum that consumer speakers barely reproduce,
 // which is why a strike read as a tick and then nothing. Thunder's weight sits at
 // 100-300 Hz and is what carries on a laptop. The body rides the SAME tail envelope
 // raised to a power, so it decays faster than the sub and the roll darkens as it

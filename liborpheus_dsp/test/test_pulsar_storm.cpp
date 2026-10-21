@@ -1782,6 +1782,9 @@ static bool test_storm_anomaly_manual_trigger_strikes() {
     printf("\n=== Test: a declared StormAnomaly strikes on the manual trigger ===\n");
     OrpheusEngine* engine = make_muted_storm_engine();
     GraphUnit unit = make_storm_pulsar_unit();
+    // The DJ graph's clip drive: at the full 3.3x both bursts pin at the clipper's ceiling and
+    // the 35 Hz HPF's fuller lull closes the gap, so the ratio would measure the clipper.
+    unit.inputs[IPORT_DRIVE].constant = 1.65f;
     StormTestWeather dry;                      // no bed: the anomaly is the whole signal
     push_storm_weather_arrangement(engine, dry, dry, /*trans_bars=*/0, /*bars=*/8);
     push_storm_anomaly_bank(engine, /*probability=*/0.0f, /*dur_min=*/6.0f, /*dur_max=*/6.0f,

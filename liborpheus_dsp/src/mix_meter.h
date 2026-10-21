@@ -56,7 +56,7 @@ inline Biquad high_pass(double fs, double hz) {
     return normalized((1 + c) / 2, -(1 + c), (1 + c) / 2, 1 + alpha, -2 * c, 1 - alpha);
 }
 
-// Splits one channel's bottom end: "sub" is below 40 Hz (rumble and DC the 55 Hz HPF removes),
+// Splits one channel's bottom end: "sub" is below 40 Hz (rumble and DC the 35 Hz HPF mostly removes),
 // "low" is 40-120 Hz, what the kick and bass fight over.
 struct Bands {
     Biquad sub, low_hp, low_lp;
@@ -96,7 +96,7 @@ inline void accumulate(StereoStats& s, double l, double r, double kl, double kr,
 // Pulsar's bus limiter (soft_limit) is linear below this level and saturates above it.
 constexpr float kKnee = 0.5f;
 
-// The Pulsar bus around its limiter and its 55 Hz HPF, one sample of one side at a time.
+// The Pulsar bus around its limiter and its 35 Hz HPF, one sample of one side at a time.
 struct BusStats {
     double pre_limit_peak = 0, e_pre_limit = 0, e_post_limit = 0, e_pre_hpf = 0, e_post_hpf = 0;
     long over_knee = 0, samples = 0;

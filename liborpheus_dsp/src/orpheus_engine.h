@@ -1255,7 +1255,7 @@ struct OrpheusEngine {
 
     // Mix measurement taps (vibe_measure suite, mix bench). Null unless one of them sets it; when
     // set, Pulsar copies each block's per-track dry contribution and its bus on both sides of the
-    // 55 Hz HPF and before soft_limit. The reader zeroes them for the next block.
+    // 35 Hz HPF and before soft_limit. The reader zeroes them for the next block.
     struct PulsarMeasureTaps {
         float track_l[8][kMaxFrames];
         float track_r[8][kMaxFrames];
