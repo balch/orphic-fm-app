@@ -169,6 +169,10 @@ static inline void constant_power_pan(float pan, float& gain_l, float& gain_r) {
     gain_r = std::sin(angle);
 }
 
+// How fast a track's pan follows its port after load, in pan units per second: a section
+// pan override drifts there (hard left to hard right in ~13 s) instead of jumping.
+static constexpr float kPanGlidePerSecond = 0.15f;
+
 // quantize_to_scale() now lives in pulsar_pattern_gen.h (shared with bar_strategy)
 
 // ── PRNG for mutation ────────────────────────────────────────────────
@@ -3759,6 +3763,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 #endif
 
         // ── Pan gains ──
+        // load_vibe snaps ts.pan to the port; after that it glides, so a section pan drifts.
+        {
+            const float target = engine->pulsar_track_pan[t].load(std::memory_order_relaxed);
+            const float max_step = kPanGlidePerSecond * static_cast<float>(num_frames) / sample_rate;
+            ts.pan += std::max(-max_step, std::min(max_step, target - ts.pan));
+        }
         float pan_l, pan_r;
         constant_power_pan(ts.pan, pan_l, pan_r);
 

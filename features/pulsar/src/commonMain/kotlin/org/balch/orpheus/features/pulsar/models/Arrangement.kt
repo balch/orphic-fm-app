@@ -76,6 +76,8 @@ data class SectionTransition(
  *   no density parameter) while `0` still mutes. Density is a pattern-GENERATION input, so
  *   unlike [volume] it cannot change mid-section — the boundary is where it lands.
  * @param volume Override mix volume (0..1).
+ * @param pan Override stereo position (-1..1). The track glides there at 0.15 pan units per
+ *   second (and back to its own pan on exit), so a pan move drifts across bars, never jumps.
  * @param morph Override the voice's morph (0..1), pinning it for the section's duration so
  *   the macro map's `spaceDecay` cannot overwrite it. On the drum engines (BD/SD/HH) morph
  *   is decay, so this is how one section gets a long-ringing kick against a tight snare.
@@ -115,6 +117,7 @@ data class TrackSectionOverride(
     val holdLengthMax: Int? = null,
     val density: Float? = null,
     val volume: Float? = null,
+    val pan: Float? = null,
     val morph: Float? = null,
     val reverbSend: Float? = null,
     val delaySend: Float? = null,
@@ -131,6 +134,7 @@ data class TrackSectionOverride(
 ) {
     init {
         require(breatheBars >= 0) { "TrackSectionOverride.breatheBars must be >= 0, got $breatheBars" }
+        require(pan == null || pan in -1f..1f) { "TrackSectionOverride.pan must be -1..1, got $pan" }
         require(breatheFloor in 0f..1f) {
             "TrackSectionOverride.breatheFloor must be 0..1, got $breatheFloor"
         }

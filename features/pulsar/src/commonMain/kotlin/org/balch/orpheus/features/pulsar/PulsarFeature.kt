@@ -2186,6 +2186,8 @@ class PulsarViewModel(
             // Both slots: C++ picks per render block by the live engine_index.
             trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(o?.volume ?: spa.volume)
+            // The C++ glides pan toward this, so a section pan drifts in and back out.
+            trackPanIds[i].value = FloatValue(o?.pan ?: tv.pan)
             // A section morph only survives if it is pinned: unpinned, the render loop
             // recomputes morph as lerp_macro(space, spaceDecay) every block and the
             // override is never heard. Pin for the override's duration, restore on exit.
