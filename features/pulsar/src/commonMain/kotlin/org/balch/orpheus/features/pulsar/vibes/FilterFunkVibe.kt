@@ -229,7 +229,7 @@ class FilterFunkVibe : VibeProvider {
             progressionAnchor = ProgressionAnchor.EVERY_4,
             progressionDriftRange = 0.15f,
             tracks = listOf(
-                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.57f).let { kick ->
+                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.72f).let { kick ->
                     TrackVoice(
                         engineEdm = kick,
                         engineSpace = kick,
