@@ -34,6 +34,7 @@ class SynthOrchestrator(
 ) {
     private val log = logging("SynthOrchestrator")
     @Volatile private var isStarted = false
+    @Volatile private var hasEverStarted = false
     @Volatile private var savedMasterVolume = 0.7f
 
     init {
@@ -58,9 +59,15 @@ class SynthOrchestrator(
 
     /**
      * Start the synth engine. Called once at app boot.
+     *
+     * @param firstStartVolume master volume for the very first start only; later restarts
+     *   restore the level saved at [stop]. The DJ app passes 1f: it has no master knob and its
+     *   transitions treat unity as home, so the first vibe would otherwise play 3 dB low.
      */
-    fun start() {
+    fun start(firstStartVolume: Float? = null) {
         if (!isStarted) {
+            if (!hasEverStarted) firstStartVolume?.let { savedMasterVolume = it }
+            hasEverStarted = true
             engine.start()
             // Restore master volume after starting (engine may reset to 0 on restart).
             engine.setMasterVolume(savedMasterVolume)

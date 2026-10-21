@@ -15,6 +15,7 @@ import com.diamondedge.logging.logging
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import org.balch.orpheus.djapp.DJ_START_MASTER_VOLUME
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.playback.albumListing
@@ -58,7 +59,7 @@ class DjMediaLibraryService : MediaLibraryService() {
     // is guaranteed to start inside the FGS grace window.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            DjAppApplication.getGraph(this).synthOrchestrator.start()
+            DjAppApplication.getGraph(this).synthOrchestrator.start(firstStartVolume = DJ_START_MASTER_VOLUME)
         } catch (e: Exception) {
             log.error(e) { "Failed to start synth engine on service start" }
         }
