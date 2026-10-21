@@ -135,13 +135,12 @@ class BellTollsVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
                 // groove is baseline — no macro overrides
-                // Skank and organ bubble sit 12 dB under their authored volume here. Until
-                // the texture-notch fix (tracks 5-7 were cut to 0.05 across energy
-                // 0.45..0.55) the groove at 0.55 had them near silent, so the chorus and
-                // dub were where they arrived; this keeps that shape without muting them.
+                // Skank and organ bubble sit 6 dB under their authored volume here, so the
+                // chorus and dub still lift them. At 12 dB under they measured 29 and 34 LU
+                // below the mix: silent for the whole groove.
                 trackOverrides = mapOf(
-                    5 to TrackSectionOverride(volume = 0.08f),
-                    6 to TrackSectionOverride(volume = 0.055f),
+                    5 to TrackSectionOverride(volume = 0.16f),
+                    6 to TrackSectionOverride(volume = 0.11f),
                 ),
             ),
             // 2 CHORUS: Bumped energy, horns prominent, skank shifts to
