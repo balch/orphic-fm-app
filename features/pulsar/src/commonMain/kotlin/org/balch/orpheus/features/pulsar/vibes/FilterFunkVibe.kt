@@ -229,7 +229,7 @@ class FilterFunkVibe : VibeProvider {
             progressionAnchor = ProgressionAnchor.EVERY_4,
             progressionDriftRange = 0.15f,
             tracks = listOf(
-                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.90f).let { kick ->
+                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.57f).let { kick ->
                     TrackVoice(
                         engineEdm = kick,
                         engineSpace = kick,
@@ -270,7 +270,7 @@ class FilterFunkVibe : VibeProvider {
                 // lifts it to E2 for punchy funk bass instead of A1 sub.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.VCF,
-                    volume = 0.85f,
+                    volume = 1.0f,
                     noteRangeLow = 40,
                     noteRangeHigh = 52,
                     reverbBrightness = 0.25f,
@@ -309,7 +309,7 @@ class FilterFunkVibe : VibeProvider {
                 },
                 OrpheusEngine(
                     engineId = OrpheusEngineId.ENS,
-                    volume = 0.10f,
+                    volume = 0.20f,
                     modLfoRate = 0.1f,
                     modLfoDepth = 0.7f,
                     modLfoShape = 0.4f,
