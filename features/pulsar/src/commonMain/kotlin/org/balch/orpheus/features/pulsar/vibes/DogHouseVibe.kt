@@ -346,7 +346,7 @@ class DogHouseVibe : VibeProvider {
                 // a textural EDM↔Space crossfade. timbre/morph are macro-driven on both slots.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.DX,
-                    volume = 0.10f,
+                    volume = 0.14f,
                     harmonics = 0.551f,          // DX idx 17 "Insert 1" — base patch (ear-tuned)
                     harmonicsMacroRange = 0.10f, // mood knob walks ±~3 patches around base
                     // harmonicsMacroSource defaults to MOOD (matches pre-pin behavior)
