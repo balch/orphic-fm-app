@@ -699,7 +699,7 @@ Mix first:
 - Pan the layers: keep kick, bass and the lead centred, and give each side an equal share of the rest. The summary's pan table catches a lopsided or mono mix (all-zero pans read as correlation ~1.0).
 - `TrackSectionOverride.pan` moves a track per section. The engine glides it at 0.15 pan units per second, in and back out, so two sustained voices can drift past each other across sections (Orphic Lore's Sirens and Hammond, mirrored, the Sirens centred in their vamp). The harness JSON's per-section track `pan` shows the path.
 
-Then level-match: with the balance settled, set `levelDb = -16 - LUFS` (rounded to 0.1), re-measure, and nudge it until the vibe reads -16 ±0.5 LUFS (the harness plays the master at 1.0, as the DJ app does). Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track, sends included, so it changes loudness, not balance; the storm, rain and street voices are not scaled.
+Then level-match: with the balance settled, set `levelDb = -16 - LUFS` (rounded to 0.1), re-measure, and nudge it until the vibe reads -16 ±0.5 LUFS (the harness plays the master at 1.0, as the DJ app does). Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track and the storm, rain, street and speech voices, sends included, so it changes loudness, not balance.
 
 ## When things go wrong
 

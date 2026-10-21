@@ -8,6 +8,8 @@
 #include "../src/pulsar_storm.h"
 #include "stmlib/utils/random.h"
 #include <cstring>
+#include <memory>
+#include <vector>
 
 // A real high-pass for the probes below: two Butterworth Svf stages, 24 dB/oct. The
 // earlier "two cascaded one-poles subtracted from the input" is only first-order near
@@ -1551,6 +1553,46 @@ static bool test_weather_bed_is_audible_on_a_muted_vibe() {
     return ok;
 }
 
+// Vibe.levelDb trims the storm like the tracks: at vibe_gain 0.5 the storm's measurement
+// tap and its delay send carry exactly half of what an identical run at 1.0 does.
+static bool test_vibe_gain_trims_the_storm() {
+    printf("\n=== Test: vibe_gain scales the storm, its tap and its sends ===\n");
+    double tap_sq[2] = {0.0, 0.0}, send_sq[2] = {0.0, 0.0};
+    float worst = 0.0f;
+    std::vector<float> first_tap;
+    for (int run = 0; run < 2; run++) {
+        OrpheusEngine* engine = make_muted_storm_engine();
+        GraphUnit unit = make_storm_pulsar_unit();
+        auto taps = std::make_unique<OrpheusEngine::PulsarMeasureTaps>();
+        engine->pulsar_measure_taps.store(taps.get(), std::memory_order_release);
+        engine->pulsar_vibe_gain.store(run == 0 ? 1.0f : 0.5f, std::memory_order_relaxed);
+        StormTestWeather wet; wet.rain = 0.8f; wet.rumble = 0.55f; wet.distance = 0.4f;
+        wet.rain_level = 1.0f;
+        push_storm_weather_arrangement(engine, wet, wet, /*trans_bars=*/0, /*bars=*/8);
+        trigger_vibe_load(engine);
+        for (int b = 0; b < 200; b++) {
+            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            if (b < 60) continue;
+            const float* tap = taps->source_l[OrpheusEngine::PulsarMeasureTaps::kMeasureStorm];
+            for (int i = 0; i < 512; i++) {
+                tap_sq[run] += static_cast<double>(tap[i]) * tap[i];
+                send_sq[run] += static_cast<double>(engine->pulsar_delay_send_l[i]) * engine->pulsar_delay_send_l[i];
+                if (run == 0) first_tap.push_back(tap[i]);
+                else worst = std::fmax(worst, std::fabs(tap[i] - 0.5f * first_tap[(b - 60) * 512 + i]));
+            }
+        }
+        engine->pulsar_measure_taps.store(nullptr, std::memory_order_release);
+        orpheus_engine_destroy(engine);
+    }
+    const double tap_ratio = std::sqrt(tap_sq[1] / tap_sq[0]);
+    const double send_ratio = std::sqrt(send_sq[1] / send_sq[0]);
+    const bool ok = tap_sq[0] > 1e-3 && std::fabs(tap_ratio - 0.5) < 1e-6
+                 && std::fabs(send_ratio - 0.5) < 1e-6 && worst < 1e-7f;
+    printf("  tap ratio %.6f, send ratio %.6f, worst sample error %.2e -- %s\n",
+           tap_ratio, send_ratio, worst, ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 // The storm is a mix citizen: it taps the same send buses the tracks accumulate into,
 // at a fixed reverb 0.45 / delay 0.15 — and the reverb tap is darkened by a one-pole on
 // the way, the same treatment every per-track send already got and the storm alone did
@@ -2087,6 +2129,7 @@ bool run_pulsar_storm_tests() {
         uint32_t saved = stmlib::Random::state();
         tally(test_weather_bed_is_audible_on_a_muted_vibe());
         tally(test_storm_taps_the_send_buses());
+        tally(test_vibe_gain_trims_the_storm());
         tally(test_zero_weather_leaves_the_mix_bit_quiet());
         tally(test_bed_drains_across_a_transition_ramp());
         tally(test_void_ducks_the_storm());

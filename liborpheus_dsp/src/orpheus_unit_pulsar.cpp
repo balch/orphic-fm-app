@@ -6430,6 +6430,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
+    // The vibe's level trim, read once for the storm, street and speech blocks below. The
+    // tracks took it in their volume, so the taps see every voice trimmed alike.
+    const float vibe_gain = engine->pulsar_vibe_gain.load(std::memory_order_relaxed);
+
     // ── Storm weather bed (the 9th voice) ────────────────────────────────
     // Not sequenced and not a bus stem: the storm renders once per block, straight
     // into the stereo mix ahead of the output HPF, so the master chain (tape stop,
@@ -6487,9 +6491,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             for (int i = 0; i < num_frames; i++) {
                 // The same per-sample void gain the tracks got: the storm sinks into
                 // a Void with everything else. Unconditional — a branch on "no void
-                // armed" costs more than the multiply it would save.
-                const float sl = storm_l[i] * void_gain_buf[i];
-                const float sr = storm_r[i] * void_gain_buf[i];
+                // armed" costs more than the multiply it would save. Trimmed by the
+                // vibe's level like the tracks, so Vibe.levelDb moves the whole mix.
+                storm_l[i] *= void_gain_buf[i] * vibe_gain;
+                storm_r[i] *= void_gain_buf[i] * vibe_gain;
+                const float sl = storm_l[i];
+                const float sr = storm_r[i];
                 out_l[i] += sl;
                 out_r[i] += sr;
                 engine->pulsar_delay_send_l[i]  += sl * kStormDelaySend;
@@ -6502,10 +6509,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 engine->pulsar_reverb_send_r[i] += dark_r * kStormReverbSend;
             }
             if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
-                for (int i = 0; i < num_frames; i++) {
-                    taps->source_l[taps->kMeasureStorm][i] = storm_l[i] * void_gain_buf[i];
-                    taps->source_r[taps->kMeasureStorm][i] = storm_r[i] * void_gain_buf[i];
-                }
+                std::memcpy(taps->source_l[taps->kMeasureStorm], storm_l, num_frames * sizeof(float));
+                std::memcpy(taps->source_r[taps->kMeasureStorm], storm_r, num_frames * sizeof(float));
             }
         }
     }
@@ -6555,7 +6560,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             const float foot_rev = kStreetFootReverbSend * echo;
             const float foot_dly = kStreetFootDelaySend * echo;
             for (int i = 0; i < num_frames; i++) {
-                const float g = void_gain_buf[i];
+                const float g = void_gain_buf[i] * vibe_gain;
                 const float fl = foot_l[i] * g, fr = foot_r[i] * g;
                 const float tl = train_l[i] * g, tr = train_r[i] * g;
                 out_l[i] += fl + tl;
@@ -6567,8 +6572,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
             if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
                 for (int i = 0; i < num_frames; i++) {
-                    taps->source_l[taps->kMeasureStreet][i] = (foot_l[i] + train_l[i]) * void_gain_buf[i];
-                    taps->source_r[taps->kMeasureStreet][i] = (foot_r[i] + train_r[i]) * void_gain_buf[i];
+                    const float g = void_gain_buf[i] * vibe_gain;
+                    taps->source_l[taps->kMeasureStreet][i] = (foot_l[i] + train_l[i]) * g;
+                    taps->source_r[taps->kMeasureStreet][i] = (foot_r[i] + train_r[i]) * g;
                 }
             }
         }
@@ -6582,7 +6588,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memset(speech_buf, 0, num_frames * sizeof(float));
         state->speech_player.Render(speech_buf, num_frames);
         for (int i = 0; i < num_frames; i++) {
-            const float s = speech_buf[i] * void_gain_buf[i];
+            const float s = speech_buf[i] * void_gain_buf[i] * vibe_gain;
             out_l[i] += s;
             out_r[i] += s;
             engine->pulsar_delay_send_l[i]  += s * kSpeechDelaySend;
@@ -6592,8 +6598,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
         if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
             for (int i = 0; i < num_frames; i++) {
-                taps->source_l[taps->kMeasureSpeech][i] = speech_buf[i] * void_gain_buf[i];
-                taps->source_r[taps->kMeasureSpeech][i] = speech_buf[i] * void_gain_buf[i];
+                const float s = speech_buf[i] * void_gain_buf[i] * vibe_gain;
+                taps->source_l[taps->kMeasureSpeech][i] = s;
+                taps->source_r[taps->kMeasureSpeech][i] = s;
             }
         }
     }
