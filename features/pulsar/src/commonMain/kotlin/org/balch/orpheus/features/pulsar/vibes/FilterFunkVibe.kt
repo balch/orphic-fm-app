@@ -68,6 +68,9 @@ class FilterFunkVibe : VibeProvider {
                 ),
                 recencyDecay = 0.5f,
                 macroOverrides = null,  // groove IS the baseline
+                // Energy 0.5 sits in the texture notch (-26 dB on 5-7), so the grains on 6 get
+                // their level back here; the override lands up to 200 ms after the boundary.
+                trackOverrides = mapOf(6 to TrackSectionOverride(volume = 0.6f)),
             ),
             // 1: build — rising energy, more complexity, filter opens up.
             //    The lead PEDALS the hook here (track 4 → per-track FIXED) instead of
@@ -116,6 +119,7 @@ class FilterFunkVibe : VibeProvider {
                     energy = 1.0f, complexity = 1.2f, space = 1.1f, mood = 1.1f,
                 ),
                 soloMode = SoloMode.LickBuilder(probability = 0.7f, mutationRate = 0.6f),
+                trackOverrides = mapOf(6 to TrackSectionOverride(volume = 0.6f)),  // as in groove: notched
             ),
             // 3: drop — stripped to kick + bass droning on G for impact on return
             Section(
@@ -216,7 +220,7 @@ class FilterFunkVibe : VibeProvider {
             complexity = 0.35f,
             space = 0.4f,
             mood = 0.45f,
-            levelDb = 2.2f,  // loudness match to -19 LUFS
+            levelDb = 1.6f,  // loudness match to -16 LUFS
             genre = GenreProfile(
                 swingAmount = 0.03f,
                 ghostProbability = 0.15f,

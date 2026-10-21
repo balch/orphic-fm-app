@@ -323,7 +323,7 @@ class BellTollsVibe : VibeProvider {
             complexity = 0.45f,
             space = 0.6f,     // reggae has space — don't crowd the mix
             mood = 0.7f,      // warm, uplifting
-            levelDb = -0.4f,  // loudness match to -19 LUFS
+            levelDb = -0.9f,  // loudness match to -16 LUFS
             genre = GenreProfile(
                 swingAmount = 0.05f,   // straight feel — reggae swings via articulation, not timing
                 ghostProbability = 0.12f,
@@ -519,7 +519,7 @@ class BellTollsVibe : VibeProvider {
                 // Low volume, long holds, heavy reverb — the warm Caribbean haze.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.ENS,
-                    volume = 0.25f,
+                    volume = 0.5f,  // only plays where the FX slot opens (dub, solo, intro)
                     modLfoRate = 0.05f, modLfoDepth = 0.4f, modLfoShape = 0.3f, modLfoCoupling = 0.2f,
                     holdProbability = 0.85f, holdLengthMin = 8, holdLengthMax = 24,
                     reverbSend = 0.55f, delaySend = 0.25f,
