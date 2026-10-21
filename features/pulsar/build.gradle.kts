@@ -105,5 +105,9 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)
         }
+        jvmTest.dependencies {
+            // Skia natives, so draw code can be rendered and inspected.
+            implementation(compose.desktop.currentOs)
+        }
     }
 }

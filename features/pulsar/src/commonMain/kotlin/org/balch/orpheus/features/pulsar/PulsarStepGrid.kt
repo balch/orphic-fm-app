@@ -29,7 +29,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,6 +57,8 @@ import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
+import kotlin.math.max
+import kotlin.math.min
 
 /** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX. The DJ app's progress wave wears them too. */
 val PulsarTrackColors = listOf(
@@ -76,8 +78,48 @@ private const val MAX_STEPS = 32
 // Stroke is a class, not a value class: build each once rather than per shape per frame.
 private val SelectionStroke = Stroke(width = 1.5f)
 private val CellBorderStroke = Stroke(width = 1f)
-private val TraceGlowStroke = Stroke(width = 4f)
-private val TraceStroke = Stroke(width = 1.5f)
+private const val TraceGlowWidth = 4f
+private const val TraceWidth = 1.5f
+
+/** One trace's levels, reused across tracks and frames; written in draw, so not snapshot state. */
+private class TraceBuffer {
+    private var buffer = FloatArray(0)
+
+    fun ys(count: Int): FloatArray {
+        if (buffer.size < count) buffer = FloatArray(count)
+        return buffer
+    }
+}
+
+/**
+ * The staircase trace through [ys] (one level per [xStep], held to [width]) as rects, the shape a
+ * butt-capped, mitre-joined stroke makes. A stroked path this wide becomes a CPU mask Skia
+ * re-uploads every frame; rects stay on the GPU. Runs at one level merge, so nothing overlaps.
+ */
+internal fun DrawScope.drawStaircase(
+    ys: FloatArray,
+    count: Int,
+    xStep: Float,
+    width: Float,
+    strokeWidth: Float,
+    color: Color,
+    blendMode: BlendMode = DrawScope.DefaultBlendMode,
+) {
+    val half = strokeWidth / 2
+    var runLeft = 0f
+    for (i in 1 until count) {
+        val from = ys[i - 1]
+        val to = ys[i]
+        if (from == to) continue
+        val x = i * xStep
+        drawRect(color, Offset(runLeft, from - half), Size(x + half - runLeft, strokeWidth), blendMode = blendMode)
+        val top = min(from, to) + half
+        val bottom = max(from, to) - half
+        if (bottom > top) drawRect(color, Offset(x - half, top), Size(strokeWidth, bottom - top), blendMode = blendMode)
+        runLeft = x - half
+    }
+    drawRect(color, Offset(runLeft, ys[count - 1] - half), Size(width - runLeft, strokeWidth), blendMode = blendMode)
+}
 
 /**
  * The embossed cell's highlight and shadow gradients, one pair per track, rebuilt only when
@@ -154,7 +196,7 @@ fun PulsarStepGrid(
     val trackGap = 4f
 
     val cellBrushes = remember { CellBrushCache() }
-    val tracePaths = remember { List(NUM_TRACKS) { Path() } }
+    val traceBuffer = remember { TraceBuffer() }
     // No whole-grid transform lives here. A 3% beat-pulse scale on the outer graphicsLayer used
     // to fire on every step advance of track 0, which repainted 84% of the canvas on the step
     // frame and 83% on the next one; at high energy, where steps land every few frames, that
@@ -435,42 +477,27 @@ fun PulsarStepGrid(
                 // Use running peak for stable normalization (not per-frame max)
                 val maxVal = trackPeaks[track].coerceAtLeast(0.01f)
 
-                val path = tracePaths[track].apply { rewind() }
-                val xStep = size.width / data.size.coerceAtLeast(1)
-
-                var prevY = baseY
+                val ys = traceBuffer.ys(data.size)
+                val xStep = size.width / data.size
                 data.forEachIndexed { i, v ->
-                    val x = i * xStep
                     // Normalize — values are positive peaks, map 0..max to 0..1
                     val normalized = (v / maxVal).coerceIn(0f, 1f)
                     // Square filter: quantize to 5 levels
                     val quantized = (normalized * 4f).toInt() / 4f
                     // Anchor at baseY (bottom), grow upward
-                    val y = baseY - quantized * maxH
-
-                    if (i == 0) {
-                        path.moveTo(x, y)
-                    } else {
-                        // Staircase: hold horizontal, then jump vertical
-                        path.lineTo(x, prevY)
-                        path.lineTo(x, y)
-                    }
-                    prevY = y
+                    ys[i] = baseY - quantized * maxH
                 }
-                path.lineTo(size.width, prevY)
 
                 // Glow — scales with frost/boldness
-                drawPath(
-                    path = path,
-                    color = color.copy(alpha = (0.08f * boldness).coerceAtMost(0.25f)),
-                    style = TraceGlowStroke,
-                    blendMode = BlendMode.Plus,
+                drawStaircase(
+                    ys, data.size, xStep, size.width, TraceGlowWidth,
+                    color.copy(alpha = (0.08f * boldness).coerceAtMost(0.25f)),
+                    BlendMode.Plus,
                 )
                 // Main trace
-                drawPath(
-                    path = path,
-                    color = color.copy(alpha = (0.25f * boldness).coerceAtMost(0.6f)),
-                    style = TraceStroke,
+                drawStaircase(
+                    ys, data.size, xStep, size.width, TraceWidth,
+                    color.copy(alpha = (0.25f * boldness).coerceAtMost(0.6f)),
                 )
             }
         }
