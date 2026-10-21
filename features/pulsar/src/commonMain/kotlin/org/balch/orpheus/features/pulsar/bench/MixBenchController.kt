@@ -191,13 +191,13 @@ class MixBenchController(
     /** Section edits fall back to the vibe layer when the vibe has fewer than two sections. */
     suspend fun setScope(s: Scope) = lock.withLock { _scope.value = s }
 
-    /** Jumps at the next loop wrap; a held loop moves to [section]. */
+    /** Jumps at the next bar line; a held loop moves to [section]. */
     suspend fun jumpTo(section: Int) = lock.withLock {
         if (_loopSection.value != null) _loopSection.value = section
         pulsar.jumpToSection(section)
     }
 
-    /** Holds the playing section: each observed move away from it jumps back at the next wrap. */
+    /** Holds the playing section: each observed move away from it jumps back at the next bar line. */
     suspend fun setLoop(on: Boolean) = lock.withLock {
         _loopSection.value = if (on) section.takeIf { it >= 0 } else null
     }

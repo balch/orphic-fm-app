@@ -319,7 +319,7 @@
       const c = el("button", "chip", s.name);
       c.classList.toggle("on", s.index === state.section);
       c.classList.toggle("loop", s.index === state.loop);
-      c.title = "Jump to " + s.name + " at the next loop wrap";
+      c.title = "Jump to " + s.name + " at the next bar line";
       c.addEventListener("click", () => cmd("jump", { section: s.index }));
       box.append(c);
     });

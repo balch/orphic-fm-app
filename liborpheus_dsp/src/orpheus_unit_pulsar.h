@@ -664,6 +664,15 @@ inline void pulsar_advance_playhead(PulsarTrackState& ts, HalfLickMode mode) {
     ts.wrap_mode  = mode;
 }
 
+// Ends the loop early, as a wrap would: the playhead and its window restart at the window start.
+inline void pulsar_restart_loop(PulsarTrackState& ts, HalfLickMode mode) {
+    const PulsarLoopWindow win = pulsar_effective_loop_window(ts, mode);
+    ts.playhead   = win.start;
+    ts.wrap_start = win.start;
+    ts.wrap_len   = win.len;
+    ts.wrap_mode  = mode;
+}
+
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
 static constexpr int kMaxLickSteps = 64;
 static constexpr int kLickFieldsPerStep = 4;   // degree, duration, velocity, glide

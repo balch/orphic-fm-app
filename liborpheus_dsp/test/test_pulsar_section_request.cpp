@@ -335,7 +335,7 @@ struct LongSectionFixture {
     // Returns the number of blocks it took, or -1 when none arrived.
     int run_to_wrap() {
         const int before = ps->loop_count;
-        for (int i = 1; i <= 200; i++) {
+        for (int i = 1; i <= 400; i++) {
             block();
             if (ps->loop_count != before) return i;
         }
@@ -343,7 +343,10 @@ struct LongSectionFixture {
     }
 };
 
-static void start_long_sections(LongSectionFixture& f) {
+// At 300 BPM a step is 2400 samples, so a 16-step bar is 75 blocks of 512.
+static constexpr int kBarBlocks = 75;
+
+static void start_long_sections(LongSectionFixture& f, int step_count = 16) {
     f.engine = orpheus_engine_create(48000.0f);
     std::memset(&f.unit, 0, sizeof(f.unit));
     f.unit.type = UNIT_PULSAR; f.unit.enabled = true;
@@ -355,6 +358,7 @@ static void start_long_sections(LongSectionFixture& f) {
         f.engine->pulsar_section_data[s * kSectionDataFields + 0].store(16, std::memory_order_relaxed);
         f.engine->pulsar_section_data[s * kSectionDataFields + 1].store(16, std::memory_order_relaxed);
     }
+    f.engine->pulsar_step_count.store(step_count, std::memory_order_relaxed);
     f.engine->pulsar_seed.store(4242, std::memory_order_relaxed);
     trigger_vibe_load(f.engine);
     f.engine->clock_bpm.store(300.0f, std::memory_order_relaxed);
@@ -362,37 +366,43 @@ static void start_long_sections(LongSectionFixture& f) {
     f.ps = f.engine->pulsar_state;
 }
 
-static bool test_jump_lands_at_next_loop() {
-    printf("\n=== Test: arrangement_section_jump lands at the next loop wrap ===\n");
-    LongSectionFixture f; start_long_sections(f);
+// On a 64-step vibe track 0 loops over more than one bar (a generative track plays 32 steps,
+// a FILL lick 64), so a jump that waited for the loop wrap took bars. It lands on the next bar
+// line instead, with every track back at its loop top.
+static bool test_jump_lands_at_next_bar() {
+    printf("\n=== Test: arrangement_section_jump lands at the next bar line of a 64-step loop ===\n");
+    LongSectionFixture f; start_long_sections(f, 64);
     if (!f.ps) { orpheus_engine_destroy(f.engine); return false; }
+    const int loop_steps = f.ps->tracks[0].step_count;
     f.run_to_wrap();
-    for (int i = 0; i < 5; i++) f.block();       // mid-loop
+    for (int i = 0; i < 5; i++) f.block();       // a few blocks into the loop's first bar
     const int bars_before = f.ps->section_state.bars_remaining;
 
     f.engine->pulsar_arrangement_section_jump.store(3, std::memory_order_relaxed);
-    const int before_wrap = f.ps->loop_count;
-    bool held_until_wrap = true;
     int blocks = 0;
-    while (f.ps->loop_count == before_wrap && blocks < 200) {
+    while (f.ps->section_state.current_section != 2 && blocks < 4 * kBarBlocks) {
         f.block(); blocks++;
-        if (f.ps->loop_count == before_wrap && f.ps->section_state.current_section != 0)
-            held_until_wrap = false;
     }
-    f.block();                                   // one block of slack
     const int sec = f.ps->section_state.current_section;
+    bool tops = true;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        const PulsarTrackState& ts = f.ps->tracks[t];
+        if (ts.step_count > 0 && ts.playhead != ts.wrap_start) tops = false;
+    }
     const bool self_cleared =
         f.engine->pulsar_arrangement_section_jump.load(std::memory_order_relaxed) == 0;
-    bool ok = bars_before > 2 && blocks < 200 && held_until_wrap && sec == 2 && self_cleared;
-    printf("  bars_before=%d blocks=%d held=%d section=%d cleared=%d -- %s\n",
-           bars_before, blocks, held_until_wrap, sec, self_cleared, ok ? "PASS" : "FAIL");
+    bool ok = loop_steps > 16 && bars_before > 2 && sec == 2 && blocks <= kBarBlocks + 1
+        && tops && self_cleared;
+    printf("  loop_steps=%d bars_before=%d blocks=%d (bar=%d) section=%d tops=%d cleared=%d -- %s\n",
+           loop_steps, bars_before, blocks, kBarBlocks, sec, tops, self_cleared,
+           ok ? "PASS" : "FAIL");
     orpheus_engine_destroy(f.engine);
     return ok;
 }
 
 static bool test_request_waits_for_boundary() {
     printf("\n=== Test: arrangement_section_request still waits for the section boundary ===\n");
-    LongSectionFixture f; start_long_sections(f);
+    LongSectionFixture f; start_long_sections(f, 64);   // bar lines pass, the request holds
     if (!f.ps) { orpheus_engine_destroy(f.engine); return false; }
     f.run_to_wrap();
     f.engine->pulsar_arrangement_section_request.store(3, std::memory_order_relaxed);
@@ -441,7 +451,7 @@ bool run_pulsar_section_request_tests() {
     run(test_request_for_the_planned_section_leaves_the_ramp_alone);
     run(test_apply_rejects_an_out_of_range_request);
     run(test_section_request_integration_through_real_engine);
-    run(test_jump_lands_at_next_loop);
+    run(test_jump_lands_at_next_bar);
     run(test_request_waits_for_boundary);
     run(test_jump_to_current_restarts_section);
     printf("\n  Pulsar Section Request: %d passed, %d failed\n", passed, failed);

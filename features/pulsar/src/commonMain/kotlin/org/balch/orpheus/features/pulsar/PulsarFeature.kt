@@ -409,7 +409,7 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     fun queueSection(index: Int) {}
 
     /**
-     * Jump to section [index] at the next loop wrap. The playing section re-enters from its top.
+     * Jump to section [index] at the next bar line. The playing section re-enters from its top.
      * A no-op default for preview and stub implementations.
      */
     fun jumpToSection(index: Int) {}

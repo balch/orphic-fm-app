@@ -173,6 +173,16 @@ static inline void constant_power_pan(float pan, float& gain_l, float& gain_r) {
 // pan override drifts there (hard left to hard right in ~13 s) instead of jumping.
 static constexpr float kPanGlidePerSecond = 0.15f;
 
+// A 4/4 bar of sixteenth steps: where a section jump lands inside a longer loop.
+static constexpr int kJumpBarSteps = 16;
+
+// True when arrangement_section_jump holds a section the next wrap would flip to.
+static inline bool section_jump_pending(OrpheusEngine* engine, const ArrangementParams& arr) {
+    if (!arr.active || arr.section_count <= 1) return false;
+    const int jump = engine->pulsar_arrangement_section_jump.load(std::memory_order_relaxed);
+    return jump > 0 && jump - 1 < arr.section_count;
+}
+
 // quantize_to_scale() now lives in pulsar_pattern_gen.h (shared with bar_strategy)
 
 // ── PRNG for mutation ────────────────────────────────────────────────
@@ -3801,6 +3811,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // only to seat the playhead on the new window and sound steps[0].
             const bool is_load_boundary = (b == load_boundary_index);
             pulsar_advance_playhead(ts, state->tension.half_lick);
+            // A section jump lands on the next bar line, not the loop's end: every track's loop
+            // restarts here, so the wrap below consumes the jump and runs the flip unchanged.
+            if (t == 0 && !is_load_boundary && ts.playhead != ts.wrap_start
+                && (ts.playhead - ts.wrap_start) % kJumpBarSteps == 0
+                && section_jump_pending(engine, state->arrangement)) {
+                pulsar_restart_loop(ts, state->tension.half_lick);
+                for (int rt = 1; rt < kNumPulsarTracks; rt++) state->tracks[rt].resync_pending = true;
+            }
             // The opening section's first cycle has no wrap to plan from, so it is
             // planned here, at the vibe-load boundary itself.
             if (t == 0 && is_load_boundary && state->arrangement.active) {
@@ -3885,9 +3903,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         stage_transition_fx_for_planned_edge(state, /*after_request*/ true);
                     }
 
-                    // A jump is a request that also ends the section on this wrap.
-                    // advance_section() decrements first, so 1 flips it below and the
-                    // section_changed block runs unchanged. Section 0 -> 0 restarts it.
+                    // A jump is a request that also ends the section on this wrap, which a
+                    // pending jump forces at the bar line. advance_section() decrements first,
+                    // so 1 flips it below and the section_changed block runs unchanged.
+                    // Section 0 -> 0 restarts it.
                     const int sec_jump = engine->pulsar_arrangement_section_jump.exchange(
                         0, std::memory_order_relaxed);
                     if (sec_jump > 0 && sec_jump - 1 < state->arrangement.section_count) {
