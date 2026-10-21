@@ -203,7 +203,7 @@ class MixBenchController(
         _loopSection.value = if (on) section.takeIf { it >= 0 } else null
     }
 
-    /** Drops every layer edit and plays the file's mix. Mutes and solos stay. */
+    /** Drops every layer edit: tracks play the file's mix, macros the app's knobs. Mutes and solos stay. */
     suspend fun resetToFile() = lock.withLock {
         _layers.value = BenchLayers()
         pushGains()
