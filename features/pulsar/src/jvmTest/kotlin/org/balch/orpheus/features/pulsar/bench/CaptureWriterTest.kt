@@ -10,6 +10,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
+import org.balch.orpheus.features.pulsar.vibes.VibeStatus
 
 class CaptureWriterTest {
     private val vibesDir = File("src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes")
@@ -25,6 +27,13 @@ class CaptureWriterTest {
 
     @Test fun findsOrphicLore() {
         assertEquals("OrphicLoreVibe.kt", findVibeSource(vibesDir, "Orphic Lore")?.name)
+    }
+
+    @Test fun everyLiveVibeHasASource() {
+        val live = VibeCatalog.entries.filterValues { it.status == VibeStatus.LIVE }.keys.map { it.value }
+        assertTrue(live.isNotEmpty(), "no LIVE vibes in the catalog")
+        val missing = live.filter { findVibeSource(vibesDir, it) == null }
+        assertTrue(missing.isEmpty(), "no source file found for: $missing")
     }
 
     @Test fun findsVibeInMultiVibeFile() {
