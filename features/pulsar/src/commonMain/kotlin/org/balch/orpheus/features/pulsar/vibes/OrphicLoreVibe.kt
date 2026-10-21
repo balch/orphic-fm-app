@@ -268,7 +268,7 @@ class OrphicLoreVibe : VibeProvider {
             space = 0.45f,
             mood = 0.35f,
             deep = 0.5f,
-            levelDb = -3.1f,  // loudness match to -19 LUFS
+            levelDb = -3.8f,  // loudness match to -16 LUFS
             stepCount = 64,   // 4-bar pattern = one full pass of the 4-chord descent
             genre = GenreProfile(
                 swingAmount = 0.06f,

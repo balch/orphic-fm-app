@@ -179,7 +179,7 @@ class TechnoWobbleVibe : VibeProvider {
             space = 0.35f,
             mood = 0.55f,
             deep = 0.6f,
-            levelDb = 4.8f,  // loudness match to -19 LUFS
+            levelDb = 4.1f,  // loudness match to -16 LUFS
             genre = GenreProfile(
                 swingAmount = 0.0f,          // dead straight — mechanical
                 ghostProbability = 0.12f,    // sparse ghosts for grit

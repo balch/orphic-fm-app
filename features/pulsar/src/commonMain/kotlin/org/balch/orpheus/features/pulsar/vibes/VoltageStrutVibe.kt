@@ -124,7 +124,7 @@ class VoltageStrutVibe : VibeProvider {
             space = 0.35f,
             mood = 0.45f,
             deep = 0.40f,
-            levelDb = -2.3f,  // loudness match to -19 LUFS
+            levelDb = -2.9f,  // loudness match to -16 LUFS
             genre = GenreProfile(
                 // Nearly straight — slight 0.04 pocket keeps it from sounding sterile.
                 swingAmount = 0.04f,

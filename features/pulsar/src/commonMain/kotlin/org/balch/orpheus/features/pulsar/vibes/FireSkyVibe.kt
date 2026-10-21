@@ -515,7 +515,7 @@ private class FireSkyVibeBase(
             space = 0.40f,
             mood = 0.75f,
             deep = 0.48f,
-            levelDb = 0.2f,  // loudness match to -19 LUFS
+            levelDb = -0.1f,  // loudness match to -16 LUFS
             lickMutation = 0.10f,  // low drift keeps the octave double coherent; distance now lives in the notes
             lickOctave = -1,       // auto = midpoint of the lead's note range (low-mid guitar register)
             genre = GenreProfile(
