@@ -651,6 +651,22 @@ class MyNewVibe : VibeProvider {
 
 Existing vibes use the full list of explicit imports (no wildcard) — match that style; your IDE auto-fills them as you reference the types.
 
+## Mixing
+
+The gain path: engine trim, then `volume` x `energyVolume` x notch, then the TRACKS mixer, then pan, then the DJ bus (pre-clipper drive 1.65, `clipDrive`), a soft clip, and a 35 Hz output HPF. Vibes are levelled to about -16 LUFS at master 1.0. Peaks run near -4.5 dBFS.
+
+Targets from `scripts/mix/measure.sh` (bounds taken from the live vibes in `summary.md` on 2026-10-20; most meet them, a few do not):
+- Kick and bass within about 3 LU of each other.
+- No track except kick and bass with more than about 40% of its energy in 40-120 Hz.
+- Lead tracks pan centre. Doubles and pads sit at +/-0.3 to 0.6, with balanced sides.
+- Loudness within about 2 LU of -16 LUFS.
+- Pre-limit peak at or under +4 dBFS (live vibes sit between -0.3 and +6.6).
+- Under about 2% of samples past the knee (live vibes sit between 0% and 5%).
+
+Run `scripts/mix/measure.sh "<vibe name>"` before and after any level change. It re-dumps the vibe, so skip `NO_DUMP=1` after an edit. Results go to `liborpheus_dsp/test/output/vibe_measure/`.
+
+To mix by ear, launch the Mix Bench: `./gradlew :apps:djapp:desktopApp:run -Pbench=true` (URL in `build/mix-bench/url.txt`). It writes capture files; the `apply-mix-capture` skill puts them into the vibe source.
+
 ## Testing a new vibe
 
 1. **Compile check (fast)**: `./gradlew :features:pulsar:compileKotlinJvm`. Must pass. Errors here are almost always a missing import, a mistyped enum value, or an incorrect number of tracks (must be exactly 8).
