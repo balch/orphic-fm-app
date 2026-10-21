@@ -1069,6 +1069,8 @@ struct OrpheusEngine {
     // Conductor's section jump. Value is section index + 1; 0 = no request, so a
     // zero-initialised atomic cannot be mistaken for a request for section 0.
     std::atomic<int> pulsar_arrangement_section_request{0};
+    // Mix bench jump: same index + 1 value, but lands at the next track-0 loop wrap.
+    std::atomic<int> pulsar_arrangement_section_jump{0};
     // Conductor tension gestures accumulate deltas here; the unit folds them into
     // tension_intensity per bar and decays the held value back toward the piece's own arc.
     std::atomic<float> pulsar_tension_drive{0.0f};

@@ -934,6 +934,8 @@ enum class PulsarSymbol(
     ARRANGEMENT_OUTRO_INDEX("arrangement_outro_index"),
     ARRANGEMENT_OUTRO_REQUEST("arrangement_outro_request"),
     ARRANGEMENT_SECTION_REQUEST("arrangement_section_request"),
+    // Same index + 1 value, but lands at the next track-0 loop wrap instead of the section end.
+    ARRANGEMENT_SECTION_JUMP("arrangement_section_jump"),
     // Conductor live-gesture ports, all with live C++ rows: TENSION_DRIVE accumulates
     // deltas and decays per bar; SCORE_HOLD_RELEASE frees parked score cursors;
     // SCORE_FREE_RUN stops hold flags parking them at all; BAND_HOLD mutes the generative

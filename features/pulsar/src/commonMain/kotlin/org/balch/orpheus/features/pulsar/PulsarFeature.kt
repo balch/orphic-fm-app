@@ -406,6 +406,12 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
      */
     fun queueSection(index: Int) {}
 
+    /**
+     * Jump to section [index] at the next loop wrap. The playing section re-enters from its top.
+     * A no-op default for preview and stub implementations.
+     */
+    fun jumpToSection(index: Int) {}
+
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
     override val synthControl: SynthFeature.SynthControl
@@ -1173,6 +1179,10 @@ class PulsarViewModel(
             sectionCount = vibeFlow.value.arrangement?.sections?.size ?: 0,
             outroArmed = songEndingEventSource.endingTriggered.value,
         )
+    }
+
+    override fun jumpToSection(index: Int) {
+        synthController.setPluginControl(PulsarSymbol.ARRANGEMENT_SECTION_JUMP.controlId, IntValue(index + 1))
     }
 
     // ═══════════════════════════════════════════════════════════

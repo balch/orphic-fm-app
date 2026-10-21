@@ -113,6 +113,19 @@ class PulsarQueueSectionTest {
         }
 
     @Test
+    fun `jumpToSection writes the jump port`() = runTest(testDispatcher) {
+        val vm = makeViewModel()
+        vm.applyVibe(vibe)
+        pushSection(0)
+        advanceUntilIdle()
+
+        vm.jumpToSection(2)
+        val id = PulsarSymbol.ARRANGEMENT_SECTION_JUMP.controlId
+        assertEquals(PortValue.IntValue(3), ports["${id.uri}:${id.symbol}"], "port carries index + 1")
+        assertNull(requestPort(), "a jump does not touch the request port")
+    }
+
+    @Test
     fun `an armed outro blocks the request`() = runTest(testDispatcher) {
         val vm = makeViewModel()
         vm.applyVibe(vibe)

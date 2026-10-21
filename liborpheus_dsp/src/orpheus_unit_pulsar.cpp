@@ -2609,6 +2609,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     // it always runs regardless of whether arr_active is set.
     engine->pulsar_arrangement_outro_request.store(0, std::memory_order_relaxed);
     engine->pulsar_arrangement_section_request.store(0, std::memory_order_relaxed);
+    engine->pulsar_arrangement_section_jump.store(0, std::memory_order_relaxed);
     engine->pulsar_tension_drive.store(0.f, std::memory_order_relaxed);
     // Notated-score position: restart at the top so re-selecting a piece (or reloading
     // the same one) doesn't resume mid-score from a prior play-through.
@@ -3855,6 +3856,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     if (sec_req > 0 && apply_section_request(state->section_state,
                                                              state->arrangement, sec_req - 1)) {
                         stage_transition_fx_for_planned_edge(state, /*after_request*/ true);
+                    }
+
+                    // A jump is a request that also ends the section on this wrap.
+                    // advance_section() decrements first, so 1 flips it below and the
+                    // section_changed block runs unchanged. Section 0 -> 0 restarts it.
+                    const int sec_jump = engine->pulsar_arrangement_section_jump.exchange(
+                        0, std::memory_order_relaxed);
+                    if (sec_jump > 0 && sec_jump - 1 < state->arrangement.section_count) {
+                        if (apply_section_request(state->section_state, state->arrangement,
+                                                  sec_jump - 1)) {
+                            stage_transition_fx_for_planned_edge(state, /*after_request*/ true);
+                        }
+                        state->section_state.pending_section_request = sec_jump - 1;
+                        state->section_state.bars_remaining = 1;
                     }
 
                     // Anomaly Engine: edge-detect the manual trigger counter and fire every
