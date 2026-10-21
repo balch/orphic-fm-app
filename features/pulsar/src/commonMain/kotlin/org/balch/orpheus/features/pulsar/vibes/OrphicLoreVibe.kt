@@ -679,8 +679,10 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_8TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.28f, breatheBars = 2, breatheFloor = 0.55f),
-                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
+                            // The Sirens and the organ drift: each section pan glides there at 0.15/s,
+                            // mirrored. Here they lean in with the band; shades crosses them over.
+                            5 to TrackSectionOverride(volume = 0.28f, pan = 0.30f, breatheBars = 2, breatheFloor = 0.55f),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f, pan = -0.30f),
                         ),
                         transitions = listOf(SectionTransition(3, 1f, transitionBars = 1)),
                     ),
@@ -695,7 +697,8 @@ class OrphicLoreVibe : VibeProvider {
                         macroOverrides = MacroOverrides(energy = 0.7f),
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
-                            5 to TrackSectionOverride(volume = 0.24f, breatheBars = 2, breatheFloor = 0.55f),
+                            5 to TrackSectionOverride(volume = 0.24f, pan = -0.35f, breatheBars = 2, breatheFloor = 0.55f),
+                            6 to TrackSectionOverride(pan = 0.35f),
                             7 to TrackSectionOverride(volume = .42f, reverbSend = .65f),
                         ),
                         transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
@@ -719,11 +722,12 @@ class OrphicLoreVibe : VibeProvider {
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
                             // The Sirens dominate their section: twice the base level, a shallow
-                            // breath, drier so they sit in front; the organ steps back for them.
+                            // breath, drier and drifting to the centre so they sit in front; the
+                            // organ steps back and out to the side for them.
                             5 to TrackSectionOverride(
-                                volume = 0.80f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
+                                volume = 0.80f, pan = 0f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
                             ),
-                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.45f),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.45f, pan = -0.60f),
                         ),
                         transitions = listOf(SectionTransition(5, 1f, transitionBars = 2)),
                     ),
@@ -765,8 +769,9 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         trackOverrides = mapOf(
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.49f),
-                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
+                            // The storm throws the Sirens and the organ wide; ithaca brings them home.
+                            5 to TrackSectionOverride(volume = 0.49f, pan = 0.55f),
+                            6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f, pan = -0.55f),
                             // The bell swings hard in the storm.
                             7 to TrackSectionOverride(volume = 0.5f),
                         ),
@@ -810,11 +815,13 @@ class OrphicLoreVibe : VibeProvider {
                             innerBars = 6, volume = 1f, timing = 0.1f, arc = TensionArc.FALL,
                         ),
                         trackOverrides = mapOf(
-                            5 to TrackSectionOverride(  // the Sirens sing it ashore
+                            5 to TrackSectionOverride(  // the Sirens sing it ashore, drawing in
                                 volume = 0.61f,
+                                pan = 0.20f,
                                 reverbSend = .7f,
                                 delaySend = 0.15f
                             ),
+                            6 to TrackSectionOverride(pan = -0.20f),
                             7 to TrackSectionOverride( // across water
                                 density = .5f,
                                 reverbSend = 0.95f,
