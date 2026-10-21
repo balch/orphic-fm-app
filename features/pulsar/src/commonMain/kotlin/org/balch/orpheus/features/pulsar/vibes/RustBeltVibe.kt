@@ -171,7 +171,7 @@ class RustBeltVibe : VibeProvider {
                     // above walks the bass morph 0.22 -> 0.72 and the fingered PLUCK character
                     // wanders with it. 0.30 is what the verse's own Space resolves to through
                     // MELODIC's spaceDecay, so the un-pin at the boundary is inaudible.
-                    3 to TrackSectionOverride(volume = 0.1f, morph = 0.30f, density = .15f),
+                    3 to TrackSectionOverride(volume = 0.07f, morph = 0.30f, density = .15f),
                     4 to TrackSectionOverride(volume = 0.4f, density = .15f),   // jangle
                     5 to TrackSectionOverride(volume = 0.4f, density = .15f),   // twang
                     6 to TrackSectionOverride(volume = 0.4f, density = .15f),  // organ
@@ -330,7 +330,7 @@ class RustBeltVibe : VibeProvider {
                     // The hook is buried but never gone — a low ceiling and a deep floor,
                     // so it surfaces between rolls instead of holding a line through them.
                     3 to TrackSectionOverride(
-                        volume = 0.45f, density = 0.9f,
+                        volume = 0.32f, density = 0.9f,
                         breatheBars = 2, breatheFloor = 0.04f, breatheTimbreSpan = 0.40f,
                     ),
                     4 to TrackSectionOverride(volume = 0.24f, reverbSend = 0.55f, delaySend = 0.28f),  // chank -> wash, under
@@ -396,7 +396,7 @@ class RustBeltVibe : VibeProvider {
                     // The hook comes back up on the bed's period — same breath, shallower
                     // floor: present again, still weathered.
                     3 to TrackSectionOverride(
-                        volume = 0.78f, density = 0.9f,
+                        volume = 0.55f, density = 0.9f,
                         breatheBars = 3, breatheFloor = 0.35f, breatheTimbreSpan = 0.18f,
                     ),
                     4 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.45f, delaySend = 0.24f),
@@ -565,7 +565,7 @@ class RustBeltVibe : VibeProvider {
                 // lift transposes the hook with the chord roots (the payoff moment).
                 OrpheusEngine(
                     engineId = OrpheusEngineId.PD,
-                    volume = 0.88f,
+                    volume = 0.62f,
                     noteRangeLow = 26,        // D1
                     noteRangeHigh = 50,       // D3 — auto lick octave centers ~D2
                     reverbSend = 0.06f,       // nearly dry — forward in the mix
@@ -722,7 +722,7 @@ class RustBeltVibe : VibeProvider {
                         engineEdm = shaker,
                         engineSpace = shaker.copy(engineId = OrpheusEngineId.PAR, reverbSend = 0.32f),
                         role = TrackRole.Percussive,
-                        pan = -0.30f,
+                        pan = 0.30f,
                         density = 0.22f,
                         envelopeProfile = EnvelopeProfile.EFFECT,
                         macroMap = TrackMacroMap.EFFECT,
