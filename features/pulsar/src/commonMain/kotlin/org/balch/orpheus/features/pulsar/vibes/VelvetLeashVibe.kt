@@ -260,7 +260,7 @@ class VelvetLeashVibe : VibeProvider {
             space = 0.5f,   // Dryish 60s production
             mood = 0.40f,    // Sly / slightly dark — minor key with a smirk
             deep = 0.75f,
-            levelDb = 3.6f,  // loudness match to -19 LUFS
+            levelDb = 3.1f,  // loudness match to -16 LUFS
             genre = GenreProfile(
                 swingAmount = 0.10f,         // Charlie-Watts-ish laid-back lean
                 ghostProbability = 0.20f,
@@ -403,6 +403,7 @@ class VelvetLeashVibe : VibeProvider {
                     pinTimbre = true,
                     morph = 1.0f,
                     pinMorph = true,
+                    noteRangeLow = 72, noteRangeHigh = 96,
                     reverbSend = 0.25f,
                     reverbBrightness = 0.75f, // Bright shimmer
                 ).let { tambourine ->
