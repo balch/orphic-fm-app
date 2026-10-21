@@ -721,7 +721,7 @@ class OrphicLoreVibe : VibeProvider {
                             // The Sirens dominate their section: twice the base level, a shallow
                             // breath, drier so they sit in front; the organ steps back for them.
                             5 to TrackSectionOverride(
-                                volume = 0.65f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
+                                volume = 0.80f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
                             ),
                             6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.45f),
                         ),
