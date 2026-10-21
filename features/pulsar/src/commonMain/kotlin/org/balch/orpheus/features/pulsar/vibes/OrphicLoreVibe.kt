@@ -616,7 +616,7 @@ class OrphicLoreVibe : VibeProvider {
             arrangement = Arrangement(
                 introIndex = 0,
                 outroIndex = 7,
-                lengthSeconds = 240..300,
+                lengthSeconds = 210..240,
                 sections = listOf(
                     // Lengths are section bars (32 steps = two musical bars) and all even: the
                     // descent is 64 steps, so an odd count would start a homecoming on its Bb.
