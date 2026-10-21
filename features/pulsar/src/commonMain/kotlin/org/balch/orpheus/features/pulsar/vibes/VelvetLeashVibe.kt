@@ -277,7 +277,7 @@ class VelvetLeashVibe : VibeProvider {
             progressionDriftRange = 0.10f,                  // Tight — the walkdown is the hook
             tracks = listOf(
                 // 0: Kick — laid-back four-on-floor with a slight hold on 1
-                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.80f).let { kick ->
+                OrpheusEngine(engineId = OrpheusEngineId.BD, volume = 0.70f).let { kick ->
                     TrackVoice(
                         engineEdm = kick,
                         engineSpace = kick,
@@ -326,7 +326,7 @@ class VelvetLeashVibe : VibeProvider {
                 //    cleaner string tone on Space.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.WSH,
-                    volume = 0.70f,
+                    volume = 0.95f,
                     harmonics = 0.45f,
                     timbre = 0.40f,
                     morph = 0.45f,
@@ -375,7 +375,7 @@ class VelvetLeashVibe : VibeProvider {
                         engineEdm = marimba,
                         engineSpace = marimba.copy(
                             timbre = .25f,
-                            reverbSend = .75f,
+                            reverbSend = .45f,
                             lpgMode = LpgMode.BYPASS,
 //                        lpgDecay = 0.75f,
 //                        lpgColour = 0.25f,
