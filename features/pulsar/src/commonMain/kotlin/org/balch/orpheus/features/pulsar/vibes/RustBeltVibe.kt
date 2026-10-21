@@ -172,7 +172,7 @@ class RustBeltVibe : VibeProvider {
                     // wanders with it. 0.30 is what the verse's own Space resolves to through
                     // MELODIC's spaceDecay, so the un-pin at the boundary is inaudible.
                     3 to TrackSectionOverride(volume = 0.07f, morph = 0.30f, density = .15f),
-                    4 to TrackSectionOverride(volume = 0.4f, density = .15f),   // jangle
+                    4 to TrackSectionOverride(volume = 0.71f, density = .15f),   // jangle
                     5 to TrackSectionOverride(volume = 0.4f, density = .15f),   // twang
                     6 to TrackSectionOverride(volume = 0.4f, density = .15f),  // organ
                     // Track 7 — the texture, deliberately NOT morph-pinned so the evolution
@@ -233,7 +233,7 @@ class RustBeltVibe : VibeProvider {
                     // still took the lead and played nothing. Chorus level to start.
                     // EAR-TUNE(user owns after ear test)
                     5 to TrackSectionOverride(density = 0.26f),
-                    6 to TrackSectionOverride(volume = .8f, delaySend = .8f, reverbSend = .6f),
+                    6 to TrackSectionOverride(volume = .45f, delaySend = .8f, reverbSend = .6f),
                     7 to TrackSectionOverride(volume = .8f, delaySend = .8f, reverbSend = .6f),
                 ),
                 customProgression = jamProgression,
@@ -333,7 +333,7 @@ class RustBeltVibe : VibeProvider {
                         volume = 0.32f, density = 0.9f,
                         breatheBars = 2, breatheFloor = 0.04f, breatheTimbreSpan = 0.40f,
                     ),
-                    4 to TrackSectionOverride(volume = 0.24f, reverbSend = 0.55f, delaySend = 0.28f),  // chank -> wash, under
+                    4 to TrackSectionOverride(volume = 0.43f, reverbSend = 0.55f, delaySend = 0.28f),  // chank -> wash, under
                     5 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.50f, delaySend = 0.42f),  // the lone slide voice
                     // The bed goes long-form: sustained holds, breathing on 3 against the hook's 2.
                     6 to TrackSectionOverride(
@@ -399,7 +399,7 @@ class RustBeltVibe : VibeProvider {
                         volume = 0.55f, density = 0.9f,
                         breatheBars = 3, breatheFloor = 0.35f, breatheTimbreSpan = 0.18f,
                     ),
-                    4 to TrackSectionOverride(volume = 0.34f, reverbSend = 0.45f, delaySend = 0.24f),
+                    4 to TrackSectionOverride(volume = 0.60f, reverbSend = 0.45f, delaySend = 0.24f),
                     5 to TrackSectionOverride(volume = 0.50f, reverbSend = 0.45f, delaySend = 0.38f),
                     6 to TrackSectionOverride(
                         volume = 0.58f, density = 0.30f, reverbSend = 0.45f,
@@ -474,7 +474,7 @@ class RustBeltVibe : VibeProvider {
             space = 0.34f,
             mood = 0.62f,
             deep = 0.30f,
-            levelDb = -2.2f,  // loudness match to -19 LUFS
+            levelDb = -2.1f,  // loudness match to -16 LUFS
             // --- THE HOOK (track 3 bass plays it as LickMode.Fill) ---
             // DORIAN degrees: 0=D(root), 1=E(2), 2=F(b3), 3=G(4), 4=A(5), 5=B(6), 6=C(b7), 7=D(oct).
             // Copyright-safe rewrite: keeps the swampy D-Dorian pocket (scale, low register,
@@ -596,7 +596,7 @@ class RustBeltVibe : VibeProvider {
                 // Track 4 — Jangle chank (CHD native chords): dry rhythm bed on the off-hand.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.CHD,
-                    volume = 0.42f,
+                    volume = 0.75f,
                     noteRangeLow = 55,        // G3
                     noteRangeHigh = 76,       // E5
                     reverbSend = 0.10f,
