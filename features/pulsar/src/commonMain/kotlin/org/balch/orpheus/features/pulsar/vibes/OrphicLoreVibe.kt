@@ -427,16 +427,17 @@ class OrphicLoreVibe : VibeProvider {
                 // line, so the texture notch leaves it alone. lickDegreeOffset 23 = +3 octaves and a
                 // third (FIXED skips the octave pin). Grain FX turns the one voice into a choir.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.VOWEL_FOF,
+                    engineId = OrpheusEngineId.SPK,
                     volume = 0.3f,  // enters as a faint hum
-                    // VOWEL_FOF: harmonics is the vowel (0 a, .25 e, .5 i, .75 o, 1 u); morph is the
-                    // voice type and, unpinned, follows Space.
-                    harmonics = 0.25f, pinHarmonics = true,
-                    pinMorph = false,
-                    // Each sung note climbs a quarter tone over 2 s while DRONE swells it in.
-                    pitchRise = 50f, pitchRiseTime = 2f,
-                    // ...and opens its vowel from "eh" to "ah" over 1.5 s.
-                    harmonicsRise = -0.25f, harmonicsRiseTime = 1.5f,
+                    // SPK: harmonics picks the speech model (0 formant, .17 SAM, .33 LPC), so 0.13 is
+                    // mostly SAM; morph is the vowel (SAM: 0 a, .2 e, .4 i, .6 o, .8 u), pinned.
+                    timbre = 0.5f,
+                    harmonics = 0.13f, pinHarmonics = true,
+                    // Each sung note closes its vowel from "ah" to "eh" over 1.5 s...
+                    morph = 0f, pinMorph = true,
+                    morphRise = 0.2f, morphRiseTime = 1.5f,
+                    // ...and climbs an eighth tone over 2 s while DRONE swells it in.
+                    pitchRise = 25f, pitchRiseTime = 2f,
                     // A singer's waver on top, fading in 0.3 s after each note starts.
                     vibratoDepth = 25f, vibratoRate = 5.5f,
                     // The choir: grains of the voice itself landing on chord tones within about a
@@ -780,8 +781,10 @@ class OrphicLoreVibe : VibeProvider {
                     // 7 ASHORE (outro): the Sirens' Bb-C climb returns and the song fades out still
                     // climbing (terminal; reached only when armed). It glides from just under the
                     // verse's level to the intro's soft opening, with a FALL arc easing the
-                    // velocities down, while the mix fades out: 40% as bar 5 starts, 15% as bar 6
-                    // starts, silent from its middle on (and through the loop the song hands off in).
+                    // velocities down, while the mix fades out: 40% as bar 5 starts, 15% halfway
+                    // through it, silent a quarter into bar 6 (and through the loop the song hands
+                    // off in). The fade is on the dry mix only, so the last bar is the Sirens' and
+                    // the bell's reverb and delay, carrying out alone.
                     // Energy 0.75 (0.55 * 0.75 = 0.41) drops under the bell's gate (< 0.4) within a
                     // bar, so it tolls across the water almost from the start; at 1.0 it waited 3 bars.
                     Section(
@@ -794,8 +797,8 @@ class OrphicLoreVibe : VibeProvider {
                         volumeEnvelope = listOf(
                             VolumePoint(bar = 0f, level = 1f),
                             VolumePoint(bar = 4f, level = 0.4f),
-                            VolumePoint(bar = 5f, level = 0.15f),
-                            VolumePoint(bar = 5.5f, level = 0f),
+                            VolumePoint(bar = 4.5f, level = 0.15f),
+                            VolumePoint(bar = 5.25f, level = 0f),
                         ),
                         tensionOverride = TensionProfile(
                             innerBars = 6, volume = 1f, timing = 0.1f, arc = TensionArc.FALL,
