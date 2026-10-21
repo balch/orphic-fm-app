@@ -105,7 +105,7 @@ class BenchMeters(sampleRate: Float) {
 
     fun snapshot(): MeterSnapshot {
         if (integratedDirty) {
-            integrated = gatedLufs()
+            integrated = gatedLufs(blocks, blockCount)
             integratedDirty = false
         }
         var frames = 0.0
@@ -194,22 +194,6 @@ class BenchMeters(sampleRate: Float) {
         return w
     }
 
-    // mix_meter.h integrated_lufs: absolute gate, then relative to the mean of what passed.
-    private fun gatedLufs(): Double {
-        var sum = 0.0
-        var n = 0
-        for (i in 0 until blockCount) if (lufs(blocks[i]) > ABS_GATE) { sum += blocks[i]; n++ }
-        if (n == 0) return SILENT_DB
-        val gate = lufs(sum / n) + REL_GATE
-        sum = 0.0
-        n = 0
-        for (i in 0 until blockCount) {
-            val l = lufs(blocks[i])
-            if (l > ABS_GATE && l > gate) { sum += blocks[i]; n++ }
-        }
-        return if (n > 0) lufs(sum / n) else SILENT_DB
-    }
-
     companion object {
         /** mix_meter.h constants. */
         const val SILENT_DB = -120.0
@@ -243,6 +227,25 @@ class BenchMeters(sampleRate: Float) {
         private const val SLOT = SLOT_CH + L.CHANNELS * CH_SUMS
 
         fun lufs(meanPower: Double): Double = if (meanPower > 1e-30) K_OFFSET + 10.0 * log10(meanPower) else SILENT_DB
+
+        /**
+         * A copy of mix_meter::integrated_lufs (liborpheus_dsp/src/mix_meter.h): absolute gate, then
+         * relative to the mean of what passed. BenchMetersTest and vibe_measure_meter pin the same cases.
+         */
+        internal fun gatedLufs(blocks: DoubleArray, count: Int = blocks.size): Double {
+            var sum = 0.0
+            var n = 0
+            for (i in 0 until count) if (lufs(blocks[i]) > ABS_GATE) { sum += blocks[i]; n++ }
+            if (n == 0) return SILENT_DB
+            val gate = lufs(sum / n) + REL_GATE
+            sum = 0.0
+            n = 0
+            for (i in 0 until count) {
+                val l = lufs(blocks[i])
+                if (l > ABS_GATE && l > gate) { sum += blocks[i]; n++ }
+            }
+            return if (n > 0) lufs(sum / n) else SILENT_DB
+        }
         fun dbAmp(a: Double): Double = if (abs(a) > 1e-15) 20.0 * log10(abs(a)) else SILENT_DB
     }
 }

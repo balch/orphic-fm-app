@@ -60,6 +60,23 @@ class BenchMetersTest {
         assertEquals(L.CHANNELS, ch.size)
     }
 
+    /** Block powers that read [lufs] LUFS. */
+    private fun p(lufs: Double) = 10.0.pow((lufs + 0.691) / 10.0)
+
+    // The same blocks and hand-worked results as the gate cases in vibe_measure_meter
+    // (test_vibe_measure.cpp), which run them through mix_meter::integrated_lufs.
+    @Test
+    fun gateMatchesMixMeterCases() {
+        // All above both gates: the plain mean, 10*log10((10^-2 + 10^-2.3) / 2).
+        assertEquals(-21.245951, BenchMeters.gatedLufs(doubleArrayOf(p(-20.0), p(-20.0), p(-23.0), p(-23.0))), 1e-5)
+        // The absolute gate drops the -80 blocks; ungated this would read -23.01.
+        assertEquals(-20.0, BenchMeters.gatedLufs(doubleArrayOf(p(-20.0), p(-20.0), p(-80.0), p(-80.0))), 1e-5)
+        // All pass -70, but the relative gate (-21.20 - 10) drops the -35 block.
+        assertEquals(-20.0, BenchMeters.gatedLufs(doubleArrayOf(p(-20.0), p(-20.0), p(-20.0), p(-35.0))), 1e-5)
+        // Nothing above -70 is silence.
+        assertEquals(-120.0, BenchMeters.gatedLufs(doubleArrayOf(p(-80.0), p(-90.0))))
+    }
+
     @Test
     fun resetClearsIntegrated() {
         val m = BenchMeters(SR)

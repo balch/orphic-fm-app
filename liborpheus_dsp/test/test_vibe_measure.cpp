@@ -464,6 +464,18 @@ bool run_vibe_measure_meter_tests() {
     v = lufs_of(gated, gated, fs);
     tally(check(std::fabs(v + 20.0) < 0.2, "silence after the sine is gated out", v));
 
+    // Gate cases on known block powers. BenchMetersTest.gateMatchesMixMeterCases asserts the same
+    // numbers on the Mix Bench's Kotlin copy of integrated_lufs.
+    auto p = [](double l) { return std::pow(10.0, (l + 0.691) / 10.0); };
+    v = integrated_lufs({p(-20), p(-20), p(-23), p(-23)});
+    tally(check(std::fabs(v + 21.245951) < 1e-5, "blocks above both gates read their plain mean", v));
+    v = integrated_lufs({p(-20), p(-20), p(-80), p(-80)});
+    tally(check(std::fabs(v + 20.0) < 1e-5, "the absolute gate drops blocks under -70 LUFS", v));
+    v = integrated_lufs({p(-20), p(-20), p(-20), p(-35)});
+    tally(check(std::fabs(v + 20.0) < 1e-5, "the relative gate drops a block 10 LU under the mean", v));
+    v = integrated_lufs({p(-80), p(-90)});
+    tally(check(v == kSilentDb, "nothing above -70 LUFS reads silent", v));
+
     double sub, low;
     band_shares(20.0, fs, sub, low);
     tally(check(sub > 70.0, "a 20 Hz sine is mostly sub", sub));
