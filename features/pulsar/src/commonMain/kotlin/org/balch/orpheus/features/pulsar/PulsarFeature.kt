@@ -76,6 +76,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.bench.MixOverlay
 import org.balch.orpheus.features.pulsar.kraken.KRAKEN_TARGET_COUNT
 import org.balch.orpheus.features.pulsar.kraken.KrakenGesture
 import org.balch.orpheus.features.pulsar.models.Album
@@ -411,6 +412,12 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
      * A no-op default for preview and stub implementations.
      */
     fun jumpToSection(index: Int) {}
+
+    /**
+     * Layer live pan and send edits over the vibe, re-pushing at once. Null clears it.
+     * A no-op default for preview and stub implementations.
+     */
+    fun setMixOverlay(overlay: MixOverlay?) {}
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -1105,6 +1112,12 @@ class PulsarViewModel(
 
     @Volatile private var sendBases = SendBases()
 
+    /** Bench edits over pans and sends; null in every normal run. */
+    @Volatile private var mixOverlay: MixOverlay? = null
+
+    /** Section whose sends were last pushed; -1 before one is known. */
+    @Volatile private var pushedSection = -1
+
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
     init {
@@ -1668,7 +1681,7 @@ class PulsarViewModel(
             trackSpaceIds[i].value = IntValue(spa.engineId.id)
             trackVolumeIds[i].value = FloatValue(edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(spa.volume)
-            trackPanIds[i].value = FloatValue(tv.pan)
+            trackPanIds[i].value = FloatValue(mixOverlay?.pan(i, tv.pan) ?: tv.pan)
             trackHarmonicsIds[i].value = FloatValue(edm.harmonics)
             trackHarmonicsSpaceIds[i].value = FloatValue(spa.harmonics)
             trackTimbreIds[i].value = FloatValue(edm.timbre)
@@ -1825,6 +1838,7 @@ class PulsarViewModel(
                 reverbSpace[i] = tv?.engineSpace?.reverbSend ?: 0f
             }
         }
+        pushedSection = -1
         stepCountId.value = IntValue(vibe.stepCount)
         // 0 = no opening floor; the port carries a number, so null can't cross it directly.
         openingNoteFloorId.value = IntValue(vibe.openingNoteFloor ?: 0)
@@ -2181,6 +2195,15 @@ class PulsarViewModel(
             next.reverbSpace[i] = o?.reverbSend ?: spa.reverbSend
         }
         sendBases = next
+        pushedSection = sectionIndex
+        pushEffectiveSends(deepId.value.asFloat())
+    }
+
+    override fun setMixOverlay(overlay: MixOverlay?) {
+        mixOverlay = overlay
+        vibeFlow.value.tracks.forEachIndexed { i, tv ->
+            trackPanIds[i].value = FloatValue(overlay?.pan(i, tv.pan) ?: tv.pan)
+        }
         pushEffectiveSends(deepId.value.asFloat())
     }
 
@@ -2191,11 +2214,23 @@ class PulsarViewModel(
         // SPACE boosts DEEP with a per-vibe floor: effectiveDeep = deep * (floor + space * (1 - floor))
         val effectiveDeep = deep * (floor + space * (1.0f - floor))
         val bases = sendBases
+        val overlay = mixOverlay
+        val section = pushedSection
         for (i in 0 until 8) {
-            trackDelaySendIds[i].value = FloatValue(bases.delayEdm[i] * effectiveDeep)
-            trackReverbSendIds[i].value = FloatValue(bases.reverbEdm[i] * effectiveDeep)
-            trackDelaySendSpaceIds[i].value = FloatValue(bases.delaySpace[i] * effectiveDeep)
-            trackReverbSendSpaceIds[i].value = FloatValue(bases.reverbSpace[i] * effectiveDeep)
+            var delayEdm = bases.delayEdm[i]
+            var reverbEdm = bases.reverbEdm[i]
+            var delaySpace = bases.delaySpace[i]
+            var reverbSpace = bases.reverbSpace[i]
+            if (overlay != null) {
+                delayEdm = overlay.delaySend(i, section, delayEdm)
+                reverbEdm = overlay.reverbSend(i, section, reverbEdm)
+                delaySpace = overlay.delaySend(i, section, delaySpace)
+                reverbSpace = overlay.reverbSend(i, section, reverbSpace)
+            }
+            trackDelaySendIds[i].value = FloatValue(delayEdm * effectiveDeep)
+            trackReverbSendIds[i].value = FloatValue(reverbEdm * effectiveDeep)
+            trackDelaySendSpaceIds[i].value = FloatValue(delaySpace * effectiveDeep)
+            trackReverbSendSpaceIds[i].value = FloatValue(reverbSpace * effectiveDeep)
         }
     }
 
