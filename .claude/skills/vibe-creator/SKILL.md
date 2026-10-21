@@ -76,7 +76,7 @@ Outside those two conditions nothing changes. A vibe that references a modern ba
 4. **Compile.** Run `./gradlew :features:pulsar:compileKotlinJvm` (fast — Pulsar only). Fix any type errors. If any section sets a `soloMode`, the vibe needs a `band` — `BandPresets.quartet(...)` is the one-liner (see the `Band` section).
 5. **Run it live.** Build the JVM desktop app and load the vibe from the picker. A/B against `DogHouseVibe`.
 6. **Tune by ear.** The file should change first, not any wider code. If you find yourself wanting to change Pulsar DSP, stop — the DogHouseVibe benchmark exists to catch regressions, and vibes should only tune what the schema exposes.
-7. **Measure the mix, then level-match.** Balance the tracks with the headless harness, then set `levelDb` so the vibe plays at -19 LUFS like every other live vibe. See "Mixing and level matching" under Testing.
+7. **Measure the mix, then level-match.** Balance the tracks with the headless harness, then set `levelDb` so the vibe plays at -16 LUFS like every other live vibe. See "Mixing and level matching" under Testing.
 
 ## The Vibe schema — parameter-by-parameter
 
@@ -94,7 +94,7 @@ All of this is in the `models/` package (one file per type — see "Where vibes 
 | `scaleType` | Scale | `MINOR` / `PHRYGIAN` / `HARMONIC_MINOR` for dark, `MAJOR` / `MIXOLYDIAN` for bright, `IN_SEN` / `HIRAJOSHI` for exotic. |
 | `energy` / `complexity` / `space` / `mood` | Starting macro positions (0-1) | These are the user's starting knob positions. Lean slightly toward what the vibe wants to be — users will dial from there. |
 | `deep` | Starting effect send (0-1) | 0.4-0.7 for wet vibes, 0.2-0.3 for dry/punchy. |
-| `levelDb` | Whole-vibe loudness trim (-12..12 dB) | Set last, from the harness, so the vibe measures -19 LUFS (±0.5). Never use it to balance tracks. |
+| `levelDb` | Whole-vibe loudness trim (-12..12 dB) | Set last, from the harness, so the vibe measures -16 LUFS (±0.5). Never use it to balance tracks. |
 | `stepCount` | 16 or 32 | 16 for short repetitive patterns, 32 for 2-bar phrases. |
 
 ### `GenreProfile` (groove DNA)
@@ -673,7 +673,9 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
 `scripts/mix/measure.sh "<Vibe Name>"` dumps the vibe's port writes from Kotlin, replays 240 s through the C++ DJ graph and writes `liborpheus_dsp/test/output/vibe_measure/summary.md` (LUFS, clipper load, per-track LU against the dry mix, per section). Use the exact display name ("Lost In Space", not "Lost in Space"): a wrong name fails the dump, and a redirected run hides that. `NO_DUMP=1` reuses the dump when no vibe file changed; `VIBE_TRIM=3:-2.6` tries a per-track dB move without editing (capped at +3.5 dB).
 
 Mix first:
-- Aim for the kick and bass within about 3-5 LU of each other, unless the genre says otherwise (a reggae or "the bass is the song" vibe can run the bass hotter). Keep "past knee" under ~10%; above that the bus clipper is shaping the mix.
+- Aim for the kick and bass within about 3-5 LU of each other, unless the genre says otherwise (a reggae or "the bass is the song" vibe can run the bass hotter). Keep "past knee" under ~3% (live vibes run 0-2%); above that the bus clipper is shaping the mix.
+- Tracks 5-7 at mid energy (0.45-0.55) sit in a -26 dB notch unless they are `Chordal` or a lick line, and track 7's note-ons are gated off at default macros. A texture that must be heard there needs a role that skips the notch, or a section `volume` boost (it lands up to 200 ms after the boundary, so keep it moderate).
+- A `Chordal` or melodic track with no `noteRangeLow/High` plays from the genre range. A PAR or noise voice down there turns to rumble (Velvet Leash's tambourine read 99.6% below 40 Hz until it got 72-96), so give non-bass voices their own range.
 - A section `volume` REPLACES the base volume. To move a track by N dB, scale its base and every section override for it by the same factor.
 - The EDM and space slots can differ a lot in loudness at the same `volume` (engine trims and patches differ; Fire Sky's riff measured 9 dB apart). Compare a track's `rms_dbfs` in a high-energy section against a low-energy one in the JSON, and set the two slot volumes so it doesn't jump.
 - Track volume tops out at 1.0. If a track needs more, pull the others down.
@@ -681,7 +683,7 @@ Mix first:
 - Pan the layers: keep kick, bass and the lead centred, and give each side an equal share of the rest. The summary's pan table catches a lopsided or mono mix (all-zero pans read as correlation ~1.0).
 - `TrackSectionOverride.pan` moves a track per section. The engine glides it at 0.15 pan units per second, in and back out, so two sustained voices can drift past each other across sections (Orphic Lore's Sirens and Hammond, mirrored, the Sirens centred in their vamp). The harness JSON's per-section track `pan` shows the path.
 
-Then level-match: with the balance settled, set `levelDb = -19 - LUFS` (rounded to 0.1), re-measure, and nudge it until the vibe reads -19 ±0.5 LUFS. Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track, sends included, so it changes loudness, not balance; the storm, rain and street voices are not scaled.
+Then level-match: with the balance settled, set `levelDb = -16 - LUFS` (rounded to 0.1), re-measure, and nudge it until the vibe reads -16 ±0.5 LUFS (the harness plays the master at 1.0, as the DJ app does). Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track, sends included, so it changes loudness, not balance; the storm, rain and street voices are not scaled.
 
 ## When things go wrong
 

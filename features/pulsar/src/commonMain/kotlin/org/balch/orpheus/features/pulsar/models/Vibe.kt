@@ -119,7 +119,8 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param deep Starting depth 0-1. Controls wet/dry mix for vibe effects (delay + reverb).
  * @param levelDb Whole-vibe level trim in dB, -12..12, applied to every track (sends included)
  *   so vibes play at matching loudness. Set it from `scripts/mix/measure.sh` so the vibe's
- *   240 s integrated loudness lands at -19 LUFS (±0.5); it is a loudness match, not a mix move,
+ *   240 s integrated loudness lands at -16 LUFS (±0.5, master at 1.0 as the DJ app plays); it is
+ *   a loudness match, not a mix move,
  *   so balance the tracks first.
  * @param stepCount Steps per pattern. 16 = standard, 32 = double-length phrases,
  *   64 = quad-length phrases (max).
