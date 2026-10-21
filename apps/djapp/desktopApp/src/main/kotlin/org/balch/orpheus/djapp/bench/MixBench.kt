@@ -1,6 +1,8 @@
 package org.balch.orpheus.djapp.bench
 
+import java.awt.Desktop
 import java.io.File
+import java.net.URI
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -55,18 +57,29 @@ object MixBench {
         println("Mix Bench: $url")
         File(root, "build/mix-bench").mkdirs()
         File(root, "build/mix-bench/url.txt").writeText(url + "\n")
-        val handle = Handle(controller, server, scope)
+        val handle = Handle(url, controller, server, scope)
         Runtime.getRuntime().addShutdownHook(Thread({ handle.close() }, "mix-bench-shutdown"))
         return handle
     }
 
     /** Releases the taps, overlay and audition gains, then stops the server. Safe to call twice. */
     class Handle internal constructor(
+        val url: String,
         private val controller: MixBenchController,
         private val server: MixBenchServer,
         private val scope: CoroutineScope,
     ) {
         private val closed = AtomicBoolean(false)
+
+        /** Opens the bench page in the default browser; prints the URL if there is none. */
+        fun open() {
+            val desktop = if (Desktop.isDesktopSupported()) Desktop.getDesktop() else null
+            if (desktop?.isSupported(Desktop.Action.BROWSE) == true) {
+                runCatching { desktop.browse(URI(url)) }.onFailure { println("Mix Bench: $url ($it)") }
+            } else {
+                println("Mix Bench: $url")
+            }
+        }
 
         fun close() {
             if (!closed.compareAndSet(false, true)) return

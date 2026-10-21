@@ -2,6 +2,7 @@ package org.balch.orpheus.djapp
 
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -52,6 +53,13 @@ fun main() {
             title = "Orphic DJ",
             state = windowState,
         ) {
+            if (bench != null) {
+                MenuBar {
+                    Menu("Bench") {
+                        Item("Open Mix Bench", onClick = bench::open)
+                    }
+                }
+            }
             // Any window big enough gets the dock; it was fullscreen-only once, but a large
             // window reflowing to the landscape layout wasted most of it.
             DesktopCanvasScale {
