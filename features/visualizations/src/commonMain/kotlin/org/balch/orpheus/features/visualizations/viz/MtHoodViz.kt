@@ -9,6 +9,7 @@ import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -144,6 +145,7 @@ class MtHoodViz(
     private val rimPath = Path()
     private val foregroundPath = Path()
     private val flowPath = Path()  // Reused for each lava flow segment
+    private var silhouetteSize = Size.Zero
 
     // Pre-allocated gradient color-stop arrays to avoid per-frame heap allocations.
     // Colors are updated in-place each frame; only the float stop positions are truly static.
@@ -235,6 +237,7 @@ class MtHoodViz(
             // Read inside drawScope so per-frame _uiState writes only invalidate
             // the draw pass, not recompose this @Composable.
             val state = _uiState.value
+            buildSilhouettes()
             drawSky(sunsetT, state.lfoModulation, state.time)
             drawSunGlow(sunsetT, state.eruptionLevel)
             drawBackRidge()
@@ -449,9 +452,19 @@ class MtHoodViz(
 
     // -- Drawing: Mountain Silhouettes --
 
-    private fun DrawScope.drawBackRidge() {
+    /**
+     * The silhouettes and rim depend only on size, so they are built when it changes. A path rebuilt
+     * every frame gets a new id, and Skia re-rasterizes or re-triangulates it each time: about a
+     * screen of CPU masks per frame on a Fold.
+     */
+    private fun DrawScope.buildSilhouettes() {
+        if (size == silhouetteSize) return
+        silhouetteSize = size
         val w = size.width
         val h = size.height
+        val px = peakX * w
+        val py = peakY * h
+
         backRidgePath.reset()
         backRidgePath.moveTo(0f, h * 0.55f)
         backRidgePath.lineTo(w * 0.1f, h * 0.50f)
@@ -465,14 +478,6 @@ class MtHoodViz(
         backRidgePath.lineTo(w, h)
         backRidgePath.lineTo(0f, h)
         backRidgePath.close()
-        drawPath(path = backRidgePath, color = OrpheusColors.hoodBackRidge)
-    }
-
-    private fun DrawScope.drawMtHood(eruptionLevel: Float) {
-        val w = size.width
-        val h = size.height
-        val px = peakX * w
-        val py = peakY * h
 
         hoodPath.reset()
         hoodPath.moveTo(0f, h * 0.70f)
@@ -494,9 +499,7 @@ class MtHoodViz(
         hoodPath.lineTo(w, h)
         hoodPath.lineTo(0f, h)
         hoodPath.close()
-        drawPath(path = hoodPath, color = OrpheusColors.hoodMountain)
 
-        val rimAlpha = (0.2f + eruptionLevel * 0.5f).coerceAtMost(0.7f)
         rimPath.reset()
         rimPath.moveTo(w * 0.25f, h * 0.55f)
         rimPath.lineTo(w * 0.38f, h * 0.44f)
@@ -508,16 +511,7 @@ class MtHoodViz(
         rimPath.lineTo(w * 0.65f, h * 0.46f)
         rimPath.lineTo(w * 0.70f, h * 0.50f)
         rimPath.lineTo(w * 0.78f, h * 0.55f)
-        drawPath(
-            path = rimPath,
-            color = OrpheusColors.hoodRimGlow.copy(alpha = rimAlpha),
-            style = Stroke(width = 2f + eruptionLevel * 2f),
-        )
-    }
 
-    private fun DrawScope.drawForegroundRidge() {
-        val w = size.width
-        val h = size.height
         foregroundPath.reset()
         foregroundPath.moveTo(0f, h * 0.82f)
         foregroundPath.lineTo(w * 0.1f, h * 0.80f)
@@ -529,6 +523,24 @@ class MtHoodViz(
         foregroundPath.lineTo(w, h)
         foregroundPath.lineTo(0f, h)
         foregroundPath.close()
+    }
+
+    private fun DrawScope.drawBackRidge() {
+        drawPath(path = backRidgePath, color = OrpheusColors.hoodBackRidge)
+    }
+
+    private fun DrawScope.drawMtHood(eruptionLevel: Float) {
+        drawPath(path = hoodPath, color = OrpheusColors.hoodMountain)
+
+        val rimAlpha = (0.2f + eruptionLevel * 0.5f).coerceAtMost(0.7f)
+        drawPath(
+            path = rimPath,
+            color = OrpheusColors.hoodRimGlow.copy(alpha = rimAlpha),
+            style = Stroke(width = 2f + eruptionLevel * 2f),
+        )
+    }
+
+    private fun DrawScope.drawForegroundRidge() {
         drawPath(path = foregroundPath, color = OrpheusColors.hoodForeground)
     }
 
