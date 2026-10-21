@@ -843,6 +843,11 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_volume[8]{};
     std::atomic<float> pulsar_track_volume_space[8]{};
     std::atomic<float> pulsar_track_pan[8]{};
+    // Section pan target: the track glides here, where a track_N_pan write snaps. The
+    // routing counts writes to both, so a write of an unchanged value still takes effect.
+    std::atomic<float> pulsar_track_pan_glide[8]{};
+    std::atomic<uint32_t> pulsar_track_pan_writes[8]{};
+    std::atomic<uint32_t> pulsar_track_pan_glide_writes[8]{};
     std::atomic<float> pulsar_track_harmonics[8]{};
     std::atomic<float> pulsar_track_harmonics_space[8]{};
     std::atomic<float> pulsar_track_timbre[8]{};

@@ -765,6 +765,9 @@ class PulsarViewModel(
     private val trackPanIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PAN.ordinal + i].controlId)
     }
+    private val trackPanGlideIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PAN_GLIDE.ordinal + i].controlId)
+    }
     private val trackHarmonicsIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS.ordinal + i].controlId)
     }
@@ -1686,7 +1689,9 @@ class PulsarViewModel(
             trackSpaceIds[i].value = IntValue(spa.engineId.id)
             trackVolumeIds[i].value = FloatValue(edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(spa.volume)
-            trackPanIds[i].value = FloatValue(mixOverlay?.pan(i, tv.pan) ?: tv.pan)
+            val pan = FloatValue(mixOverlay?.pan(i, tv.pan) ?: tv.pan)
+            trackPanIds[i].value = pan
+            trackPanGlideIds[i].value = pan
             trackHarmonicsIds[i].value = FloatValue(edm.harmonics)
             trackHarmonicsSpaceIds[i].value = FloatValue(spa.harmonics)
             trackTimbreIds[i].value = FloatValue(edm.timbre)
@@ -2186,8 +2191,10 @@ class PulsarViewModel(
             // Both slots: C++ picks per render block by the live engine_index.
             trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(o?.volume ?: spa.volume)
-            // The C++ glides pan toward this, so a section pan drifts in and back out.
-            trackPanIds[i].value = FloatValue(effectivePan(i, o?.pan ?: tv.pan))
+            // The glide port drifts a section pan in and back out; at load the pan port snaps there too.
+            val pan = FloatValue(effectivePan(i, o?.pan ?: tv.pan))
+            if (!applyPatternInputs) trackPanIds[i].value = pan
+            trackPanGlideIds[i].value = pan
             // A section morph only survives if it is pinned: unpinned, the render loop
             // recomputes morph as lerp_macro(space, spaceDecay) every block and the
             // override is never heard. Pin for the override's duration, restore on exit.
@@ -2207,11 +2214,15 @@ class PulsarViewModel(
     }
 
     override fun setMixOverlay(overlay: MixOverlay?) {
+        val old = mixOverlay
         mixOverlay = overlay
         val vibe = vibeFlow.value
         val overrides = vibe.arrangement?.sections?.getOrNull(pushedSection)?.trackOverrides
         vibe.tracks.forEachIndexed { i, tv ->
-            trackPanIds[i].value = FloatValue(effectivePan(i, overrides?.get(i)?.pan ?: tv.pan))
+            val sectionPan = overrides?.get(i)?.pan ?: tv.pan
+            val pan = effectivePan(i, sectionPan)
+            // A bench pan snaps; only a changed one is written, so a send edit can't cut a section drift short.
+            if (pan != (old?.pan(i, sectionPan) ?: sectionPan)) trackPanIds[i].value = FloatValue(pan)
         }
         pushEffectiveSends(deepId.value.asFloat())
     }

@@ -94,6 +94,10 @@ static bool test_pulsar_per_track_port_routing() {
         check_float_port(engine, sym, -0.1f * t, engine->pulsar_track_pan[t], pass);
         routed++;
 
+        snprintf(sym, sizeof(sym), "track_%d_pan_glide", t);
+        check_float_port(engine, sym, 0.1f * t, engine->pulsar_track_pan_glide[t], pass);
+        routed++;
+
         snprintf(sym, sizeof(sym), "track_%d_harmonics", t);
         check_float_port(engine, sym, 0.3f + t * 0.01f, engine->pulsar_track_harmonics[t], pass);
         routed++;

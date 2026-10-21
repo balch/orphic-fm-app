@@ -66,6 +66,7 @@ class PulsarPlugin : DspPlugin {
     private var _trackSpace = intArrayOf(20, 17, 23, 19, 6, 14, 17, 19)
     private var _trackVolume = floatArrayOf(0.9f, 0.6f, 0.65f, 0.75f, 0.55f, 0.4f, 0.3f, 0.25f)
     private var _trackPan = floatArrayOf(0f, -0.15f, 0.2f, 0f, -0.25f, -0.35f, 0.3f, 0.4f)
+    private val _trackPanGlide = _trackPan.copyOf()
     private val _trackHarmonics = FloatArray(8) { 0.5f }
     private val _trackTimbre = FloatArray(8) { 0.5f }
     private val _trackMorph = FloatArray(8) { 0.3f }
@@ -310,6 +311,15 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PAN.ordinal + t]) {
                 floatType { default = _trackPan[t]; min = -1f; max = 1f; get { _trackPan[t] }; set { _trackPan[t] = it } }
+            }
+        }
+        // Section pan target. Session state from the arrangement: never saved in a preset.
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PAN_GLIDE.ordinal + t]) {
+                floatType {
+                    default = _trackPanGlide[t]; min = -1f; max = 1f; excludeFromPresets = true
+                    get { _trackPanGlide[t] }; set { _trackPanGlide[t] = it }
+                }
             }
         }
         for (t in 0..7) {

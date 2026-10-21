@@ -169,7 +169,7 @@ static inline void constant_power_pan(float pan, float& gain_l, float& gain_r) {
     gain_r = std::sin(angle);
 }
 
-// How fast a track's pan follows its port after load, in pan units per second: a section
+// How fast a track's pan follows a track_N_pan_glide write, in pan units per second: a section
 // pan override drifts there (hard left to hard right in ~13 s) instead of jumping.
 static constexpr float kPanGlidePerSecond = 0.15f;
 
@@ -1587,7 +1587,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
 
         // Read per-track voice config from atomics
         ts.volume = engine->pulsar_track_volume[t].load(std::memory_order_relaxed);
+        // Snap to the pan port and absorb every write made before the load.
+        ts.pan_writes_seen = engine->pulsar_track_pan_writes[t].load(std::memory_order_acquire);
+        ts.pan_glide_writes_seen = engine->pulsar_track_pan_glide_writes[t].load(std::memory_order_acquire);
         ts.pan = engine->pulsar_track_pan[t].load(std::memory_order_relaxed);
+        ts.pan_target = ts.pan;
         ts.harmonics = engine->pulsar_track_harmonics[t].load(std::memory_order_relaxed);
         ts.timbre = engine->pulsar_track_timbre[t].load(std::memory_order_relaxed);
         ts.morph = engine->pulsar_track_morph[t].load(std::memory_order_relaxed);
@@ -3763,11 +3767,22 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 #endif
 
         // ── Pan gains ──
-        // load_vibe snaps ts.pan to the port; after that it glides, so a section pan drifts.
+        // A track_N_pan write snaps (load, the Mix Bench); a track_N_pan_glide write, which only
+        // a section pan change makes, sets a target the pan drifts to at kPanGlidePerSecond.
         {
-            const float target = engine->pulsar_track_pan[t].load(std::memory_order_relaxed);
+            const uint32_t snaps = engine->pulsar_track_pan_writes[t].load(std::memory_order_acquire);
+            if (snaps != ts.pan_writes_seen) {
+                ts.pan_writes_seen = snaps;
+                ts.pan = engine->pulsar_track_pan[t].load(std::memory_order_relaxed);
+                ts.pan_target = ts.pan;
+            }
+            const uint32_t glides = engine->pulsar_track_pan_glide_writes[t].load(std::memory_order_acquire);
+            if (glides != ts.pan_glide_writes_seen) {
+                ts.pan_glide_writes_seen = glides;
+                ts.pan_target = engine->pulsar_track_pan_glide[t].load(std::memory_order_relaxed);
+            }
             const float max_step = kPanGlidePerSecond * static_cast<float>(num_frames) / sample_rate;
-            ts.pan += std::max(-max_step, std::min(max_step, target - ts.pan));
+            ts.pan += std::max(-max_step, std::min(max_step, ts.pan_target - ts.pan));
         }
         float pan_l, pan_r;
         constant_power_pan(ts.pan, pan_l, pan_r);

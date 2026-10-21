@@ -768,8 +768,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_volume[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "volume_space") == 0)
                 engine->pulsar_track_volume_space[t].store(value, std::memory_order_relaxed);
-            else if (std::strcmp(param, "pan") == 0)
+            else if (std::strcmp(param, "pan") == 0) {
                 engine->pulsar_track_pan[t].store(value, std::memory_order_relaxed);
+                engine->pulsar_track_pan_writes[t].fetch_add(1, std::memory_order_release);
+            }
+            else if (std::strcmp(param, "pan_glide") == 0) {
+                engine->pulsar_track_pan_glide[t].store(value, std::memory_order_relaxed);
+                engine->pulsar_track_pan_glide_writes[t].fetch_add(1, std::memory_order_release);
+            }
             else if (std::strcmp(param, "harmonics") == 0)
                 engine->pulsar_track_harmonics[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "harmonics_space") == 0)

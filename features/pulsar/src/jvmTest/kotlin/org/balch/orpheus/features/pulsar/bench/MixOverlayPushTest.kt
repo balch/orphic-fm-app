@@ -110,6 +110,28 @@ class MixOverlayPushTest {
         assertEquals(plain * 2f, doubled, 1e-6f)
     }
 
+    @Test
+    fun sectionPanGoesToTheGlidePortThroughTheOverlay() = runTest(testDispatcher) {
+        val sections = lore.arrangement!!.sections
+        val introPan = sections[0].trackOverrides?.get(5)?.pan ?: lore.tracks[5].pan
+        val s = sections.indices.first { it > 0 && (sections[it].trackOverrides?.get(5)?.pan ?: introPan) != introPan }
+        val sectionPan = sections[s].trackOverrides!![5]!!.pan!!
+
+        val plain = run(null, installCall = false, sections = listOf(s))
+        // A section change writes only the glide target; the snapping pan port keeps the load value.
+        assertEquals(sectionPan, plain.last { it.first == "track_5_pan_glide" }.second)
+        assertEquals(introPan, plain.last { it.first == "track_5_pan" }.second)
+
+        val benchPan = object : MixOverlay {
+            override fun pan(t: Int, vibePan: Float) = if (t == 5) 0.35f else vibePan
+            override fun reverbSend(t: Int, section: Int, base: Float) = base
+            override fun delaySend(t: Int, section: Int, base: Float) = base
+        }
+        val overlaid = run(benchPan, installCall = true, sections = listOf(s))
+        assertEquals(0.35f, overlaid.last { it.first == "track_5_pan_glide" }.second)
+        assertEquals(0.35f, overlaid.last { it.first == "track_5_pan" }.second)
+    }
+
     private fun TestScope.makeViewModel(engine: SongEndingStubSynthEngine, vibe: Vibe, scope: FeatureCoroutineScope): PulsarViewModel {
         val provider = VibeCatalogScan.allProviders().first { it.vibe.name == vibe.name }
         val controller = SynthController().apply {

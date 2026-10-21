@@ -367,6 +367,10 @@ struct PulsarTrackState {
     int engine_index;
     float volume;
     float pan;
+    // Where pan is gliding, and the port write counts last seen (see pulsar_track_pan_glide).
+    float pan_target = 0.0f;
+    uint32_t pan_writes_seen = 0;
+    uint32_t pan_glide_writes_seen = 0;
     float harmonics, timbre, morph;
     // Effective pin flags resolved from per-slot atomics + DX engine enforcement.
     // True = bypass all modulation (lerp_macro, evolution, accent, LFO) for that param.

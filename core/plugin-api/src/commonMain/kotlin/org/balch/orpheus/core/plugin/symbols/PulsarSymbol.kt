@@ -975,6 +975,16 @@ enum class PulsarSymbol(
     TRACK_6_AUDITION_GAIN("track_6_audition_gain"),
     TRACK_7_AUDITION_GAIN("track_7_audition_gain"),
 
+    // Section pan target: the track glides here, where a TRACK_N_PAN write snaps
+    TRACK_0_PAN_GLIDE("track_0_pan_glide"),
+    TRACK_1_PAN_GLIDE("track_1_pan_glide"),
+    TRACK_2_PAN_GLIDE("track_2_pan_glide"),
+    TRACK_3_PAN_GLIDE("track_3_pan_glide"),
+    TRACK_4_PAN_GLIDE("track_4_pan_glide"),
+    TRACK_5_PAN_GLIDE("track_5_pan_glide"),
+    TRACK_6_PAN_GLIDE("track_6_pan_glide"),
+    TRACK_7_PAN_GLIDE("track_7_pan_glide"),
+
     // Per-track mod LFO parameters
     TRACK_0_MOD_LFO_RATE("track_0_mod_lfo_rate"),
     TRACK_1_MOD_LFO_RATE("track_1_mod_lfo_rate"),
