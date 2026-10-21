@@ -332,11 +332,12 @@ class OrphicLoreVibe : VibeProvider {
                 // 1 — snare + toms: the fills are the point. Big and loose, landing hard on
                 // the backbeat and spilling into tom rolls between the walkdown anchors.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.SD, volume = 0.95f,
+                    engineId = OrpheusEngineId.SD, volume = 0.75f,
                 ).let { snare ->
                     TrackVoice(
                         engineEdm = snare, engineSpace = snare,
                         role = TrackRole.Percussive,
+                        pan = -0.08f,
                         density = 0.56f,
                         barStrategy = BarStrategy.FILL,
                         envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -348,12 +349,13 @@ class OrphicLoreVibe : VibeProvider {
                 // 2 — ride wash: rides the whole jam rather than ticking a hat. Louder and
                 // busier than a backbeat hat wants, which is exactly the point.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.HH, volume = 0.7f,
+                    engineId = OrpheusEngineId.HH, volume = 0.42f,
                     reverbSend = 0.15f,
                 ).let { ride ->
                     TrackVoice(
                         engineEdm = ride, engineSpace = ride,
                         role = TrackRole.Percussive,
+                        pan = 0.30f,
                         density = 0.62f,
                         barStrategy = BarStrategy.MUTATE,
                         envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -363,7 +365,7 @@ class OrphicLoreVibe : VibeProvider {
                 // 3 — THE bass: plays the section's pool lick, like Stay Asleep's gesture track.
                 // FIXED: the descent IS the progression, so FOLLOW would transpose it twice.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.PD, volume = 0.75f,
+                    engineId = OrpheusEngineId.PD, volume = 0.56f,
                     noteRangeLow = 33, noteRangeHigh = 45,
                 ).let { bass ->
                     TrackVoice(
@@ -400,7 +402,7 @@ class OrphicLoreVibe : VibeProvider {
                 // REPEAT, not CALL_RESPONSE, so the written lick is not rewritten as an answer.
                 // WSH in both slots: a VA space slot made it thin out at random at mid energy.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.WSH, volume = 0.85f,
+                    engineId = OrpheusEngineId.WSH, volume = 0.79f,
                     noteRangeLow = 57, noteRangeHigh = 76,
                     delaySend = 0.25f, reverbSend = 0.3f,
                     lpgMode = LpgMode.PLUCK,
@@ -428,7 +430,7 @@ class OrphicLoreVibe : VibeProvider {
                 // third (FIXED skips the octave pin). Grain FX turns the one voice into a choir.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.SPK,
-                    volume = 0.3f,  // enters as a faint hum
+                    volume = 0.24f,  // enters as a faint hum
                     // SPK: harmonics picks the speech model (0 formant, .17 SAM, .33 LPC), so 0.13 is
                     // mostly SAM; morph is the vowel (SAM: 0 a, .2 e, .4 i, .6 o, .8 u), pinned.
                     timbre = 0.5f,
@@ -468,6 +470,7 @@ class OrphicLoreVibe : VibeProvider {
                             lickSource = LickSource.BASS,
                             lickDegreeOffset = 23,
                         ),
+                        pan = 0.50f,
                         density = 0.36f,
                         barStrategy = BarStrategy.REPEAT,
                         envelopeProfile = EnvelopeProfile.DRONE,
@@ -513,6 +516,7 @@ class OrphicLoreVibe : VibeProvider {
                                 ),
                             ),
                         ),
+                        pan = -0.50f,
                         density = 0.7f,
                         barStrategy = BarStrategy.REPEAT,
                         envelopeProfile = EnvelopeProfile.EFFECT,
@@ -534,7 +538,7 @@ class OrphicLoreVibe : VibeProvider {
                 // slot adds grains of its own ring, gusting and smeared by the wind. Track 7 is the
                 // FX slot, so it only rings at low energy or in the storm.
                 OrpheusEngine(
-                    engineId = OrpheusEngineId.DX2, volume = 0.4f,
+                    engineId = OrpheusEngineId.DX2, volume = 0.34f,
                     harmonics = 0.689f,                       // DX2 idx 22 "Tub Bells" (auto-pinned)
                     noteRangeLow = 62, noteRangeHigh = 74,
                     reverbSend = 0.8f, delaySend = 0.35f,     // across water
@@ -560,6 +564,7 @@ class OrphicLoreVibe : VibeProvider {
                                 arpSpeed = 0.3f,                  // a ding-dong, not a run
                             ),
                         ),
+                        pan = 0.60f,
                         density = 0.35f,                      // the wind drops some tolls
                         barStrategy = BarStrategy.REPEAT,
                         envelopeProfile = EnvelopeProfile.RHYTHM,
@@ -673,7 +678,7 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_8TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.35f, breatheBars = 2, breatheFloor = 0.55f),
+                            5 to TrackSectionOverride(volume = 0.28f, breatheBars = 2, breatheFloor = 0.55f),
                             6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
                         ),
                         transitions = listOf(SectionTransition(3, 1f, transitionBars = 1)),
@@ -689,8 +694,8 @@ class OrphicLoreVibe : VibeProvider {
                         macroOverrides = MacroOverrides(energy = 0.7f),
                         trackOverrides = mapOf(
                             3 to TrackSectionOverride(breatheBars = 3, breatheFloor = 0.75f),
-                            5 to TrackSectionOverride(volume = 0.3f, breatheBars = 2, breatheFloor = 0.55f),
-                            7 to TrackSectionOverride(volume = .5f, reverbSend = .65f),
+                            5 to TrackSectionOverride(volume = 0.24f, breatheBars = 2, breatheFloor = 0.55f),
+                            7 to TrackSectionOverride(volume = .42f, reverbSend = .65f),
                         ),
                         transitions = listOf(SectionTransition(4, 1f, transitionBars = 2)),
                     ),
@@ -715,7 +720,7 @@ class OrphicLoreVibe : VibeProvider {
                             // The Sirens dominate their section: twice the base level, a shallow
                             // breath, drier so they sit in front; the organ steps back for them.
                             5 to TrackSectionOverride(
-                                volume = 0.8f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
+                                volume = 0.65f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
                             ),
                             6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.45f),
                         ),
@@ -759,10 +764,10 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         trackOverrides = mapOf(
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
-                            5 to TrackSectionOverride(volume = 0.6f),
+                            5 to TrackSectionOverride(volume = 0.49f),
                             6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f),
                             // The bell swings hard in the storm.
-                            7 to TrackSectionOverride(volume = 0.6f),
+                            7 to TrackSectionOverride(volume = 0.5f),
                         ),
                         // Hard cut home: the biggest bar slams into the descent.
                         transitions = listOf(SectionTransition(6, 1f, transitionBars = 0)),
@@ -805,7 +810,7 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         trackOverrides = mapOf(
                             5 to TrackSectionOverride(  // the Sirens sing it ashore
-                                volume = 0.75f,
+                                volume = 0.61f,
                                 reverbSend = .7f,
                                 delaySend = 0.15f
                             ),
