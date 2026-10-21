@@ -92,7 +92,6 @@ object VibeCatalog {
     private val entryList: List<Pair<VibeName, CatalogEntry>> = listOf(
         VibeNames.RUST_BELT to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "swamp")),
         VibeNames.DOG_HOUSE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
-        VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.LIVE, tags = listOf("og", "backup", "riff")),
         VibeNames.FILTER_FUNK to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         VibeNames.BELL_TOLLS to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         VibeNames.FIRE_SKY to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
@@ -105,6 +104,7 @@ object VibeCatalog {
         VibeNames.STAY_ASLEEP to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff", "blues", "minimal", "cinematic")),
 
 // -----------------------------
+        VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         VibeNames.DOUBLE_SHIFT to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "drone", "lope")),
         VibeNames.BLUES_BURN to CatalogEntry(VibeStatus.WIP, tags = listOf("rock", "riff")),
         VibeNames.FIRE_SKY_CX to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
