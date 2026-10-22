@@ -650,6 +650,8 @@ void orpheus_engine_set_mix_bench(OrpheusEngine* engine, int enabled) {
     delete old;
 }
 
+static_assert(ORPHEUS_MIX_BENCH_SUMMARY_FLOATS == kBenchSummaryFloats, "orpheus_dsp.h must match mix_bench.h");
+
 int orpheus_engine_drain_mix_bench(OrpheusEngine* engine, float* out, int max_summaries) {
     if (!engine) return 0;
     engine->mix_bench_drains.fetch_add(1, std::memory_order_seq_cst);

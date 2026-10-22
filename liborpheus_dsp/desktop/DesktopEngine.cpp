@@ -192,6 +192,12 @@ int DesktopEngine::drainRecording(float* out, int maxFrames) {
 uint64_t DesktopEngine::recordDroppedFrames() const {
     return record_ring_.dropped_frames();
 }
+void DesktopEngine::setMixBench(bool enabled) {
+    if (dsp_engine_) orpheus_engine_set_mix_bench(dsp_engine_, enabled ? 1 : 0);
+}
+int DesktopEngine::drainMixBench(float* out, int maxSummaries) {
+    return dsp_engine_ ? orpheus_engine_drain_mix_bench(dsp_engine_, out, maxSummaries) : 0;
+}
 void DesktopEngine::getTurntableViz(int deck, float* outBuf) {
     if (dsp_engine_) orpheus_engine_get_turntable_viz(dsp_engine_, deck, outBuf);
     else memset(outBuf, 0, 129 * sizeof(float));

@@ -9,7 +9,7 @@ import com.diamondedge.logging.logging
  * calls DesktopEngine::process() directly from the OS audio thread.
  * No Java Sound mixer, no float-to-int16 conversion, no JNI per-buffer round-trip.
  */
-class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
+class NativeDspAudioEngine : AudioEngine, NativeDspBridge, MixBenchTap {
 
     private val bridge = DesktopDspBridge()
 
@@ -152,6 +152,31 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
     ) = bridge.nativeGetPulsarViz(gatesOut, velocitiesOut, playheadsOut, stepCountsOut)
     override fun nativeGetPulsarActiveEngines(out: IntArray) = bridge.nativeGetPulsarActiveEngines(out)
     override fun nativeGetPulsarArrangement(out: IntArray) = bridge.nativeGetPulsarArrangement(out)
+
+    // -- MixBenchTap: guarded like nativeGetScope, so a stale dylib reads as an idle bench ---------
+
+    @Volatile
+    private var mixBenchMissing = false
+    override fun setEnabled(on: Boolean) {
+        if (mixBenchMissing) return
+        try {
+            bridge.nativeSetMixBench(on)
+        } catch (e: UnsatisfiedLinkError) {
+            mixBenchMissing = true
+            log.warn { "nativeSetMixBench missing from the native library; rebuild it (${e.message})" }
+        }
+    }
+
+    override fun drain(out: FloatArray): Int {
+        if (mixBenchMissing) return 0
+        return try {
+            bridge.nativeDrainMixBench(out, out.size / BenchSummaryLayout.FLOATS)
+        } catch (e: UnsatisfiedLinkError) {
+            mixBenchMissing = true
+            log.warn { "nativeDrainMixBench missing from the native library; rebuild it (${e.message})" }
+            0
+        }
+    }
 
     companion object {
         private val log = logging("NativeDspAudioEngine")

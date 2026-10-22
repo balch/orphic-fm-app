@@ -71,6 +71,10 @@ public:
     int      drainRecording(float* out, int maxFrames);
     uint64_t recordDroppedFrames() const;
 
+    // Mix bench: per-block meter summaries (orpheus_engine_set/drain_mix_bench). One drain thread.
+    void setMixBench(bool enabled);
+    int  drainMixBench(float* out, int maxSummaries);
+
     void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void  getPulsarActiveEngines(int* out);
     void  getPulsarArrangement(int* out);

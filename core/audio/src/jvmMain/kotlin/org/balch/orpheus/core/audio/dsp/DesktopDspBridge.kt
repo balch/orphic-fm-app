@@ -115,6 +115,10 @@ class DesktopDspBridge {
     /** Copies up to out.size / 2 interleaved stereo frames; returns frames copied. */
     external fun nativeDrainRecording(out: FloatArray): Int
     external fun nativeRecordDroppedFrames(): Long
+    /** Mix bench: on allocates the per-block meter taps, off frees them (may block ~100 ms). */
+    external fun nativeSetMixBench(enabled: Boolean)
+    /** Copies up to [max] summaries of BenchSummaryLayout.FLOATS floats each; returns the count. One reader only. */
+    external fun nativeDrainMixBench(out: FloatArray, max: Int): Int
     external fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     external fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
     external fun nativeClearAutomation(target: Int, voiceIndex: Int)

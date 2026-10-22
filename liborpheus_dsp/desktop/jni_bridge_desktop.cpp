@@ -286,6 +286,30 @@ JNI_FN(nativeRecordDroppedFrames)(JNIEnv *env, jobject thiz) {
     return static_cast<jlong>(sEngine.recordDroppedFrames());
 }
 
+// -- Mix bench ----------------------------------------------------------------
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeSetMixBench)(JNIEnv *env, jobject thiz, jboolean enabled) { sEngine.setMixBench(enabled); }
+
+// Drains through a stack chunk and SetFloatArrayRegion, like nativeDrainRecording.
+JNIEXPORT jint JNICALL
+JNI_FN(nativeDrainMixBench)(JNIEnv *env, jobject thiz, jfloatArray out, jint max) {
+    constexpr int kChunk = 16;
+    constexpr int kFloats = ORPHEUS_MIX_BENCH_SUMMARY_FLOATS;
+    float chunk[kChunk * kFloats];
+    const jsize maxSummaries = std::min<jsize>(max, env->GetArrayLength(out) / kFloats);
+    jsize total = 0;
+    while (total < maxSummaries) {
+        const int want = std::min<jsize>(kChunk, maxSummaries - total);
+        const int got = sEngine.drainMixBench(chunk, want);
+        if (got <= 0) break;
+        env->SetFloatArrayRegion(out, total * kFloats, got * kFloats, chunk);
+        total += got;
+        if (got < want) break;
+    }
+    return total;
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(nativeGetTurntableViz)(JNIEnv *env, jobject thiz,
                                jint deck, jfloatArray outBuf) {

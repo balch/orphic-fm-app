@@ -143,7 +143,24 @@ internal class FakePulsarFeature(
         return true
     }
     override val stateFlow = MutableStateFlow(PulsarUiState(vibe = initial))
-    override val actions = PulsarPanelActions()
+
+    /** Every macro knob write through [actions], as (macro name, value). */
+    val macroWrites = mutableListOf<Pair<String, Float>>()
+    override val actions = PulsarPanelActions(
+        setEnergy = { macroWrites += "energy" to it },
+        setComplexity = { macroWrites += "complexity" to it },
+        setSpace = { macroWrites += "space" to it },
+        setMood = { macroWrites += "mood" to it },
+    )
+
+    /** Sections passed to [jumpToSection]; the real feature writes index + 1 to arrangement_section_jump. */
+    val jumps = mutableListOf<Int>()
+    override fun jumpToSection(index: Int) { jumps += index }
+
+    /** The last overlay passed to [setMixOverlay]. */
+    var overlay: org.balch.orpheus.features.pulsar.bench.MixOverlay? = null
+        private set
+    override fun setMixOverlay(overlay: org.balch.orpheus.features.pulsar.bench.MixOverlay?) { this.overlay = overlay }
 }
 
 internal class FixturesDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {

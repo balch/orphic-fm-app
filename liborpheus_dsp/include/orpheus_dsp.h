@@ -35,6 +35,7 @@ void orpheus_engine_process_deinterleaved(OrpheusEngine* engine,
 void orpheus_engine_set_mix_bench(OrpheusEngine* engine, int enabled);
 // Single reader only: call drain from one thread. Writes up to max_summaries summaries of kBenchSummaryFloats floats each
 // (mix_bench.h) into out, oldest first; returns the count. 0 while the bench is off.
+#define ORPHEUS_MIX_BENCH_SUMMARY_FLOATS 126  // kBenchSummaryFloats, for callers without the engine's include paths
 int  orpheus_engine_drain_mix_bench(OrpheusEngine* engine, float* out, int max_summaries);
 
 // ── Diagnostics ────

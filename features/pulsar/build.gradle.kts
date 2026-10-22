@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.metro)
 }
 
-// ── C++ header inputs for PulsarSectionLimitsTest's mirror-parity guards ──────
+// ── C++ header inputs for the mirror-parity guards (PulsarSectionLimitsTest, BenchSummaryLayoutTest) ──
 // The guards regex-parse these headers' text for specific constants (kMaxSections,
 // kSectionDataFields, kMaxLickPool, HalfLickMode ordinals) — not a Kotlin source
 // change, so without this a header-only edit leaves jvmTest falsely up-to-date and
@@ -17,6 +17,7 @@ tasks.named<Test>("jvmTest") {
         file("../../liborpheus_dsp/src/orpheus_unit_pulsar.h"),
         file("../../liborpheus_dsp/src/pulsar_score_clock.h"),
         file("../../liborpheus_dsp/src/pulsar_speech.h"),
+        file("../../liborpheus_dsp/src/mix_bench.h"),
     )
         .withPropertyName("cppSectionLimitsHeaders")
         .withPathSensitivity(PathSensitivity.NAME_ONLY)
