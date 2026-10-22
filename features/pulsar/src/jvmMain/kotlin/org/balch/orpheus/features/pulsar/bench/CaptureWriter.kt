@@ -29,47 +29,65 @@ fun findVibeSource(vibesDir: File, name: String): File? {
 fun sha256(file: File): String =
     MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
 
+/**
+ * One capture file. [source], [baselineHash] and [currentHash] need a repo checkout and a catalog vibe;
+ * [stale] is null when it can't be told: no source file, or no baseline. [vibeJson] is the vibe the rows were read from.
+ */
 @Serializable
 data class CaptureFile(
     val vibe: String,
     val slug: String,
     val source: String?,
-    val baselineHash: String,
+    val baselineHash: String?,
     val currentHash: String?,
-    val stale: Boolean,
+    val stale: Boolean?,
+    val aiVibe: Boolean = false,
     val capturedAt: String,
     val rows: List<CaptureRow>,
+    val vibeJson: String = "",
 )
 
 /** A capture on disk: where it went and what it holds, so callers need not read it back. */
 data class WrittenCapture(val file: File, val capture: CaptureFile)
 
-/** Writes `build/mix-bench/captures/<slug>-<timestamp>.json` under [repoRoot]. */
-class CaptureWriter(private val repoRoot: File) {
+/** Writes `<slug>-<timestamp>.json` into [captureDir]; [repoRoot] (null without a checkout) finds vibe sources. */
+class CaptureWriter(private val captureDir: File, private val repoRoot: File?) {
     private val json = Json { prettyPrint = true; encodeDefaults = true }
-    private val vibesDir = File(repoRoot, "features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes")
+    // Same encoding as the AI vibe tools (encodeDefaults, no pretty print), so the import pipeline reads it.
+    private val vibeJson = Json { encodeDefaults = true }
+    private val vibesDir = repoRoot?.let {
+        File(it, "features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes")
+    }
 
-    /** [baselineHash] is the source hash when the bench loaded the vibe; stale means the file changed since. */
-    fun write(vibe: Vibe, rows: List<CaptureRow>, baselineHash: String): WrittenCapture {
-        val src = findVibeSource(vibesDir, vibe.name)
+    /** The source hash of the vibe named [name], or null without a repo or a source file. */
+    fun sourceHash(name: String): String? = vibesDir?.let { findVibeSource(it, name) }?.let(::sha256)
+
+    /**
+     * [baselineHash] is the source hash when the vibe was loaded, null if unknown; stale means the file changed since.
+     * An [aiVibe] has no source file, so its source fields stay null.
+     */
+    fun write(vibe: Vibe, rows: List<CaptureRow>, baselineHash: String?, aiVibe: Boolean = false): WrittenCapture {
+        val src = if (aiVibe) null else vibesDir?.let { findVibeSource(it, vibe.name) }
         val currentHash = src?.let(::sha256)
-        val slug = vibe.name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+        val slug = vibe.name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_').ifEmpty { "vibe" }
         val now = LocalDateTime.now()
         val body = CaptureFile(
             vibe = vibe.name,
             slug = slug,
-            source = src?.relativeTo(repoRoot)?.invariantSeparatorsPath,
-            baselineHash = baselineHash,
+            source = src?.relativeTo(repoRoot!!)?.invariantSeparatorsPath,
+            baselineHash = baselineHash.takeIf { src != null },
             currentHash = currentHash,
-            stale = currentHash != null && currentHash != baselineHash,
+            stale = if (currentHash == null || baselineHash == null) null else currentHash != baselineHash,
+            aiVibe = aiVibe,
             capturedAt = now.toString(),
             rows = rows,
+            vibeJson = vibeJson.encodeToString(Vibe.serializer(), vibe),
         )
-        val dir = File(repoRoot, "build/mix-bench/captures").apply { mkdirs() }
+        captureDir.mkdirs()
         val stamp = now.format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-        var out = File(dir, "$slug-$stamp.json")
+        var out = File(captureDir, "$slug-$stamp.json")
         var n = 2
-        while (!out.createNewFile()) out = File(dir, "$slug-$stamp-${n++}.json")
+        while (!out.createNewFile()) out = File(captureDir, "$slug-$stamp-${n++}.json")
         out.writeText(json.encodeToString(CaptureFile.serializer(), body))
         return WrittenCapture(out, body)
     }

@@ -1,51 +1,32 @@
 package org.balch.orpheus.djapp.ai.tools
 
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.NoMeterTap
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
-import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.ControlPort
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
-import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
-import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.ports.PortRegistry
 import org.balch.orpheus.djapp.di.MixBenchExit
-import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarPanelActions
-import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
-import org.balch.orpheus.features.pulsar.models.Arrangement
-import org.balch.orpheus.features.pulsar.models.GenreProfile
-import org.balch.orpheus.features.pulsar.models.OrpheusEngine
-import org.balch.orpheus.features.pulsar.models.RhythmPattern
-import org.balch.orpheus.features.pulsar.models.RootNote
-import org.balch.orpheus.features.pulsar.models.ScaleType
-import org.balch.orpheus.features.pulsar.models.Section
-import org.balch.orpheus.features.pulsar.models.TrackVoice
-import org.balch.orpheus.features.pulsar.models.Vibe
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -54,69 +35,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-private fun vibe(name: String) = Vibe(
-    name = name,
-    tracks = List(8) { TrackVoice(engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VA), engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VA)) },
-    bpm = 120f,
-    rootNote = RootNote.A,
-    scaleType = ScaleType.MINOR,
-    genre = GenreProfile(swingAmount = 0f, ghostProbability = 0f, noteRangeLow = 36, noteRangeHigh = 72, rhythmDensity = RhythmPattern.SPARSE.density),
-    arrangement = Arrangement(sections = listOf(Section("intro"), Section("verse"), Section("chorus"))),
-)
-
-/** Just enough Pulsar for the controller and tools: knob writes move [stateFlow], as the real knobs do. */
-private class FakePulsar(override val vibeList: List<Vibe>) : PulsarFeature {
-    override val vibeFlow = MutableStateFlow(vibeList.first())
-    override val vibeNames = vibeList.map { it.name }
-    override val vibeLoadCount = MutableStateFlow(0)
-    val arrangement = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
-    override val arrangementStateFlow: StateFlow<PulsarArrangementState> = arrangement
-    override val stateFlow = MutableStateFlow(PulsarUiState(vibe = vibeList.first()))
-    val macroWrites = mutableListOf<Pair<String, Float>>()
-    override val actions = PulsarPanelActions(
-        setEnergy = { macroWrites += "energy" to it; stateFlow.value = stateFlow.value.copy(energy = it) },
-        setComplexity = { macroWrites += "complexity" to it; stateFlow.value = stateFlow.value.copy(complexity = it) },
-        setSpace = { macroWrites += "space" to it; stateFlow.value = stateFlow.value.copy(space = it) },
-        setMood = { macroWrites += "mood" to it; stateFlow.value = stateFlow.value.copy(mood = it) },
-    )
-
-    override fun applyVibe(vibe: Vibe) {
-        vibeFlow.value = vibe
-        benchMacros = emptyMap()
-        vibeLoadCount.value++
-    }
-
-    /** Engine-only section macros, as the controller last set them. */
-    var benchMacros: Map<Macro, Float> = emptyMap()
-        private set
-
-    override fun setBenchMacros(values: Map<Macro, Float>) {
-        benchMacros = values
-    }
-
-    override fun applyVibeByName(name: String): Boolean {
-        applyVibe(vibeList.firstOrNull { it.name == name } ?: return false)
-        return true
-    }
-
-    fun section(s: Int) {
-        arrangement.value = PulsarArrangementState(s, 0, 0, false, -1, 0)
-    }
-}
-
 private class FakePlugin(uri: String, override val ports: List<Port>) : DspPlugin {
     override val info = PluginInfo(uri = uri, name = uri, author = "test")
 }
 
 private fun port(i: Int, symbol: String, min: Float = 0f, max: Float = 1f, type: PortType = PortType.FLOAT) =
     ControlPort(index = i, symbol = symbol, name = symbol, type = type, default = min, min = min, max = max)
-
-private class OneDispatcher(d: CoroutineDispatcher) : DispatcherProvider {
-    override val main = d
-    override val io = d
-    override val default = d
-    override val unconfined = d
-}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MixToolsTest {
@@ -172,6 +96,23 @@ class MixToolsTest {
         assertEquals("SECTION", r.scope)
         assertEquals(-3f, c.layers.value.sections.getValue(1).levelDb[5], 1e-5f)
         assertEquals(10f.pow(-3f / 20f), gain(5), 1e-4f)
+    }
+
+    @Test
+    fun mixSetSectionSendClampsAndSaysSo() = runTest {
+        pulsar.section(1)
+        val c = controller()
+        val set = MixSetTool({ pulsar }, { c }).tool
+        val high = set.execute(MixSetArgs(field = "reverb", value = 1.4f, track = 2, scope = "section"))
+        assertTrue(high.ok, high.message)
+        assertTrue("clamped" in high.message, high.message)
+        assertEquals(1f, c.layers.value.sections.getValue(1).reverbSend[2])
+        assertEquals(1f, high.track?.reverb)
+        val low = set.execute(MixSetArgs(field = "delay", value = -0.2f, track = 2))
+        assertTrue(low.ok, low.message)
+        assertTrue("clamped" in low.message, low.message)
+        assertEquals(0f, c.layers.value.sections.getValue(1).delaySend[2])
+        assertEquals("ok", set.execute(MixSetArgs(field = "delay", value = 0.3f, track = 2)).message)
     }
 
     @Test

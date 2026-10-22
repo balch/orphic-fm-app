@@ -2,6 +2,7 @@ package org.balch.orpheus.djapp.bench
 
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -16,6 +17,7 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.capture
 
@@ -25,6 +27,7 @@ internal class BenchCommandException(message: String) : Exception(message)
 /**
  * Runs `POST /cmd` bodies one at a time. Level and sends take what the playing section should hear;
  * the controller picks the layer under its lock, so the page never needs to know which one.
+ * Capture goes through [captureService] when the app has one (AI edition), else to [captures].
  */
 internal class BenchCommands(
     private val controller: MixBenchController,
@@ -32,7 +35,8 @@ internal class BenchCommands(
     private val transport: BenchTransport,
     private val captures: CaptureWriter,
     private val uiDispatcher: CoroutineDispatcher,
-    private val baselineHash: () -> String?,
+    private val captureService: MixCaptureService? = null,
+    private val baselineHash: (vibeName: String) -> String?,
 ) {
     /** The last capture file written, for the page. */
     @Volatile var lastCapture: File? = null
@@ -59,7 +63,9 @@ internal class BenchCommands(
             "pan" -> controller.setPan(cmd.track(), cmd.float("v"))
             "reverb" -> setSend(cmd.track(), cmd.float("v"), reverb = true)
             "delay" -> setSend(cmd.track(), cmd.float("v"), reverb = false)
-            "macro" -> controller.setMacro(cmd.enum<Macro>("m"), cmd.float("v"))
+            "macro" -> if (!controller.setMacro(cmd.enum<Macro>("m"), cmd.float("v"))) {
+                throw BenchCommandException("a vibe is loading; move the knob again once it plays")
+            }
             "mute" -> controller.toggleMute(cmd.track())
             "solo" -> controller.toggleSolo(cmd.track())
             "scope" -> controller.setScope(cmd.enum<Scope>("s"))
@@ -70,16 +76,33 @@ internal class BenchCommands(
         return OK
     }
 
-    private fun capture(): JsonObject {
-        val vibe = pulsar.vibeFlow.value
-        val rows = capture(vibe, controller.layers.value)
-        val written = captures.write(vibe, rows, baselineHash() ?: "")
+    private suspend fun capture(): JsonObject {
+        captureService?.let { return captureThrough(it) }
+        val snap = controller.captureSnapshot() ?: throw BenchCommandException("a vibe is loading; capture again once it plays")
+        val rows = capture(snap.vibe, snap.layers)
+        val written = withContext(Dispatchers.IO) { captures.write(snap.vibe, rows, baselineHash(snap.vibe.name)) }
         lastCapture = written.file
         return buildJsonObject {
             put("ok", true)
             put("file", written.file.absolutePath)
             put("rows", BenchJson.rows(rows))
             put("stale", written.capture.stale)
+        }
+    }
+
+    // A refused write-back may still have written the file, so the page hears both.
+    private suspend fun captureThrough(service: MixCaptureService): JsonObject {
+        val o = service.capture()
+        o.file?.let { lastCapture = File(it) }
+        if (!o.ok) throw BenchCommandException(o.message)
+        return buildJsonObject {
+            put("ok", true)
+            put("file", o.file)
+            put("rows", BenchJson.rows(o.rows))
+            put("stale", o.stale)
+            put("aiVibe", o.aiVibe)
+            put("appliedToAiVibe", o.appliedToAiVibe)
+            put("message", o.message)
         }
     }
 

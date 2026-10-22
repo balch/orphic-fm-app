@@ -18,6 +18,7 @@ import org.balch.orpheus.djapp.di.DjAppGraph
 import org.balch.orpheus.djapp.di.MixBenchExit
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
 import org.balch.orpheus.features.pulsar.bench.OverviewCache
+import org.balch.orpheus.features.pulsar.bench.UnavailableMixCaptureService
 
 /** Starts the Mix Bench when the app runs with `-Dorpheus.bench=true` (`-Pbench=true`). */
 object MixBench {
@@ -45,10 +46,12 @@ object MixBench {
             controller = controller,
             pulsar = graph.pulsarFeature,
             transport = transport,
-            captures = CaptureWriter(root),
+            captures = CaptureWriter(File(root, "build/mix-bench/captures"), root),
             overview = OverviewCache(root),
             vibesDir = File(root, VIBES_DIR),
             uiDispatcher = Dispatchers.Main,
+            // The AI edition captures to app storage and writes AI vibes back; without it, to the repo.
+            captureService = graph.mixCaptureService.takeUnless { it is UnavailableMixCaptureService },
         )
         val url = server.start()
         println("Mix Bench: $url")

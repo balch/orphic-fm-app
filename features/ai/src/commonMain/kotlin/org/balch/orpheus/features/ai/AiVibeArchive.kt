@@ -14,15 +14,15 @@ import dev.zacsweers.metro.Inject
  * implementation that `replaces` the no-op.
  */
 interface AiVibeArchive {
-    /** Write [vibeJson] (the full applied vibe JSON) to local storage, tagged by [vibeName]. */
-    suspend fun archive(vibeName: String, vibeJson: String)
+    /** Write [vibeJson] (the full applied vibe JSON) to local storage, tagged by [vibeName]. True once it is on disk. */
+    suspend fun archive(vibeName: String, vibeJson: String): Boolean
 }
 
 /** Default no-op so platforms without a file writer (iOS/WASM/Orpheus) still build. */
 @ContributesBinding(AppScope::class)
 @Inject
 class NoOpAiVibeArchive : AiVibeArchive {
-    override suspend fun archive(vibeName: String, vibeJson: String) = Unit
+    override suspend fun archive(vibeName: String, vibeJson: String) = false
 }
 
 /**

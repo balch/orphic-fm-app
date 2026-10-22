@@ -1,17 +1,19 @@
 ---
 name: apply-mix-capture
-description: Use when the user says "apply my mix capture" or "apply the latest capture", or hands you a file from build/mix-bench/captures/. Turns a Mix Bench capture JSON into hand edits of the vibe's Kotlin source, then measures before and after. Never commits without the user's ok.
+description: Use when the user says "apply my mix capture" or "apply the latest capture", or hands you a file from build/mix-bench/captures/ or ~/.config/orpheus-dj/mix-captures/. Turns a Mix Bench capture JSON into hand edits of the vibe's Kotlin source, then measures before and after. Never commits without the user's ok.
 ---
 
 # Apply a Mix Bench capture
 
-The Mix Bench (desktop DJ app, `./gradlew :apps:djapp:desktopApp:run -Pbench=true`) lets the user mix a vibe by ear. Its URL is printed and written to `build/mix-bench/url.txt`. Each capture is a JSON file in `build/mix-bench/captures/<slug>-<yyyyMMdd-HHmmss>.json`. Your job is to put those numbers into the vibe's Kotlin source.
+The Mix Bench (desktop DJ app, `./gradlew :apps:djapp:desktopApp:run -Pbench=true`) lets the user mix a vibe by ear. Its URL is printed and written to `build/mix-bench/url.txt`. Each capture is a JSON file named `<slug>-<yyyyMMdd-HHmmss>.json`: in `build/mix-bench/captures/` from the core edition's bench, in `~/.config/orpheus-dj/mix-captures/` from the AI edition (its bench page and the agent's `mix_capture` tool). Your job is to put those numbers into the vibe's Kotlin source.
 
 ## 1. Pick and check the file
 
-- Use the file the user named, else the newest `build/mix-bench/captures/*.json`.
-- Fields: `vibe`, `slug`, `source` (repo-relative path, may be null), `baselineHash`, `currentHash`, `stale`, `capturedAt`, `rows`.
+- Use the file the user named, else the newest of `build/mix-bench/captures/*.json` and `~/.config/orpheus-dj/mix-captures/*.json`.
+- Fields: `vibe`, `slug`, `source` (repo-relative path, may be null), `baselineHash`, `currentHash`, `stale` (null when the app can't tell: no source, or no hash from when the vibe loaded), `aiVibe`, `capturedAt`, `rows`, `vibeJson` (the vibe the rows were read from).
+- If `aiVibe` is true, the vibe is AI-made and has no Kotlin source. The app writes such a capture into the vibe itself and archives it under `~/.config/orpheus-dj/ai-vibes/`. Tell the user, and point them at the grab-ai-vibes skill to import it.
 - If `stale` is true, the source changed after the bench loaded the vibe. Stop and ask the user before editing. Old values in the rows may no longer match the file.
+- If `stale` is null (and `source` is set), the app could not tell whether the source changed since load. Say so and ask the user before editing.
 - If `source` is null, the bench could not find the vibe file. Search `features/pulsar/src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/` for the vibe name (names resolve through `VibeNames.kt`) or ask.
 - If `rows` is empty, say so and stop.
 

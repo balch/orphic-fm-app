@@ -13,6 +13,8 @@ import org.balch.orpheus.djapp.DomeWiggleLaunch
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.MixCaptureService
+import org.balch.orpheus.features.pulsar.bench.UnavailableMixCaptureService
 
 /**
  * Common surface the [DjApp] composable consumes, independent of platform.
@@ -49,4 +51,7 @@ interface DjAppGraph : ViewModelGraph {
 
     /** The Mix Bench controller the agent's mix tools share; built on first read. */
     val mixBenchController: MixBenchController
+
+    /** Mix capture to app storage on the desktop AI edition; elsewhere [UnavailableMixCaptureService]. */
+    val mixCaptureService: MixCaptureService
 }

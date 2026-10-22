@@ -36,6 +36,7 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Overview
 import org.balch.orpheus.features.pulsar.bench.OverviewCache
 import org.balch.orpheus.features.pulsar.bench.capture
@@ -53,6 +54,8 @@ interface BenchTransport {
  * The Mix Bench web page: static files, an SSE stream (`snapshot`, then `meters` at 20 Hz and
  * `state` on change) and `POST /cmd`. Binds to loopback only and refuses any request without the key.
  * [vibesDir] locates vibe sources for the stale check; [uiDispatcher] runs vibe loads and transport.
+ * Capture uses [captureService] when given (the AI edition's app storage), else [captures]; the stale
+ * banner then reads the service's load-time baseline, so the page and the capture agree.
  */
 class MixBenchServer(
     private val controller: MixBenchController,
@@ -63,6 +66,7 @@ class MixBenchServer(
     private val vibesDir: File?,
     private val port: Int = 0,
     private val uiDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val captureService: MixCaptureService? = null,
 ) {
     private val log = logging("MixBenchServer")
     // 32 random bytes as 64 hex chars, compared in constant time.
@@ -71,12 +75,12 @@ class MixBenchServer(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val clients = mutableSetOf<SseClient>()
     private val stateTicks = Channel<Unit>(Channel.CONFLATED)
-    private val commands = BenchCommands(controller, pulsar, transport, captures, uiDispatcher) { baseline() }
+    private val commands = BenchCommands(controller, pulsar, transport, captures, uiDispatcher, captureService) { staleBaseline(it) }
 
     private var http: HttpServer? = null
     private var executor: ExecutorService? = null
 
-    // Per vibe name: the source hash at first load (R5), and the overview render state.
+    // Per vibe name: the source hash at first load (R5; the overview key), and the overview render state.
     private val baselines = mutableMapOf<String, String?>()
     private val overviews = mutableMapOf<String, OverviewState>()
     private val sources = mutableMapOf<String, File?>()
@@ -286,9 +290,14 @@ class MixBenchServer(
 
     private fun baseline(): String? = synchronized(baselines) { baselines[pulsar.vibeFlow.value.name] }
 
+    /** What stale compares against: the capture service's load-time hash when there is one, else the page's. */
+    private fun staleBaseline(name: String): String? =
+        if (captureService != null) captureService.baselineHash(name) else synchronized(baselines) { baselines[name] }
+
     private fun computeStale(): Boolean {
-        val base = baseline() ?: return false
-        val src = source(pulsar.vibeFlow.value.name) ?: return false
+        val name = pulsar.vibeFlow.value.name
+        val base = staleBaseline(name) ?: return false
+        val src = source(name) ?: return false
         return sha256(src) != base
     }
 

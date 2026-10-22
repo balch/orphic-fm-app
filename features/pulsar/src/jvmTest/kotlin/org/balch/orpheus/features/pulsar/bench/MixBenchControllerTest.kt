@@ -360,6 +360,30 @@ class MixBenchControllerTest {
     }
 
     @Test
+    fun vibeLoadReleasesHeldMacrosAndRefusesMacroEditsUntilFollowed() = runTest {
+        section(1)
+        val c = started()
+        c.setScope(Scope.SECTION)
+        assertTrue(c.setMacro(Macro.SPACE, 0.1f))
+        assertEquals(listOf(mapOf(Macro.SPACE to 0.1f)), feature.benchMacroWrites)
+        // The follower has not seen this load, so the layers still belong to the old vibe.
+        feature.applyVibe(vibe)
+        assertNull(c.captureSnapshot())
+        assertFalse(c.setMacro(Macro.SPACE, 0.2f))
+        c.setScope(Scope.VIBE)
+        assertFalse(c.setMacro(Macro.ENERGY, 0.9f))
+        assertTrue(feature.macroWrites.none { it.first == "energy" }, "${feature.macroWrites}")
+        assertEquals(listOf(mapOf(Macro.SPACE to 0.1f)), feature.benchMacroWrites)
+        runCurrent()
+        // The load follower tells the feature, so a held SPACE can't keep scaling the sends.
+        assertEquals(listOf(mapOf(Macro.SPACE to 0.1f), emptyMap()), feature.benchMacroWrites)
+        assertEquals(BenchLayers(), c.layers.value)
+        assertEquals(1, c.captureSnapshot()?.loadCount)
+        assertTrue(c.setMacro(Macro.ENERGY, 0.9f))
+        assertEquals("energy" to 0.9f, feature.macroWrites.last())
+    }
+
+    @Test
     fun vibeChangeClearsLayers() = runTest {
         section(1)
         val c = started()

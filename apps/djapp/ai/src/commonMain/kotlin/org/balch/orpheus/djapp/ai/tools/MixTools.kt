@@ -335,16 +335,19 @@ class MixSetTool(
                 if (scope == Scope.SECTION && !pulsar.vibeFlow.value.sectionScopeAvailable()) {
                     notes += "This vibe has fewer than two sections, so the edit went to the whole vibe."
                 }
+                val range = RANGES.getValue(field)
+                val value = args.value.coerceIn(range)
+                if (value != args.value) notes += "$field clamped to ${range.start}..${range.endInclusive} (asked ${args.value})."
                 when (field) {
-                    "level_db" -> c.setHeardLevelDb(track!!, args.value.coerceIn(FADER_MIN_DB, FADER_MAX_DB))
+                    "level_db" -> c.setHeardLevelDb(track!!, value)
                     "pan" -> {
                         if (scope == Scope.SECTION) notes += "Pan is whole-vibe only."
-                        c.setPan(track!!, args.value)
+                        c.setPan(track!!, value)
                     }
-                    "reverb", "delay" -> if (!c.setHeardSend(track!!, args.value, reverb = field == "reverb")) {
+                    "reverb", "delay" -> if (!c.setHeardSend(track!!, value, reverb = field == "reverb")) {
                         badArg("This send is 0 here, so a whole-vibe edit can't scale it; use scope=section.")
                     }
-                    "macro" -> c.setMacro(macro!!, args.value)
+                    "macro" -> if (!c.setMacro(macro!!, value)) badArg("A vibe is loading; call mix_read, then try again.")
                 }
                 val section = pulsar.arrangementStateFlow.value.sectionIndex
                 MixSetResult(
@@ -363,6 +366,13 @@ class MixSetTool(
 
     private companion object {
         val FIELDS = listOf("level_db", "pan", "reverb", "delay", "macro")
+        val RANGES = mapOf(
+            "level_db" to FADER_MIN_DB..FADER_MAX_DB,
+            "pan" to -1f..1f,
+            "reverb" to 0f..1f,
+            "delay" to 0f..1f,
+            "macro" to 0f..1f,
+        )
     }
 }
 

@@ -26,8 +26,10 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
+import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.OverviewCache
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -69,7 +71,7 @@ class MixBenchServerTest {
         controller = controller,
         pulsar = feature,
         transport = NoTransport,
-        captures = CaptureWriter(root),
+        captures = CaptureWriter(File(root, "build/mix-bench/captures"), root),
         overview = OverviewCache(root, launch = { 1 }),
         vibesDir = null,
     )
@@ -133,6 +135,75 @@ class MixBenchServerTest {
     }
 
     @Test
+    fun captureWritesToTheRepoWithoutAService() {
+        val reply = post(url, """{"op":"capture"}""")
+        assertTrue(reply.contains("\"ok\":true"), reply)
+        assertEquals(1, File(root, "build/mix-bench/captures").listFiles()?.size, reply)
+    }
+
+    @Test
+    fun captureGoesThroughTheServiceWhenGiven() {
+        val out = File(root, "app-captures/x.json")
+        var calls = 0
+        val service = object : MixCaptureService {
+            override suspend fun capture(): CaptureOutcome {
+                calls++
+                return CaptureOutcome(true, "applied", out.path, emptyList(), null, aiVibe = true, appliedToAiVibe = true)
+            }
+        }
+        val s = MixBenchServer(controller, feature, NoTransport, CaptureWriter(root, root), OverviewCache(root, launch = { 1 }), null, captureService = service)
+        val u = s.start()
+        try {
+            val reply = post(u, """{"op":"capture"}""")
+            assertEquals(1, calls)
+            assertTrue(reply.contains("\"appliedToAiVibe\":true"), reply)
+            assertTrue(reply.contains(out.path), reply)
+            assertTrue(File(root, "build/mix-bench/captures").listFiles().isNullOrEmpty())
+        } finally {
+            s.stop()
+        }
+    }
+
+    @Test
+    fun staleBannerReadsTheServiceBaseline() {
+        val vibes = File(root, "vibes").apply { mkdirs() }
+        File(vibes, "VibeNames.kt").writeText("val BENCH = VibeName(\"bench\")\n")
+        File(vibes, "BenchVibe.kt").writeText("val v = Vibe(name = VibeNames.BENCH)\n")
+        // The service recorded a different hash at load, so the source changed since: the page must say so too.
+        val service = object : MixCaptureService {
+            override suspend fun capture() = error("unused")
+            override fun baselineHash(vibeName: String) = if (vibeName == "bench") "deadbeef" else null
+        }
+        val s = MixBenchServer(controller, feature, NoTransport, CaptureWriter(root, root), OverviewCache(root, launch = { 1 }), vibes, captureService = service)
+        val u = s.start()
+        val events = LinkedBlockingQueue<Pair<String, String>>()
+        val conn = URI(u.substringBefore("?") + "events?key=" + u.substringAfter("key=")).toURL().openConnection() as HttpURLConnection
+        conn.readTimeout = 10_000
+        val reader = thread(isDaemon = true) { readEvents(BufferedReader(InputStreamReader(conn.inputStream)), events) }
+        try {
+            val deadline = System.nanoTime() + 5_000_000_000L
+            while (System.nanoTime() < deadline) {
+                val (name, data) = events.poll(100, TimeUnit.MILLISECONDS) ?: continue
+                if ((name == "state" || name == "snapshot") && "\"stale\":true" in data) return
+            }
+            fail("the page never showed stale")
+        } finally {
+            s.stop()
+            conn.disconnect()
+            reader.interrupt()
+        }
+    }
+
+    private fun post(pageUrl: String, body: String): String {
+        val c = URI(pageUrl.substringBefore("?") + "cmd?key=" + pageUrl.substringAfter("key=")).toURL().openConnection() as HttpURLConnection
+        c.requestMethod = "POST"
+        c.doOutput = true
+        c.setRequestProperty("Content-Type", "application/json")
+        c.outputStream.use { it.write(body.toByteArray()) }
+        return (if (c.responseCode < 400) c.inputStream else c.errorStream).bufferedReader().readText()
+    }
+
+    @Test
     fun bindsLoopbackOnly() {
         assertTrue(server.address.address.isLoopbackAddress)
         assertTrue(url.startsWith("http://127.0.0.1:") || url.startsWith("http://localhost:"), url)
@@ -156,7 +227,7 @@ class MixBenchServerTest {
         })
         val f = FakeFeature(alpha, listOf(alpha, beta))
         val c = MixBenchController(f, synth, NoTap, scope)
-        val s = MixBenchServer(c, f, NoTransport, CaptureWriter(root), cache, vibes)
+        val s = MixBenchServer(c, f, NoTransport, CaptureWriter(File(root, "build/mix-bench/captures"), root), cache, vibes)
         val u = s.start()
         val events = LinkedBlockingQueue<Pair<String, String>>()
         val conn = URI(u.substringBefore("?") + "events?key=" + u.substringAfter("key=")).toURL().openConnection() as HttpURLConnection

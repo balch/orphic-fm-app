@@ -20,18 +20,19 @@ import java.io.File
 class JvmAiVibeArchive : AiVibeArchive {
     private val log = logging("JvmAiVibeArchive")
 
-    override suspend fun archive(vibeName: String, vibeJson: String) {
+    override suspend fun archive(vibeName: String, vibeJson: String): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val dir = File(System.getProperty("user.home"), "$CONFIG_DIR/$ARCHIVE_DIR").apply { mkdirs() }
                 val file = File(dir, aiVibeFileName(vibeName, System.currentTimeMillis()))
                 file.writeText(vibeJson)
                 log.debug { "Archived AI vibe '$vibeName' -> ${file.absolutePath}" }
+                true
             } catch (e: Exception) {
                 log.error { "Failed to archive AI vibe '$vibeName': ${e.message}" }
+                false
             }
         }
-    }
 
     private companion object {
         const val CONFIG_DIR = ".config/orpheus-dj"

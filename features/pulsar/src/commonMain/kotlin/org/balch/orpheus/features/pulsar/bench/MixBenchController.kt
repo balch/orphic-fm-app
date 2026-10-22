@@ -21,6 +21,10 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.models.Vibe
+
+/** What a capture reads: the vibe, its bench layers, and the vibe load they belong to. */
+data class CaptureSnapshot(val vibe: Vibe, val layers: BenchLayers, val loadCount: Int)
 
 /**
  * Applies Mix Bench edits to the live Pulsar engine and turns [MixBenchTap] summaries into [meters].
@@ -208,8 +212,10 @@ class MixBenchController(
     /**
      * [Scope.VIBE]: moves the app's knob, saved like the user's own. [Scope.SECTION]: the value heard in the
      * playing section, written to the engine port while that section plays; the knob keeps the whole-vibe value.
+     * Returns false, changing nothing, while a vibe load is not yet followed: the edit would hit the new vibe.
      */
-    suspend fun setMacro(m: Macro, v: Float) = lock.withLock {
+    suspend fun setMacro(m: Macro, v: Float): Boolean = lock.withLock {
+        if (loadInFlight()) return@withLock false
         val value = v.coerceIn(0f, 1f)
         val s = editSection()
         val l = _layers.value
@@ -224,6 +230,12 @@ class MixBenchController(
             _layers.value = l.withSection(s) { it.copy(macrosHeard = it.macrosHeard + (m to value)) }
             applySectionMacros()
         }
+        true
+    }
+
+    /** The vibe and the layers a capture reads, taken together; null while a vibe load is not yet followed. */
+    suspend fun captureSnapshot(): CaptureSnapshot? = lock.withLock {
+        if (loadInFlight()) null else CaptureSnapshot(vibe, _layers.value, pulsar.vibeLoadCount.value)
     }
 
     suspend fun toggleMute(t: Int) = edit(t) {
@@ -359,8 +371,13 @@ class MixBenchController(
         if (running) for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         owned.clear()
         releaseOverlay()
+        // The feature drops its copy on a load too; telling it covers any path that didn't.
+        if (held.isNotEmpty()) pulsar.setBenchMacros(emptyMap())
         held = emptyMap()
     }
+
+    /** True while the layers belong to a vibe the load follower has not cleared yet. */
+    private fun loadInFlight() = running && pulsar.vibeLoadCount.value != loadsApplied
 
     private fun setSend(t: Int, v: Float, reverb: Boolean) {
         val value = v.coerceAtLeast(0f)
@@ -415,7 +432,7 @@ class MixBenchController(
      * again. [force] rewrites unchanged values after a knob move has overwritten the port.
      */
     private fun applySectionMacros(force: Boolean = false) {
-        if (!running) return
+        if (!running || loadInFlight()) return
         val l = _layers.value
         val s = section
         val heard = l.sections[s]?.macrosHeard.orEmpty()
