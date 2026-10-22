@@ -706,6 +706,26 @@ class PulsarSectionProgressionPushTest {
             assertEquals(0f, floatPort("track_6_reverb_send_space"))
         }
 
+    @Test
+    fun `section morphRise override reaches both slots`() =
+        runTest(testDispatcher) {
+            val vibe = pushTestVibe(
+                sections = listOf(
+                    Section(
+                        name = "intro", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(5 to TrackSectionOverride(morphRise = 0.375f)),
+                    ),
+                    Section(name = "groove", barsMin = 4, barsMax = 4),
+                ),
+            )
+
+            makeViewModel(vibe).actions.setVibe(vibe)
+            advanceUntilIdle()
+
+            assertEquals(0.375f, floatPort("track_5_morph_rise"))
+            assertEquals(0.375f, floatPort("track_5_morph_rise_space"))
+        }
+
     /**
      * A section's lpgMode rides the per-track bank as the enum id. An unauthored slot must
      * push -1, not 0: 0 is BYPASS, which would switch the vactrol off on every track.

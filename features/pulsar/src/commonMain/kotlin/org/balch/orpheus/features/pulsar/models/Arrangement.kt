@@ -82,6 +82,8 @@ data class SectionTransition(
  *   the macro map's `spaceDecay` cannot overwrite it. On the drum engines (BD/SD/HH) morph
  *   is decay, so this is how one section gets a long-ringing kick against a tight snare.
  *   The track's base morph and pin state are restored on exit.
+ * @param morphRise Override [OrpheusEngine.morphRise] (-1..1) on both engine slots, so one
+ *   section's SPK vowel glides further than another's. The track's own rise returns on exit.
  * @param reverbSend Override per-track reverb send (0..1).
  * @param delaySend Override per-track delay send (0..1).
  * @param envelopeProfile Override envelope profile for this section. Switch e.g.
@@ -119,6 +121,7 @@ data class TrackSectionOverride(
     val volume: Float? = null,
     val pan: Float? = null,
     val morph: Float? = null,
+    val morphRise: Float? = null,
     val reverbSend: Float? = null,
     val delaySend: Float? = null,
     val envelopeProfile: EnvelopeProfile? = null,

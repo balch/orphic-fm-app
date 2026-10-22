@@ -2227,6 +2227,8 @@ class PulsarViewModel(
             trackMorphSpaceIds[i].value = FloatValue(o?.morph ?: spa.morph)
             trackPinMorphIds[i].value = IntValue(if (o?.morph != null || edm.pinMorph) 1 else 0)
             trackPinMorphSpaceIds[i].value = IntValue(if (o?.morph != null || spa.pinMorph) 1 else 0)
+            trackMorphRiseIds[i].value = FloatValue(o?.morphRise ?: edm.morphRise)
+            trackMorphRiseSpaceIds[i].value = FloatValue(o?.morphRise ?: spa.morphRise)
             trackEnvelopeIds[i].value = IntValue((o?.envelopeProfile ?: tv.envelopeProfile).id)
             next.delayEdm[i] = o?.delaySend ?: edm.delaySend
             next.reverbEdm[i] = o?.reverbSend ?: edm.reverbSend
