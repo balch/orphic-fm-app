@@ -154,6 +154,8 @@ class DspSynthEngine(
     override val scopeFrame: ScopeFrame get() = monitor.scopeFrame
     override val pulsarVizFlow get() = monitor.pulsarVizFlow
     override val pulsarTrackVizFlows get() = monitor.pulsarTrackVizFlows
+    override val pulsarTrackHistory get() = monitor.pulsarTrackHistory
+    override val scopeHistory get() = monitor.scopeHistory
     override val pulsarArrangementStateFlow get() = monitor.arrangementStateFlow
 
     init {

@@ -11,9 +11,11 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.core.plugin.viz.ScopeFrame
+import org.balch.orpheus.core.plugin.viz.VizHistory
 
 private val emptyVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
 private val emptyPulsarTrackVizFlows: List<StateFlow<FloatArray>> = List(8) { emptyVizFlow }
+private val emptyVizHistory: StateFlow<VizHistory?> = MutableStateFlow(null)
 private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(PulsarVizData())
 private val emptyPulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> = MutableStateFlow(null)
 private val emptyBeatPhaseFlow: StateFlow<Float> = MutableStateFlow(0f)
@@ -262,6 +264,12 @@ interface SynthEngine : AudioHostSuspender {
 
     // Per-track audio waveform viz (8 tracks, each a FloatArray ring)
     val pulsarTrackVizFlows: List<StateFlow<FloatArray>> get() = emptyPulsarTrackVizFlows
+
+    /** The Pulsar poll's track rings with their ends and arrival, for an even scroll. Null until it polls. */
+    val pulsarTrackHistory: StateFlow<VizHistory?> get() = emptyVizHistory
+
+    /** The same for the signal-scope poll's bus rings, while the scope is enabled. */
+    val scopeHistory: StateFlow<VizHistory?> get() = emptyVizHistory
 
     // Arrangement state (section, bars remaining, solo) from C++ engine
     val pulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> get() = emptyPulsarArrangementStateFlow

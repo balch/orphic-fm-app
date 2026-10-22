@@ -17,8 +17,10 @@ import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.core.plugin.viz.ScopeFrame
+import org.balch.orpheus.core.plugin.viz.VizHistory
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * Owns all monitoring StateFlows and signal visualization polling.
@@ -137,6 +139,11 @@ class SynthEngineMonitor(
     val pulsarVizFlow: StateFlow<PulsarVizData> = _pulsarVizFlow.asStateFlow()
     private val _pulsarTrackVizFlows = List(PULSAR_NUM_TRACKS) { MutableStateFlow(FloatArray(0)) }
     val pulsarTrackVizFlows: List<StateFlow<FloatArray>> = _pulsarTrackVizFlows.map { it.asStateFlow() }
+    // Each poll's rings with their absolute ends, for scrolling at an even speed. Null until a poll runs.
+    private val _pulsarTrackHistory = MutableStateFlow<VizHistory?>(null)
+    val pulsarTrackHistory: StateFlow<VizHistory?> = _pulsarTrackHistory.asStateFlow()
+    private val _scopeHistory = MutableStateFlow<VizHistory?>(null)
+    val scopeHistory: StateFlow<VizHistory?> = _scopeHistory.asStateFlow()
     private val _arrangementStateFlow = MutableStateFlow<PulsarArrangementState?>(null)
     val arrangementStateFlow: StateFlow<PulsarArrangementState?> = _arrangementStateFlow.asStateFlow()
 
@@ -198,6 +205,33 @@ class SynthEngineMonitor(
         if (count > 0) {
             flow.value = appendToVizRing(flow.value, vizBuf, count)
         }
+    }
+
+    /** Publishes the rings [ring] returns, by channel id, with their ends, if any moved since the last. */
+    private inline fun publishHistory(
+        flow: MutableStateFlow<VizHistory?>, readPositions: IntArray, ring: (Int) -> FloatArray?,
+    ) {
+        val last = flow.value
+        if (last != null && last.ends.contentEquals(readPositions)) return
+        val samples = Array(VIZ_CHANNEL_COUNT) { ring(it) ?: EMPTY_RING }
+        flow.value = VizHistory(samples, readPositions.copyOf(), TimeSource.Monotonic.markNow())
+    }
+
+    // The scope poll's bus flows by channel id; the DJ ring is kept by the poll itself.
+    private val scopeFlows: Map<Int, MutableStateFlow<FloatArray>> by lazy {
+        mapOf(
+            VIZ_LFO to _lfoVizFlow, VIZ_WARPS_C to _warpsCarrierVizFlow, VIZ_WARPS_M to _warpsModVizFlow,
+            VIZ_WARPS_O to _warpsOutVizFlow, VIZ_DELAY_IN to _delayInVizFlow, VIZ_DELAY_FB to _delayFbVizFlow,
+            VIZ_DELAY_OUT to _delayOutVizFlow, VIZ_REVERB_IN to _reverbInVizFlow, VIZ_REVERB_OUT to _reverbOutVizFlow,
+            VIZ_FLUX_CV to _fluxCvVizFlow, VIZ_RESO_IN to _resoInVizFlow, VIZ_RESO_OUT to _resoOutVizFlow,
+            VIZ_DRUM_OUT to _drumOutVizFlow, VIZ_GRAINS_IN to _grainsInVizFlow, VIZ_GRAINS_OUT to _grainsOutVizFlow,
+            VIZ_LFO_CH1 to _lfoCh1VizFlow, VIZ_LFO_CH2 to _lfoCh2VizFlow, VIZ_LFO_CH3 to _lfoCh3VizFlow,
+            VIZ_BASS_OUT to _bassOutVizFlow, VIZ_MASTER_OUT to _masterOutVizFlow,
+            VIZ_HORN_IN to _hornInVizFlow, VIZ_HORN_OUT to _hornOutVizFlow,
+            VIZ_HORN_PHASE to _hornPhaseVizFlow, VIZ_WOOFER_PHASE to _wooferPhaseVizFlow,
+            VIZ_TIDES_CH0 to _tidesCh0VizFlow, VIZ_TIDES_CH1 to _tidesCh1VizFlow,
+            VIZ_TIDES_CH2 to _tidesCh2VizFlow, VIZ_TIDES_CH3 to _tidesCh3VizFlow,
+        )
     }
 
     private fun pollTurntableViz(
@@ -374,6 +408,10 @@ class SynthEngineMonitor(
                     val data = _pulsarTrackVizFlows[t].value
                     trackLevels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
                 }
+                publishHistory(_pulsarTrackHistory, pulsarReadPos) { ch ->
+                    if (ch >= VIZ_PULSAR_TRACK_0 && ch < VIZ_PULSAR_TRACK_0 + PULSAR_NUM_TRACKS)
+                        _pulsarTrackVizFlows[ch - VIZ_PULSAR_TRACK_0].value else null
+                }
                 // Void Anomaly gain: a single live scalar (1.0 = idle), same channel
                 // shape as beat_phase below — only the latest sample matters, so read
                 // straight off the ring rather than accumulating a history flow.
@@ -539,6 +577,7 @@ class SynthEngineMonitor(
                    _djOutVizFlow,
                    _tidesCh0VizFlow, _tidesCh1VizFlow, _tidesCh2VizFlow, _tidesCh3VizFlow,
             ).forEach { it.value = FloatArray(0) }
+            _scopeHistory.value = null
             _pulsarVizFlow.value = PulsarVizData()
         }
     }
@@ -550,6 +589,10 @@ class SynthEngineMonitor(
             val vizBuf = FloatArray(VIZ_BUF_SIZE)
             val readPositions = IntArray(VIZ_CHANNEL_COUNT)
             val posBuf = IntArray(1)
+            // The turntable poll appends to the DJ flow too, so history reads the DJ ring on its own.
+            val scopeDj = MutableStateFlow(FloatArray(0))
+            val djHistoryPos = IntArray(VIZ_CHANNEL_COUNT)
+            val historyEnds = IntArray(VIZ_CHANNEL_COUNT)
             while (isActive) {
                 pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow, posBuf)
                 pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow, posBuf)
@@ -576,10 +619,16 @@ class SynthEngineMonitor(
                 pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow, posBuf)
                 pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow, posBuf)
                 pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow, posBuf)
+                pollVizChannel(VIZ_DJ_OUT, djHistoryPos, vizBuf, scopeDj, posBuf)
                 pollVizChannel(VIZ_TIDES_CH0, readPositions, vizBuf, _tidesCh0VizFlow, posBuf)
                 pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow, posBuf)
                 pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow, posBuf)
                 pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow, posBuf)
+                readPositions.copyInto(historyEnds)
+                historyEnds[VIZ_DJ_OUT] = djHistoryPos[VIZ_DJ_OUT]
+                publishHistory(_scopeHistory, historyEnds) { ch ->
+                    if (ch == VIZ_DJ_OUT) scopeDj.value else scopeFlows[ch]?.value
+                }
 
                 delay(VIZ_SCOPE_POLL_INTERVAL)
             }
@@ -707,5 +756,6 @@ class SynthEngineMonitor(
         private const val VIZ_PULSAR_KRAKEN = 39  // Kraken shift in effect (-1 = home)
         private const val VIZ_CHANNEL_COUNT = 40  // 29 + 8 pulsar tracks + beat_phase + void_gain + kraken
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
+        private val EMPTY_RING = FloatArray(0)
     }
 }
