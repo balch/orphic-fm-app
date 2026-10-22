@@ -43,23 +43,12 @@ constexpr int kTracks = 8;
 constexpr int kChannels = kTracks + OrpheusEngine::PulsarMeasureTaps::kMeasureSources;
 const char* const kChannelNames[kChannels] = {"KICK", "PERC", "HIHAT", "BASS", "KEYS", "PAD", "TEXT", "FX",
                                               "STORM", "STREET", "SPEECH"};
-// One stereo signal's running sums for a window (whole render or one section).
-struct StereoStats {
-    double k_energy = 0, e_l = 0, e_r = 0, e_lr = 0, e_sub = 0, e_low = 0, peak = 0;
-    long frames = 0;
-    void add(const StereoStats& o) {
-        k_energy += o.k_energy; e_l += o.e_l; e_r += o.e_r; e_lr += o.e_lr; e_sub += o.e_sub; e_low += o.e_low;
-        peak = std::max(peak, o.peak); frames += o.frames;
-    }
-};
-
 struct Window {
     StereoStats out, dry, track[kChannels];
     std::vector<double> out_blocks;         // 400 ms output block powers, for gated LUFS
     long audible_blocks[kChannels] = {};    // blocks a channel sits within 30 dB of the dry mix
     long mix_blocks = 0;                    // blocks where the dry mix itself is above -70
-    double pre_limit_peak = 0, e_pre_limit = 0, e_post_limit = 0, e_pre_hpf = 0, e_post_hpf = 0;
-    long over_knee = 0, samples = 0;
+    BusStats bus;                           // both sides, every sample
     double seconds = 0;
     double peak_at = 0;                     // render time of the output peak, in seconds
 };
@@ -77,20 +66,6 @@ struct Meter {
 };
 
 struct SubBlock { double out = 0, dry = 0, track[kChannels] = {}; long frames = 0; };
-
-void accumulate(StereoStats& s, double l, double r, double kl, double kr, Bands& bl, Bands& br) {
-    double sub_l, low_l, sub_r, low_r;
-    bl.process(l, sub_l, low_l);
-    br.process(r, sub_r, low_r);
-    s.k_energy += kl * kl + kr * kr;
-    s.e_sub += sub_l * sub_l + sub_r * sub_r;
-    s.e_l += l * l;
-    s.e_r += r * r;
-    s.e_lr += l * r;
-    s.e_low += low_l * low_l + low_r * low_r;
-    s.peak = std::max(s.peak, std::max(std::fabs(l), std::fabs(r)));
-    s.frames++;
-}
 
 std::string json_escape(const std::string& s) {
     std::string o;
@@ -123,9 +98,9 @@ void write_window(FILE* f, const Window& w, const char* indent) {
             w.peak_at);
     fprintf(f, "%s\"bus\": {\"pre_limit_peak_dbfs\": %.2f, \"over_knee_pct\": %.2f, \"limiter_gr_db\": %.2f, "
                "\"hpf_loss_db\": %.2f},\n", indent,
-            db_amp(w.pre_limit_peak), w.samples ? 100.0 * w.over_knee / w.samples : 0.0,
-            w.e_pre_limit > 1e-30 ? 10.0 * std::log10(w.e_post_limit / w.e_pre_limit) : 0.0,
-            w.e_pre_hpf > 1e-30 ? 10.0 * std::log10(w.e_post_hpf / w.e_pre_hpf) : 0.0);
+            db_amp(w.bus.pre_limit_peak), w.bus.samples ? 100.0 * w.bus.over_knee / w.bus.samples : 0.0,
+            w.bus.e_pre_limit > 1e-30 ? 10.0 * std::log10(w.bus.e_post_limit / w.bus.e_pre_limit) : 0.0,
+            w.bus.e_pre_hpf > 1e-30 ? 10.0 * std::log10(w.bus.e_post_hpf / w.bus.e_pre_hpf) : 0.0);
     fprintf(f, "%s\"dry\": {", indent);
     write_signal(f, w.dry, w.dry, false);
     fprintf(f, "}");
@@ -146,9 +121,9 @@ void write_window(FILE* f, const Window& w, const char* indent) {
 void print_window(const char* label, const Window& w) {
     const double rel_den = w.dry.k_energy;
     printf("  %-10s %5.0fs  LUFS %6.1f  peak %6.1f  pre-limit %+5.1f dBFS  knee %5.1f%%  GR %5.1f dB |",
-           label, w.seconds, integrated_lufs(w.out_blocks), db_amp(w.out.peak), db_amp(w.pre_limit_peak),
-           w.samples ? 100.0 * w.over_knee / w.samples : 0.0,
-           w.e_pre_limit > 1e-30 ? 10.0 * std::log10(w.e_post_limit / w.e_pre_limit) : 0.0);
+           label, w.seconds, integrated_lufs(w.out_blocks), db_amp(w.out.peak), db_amp(w.bus.pre_limit_peak),
+           w.bus.samples ? 100.0 * w.bus.over_knee / w.bus.samples : 0.0,
+           w.bus.e_pre_limit > 1e-30 ? 10.0 * std::log10(w.bus.e_post_limit / w.bus.e_pre_limit) : 0.0);
     for (int t = 0; t < kChannels; t++) {
         const double e = w.track[t].k_energy;
         if (e > 1e-30 && rel_den > 1e-30) printf(" %6.1f", 10.0 * std::log10(e / rel_den));
@@ -188,7 +163,7 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
     OrpheusEngine* e = orpheus_engine_create(static_cast<float>(sr));
     if (!load_dj_graph(e)) { orpheus_engine_destroy(e); return false; }
     auto taps = std::make_unique<OrpheusEngine::PulsarMeasureTaps>();
-    e->pulsar_measure_taps = taps.get();
+    e->pulsar_measure_taps.store(taps.get(), std::memory_order_release);
     stmlib::Random::Seed(static_cast<uint32_t>(d.seed));
     e->clock_bpm.store(d.bpm, std::memory_order_relaxed);
     apply(e, d.base);
@@ -254,18 +229,9 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
             }
             for (int c = 0; c < 2; c++) {
                 const float pre = c ? taps->pre_limit_r[i] : taps->pre_limit_l[i];
-                const float post = soft_limit(pre);
-                for (Window* w : {&run.whole, &sec}) {
-                    w->pre_limit_peak = std::max(w->pre_limit_peak, static_cast<double>(std::fabs(pre)));
-                    w->e_pre_limit += static_cast<double>(pre) * pre;
-                    w->e_post_limit += static_cast<double>(post) * post;
-                    const double ph = c ? taps->pre_hpf_r[i] : taps->pre_hpf_l[i];
-                    const double qh = c ? taps->post_hpf_r[i] : taps->post_hpf_l[i];
-                    w->e_pre_hpf += ph * ph;
-                    w->e_post_hpf += qh * qh;
-                    if (std::fabs(pre) > 0.5f) w->over_knee++;
-                    w->samples++;
-                }
+                const double ph = c ? taps->pre_hpf_r[i] : taps->pre_hpf_l[i];
+                const double qh = c ? taps->post_hpf_r[i] : taps->post_hpf_l[i];
+                for (Window* w : {&run.whole, &sec}) w->bus.add(pre, ph, qh, soft_limit);
             }
         }
         for (Window* w : {&run.whole, &sec}) {
@@ -284,7 +250,7 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
             trim();
         }
     }
-    e->pulsar_measure_taps = nullptr;
+    e->pulsar_measure_taps.store(nullptr, std::memory_order_release);
     orpheus_engine_destroy(e);
     return run.whole.out.peak > 1e-4;
 }

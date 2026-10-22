@@ -144,6 +144,7 @@ static TestSuite suites[] = {
     {"vibe_record",     run_vibe_record,           false},  // manual: writes WAV files
     {"vibe_measure",    run_vibe_measure,          false},  // manual: writes JSON
     {"vibe_measure_meter", run_vibe_measure_meter_tests, true},
+    {"mix_bench",       run_mix_bench_tests,       true},
     {"pulsar_mist",     run_pulsar_mist_tests,     true},
     {"pulsar_vibrato",  run_pulsar_vibrato_tests,  true},
     {"pulsar_pitch_rise", run_pulsar_pitch_rise_tests, true},

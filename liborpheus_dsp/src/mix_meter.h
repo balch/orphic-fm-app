@@ -1,6 +1,7 @@
 #pragma once
 // Loudness and low-band meter maths shared by the vibe measurement harness and the mix bench.
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -63,6 +64,53 @@ struct Bands {
     void process(double x, double& sub_out, double& low_out) {
         sub_out = sub.process(x);
         low_out = low_lp.process(low_hp.process(x));
+    }
+};
+
+// One stereo signal's running sums over a window: K-weighted energy, per-side and cross energy,
+// sub and low band energy (both sides), and the sample peak.
+struct StereoStats {
+    double k_energy = 0, e_l = 0, e_r = 0, e_lr = 0, e_sub = 0, e_low = 0, peak = 0;
+    long frames = 0;
+    void add(const StereoStats& o) {
+        k_energy += o.k_energy; e_l += o.e_l; e_r += o.e_r; e_lr += o.e_lr; e_sub += o.e_sub; e_low += o.e_low;
+        peak = std::max(peak, o.peak); frames += o.frames;
+    }
+};
+
+// One frame into s: raw l and r, their K-weighted values kl and kr, and each side's band splitter.
+inline void accumulate(StereoStats& s, double l, double r, double kl, double kr, Bands& bl, Bands& br) {
+    double sub_l, low_l, sub_r, low_r;
+    bl.process(l, sub_l, low_l);
+    br.process(r, sub_r, low_r);
+    s.k_energy += kl * kl + kr * kr;
+    s.e_sub += sub_l * sub_l + sub_r * sub_r;
+    s.e_l += l * l;
+    s.e_r += r * r;
+    s.e_lr += l * r;
+    s.e_low += low_l * low_l + low_r * low_r;
+    s.peak = std::max(s.peak, std::max(std::fabs(l), std::fabs(r)));
+    s.frames++;
+}
+
+// Pulsar's bus limiter (soft_limit) is linear below this level and saturates above it.
+constexpr float kKnee = 0.5f;
+
+// The Pulsar bus around its limiter and its 55 Hz HPF, one sample of one side at a time.
+struct BusStats {
+    double pre_limit_peak = 0, e_pre_limit = 0, e_post_limit = 0, e_pre_hpf = 0, e_post_hpf = 0;
+    long over_knee = 0, samples = 0;
+    // limit is the bus limiter (soft_limit), a parameter so this header stays free of the voice code.
+    template <typename Limiter>
+    void add(float pre_limit, double pre_hpf, double post_hpf, Limiter limit) {
+        const float post = limit(pre_limit);
+        pre_limit_peak = std::max(pre_limit_peak, static_cast<double>(std::fabs(pre_limit)));
+        e_pre_limit += static_cast<double>(pre_limit) * pre_limit;
+        e_post_limit += static_cast<double>(post) * post;
+        e_pre_hpf += pre_hpf * pre_hpf;
+        e_post_hpf += post_hpf * post_hpf;
+        if (std::fabs(pre_limit) > kKnee) over_knee++;
+        samples++;
     }
 };
 

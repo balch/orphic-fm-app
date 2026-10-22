@@ -28,6 +28,15 @@ void orpheus_engine_process_deinterleaved(OrpheusEngine* engine,
                                           float* left, float* right,
                                           int num_frames);
 
+// ── Mix bench (live per-block meter summaries) ──
+// Enable allocates the bench and Pulsar's measurement taps; disable nulls both and frees them
+// after the next block. Call from a control thread, never the audio thread.
+// Disable may block briefly (up to ~100 ms while it waits out an in-flight block).
+void orpheus_engine_set_mix_bench(OrpheusEngine* engine, int enabled);
+// Single reader only: call drain from one thread. Writes up to max_summaries summaries of kBenchSummaryFloats floats each
+// (mix_bench.h) into out, oldest first; returns the count. 0 while the bench is off.
+int  orpheus_engine_drain_mix_bench(OrpheusEngine* engine, float* out, int max_summaries);
+
 // ── Diagnostics ────
 void  orpheus_engine_dump_state(OrpheusEngine* engine);
 

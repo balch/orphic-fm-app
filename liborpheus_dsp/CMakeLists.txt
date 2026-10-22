@@ -394,6 +394,7 @@ if(BUILD_TESTS)
         test/test_mist_samples.cpp
         test/test_vibe_record.cpp
         test/test_vibe_measure.cpp
+        test/test_mix_bench.cpp
         test/test_pulsar_mist.cpp
         test/test_pulsar_vibrato.cpp
         test/test_pulsar_pitch_rise.cpp

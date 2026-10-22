@@ -1,5 +1,6 @@
 #include "orpheus_engine.h"
 #include "orpheus_graph.h"
+#include "mix_bench.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -243,6 +244,7 @@ void orpheus_engine_destroy(OrpheusEngine* engine) {
         delete[] engine->speech_clip_buffer;
         delete[] engine->tts_delay_buffer;
         pulsar_state_free(engine->pulsar_state);
+        delete engine->mix_bench.load(std::memory_order_acquire);
         delete engine;
     }
 }
@@ -546,6 +548,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
     std::memset(output_buffer, 0, num_frames * 2 * sizeof(float));
 
     OrpheusGraph* graph = engine->graph.load(std::memory_order_acquire);
+    // One null check per block while the bench is off.
+    MixBench* bench = engine->mix_bench.load(std::memory_order_acquire);
     if (graph) {
         // Process in kMaxFrames (512) chunks for large Bluetooth callbacks.
         // orpheus_graph_process clamps to kMaxFrames internally — without
@@ -555,6 +559,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
             int chunk = num_frames - frames_done;
             if (chunk > kMaxFrames) chunk = kMaxFrames;
             orpheus_graph_process(graph, engine, output_buffer + frames_done * 2, chunk);
+            // Per chunk, while the taps still hold this chunk. OUT is the graph's output, before TTS.
+            if (bench) bench->on_block(engine, output_buffer + frames_done * 2, chunk);
             frames_done += chunk;
         }
     }
@@ -615,6 +621,42 @@ void orpheus_engine_process(OrpheusEngine* engine,
     engine->cpu_load.store(elapsed_us / buffer_us, std::memory_order_relaxed);
 
     engine->blocks_rendered.fetch_add(1, std::memory_order_release);
+}
+
+void orpheus_engine_set_mix_bench(OrpheusEngine* engine, int enabled) {
+    if (!engine) return;
+    if (enabled) {
+        if (engine->mix_bench.load(std::memory_order_acquire)) return;
+        auto* bench = new MixBench(engine->sample_rate);
+        // Taps first, so a block that sees the bench also sees its taps.
+        engine->pulsar_measure_taps.store(bench->taps(), std::memory_order_seq_cst);
+        engine->mix_bench.store(bench, std::memory_order_seq_cst);
+        return;
+    }
+    if (!engine->mix_bench.load(std::memory_order_acquire)) return;
+    // Taps first, mirroring enable; neither pointer is freed until the waits below.
+    engine->pulsar_measure_taps.store(nullptr, std::memory_order_seq_cst);
+    MixBench* old = engine->mix_bench.exchange(nullptr, std::memory_order_seq_cst);
+    if (!old) return;
+#ifndef __EMSCRIPTEN__
+    // As orpheus_graph_retire: one blocks_rendered advance proves no block still holds the old
+    // pointers; when audio is idle it never comes, so only this wait may time out.
+    const uint64_t epoch = engine->blocks_rendered.load(std::memory_order_seq_cst);
+    for (int i = 0; i < 100 && engine->blocks_rendered.load(std::memory_order_seq_cst) == epoch; i++)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    // A drain that loaded the old pointer finishes in microseconds; this wait has no timeout.
+    while (engine->mix_bench_drains.load(std::memory_order_seq_cst) != 0) std::this_thread::yield();
+#endif
+    delete old;
+}
+
+int orpheus_engine_drain_mix_bench(OrpheusEngine* engine, float* out, int max_summaries) {
+    if (!engine) return 0;
+    engine->mix_bench_drains.fetch_add(1, std::memory_order_seq_cst);
+    MixBench* bench = engine->mix_bench.load(std::memory_order_seq_cst);
+    const int n = bench ? bench->drain(out, max_summaries) : 0;
+    engine->mix_bench_drains.fetch_sub(1, std::memory_order_seq_cst);
+    return n;
 }
 
 // Max frames per callback — CoreAudio typically uses 512 or 1024.

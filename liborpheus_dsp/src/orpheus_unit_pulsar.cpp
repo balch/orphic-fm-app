@@ -2830,8 +2830,15 @@ void pulsar_state_free(PulsarState* state) {
     delete state;
 }
 
+int pulsar_current_section(const PulsarState* state) {
+    return state ? state->section_state.current_section : -1;
+}
+
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate) {
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
+    // Loaded once so a toggle mid-block cannot leave some taps written and others not.
+    OrpheusEngine::PulsarMeasureTaps* const measure_taps =
+        engine->pulsar_measure_taps.load(std::memory_order_acquire);
 
     float* out_l = engine->pulsar_out_l;
     float* out_r = engine->pulsar_out_r;
@@ -6321,7 +6328,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 bus_r[i] -= sd;
             }
         }
-        if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+        if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
             for (int i = 0; i < num_frames; i++) {
                 const float s = track_buffer[i] * vol * void_gain_buf[i];
                 const float sd = grain_track ? mist_side[i] * vol * void_gain_buf[i] * mist_width : 0.0f;
@@ -6452,7 +6459,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 engine->pulsar_reverb_send_l[i] += dark_l * kStormReverbSend;
                 engine->pulsar_reverb_send_r[i] += dark_r * kStormReverbSend;
             }
-            if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+            if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
                 for (int i = 0; i < num_frames; i++) {
                     taps->source_l[taps->kMeasureStorm][i] = storm_l[i] * void_gain_buf[i];
                     taps->source_r[taps->kMeasureStorm][i] = storm_r[i] * void_gain_buf[i];
@@ -6516,7 +6523,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 engine->pulsar_reverb_send_l[i] += fl * foot_rev + tl * kStreetTrainReverbSend;
                 engine->pulsar_reverb_send_r[i] += fr * foot_rev + tr * kStreetTrainReverbSend;
             }
-            if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+            if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
                 for (int i = 0; i < num_frames; i++) {
                     taps->source_l[taps->kMeasureStreet][i] = (foot_l[i] + train_l[i]) * void_gain_buf[i];
                     taps->source_r[taps->kMeasureStreet][i] = (foot_r[i] + train_r[i]) * void_gain_buf[i];
@@ -6541,7 +6548,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             engine->pulsar_reverb_send_l[i] += s * kSpeechReverbSend;
             engine->pulsar_reverb_send_r[i] += s * kSpeechReverbSend;
         }
-        if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+        if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
             for (int i = 0; i < num_frames; i++) {
                 taps->source_l[taps->kMeasureSpeech][i] = speech_buf[i] * void_gain_buf[i];
                 taps->source_r[taps->kMeasureSpeech][i] = speech_buf[i] * void_gain_buf[i];
@@ -6584,7 +6591,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->output_hpf2_r.set_f_q<stmlib::FREQUENCY_EXACT>(hpf_f, 0.707f);
         state->output_hpf_initialized = true;
     }
-    OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps;
+    OrpheusEngine::PulsarMeasureTaps* taps = measure_taps;
     if (taps) {
         std::memcpy(taps->pre_hpf_l, out_l, num_frames * sizeof(float));
         std::memcpy(taps->pre_hpf_r, out_r, num_frames * sizeof(float));

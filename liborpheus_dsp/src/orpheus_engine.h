@@ -69,6 +69,9 @@
 struct PulsarState;
 // Defined beside the `new` in orpheus_unit_pulsar.cpp; a delete here would skip ~PulsarState.
 void pulsar_state_free(PulsarState* state);
+// The arrangement's current section, or -1 when there is no Pulsar state.
+int pulsar_current_section(const PulsarState* state);
+class MixBench;  // mix_bench.h
 #include "orpheus_unit_chaos.h"
 #include "orpheus_master_fader.h"
 #include "orpheus_master_tape_stop.h"
@@ -1247,9 +1250,9 @@ struct OrpheusEngine {
     // is set in orpheus_engine_create; mute and solo arrive here as 0.
     std::atomic<float> pulsar_track_audition_gain[8] = {};
 
-    // Headless mix harness taps (vibe_measure suite). Null in the apps; when set, Pulsar copies
-    // each block's per-track dry contribution and its bus on both sides of the 55 Hz HPF and
-    // before soft_limit. The harness zeroes them before each block.
+    // Mix measurement taps (vibe_measure suite, mix bench). Null unless one of them sets it; when
+    // set, Pulsar copies each block's per-track dry contribution and its bus on both sides of the
+    // 55 Hz HPF and before soft_limit. The reader zeroes them for the next block.
     struct PulsarMeasureTaps {
         float track_l[8][kMaxFrames];
         float track_r[8][kMaxFrames];
@@ -1264,7 +1267,12 @@ struct OrpheusEngine {
         float pre_limit_l[kMaxFrames];
         float pre_limit_r[kMaxFrames];
     };
-    PulsarMeasureTaps* pulsar_measure_taps = nullptr;
+    // Used by the vibe_measure suite or the mix bench, never both at once.
+    std::atomic<PulsarMeasureTaps*> pulsar_measure_taps{nullptr};
+    // Live mix bench (orpheus_engine_set_mix_bench). Null unless enabled; it owns the taps above.
+    std::atomic<MixBench*> mix_bench{nullptr};
+    // Drains in flight, so a disable can wait them out before freeing the bench.
+    std::atomic<int> mix_bench_drains{0};
 
     // Per-track delay/reverb sends — per-engine
     std::atomic<float> pulsar_track_delay_send[8] = {};
