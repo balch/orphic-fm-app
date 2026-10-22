@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.audio.dsp.StemLayout
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.djapp.ai.OrphicFiles
 import org.balch.orpheus.features.pulsar.bench.StemCaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.StemCaptureService
 import org.balch.orpheus.features.pulsar.bench.StemFile
@@ -26,18 +27,15 @@ import org.balch.orpheus.features.pulsar.bench.UnavailableStemCaptureService
 import org.balch.orpheus.features.pulsar.bench.analysis.AnalysisKind
 import org.balch.orpheus.features.pulsar.bench.analysis.StemAnalyzer
 
-/** Desktop stem captures, one owner-only folder each under `~/.config/orpheus-dj/stem-captures/`. */
+/** Stem captures, one owner-only folder each under [OrphicFiles.stemCaptures] (desktop `~/.config/orpheus-dj/stem-captures/`). */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, replaces = [UnavailableStemCaptureService::class])
 @Inject
 class JvmStemCaptureService(
     recorderProvider: () -> StemRecorder,
     dispatchers: DispatcherProvider,
-) : StemCaptureService by StemCaptureFlow(
-    recorderProvider,
-    File(System.getProperty("user.home"), ".config/orpheus-dj/stem-captures"),
-    dispatchers,
-)
+    files: OrphicFiles,
+) : StemCaptureService by StemCaptureFlow(recorderProvider, files.stemCaptures, dispatchers)
 
 /** The manifest written beside the WAVs as `stems.json`. */
 @Serializable
@@ -78,10 +76,12 @@ internal class StemCaptureFlow(
                 ownerOnlyTempDir()
             }
             dir = partial
+            // Read once: the headers and the analyzer must agree with the rate record() pins, checked below.
+            val headerRate = recorder.sampleRate
             withContext(dispatchers.io) {
-                for (s in stems) writers += openWriter(File(partial, "${StemLayout.NAMES[s]}.wav"), recorder.sampleRate)
+                for (s in stems) writers += openWriter(File(partial, "${StemLayout.NAMES[s]}.wav"), headerRate)
             }
-            val levels = StemAnalyzer(recorder.sampleRate, stems, setOf(AnalysisKind.LEVEL))
+            val levels = StemAnalyzer(headerRate, stems, setOf(AnalysisKind.LEVEL))
             val rec = recorder.record(
                 seconds,
                 { frames, count ->
@@ -91,6 +91,9 @@ internal class StemCaptureFlow(
                 progress,
             )
             if (!rec.ok) return StemCaptureOutcome(false, rec.message, frames = rec.frames, droppedFrames = rec.droppedFrames)
+            if (rec.sampleRate != headerRate) {
+                return StemCaptureOutcome(false, StemRecording.RATE_CHANGED, frames = rec.frames, droppedFrames = rec.droppedFrames)
+            }
 
             return withContext(dispatchers.io) {
                 writers.forEach { it.close() }
@@ -104,7 +107,7 @@ internal class StemCaptureFlow(
                 val manifest = StemManifest(
                     vibe = rec.vibe,
                     sectionAtStart = rec.sectionAtStart,
-                    sampleRate = recorder.sampleRate,
+                    sampleRate = rec.sampleRate,
                     frames = rec.frames,
                     droppedFrames = rec.droppedFrames,
                     stems = files.map { StemManifestEntry(it.stem, it.label, it.rmsDb, it.peakDb) },

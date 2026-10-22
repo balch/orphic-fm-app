@@ -25,6 +25,8 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.playback.PlaybackController
+import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
+import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.AgentActivityEventBus
 import org.balch.orpheus.features.ai.OrpheusAgent
@@ -209,6 +211,10 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
     }
 }
 
+/** Carry the MCP server's current endpoint (null while it is not listening) into the UI state. */
+internal fun withMcpEndpoint(s: DjAiUiState, endpoint: McpEndpoint?): DjAiUiState =
+    s.copy(mcpEndpoint = endpoint)
+
 /**
  * Reduce a [VibeCreateEvent] into a new [DjAiUiState].
  */
@@ -242,6 +248,7 @@ class DjAiViewModel(
     private val dispatcherProvider: DispatcherProvider,
     private val playbackController: PlaybackController,
     private val scope: FeatureCoroutineScope,
+    private val mcpEndpointState: McpEndpointState,
 ) : DjAiFeature {
 
     private val log = logging("DjAiViewModel")
@@ -279,6 +286,12 @@ class DjAiViewModel(
                 if (event is VibeCreateEvent.Generated && wasActive) {
                     withContext(dispatcherProvider.main) { playbackController.play() }
                 }
+            }
+        }
+
+        scope.launch(dispatcherProvider.default) {
+            mcpEndpointState.endpoint.collect { endpoint ->
+                _uiState.update { withMcpEndpoint(it, endpoint) }
             }
         }
 

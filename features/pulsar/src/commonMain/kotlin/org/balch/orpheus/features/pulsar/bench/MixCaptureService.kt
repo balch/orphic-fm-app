@@ -32,7 +32,7 @@ data class CaptureOutcome(
     val appliedToAiVibe: Boolean,
 )
 
-/** Default for platforms with no capture writer yet (Android, iOS, and the desktop app without the AI edition). */
+/** Default where no capture writer exists: iOS, and the og/core edition (the writer ships with desktop and Android ai). */
 @ContributesBinding(AppScope::class)
 @Inject
 class UnavailableMixCaptureService : MixCaptureService {

@@ -47,6 +47,19 @@ class OboeAudioBridge : NativeDspBridge {
     external fun nativeDrainRecording(out: FloatArray): Int
     external fun nativeRecordDroppedFrames(): Long
 
+    // ── Mix bench and stem ring ──────────────────
+    // On allocates the per-block meter taps, off frees them (may block ~100 ms). Survives a rebuild.
+    external fun nativeSetMixBench(enabled: Boolean)
+    // Copies up to [max] summaries of BenchSummaryLayout.FLOATS floats each; returns the count. One reader.
+    external fun nativeDrainMixBench(out: FloatArray, max: Int): Int
+    // Enable allocates the ring, disable frees it. Records only while the mix bench is also on.
+    external fun nativeSetStemCapture(enabled: Boolean)
+    external fun nativeArmStemCapture(frames: Int): Boolean
+    // Copies up to [maxFrames] frames of StemLayout.FLOATS_PER_FRAME floats each; returns frames copied.
+    external fun nativeDrainStemCapture(out: FloatArray, maxFrames: Int): Int
+    external fun nativeStemCaptureRemaining(): Int
+    external fun nativeStemCaptureDropped(): Long
+
     // ── Parameter control (called from UI thread) ─
     external override fun nativeSetPort(uri: String, symbol: String, value: Float)
     external override fun nativeGetPort(uri: String, symbol: String): Float

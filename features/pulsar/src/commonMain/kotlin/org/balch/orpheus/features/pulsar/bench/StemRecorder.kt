@@ -30,7 +30,14 @@ data class StemRecording(
     val sectionAtStart: String = "",
     /** Per track 0..7: the vibe's engine display name, "edm / space" when the two slots differ. */
     val trackLabels: List<String> = emptyList(),
-)
+    /** The rate the capture ran at, set on every result produced after it was read; 0 for an early refusal. */
+    val sampleRate: Int = 0,
+) {
+    companion object {
+        /** Shared with sinks that pin the rate before [StemRecorder.record] does. */
+        const val RATE_CHANGED = "the audio output's sample rate changed during the capture"
+    }
+}
 
 /**
  * Records the next N seconds of the stem ring into a [StemSink], one capture at a time across all callers.
@@ -41,12 +48,15 @@ class StemRecorder(
     private val controller: MixBenchController,
     private val pulsarProvider: () -> PulsarFeature,
     private val tap: StemTap,
-    val sampleRate: Int,
+    private val sampleRateProvider: () -> Int,
     private val dispatchers: DispatcherProvider,
     private val pollMs: Long = 20,
 ) {
     private val busy = Mutex()
     @Volatile private var closed = false
+
+    /** The live engine rate, which can change on a route change; a capture's own rate is [StemRecording.sampleRate]. */
+    val sampleRate: Int get() = sampleRateProvider()
 
     /** False where the engine has no stem ring. */
     val supported: Boolean get() = tap !== NoStemTap
@@ -82,10 +92,11 @@ class StemRecorder(
             val pulsar = pulsarProvider()
             if (!pulsar.stateFlow.value.playing) return fail(STOPPED)
             if (controller.vibeLoadInFlight()) return fail(LOADING)
-            val total = (seconds * sampleRate).roundToInt()
+            val rate = sampleRateProvider()
+            val total = (seconds * rate).roundToInt()
             require(total > 0) { "seconds must be positive: $seconds" }
             return controller.holdingTaps {
-                withContext(dispatchers.io) { capture(pulsar, seconds, total, sink, progress) }
+                withContext(dispatchers.io) { capture(pulsar, seconds, total, rate, sink, progress) }
             }
         } finally {
             busy.unlock()
@@ -96,6 +107,7 @@ class StemRecorder(
         pulsar: PulsarFeature,
         seconds: Float,
         total: Int,
+        rate: Int,
         sink: StemSink,
         progress: suspend (Float) -> Unit,
     ): StemRecording {
@@ -104,7 +116,7 @@ class StemRecorder(
         val vibe = pulsar.vibeFlow.value
         val section = vibe.arrangement?.sections?.getOrNull(pulsar.arrangementStateFlow.value.sectionIndex)?.name ?: ""
         fun result(ok: Boolean, message: String, frames: Int = 0, dropped: Long = 0) =
-            StemRecording(ok, message, frames, dropped, vibe.name, section, labels(vibe))
+            StemRecording(ok, message, frames, dropped, vibe.name, section, labels(vibe), rate)
 
         // The ring records only while the bench meters, so a stopped controller would never count down.
         if (!controller.isMetering) return result(false, NOT_METERING)
@@ -124,6 +136,7 @@ class StemRecorder(
             while (true) {
                 if (closed) return result(false, CLOSED, recorded)
                 if (pulsar.vibeLoadCount.value != loads) return result(false, VIBE_CHANGED, recorded)
+                if (sampleRateProvider() != rate) return result(false, RATE_CHANGED, recorded)
                 // The bench still renders while stopped, so a capture would go on recording silence.
                 if (!pulsar.stateFlow.value.playing) return result(false, PLAYBACK_STOPPED, recorded)
                 // Read before draining: once it is 0 nothing more arrives, so an empty drain ends the capture.
@@ -150,6 +163,7 @@ class StemRecorder(
             // A load or a stop during the last poll still spoils the stems.
             if (pulsar.vibeLoadCount.value != loads) return result(false, VIBE_CHANGED, recorded)
             if (!pulsar.stateFlow.value.playing) return result(false, PLAYBACK_STOPPED, recorded)
+            if (sampleRateProvider() != rate) return result(false, RATE_CHANGED, recorded)
             val dropped = tap.dropped() - droppedBase
             // Every armed frame is recorded or dropped; a closed engine reads remaining 0 with frames missing.
             if (recorded + dropped != total.toLong()) return result(false, CUT_SHORT, recorded)
@@ -189,6 +203,7 @@ class StemRecorder(
         const val NO_AUDIO = "no audio reached the recorder; is the audio engine running?"
         const val VIBE_CHANGED = "the vibe changed during the capture"
         const val PLAYBACK_STOPPED = "playback stopped during the capture"
+        const val RATE_CHANGED = StemRecording.RATE_CHANGED
         const val CUT_SHORT = "the capture was cut short; the audio engine stopped before it finished"
 
         /** 0.5 -> "0.5", 10.0 -> "10", 2.25 -> "2.25". */

@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
 class OboeAudioEngine(
     private val bridge: OboeAudioBridge,
     private val application: Application,
-) : AudioEngine, NativeDspBridge by bridge {
+) : AudioEngine, NativeDspBridge by bridge, MixBenchTap, StemTapSource {
 
     private var routeLostCallback: (() -> Unit)? = null
 
@@ -114,6 +114,29 @@ class OboeAudioEngine(
     override fun setPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
     override fun getPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
     override fun triggerDrum(type: Int, accent: Float) = bridge.nativeTriggerDrum(type, accent)
+
+    // -- MixBenchTap: the native host re-enables it on an engine rebuilt at a new rate ----------
+    override fun setEnabled(on: Boolean) = bridge.nativeSetMixBench(on)
+
+    override fun drain(out: FloatArray): Int =
+        bridge.nativeDrainMixBench(out, out.size / BenchSummaryLayout.FLOATS)
+
+    // -- StemTap: a property, since MixBenchTap already owns setEnabled/drain on this class -------
+    override val stemTap: StemTap = object : StemTap {
+        override fun setEnabled(on: Boolean): Boolean {
+            bridge.nativeSetStemCapture(on)
+            return true
+        }
+
+        override fun arm(frames: Int): Boolean = bridge.nativeArmStemCapture(frames)
+
+        override fun drain(out: FloatArray): Int =
+            bridge.nativeDrainStemCapture(out, out.size / StemLayout.FLOATS_PER_FRAME)
+
+        override fun remaining(): Int = bridge.nativeStemCaptureRemaining()
+
+        override fun dropped(): Long = bridge.nativeStemCaptureDropped()
+    }
 
     companion object {
         private val log = logging("OboeAudioEngine")

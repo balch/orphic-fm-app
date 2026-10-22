@@ -1,6 +1,6 @@
 package org.balch.orpheus.core.audio.dsp
 
-/** Raw per-stem audio from the engine's stem ring. Desktop only for now. */
+/** Raw per-stem audio from the engine's stem ring. Desktop and Android; iOS has none. */
 interface StemTap {
     /** Allocates or frees the native ring; false when the native library lacks it. */
     fun setEnabled(on: Boolean): Boolean

@@ -1,5 +1,7 @@
 package org.balch.orpheus.djapp.ai.mcp
 
+import java.net.InetAddress
+import java.net.Socket
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -26,6 +28,19 @@ internal class McpTestHttp(private val http: HttpClient = HttpClient.newHttpClie
             .build()
         return http.send(request, HttpResponse.BodyHandlers.ofString())
     }
+
+    /** A POST over a raw socket, since HttpClient won't set `Host`; returns the status code. */
+    fun postWithHost(port: Int, host: String, body: String, token: String): Int =
+        Socket(InetAddress.getByName("127.0.0.1"), port).use { socket ->
+            socket.soTimeout = 10_000
+            val bytes = body.toByteArray()
+            val head = "POST /mcp HTTP/1.1\r\nHost: $host\r\nContent-Type: application/json\r\n" +
+                "Accept: application/json, text/event-stream\r\nAuthorization: Bearer $token\r\n" +
+                "Content-Length: ${bytes.size}\r\nConnection: close\r\n\r\n"
+            socket.getOutputStream().apply { write(head.toByteArray()); write(bytes); flush() }
+            val status = socket.getInputStream().bufferedReader().readLine().orEmpty()
+            status.split(" ").getOrNull(1)?.toIntOrNull() ?: error("no status line: '$status'")
+        }
 
     /** `initialize` then `notifications/initialized`; returns the session id. */
     fun openSession(endpoint: McpEndpoint): String {

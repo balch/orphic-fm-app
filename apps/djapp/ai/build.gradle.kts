@@ -15,7 +15,16 @@ kotlin {
         }
     }
 
+    // Re-asserted explicitly: the dependsOn edges below would otherwise switch the default
+    // hierarchy template off, and iosMain would stop existing along with it.
+    applyDefaultHierarchyTemplate()
+
     sourceSets {
+        // The MCP server and capture services, shared by desktop and Android; iOS never sees them.
+        val jvmAndroidMain = create("jvmAndroidMain") { dependsOn(commonMain.get()) }
+        jvmMain.get().dependsOn(jvmAndroidMain)
+        androidMain.get().dependsOn(jvmAndroidMain)
+
         commonMain.dependencies {
             api(project(":apps:djapp:shared"))
             api(project(":features:ai"))
@@ -28,8 +37,8 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)
         }
-        // The MCP server is desktop-only for now; Android stays off the network stack.
-        jvmMain.dependencies {
+        // Only the ai edition carries this module, so the og flavor never gets the server stack.
+        jvmAndroidMain.dependencies {
             // The SDK pins ktor 3.5.1 for sse/websockets/content-negotiation; the BOM keeps every ktor module on one version.
             implementation(project.dependencies.platform(libs.ktor.bom))
             implementation(libs.mcp.kotlin.server)

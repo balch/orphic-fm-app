@@ -317,7 +317,7 @@ class MixToolsTest {
             // What the desktop window close runs; it closes the recorder first.
             val exit = MixBenchExit.register(c)
             assertEquals(exit, MixBenchExit.current)
-            val recorder = StemRecorder(c, { pulsar }, FakeStemTap(), 48_000, OneDispatcher(Dispatchers.Default))
+            val recorder = StemRecorder(c, { pulsar }, FakeStemTap(), { 48_000 }, OneDispatcher(Dispatchers.Default))
             exit.recorder = recorder
             assertTrue(MixBenchExit.runIfCreated())
             assertFalse(c.isRunning)

@@ -75,15 +75,19 @@ internal class FakeStemTap(var gate: () -> Boolean = { true }) : StemTap {
     }
 }
 
-/** A real recorder over [tap] at 48 kHz, its controller metering for [pulsar] in the test's background scope. */
-internal suspend fun TestScope.stemRecorder(pulsar: FakePulsar, tap: FakeStemTap = FakeStemTap()): StemRecorder {
+/** A real recorder over [tap] at [rate] (48 kHz), its controller metering for [pulsar] in the test's background scope. */
+internal suspend fun TestScope.stemRecorder(
+    pulsar: FakePulsar,
+    tap: FakeStemTap = FakeStemTap(),
+    rate: () -> Int = { 48_000 },
+): StemRecorder {
     val controller = MixBenchController(pulsar, SynthController(), NoMeterTap, backgroundScope).also {
         it.start()
         runCurrent()
     }
     tap.gate = { controller.isMetering }
     tap.renderIn(backgroundScope)
-    return StemRecorder(controller, { pulsar }, tap, 48_000, OneDispatcher(StandardTestDispatcher(testScheduler)))
+    return StemRecorder(controller, { pulsar }, tap, rate, OneDispatcher(StandardTestDispatcher(testScheduler)))
 }
 
 /** A [FakePulsar] playing its first vibe, in section 1 ("verse"). */

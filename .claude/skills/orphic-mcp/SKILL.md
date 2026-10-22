@@ -1,6 +1,6 @@
 ---
 name: orphic-mcp
-description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like. Covers launching the app, connecting over MCP, the tools, the mixing workflow, raw audio and troubleshooting.
+description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like, on the desktop app or on an Android phone (adb forward). Covers launching the app, connecting over MCP, the tools, the mixing workflow, raw audio and troubleshooting.
 ---
 
 # Orphic MCP
@@ -48,6 +48,32 @@ disown
 
 Whole-vibe macro moves change the real saved knob. Section macros do not.
 
+## Android (ai flavor)
+
+The `aiDebug` build of Orphic DJ on a phone or emulator runs the same server. The host reaches it through `adb forward`. Never run adb without `-s <serial>`, since a phone may sit next to an emulator. The helper `scripts/android.sh` wraps the steps.
+
+- Only `aiDebug` works with `run-as`, which needs a debuggable build. `aiDebugRelease` shares the package id but is not debuggable: check with `adb -s <serial> shell dumpsys package <pkg> | grep pkgFlags`.
+- Packages: `org.balch.djapp.ai.debug` (aiDebug) and `org.balch.djapp.ai` (release). Release builds have no `run-as`, so copy the token from the AI tab (the `MCP` chip shows the url and a copy-token button).
+- The chip copies the token marked sensitive, so the Android 13+ clipboard preview hides it. Release ai builds were verified working under R8.
+- Build: `./gradlew :apps:djapp:androidApp:assembleAiDebug`. The apk lands in `apps/djapp/androidApp/build/outputs/apk/ai/debug/` (`*.apk`).
+- Install: `adb -s <serial> install -r <apk>`. Never use a Gradle install task, it may hit the wrong device.
+- Launch the app. The server starts with the app process, so the AI tab need not be open.
+- Connect: `.claude/skills/orphic-mcp/scripts/android.sh --serial <serial> connect`. It reads `files/mcp.json` under `run-as`, forwards host port 47821 to the device port, and prints the host url and the token.
+- Host port is 47821 so the desktop app keeps 47801. Pass `--host-port` for another.
+- The url inside the device `mcp.json` is the device url. The host can only reach it through the forward, so use `http://127.0.0.1:47821/mcp`.
+- The device port comes from `mcp.json`: 47801, or 47802 when two ai builds run at once. Read it before forwarding. `connect` does this for you; pass `--package` to pick a build.
+- Register once (the user runs this, never Claude):
+  `claude mcp add --transport http orphic-phone http://127.0.0.1:47821/mcp --header "Authorization: Bearer <token>"`
+- `adb forward` dies with the adb server or a replug. Re-run `connect`. The token persists, so the registration stays valid.
+- Android freezes a backgrounded app that is paused (the cached-app freezer). MCP requests then hang until the client times out.
+- A backgrounded app that is still playing keeps answering.
+- So keep the app in the foreground, or playing, while Claude drives it.
+- Other commands: `token` (print `mcp.json`), `list` (capture folders on the device), `pull <dest>` (both folders to `<dest>/mix-captures` and `<dest>/stem-captures`), `clean-stems`.
+- Captures are app files on the phone, in `files/mix-captures/` and `files/stem-captures/<vibe>-<timestamp>/` (`<stem>.wav` plus `stems.json`). The user cannot see them, so `pull` them to read the WAVs or hand a mix capture to `apply-mix-capture`.
+- Stem captures take about 5 MB per second. Run `clean-stems` when done.
+- The script uses `adb exec-out`, not `shell`, because `shell` rewrites bytes and would corrupt WAVs.
+- A 401 reply names where the token file lives.
+
 ## Mixing workflow
 
 1. `transport` play, then `mix_read`. Note the vibe, the sections and the loudness.
@@ -64,7 +90,7 @@ Whole-vibe macro moves change the real saved knob. Section macros do not.
 - The TRACKS view in the app shares this mix. Faders the user moves show up in `mix_read`.
 - Capture on a catalog vibe writes a file only. The live mix stays as it is.
 - Capture on an AI vibe also writes the rows into the vibe, archives it in `~/.config/orpheus-dj/ai-vibes/`, and restarts the song. Mutes, solos and the loop clear.
-- Captures land in `~/.config/orpheus-dj/mix-captures/`. `stale` is true, false or null. Do not apply a stale or null one without asking the user.
+- Captures land in `~/.config/orpheus-dj/mix-captures/` (on the phone, `files/mix-captures/`; use `android.sh pull`). `stale` is true, false or null. Do not apply a stale or null one without asking the user.
 - Audio tools need Pulsar playing. Stopped, they refuse.
 - One recording at a time, across MCP and the in-app agent. A second is refused at once, never queued.
 - An audio call blocks for its N seconds. It sends MCP progress while it records, for clients that show it.
@@ -83,4 +109,5 @@ Whole-vibe macro moves change the real saved knob. Section macros do not.
 - 403 `Invalid Host`: the Host or Origin header is not localhost. Use `127.0.0.1` or `localhost`, not a LAN name or a proxy.
 - `ok: false` in a tool result comes back as an MCP error. Read the message, since it names the bad argument.
 - A long audio call times out on the client side: raise `MCP_TOOL_TIMEOUT` (milliseconds) in Claude Code's env. The server's own idle timeout is 120 s, above the 30 s capture cap.
+- On the phone, connection refused usually means the forward is gone (adb restarted or the cable was replugged). Re-run `android.sh connect`.
 - Log noise is normal. The SDK logs DEBUG lines per request.

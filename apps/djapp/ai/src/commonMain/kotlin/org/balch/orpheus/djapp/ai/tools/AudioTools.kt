@@ -122,7 +122,7 @@ class AudioAnalyzeTool(private val recorderProvider: () -> StemRecorder) : ToolP
                 Record the next N seconds of live audio (seconds 0.5 to 15, default 5; the call takes that long)
                 and measure each stem: level, third-octave spectrum, envelope, onsets, low end and stereo.
                 $STEMS_DOC
-                Pulsar must be playing. Desktop app only; one recording runs at a time, and a second is refused.
+                Pulsar must be playing. Not available on iOS; one recording runs at a time, and a second is refused.
                 Fails (ok=false) if the vibe changes or playback stops while recording.
             """.trimIndent(),
         ) {
@@ -131,14 +131,17 @@ class AudioAnalyzeTool(private val recorderProvider: () -> StemRecorder) : ToolP
                 val stems = parseStems(args.stems)
                 val kinds = parseKinds(args.kinds)
                 val recorder = recorderProvider()
-                val analyzer = StemAnalyzer(recorder.sampleRate, stems, kinds)
+                val rate = recorder.sampleRate
+                val analyzer = StemAnalyzer(rate, stems, kinds)
                 val r = recorder.record(seconds, analyzer) { reportProgress(it.toDouble(), 1.0, "recording") }
+                // The analyzer was built before the recorder pinned its rate; a change in between voids the numbers.
+                if (r.ok && r.sampleRate != rate) return@guarded AudioAnalyzeResult(false, "the output rate changed; try again")
                 AudioAnalyzeResult(
                     ok = r.ok,
                     message = r.message,
                     vibe = r.vibe,
                     section = r.sectionAtStart,
-                    seconds = r.frames.toFloat() / recorder.sampleRate,
+                    seconds = if (r.sampleRate > 0) r.frames.toFloat() / r.sampleRate else 0f,
                     droppedFrames = r.droppedFrames,
                     // The analyzer's buffers are free only once record returns.
                     stems = if (r.ok) analyzer.results() else emptyList(),
@@ -162,7 +165,7 @@ class AudioCaptureTool(private val service: StemCaptureService) : ToolProvider {
                 to one WAV file per stem, stereo 32-bit float at the app's sample rate, for offline analysis.
                 The folder also holds stems.json (vibe, section, sample rate, frames, per-stem levels).
                 $STEMS_DOC
-                Pulsar must be playing. Desktop app only; one recording runs at a time, and a second is refused.
+                Pulsar must be playing. Not available on iOS; one recording runs at a time, and a second is refused.
                 Fails (ok=false), keeping no files, if the vibe changes or playback stops while recording.
             """.trimIndent(),
         ) {

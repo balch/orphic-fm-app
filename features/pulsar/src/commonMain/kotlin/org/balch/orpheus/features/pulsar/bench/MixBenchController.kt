@@ -44,12 +44,13 @@ class MixBenchController(
     private val synthController: SynthController,
     private val tap: MixBenchTap,
     scope: CoroutineScope,
-    sampleRate: Float = 48_000f,
+    private val sampleRate: () -> Float = { 48_000f },
     private val meterIdleMs: Long = 10_000,
 ) {
     private val launcher = scope
     private val lock = Mutex()
-    private val benchMeters = BenchMeters(sampleRate)
+    private var meterRate = sampleRate()
+    private var benchMeters = BenchMeters(meterRate)
     private val drainBuf = FloatArray(MAX_DRAIN * BenchSummaryLayout.FLOATS)
     private val gainIds = List(TRACKS) { PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + it].controlId }
 
@@ -394,7 +395,13 @@ class MixBenchController(
 
     private fun startMetering() {
         tap.setEnabled(true)
-        // The poll is stopped here, so the meters can be reset without racing it.
+        // The poll is stopped here, so the meters can be rebuilt or reset without racing it.
+        // The engine's rate can change on a route change, so read it at each start.
+        val rate = sampleRate()
+        if (rate != meterRate) {
+            meterRate = rate
+            benchMeters = BenchMeters(rate)
+        }
         benchMeters.reset()
         resetMeters = false
         _meters.value = benchMeters.snapshot()

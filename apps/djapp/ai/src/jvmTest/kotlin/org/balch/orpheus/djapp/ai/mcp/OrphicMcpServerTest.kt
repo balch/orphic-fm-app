@@ -45,8 +45,16 @@ class OrphicMcpServerTest {
     private fun server(
         ports: IntRange = freePort().let { it..it },
         toolsContext: CoroutineContext = EmptyCoroutineContext,
+        endpointState: McpEndpointState? = null,
         tools: () -> Collection<ToolProvider> = { listOf(FakeProvider(EchoTool())) },
-    ) = McpHttpServer(McpTokenStore(dir), ports, toolsContext, tools).also { servers += it }
+    ) = McpHttpServer(
+        McpTokenStore(dir),
+        ports,
+        toolsContext = toolsContext,
+        mcpJsonHint = HINT,
+        endpointState = endpointState,
+        tools = tools,
+    ).also { servers += it }
 
     private fun post(url: String, body: String, token: String?, session: String? = null) = http.post(url, body, token, session)
 
@@ -59,6 +67,7 @@ class OrphicMcpServerTest {
 
         val none = post(endpoint.url, INITIALIZE, token = null)
         assertEquals(401, none.statusCode())
+        assertTrue(HINT in none.body(), none.body())
         val wrong = post(endpoint.url, INITIALIZE, token = "0".repeat(64))
         assertEquals(401, wrong.statusCode())
         assertEquals(0, asked.get(), "an unauthorized request must not reach the tools")
@@ -111,6 +120,38 @@ class OrphicMcpServerTest {
         val failed = post(endpoint.url, rpc(4, "tools/call", """{"name":"echo","arguments":{"text":"refuse"}}"""), endpoint.token, session)
         val failedResult = Json.parseToJsonElement(failed.body()).jsonObject.getValue("result").jsonObject
         assertEquals("true", failedResult.getValue("isError").jsonPrimitive.content)
+    }
+
+    @Test
+    fun publishesTheEndpointOnceListening() {
+        val state = McpEndpointState()
+        val server = server(endpointState = state)
+        assertNull(state.endpoint.value)
+
+        val endpoint = assertNotNull(server.start())
+        val onDisk = Json.decodeFromString(McpEndpoint.serializer(), File(dir, "mcp.json").readText())
+        assertEquals(onDisk, state.endpoint.value)
+        assertEquals(endpoint, state.endpoint.value)
+
+        server.stop()
+        assertNull(state.endpoint.value)
+    }
+
+    @Test
+    fun acceptsLocalhostOnAForwardedPort() {
+        val endpoint = assertNotNull(server().start())
+        // `adb forward tcp:47821 tcp:<device port>` keeps the client's Host, so the port is not the bound one.
+        assertNotEquals(47821, endpoint.port)
+        for (host in listOf("127.0.0.1:47821", "localhost:47821")) {
+            assertEquals(200, http.postWithHost(endpoint.port, host, INITIALIZE, endpoint.token), host)
+        }
+    }
+
+    @Test
+    fun rejectsAForeignHost() {
+        val endpoint = assertNotNull(server().start())
+        assertEquals(403, http.postWithHost(endpoint.port, "evil.example", INITIALIZE, endpoint.token))
+        assertEquals(403, http.postWithHost(endpoint.port, "evil.example:${endpoint.port}", INITIALIZE, endpoint.token))
     }
 
     @Test
@@ -175,5 +216,6 @@ class OrphicMcpServerTest {
 
     private companion object {
         val LOOPBACK: InetAddress = InetAddress.getByName("127.0.0.1")
+        const val HINT = "test-dir/mcp.json"
     }
 }

@@ -50,6 +50,8 @@ class StemRecorderTest {
         for (f in 0 until count) received += frames[f * StemLayout.FLOATS_PER_FRAME]
     }
 
+    private var rate = 48_000
+
     private suspend fun TestScope.recorder(stemTap: StemTap = tap): StemRecorder {
         controller = MixBenchController(feature, synth, NoMeterTap, backgroundScope, meterIdleMs = 1_000).also {
             it.start()
@@ -59,7 +61,7 @@ class StemRecorderTest {
         tap.gate = { controller.isMetering }
         tap.renderIn(backgroundScope)
         val io = FixturesDispatchers(StandardTestDispatcher(testScheduler))
-        return StemRecorder(controller, { feature }, stemTap, sampleRate = 48_000, dispatchers = io)
+        return StemRecorder(controller, { feature }, stemTap, sampleRateProvider = { rate }, dispatchers = io)
     }
 
     @Test
@@ -75,6 +77,29 @@ class StemRecorderTest {
         assertEquals("drop", r.sectionAtStart)
         val va = OrpheusEngineId.VA.displayName
         assertEquals(List(8) { if (it == 2) "$va / ${OrpheusEngineId.FM.displayName}" else va }, r.trackLabels)
+    }
+
+    @Test
+    fun armsFramesAtTheRateWhenRecordingStarts() = runTest {
+        val rec = recorder()
+        rate = 44_100
+        val r = rec.record(1f, sink)
+        assertTrue(r.ok, r.message)
+        assertEquals(listOf(44_100), tap.arms)
+        assertEquals(44_100, r.frames)
+        assertEquals(44_100, r.sampleRate)
+    }
+
+    @Test
+    fun rateChangeDuringCaptureFails() = runTest {
+        val rec = recorder()
+        val first = async { rec.record(2f, sink) }
+        advanceTimeBy(100); runCurrent()
+        rate = 44_100
+        val r = first.await()
+        assertFalse(r.ok)
+        assertEquals("the audio output's sample rate changed during the capture", r.message)
+        assertEquals(48_000, r.sampleRate)
     }
 
     @Test

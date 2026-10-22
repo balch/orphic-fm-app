@@ -81,6 +81,17 @@ public:
     int      drainRecording(float* out, int maxFrames);
     uint64_t recordDroppedFrames() const;
 
+    // Mix bench meters. The wanted state survives an engine rebuild, which re-enables it.
+    // Disable may block ~100 ms waiting out a block, holding the lifecycle lock.
+    void setMixBench(bool enabled);
+    int  drainMixBench(float* out, int maxSummaries);
+    // Stem ring: not carried over a rebuild, so a capture across one ends short.
+    void      setStemCapture(bool enabled);
+    bool      armStemCapture(int frames);
+    int       drainStemCapture(float* out, int maxFrames);
+    int       stemCaptureRemaining();
+    long long stemCaptureDropped();
+
     // Oboe callbacks
     oboe::DataCallbackResult onAudioReady(
         oboe::AudioStream* stream, void* audioData, int32_t numFrames) override;
@@ -114,6 +125,8 @@ private:
     // Set by park(), cleared by ensureRunning() and stop(); guarded by mLifecycleMutex.
     // mIsRunning stays set while parked: the host is alive, just not rendering.
     bool mParked = false;
+    // Set by setMixBench(); guarded by mLifecycleMutex. Each new engine gets the bench when set.
+    bool mMixBenchWanted = false;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};
     // Cumulative underrun count for the current stream, mirrored out of the

@@ -1,6 +1,8 @@
 package org.balch.orpheus.djapp.ai
 
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
+import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.pulsar.VibeCreateEvent
 import org.balch.orpheus.features.pulsar.models.GenreProfile
@@ -461,6 +463,25 @@ class DjAiViewModelTest {
         assertEquals(DjAiFeedItem.Request(id = 0, text = "lofi beats"), s2.feed[0])
         assertTrue(s2.feed[1] is DjAiFeedItem.Thinking)
         assertTrue(s2.feed[2] is DjAiFeedItem.Reply)
+    }
+
+    // ─────────────────────────────────────────────────
+    // MCP endpoint
+    // ─────────────────────────────────────────────────
+
+    @Test
+    fun stateCarriesTheMcpEndpoint() {
+        // The VM's injected graph is too deep to build here, so its collector is the pure reducer.
+        val published = McpEndpointState()
+        val before = withMcpEndpoint(DjAiUiState(), published.endpoint.value)
+        assertNull(before.mcpEndpoint)
+
+        val endpoint = McpEndpoint(url = "http://127.0.0.1:47801/mcp", token = "t0k3n", port = 47801)
+        published.publish(endpoint)
+        assertEquals(endpoint, withMcpEndpoint(before, published.endpoint.value).mcpEndpoint)
+
+        published.publish(null)
+        assertNull(withMcpEndpoint(before, published.endpoint.value).mcpEndpoint)
     }
 
     // ─────────────────────────────────────────────────

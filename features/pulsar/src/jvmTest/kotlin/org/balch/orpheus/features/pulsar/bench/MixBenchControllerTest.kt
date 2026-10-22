@@ -74,10 +74,10 @@ class MixBenchControllerTest {
     /** The track's audition gain; an unwritten port plays the engine default, 1. */
     private fun gain(t: Int) = (ports["track_${t}_audition_gain"] as PortValue.FloatValue?)?.value ?: 1f
 
-    private fun summary(lufs: Double = -20.0) = FloatArray(BenchSummaryLayout.FLOATS).also { a ->
-        a[BenchSummaryLayout.FRAMES] = 512f
+    private fun summary(lufs: Double = -20.0, frames: Int = 512) = FloatArray(BenchSummaryLayout.FLOATS).also { a ->
+        a[BenchSummaryLayout.FRAMES] = frames.toFloat()
         a[BenchSummaryLayout.channel(BenchSummaryLayout.OUT) + BenchSummaryLayout.K_ENERGY] =
-            (10.0.pow((lufs + 0.691) / 10.0) * 512).toFloat()
+            (10.0.pow((lufs + 0.691) / 10.0) * frames).toFloat()
     }
 
     private fun section(s: Int) {
@@ -133,6 +133,32 @@ class MixBenchControllerTest {
         assertTrue(tap.on)
         assertEquals(2, tap.enables)
         assertTrue(tap.queue.isEmpty())
+    }
+
+    @Test
+    fun meteringRebuildsMetersAtTheNewRate() = runTest {
+        var rate = 48_000f
+        var reads = 0
+        val c = MixBenchController(feature, synth, tap, backgroundScope, { reads++; rate }, meterIdleMs = 500)
+            .also { it.start(); runCurrent() }
+        val silent = c.meters.value.lufsShort
+        val before = reads
+        c.readMeters()
+        assertEquals(before + 1, reads)
+        // 4410 frames are 100 ms at 44.1k but short of a sub-block at 48k.
+        repeat(9) { tap.queue += summary(frames = 490) }
+        advanceTimeBy(400); runCurrent()
+        assertEquals(silent, c.readMeters().lufsShort)
+        advanceTimeBy(600); runCurrent()
+        assertFalse(tap.on)
+        rate = 44_100f
+        val beforeRestart = reads
+        c.readMeters()
+        runCurrent()
+        assertEquals(beforeRestart + 1, reads)
+        repeat(9) { tap.queue += summary(frames = 490) }
+        advanceTimeBy(400); runCurrent()
+        assertEquals(-20.0, c.readMeters().lufsShort, 0.2)
     }
 
     @Test

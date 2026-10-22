@@ -44,6 +44,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.features.FeatureGraphHolder
+import org.balch.orpheus.djapp.ai.OrphicFiles
 
 /**
  * Merged into the FeatureScope graph so the AppScope server can read the same tool set the
@@ -56,7 +57,8 @@ interface McpToolAccess {
 
 /**
  * The AI edition's loopback MCP server: every koog [ToolProvider] in FeatureScope, served at
- * `http://127.0.0.1:<port>/mcp` with a bearer token. Starts with the app, stops on JVM exit.
+ * `http://127.0.0.1:<port>/mcp` with a bearer token, `mcp.json` under [OrphicFiles.root].
+ * Starts with the app, stops on process exit; [McpEndpointState] carries the endpoint once it listens.
  */
 @SingleIn(AppScope::class)
 @Inject
@@ -65,12 +67,20 @@ class OrphicMcpServer(
     holder: FeatureGraphHolder,
     scope: AppCoroutineScope,
     dispatchers: DispatcherProvider,
+    files: OrphicFiles,
+    endpointState: McpEndpointState,
 ) {
     private val log = logging("OrphicMcpServer")
 
     // The tools resolve on the first authorized request, never while this root is being built, and on Main,
     // since a first resolve can build the FeatureGraph.
-    private val server = McpHttpServer(McpTokenStore(McpTokenStore.defaultDir()), DEFAULT_PORTS, dispatchers.main) {
+    private val server = McpHttpServer(
+        McpTokenStore(files.root),
+        DEFAULT_PORTS,
+        toolsContext = dispatchers.main,
+        mcpJsonHint = files.mcpJsonHint,
+        endpointState = endpointState,
+    ) {
         val access = holder.featureGraph as? McpToolAccess
             ?: error("FeatureGraph does not merge McpToolAccess; is :apps:djapp:ai on the graph's classpath?")
         access.mcpToolProviders
@@ -92,11 +102,14 @@ class OrphicMcpServer(
 /**
  * Ktor CIO plus the SDK's streamable HTTP transport; the first free port in [ports] wins.
  * [tools] runs once, on [toolsContext], for the first authorized request; a failed resolve retries on the next.
+ * [endpointState] gets the endpoint once listening and null on [stop]; a 401 points at [mcpJsonHint].
  */
 internal class McpHttpServer(
     private val tokenStore: McpTokenStore,
     private val ports: IntRange,
     private val toolsContext: CoroutineContext = EmptyCoroutineContext,
+    private val mcpJsonHint: String = McpTokenStore.FILE_NAME,
+    private val endpointState: McpEndpointState? = null,
     private val tools: () -> Collection<ToolProvider>,
 ) {
     private val log = logging("OrphicMcpServer")
@@ -154,6 +167,7 @@ internal class McpHttpServer(
             engine = candidate
             engineJob = job
             endpoint = published
+            endpointState?.publish(published)
             log.info { "Orphic MCP: ${published.url}" }
             println("Orphic MCP: ${published.url}")
             return published
@@ -168,6 +182,7 @@ internal class McpHttpServer(
         engine = null
         engineJob = null
         endpoint = null
+        endpointState?.publish(null)
     }
 
     private fun Application.mcpModule(expected: ByteArray) {
@@ -175,7 +190,7 @@ internal class McpHttpServer(
             val given = call.request.header(HttpHeaders.Authorization).orEmpty().toByteArray()
             if (!MessageDigest.isEqual(expected, given)) {
                 call.response.header(HttpHeaders.WWWAuthenticate, "Bearer")
-                call.respondText("Missing or wrong bearer token; see ~/.config/orpheus-dj/mcp.json", status = HttpStatusCode.Unauthorized)
+                call.respondText("Missing or wrong bearer token; see $mcpJsonHint", status = HttpStatusCode.Unauthorized)
                 finish()
                 return@intercept
             }

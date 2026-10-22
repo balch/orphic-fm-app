@@ -1,6 +1,6 @@
 package org.balch.orpheus.core.audio.dsp
 
-/** The engine's per-block mix bench summaries ([BenchSummaryLayout]). Desktop only for now. */
+/** The engine's per-block mix bench summaries ([BenchSummaryLayout]). Desktop and Android; iOS has none. */
 interface MixBenchTap {
     /** Turns the native taps on or off. Turning off may block up to ~100 ms. */
     fun setEnabled(on: Boolean)

@@ -68,6 +68,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiProvider
+import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
 import org.balch.orpheus.features.ai.widgets.ModelSelector
 import org.balch.orpheus.features.ai.widgets.UserKeyIndicator
@@ -92,6 +93,7 @@ fun DjAiPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    var mcpExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier.fillMaxSize().padding(8.dp),
@@ -101,10 +103,14 @@ fun DjAiPanel(
             selectedModel = uiState.selectedModel,
             availableModels = uiState.availableModels,
             isKeySet = uiState.isKeySet,
+            mcpEndpoint = uiState.mcpEndpoint,
+            mcpExpanded = mcpExpanded,
+            onToggleMcp = { mcpExpanded = !mcpExpanded },
             onSelectModel = actions.selectModel,
             onSaveKey = actions.saveKey,
             onClearKey = actions.clearKey,
         )
+        uiState.mcpEndpoint?.takeIf { mcpExpanded }?.let { McpEndpointRow(it) }
 
         // The prompt row is the input box when idle, and a one-line status strip while the
         // agent runs (and after a result). The agent's reply lives in the feed below.
@@ -178,6 +184,9 @@ private fun ConfigStrip(
     selectedModel: AiModel,
     availableModels: List<AiModel>,
     isKeySet: Boolean,
+    mcpEndpoint: McpEndpoint?,
+    mcpExpanded: Boolean,
+    onToggleMcp: () -> Unit,
     onSelectModel: (AiModel) -> Unit,
     onSaveKey: (AiProvider, String) -> Unit,
     onClearKey: (AiProvider) -> Unit,
@@ -196,6 +205,18 @@ private fun ConfigStrip(
             horizontalPadding = 10.dp,
         )
 
+        if (mcpEndpoint != null) {
+            Text(
+                text = "MCP",
+                style = MaterialTheme.typography.labelSmall,
+                color = OrpheusColors.metallicBlue.copy(alpha = if (mcpExpanded) 1f else 0.7f),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable(onClick = onToggleMcp)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+
         if (isKeySet) {
             UserKeyIndicator(
                 aiProvider = selectedModel.aiProvider,
@@ -204,6 +225,53 @@ private fun ConfigStrip(
         } else {
             ApiKeyEntryCompact(onSubmit = onSaveKey)
         }
+    }
+}
+
+/** The MCP url and a copy glyph for its bearer token, which flips to a check for a moment. */
+@Composable
+private fun McpEndpointRow(endpoint: McpEndpoint, modifier: Modifier = Modifier) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            delay(1_500)
+            copied = false
+        }
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .background(OrpheusColors.midnightBlue.copy(alpha = 0.4f))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = "MCP",
+            style = MaterialTheme.typography.labelSmall,
+            color = OrpheusColors.metallicBlue,
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        Text(
+            text = endpoint.url,
+            style = MaterialTheme.typography.labelMedium,
+            color = OrpheusColors.pureWhite,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = if (copied) "✓" else "⧉",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (copied) OrpheusColors.metallicBlue else OrpheusColors.sterlingSilver,
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable {
+                    scope.launch { clipboard.copyPlainText(endpoint.token, sensitive = true) }
+                    copied = true
+                }
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }
 

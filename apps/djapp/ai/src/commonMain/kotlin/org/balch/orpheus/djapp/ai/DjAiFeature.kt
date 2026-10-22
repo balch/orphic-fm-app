@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 
 /** Lifecycle phase of the DJ AI vibe-creation flow. */
 enum class DjAiPhase {
@@ -84,6 +85,7 @@ sealed interface DjAiFeedItem {
  * @property selectedModel Currently selected AI model.
  * @property availableModels All models the user may choose from.
  * @property isKeySet Whether an API key is configured for the current model's provider.
+ * @property mcpEndpoint The loopback MCP server's url and token; null until it listens (and on iOS).
  */
 @Immutable
 data class DjAiUiState(
@@ -96,6 +98,7 @@ data class DjAiUiState(
     val selectedModel: AiModel = AiModel.DEFAULT,
     val availableModels: List<AiModel> = emptyList(),
     val isKeySet: Boolean = false,
+    val mcpEndpoint: McpEndpoint? = null,
 )
 
 /**

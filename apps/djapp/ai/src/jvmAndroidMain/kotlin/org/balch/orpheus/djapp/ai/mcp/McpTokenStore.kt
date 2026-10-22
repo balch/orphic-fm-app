@@ -8,12 +8,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermissions
 import java.security.SecureRandom
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-
-/** What `mcp.json` holds: where the server listens and the bearer token it wants. */
-@Serializable
-data class McpEndpoint(val url: String, val token: String, val port: Int)
 
 /**
  * The bearer token, kept in `<dir>/mcp.json` so a `claude mcp add` stays valid across launches.
@@ -68,8 +63,5 @@ internal class McpTokenStore(private val dir: File) {
         const val FILE_NAME = "mcp.json"
         private val TOKEN = Regex("[0-9a-f]{64}")
         private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
-
-        /** `~/.config/orpheus-dj`, beside `settings.json` and `ai-vibes`. */
-        fun defaultDir(): File = File(System.getProperty("user.home"), ".config/orpheus-dj")
     }
 }

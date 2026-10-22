@@ -24,7 +24,7 @@ data class StemCaptureOutcome(
 @Serializable
 data class StemFile(val stem: String, val label: String, val path: String, val rmsDb: Float, val peakDb: Float)
 
-/** Default where no stem writer exists (Android, iOS, and the desktop app without the AI edition). */
+/** Default where no stem writer exists: iOS, and the og/core edition (the writer ships with desktop and Android ai). */
 @ContributesBinding(AppScope::class)
 @Inject
 class UnavailableStemCaptureService : StemCaptureService {

@@ -141,6 +141,17 @@ class JvmStemCaptureServiceTest {
     }
 
     @Test
+    fun rateChangeBeforeRecordingLeavesNoFolder() = runTest {
+        var rate = 48_000
+        // The route changes after the WAV headers are written at 48k but before the recorder pins its rate.
+        val service = flow(stemRecorder(pulsar, rate = { rate })) { f, hz -> StemWavWriter(f, hz).also { rate = 44_100 } }
+        val r = service.capture(0.5f, listOf(0, 12))
+        assertFalse(r.ok, r.message)
+        assertTrue("sample rate changed" in r.message, r.message)
+        assertEquals(emptyList(), root.list()!!.toList())
+    }
+
+    @Test
     fun refusedCaptureLeavesNoFolder() = runTest {
         pulsar.stateFlow.value = pulsar.stateFlow.value.copy(playing = false)
         val r = service().capture(1f, listOf(0))

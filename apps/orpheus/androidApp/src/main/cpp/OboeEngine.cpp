@@ -55,6 +55,8 @@ oboe::Result OboeEngine::open() {
     float sr = static_cast<float>(mStream->getSampleRate());
     mCreatedSampleRate = mStream->getSampleRate();
     OrpheusEngine* created = orpheus_engine_create(sr);
+    // Before it is installed, so the first block already meters.
+    if (mMixBenchWanted) orpheus_engine_set_mix_bench(created, 1);
     // A failed reopen keeps its engine with no stream rendering it, so the slot may not be empty.
     engine_.replace(created);
 
@@ -244,7 +246,10 @@ void OboeEngine::reopenLocked(bool* engineRecreated) {
         // A take must not mix sample rates, so it ends at the route change.
         record_ring_.disarm();
         engine_.replace(nullptr);
-        engine_.publish(orpheus_engine_create(static_cast<float>(new_sr)));
+        OrpheusEngine* created = orpheus_engine_create(static_cast<float>(new_sr));
+        // The meters come back at the new rate; the stem ring stays off, so a capture ends short.
+        if (mMixBenchWanted) orpheus_engine_set_mix_bench(created, 1);
+        engine_.publish(created);
         mCreatedSampleRate = new_sr;
         *engineRecreated = true;
     }
@@ -391,4 +396,30 @@ void OboeEngine::stopTts() {
 }
 int OboeEngine::isTtsPlaying() {
     return engine_.with(0, [](OrpheusEngine* e) { return orpheus_engine_is_tts_playing(e); });
+}
+
+// Under the lifecycle lock, so a rebuild can't publish an engine between the flag and the call.
+// The audio callback never takes the lock, so a disable's wait for a block can still finish.
+void OboeEngine::setMixBench(bool enabled) {
+    std::lock_guard<std::mutex> lock(mLifecycleMutex);
+    mMixBenchWanted = enabled;
+    engine_.with([&](OrpheusEngine* e) { orpheus_engine_set_mix_bench(e, enabled ? 1 : 0); });
+}
+int OboeEngine::drainMixBench(float* out, int maxSummaries) {
+    return engine_.with(0, [&](OrpheusEngine* e) { return orpheus_engine_drain_mix_bench(e, out, maxSummaries); });
+}
+void OboeEngine::setStemCapture(bool enabled) {
+    engine_.with([&](OrpheusEngine* e) { orpheus_engine_set_stem_capture(e, enabled ? 1 : 0); });
+}
+bool OboeEngine::armStemCapture(int frames) {
+    return engine_.with(false, [&](OrpheusEngine* e) { return orpheus_engine_arm_stem_capture(e, frames) != 0; });
+}
+int OboeEngine::drainStemCapture(float* out, int maxFrames) {
+    return engine_.with(0, [&](OrpheusEngine* e) { return orpheus_engine_drain_stem_capture(e, out, maxFrames); });
+}
+int OboeEngine::stemCaptureRemaining() {
+    return engine_.with(0, [](OrpheusEngine* e) { return orpheus_engine_stem_capture_remaining(e); });
+}
+long long OboeEngine::stemCaptureDropped() {
+    return engine_.with(0LL, [](OrpheusEngine* e) { return orpheus_engine_stem_capture_dropped(e); });
 }

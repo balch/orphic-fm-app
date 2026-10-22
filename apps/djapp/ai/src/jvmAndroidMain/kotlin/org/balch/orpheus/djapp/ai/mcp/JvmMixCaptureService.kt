@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.djapp.ai.OrphicFiles
 import org.balch.orpheus.features.ai.AiVibeArchive
 import org.balch.orpheus.features.ai.tools.vibeApplyJson
 import org.balch.orpheus.features.pulsar.PulsarFeature
@@ -27,7 +28,7 @@ import org.balch.orpheus.features.pulsar.bench.withCapture
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 /**
- * Desktop capture: files go to `~/.config/orpheus-dj/mix-captures/`. With a repo checkout
+ * Capture files go to [OrphicFiles.mixCaptures] (desktop `~/.config/orpheus-dj/mix-captures/`). With a repo checkout
  * (`orpheus.dsp.sourceDir`, set by the Gradle run task) they also name the vibe's source and its hash.
  * One per app, so the bench page, MCP and the in-app agent share the stale baseline and the capture lock.
  */
@@ -39,16 +40,17 @@ class JvmMixCaptureService(
     controllerProvider: () -> MixBenchController,
     archive: AiVibeArchive,
     dispatchers: DispatcherProvider,
+    files: OrphicFiles,
 ) : MixCaptureService by MixCaptureFlow(
     pulsarFeatureProvider,
     controllerProvider,
     archive,
     dispatchers,
-    CaptureWriter(File(System.getProperty("user.home"), ".config/orpheus-dj/mix-captures"), repoRoot()),
+    CaptureWriter(files.mixCaptures, repoRoot()),
     CoroutineScope(SupervisorJob() + dispatchers.io),
 )
 
-/** `<repo>/liborpheus_dsp` from the run task, so its parent is the checkout; null when unset. */
+/** `<repo>/liborpheus_dsp` from the run task, so its parent is the checkout; null when unset, as on Android. */
 internal fun repoRoot(dspDir: String? = System.getProperty("orpheus.dsp.sourceDir")): File? =
     dspDir?.let { File(it).absoluteFile.parentFile }?.takeIf { File(it, "features/pulsar").isDirectory }
 

@@ -43,7 +43,7 @@ interface MixBenchModule {
                 synthController = synthController,
                 tap = audioEngine as? MixBenchTap ?: NoMeterTap,
                 scope = scope,
-                sampleRate = audioEngine.sampleRate.toFloat(),
+                sampleRate = { audioEngine.sampleRate.toFloat() },
             )
             // start() never suspends on its uncontended lock, so this finishes before the first edit can arrive.
             scope.launch(start = CoroutineStart.UNDISPATCHED) { controller.start() }
@@ -51,7 +51,7 @@ interface MixBenchModule {
             return controller
         }
 
-        /** Raw stem captures for the audio tools; [NoStemTap] off desktop, so it refuses there. */
+        /** Raw stem captures for the audio tools; [NoStemTap] on engines without a stem ring, so it refuses there. */
         @Provides
         @SingleIn(AppScope::class)
         fun provideStemRecorder(
@@ -63,7 +63,7 @@ interface MixBenchModule {
             controller = controller,
             pulsarProvider = pulsarFeatureProvider,
             tap = (audioEngine as? StemTapSource)?.stemTap ?: NoStemTap,
-            sampleRate = audioEngine.sampleRate,
+            sampleRateProvider = { audioEngine.sampleRate },
             dispatchers = dispatchers,
         ).also { closeOnAppExit(it) }
     }

@@ -52,6 +52,6 @@ interface DjAppGraph : ViewModelGraph {
     /** The Mix Bench controller the agent's mix tools share; built on first read. */
     val mixBenchController: MixBenchController
 
-    /** Mix capture to app storage on the desktop AI edition; elsewhere [UnavailableMixCaptureService]. */
+    /** Mix capture to app storage on the desktop and Android AI editions; elsewhere [UnavailableMixCaptureService]. */
     val mixCaptureService: MixCaptureService
 }
