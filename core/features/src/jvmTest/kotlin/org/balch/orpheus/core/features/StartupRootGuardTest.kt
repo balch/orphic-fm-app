@@ -27,6 +27,7 @@ class StartupRootGuardTest {
             "DjAppLifecycleManager",
             "InAppReviewManager",
             "IosAppLifecycle",
+            "OrphicMcpServer",
         )
 
         /**

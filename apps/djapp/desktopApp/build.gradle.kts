@@ -84,3 +84,6 @@ val buildDesktopNative = tasks.register<Exec>("buildDesktopNative") {
 
 // Wiring the task as a resource dir also makes processResources depend on it.
 sourceSets.main { resources.srcDir(buildDesktopNative) }
+
+// FeatureGraphEditionTest checks the merge each edition should have; run it with -Pedition=ai too.
+tasks.withType<Test>().configureEach { systemProperty("orpheus.djapp.edition", edition) }

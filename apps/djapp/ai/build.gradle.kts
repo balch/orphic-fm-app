@@ -28,6 +28,13 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)
         }
+        // The MCP server is desktop-only for now; Android stays off the network stack.
+        jvmMain.dependencies {
+            // The SDK pins ktor 3.5.1 for sse/websockets/content-negotiation; the BOM keeps every ktor module on one version.
+            implementation(project.dependencies.platform(libs.ktor.bom))
+            implementation(libs.mcp.kotlin.server)
+            implementation(libs.ktor.server.cio)
+        }
     }
 }
 
