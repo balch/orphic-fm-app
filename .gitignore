@@ -89,7 +89,8 @@ export-appstore-*/
 .superpowers/
 
 # AI-authored design specs — superseded by the code, stale within days
-docs/superpowers/
+docs/superpowers/*
+!docs/superpowers/specs/
 
 # Private app modules. They live in a separate repository, cloned into noop/ by whoever
 # has access; settings.gradle.kts loads noop/settings.gradle.kts when present, so this
