@@ -1,5 +1,7 @@
-More mixing, a new epic vibe, and Bluetooth fixes
+A louder, better-balanced live set
 
-• More Mixing: track fader controls with solo and mute, great for live performance
-• New Vibe: Orphic Lore tells a classic Homer-inspired epic, with sweet singing sirens, granular synth effects and a storm for the ages
-• Bluetooth DJ scratch fixes on 44.1 kHz devices
+• Every live vibe re-levelled to a consistent loudness
+• Per-section stereo panning that glides between sections
+• Orphic Lore's Sirens sing ah-oh, and the vibe now runs 3.5 to 4 minutes
+• Orphoscope gives each Pulsar track its own lane
+• Smoother Swirly and Mt Hood visuals
