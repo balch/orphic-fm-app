@@ -74,7 +74,9 @@ import org.balch.orpheus.djapp.playlist.EightBallRevealState
 import org.balch.orpheus.djapp.playlist.LocalEightBall
 import org.balch.orpheus.djapp.playlist.PlaylistSheet
 import org.balch.orpheus.djapp.variant.DjTabContribution
+import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
 import org.balch.orpheus.djapp.variant.mergeTabContributions
+import org.balch.orpheus.djapp.variant.stageChromeOverhang
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
 import org.balch.orpheus.features.dj.DjPanel
@@ -784,14 +786,16 @@ private fun DjAppOverlaySheets(
 
     // Contributions stay composed while closed (isOpen tracks activeSheet) so they can
     // cancel in-flight work on close. See DjTabContribution.Content's kdoc.
-    tabContributions.forEach { contribution ->
-        if (contribution.route.opensAsSheet) {
-            contribution.Content(
-                isOpen = activeSheet == contribution.route,
-                modifier = Modifier.fillMaxSize(),
-                isLandscape = layout.usesLandscapeChrome(),
-                onDismiss = onDismiss,
-            )
+    CompositionLocalProvider(LocalStageChromeOverhang provides stageChromeOverhang(layout)) {
+        tabContributions.forEach { contribution ->
+            if (contribution.route.opensAsSheet) {
+                contribution.Content(
+                    isOpen = activeSheet == contribution.route,
+                    modifier = Modifier.fillMaxSize(),
+                    isLandscape = layout.usesLandscapeChrome(),
+                    onDismiss = onDismiss,
+                )
+            }
         }
     }
 }

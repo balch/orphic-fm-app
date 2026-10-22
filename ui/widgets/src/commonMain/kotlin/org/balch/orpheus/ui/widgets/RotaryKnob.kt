@@ -43,8 +43,13 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,8 +60,10 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlin.math.sin
 
 /** Shared state holder for knob drag interaction. */
@@ -128,6 +135,53 @@ private fun stepIf(
     return true
 }
 
+/**
+ * The knob's vertical drag, in pixels. With [requireVerticalSlop] nothing is consumed or applied until the
+ * pointer travels touch slop vertically; a lift or horizontal slop first leaves the gesture to a parent scroll.
+ */
+private suspend fun PointerInputScope.detectKnobDrag(
+    requireVerticalSlop: Boolean,
+    onDrag: (dragAmount: Float, ctrlPressed: Boolean) -> Unit,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var previousY = down.position.y
+        var pending: PointerEvent? = null
+        if (requireVerticalSlop) {
+            pending = awaitVerticalSlop(down) ?: return@awaitEachGesture
+            // Counted from the slop's edge, so the knob doesn't jump by the slop.
+            val y = pending.changes.first { it.id == down.id }.position.y
+            previousY += sign(y - previousY) * viewConfiguration.touchSlop
+        }
+        while (true) {
+            val event = pending ?: awaitPointerEvent()
+            pending = null
+            val change = event.changes.firstOrNull() ?: break
+            if (!change.pressed) break
+            val dragAmount = change.position.y - previousY
+            previousY = change.position.y
+            if (dragAmount != 0f) {
+                change.consume()
+                onDrag(dragAmount, event.keyboardModifiers.isCtrlPressed)
+            }
+        }
+    }
+}
+
+/** The event where [down]'s pointer passes vertical touch slop, or null if it lifts, is consumed or goes sideways first. */
+private suspend fun AwaitPointerEventScope.awaitVerticalSlop(down: PointerInputChange): PointerEvent? {
+    val slop = viewConfiguration.touchSlop
+    var moved = Offset.Zero
+    while (true) {
+        val event = awaitPointerEvent()
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return null
+        if (!change.pressed || change.isConsumed) return null
+        moved += change.positionChange()
+        if (abs(moved.y) > slop) return event
+        if (abs(moved.x) > slop) return null
+    }
+}
+
 @Composable
 internal fun RotaryKnobDial(
     dragState: KnobDragState,
@@ -141,6 +195,7 @@ internal fun RotaryKnobDial(
     indicatorColor: Color = OrpheusColors.neonCyan,
     isLearning: Boolean = false,
     enabled: Boolean = true,
+    requireVerticalSlop: Boolean = false,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // null (the default, used by every real call site) means "use live focus state" below.
     previewFocused: Boolean? = null,
@@ -213,23 +268,10 @@ internal fun RotaryKnobDial(
                     }
                 }
                 .focusable(enabled = enabled && !isLearning)
-                .pointerInput(sensitivity, range, isLearning, enabled) {
+                .pointerInput(sensitivity, range, isLearning, enabled, requireVerticalSlop) {
                     if (isLearning || !enabled) return@pointerInput
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        var previousY = down.position.y
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull() ?: break
-                            if (!change.pressed) break
-                            val dragAmount = change.position.y - previousY
-                            previousY = change.position.y
-                            if (dragAmount != 0f) {
-                                change.consume()
-                                dragState.applyDrag(dragAmount, event.keyboardModifiers.isCtrlPressed)
-                                    ?.let { currentOnValueChange(it) }
-                            }
-                        }
+                    detectKnobDrag(requireVerticalSlop) { dragAmount, ctrl ->
+                        dragState.applyDrag(dragAmount, ctrl)?.let { currentOnValueChange(it) }
                     }
                 }
         ) {
@@ -504,6 +546,7 @@ internal fun KnobValueText(
     valueFormatter: (Float) -> String,
     modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.Center,
+    requireVerticalSlop: Boolean = false,
 ) {
     val sensitivity = 200f
     val currentOnValueChange by rememberUpdatedState(onValueChange)
@@ -514,22 +557,9 @@ internal fun KnobValueText(
         color = progressColor.lighten(0.3f),
         textAlign = textAlign,
         maxLines = 1,
-        modifier = modifier.pointerInput(range, sensitivity) {
-            awaitEachGesture {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                var previousY = down.position.y
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull() ?: break
-                    if (!change.pressed) break
-                    val dragAmount = change.position.y - previousY
-                    previousY = change.position.y
-                    if (dragAmount != 0f) {
-                        change.consume()
-                        dragState.applyDrag(dragAmount, event.keyboardModifiers.isCtrlPressed, fineTune = true)
-                            ?.let { currentOnValueChange(it) }
-                    }
-                }
+        modifier = modifier.pointerInput(range, sensitivity, requireVerticalSlop) {
+            detectKnobDrag(requireVerticalSlop) { dragAmount, ctrl ->
+                dragState.applyDrag(dragAmount, ctrl, fineTune = true)?.let { currentOnValueChange(it) }
             }
         }
     )
@@ -559,6 +589,9 @@ typealias KnobValueFormatter = (Float) -> String
  *   Null (the default) means no long press and the label is not focusable.
  * @param pulseLabel Pulses the label's colour toward [indicatorColor] and its size while true,
  *   for a mode this knob switches.
+ * @param requireVerticalSlop For a knob inside a scrolling list: the dial and value text change
+ *   nothing until a drag passes vertical touch slop, and a sideways or short gesture is left alone.
+ *   False (the default) turns on the first pixel of movement.
  */
 @Composable
 fun RotaryKnob(
@@ -581,6 +614,7 @@ fun RotaryKnob(
     },
     onLongPress: (() -> Unit)? = null,
     pulseLabel: Boolean = false,
+    requireVerticalSlop: Boolean = false,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // Every production call site leaves this null and gets live focus behavior.
     previewFocused: Boolean? = null,
@@ -614,6 +648,7 @@ fun RotaryKnob(
             indicatorColor = indicatorColor,
             isLearning = isLearning,
             enabled = enabled,
+            requireVerticalSlop = requireVerticalSlop,
             previewFocused = previewFocused,
             previewAdjusting = previewAdjusting,
         )
@@ -637,6 +672,7 @@ fun RotaryKnob(
                 range = range,
                 progressColor = progressColor,
                 valueFormatter = valueFormatter,
+                requireVerticalSlop = requireVerticalSlop,
             )
         }
     }

@@ -3,6 +3,7 @@ package org.balch.orpheus.djapp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Shuffle
@@ -50,6 +51,14 @@ data object HornTab : DjRoute {
 data object AiTab : DjRoute {
     override val icon: ImageVector get() = Icons.Rounded.AutoAwesome
     override val label: String = "AI"
+    override val opensAsSheet: Boolean = true
+}
+
+/** AI edition only: contributed by :apps:djapp:ai, never listed in [djTabs]. */
+@Serializable
+data object MixerTab : DjRoute {
+    override val icon: ImageVector get() = Icons.Rounded.GraphicEq
+    override val label: String = "Mixer"
     override val opensAsSheet: Boolean = true
 }
 

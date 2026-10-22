@@ -101,6 +101,21 @@ internal val TvBottomBarItemGap = 8.dp
 /** The item's inset around its content. */
 private val TvBottomBarItemPadding = 14.dp
 
+/** The bar's room above its items. */
+private val TvBottomBarTopPadding = 10.dp
+
+/** From the bar's top edge down to the toggles' label line: its top room, an item's inset, icon and gap, and the label's ascent. */
+@Composable
+internal fun dockBarLabelLine(): Dp {
+    val style = MaterialTheme.typography.labelMedium
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val ascent = remember(style, density, measurer) {
+        with(density) { measurer.measure(" ", style.copy(fontSize = TvBottomBarLabelSize)).firstBaseline.toDp() }
+    }
+    return TvBottomBarTopPadding + TvBottomBarItemPadding + TvBottomBarIconSize + TvBottomBarIconLabelGap + ascent
+}
+
 /**
  * Wash alpha for the TV bar's docked item fill — passed to [orpheusChromeWash], NOT a bare
  * `background(accent.copy(alpha=...))` on its own. A flat wash alone was tried first and
@@ -285,7 +300,7 @@ fun DjTvBottomBar(
                     .fillMaxWidth()
                     // Bottom trimmed well below top: the safe-area inset already sits below the
                     // bar, so a full 12.dp here on top of that read bottom-heavy.
-                    .padding(start = TvBottomBarSidePadding, end = TvBottomBarSidePadding, top = 10.dp, bottom = 2.dp),
+                    .padding(start = TvBottomBarSidePadding, end = TvBottomBarSidePadding, top = TvBottomBarTopPadding, bottom = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(TvBottomBarItemGap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

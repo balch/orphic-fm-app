@@ -51,7 +51,8 @@ internal fun levelGain(db: Float): Float = if (db <= SILENT_DB) 0f else dbToGain
 /** Whole-vibe fader gain as heard, capped at [MAX_GAIN]. */
 internal fun BenchLayers.vibeGain(t: Int): Float = levelGain(vibeDb(t))
 
-internal fun Macro.vibeDefault(vibe: Vibe): Float = when (this) {
+/** The macro as the vibe file writes it. */
+fun Macro.vibeDefault(vibe: Vibe): Float = when (this) {
     Macro.ENERGY -> vibe.energy
     Macro.COMPLEXITY -> vibe.complexity
     Macro.MOOD -> vibe.mood

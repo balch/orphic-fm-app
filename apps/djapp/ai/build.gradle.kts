@@ -30,12 +30,17 @@ kotlin {
             api(project(":features:ai"))
             api(project(":core:ai"))
             implementation(libs.compose.material.icons)
+            implementation(libs.jetbrains.navigationevent.compose)
             implementation(libs.kmlogging)
             implementation(libs.metrox.viewmodel)
             implementation(libs.metrox.viewmodel.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)
+        }
+        // DjRoute extends NavKey; tests reading route fields need it on the classpath.
+        jvmTest.dependencies {
+            implementation(libs.jetbrains.navigation3.ui)
         }
         // Only the ai edition carries this module, so the og flavor never gets the server stack.
         jvmAndroidMain.dependencies {

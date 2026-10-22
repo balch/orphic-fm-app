@@ -105,6 +105,8 @@ class DockDomeRaiseTest {
         val scale = if (desktop) desktopCanvasScale(widthDp, heightDp) else 1f
         val totalScale = scale * nativeDensity
         var ringSize = 0.dp
+        // What a sheet over the stage is told the pill reaches past the bar's top, in the canvas's dp.
+        var overhang = 0.dp
         var toggles = 0
         var nexts = 0
         var stageTaps = 0
@@ -134,6 +136,7 @@ class DockDomeRaiseTest {
                     LocalLiquidState provides rememberLiquidState(),
                     LocalVizStage provides vizStage,
                 ) {
+                    overhang = dockDomeOverhang(television = tv)
                     Box(Modifier.fillMaxSize().background(background)) {
                         DjAppTvChrome(
                             tvHardware = tv,
@@ -383,6 +386,30 @@ class DockDomeRaiseTest {
                     // independent dp-constant rounding compounds more on a scaled canvas.
                     val toleranceDp = 2f / dock.totalScale
                     assertEquals(DockDomeDrop.value, drop, toleranceDp, "${w}x$h @${density}x drop below the label line")
+                } finally {
+                    dock.close()
+                }
+            }
+        }
+    }
+
+    /**
+     * dockDomeOverhang, which a sheet over the stage pads its bottom by, is how far the laid-out pill's top
+     * sits above the bar's top edge: desktop windows (scaled canvases included), tablets, 2x density, and TV
+     * hardware, whose pill sits inside the bar and so overhangs nothing.
+     */
+    @Test
+    fun theOverhangReachesThePillsTop() {
+        val docks = listOf(1280 to 800, 1280 to 720, 1512 to 982, 1000 to 700).map { (w, h) -> { d: Float -> Dock(w, h, nativeDensity = d) } } +
+            { d: Float -> Dock(1366, 1024, desktop = false, nativeDensity = d) } +
+            { d: Float -> Dock(960, 540, desktop = false, tv = true, nativeDensity = d) }
+        docks.forEach { make ->
+            listOf(1f, 2f).forEach { density ->
+                val dock = make(density)
+                try {
+                    val reach = maxOf(0f, (dock.barTop - dock.pill.top) / dock.totalScale)                    // 2 device px each way, in canvas dp, for the dp constants' independent rounding.
+                    assertEquals(reach, dock.overhang.value, 2f / dock.totalScale, "the overhang at ${dock.scale}x canvas @${density}x")
+                    assertTrue(dock.overhang > 0.dp || dock.ringSize == TvDockDomeRingSize, "the pill rose nothing out of the bar")
                 } finally {
                     dock.close()
                 }

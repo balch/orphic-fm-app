@@ -22,7 +22,9 @@ import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Overview
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.effective
+import org.balch.orpheus.features.pulsar.bench.macroView
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
+import org.balch.orpheus.features.pulsar.bench.vibeDefault
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 /** Everything a `state` event shows; [vibes] is only filled for the first `snapshot`. */
@@ -79,19 +81,15 @@ internal object BenchJson {
         }
         putJsonObject("macros") {
             for (m in Macro.entries) {
-                val file = fileMacro(v.vibe, m)
-                val live = v.knobs[m] ?: file
-                val mult = sectionMultiplier(v.vibe, v.section, m)
-                val knob = v.layers.vibe.macros[m] ?: live
-                val sectionHeard = v.layers.sections[v.section]?.macrosHeard?.get(m)
+                val mv = v.layers.macroView(v.vibe, v.section, m, v.knobs[m] ?: m.vibeDefault(v.vibe))
                 putJsonObject(m.name) {
-                    put("file", r3(file))
-                    put("live", r3(live))
-                    put("knob", r3(knob))
-                    put("mult", r3(mult))
-                    put("heard", r3(sectionHeard ?: (knob * mult).coerceIn(0f, 1f)))
-                    put("knobMoved", m in v.layers.vibe.macros)
-                    put("heardMoved", sectionHeard != null)
+                    put("file", r3(mv.file))
+                    put("live", r3(mv.live))
+                    put("knob", r3(mv.knob))
+                    put("mult", r3(mv.mult))
+                    put("heard", r3(mv.heard))
+                    put("knobMoved", mv.knobMoved)
+                    put("heardMoved", mv.heardMoved)
                 }
             }
         }
@@ -135,23 +133,6 @@ internal object BenchJson {
             append("]}")
         }
         append("]}")
-    }
-
-    fun fileMacro(vibe: Vibe, m: Macro): Float = when (m) {
-        Macro.ENERGY -> vibe.energy
-        Macro.COMPLEXITY -> vibe.complexity
-        Macro.MOOD -> vibe.mood
-        Macro.SPACE -> vibe.space
-    }
-
-    private fun sectionMultiplier(vibe: Vibe, section: Int, m: Macro): Float {
-        val o = vibe.arrangement?.sections?.getOrNull(section)?.macroOverrides ?: return 1f
-        return when (m) {
-            Macro.ENERGY -> o.energy
-            Macro.COMPLEXITY -> o.complexity
-            Macro.MOOD -> o.mood
-            Macro.SPACE -> o.space
-        } ?: 1f
     }
 
     private fun r3(x: Float): Float = (x * 1000f).roundToLong() / 1000f

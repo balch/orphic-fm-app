@@ -3,6 +3,7 @@ package org.balch.orpheus.djapp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +14,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.ColorProducer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +43,23 @@ internal fun dockDomeRingSize(television: Boolean): Dp = if (television) TvDockD
 
 /** TV hardware hangs its dome lower, so the ring sits inside the bar with its name pill just above. */
 internal val TvDockDomeDrop = DockDomeDrop + 14.dp
+
+/**
+ * How far the dome's name pill reaches above the bottom bar's top edge, over the stage: the pill,
+ * the ring's padding and the ring above the label line, less the drop and the bar above that line.
+ */
+@Composable
+internal fun dockDomeOverhang(television: Boolean): Dp {
+    val nameStyle = MaterialTheme.typography.labelMedium.let { remember(it) { it.copy(fontSize = DockNameSize) } }
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val nameLine = remember(nameStyle, density, measurer) {
+        with(density) { measurer.measure(" ", nameStyle).size.height.toDp() }
+    }
+    val drop = if (television) TvDockDomeDrop else DockDomeDrop
+    val aboveLabelLine = nameLine + VibeNamePillPaddingY * 2 + TransportPadding + dockDomeRingSize(television) - drop
+    return (aboveLabelLine - dockBarLabelLine()).coerceAtLeast(0.dp)
+}
 
 /** Extra room each side of the dome's slot off TV hardware, so it isn't crowded by Mix and Horn. */
 internal val DockDomeSideRoom = 4.dp

@@ -1,7 +1,7 @@
 # Orphic MCP: live mixing and control for Claude Code, the in-app agent and MIDI
 
-> **Status:** phase 1 (desktop MCP core) landed on main 2026-10-21; phase 2 (raw audio, desktop) built on branch
-> claude/orphic-mcp-audio, 2026-10-21; phases 3-6 not built.
+> **Status:** phase 1 (desktop MCP core) landed on main 2026-10-21; phases 2 (raw audio), 3 (Android) and 5 (in-app
+> mixer panel) built on branch claude/orphic-mcp-audio, 2026-10-21/22; phases 4 and 6 not built.
 > This is a dated snapshot of the design and its decisions; the code is the source of truth. Later changes
 > add a "Superseded by" line rather than editing the text.
 
@@ -257,4 +257,43 @@ Decisions taken while building phase 2 (raw audio, desktop), one line each.
 - Captures are about 4.6 MB/s and nothing deletes them; dropped frames are cut from the WAVs, so a capture with drops is shorter.
 - Whether Claude Code shows MCP progress is unverified; the SDK only sends it on the session's listening stream.
 - Desktop only: Android and iOS answer that raw audio isn't available yet (phase 3).
+
+## Appendix: phase 3 rulings
+
+Decisions taken while building phase 3 (Android, ai flavor), one line each.
+
+- The MCP server, token store and capture services moved to a `jvmAndroidMain` source set shared by desktop and Android; iOS never compiles them, and the og flavor never carries the module. The capture classes keep their `Jvm*` names.
+- The Oboe JNI gained the bench drain and the stem ring; a capture pins the engine's rate at the start and fails with `ok: false` if the rate changes during it, since Android's rate is not fixed.
+- The host side of `adb forward` uses port 47821, outside the desktop's 47801-47810; `.claude/skills/orphic-mcp/scripts/android.sh` handles `connect`, `pull` and `clean-stems`.
+- Verification used the `aiDebug` build on an emulator, because `run-as` needs a debuggable build; an R8 release build was also checked.
+- The AI tab shows an MCP chip (on desktop too) that copies the token, marked sensitive; release builds have no `run-as`, so the chip is how a phone user gets the token.
+- A backgrounded, paused app is frozen by Android and MCP calls hang; this is documented in the skill rather than fixed with a foreground service.
+- Turning metering off while the stream is parked holds the engine lifecycle lock for up to about 100 ms; that bounded stall was kept over an unlock that could leave metering off while wanted.
+
+## Appendix: phase 3 known gaps
+
+- Not yet run on a real phone; phone metering CPU is unmeasured, and the emulator ran unoptimised natives (19 underruns, 0 dropped capture frames).
+- An engine rebuild with the stem ring on stalls the Oboe error thread about 100 ms; with no open stream the engine reports 48000.
+- `android.sh clean-stems` reports done whatever `rm` did and has not been run; a lint warning is possible on the clipboard sensitivity extra.
+- The AI tab MCP chip's expanded state resets on a tab switch, its copy icon has no content description, and its test drives the reducer, not the ViewModel.
+
+## Appendix: phase 5 rulings
+
+Decisions taken while building phase 5 (the in-app mixer panel, AI edition), one line each.
+
+- The mixer is a new tab, `MixerTab`, declared in `:apps:djapp:shared` (routes are sealed) and contributed only by `:apps:djapp:ai`; the core edition's tabs are unchanged.
+- It draws its own opaque overlay sheet, because the shared landscape sheet caps at 400dp, too narrow for 8 strips.
+- No play/pause, vibe picker or section overview waveform in the panel: the app's own transport sits around it, and the overview needs a desktop-only offline render.
+- Phone portrait and short screens (width under 600dp or height under 480dp) get a list of one-line track rows with a wide wave, expanding one row at a time; wide screens get full strips once 400dp of height is free.
+- Sends use the `mix_set` meaning (the value heard in the playing section), Reset is `resetToFile` as in `mix_reset`, and the bench page's macro view moved into `BenchLayers.macroView`, shared by the page and the panel.
+- Every control claims a drag only after touch slop on its own axis, and a tap within slop sets the value; the macro knobs get this through an opt-in `RotaryKnob` parameter, so other knobs are unchanged.
+- Stage-chrome clearance for overlay sheets comes through a new CompositionLocal in `:apps:djapp:shared`, defaulting to 0dp.
+
+## Appendix: phase 5 known gaps
+
+- Knob slop also applies to a desktop mouse; in the compact list a vertical drag that starts on a knob turns it instead of scrolling.
+- No stale-file banner while mixing, no screen-reader value semantics on faders and sliders, and the sheet has no pane title.
+- Strip layouts are checked by render at the default font scale only; at 1280x800 the changes column scrolls inside the strips' height.
+- Android draw cost is unmeasured (about 2200 rects at 20 Hz across 11 waves); worth one `gfxinfo` pass on the phone.
+- Untested: several ViewModel edits (dB clamp, pan, solo, scope, jump, loop, capture failure), compact expand, double-tap reset and gesture cancel.
 
