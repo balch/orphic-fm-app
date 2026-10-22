@@ -127,6 +127,29 @@ class MixToolsTest {
     }
 
     @Test
+    fun editsDuringAnUnfollowedVibeLoadAskForAMixRead() = runTest {
+        val c = controller()
+        pulsar.applyVibe(pulsar.vibeFlow.value)
+        val set = MixSetTool({ pulsar }, { c }).tool
+        for (args in listOf(
+            MixSetArgs(field = "level_db", value = -6f, track = 2),
+            MixSetArgs(field = "pan", value = 0.5f, track = 2),
+            MixSetArgs(field = "reverb", value = 0.3f, track = 2, scope = "section"),
+            MixSetArgs(field = "macro", value = 0.7f, macro = "energy"),
+        )) {
+            val r = set.execute(args)
+            assertFalse(r.ok, args.field)
+            assertEquals(VIBE_LOADING, r.message)
+        }
+        val mute = MixMuteTool { c }.tool.execute(MixTrackArgs(1))
+        assertFalse(mute.ok)
+        assertEquals(VIBE_LOADING, mute.message)
+        assertEquals(BenchLayers(), c.layers.value)
+        runCurrent()
+        assertTrue(set.execute(MixSetArgs(field = "level_db", value = -6f, track = 2)).ok)
+    }
+
+    @Test
     fun mixReadReportsTracksMacrosAndSection() = runTest {
         pulsar.section(2)
         val c = controller()

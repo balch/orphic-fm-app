@@ -26,12 +26,16 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 /** What a capture reads: the vibe, its bench layers, and the vibe load they belong to. */
 data class CaptureSnapshot(val vibe: Vibe, val layers: BenchLayers, val loadCount: Int)
 
+/** How [MixBenchController.setHeardSend] went. */
+enum class SendEdit { APPLIED, ZERO_SEND, VIBE_LOADING }
+
 /**
  * Applies Mix Bench edits to the live Pulsar engine and turns [MixBenchTap] summaries into [meters].
  * Idle it writes nothing: a track's audition gain is written only after a level, mute or solo edit to it,
  * and the tap runs only for [meterIdleMs] after a [readMeters]. Whole-vibe macros move the app's real knobs;
  * a section's macros reach only the engine, so the saved knob never holds a section value.
  * Every state change and engine write runs under one lock, so nothing the bench pushes lands after [stop].
+ * Edits return false, changing nothing, while a vibe load is not yet followed: they would hit the new vibe.
  */
 class MixBenchController(
     private val pulsar: PulsarFeature,
@@ -176,14 +180,15 @@ class MixBenchController(
 
     /**
      * Send as heard in the playing section. [Scope.VIBE] turns it into a ratio over the send at ratio 1;
-     * returns false (and changes nothing) when that send is 0, since no ratio can lift it.
+     * [SendEdit.ZERO_SEND] (changing nothing) when that send is 0, since no ratio can lift it.
      */
-    suspend fun setHeardSend(t: Int, v: Float, reverb: Boolean): Boolean {
+    suspend fun setHeardSend(t: Int, v: Float, reverb: Boolean): SendEdit {
         requireTrack(t)
         return lock.withLock {
+            if (loadInFlight()) return@withLock SendEdit.VIBE_LOADING
             if (editSection() != null) {
                 setSend(t, v, reverb)
-                return@withLock true
+                return@withLock SendEdit.APPLIED
             }
             val l = _layers.value
             val unit = l.copy(
@@ -191,9 +196,9 @@ class MixBenchController(
                 else l.vibe.copy(delayRatio = l.vibe.delayRatio.with(t, 1f)),
             ).effective(vibe, section, t, pulsar.macroKnob(Macro.ENERGY))
             val base = if (reverb) unit.reverbSend else unit.delaySend
-            if (base < MIN_SEND) return@withLock false
+            if (base < MIN_SEND) return@withLock SendEdit.ZERO_SEND
             setSend(t, v.coerceIn(0f, 1f) / base, reverb)
-            true
+            SendEdit.APPLIED
         }
     }
 
@@ -375,9 +380,13 @@ class MixBenchController(
         tap.setEnabled(false)
     }
 
-    private suspend inline fun edit(t: Int, crossinline body: () -> Unit) {
+    private suspend inline fun edit(t: Int, crossinline body: () -> Unit): Boolean {
         requireTrack(t)
-        lock.withLock { body() }
+        return lock.withLock {
+            if (loadInFlight()) return@withLock false
+            body()
+            true
+        }
     }
 
     // The load already put the new vibe's knobs on the engine, so held section macros are dropped, not restored.

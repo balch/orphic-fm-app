@@ -401,6 +401,32 @@ class MixBenchControllerTest {
     }
 
     @Test
+    fun trackEditsAreRefusedUntilAVibeLoadIsFollowed() = runTest {
+        feature.applyVibe(sendVibe)
+        section(1)
+        val c = started()
+        // The follower has not seen this load, so an edit now would land on the old vibe's layers.
+        feature.applyVibe(sendVibe)
+        assertFalse(c.setLevelDb(2, -6f))
+        assertFalse(c.setHeardLevelDb(2, -6f))
+        assertFalse(c.setPan(3, 0.5f))
+        assertFalse(c.setReverb(3, 0.2f))
+        assertFalse(c.setDelay(3, 0.2f))
+        assertEquals(SendEdit.VIBE_LOADING, c.setHeardSend(3, 0.25f, reverb = true))
+        assertFalse(c.toggleMute(5))
+        assertFalse(c.toggleSolo(6))
+        assertEquals(BenchLayers(), c.layers.value)
+        assertTrue(c.muted.value.isEmpty() && c.soloed.value.isEmpty())
+        assertTrue(c.ownedTracks().isEmpty())
+        assertTrue(gainWrites.isEmpty(), "$gainWrites")
+        assertNull(feature.overlay)
+        runCurrent()
+        assertTrue(c.setLevelDb(2, -6f))
+        assertTrue(c.toggleMute(5))
+        assertEquals(setOf(2, 5), c.ownedTracks())
+    }
+
+    @Test
     fun vibeChangeClearsLayers() = runTest {
         section(1)
         val c = started()
@@ -553,7 +579,7 @@ class MixBenchControllerTest {
         feature.applyVibe(sendVibe)
         section(1)
         val c = started()
-        assertTrue(c.setHeardSend(3, 0.25f, reverb = true))
+        assertEquals(SendEdit.APPLIED, c.setHeardSend(3, 0.25f, reverb = true))
         assertEquals(0.5f, c.layers.value.vibe.reverbRatio[3], 1e-5f)
         assertEquals(0.25f, c.layers.value.effective(sendVibe, 1, 3).reverbSend, 1e-5f)
     }
@@ -563,7 +589,7 @@ class MixBenchControllerTest {
         feature.applyVibe(sendVibe)
         section(1)
         val c = started()
-        assertFalse(c.setHeardSend(0, 0.3f, reverb = false))
+        assertEquals(SendEdit.ZERO_SEND, c.setHeardSend(0, 0.3f, reverb = false))
         assertEquals(BenchLayers(), c.layers.value)
     }
 
@@ -574,7 +600,7 @@ class MixBenchControllerTest {
         val c = started()
         c.setHeardSend(3, 0.25f, reverb = true)
         c.setScope(Scope.SECTION)
-        assertTrue(c.setHeardSend(3, 0.4f, reverb = true))
+        assertEquals(SendEdit.APPLIED, c.setHeardSend(3, 0.4f, reverb = true))
         assertEquals(0.4f, feature.overlay!!.reverbSend(3, 1, 0.5f), 1e-5f)
         val row = capture(sendVibe, c.layers.value)
             .single { it.scope == Scope.SECTION && it.field == CaptureField.REVERB_SEND }

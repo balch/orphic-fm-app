@@ -17,12 +17,16 @@ import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.Scope
+import org.balch.orpheus.features.pulsar.bench.SendEdit
 import org.balch.orpheus.features.pulsar.bench.effective
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 
 private const val TRACKS = 8
 private const val FADER_MIN_DB = -30f
 private const val FADER_MAX_DB = 3.5f
+
+/** A mix edit the controller refused because a vibe load is not yet followed. */
+internal const val VIBE_LOADING = "The vibe just changed; call mix_read, then try again."
 
 @LLMDescription("Arguments for mix_read.")
 @Serializable
@@ -338,17 +342,21 @@ class MixSetTool(
                 val range = RANGES.getValue(field)
                 val value = args.value.coerceIn(range)
                 if (value != args.value) notes += "$field clamped to ${range.start}..${range.endInclusive} (asked ${args.value})."
-                when (field) {
+                val applied = when (field) {
                     "level_db" -> c.setHeardLevelDb(track!!, value)
                     "pan" -> {
                         if (scope == Scope.SECTION) notes += "Pan is whole-vibe only."
                         c.setPan(track!!, value)
                     }
-                    "reverb", "delay" -> if (!c.setHeardSend(track!!, value, reverb = field == "reverb")) {
-                        badArg("This send is 0 here, so a whole-vibe edit can't scale it; use scope=section.")
+                    "reverb", "delay" -> when (c.setHeardSend(track!!, value, reverb = field == "reverb")) {
+                        SendEdit.APPLIED -> true
+                        SendEdit.VIBE_LOADING -> false
+                        SendEdit.ZERO_SEND ->
+                            badArg("This send is 0 here, so a whole-vibe edit can't scale it; use scope=section.")
                     }
-                    "macro" -> if (!c.setMacro(macro!!, value)) badArg("A vibe is loading; call mix_read, then try again.")
+                    else -> c.setMacro(macro!!, value)
                 }
+                if (!applied) badArg(VIBE_LOADING)
                 val section = pulsar.arrangementStateFlow.value.sectionIndex
                 MixSetResult(
                     ok = true,
@@ -404,7 +412,7 @@ private fun toggleTool(
     name: String,
     description: String,
     controllerProvider: () -> MixBenchController,
-    toggle: suspend MixBenchController.(Int) -> Unit,
+    toggle: suspend MixBenchController.(Int) -> Boolean,
 ): Tool<MixTrackArgs, MixToggleResult> = object : Tool<MixTrackArgs, MixToggleResult>(
     argsType = typeToken<MixTrackArgs>(),
     resultType = typeToken<MixToggleResult>(),
@@ -413,7 +421,7 @@ private fun toggleTool(
 ) {
     override suspend fun execute(args: MixTrackArgs): MixToggleResult = guarded({ MixToggleResult(false, it) }) {
         val c = controllerProvider()
-        c.toggle(requireTrack(args.track))
+        if (!c.toggle(requireTrack(args.track))) badArg(VIBE_LOADING)
         MixToggleResult(true, "ok", c.muted.value.sorted(), c.soloed.value.sorted())
     }
 }

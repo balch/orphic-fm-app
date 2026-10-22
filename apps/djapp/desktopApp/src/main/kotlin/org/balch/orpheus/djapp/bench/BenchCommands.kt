@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
+import org.balch.orpheus.features.pulsar.bench.SendEdit
 import org.balch.orpheus.features.pulsar.bench.capture
 
 /** Thrown for a command the bench refuses; the message goes back to the page. */
@@ -59,15 +60,13 @@ internal class BenchCommands(
             }
             "jump" -> controller.jumpTo(cmd.int("section"))
             "loop" -> controller.setLoop(cmd.bool("on"))
-            "level" -> controller.setHeardLevelDb(cmd.track(), cmd.float("db"))
-            "pan" -> controller.setPan(cmd.track(), cmd.float("v"))
+            "level" -> applied(controller.setHeardLevelDb(cmd.track(), cmd.float("db")))
+            "pan" -> applied(controller.setPan(cmd.track(), cmd.float("v")))
             "reverb" -> setSend(cmd.track(), cmd.float("v"), reverb = true)
             "delay" -> setSend(cmd.track(), cmd.float("v"), reverb = false)
-            "macro" -> if (!controller.setMacro(cmd.enum<Macro>("m"), cmd.float("v"))) {
-                throw BenchCommandException("a vibe is loading; move the knob again once it plays")
-            }
-            "mute" -> controller.toggleMute(cmd.track())
-            "solo" -> controller.toggleSolo(cmd.track())
+            "macro" -> applied(controller.setMacro(cmd.enum<Macro>("m"), cmd.float("v")))
+            "mute" -> applied(controller.toggleMute(cmd.track()))
+            "solo" -> applied(controller.toggleSolo(cmd.track()))
             "scope" -> controller.setScope(cmd.enum<Scope>("s"))
             "reset" -> controller.resetToFile()
             "capture" -> return capture()
@@ -107,9 +106,17 @@ internal class BenchCommands(
     }
 
     private suspend fun setSend(t: Int, v: Float, reverb: Boolean) {
-        if (!controller.setHeardSend(t, v, reverb)) {
-            throw BenchCommandException("this send is 0 here, so a whole-vibe move can't scale it; edit it in section scope")
+        when (controller.setHeardSend(t, v, reverb)) {
+            SendEdit.APPLIED -> Unit
+            SendEdit.VIBE_LOADING -> applied(false)
+            SendEdit.ZERO_SEND ->
+                throw BenchCommandException("this send is 0 here, so a whole-vibe move can't scale it; edit it in section scope")
         }
+    }
+
+    /** The controller refuses edits while a vibe load is not yet followed. */
+    private fun applied(ok: Boolean) {
+        if (!ok) throw BenchCommandException("a vibe is loading; try again once it plays")
     }
 
     private companion object {
