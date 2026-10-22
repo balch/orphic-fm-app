@@ -271,10 +271,11 @@ class MixBenchController(
 
     /**
      * Drops every layer edit and hands their tracks, the overlay and held section macros back to the app.
-     * Mutes and solos stay, with the tracks they need. Whole-vibe macro moves stay on the app's knobs.
+     * Mutes and solos stay, with the tracks they need. Whole-vibe macro moves stay on the app's knobs,
+     * and in the vibe layer, so a capture still writes what the knob plays.
      */
     suspend fun resetToFile() = lock.withLock {
-        _layers.value = BenchLayers()
+        _layers.value = BenchLayers(vibe = VibeLayer(macros = _layers.value.vibe.macros))
         val keep = if (_soloed.value.isNotEmpty()) owned.toSet() else owned intersect _muted.value
         val released = owned - keep
         owned.retainAll(keep)

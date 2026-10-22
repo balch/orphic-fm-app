@@ -427,13 +427,14 @@ class MixResetTool(private val controllerProvider: () -> MixBenchController) : T
             resultType = typeToken<MixStatusResult>(),
             name = "mix_reset",
             description = """
-                Reset the mix edits: levels, pans, sends and section layers go back to the vibe as written.
-                Keeps mutes, solos and whole-vibe macro moves (those are the app's real knobs).
+                Reset the mix edits: levels, pans, sends and every section edit (section macros included) go back
+                to the vibe as written. Keeps mutes, solos and whole-vibe macro moves: those stay on the app's
+                knobs and a mix capture still writes them.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: NoArgs): MixStatusResult = guarded({ MixStatusResult(false, it) }) {
                 controllerProvider().resetToFile()
-                MixStatusResult(true, "Levels, pans, sends and section layers reset; mutes, solos and macro knobs kept.")
+                MixStatusResult(true, "Levels, pans, sends and section edits reset; mutes, solos and whole-vibe macro moves kept (a capture includes them).")
             }
         }
     }

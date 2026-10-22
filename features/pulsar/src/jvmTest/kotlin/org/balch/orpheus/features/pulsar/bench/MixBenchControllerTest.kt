@@ -176,6 +176,23 @@ class MixBenchControllerTest {
     }
 
     @Test
+    fun resetKeepsWholeVibeMacroMovesSoCaptureStillWritesThem() = runTest {
+        val c = started()
+        c.setMacro(Macro.ENERGY, 0.7f)
+        c.setLevelDb(2, -6f)
+        c.resetToFile()
+        // The knob still plays 0.7, so the layer that capture reads keeps it too.
+        assertEquals(0.7f, feature.macroKnob(Macro.ENERGY))
+        assertEquals(BenchLayers(vibe = VibeLayer(macros = mapOf(Macro.ENERGY to 0.7f))), c.layers.value)
+        assertEquals(0.7f, c.layers.value.heardEnergy(vibe, 0), 1e-6f)
+        val snap = c.captureSnapshot()!!
+        val row = capture(snap.vibe, snap.layers).single()
+        assertEquals(CaptureField.MACRO, row.field)
+        assertEquals(Macro.ENERGY, row.macro)
+        assertEquals(0.7f, row.new, 1e-6f)
+    }
+
+    @Test
     fun vibeMacroMovesRealKnob() = runTest {
         val c = started()
         c.setMacro(Macro.ENERGY, 0.7f)

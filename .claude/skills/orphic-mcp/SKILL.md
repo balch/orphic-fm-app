@@ -32,7 +32,7 @@ disown
 - `mix_read`: vibe, playing section, per-track level/pan/sends/mute/solo, macros, and loudness meters.
 - `mix_set`: `field` is level_db (heard dB in the playing section, -30 to 3.5), pan, reverb, delay or macro. `scope` is vibe or section.
 - `mix_mute`, `mix_solo`: toggle one track (0-7).
-- `mix_reset`: levels, pans, sends and section layers back to the vibe. Keeps mutes, solos and whole-vibe macro moves.
+- `mix_reset`: levels, pans, sends and section layers back to the vibe. Keeps mutes, solos and whole-vibe macro moves, and a capture still writes those macros.
 - `section_jump`, `section_loop`: move to a section at the next bar line, or hold the current one.
 - `mix_capture`: save the mix edits as a capture file (see below).
 - `ports_list`, `port_get`, `port_set`: raw engine control ports, keyed `uri:symbol`.
