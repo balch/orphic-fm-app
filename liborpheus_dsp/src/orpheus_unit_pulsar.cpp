@@ -2993,6 +2993,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // (`state` is always non-null here: the lazy-init block above allocated it.)
         state->void_state.gain_smoothed = 1.0f;
         engine->viz_rings[VIZ_PULSAR_VOID_GAIN].write(1.0f);
+        // Silence on every track ring, as the other units write 0 when bypassed: the
+        // Orphoscope lanes and grid traces scroll off instead of freezing until resume.
+        for (int t = 0; t < kNumPulsarTracks; t++)
+            engine->viz_rings[VIZ_PULSAR_TRACK_0 + t].write(0.0f);
         // An armed wah-anomaly window deliberately FREEZES here rather than cancelling.
         // This return sits above the per-track loop that owns the once-per-block countdown,
         // so anomaly_wah_samples_left stops advancing along with everything else on the

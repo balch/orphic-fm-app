@@ -751,6 +751,34 @@ bool run_pulsar_tests() {
         }
     }
 
+    // ── Test 17b: a paused Pulsar keeps writing silence to every track ring ──
+    {
+        printf("  Test 17b: Paused tracks write silent viz levels\n");
+        engine->pulsar_playing.store(0, std::memory_order_relaxed);
+        constexpr int kPausedBlocks = 10;
+        uint32_t before[kNumPulsarTracks];
+        for (int t = 0; t < kNumPulsarTracks; t++)
+            before[t] = engine->viz_rings[VIZ_PULSAR_TRACK_0 + t].write_count.load();
+        for (int i = 0; i < kPausedBlocks; i++) unit_process_pulsar(&unit, engine, 512, 48000.0f);
+
+        bool ok = true;
+        for (int t = 0; t < kNumPulsarTracks; t++) {
+            auto& ring = engine->viz_rings[VIZ_PULSAR_TRACK_0 + t];
+            uint32_t wc = ring.write_count.load();
+            if (wc - before[t] != kPausedBlocks) ok = false;
+            for (uint32_t k = before[t]; k < wc; k++)
+                if (ring.buf[k % VizRing::kVizBufSize] != 0.0f) ok = false;
+        }
+        if (ok) {
+            printf("    PASS: every track ring took %d silent samples\n", kPausedBlocks);
+            pass++;
+        } else {
+            printf("    FAIL: a paused track ring froze or wrote signal\n");
+            fail++;
+        }
+        engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    }
+
     // Shared `engine` is done being read here. Test 17 reused Test 16's render
     // pass, so this is the first point after which nothing touches it again.
     orpheus_engine_destroy(engine);
