@@ -186,16 +186,15 @@ class SynthEngineMonitor(
     /** Scope was requested by UI (survives a background pause/resume and an engine restart). */
     private var scopeRequested = false
 
-    // Reusable IntArray(1) for JNI read position — avoids allocation per channel per poll
-    private val vizReadPosBuf = IntArray(1)
-
+    // posBuf is the JNI read-position cell, one per poll job: jobs run concurrently on io threads,
+    // and a shared cell let one job's read position land in another's.
     private fun pollVizChannel(
         channel: Int, readPositions: IntArray, vizBuf: FloatArray,
-        flow: MutableStateFlow<FloatArray>
+        flow: MutableStateFlow<FloatArray>, posBuf: IntArray,
     ) {
-        vizReadPosBuf[0] = readPositions[channel]
-        val count = nativeBridge.nativeGetViz(channel, vizBuf, vizReadPosBuf)
-        readPositions[channel] = vizReadPosBuf[0]
+        posBuf[0] = readPositions[channel]
+        val count = nativeBridge.nativeGetViz(channel, vizBuf, posBuf)
+        readPositions[channel] = posBuf[0]
         if (count > 0) {
             flow.value = appendToVizRing(flow.value, vizBuf, count)
         }
@@ -348,6 +347,7 @@ class SynthEngineMonitor(
         pulsarVizJob = monitoringScope.launch(dispatcherProvider.io) {
             val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
             val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
+            val posBuf = IntArray(1)
             var lastVoidGain = 1f
             var lastKrakenShift = -1
             // Previous-tick snapshots for change gating: emitting PulsarVizData
@@ -370,22 +370,22 @@ class SynthEngineMonitor(
                 nativeBridge.nativeGetPulsarActiveEngines(pulsarActiveEngines)
                 val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
                 for (t in 0 until PULSAR_NUM_TRACKS) {
-                    pollVizChannel(VIZ_PULSAR_TRACK_0 + t, pulsarReadPos, pulsarVizBuf, _pulsarTrackVizFlows[t])
+                    pollVizChannel(VIZ_PULSAR_TRACK_0 + t, pulsarReadPos, pulsarVizBuf, _pulsarTrackVizFlows[t], posBuf)
                     val data = _pulsarTrackVizFlows[t].value
                     trackLevels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
                 }
                 // Void Anomaly gain: a single live scalar (1.0 = idle), same channel
                 // shape as beat_phase below — only the latest sample matters, so read
                 // straight off the ring rather than accumulating a history flow.
-                vizReadPosBuf[0] = pulsarReadPos[VIZ_PULSAR_VOID_GAIN]
-                val voidGainCount = nativeBridge.nativeGetViz(VIZ_PULSAR_VOID_GAIN, pulsarVizBuf, vizReadPosBuf)
-                pulsarReadPos[VIZ_PULSAR_VOID_GAIN] = vizReadPosBuf[0]
+                posBuf[0] = pulsarReadPos[VIZ_PULSAR_VOID_GAIN]
+                val voidGainCount = nativeBridge.nativeGetViz(VIZ_PULSAR_VOID_GAIN, pulsarVizBuf, posBuf)
+                pulsarReadPos[VIZ_PULSAR_VOID_GAIN] = posBuf[0]
                 if (voidGainCount > 0) {
                     lastVoidGain = pulsarVizBuf[voidGainCount - 1].coerceIn(0f, 1f)
                 }
-                vizReadPosBuf[0] = pulsarReadPos[VIZ_PULSAR_KRAKEN]
-                val krakenCount = nativeBridge.nativeGetViz(VIZ_PULSAR_KRAKEN, pulsarVizBuf, vizReadPosBuf)
-                pulsarReadPos[VIZ_PULSAR_KRAKEN] = vizReadPosBuf[0]
+                posBuf[0] = pulsarReadPos[VIZ_PULSAR_KRAKEN]
+                val krakenCount = nativeBridge.nativeGetViz(VIZ_PULSAR_KRAKEN, pulsarVizBuf, posBuf)
+                pulsarReadPos[VIZ_PULSAR_KRAKEN] = posBuf[0]
                 if (krakenCount > 0) lastKrakenShift = pulsarVizBuf[krakenCount - 1].roundToInt()
 
                 val changed = !everEmitted ||
@@ -471,14 +471,15 @@ class SynthEngineMonitor(
             val ttBuf = FloatArray(TURNTABLE_VIZ_SIZE)
             val vizBuf = FloatArray(VIZ_BUF_SIZE)
             val readPositions = IntArray(VIZ_CHANNEL_COUNT)
+            val posBuf = IntArray(1)
             while (isActive) {
                 pollTurntableViz(0, ttBuf, _djVizFlowA)
                 pollTurntableViz(1, ttBuf, _djVizFlowB)
-                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
+                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow, posBuf)
                 // Poll latest beat_phase for zone-strip pulse animation
-                vizReadPosBuf[0] = readPositions[VIZ_BEAT_PHASE]
-                val beatCount = nativeBridge.nativeGetViz(VIZ_BEAT_PHASE, vizBuf, vizReadPosBuf)
-                readPositions[VIZ_BEAT_PHASE] = vizReadPosBuf[0]
+                posBuf[0] = readPositions[VIZ_BEAT_PHASE]
+                val beatCount = nativeBridge.nativeGetViz(VIZ_BEAT_PHASE, vizBuf, posBuf)
+                readPositions[VIZ_BEAT_PHASE] = posBuf[0]
                 if (beatCount > 0) {
                     _beatPhaseFlow.value = vizBuf[beatCount - 1].coerceIn(0f, 1f)
                 }
@@ -548,36 +549,37 @@ class SynthEngineMonitor(
         vizJob = monitoringScope.launch(dispatcherProvider.io) {
             val vizBuf = FloatArray(VIZ_BUF_SIZE)
             val readPositions = IntArray(VIZ_CHANNEL_COUNT)
+            val posBuf = IntArray(1)
             while (isActive) {
-                pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow)
-                pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow)
-                pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow)
-                pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow)
-                pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow)
-                pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow)
-                pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow)
-                pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow)
-                pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow)
-                pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow)
-                pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow)
-                pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow)
-                pollVizChannel(VIZ_DRUM_OUT, readPositions, vizBuf, _drumOutVizFlow)
-                pollVizChannel(VIZ_GRAINS_IN, readPositions, vizBuf, _grainsInVizFlow)
-                pollVizChannel(VIZ_GRAINS_OUT, readPositions, vizBuf, _grainsOutVizFlow)
-                pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow)
-                pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow)
-                pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow)
-                pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow)
-                pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow)
-                pollVizChannel(VIZ_HORN_IN, readPositions, vizBuf, _hornInVizFlow)
-                pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow)
-                pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow)
-                pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow)
-                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
-                pollVizChannel(VIZ_TIDES_CH0, readPositions, vizBuf, _tidesCh0VizFlow)
-                pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow)
-                pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow)
-                pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow)
+                pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow, posBuf)
+                pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow, posBuf)
+                pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow, posBuf)
+                pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow, posBuf)
+                pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow, posBuf)
+                pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow, posBuf)
+                pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow, posBuf)
+                pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow, posBuf)
+                pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow, posBuf)
+                pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow, posBuf)
+                pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow, posBuf)
+                pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow, posBuf)
+                pollVizChannel(VIZ_DRUM_OUT, readPositions, vizBuf, _drumOutVizFlow, posBuf)
+                pollVizChannel(VIZ_GRAINS_IN, readPositions, vizBuf, _grainsInVizFlow, posBuf)
+                pollVizChannel(VIZ_GRAINS_OUT, readPositions, vizBuf, _grainsOutVizFlow, posBuf)
+                pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow, posBuf)
+                pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow, posBuf)
+                pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow, posBuf)
+                pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow, posBuf)
+                pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow, posBuf)
+                pollVizChannel(VIZ_HORN_IN, readPositions, vizBuf, _hornInVizFlow, posBuf)
+                pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow, posBuf)
+                pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow, posBuf)
+                pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow, posBuf)
+                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow, posBuf)
+                pollVizChannel(VIZ_TIDES_CH0, readPositions, vizBuf, _tidesCh0VizFlow, posBuf)
+                pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow, posBuf)
+                pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow, posBuf)
+                pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow, posBuf)
 
                 delay(VIZ_SCOPE_POLL_INTERVAL)
             }
