@@ -13,6 +13,8 @@
 // VIBE_SET=symbol=value,...  Pulsar port overrides, re-applied after every section flip.
 // VIBE_TRIM=3:-2.6,2:-4.4  per-track dB on the TRACKS fader (audition gain, capped at +3.5 dB).
 // VIBE_TAG suffixes the output name. VIBE_WAV=1 also writes the mix WAV next to the JSON.
+// VIBE_OVERVIEW=1 also writes <name>.overview.json: mid-signal min/max per 100 ms of the OUT signal
+// plus each section's first-entry time, for the Mix Bench's whole-song overview.
 //
 // Besides the 8 tracks it measures the storm, street and speech voices, which Pulsar mixes in
 // outside them. Speech stays silent here: its clips come from the platform's TTS in Kotlin.
@@ -137,6 +139,8 @@ struct Run {
     Window whole;
     std::map<int, Window> sections;
     std::vector<float> pcm;
+    std::vector<std::pair<float, float>> env;   // mid min/max per 100 ms of OUT
+    std::map<int, double> section_start;        // first-entry render time, seconds
 };
 
 void close_block(Run& run, int section, std::vector<SubBlock>& subs, Window& sec) {
@@ -190,6 +194,7 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
     std::vector<float> buf(static_cast<size_t>(block) * 2);
     const long sub_frames = sr / 10;
     std::vector<SubBlock> subs(1);
+    float env_lo = 0, env_hi = 0;
     int section = -1;
     for (int b = 0; b < blocks; b++) {
         if (b == outro_block) orpheus_engine_set_port(e, kPulsarUri, "arrangement_outro_request", 1.0f);
@@ -200,6 +205,7 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
         const PulsarState* ps = e->pulsar_state;
         const int now = ps ? ps->section_state.current_section : -1;
         Window& sec = run.sections[now];
+        run.section_start.emplace(now, static_cast<double>(b) * block / sr);
         if (std::find(section_order.begin(), section_order.end(), now) == section_order.end())
             section_order.push_back(now);
         StereoStats out, dry, tr[kChannels];
@@ -213,6 +219,10 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
             double dl = 0, dr = 0;
             SubBlock& sb = subs.back();
             sb.out += kl * kl + kr * kr;
+            const float mid = 0.5f * (buf[2 * i] + buf[2 * i + 1]);
+            if (sb.frames == 0) env_lo = env_hi = mid;
+            env_lo = std::min(env_lo, mid);
+            env_hi = std::max(env_hi, mid);
             for (int t = 0; t < kChannels; t++) {
                 const double tl = t < kTracks ? taps->track_l[t][i] : taps->source_l[t - kTracks][i];
                 const double trr = t < kTracks ? taps->track_r[t][i] : taps->source_r[t - kTracks][i];
@@ -226,6 +236,7 @@ bool measure(const PortDump& d, const std::vector<float>& trims_db, float dist, 
             accumulate(dry, dl, dr, dkl, dkr, m.dry_b[0], m.dry_b[1]);
             sb.dry += dkl * dkl + dkr * dkr;
             if (++sb.frames == sub_frames) {
+                run.env.emplace_back(env_lo, env_hi);
                 close_block(run, now, subs, sec);
                 subs.emplace_back();
                 if (subs.size() > 4) subs.erase(subs.begin());
@@ -353,6 +364,27 @@ bool run_vibe_measure() {
     fprintf(f, "  ]\n}\n");
     fclose(f);
     printf("  wrote %s\n", json.c_str());
+    if (std::getenv("VIBE_OVERVIEW")) {
+        const std::string ov = dir + "/" + name + ".overview.json";
+        if (FILE* o = fopen(ov.c_str(), "w")) {
+            fprintf(o, "{\"seconds\": %d, \"sections\": [", seconds);
+            for (size_t i = 0; i < order.size(); i++) {
+                const int s = order[i];
+                const std::string label = s >= 0 && s < static_cast<int>(names.size()) ? names[s] : std::to_string(s);
+                fprintf(o, "%s{\"index\": %d, \"name\": \"%s\", \"start_s\": %.2f}", i ? ", " : "", s,
+                        json_escape(label).c_str(), run.section_start[s]);
+            }
+            fprintf(o, "], \"env\": [");
+            for (size_t i = 0; i < run.env.size(); i++)
+                fprintf(o, "%s[%.4f, %.4f]", i ? "," : "", run.env[i].first, run.env[i].second);
+            fprintf(o, "]}\n");
+            fclose(o);
+            printf("  wrote %s\n", ov.c_str());
+        } else {
+            printf("  FAIL: cannot write %s\n", ov.c_str());
+            return false;
+        }
+    }
     if (!run.pcm.empty()) {
         const std::string wav = dir + "/" + name + ".wav";
         write_wav(wav.c_str(), run.pcm.data(), static_cast<int>(run.pcm.size() / 2), sr);

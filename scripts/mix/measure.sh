@@ -9,7 +9,7 @@
 #   VIBE_SET=energy=0.7 VIBE_TAG=e70 NO_DUMP=1 scripts/mix/measure.sh "Orphic Lore"
 #
 # Passed through to the suite: VIBE_SECONDS (240), VIBE_DIST (0.30), VIBE_SET, VIBE_TRIM, VIBE_TAG,
-# VIBE_WAV, VIBE_OUTRO_AT. VIBE_SET reaches Pulsar ports only: energy and complexity work, but
+# VIBE_WAV, VIBE_OUTRO_AT, VIBE_OVERVIEW (also writes <name>.overview.json for the Mix Bench). VIBE_SET reaches Pulsar ports only: energy and complexity work, but
 # reverb/delay sends are scaled by space in Kotlin, so a space override leaves the sends alone.
 # NO_DUMP=1 reuses the last dump (skip it only when no vibe file changed).
 set -euo pipefail

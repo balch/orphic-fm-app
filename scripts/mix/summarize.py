@@ -53,7 +53,8 @@ def lu(x):
 
 
 def main(directory):
-    runs = [json.loads(p.read_text()) for p in sorted(Path(directory).glob("*.json"))]
+    runs = [json.loads(p.read_text()) for p in sorted(Path(directory).glob("*.json"))
+            if not p.name.endswith(".overview.json")]
     names = [r["vibe"] + ("" if not r.get("set") and not any(r["trims_db"]) else " *") for r in runs]
     print("# Vibe mix measurements\n")
     print(f"{runs[0]['seconds'] if runs else 0} s per vibe through the DJ graph, DIST {runs[0]['dist'] if runs else 0}. "
