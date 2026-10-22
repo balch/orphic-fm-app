@@ -108,6 +108,8 @@ kotlin {
         jvmTest.dependencies {
             // Skia natives, so draw code can be rendered and inspected.
             implementation(compose.desktop.currentOs)
+            // VibePortDumpRenderHarness replays the plugin's port defaults, as the app's engine start does.
+            implementation(projects.core.plugins.pulsar)
         }
     }
 }

@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -12,6 +13,7 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PulsarPlaybackMode
+import org.balch.orpheus.core.plugin.ControlPort
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.ports.PortRegistry
@@ -19,7 +21,11 @@ import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
+import org.balch.orpheus.features.pulsar.vibes.VibeStatus
+import org.balch.orpheus.plugins.pulsar.PulsarPlugin
 import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -37,6 +43,8 @@ import kotlin.test.Test
  *
  * RECORD_VIBE="Orphic Lore" ./gradlew :features:pulsar:jvmTest \
  *     --tests '*VibePortDumpRenderHarness*' -PrenderHarness --rerun
+ *
+ * RECORD_VIBE takes a comma list of names, or `live` for every LIVE catalog vibe.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class VibePortDumpRenderHarness {
@@ -50,18 +58,40 @@ class VibePortDumpRenderHarness {
 
     @Test
     fun dumpVibePortWrites() = runTest(testDispatcher) {
-        val name = System.getenv("RECORD_VIBE")?.takeIf { it.isNotBlank() } ?: "Orphic Lore"
-        val provider = VibeCatalogScan.allProviders().firstOrNull { it.vibe.name == name }
-            ?: error("No vibe named '$name'")
+        val requested = System.getenv("RECORD_VIBE")?.takeIf { it.isNotBlank() } ?: "Orphic Lore"
+        val all = VibeCatalogScan.allProviders()
+        val providers = if (requested == "live") {
+            val live = VibeCatalog.entries.filterValues { it.status == VibeStatus.LIVE }.keys
+            live.map { name -> all.first { it.name == name } }
+        } else {
+            requested.split(',').map { name -> all.firstOrNull { it.vibe.name == name.trim() } ?: error("No vibe named '$name'") }
+        }
+        providers.forEach { dump(it) }
+    }
+
+    private fun TestScope.dump(provider: VibeProvider) {
         val vibe = provider.vibe
+        val name = vibe.name
+        ports.clear()
+        writes.clear()
         val engine = SongEndingStubSynthEngine()
-        val vm = makeViewModel(engine, provider)
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(engine, provider, scope)
 
         vm.actions.onToggleModeOne()
         vm.actions.setVibe(vibe)
         advanceUntilIdle()
 
+        // The app's engine start forwards every plugin port to native before a vibe loads
+        // (DspSynthEngine's generic sync). Without it, a port whose Kotlin default differs from
+        // the C++ atomic replays wrong: density_override is -1 in Kotlin but 0 in C++, which
+        // empties every generative track.
         val out = StringBuilder()
+        val plugin = PulsarPlugin()
+        plugin.ports.filterIsInstance<ControlPort>().filter { it.isInput }.forEach { port ->
+            val value = plugin.getPortValue(port.symbol) ?: return@forEach
+            out.append(plugin.info.uri).append('\t').append(port.symbol).append('\t').append(value.asFloat()).append('\n')
+        }
         writes.forEach { out.append(it).append('\n') }
         writes.clear()
 
@@ -77,6 +107,7 @@ class VibePortDumpRenderHarness {
             writes.forEach { out.append("#section\t").append(s).append('\t').append(it).append('\n') }
             writes.clear()
         }
+        scope.cancel()
 
         val slug = name.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
         val dir = File("build/vibe-recordings").apply { mkdirs() }
@@ -88,7 +119,7 @@ class VibePortDumpRenderHarness {
         println("Wrote ${file.absolutePath}")
     }
 
-    private fun makeViewModel(engine: SongEndingStubSynthEngine, provider: org.balch.orpheus.features.pulsar.models.VibeProvider): PulsarViewModel {
+    private fun makeViewModel(engine: SongEndingStubSynthEngine, provider: VibeProvider, scope: FeatureCoroutineScope): PulsarViewModel {
         val controller = SynthController().apply {
             setDelegates(
                 setter = { id, value ->
@@ -115,7 +146,7 @@ class VibePortDumpRenderHarness {
             appPreferencesRepository = RecorderPrefs(),
             presetLoader = PresetLoader(PortRegistry(emptySet()), tempo, controller),
             dispatcherProvider = dispatchers,
-            scope = FeatureCoroutineScope(),
+            scope = scope,
             vibeProviders = setOf(provider),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
             songEndingPreferences = StubSongEndingPreferences(),

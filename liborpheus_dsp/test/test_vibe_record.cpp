@@ -14,6 +14,7 @@
 // suffixes the file names so an A/B keeps both takes.
 #include "test_harness.h"   // declares braids/plaits namespaces before orpheus_unit_pulsar.h
 #include "test_pulsar_helpers.h"
+#include "test_vibe_replay.h"
 #include "orpheus_engine.h"
 #include "orpheus_unit_pulsar.h"
 #include "stmlib/utils/random.h"
@@ -31,48 +32,7 @@
 namespace {
 
 constexpr const char* kDefaultPorts = "features/pulsar/build/vibe-recordings/orphic_lore.ports";
-constexpr const char* kPulsarUri = "org.balch.orpheus.plugins.pulsar";
-
-struct PortWrite { std::string uri, symbol; float value; };
-
-struct PortDump {
-    std::vector<PortWrite> base;
-    std::map<int, std::vector<PortWrite>> sections;
-    float seed = 0.0f;
-    float bpm = 120.0f;
-    std::vector<PortWrite> overrides;   // VIBE_SET, applied last
-};
-
-bool parse_dump(const std::string& path, PortDump& d) {
-    std::ifstream in(path);
-    if (!in) return false;
-    std::string line;
-    while (std::getline(in, line)) {
-        if (line.empty()) continue;
-        std::vector<std::string> f;
-        std::stringstream ss(line);
-        std::string cell;
-        while (std::getline(ss, cell, '\t')) f.push_back(cell);
-        if (f[0] == "#section" && f.size() == 5) {
-            d.sections[std::stoi(f[1])].push_back({f[2], f[3], std::stof(f[4])});
-        } else if (f.size() == 3) {
-            PortWrite w{f[0], f[1], std::stof(f[2])};
-            if (w.uri == kPulsarUri && w.symbol == "seed") d.seed = w.value;
-            if (w.uri == kPulsarUri && w.symbol == "bpm") d.bpm = w.value;
-            d.base.push_back(w);
-        }
-    }
-    return true;
-}
-
-void apply(OrpheusEngine* e, const std::vector<PortWrite>& ws) {
-    for (const PortWrite& w : ws) orpheus_engine_set_port(e, w.uri.c_str(), w.symbol.c_str(), w.value);
-}
-
-int env_int(const char* name, int fallback) {
-    const char* v = std::getenv(name);
-    return v ? std::atoi(v) : fallback;
-}
+using namespace vibe_replay;
 
 // VIBE_SR and VIBE_BLOCK mimic another output stream, e.g. 44100 / 882 for Bluetooth on Android.
 const int kSr = env_int("VIBE_SR", 48000);
@@ -167,15 +127,7 @@ bool run_vibe_record() {
     const std::string dir = env_dir ? env_dir : "liborpheus_dsp/test/output/vibe_record/" + stem;
     std::filesystem::create_directories(dir);
     const int seconds = env_int("VIBE_SECONDS", 60);
-    if (const char* set = std::getenv("VIBE_SET")) {
-        std::stringstream os(set);
-        std::string kv;
-        while (std::getline(os, kv, ',')) {
-            const size_t eq = kv.find('=');
-            if (eq == std::string::npos) continue;
-            dump.overrides.push_back({kPulsarUri, kv.substr(0, eq), std::stof(kv.substr(eq + 1))});
-        }
-    }
+    parse_pulsar_set(std::getenv("VIBE_SET"), dump.overrides);
     const char* env_tag = std::getenv("VIBE_TAG");
     const std::string tag = env_tag ? std::string("_") + env_tag : "";
 

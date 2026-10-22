@@ -1247,6 +1247,25 @@ struct OrpheusEngine {
     // is set in orpheus_engine_create; mute and solo arrive here as 0.
     std::atomic<float> pulsar_track_audition_gain[8] = {};
 
+    // Headless mix harness taps (vibe_measure suite). Null in the apps; when set, Pulsar copies
+    // each block's per-track dry contribution and its bus on both sides of the 55 Hz HPF and
+    // before soft_limit. The harness zeroes them before each block.
+    struct PulsarMeasureTaps {
+        float track_l[8][kMaxFrames];
+        float track_r[8][kMaxFrames];
+        float pre_hpf_l[kMaxFrames];
+        float pre_hpf_r[kMaxFrames];
+        float post_hpf_l[kMaxFrames];
+        float post_hpf_r[kMaxFrames];
+        // Voices mixed in outside the 8 tracks, indexed by kMeasureStorm/Street/Speech.
+        static constexpr int kMeasureStorm = 0, kMeasureStreet = 1, kMeasureSpeech = 2, kMeasureSources = 3;
+        float source_l[kMeasureSources][kMaxFrames];
+        float source_r[kMeasureSources][kMaxFrames];
+        float pre_limit_l[kMaxFrames];
+        float pre_limit_r[kMaxFrames];
+    };
+    PulsarMeasureTaps* pulsar_measure_taps = nullptr;
+
     // Per-track delay/reverb sends — per-engine
     std::atomic<float> pulsar_track_delay_send[8] = {};
     std::atomic<float> pulsar_track_delay_send_space[8] = {};

@@ -594,6 +594,8 @@ bool run_pulsar_osc_tests();
 bool run_mist_tests();
 bool run_mist_samples();
 bool run_vibe_record();
+bool run_vibe_measure();
+bool run_vibe_measure_meter_tests();
 bool run_pulsar_morph_rise_tests();
 bool run_pulsar_mist_tests();
 bool run_pulsar_vibrato_tests();

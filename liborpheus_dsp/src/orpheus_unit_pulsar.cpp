@@ -6321,6 +6321,15 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 bus_r[i] -= sd;
             }
         }
+        if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+            for (int i = 0; i < num_frames; i++) {
+                const float s = track_buffer[i] * vol * void_gain_buf[i];
+                const float sd = grain_track ? mist_side[i] * vol * void_gain_buf[i] * mist_width : 0.0f;
+                taps->track_l[t][i] = s * pan_l + sd;
+                taps->track_r[t][i] = s * pan_r - sd;
+            }
+        }
+
         // Write per-track peak to viz ring
         engine->viz_rings[VIZ_PULSAR_TRACK_0 + t].write(track_peak);
 
@@ -6443,6 +6452,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 engine->pulsar_reverb_send_l[i] += dark_l * kStormReverbSend;
                 engine->pulsar_reverb_send_r[i] += dark_r * kStormReverbSend;
             }
+            if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+                for (int i = 0; i < num_frames; i++) {
+                    taps->source_l[taps->kMeasureStorm][i] = storm_l[i] * void_gain_buf[i];
+                    taps->source_r[taps->kMeasureStorm][i] = storm_r[i] * void_gain_buf[i];
+                }
+            }
         }
     }
 
@@ -6501,6 +6516,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 engine->pulsar_reverb_send_l[i] += fl * foot_rev + tl * kStreetTrainReverbSend;
                 engine->pulsar_reverb_send_r[i] += fr * foot_rev + tr * kStreetTrainReverbSend;
             }
+            if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+                for (int i = 0; i < num_frames; i++) {
+                    taps->source_l[taps->kMeasureStreet][i] = (foot_l[i] + train_l[i]) * void_gain_buf[i];
+                    taps->source_r[taps->kMeasureStreet][i] = (foot_r[i] + train_r[i]) * void_gain_buf[i];
+                }
+            }
         }
     }
 
@@ -6519,6 +6540,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             engine->pulsar_delay_send_r[i]  += s * kSpeechDelaySend;
             engine->pulsar_reverb_send_l[i] += s * kSpeechReverbSend;
             engine->pulsar_reverb_send_r[i] += s * kSpeechReverbSend;
+        }
+        if (OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps) {
+            for (int i = 0; i < num_frames; i++) {
+                taps->source_l[taps->kMeasureSpeech][i] = speech_buf[i] * void_gain_buf[i];
+                taps->source_r[taps->kMeasureSpeech][i] = speech_buf[i] * void_gain_buf[i];
+            }
         }
     }
 
@@ -6557,11 +6584,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->output_hpf2_r.set_f_q<stmlib::FREQUENCY_EXACT>(hpf_f, 0.707f);
         state->output_hpf_initialized = true;
     }
+    OrpheusEngine::PulsarMeasureTaps* taps = engine->pulsar_measure_taps;
+    if (taps) {
+        std::memcpy(taps->pre_hpf_l, out_l, num_frames * sizeof(float));
+        std::memcpy(taps->pre_hpf_r, out_r, num_frames * sizeof(float));
+    }
     for (int i = 0; i < num_frames; i++) {
         out_l[i] = state->output_hpf_l.Process<stmlib::FILTER_MODE_HIGH_PASS>(out_l[i]);
         out_l[i] = state->output_hpf2_l.Process<stmlib::FILTER_MODE_HIGH_PASS>(out_l[i]);
         out_r[i] = state->output_hpf_r.Process<stmlib::FILTER_MODE_HIGH_PASS>(out_r[i]);
         out_r[i] = state->output_hpf2_r.Process<stmlib::FILTER_MODE_HIGH_PASS>(out_r[i]);
+    }
+    if (taps) {
+        std::memcpy(taps->post_hpf_l, out_l, num_frames * sizeof(float));
+        std::memcpy(taps->post_hpf_r, out_r, num_frames * sizeof(float));
     }
 
     // Apply mix gain BEFORE bus limiter so soft_limit catches the boosted peaks.
@@ -6577,6 +6613,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         out_r[i] *= output_gain;
     }
     state->section_volume_gain = section_volume;
+    if (taps) {
+        std::memcpy(taps->pre_limit_l, out_l, num_frames * sizeof(float));
+        std::memcpy(taps->pre_limit_r, out_r, num_frames * sizeof(float));
+    }
 
     // Bus limiter: soft-clip the boosted 8-track sum to prevent digital overs.
     // soft_limit is linear below 0.5, tanh saturation above — natural bus compression.
