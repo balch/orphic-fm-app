@@ -225,6 +225,18 @@ object OrpheusColors {
     val mixerDistRed = Color(0xFFFF3B3B)
     val mixerMasterPurple = Color(0xFFC8A8FF)
 
+    /** Pulsar track colours: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX. Grid, mixer, progress wave and Orphoscope. */
+    val pulsarTracks = listOf(
+        Color(0xFFE53935), // 0 KICK - red
+        Color(0xFFFF9800), // 1 PERC - orange
+        Color(0xFFFFEB3B), // 2 HIHAT - yellow
+        Color(0xFF42A5F5), // 3 BASS - blue
+        Color(0xFF66BB6A), // 4 KEYS - green
+        Color(0xFF26C6DA), // 5 PAD - cyan
+        Color(0xFFEC407A), // 6 TEXTURE - pink
+        Color(0xFFBDBDBD), // 7 FX - muted white
+    )
+
     // GalaxyViz Colors
     val galaxyCore = Color(0xFFFF6030)
     val galaxyMid = Color(0xFFAA40AA)

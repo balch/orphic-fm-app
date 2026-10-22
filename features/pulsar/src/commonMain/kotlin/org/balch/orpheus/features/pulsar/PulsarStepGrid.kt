@@ -60,17 +60,8 @@ import org.balch.orpheus.ui.theme.lighten
 import kotlin.math.max
 import kotlin.math.min
 
-/** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX. The DJ app's progress wave wears them too. */
-val PulsarTrackColors = listOf(
-    Color(0xFFE53935), // 0 KICK - red
-    Color(0xFFFF9800), // 1 PERC - orange
-    Color(0xFFFFEB3B), // 2 HIHAT - yellow
-    Color(0xFF42A5F5), // 3 BASS - blue
-    Color(0xFF66BB6A), // 4 KEYS - green
-    Color(0xFF26C6DA), // 5 PAD - cyan
-    Color(0xFFEC407A), // 6 TEXTURE - pink
-    Color(0xFFBDBDBD), // 7 FX - muted white
-)
+/** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX. The DJ app's progress wave and the Orphoscope wear them too. */
+val PulsarTrackColors = OrpheusColors.pulsarTracks
 
 private const val NUM_TRACKS = 8
 private const val MAX_STEPS = 32
