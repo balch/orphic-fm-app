@@ -8,3 +8,10 @@ interface MixBenchTap {
     /** Copies up to out.size / [BenchSummaryLayout.FLOATS] summaries, oldest first; returns the count. One reader only. */
     fun drain(out: FloatArray): Int
 }
+
+/** For engines without the native taps: edits still work, the meters stay silent. */
+object NoMeterTap : MixBenchTap {
+    override fun setEnabled(on: Boolean) {}
+
+    override fun drain(out: FloatArray): Int = 0
+}

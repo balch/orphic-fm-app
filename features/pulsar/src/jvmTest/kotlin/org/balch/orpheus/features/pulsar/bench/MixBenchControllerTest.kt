@@ -102,6 +102,7 @@ class MixBenchControllerTest {
         assertEquals(0, tap.enables)
         assertNull(feature.overlay)
         assertTrue(feature.macroWrites.isEmpty())
+        assertTrue(feature.benchMacroWrites.isEmpty())
     }
 
     @Test
@@ -185,8 +186,8 @@ class MixBenchControllerTest {
     }
 
     @Test
-    fun sectionMacroSetsKnobOnEntryAndRestoresOnExit() = runTest {
-        // Section 2 plays energy x 0.5, so a heard 0.2 needs a knob of 0.4 there.
+    fun sectionMacroWritesThePortOnEntryAndTheKnobBackOnExit() = runTest {
+        // Section 2 plays energy x 0.5, so a heard 0.2 needs a port value of 0.4 there.
         val halved = vibe.copy(
             arrangement = Arrangement(
                 sections = vibe.arrangement!!.sections.mapIndexed { i, s ->
@@ -201,15 +202,42 @@ class MixBenchControllerTest {
         c.setScope(Scope.SECTION)
         c.setMacro(Macro.ENERGY, 0.2f)
         assertEquals(0.2f, c.layers.value.sections.getValue(2).macrosHeard[Macro.ENERGY])
-        assertEquals("energy" to 0.4f, feature.macroWrites.last())
+        assertEquals(mapOf(Macro.ENERGY to 0.4f), feature.benchMacroWrites.last())
+        assertEquals(0.4f, feature.engineMacro(Macro.ENERGY))
         section(1); runCurrent()
-        assertEquals("energy" to 0.8f, feature.macroWrites.last())
-        assertEquals(0.8f, feature.macroKnob(Macro.ENERGY))
+        // Leaving the section plays the knob again.
+        assertEquals(emptyMap(), feature.benchMacroWrites.last())
+        assertEquals(0.8f, feature.engineMacro(Macro.ENERGY))
         section(2); runCurrent()
-        assertEquals("energy" to 0.4f, feature.macroWrites.last())
+        assertEquals(0.4f, feature.engineMacro(Macro.ENERGY))
         section(3); runCurrent()
-        assertEquals(0.8f, feature.macroKnob(Macro.ENERGY))
-        assertEquals(listOf(0.4f, 0.8f, 0.4f, 0.8f), feature.macroWrites.map { it.second })
+        assertEquals(0.8f, feature.engineMacro(Macro.ENERGY))
+        // The knob and the state the app saves never carried a section value.
+        assertTrue(feature.macroWrites.isEmpty())
+        assertEquals(0.8f, feature.stateFlow.value.energy)
+        assertEquals(listOf(0.4f, null, 0.4f, null), feature.benchMacroWrites.map { it[Macro.ENERGY] })
+    }
+
+    @Test
+    fun knobMoveWhileASectionHoldsTheMacroRewritesThePort() = runTest {
+        section(2)
+        val c = started()
+        c.setScope(Scope.SECTION)
+        c.setMacro(Macro.MOOD, 0.2f)
+        val before = feature.benchMacroWrites.size
+        // A hand on the knob writes its port; the section's value goes back over it.
+        feature.actions.setMood(0.9f)
+        runCurrent()
+        assertEquals(before + 1, feature.benchMacroWrites.size)
+        assertEquals(mapOf(Macro.MOOD to 0.2f), feature.benchMacroWrites.last())
+        // A whole-vibe move is a real knob move, and the section keeps its heard value.
+        c.setScope(Scope.VIBE)
+        c.setMacro(Macro.MOOD, 0.6f)
+        runCurrent()
+        assertEquals(0.6f, feature.macroKnob(Macro.MOOD))
+        assertEquals(mapOf(Macro.MOOD to 0.2f), feature.benchMacroWrites.last())
+        section(1); runCurrent()
+        assertEquals(0.6f, feature.engineMacro(Macro.MOOD))
     }
 
     @Test
@@ -276,9 +304,10 @@ class MixBenchControllerTest {
         val c = started()
         c.setScope(Scope.SECTION)
         c.setMacro(Macro.ENERGY, 0.2f)
-        assertEquals("energy" to 0.2f, feature.macroWrites.last())
+        assertEquals(mapOf(Macro.ENERGY to 0.2f), feature.benchMacroWrites.last())
         section(1); runCurrent()
-        assertEquals("energy" to 0.8f, feature.macroWrites.last())
+        assertEquals(0.8f, feature.engineMacro(Macro.ENERGY))
+        assertTrue(feature.macroWrites.isEmpty())
         // Capture still writes file values: the section multiplier is over the file's 0.3.
         val row = capture(feature.vibeFlow.value, c.layers.value).single { it.field == CaptureField.MACRO }
         assertEquals(1f, row.old, 1e-6f)
@@ -302,11 +331,32 @@ class MixBenchControllerTest {
         c.setMacro(Macro.MOOD, 0.3f)
         c.setScope(Scope.SECTION)
         c.setMacro(Macro.SPACE, 0.1f)
-        assertEquals(0.1f, feature.macroKnob(Macro.SPACE))
-        c.stop()
-        // The section's heard SPACE hands the knob back; a whole-vibe move is the app's knob now.
+        assertEquals(0.1f, feature.engineMacro(Macro.SPACE))
         assertEquals(0.65f, feature.macroKnob(Macro.SPACE))
+        c.stop()
+        // The engine plays the knob again; a whole-vibe move is the app's knob now.
+        assertEquals(0.65f, feature.engineMacro(Macro.SPACE))
+        assertTrue(feature.benchMacros.isEmpty())
         assertEquals(0.3f, feature.macroKnob(Macro.MOOD))
+        assertEquals(listOf("mood" to 0.3f), feature.macroWrites)
+    }
+
+    @Test
+    fun sectionFlipBeforeTheLoadFollowerLeavesTheNewVibesMacros() = runTest {
+        section(1)
+        val c = started()
+        c.setScope(Scope.SECTION)
+        c.setMacro(Macro.ENERGY, 0.2f)
+        section(2); runCurrent()
+        c.setMacro(Macro.ENERGY, 0.3f)
+        // The flip reaches the section follower before the load follower clears the old layers.
+        section(1)
+        feature.applyVibe(vibe)
+        feature.stateFlow.value = feature.stateFlow.value.copy(energy = 0.9f)
+        runCurrent()
+        assertEquals(0.9f, feature.engineMacro(Macro.ENERGY))
+        assertTrue(feature.benchMacros.isEmpty())
+        assertEquals(BenchLayers(), c.layers.value)
     }
 
     @Test

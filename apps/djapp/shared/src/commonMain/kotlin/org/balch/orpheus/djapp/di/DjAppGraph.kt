@@ -12,6 +12,7 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.DomeWiggleLaunch
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.bench.MixBenchController
 
 /**
  * Common surface the [DjApp] composable consumes, independent of platform.
@@ -45,4 +46,7 @@ interface DjAppGraph : ViewModelGraph {
     val pulsarFeature: PulsarFeature
     val synthController: SynthController
     val audioEngine: AudioEngine
+
+    /** The Mix Bench controller the agent's mix tools share; built on first read. */
+    val mixBenchController: MixBenchController
 }

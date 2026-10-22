@@ -25,7 +25,8 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 /**
  * Applies Mix Bench edits to the live Pulsar engine and turns [MixBenchTap] summaries into [meters].
  * Idle it writes nothing: a track's audition gain is written only after a level, mute or solo edit to it,
- * and the tap runs only for [meterIdleMs] after a [readMeters]. Whole-vibe macros move the app's real knobs.
+ * and the tap runs only for [meterIdleMs] after a [readMeters]. Whole-vibe macros move the app's real knobs;
+ * a section's macros reach only the engine, so the saved knob never holds a section value.
  * Every state change and engine write runs under one lock, so nothing the bench pushes lands after [stop].
  */
 class MixBenchController(
@@ -77,10 +78,8 @@ class MixBenchController(
     // Ownership, all under [lock]: what the controller writes over the app.
     private val owned = mutableSetOf<Int>()
     private var overlayOwned = false
-    /** Macros a section's heard value holds on the real knob: the whole-vibe value to restore, and what was written. */
-    private val held = mutableMapOf<Macro, Held>()
-
-    private class Held(val whole: Float, val wrote: Float)
+    /** Engine-only macro values the playing section holds, as last passed to [PulsarFeature.setBenchMacros]. */
+    private var held: Map<Macro, Float> = emptyMap()
 
     val isRunning: Boolean get() = running
 
@@ -100,6 +99,7 @@ class MixBenchController(
         job = launcher.launch {
             launch { followSections() }
             launch { followVibeLoads() }
+            launch { followKnobs() }
         }
         pushGains()
         if (overlayOwned) pushOverlay()
@@ -207,7 +207,7 @@ class MixBenchController(
 
     /**
      * [Scope.VIBE]: moves the app's knob, saved like the user's own. [Scope.SECTION]: the value heard in the
-     * playing section, set on the knob while that section plays and handed back to the whole-vibe value after.
+     * playing section, written to the engine port while that section plays; the knob keeps the whole-vibe value.
      */
     suspend fun setMacro(m: Macro, v: Float) = lock.withLock {
         val value = v.coerceIn(0f, 1f)
@@ -215,9 +215,11 @@ class MixBenchController(
         val l = _layers.value
         if (s == null) {
             _layers.value = l.copy(vibe = l.vibe.copy(macros = l.vibe.macros + (m to value)))
-            // A section holding the knob keeps its heard value; leaving it plays this one.
-            val h = held[m]
-            if (h != null) held[m] = Held(value, h.wrote) else if (running) setKnob(m, value)
+            if (running) {
+                setKnob(m, value)
+                // The knob wrote its port, so a section holding this macro writes its value back over it.
+                if (m in held) applySectionMacros(force = true)
+            }
         } else {
             _layers.value = l.withSection(s) { it.copy(macrosHeard = it.macrosHeard + (m to value)) }
             applySectionMacros()
@@ -236,6 +238,9 @@ class MixBenchController(
         _soloed.value = _soloed.value.let { if (t in it) it - t else it + t }
         pushGains()
     }
+
+    /** Tracks whose audition gain the controller writes over the app. */
+    suspend fun ownedTracks(): Set<Int> = lock.withLock { owned.toSet() }
 
     /** Section edits fall back to the vibe layer when the vibe has fewer than two sections. */
     suspend fun setScope(s: Scope) = lock.withLock { _scope.value = s }
@@ -285,7 +290,8 @@ class MixBenchController(
     private suspend fun followSections() {
         pulsar.arrangementStateFlow.map { it.sectionIndex }.distinctUntilChanged().collect { s ->
             lock.withLock {
-                if (!running) return@withLock
+                // Layers from a vibe the load follower has not cleared yet must not touch the new vibe's knobs.
+                if (!running || pulsar.vibeLoadCount.value != loadsApplied) return@withLock
                 pushGains()
                 applySectionMacros()
                 val loop = _loopSection.value
@@ -303,6 +309,16 @@ class MixBenchController(
                 loadsApplied = count
                 clearForNewVibe()
                 if (metering) tap.setEnabled(true)
+            }
+        }
+    }
+
+    // A knob move (hand, MIDI, AI) writes its port, so a macro the section holds goes back on the engine.
+    private suspend fun followKnobs() {
+        pulsar.stateFlow.map { Macro.entries.map(pulsar::macroKnob) }.distinctUntilChanged().collect {
+            lock.withLock {
+                if (!running || pulsar.vibeLoadCount.value != loadsApplied || held.isEmpty()) return@withLock
+                applySectionMacros(force = true)
             }
         }
     }
@@ -333,7 +349,7 @@ class MixBenchController(
         lock.withLock { body() }
     }
 
-    // The load already set the new vibe's knobs, so held section macros are dropped, not restored.
+    // The load already put the new vibe's knobs on the engine, so held section macros are dropped, not restored.
     private fun clearForNewVibe() {
         _layers.value = BenchLayers()
         _muted.value = emptySet()
@@ -343,7 +359,7 @@ class MixBenchController(
         if (running) for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         owned.clear()
         releaseOverlay()
-        held.clear()
+        held = emptyMap()
     }
 
     private fun setSend(t: Int, v: Float, reverb: Boolean) {
@@ -394,34 +410,26 @@ class MixBenchController(
         if (running) pulsar.setMixOverlay(null)
     }
 
-    /** Puts each heard macro of the playing section on the real knob and hands the rest back. */
-    private fun applySectionMacros() {
+    /**
+     * Writes each heard macro of the playing section to the engine port; a macro no longer held plays its knob
+     * again. [force] rewrites unchanged values after a knob move has overwritten the port.
+     */
+    private fun applySectionMacros(force: Boolean = false) {
         if (!running) return
         val l = _layers.value
         val s = section
         val heard = l.sections[s]?.macrosHeard.orEmpty()
-        for (m in Macro.entries) {
-            val h = held[m]
-            if (m in heard) {
-                val whole = h?.whole ?: pulsar.macroKnob(m)
-                val v = l.macroPortValue(vibe, s, m, whole)
-                held[m] = Held(whole, v)
-                if (h?.wrote != v) setKnob(m, v)
-            } else if (h != null) {
-                held.remove(m)
-                restore(m, h)
-            }
-        }
+        val want = heard.keys.associateWith { l.macroPortValue(vibe, s, it, pulsar.macroKnob(it)) }
+        if (want == held && !(force && want.isNotEmpty())) return
+        held = want
+        pulsar.setBenchMacros(want)
     }
 
+    /** Hands every held macro's port back to its knob. */
     private fun restoreHeldMacros() {
-        for ((m, h) in held) restore(m, h)
-        held.clear()
-    }
-
-    // A knob moved since the bench wrote it stays where it was put.
-    private fun restore(m: Macro, h: Held) {
-        if (pulsar.macroKnob(m) == h.wrote) setKnob(m, h.whole)
+        if (held.isEmpty()) return
+        held = emptyMap()
+        pulsar.setBenchMacros(emptyMap())
     }
 
     private fun setKnob(m: Macro, v: Float) = when (m) {

@@ -10,6 +10,7 @@ import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.playback.SkipDirection
 import org.balch.orpheus.djapp.bench.MixBench
+import org.balch.orpheus.djapp.di.MixBenchExit
 import org.balch.orpheus.ui.viz.PanelKeyBridge
 
 fun main() {
@@ -40,8 +41,9 @@ fun main() {
                 }
             },
             onCloseRequest = {
-                // Release the bench's taps and gains before the engine goes away.
+                // Stop the bench page, then the mix controller's meter poll and taps, before the engine goes away.
                 bench?.close()
+                MixBenchExit.runIfCreated()
                 // Fade out audio before exiting to avoid crackles/pops.
                 // Set volume to 0, let the C++ smoother ramp down (~50ms),
                 // then stop the engine and exit.

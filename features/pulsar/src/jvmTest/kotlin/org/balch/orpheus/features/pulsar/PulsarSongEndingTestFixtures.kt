@@ -134,6 +134,7 @@ internal class FakePulsarFeature(
 
     override fun applyVibe(vibe: Vibe) {
         vibeFlow.value = vibe
+        benchMacros = emptyMap()
         vibeLoadCount.value++
         onVibeApplied()
     }
@@ -161,6 +162,18 @@ internal class FakePulsarFeature(
     var overlay: org.balch.orpheus.features.pulsar.bench.MixOverlay? = null
         private set
     override fun setMixOverlay(overlay: org.balch.orpheus.features.pulsar.bench.MixOverlay?) { this.overlay = overlay }
+
+    /** Every [setBenchMacros] map, in order; like the real feature, a load drops the current one. */
+    val benchMacroWrites = mutableListOf<Map<org.balch.orpheus.features.pulsar.bench.Macro, Float>>()
+    var benchMacros: Map<org.balch.orpheus.features.pulsar.bench.Macro, Float> = emptyMap()
+        private set
+    override fun setBenchMacros(values: Map<org.balch.orpheus.features.pulsar.bench.Macro, Float>) {
+        benchMacroWrites += values
+        benchMacros = values
+    }
+
+    /** What the engine plays for [m]: the bench's section value, else the knob. */
+    fun engineMacro(m: org.balch.orpheus.features.pulsar.bench.Macro): Float = benchMacros[m] ?: macroKnob(m)
 }
 
 internal class FixturesDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
