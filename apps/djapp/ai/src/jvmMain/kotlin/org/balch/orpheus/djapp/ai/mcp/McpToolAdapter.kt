@@ -9,10 +9,14 @@ import ai.koog.serialization.kotlinx.KotlinxSerializer
 import ai.koog.serialization.kotlinx.toKoogJSONObject
 import io.modelcontextprotocol.kotlin.sdk.server.RegisteredTool
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.ProgressNotification
+import io.modelcontextprotocol.kotlin.sdk.types.ProgressNotificationParams
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.Tool
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -22,6 +26,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.djapp.ai.tools.ToolProgress
 
 /**
  * Adapts koog tools to MCP: the schema comes from the koog [ToolDescriptor] and a call runs the
@@ -41,8 +46,23 @@ internal object McpToolAdapter {
     fun registeredTools(providers: Collection<ToolProvider>): List<RegisteredTool> =
         providers.map { provider ->
             val tool = provider.tool
-            RegisteredTool(mcpTool(tool)) { request -> call(tool, request.arguments) }
+            RegisteredTool(mcpTool(tool)) { request ->
+                val token = request.meta?.progressToken ?: return@RegisteredTool call(tool, request.arguments)
+                // The JSON-response transport sends these on the session's GET stream, if the client opened one.
+                val progress = boundedProgress { done, total, message ->
+                    notification(ProgressNotification(ProgressNotificationParams(token, done, total, message)))
+                }
+                withContext(progress) { call(tool, request.arguments) }
+            }
         }
+
+    /** A [ToolProgress] whose sends give up after [timeoutMs], so a stuck client stream never stalls the tool. */
+    fun boundedProgress(
+        timeoutMs: Long = PROGRESS_SEND_MS,
+        send: suspend (done: Double, total: Double, message: String?) -> Unit,
+    ) = ToolProgress { done, total, message -> withTimeoutOrNull(timeoutMs) { send(done, total, message) } }
+
+    private const val PROGRESS_SEND_MS = 1_000L
 
     fun mcpTool(tool: ToolBase<*, *>): Tool = Tool(
         name = tool.descriptor.name,

@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.bench
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -15,6 +16,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.audio.dsp.BenchSummaryLayout
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.controller.SynthController
@@ -32,8 +34,8 @@ enum class SendEdit { APPLIED, ZERO_SEND, VIBE_LOADING }
 /**
  * Applies Mix Bench edits to the live Pulsar engine and turns [MixBenchTap] summaries into [meters].
  * Idle it writes nothing: a track's audition gain is written only after a level, mute or solo edit to it,
- * and the tap runs only for [meterIdleMs] after a [readMeters]. Whole-vibe macros move the app's real knobs;
- * a section's macros reach only the engine, so the saved knob never holds a section value.
+ * and the tap runs only for [meterIdleMs] after a [readMeters] or a [holdingTaps] block. Whole-vibe macros
+ * move the app's real knobs; a section's macros reach only the engine, so the saved knob never holds a section value.
  * Every state change and engine write runs under one lock, so nothing the bench pushes lands after [stop].
  * Edits return false, changing nothing, while a vibe load is not yet followed: they would hit the new vibe.
  */
@@ -78,8 +80,10 @@ class MixBenchController(
     private var job: Job? = null
     private var meterJob: Job? = null
     private var watchdog: Job? = null
-    /** Bumped by every [readMeters], so a watchdog a later read replaced never turns metering off. */
+    /** Bumped by every watchdog arm, so a watchdog a later read or release replaced never turns metering off. */
     private var meterReads = 0
+    /** Open [holdingTaps] blocks; the idle watchdog leaves metering on while any is open. */
+    private var holds = 0
     /** The last vibeLoadCount the layers belong to, so edits for another vibe never come back. */
     private var loadsApplied = -1
 
@@ -134,19 +138,34 @@ class MixBenchController(
     suspend fun readMeters(): MeterSnapshot = lock.withLock {
         if (running) {
             if (!metering) startMetering()
-            val read = ++meterReads
-            watchdog?.cancel()
-            watchdog = launcher.launch {
-                delay(meterIdleMs)
-                lock.withLock {
-                    if (read != meterReads) return@withLock
-                    watchdog = null
-                    stopMetering()
-                }
-            }
+            armIdleWatchdog()
         }
         _meters.value
     }
+
+    /**
+     * Keeps metering, and so the native taps, on until [block] returns; the idle watchdog never stops it meanwhile.
+     * Starts metering if it is off. Does not start it before [start] or after [stop].
+     */
+    suspend fun <T> holdingTaps(block: suspend () -> T): T {
+        lock.withLock {
+            holds++
+            if (running && !metering) startMetering()
+        }
+        try {
+            return block()
+        } finally {
+            withContext(NonCancellable) {
+                lock.withLock {
+                    holds--
+                    if (holds == 0 && metering) armIdleWatchdog()
+                }
+            }
+        }
+    }
+
+    /** True while a vibe load is not yet followed, when edits and captures would hit the new vibe. */
+    suspend fun vibeLoadInFlight(): Boolean = lock.withLock { loadInFlight() }
 
     /** Fader in dB: the whole vibe, or the playing section's offset on top of it in [Scope.SECTION]. */
     suspend fun setLevelDb(t: Int, db: Float) = edit(t) {
@@ -355,6 +374,20 @@ class MixBenchController(
             lock.withLock {
                 if (!running || pulsar.vibeLoadCount.value != loadsApplied || held.isEmpty()) return@withLock
                 applySectionMacros(force = true)
+            }
+        }
+    }
+
+    // Under [lock]. Stops metering [meterIdleMs] from now unless a later read or an open hold intervenes.
+    private fun armIdleWatchdog() {
+        val read = ++meterReads
+        watchdog?.cancel()
+        watchdog = launcher.launch {
+            delay(meterIdleMs)
+            lock.withLock {
+                if (read != meterReads || holds > 0) return@withLock
+                watchdog = null
+                stopMetering()
             }
         }
     }

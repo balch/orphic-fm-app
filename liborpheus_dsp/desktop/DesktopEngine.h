@@ -75,6 +75,13 @@ public:
     void setMixBench(bool enabled);
     int  drainMixBench(float* out, int maxSummaries);
 
+    // Stem capture: raw per-stem audio ring (orpheus_engine_*_stem_capture). One drain thread.
+    void      setStemCapture(bool enabled);
+    bool      armStemCapture(int frames);
+    int       drainStemCapture(float* out, int maxFrames);
+    int       stemCaptureRemaining();
+    long long stemCaptureDropped();
+
     void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void  getPulsarActiveEngines(int* out);
     void  getPulsarArrangement(int* out);

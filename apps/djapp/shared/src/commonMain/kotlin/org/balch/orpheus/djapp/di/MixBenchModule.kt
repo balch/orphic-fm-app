@@ -13,9 +13,13 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.audio.dsp.NoMeterTap
+import org.balch.orpheus.core.audio.dsp.NoStemTap
+import org.balch.orpheus.core.audio.dsp.StemTapSource
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.StemRecorder
 
 @ContributesTo(AppScope::class)
 @BindingContainer
@@ -46,8 +50,27 @@ interface MixBenchModule {
             stopOnAppExit(controller)
             return controller
         }
+
+        /** Raw stem captures for the audio tools; [NoStemTap] off desktop, so it refuses there. */
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideStemRecorder(
+            controller: MixBenchController,
+            pulsarFeatureProvider: () -> PulsarFeature,
+            audioEngine: AudioEngine,
+            dispatchers: DispatcherProvider,
+        ): StemRecorder = StemRecorder(
+            controller = controller,
+            pulsarProvider = pulsarFeatureProvider,
+            tap = (audioEngine as? StemTapSource)?.stemTap ?: NoStemTap,
+            sampleRate = audioEngine.sampleRate,
+            dispatchers = dispatchers,
+        ).also { closeOnAppExit(it) }
     }
 }
 
 /** Lets the desktop window close stop [controller], so metering ends before the engine closes. */
 internal expect fun stopOnAppExit(controller: MixBenchController)
+
+/** Lets the desktop window close end [recorder]'s capture before the controller stops. */
+internal expect fun closeOnAppExit(recorder: StemRecorder)

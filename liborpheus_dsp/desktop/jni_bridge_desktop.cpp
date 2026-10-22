@@ -310,6 +310,43 @@ JNI_FN(nativeDrainMixBench)(JNIEnv *env, jobject thiz, jfloatArray out, jint max
     return total;
 }
 
+// -- Stem capture -------------------------------------------------------------
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeSetStemCapture)(JNIEnv *env, jobject thiz, jboolean enabled) { sEngine.setStemCapture(enabled); }
+
+JNIEXPORT jboolean JNICALL
+JNI_FN(nativeArmStemCapture)(JNIEnv *env, jobject thiz, jint frames) {
+    return sEngine.armStemCapture(frames) ? JNI_TRUE : JNI_FALSE;
+}
+
+// Same stack-chunk + SetFloatArrayRegion loop as nativeDrainMixBench.
+JNIEXPORT jint JNICALL
+JNI_FN(nativeDrainStemCapture)(JNIEnv *env, jobject thiz, jfloatArray out, jint maxFrames) {
+    constexpr int kChunk = 256;
+    constexpr int kFloats = ORPHEUS_STEM_FLOATS_PER_FRAME;
+    float chunk[kChunk * kFloats];
+    const jsize cap = std::min<jsize>(maxFrames, env->GetArrayLength(out) / kFloats);
+    jsize total = 0;
+    while (total < cap) {
+        const int want = std::min<jsize>(kChunk, cap - total);
+        const int got = sEngine.drainStemCapture(chunk, want);
+        if (got <= 0) break;
+        env->SetFloatArrayRegion(out, total * kFloats, got * kFloats, chunk);
+        total += got;
+        if (got < want) break;
+    }
+    return total;
+}
+
+JNIEXPORT jint JNICALL
+JNI_FN(nativeStemCaptureRemaining)(JNIEnv *env, jobject thiz) { return sEngine.stemCaptureRemaining(); }
+
+JNIEXPORT jlong JNICALL
+JNI_FN(nativeStemCaptureDropped)(JNIEnv *env, jobject thiz) {
+    return static_cast<jlong>(sEngine.stemCaptureDropped());
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(nativeGetTurntableViz)(JNIEnv *env, jobject thiz,
                                jint deck, jfloatArray outBuf) {

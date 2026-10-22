@@ -27,6 +27,8 @@ import org.balch.orpheus.djapp.di.MixBenchExit
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.StemRecorder
+import org.balch.orpheus.features.pulsar.bench.StemSink
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -312,11 +314,16 @@ class MixToolsTest {
             val read = runBlocking { MixReadTool({ pulsar }, { c }).tool.execute(MixReadArgs(meters = false)) }
             assertEquals(0.65f, read.macros["space"])
             assertEquals(mapOf("space" to 0.1f), read.sectionMacros)
-            // What the desktop window close runs.
+            // What the desktop window close runs; it closes the recorder first.
             val exit = MixBenchExit.register(c)
             assertEquals(exit, MixBenchExit.current)
+            val recorder = StemRecorder(c, { pulsar }, FakeStemTap(), 48_000, OneDispatcher(Dispatchers.Default))
+            exit.recorder = recorder
             assertTrue(MixBenchExit.runIfCreated())
             assertFalse(c.isRunning)
+            val refused = runBlocking { recorder.record(0.5f, StemSink { _, _ -> error("a capture ran after exit") }) }
+            assertFalse(refused.ok)
+            assertTrue("closing" in refused.message, refused.message)
             assertTrue(pulsar.benchMacros.isEmpty())
             assertTrue(pulsar.macroWrites.isEmpty())
             // The second caller finds it done.

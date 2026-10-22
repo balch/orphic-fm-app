@@ -38,6 +38,17 @@ void orpheus_engine_set_mix_bench(OrpheusEngine* engine, int enabled);
 #define ORPHEUS_MIX_BENCH_SUMMARY_FLOATS 126  // kBenchSummaryFloats, for callers without the engine's include paths
 int  orpheus_engine_drain_mix_bench(OrpheusEngine* engine, float* out, int max_summaries);
 
+// ── Stem capture (raw per-stem audio beside the mix bench) ──
+// Records from the bench's taps, so it captures only while the mix bench is also enabled.
+// Frame: t0..t7, storm, street, speech, bus (pre-limit), out (pre-TTS), each L then R.
+#define ORPHEUS_STEM_CHANNELS 13          /* stereo stems per frame */
+#define ORPHEUS_STEM_FLOATS_PER_FRAME 26
+void orpheus_engine_set_stem_capture(OrpheusEngine* engine, int enabled);   /* allocates / frees the ring */
+int  orpheus_engine_arm_stem_capture(OrpheusEngine* engine, int frames);     /* 1 armed, 0 not enabled or already armed */
+int  orpheus_engine_drain_stem_capture(OrpheusEngine* engine, float* out, int max_frames); /* frames copied, oldest first */
+int  orpheus_engine_stem_capture_remaining(OrpheusEngine* engine);          /* frames still to record; 0 when done or off */
+long long orpheus_engine_stem_capture_dropped(OrpheusEngine* engine);       /* frames dropped since enable */
+
 // ── Diagnostics ────
 void  orpheus_engine_dump_state(OrpheusEngine* engine);
 

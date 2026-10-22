@@ -117,3 +117,11 @@ tasks.matching {
     inputs.file(rootProject.file("liborpheus_dsp/platform/ios/build-sim/orpheus_dsp/liborpheus_dsp.a"))
         .withPropertyName("orpheusDspSimArchive")
 }
+
+// The stem layout guard parses this header's text, so a header-only edit must rerun jvmTest.
+tasks.named<Test>("jvmTest") {
+    inputs.file(rootProject.file("liborpheus_dsp/include/orpheus_dsp.h"))
+        .withPropertyName("cStemHeader")
+        .withPathSensitivity(PathSensitivity.NAME_ONLY)
+        .optional()
+}

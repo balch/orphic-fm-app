@@ -72,6 +72,7 @@ void pulsar_state_free(PulsarState* state);
 // The arrangement's current section, or -1 when there is no Pulsar state.
 int pulsar_current_section(const PulsarState* state);
 class MixBench;  // mix_bench.h
+class StemCapture;  // stem_capture.h
 #include "orpheus_unit_chaos.h"
 #include "orpheus_master_fader.h"
 #include "orpheus_master_tape_stop.h"
@@ -1281,6 +1282,10 @@ struct OrpheusEngine {
     std::atomic<MixBench*> mix_bench{nullptr};
     // Drains in flight, so a disable can wait them out before freeing the bench.
     std::atomic<int> mix_bench_drains{0};
+    // Armable stem ring (orpheus_engine_set_stem_capture), fed by the mix bench from its taps.
+    std::atomic<StemCapture*> stem_capture{nullptr};
+    // Reader calls in flight, so a disable can wait them out before freeing the ring.
+    std::atomic<int> stem_capture_drains{0};
 
     // Per-track delay/reverb sends — per-engine
     std::atomic<float> pulsar_track_delay_send[8] = {};

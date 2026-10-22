@@ -1,6 +1,7 @@
 # Orphic MCP: live mixing and control for Claude Code, the in-app agent and MIDI
 
-> **Status:** phase 1 (desktop MCP core) built on branch claude/orphic-mcp, 2026-10-21; phases 2-6 not built.
+> **Status:** phase 1 (desktop MCP core) landed on main 2026-10-21; phase 2 (raw audio, desktop) built on branch
+> claude/orphic-mcp-audio, 2026-10-21; phases 3-6 not built.
 > This is a dated snapshot of the design and its decisions; the code is the source of truth. Later changes
 > add a "Superseded by" line rather than editing the text.
 
@@ -234,3 +235,26 @@ Minor findings from the per-task and final reviews, left for later. None blocks 
 - Task 5: no AI-edition test that a vibe load clears TRACKS state through `clearForNewVibe`; no test holds a section macro or the overlay across `resetLevels`; capturing a closed fader writes volume 0.
 - Task 6: the skill could say to ask the user before launching the app; its log goes to `/tmp` rather than `build/`.
 - Final: a TRACKS tap during an unfollowed vibe load is refused and dropped, so the fader snaps back; the load clears TRACKS state anyway.
+
+## Appendix: phase 2 rulings
+
+Decisions taken while building phase 2 (raw audio, desktop), one line each.
+
+- Stems are 13, not the 12 the size estimate above assumed: track0-7, storm, street, speech, bus (Pulsar's bus after the 35 Hz HPF and drive, before the limiter) and out (the graph output before TTS). Track stems are dry; effect returns are only in bus and out.
+- The stem ring rides on the mix bench's taps, so a capture holds metering on (`holdingTaps`) for its whole length.
+- `NativeDspAudioEngine` exposes the stem tap as a property through a common `StemTapSource`, since its signatures clash with `MixBenchTap`.
+- A capture is refused at once when one is running, playback is stopped, a vibe is loading or the platform has no ring; it aborts with `ok: false` on a vibe change, a playback stop, a 2 s stall or a cut-short capture, and the WAV sink deletes its folder.
+- WAVs are written by a small new writer rather than the Record feature's, which would merge Record's DI contributions into the DJ graph.
+- Third-octave bands take bin power by overlap of each bin's width, so no low band reads empty at 11.7 Hz bins; low-end shares use the same rule, with sub as 20-40 Hz so DC offset is not counted.
+- Onsets use log-compressed spectral flux; the linear rule the plan named fired about 10 times a second on noise.
+- Progress reaches an MCP client only when it sends a progress token and holds the session's listening stream open; a stuck send gives up after 1 s.
+- The app's window close aborts a running capture before the mix controller stops, and native destroy frees the stem ring through the disable path.
+
+## Appendix: phase 2 known gaps
+
+- `close()` and the controller's `stop()` share one 2 s exit budget, so a capture stuck on disk at exit can skip the controller stop.
+- Untested paths: playback stopping during the last poll, and a capture running when the window closes; native destroy still frees the mix bench without the drains wait.
+- Captures are about 4.6 MB/s and nothing deletes them; dropped frames are cut from the WAVs, so a capture with drops is shorter.
+- Whether Claude Code shows MCP progress is unverified; the SDK only sends it on the session's listening stream.
+- Desktop only: Android and iOS answer that raw audio isn't available yet (phase 3).
+

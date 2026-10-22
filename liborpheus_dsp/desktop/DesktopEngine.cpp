@@ -198,6 +198,21 @@ void DesktopEngine::setMixBench(bool enabled) {
 int DesktopEngine::drainMixBench(float* out, int maxSummaries) {
     return dsp_engine_ ? orpheus_engine_drain_mix_bench(dsp_engine_, out, maxSummaries) : 0;
 }
+void DesktopEngine::setStemCapture(bool enabled) {
+    if (dsp_engine_) orpheus_engine_set_stem_capture(dsp_engine_, enabled ? 1 : 0);
+}
+bool DesktopEngine::armStemCapture(int frames) {
+    return dsp_engine_ && orpheus_engine_arm_stem_capture(dsp_engine_, frames) != 0;
+}
+int DesktopEngine::drainStemCapture(float* out, int maxFrames) {
+    return dsp_engine_ ? orpheus_engine_drain_stem_capture(dsp_engine_, out, maxFrames) : 0;
+}
+int DesktopEngine::stemCaptureRemaining() {
+    return dsp_engine_ ? orpheus_engine_stem_capture_remaining(dsp_engine_) : 0;
+}
+long long DesktopEngine::stemCaptureDropped() {
+    return dsp_engine_ ? orpheus_engine_stem_capture_dropped(dsp_engine_) : 0;
+}
 void DesktopEngine::getTurntableViz(int deck, float* outBuf) {
     if (dsp_engine_) orpheus_engine_get_turntable_viz(dsp_engine_, deck, outBuf);
     else memset(outBuf, 0, 129 * sizeof(float));

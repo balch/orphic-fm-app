@@ -136,6 +136,35 @@ class MixBenchControllerTest {
     }
 
     @Test
+    fun holdingTapsOutlivesIdleTimeout() = runTest {
+        val c = started(meterIdleMs = 100)
+        c.readMeters()
+        c.holdingTaps {
+            advanceTimeBy(500); runCurrent()
+            assertTrue(tap.on)
+            assertTrue(c.isMetering)
+        }
+        advanceTimeBy(50); runCurrent()
+        assertTrue(tap.on)
+        // Released: off once a full idle period passes with no reads.
+        advanceTimeBy(50); runCurrent()
+        assertFalse(tap.on)
+        assertEquals(1, tap.enables)
+    }
+
+    @Test
+    fun holdingTapsStartsMeteringWithoutARead() = runTest {
+        val c = started(meterIdleMs = 100)
+        c.holdingTaps {
+            assertTrue(tap.on)
+            advanceTimeBy(500); runCurrent()
+            assertTrue(tap.on)
+        }
+        advanceTimeBy(100); runCurrent()
+        assertFalse(tap.on)
+    }
+
+    @Test
     fun editOwnsOnlyThatTrack() = runTest {
         section(1)
         val c = started()

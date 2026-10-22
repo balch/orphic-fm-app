@@ -119,6 +119,13 @@ class DesktopDspBridge {
     external fun nativeSetMixBench(enabled: Boolean)
     /** Copies up to [max] summaries of BenchSummaryLayout.FLOATS floats each; returns the count. One reader only. */
     external fun nativeDrainMixBench(out: FloatArray, max: Int): Int
+    /** Stem ring: enable allocates it, disable frees it. Records only while the mix bench is also on. */
+    external fun nativeSetStemCapture(enabled: Boolean)
+    external fun nativeArmStemCapture(frames: Int): Boolean
+    /** Copies up to [maxFrames] frames of StemLayout.FLOATS_PER_FRAME floats each; returns frames copied. One reader only. */
+    external fun nativeDrainStemCapture(out: FloatArray, maxFrames: Int): Int
+    external fun nativeStemCaptureRemaining(): Int
+    external fun nativeStemCaptureDropped(): Long
     external fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray)
     external fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
     external fun nativeClearAutomation(target: Int, voiceIndex: Int)

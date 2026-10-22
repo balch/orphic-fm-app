@@ -41,7 +41,7 @@ fun main() {
                 }
             },
             onCloseRequest = {
-                // Stop the bench page, then the mix controller's meter poll and taps, before the engine goes away.
+                // Stop the bench page, any stem capture, then the meter poll and taps, before the engine goes away.
                 bench?.close()
                 MixBenchExit.runIfCreated()
                 // Fade out audio before exiting to avoid crackles/pops.

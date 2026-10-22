@@ -5,18 +5,28 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.StemRecorder
 
 /**
  * Stops the AppScope [MixBenchController] once at app exit, from the window close or the bench's own hook,
- * so the meter poll and the tap stop before the engine closes.
+ * so a stem capture, the meter poll and the tap all stop before the engine closes.
  */
 class MixBenchExit(private val controller: MixBenchController) {
     private val done = AtomicBoolean(false)
 
-    /** Stops the controller, blocking up to [timeoutMs] so a wedged lock can't hang exit. False on timeout. */
+    /** The graph's stem recorder once built; its capture must end before the controller stops. */
+    @Volatile
+    var recorder: StemRecorder? = null
+
+    /** Ends any capture, then stops the controller, blocking up to [timeoutMs] in all. False on timeout. */
     fun run(timeoutMs: Long = 2_000): Boolean {
         if (!done.compareAndSet(false, true)) return true
-        return runBlocking(Dispatchers.Default) { withTimeoutOrNull(timeoutMs) { controller.stop() } } != null
+        return runBlocking(Dispatchers.Default) {
+            withTimeoutOrNull(timeoutMs) {
+                recorder?.close()
+                controller.stop()
+            }
+        } != null
     }
 
     companion object {
@@ -35,4 +45,9 @@ class MixBenchExit(private val controller: MixBenchController) {
 
 internal actual fun stopOnAppExit(controller: MixBenchController) {
     MixBenchExit.register(controller)
+}
+
+// The recorder is built after its controller, so the exit that controller registered is current.
+internal actual fun closeOnAppExit(recorder: StemRecorder) {
+    MixBenchExit.current?.recorder = recorder
 }

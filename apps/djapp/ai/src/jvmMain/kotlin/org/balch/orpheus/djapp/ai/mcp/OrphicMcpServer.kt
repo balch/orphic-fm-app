@@ -12,9 +12,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
+import io.ktor.server.application.serverConfig
 import io.ktor.server.cio.CIO
 import io.ktor.server.cio.CIOApplicationEngine
 import io.ktor.server.engine.EmbeddedServer
+import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.header
 import io.ktor.server.response.header
@@ -30,7 +32,6 @@ import java.security.MessageDigest
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -118,8 +119,17 @@ internal class McpHttpServer(
             // CIO runs its server as a root coroutine; this parent and handler keep a failed bind
             // out of the global uncaught-exception handler.
             val job = SupervisorJob()
-            val candidate = CoroutineScope(job + engineFailures(port)).embeddedServer(CIO, port = port, host = HOST) {
-                mcpModule(expected)
+            val config = serverConfig {
+                parentCoroutineContext = job + engineFailures(port)
+                module { mcpModule(expected) }
+            }
+            val candidate = embeddedServer(CIO, config) {
+                connector {
+                    host = HOST
+                    this.port = port
+                }
+                // Above the 30 s audio_capture cap, so a long tool call is never cut off as idle.
+                connectionIdleTimeoutSeconds = 120
             }
             try {
                 candidate.start(wait = false)

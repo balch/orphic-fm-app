@@ -597,6 +597,7 @@ bool run_vibe_record();
 bool run_vibe_measure();
 bool run_vibe_measure_meter_tests();
 bool run_mix_bench_tests();
+bool run_stem_capture_tests();
 bool run_pulsar_morph_rise_tests();
 bool run_pulsar_mist_tests();
 bool run_pulsar_vibrato_tests();

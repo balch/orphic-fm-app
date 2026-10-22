@@ -3,8 +3,10 @@ package org.balch.orpheus.djapp.ai.mcp
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.djapp.ai.tools.reportProgress
 
 @Serializable
 enum class Flavor { SWEET, SOUR }
@@ -67,3 +69,30 @@ class EchoTool(private val toolName: String = "echo") : Tool<EchoArgs, EchoResul
 }
 
 class FakeProvider(override val tool: Tool<*, *>) : ToolProvider
+
+/** Reports 1 of 2 then 2 of 2, as a recording tool does, then echoes. */
+class ProgressTool : Tool<EchoArgs, EchoResult>(
+    argsType = typeToken<EchoArgs>(),
+    resultType = typeToken<EchoResult>(),
+    name = "progress",
+    description = "Report progress.",
+) {
+    override suspend fun execute(args: EchoArgs): EchoResult {
+        reportProgress(1.0, 2.0)
+        reportProgress(2.0, 2.0, "done")
+        return EchoResult(true, "ok", args.text)
+    }
+}
+
+/** Takes [EchoArgs.times] seconds of real time, as a long capture does. */
+class SlowTool : Tool<EchoArgs, EchoResult>(
+    argsType = typeToken<EchoArgs>(),
+    resultType = typeToken<EchoResult>(),
+    name = "slow",
+    description = "Wait, then echo.",
+) {
+    override suspend fun execute(args: EchoArgs): EchoResult {
+        delay(args.times * 1_000L)
+        return EchoResult(true, "ok", args.text)
+    }
+}

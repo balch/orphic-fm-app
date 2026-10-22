@@ -1,6 +1,6 @@
 ---
 name: orphic-mcp
-description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, or connecting Claude Code to the DJ app. Covers launching the app, connecting over MCP, the tools, the mixing workflow and troubleshooting.
+description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like. Covers launching the app, connecting over MCP, the tools, the mixing workflow, raw audio and troubleshooting.
 ---
 
 # Orphic MCP
@@ -38,6 +38,13 @@ disown
 - `ports_list`, `port_get`, `port_set`: raw engine control ports, keyed `uri:symbol`.
 - `vibe_list`, `vibe_load`, `transport`: pick a vibe, and play, pause or read state.
 - `pulsar_*`, `start_composition`: the vibe-authoring tools.
+- `audio_analyze`: record the next 0.5-15 s (default 5) and measure each stem: level, third-octave spectrum, envelope, onsets, low end and stereo. `stems` and `kinds` narrow it.
+- `audio_capture`: record the next 0.5-30 s (default 10) to one WAV per stem plus `stems.json`, for offline analysis. `stems` narrows it.
+- The 13 stems:
+  - `track0`-`track7`: the 8 Pulsar tracks, post fader and pan, before the bus. They are dry, taken before the delay and reverb sends: those returns appear only in `bus` and `out`, so the tracks summed do not match the bus.
+  - `storm`, `street`, `speech`: Pulsar's own sources.
+  - `bus`: Pulsar's bus after the 35 Hz high-pass and drive, before the limiter.
+  - `out`: the app's output before any TTS announcement.
 
 Whole-vibe macro moves change the real saved knob. Section macros do not.
 
@@ -46,7 +53,7 @@ Whole-vibe macro moves change the real saved knob. Section macros do not.
 1. `transport` play, then `mix_read`. Note the vibe, the sections and the loudness.
 2. `mix_set` one change at a time. Use `scope: section` to fix one section only.
 3. Ask the user to listen. They judge the sound, not you.
-4. `mix_read` again to confirm the numbers and the meters.
+4. `mix_read` again to confirm the numbers and the meters. To check the sound itself, `audio_analyze` for numbers, `audio_capture` plus Python for anything deeper (`soundfile` or `scipy.io.wavfile` read 32-bit float).
 5. When the user likes it, `mix_capture`. It returns the rows and the file path.
 6. Hand the file to the `apply-mix-capture` skill. It edits the vibe's Kotlin source.
 
@@ -58,6 +65,15 @@ Whole-vibe macro moves change the real saved knob. Section macros do not.
 - Capture on a catalog vibe writes a file only. The live mix stays as it is.
 - Capture on an AI vibe also writes the rows into the vibe, archives it in `~/.config/orpheus-dj/ai-vibes/`, and restarts the song. Mutes, solos and the loop clear.
 - Captures land in `~/.config/orpheus-dj/mix-captures/`. `stale` is true, false or null. Do not apply a stale or null one without asking the user.
+- Audio tools need Pulsar playing. Stopped, they refuse.
+- One recording at a time, across MCP and the in-app agent. A second is refused at once, never queued.
+- An audio call blocks for its N seconds. It sends MCP progress while it records, for clients that show it.
+- Stems record only Pulsar. `out` is the whole graph, pre-TTS.
+- A vibe load or a transport stop during a recording aborts it with `ok: false`. A capture then keeps no files.
+- Stem captures live in `~/.config/orpheus-dj/stem-captures/<vibe>-<timestamp>/`: `<stem>.wav` (stereo float32) and `stems.json` (vibe, section, sample rate, frames, per-stem levels).
+- Stem captures take about 5 MB per second of audio with all 13 stems (about 150 MB for 30 s), and nothing deletes them. Remove the folders under `~/.config/orpheus-dj/stem-captures/` when you are done with them.
+- Dropped frames are cut from the WAVs. With `droppedFrames > 0` the files are shorter than `seconds` and jump at each drop.
+- `bandsDb` in `audio_analyze` is each band's absolute power in dBFS (a full-scale sine reads -3 in its band), not a share of the stem.
 - In an MCP-only session, the stale baseline for the playing vibe is its source as of the first connect (the first `initialize`, when the server builds its tools), not as of the app's launch. A source edit between launch and that connect does not show as stale.
 
 ## Troubleshooting
@@ -66,4 +82,5 @@ Whole-vibe macro moves change the real saved knob. Section macros do not.
 - Connection refused: the app is not running, or it fell back to another port. Read `mcp.json` for the current one.
 - 403 `Invalid Host`: the Host or Origin header is not localhost. Use `127.0.0.1` or `localhost`, not a LAN name or a proxy.
 - `ok: false` in a tool result comes back as an MCP error. Read the message, since it names the bad argument.
+- A long audio call times out on the client side: raise `MCP_TOOL_TIMEOUT` (milliseconds) in Claude Code's env. The server's own idle timeout is 120 s, above the 30 s capture cap.
 - Log noise is normal. The SDK logs DEBUG lines per request.

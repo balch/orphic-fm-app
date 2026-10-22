@@ -5,6 +5,7 @@
 
 #include "mix_meter.h"
 #include "orpheus_engine.h"
+#include "stem_capture.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -133,6 +134,7 @@ public:
         s.samples = static_cast<int32_t>(bus.samples);
         for (int c = 0; c < kBenchChannels; c++) acc[c].store(s.ch[c]);
         ring_.push(s);
+        if (StemCapture* sc = e->stem_capture.load(std::memory_order_acquire)) sc->on_block(t, out, frames);
         clear_taps(frames);
     }
 

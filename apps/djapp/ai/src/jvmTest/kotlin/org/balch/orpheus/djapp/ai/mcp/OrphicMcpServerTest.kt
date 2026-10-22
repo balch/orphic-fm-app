@@ -3,10 +3,6 @@ package org.balch.orpheus.djapp.ai.mcp
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission
@@ -36,7 +32,7 @@ class OrphicMcpServerTest {
 
     private val dir: File = Files.createTempDirectory("orphic-mcp").toFile()
     private val servers = mutableListOf<McpHttpServer>()
-    private val http = HttpClient.newHttpClient()
+    private val http = McpTestHttp()
 
     @AfterTest
     fun tearDown() {
@@ -52,25 +48,7 @@ class OrphicMcpServerTest {
         tools: () -> Collection<ToolProvider> = { listOf(FakeProvider(EchoTool())) },
     ) = McpHttpServer(McpTokenStore(dir), ports, toolsContext, tools).also { servers += it }
 
-    private fun post(url: String, body: String, token: String?, session: String? = null): HttpResponse<String> {
-        val request = HttpRequest.newBuilder(URI(url))
-            .header("Content-Type", "application/json")
-            .header("Accept", "application/json, text/event-stream")
-            .apply { token?.let { header("Authorization", "Bearer $it") } }
-            .apply { session?.let { header("Mcp-Session-Id", it) } }
-            .POST(HttpRequest.BodyPublishers.ofString(body))
-            .build()
-        return http.send(request, HttpResponse.BodyHandlers.ofString())
-    }
-
-    private fun rpc(id: Int, method: String, params: String = "{}") =
-        """{"jsonrpc":"2.0","id":$id,"method":"$method","params":$params}"""
-
-    private val initialize = rpc(
-        1,
-        "initialize",
-        """{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}""",
-    )
+    private fun post(url: String, body: String, token: String?, session: String? = null) = http.post(url, body, token, session)
 
     private fun readDiscovery(): JsonObject = Json.parseToJsonElement(File(dir, "mcp.json").readText()).jsonObject
 
@@ -79,13 +57,13 @@ class OrphicMcpServerTest {
         val asked = AtomicInteger()
         val endpoint = assertNotNull(server(tools = { asked.incrementAndGet(); listOf(FakeProvider(EchoTool())) }).start())
 
-        val none = post(endpoint.url, initialize, token = null)
+        val none = post(endpoint.url, INITIALIZE, token = null)
         assertEquals(401, none.statusCode())
-        val wrong = post(endpoint.url, initialize, token = "0".repeat(64))
+        val wrong = post(endpoint.url, INITIALIZE, token = "0".repeat(64))
         assertEquals(401, wrong.statusCode())
         assertEquals(0, asked.get(), "an unauthorized request must not reach the tools")
 
-        assertEquals(200, post(endpoint.url, initialize, endpoint.token).statusCode())
+        assertEquals(200, post(endpoint.url, INITIALIZE, endpoint.token).statusCode())
     }
 
     @Test
@@ -96,8 +74,8 @@ class OrphicMcpServerTest {
             val tools = { threads += Thread.currentThread().name; listOf(FakeProvider(EchoTool())) }
             val endpoint = assertNotNull(server(toolsContext = main.asCoroutineDispatcher(), tools = tools).start())
             // A first resolve can build the FeatureGraph, so it must run on Main, not a Ktor worker.
-            assertEquals(200, post(endpoint.url, initialize, endpoint.token).statusCode())
-            assertEquals(200, post(endpoint.url, initialize, endpoint.token).statusCode())
+            assertEquals(200, post(endpoint.url, INITIALIZE, endpoint.token).statusCode())
+            assertEquals(200, post(endpoint.url, INITIALIZE, endpoint.token).statusCode())
             assertEquals(1, threads.size, "$threads")
             assertTrue(threads.single().startsWith("fake-main"), threads.single())
         } finally {
@@ -109,7 +87,7 @@ class OrphicMcpServerTest {
     fun listsAndCallsToolsOverHttp() {
         val endpoint = assertNotNull(server(tools = { listOf(FakeProvider(EchoTool()), FakeProvider(KindsTool())) }).start())
 
-        val init = post(endpoint.url, initialize, endpoint.token)
+        val init = post(endpoint.url, INITIALIZE, endpoint.token)
         assertEquals(200, init.statusCode(), init.body())
         val session = init.headers().firstValue("Mcp-Session-Id").orElse(null)
         val initResult = Json.parseToJsonElement(init.body()).jsonObject.getValue("result").jsonObject
@@ -179,7 +157,20 @@ class OrphicMcpServerTest {
             val perms = Files.getPosixFilePermissions(File(dir, "mcp.json").toPath())
             assertEquals(setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE), perms)
         }
-        assertEquals(200, post(second.url, initialize, first.token).statusCode())
+        assertEquals(200, post(second.url, INITIALIZE, first.token).statusCode())
+    }
+
+    @Test
+    fun slowToolCompletes() {
+        // Real time over real HTTP: a default timeout shorter than a capture would cut this call off.
+        val endpoint = assertNotNull(server(tools = { listOf(FakeProvider(SlowTool())) }).start())
+        val session = http.openSession(endpoint)
+        val call = post(endpoint.url, rpc(2, "tools/call", """{"name":"slow","arguments":{"text":"late","times":3}}"""), endpoint.token, session)
+        assertEquals(200, call.statusCode(), call.body())
+        val result = Json.parseToJsonElement(call.body()).jsonObject.getValue("result").jsonObject
+        assertNotEquals("true", result["isError"]?.jsonPrimitive?.content, call.body())
+        val text = result.getValue("content").jsonArray.single().jsonObject.getValue("text").jsonPrimitive.content
+        assertTrue("\"echoed\":\"late\"" in text, text)
     }
 
     private companion object {

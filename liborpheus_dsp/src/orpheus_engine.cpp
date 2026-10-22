@@ -237,6 +237,8 @@ static void orpheus_graph_free(OrpheusGraph* graph) {
 
 void orpheus_engine_destroy(OrpheusEngine* engine) {
     if (engine) {
+        // Through the disable path, so a stem reader still inside a call finishes before the ring goes.
+        orpheus_engine_set_stem_capture(engine, 0);
         orpheus_graph_free(engine->graph.load(std::memory_order_relaxed));
         delete[] engine->looper_buffer_l;
         delete[] engine->looper_buffer_r;
@@ -659,6 +661,62 @@ int orpheus_engine_drain_mix_bench(OrpheusEngine* engine, float* out, int max_su
     const int n = bench ? bench->drain(out, max_summaries) : 0;
     engine->mix_bench_drains.fetch_sub(1, std::memory_order_seq_cst);
     return n;
+}
+
+void orpheus_engine_set_stem_capture(OrpheusEngine* engine, int enabled) {
+    if (!engine) return;
+    if (enabled) {
+        if (engine->stem_capture.load(std::memory_order_acquire)) return;
+        engine->stem_capture.store(new StemCapture(kStemRingFrames), std::memory_order_seq_cst);
+        return;
+    }
+    StemCapture* old = engine->stem_capture.exchange(nullptr, std::memory_order_seq_cst);
+    if (!old) return;
+#ifndef __EMSCRIPTEN__
+    // As orpheus_engine_set_mix_bench: wait out a block that loaded the old pointer, then any reader.
+    const uint64_t epoch = engine->blocks_rendered.load(std::memory_order_seq_cst);
+    for (int i = 0; i < 100 && engine->blocks_rendered.load(std::memory_order_seq_cst) == epoch; i++)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    while (engine->stem_capture_drains.load(std::memory_order_seq_cst) != 0) std::this_thread::yield();
+#endif
+    delete old;
+}
+
+static_assert(ORPHEUS_STEM_CHANNELS == kStemChannels, "orpheus_dsp.h must match stem_capture.h");
+static_assert(ORPHEUS_STEM_FLOATS_PER_FRAME == kStemFloatsPerFrame, "orpheus_dsp.h must match stem_capture.h");
+
+namespace {
+// Holds the reader guard for one call, so a disable waits until the ring is no longer in use.
+struct StemReader {
+    OrpheusEngine* e;
+    StemCapture* sc = nullptr;
+    explicit StemReader(OrpheusEngine* engine) : e(engine) {
+        if (!e) return;
+        e->stem_capture_drains.fetch_add(1, std::memory_order_seq_cst);
+        sc = e->stem_capture.load(std::memory_order_seq_cst);
+    }
+    ~StemReader() { if (e) e->stem_capture_drains.fetch_sub(1, std::memory_order_seq_cst); }
+};
+}  // namespace
+
+int orpheus_engine_arm_stem_capture(OrpheusEngine* engine, int frames) {
+    StemReader g(engine);
+    return g.sc && g.sc->arm(frames) ? 1 : 0;
+}
+
+int orpheus_engine_drain_stem_capture(OrpheusEngine* engine, float* out, int max_frames) {
+    StemReader g(engine);
+    return g.sc ? g.sc->drain(out, max_frames) : 0;
+}
+
+int orpheus_engine_stem_capture_remaining(OrpheusEngine* engine) {
+    StemReader g(engine);
+    return g.sc ? g.sc->remaining() : 0;
+}
+
+long long orpheus_engine_stem_capture_dropped(OrpheusEngine* engine) {
+    StemReader g(engine);
+    return g.sc ? static_cast<long long>(g.sc->dropped()) : 0;
 }
 
 // Max frames per callback — CoreAudio typically uses 512 or 1024.

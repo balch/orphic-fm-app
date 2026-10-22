@@ -9,7 +9,7 @@ import com.diamondedge.logging.logging
  * calls DesktopEngine::process() directly from the OS audio thread.
  * No Java Sound mixer, no float-to-int16 conversion, no JNI per-buffer round-trip.
  */
-class NativeDspAudioEngine : AudioEngine, NativeDspBridge, MixBenchTap {
+class NativeDspAudioEngine : AudioEngine, NativeDspBridge, MixBenchTap, StemTapSource {
 
     private val bridge = DesktopDspBridge()
 
@@ -175,6 +175,38 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge, MixBenchTap {
             mixBenchMissing = true
             log.warn { "nativeDrainMixBench missing from the native library; rebuild it (${e.message})" }
             0
+        }
+    }
+
+    // -- StemTap: a property, since MixBenchTap already owns setEnabled/drain on this class ---------
+
+    @Volatile
+    private var stemsMissing = false
+
+    override val stemTap: StemTap = object : StemTap {
+        override fun setEnabled(on: Boolean): Boolean = stemCall(false) {
+            bridge.nativeSetStemCapture(on)
+            true
+        }
+
+        override fun arm(frames: Int): Boolean = stemCall(false) { bridge.nativeArmStemCapture(frames) }
+
+        override fun drain(out: FloatArray): Int =
+            stemCall(0) { bridge.nativeDrainStemCapture(out, out.size / StemLayout.FLOATS_PER_FRAME) }
+
+        override fun remaining(): Int = stemCall(0) { bridge.nativeStemCaptureRemaining() }
+
+        override fun dropped(): Long = stemCall(0L) { bridge.nativeStemCaptureDropped() }
+    }
+
+    private inline fun <T> stemCall(fallback: T, block: () -> T): T {
+        if (stemsMissing) return fallback
+        return try {
+            block()
+        } catch (e: UnsatisfiedLinkError) {
+            stemsMissing = true
+            log.warn { "stem capture missing from the native library; rebuild it (${e.message})" }
+            fallback
         }
     }
 
