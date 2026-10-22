@@ -6,6 +6,8 @@ plugins {
 
 val edition = (findProperty("edition") as String?) ?: "core"
 val catalog = (findProperty("catalog") as String?) ?: "live"
+// -Pbench=true starts the Mix Bench web page beside the app (dev runs only).
+val bench = (findProperty("bench") as String?) == "true"
 
 dependencies {
     implementation(projects.apps.djapp.shared)
@@ -17,6 +19,9 @@ dependencies {
     implementation(libs.metrox.viewmodel.compose)
     implementation(libs.slf4j.api)
     implementation(libs.logback.classic)
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.kotlin.test)
 }
 
 compose.desktop {
@@ -32,6 +37,7 @@ compose.desktop {
 
         jvmArgs += listOf("-Dorpheus.engine=cpp")
         jvmArgs += "-Dcatalog=$catalog"
+        if (bench) jvmArgs += "-Dorpheus.bench=true"
         val nativePath = System.getProperty("orpheus.native.path", "")
         if (nativePath.isNotEmpty()) {
             jvmArgs += "-Djava.library.path=$nativePath"

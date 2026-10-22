@@ -8,6 +8,7 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.playback.SkipDirection
+import org.balch.orpheus.djapp.bench.MixBench
 import org.balch.orpheus.ui.viz.PanelKeyBridge
 
 fun main() {
@@ -17,6 +18,7 @@ fun main() {
         val graph = remember { createGraphFactory<DjAppGraphDesktop.Factory>().create() }
         // Builds every @StartupRoot, then the graph's startup features.
         remember { graph.startupInitializer.run() }
+        val bench = remember { if (MixBench.enabled) MixBench.launch(graph) else null }
 
         val windowState = rememberWindowState(width = 360.dp, height = 780.dp)
 
@@ -37,6 +39,8 @@ fun main() {
                 }
             },
             onCloseRequest = {
+                // Release the bench's taps and gains before the engine goes away.
+                bench?.close()
                 // Fade out audio before exiting to avoid crackles/pops.
                 // Set volume to 0, let the C++ smoother ramp down (~50ms),
                 // then stop the engine and exit.

@@ -114,6 +114,46 @@ class MixBenchController(
         pushGains()
     }
 
+    /**
+     * Fader as heard: sets whichever layer the scope edits so vibe + section dB in the playing section equals [db].
+     * Reads and writes under one lock, so a scope change or section flip can't split the two.
+     */
+    suspend fun setHeardLevelDb(t: Int, db: Float) = edit(t) {
+        val s = editSection()
+        _layers.value = _layers.value.let { l ->
+            if (s == null) {
+                val sectionDb = l.sections[section]?.levelDb?.getOrNull(t) ?: 0f
+                l.copy(vibe = l.vibe.copy(levelDb = l.vibe.levelDb.with(t, db - sectionDb)))
+            } else {
+                l.withSection(s) { it.copy(levelDb = it.levelDb.with(t, db - l.vibe.levelDb[t])) }
+            }
+        }
+        pushGains()
+    }
+
+    /**
+     * Send as heard in the playing section. [Scope.VIBE] turns it into a ratio over the send at ratio 1;
+     * returns false (and changes nothing) when that send is 0, since no ratio can lift it.
+     */
+    suspend fun setHeardSend(t: Int, v: Float, reverb: Boolean): Boolean {
+        requireTrack(t)
+        return lock.withLock {
+            if (editSection() != null) {
+                setSend(t, v, reverb)
+                return@withLock true
+            }
+            val l = _layers.value
+            val unit = l.copy(
+                vibe = if (reverb) l.vibe.copy(reverbRatio = l.vibe.reverbRatio.with(t, 1f))
+                else l.vibe.copy(delayRatio = l.vibe.delayRatio.with(t, 1f)),
+            ).effective(vibe, section, t)
+            val base = if (reverb) unit.reverbSend else unit.delaySend
+            if (base < MIN_SEND) return@withLock false
+            setSend(t, v.coerceIn(0f, 1f) / base, reverb)
+            true
+        }
+    }
+
     /** Pan is whole-vibe only. */
     suspend fun setPan(t: Int, p: Float) = edit(t) {
         val l = _layers.value
@@ -287,6 +327,7 @@ class MixBenchController(
         const val TRACKS = 8
         const val POLL_MS = 33L
         const val MAX_DRAIN = 64
+        const val MIN_SEND = 1e-4f
 
         fun requireTrack(t: Int) = require(t in 0 until TRACKS) { "track $t out of range" }
 

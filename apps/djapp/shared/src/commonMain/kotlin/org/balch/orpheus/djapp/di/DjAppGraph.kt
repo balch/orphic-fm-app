@@ -3,12 +3,15 @@ package org.balch.orpheus.djapp.di
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
+import org.balch.orpheus.core.audio.dsp.AudioEngine
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.features.StartupInitializer
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.DomeWiggleLaunch
 import org.balch.orpheus.djapp.variant.DjTabContribution
+import org.balch.orpheus.features.pulsar.PulsarFeature
 
 /**
  * Common surface the [DjApp] composable consumes, independent of platform.
@@ -37,4 +40,9 @@ interface DjAppGraph : ViewModelGraph {
 
     /** The dome's "swipe me" wiggle, spent once a process: it outlives an Android activity's recreation. */
     val domeWiggleLaunch: DomeWiggleLaunch
+
+    /** The Mix Bench (desktop, `-Pbench=true`) drives these three directly. */
+    val pulsarFeature: PulsarFeature
+    val synthController: SynthController
+    val audioEngine: AudioEngine
 }

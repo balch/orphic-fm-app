@@ -260,4 +260,69 @@ class MixBenchControllerTest {
         assertTrue(tap.on)
         assertEquals(2, tap.enables)
     }
+
+    @Test
+    fun heardLevelInVibeScopeKeepsSectionOffset() = runTest {
+        section(1)
+        val c = started()
+        c.setScope(Scope.SECTION)
+        c.setLevelDb(2, -3f)
+        c.setScope(Scope.VIBE)
+        c.setHeardLevelDb(2, -9f)
+        assertEquals(-6f, c.layers.value.vibe.levelDb[2], 1e-5f)
+        assertEquals(-3f, c.layers.value.sections.getValue(1).levelDb[2], 1e-5f)
+        assertEquals(10f.pow(-9f / 20f), gain(2), 1e-4f)
+    }
+
+    @Test
+    fun heardLevelInSectionScopeKeepsVibeOffset() = runTest {
+        section(1)
+        val c = started()
+        c.setLevelDb(2, -2f)
+        c.setScope(Scope.SECTION)
+        c.setHeardLevelDb(2, -5f)
+        assertEquals(-2f, c.layers.value.vibe.levelDb[2], 1e-5f)
+        assertEquals(-3f, c.layers.value.sections.getValue(1).levelDb[2], 1e-5f)
+        assertEquals(10f.pow(-5f / 20f), gain(2), 1e-4f)
+    }
+
+    @Test
+    fun heardSendInVibeScopeIsARatio() = runTest {
+        feature.applyVibe(sendVibe)
+        section(1)
+        val c = started()
+        assertTrue(c.setHeardSend(3, 0.25f, reverb = true))
+        assertEquals(0.5f, c.layers.value.vibe.reverbRatio[3], 1e-5f)
+        assertEquals(0.25f, c.layers.value.effective(sendVibe, 1, 3).reverbSend, 1e-5f)
+    }
+
+    @Test
+    fun heardSendRefusesAZeroSendInVibeScope() = runTest {
+        feature.applyVibe(sendVibe)
+        section(1)
+        val c = started()
+        assertFalse(c.setHeardSend(0, 0.3f, reverb = false))
+        assertEquals(BenchLayers(), c.layers.value)
+    }
+
+    @Test
+    fun heardSectionSendMatchesOverlayAndCapture() = runTest {
+        feature.applyVibe(sendVibe)
+        section(1)
+        val c = started()
+        c.setHeardSend(3, 0.25f, reverb = true)
+        c.setScope(Scope.SECTION)
+        assertTrue(c.setHeardSend(3, 0.4f, reverb = true))
+        assertEquals(0.4f, feature.overlay!!.reverbSend(3, 1, 0.5f), 1e-5f)
+        val row = capture(sendVibe, c.layers.value)
+            .single { it.scope == Scope.SECTION && it.field == CaptureField.REVERB_SEND }
+        assertEquals(0.4f, row.new, 1e-5f)
+    }
+
+    private val sendVibe = vibe.copy(
+        tracks = vibe.tracks.mapIndexed { t, tr ->
+            if (t != 3) tr
+            else tr.copy(engineEdm = tr.engineEdm.copy(reverbSend = 0.5f), engineSpace = tr.engineSpace.copy(reverbSend = 0.5f))
+        },
+    )
 }

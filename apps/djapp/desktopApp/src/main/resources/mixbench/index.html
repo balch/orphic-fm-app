@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mix Bench</title>
+<link rel="stylesheet" href="static/bench.css?key=__KEY__">
+</head>
+<body>
+<div class="mb">
+  <header class="row top">
+    <select id="vibe" title="Vibe"></select>
+    <button id="play" class="btn primary">Play</button>
+    <button id="loop" class="btn" title="Keep re-entering the playing section">Loop section</button>
+    <div id="knobs" class="knobs"></div>
+    <span class="grow"></span>
+    <div id="bus" class="bus"></div>
+  </header>
+
+  <div id="stale" class="banner" hidden></div>
+  <div id="conn" class="banner warn" hidden>Disconnected from the app; retrying.</div>
+
+  <nav id="chips" class="row chips"></nav>
+
+  <div class="wave">
+    <canvas id="overview"></canvas>
+    <div id="ovmsg" class="ovmsg"></div>
+  </div>
+  <div class="caveat">Overview: a headless Mode One render (SPEECH is silent there), so the live run can differ. Click it to jump to that section.</div>
+
+  <main class="row body">
+    <div id="strips" class="strips"></div>
+    <aside class="side">
+      <div class="sidehead">Changes <span id="srcname" class="dim"></span></div>
+      <div class="scope">
+        <span class="dim">editing:</span>
+        <button id="scopeVibe" class="seg">whole vibe</button>
+        <button id="scopeSection" class="seg">section</button>
+      </div>
+      <div id="scopenote" class="dim small"></div>
+      <div id="rows" class="rows"></div>
+      <div class="actions">
+        <button id="capture" class="btn primary">Capture</button>
+        <button id="reset" class="btn">Reset to file</button>
+      </div>
+      <div id="capres" class="small"></div>
+    </aside>
+  </main>
+
+  <footer class="notes">
+    <div>Do not use the app's TRACKS mixer while the bench runs: the bench owns each track's audition gain.</div>
+    <div>Faders show the dB offset from the file (0 dB = as written). Pan and sends show the value heard in the playing section.</div>
+    <div>A section-scope knob reaches the engine up to ~200 ms after a section change. Jumps land at the next loop wrap.</div>
+    <div>LUFS readouts are live (this run's seed, SPEECH included), so they will not match measure.sh exactly.</div>
+  </footer>
+  <div id="toast" class="toast" hidden></div>
+</div>
+<script>window.BENCH_KEY = "__KEY__";</script>
+<script src="static/bench.js?key=__KEY__"></script>
+</body>
+</html>
