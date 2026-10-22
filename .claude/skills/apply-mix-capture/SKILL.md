@@ -9,6 +9,7 @@ The Mix Bench (desktop DJ app, `./gradlew :apps:djapp:desktopApp:run -Pbench=tru
 
 ## 1. Pick and check the file
 
+- Claude can make a capture itself in the running AI edition with the `orphic-mcp` skill's `mix_capture` tool.
 - Use the file the user named, else the newest of `build/mix-bench/captures/*.json` and `~/.config/orpheus-dj/mix-captures/*.json`.
 - Fields: `vibe`, `slug`, `source` (repo-relative path, may be null), `baselineHash`, `currentHash`, `stale` (null when the app can't tell: no source, or no hash from when the vibe loaded), `aiVibe`, `capturedAt`, `rows`, `vibeJson` (the vibe the rows were read from).
 - If `aiVibe` is true, the vibe is AI-made and has no Kotlin source. The app writes such a capture into the vibe itself and archives it under `~/.config/orpheus-dj/ai-vibes/`. Tell the user, and point them at the grab-ai-vibes skill to import it.
