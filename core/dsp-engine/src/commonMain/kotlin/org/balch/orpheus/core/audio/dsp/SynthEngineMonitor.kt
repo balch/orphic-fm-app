@@ -195,44 +195,31 @@ class SynthEngineMonitor(
 
     // posBuf is the JNI read-position cell, one per poll job: jobs run concurrently on io threads,
     // and a shared cell let one job's read position land in another's.
+    // history, when given, resamples the channel into its VizHistory ring.
     private fun pollVizChannel(
         channel: Int, readPositions: IntArray, vizBuf: FloatArray,
-        flow: MutableStateFlow<FloatArray>, posBuf: IntArray,
+        flow: MutableStateFlow<FloatArray>, posBuf: IntArray, history: VizHistoryResampler? = null,
     ) {
         posBuf[0] = readPositions[channel]
         val count = nativeBridge.nativeGetViz(channel, vizBuf, posBuf)
         readPositions[channel] = posBuf[0]
         if (count > 0) {
             flow.value = appendToVizRing(flow.value, vizBuf, count)
+            history?.write(channel, vizBuf, count, posBuf[0])
         }
     }
 
-    /** Publishes the rings [ring] returns, by channel id, with their ends, if any moved since the last. */
-    private inline fun publishHistory(
-        flow: MutableStateFlow<VizHistory?>, readPositions: IntArray, ring: (Int) -> FloatArray?,
-    ) {
+    /** Closes [history]'s poll and publishes its rings, if any moved since the last. */
+    private fun publishHistory(flow: MutableStateFlow<VizHistory?>, history: VizHistoryResampler) {
+        val now = TimeSource.Monotonic.markNow()
+        history.endPoll((now - historyEpoch).inWholeNanoseconds / 1e9)
         val last = flow.value
-        if (last != null && last.ends.contentEquals(readPositions)) return
-        val samples = Array(VIZ_CHANNEL_COUNT) { ring(it) ?: EMPTY_RING }
-        flow.value = VizHistory(samples, readPositions.copyOf(), TimeSource.Monotonic.markNow())
+        if (last != null && last.ends.contentEquals(history.ends)) return
+        flow.value = VizHistory(history.rings, history.ends.copyOf(), now)
     }
 
-    // The scope poll's bus flows by channel id; the DJ ring is kept by the poll itself.
-    private val scopeFlows: Map<Int, MutableStateFlow<FloatArray>> by lazy {
-        mapOf(
-            VIZ_LFO to _lfoVizFlow, VIZ_WARPS_C to _warpsCarrierVizFlow, VIZ_WARPS_M to _warpsModVizFlow,
-            VIZ_WARPS_O to _warpsOutVizFlow, VIZ_DELAY_IN to _delayInVizFlow, VIZ_DELAY_FB to _delayFbVizFlow,
-            VIZ_DELAY_OUT to _delayOutVizFlow, VIZ_REVERB_IN to _reverbInVizFlow, VIZ_REVERB_OUT to _reverbOutVizFlow,
-            VIZ_FLUX_CV to _fluxCvVizFlow, VIZ_RESO_IN to _resoInVizFlow, VIZ_RESO_OUT to _resoOutVizFlow,
-            VIZ_DRUM_OUT to _drumOutVizFlow, VIZ_GRAINS_IN to _grainsInVizFlow, VIZ_GRAINS_OUT to _grainsOutVizFlow,
-            VIZ_LFO_CH1 to _lfoCh1VizFlow, VIZ_LFO_CH2 to _lfoCh2VizFlow, VIZ_LFO_CH3 to _lfoCh3VizFlow,
-            VIZ_BASS_OUT to _bassOutVizFlow, VIZ_MASTER_OUT to _masterOutVizFlow,
-            VIZ_HORN_IN to _hornInVizFlow, VIZ_HORN_OUT to _hornOutVizFlow,
-            VIZ_HORN_PHASE to _hornPhaseVizFlow, VIZ_WOOFER_PHASE to _wooferPhaseVizFlow,
-            VIZ_TIDES_CH0 to _tidesCh0VizFlow, VIZ_TIDES_CH1 to _tidesCh1VizFlow,
-            VIZ_TIDES_CH2 to _tidesCh2VizFlow, VIZ_TIDES_CH3 to _tidesCh3VizFlow,
-        )
-    }
+    // The resamplers' clock. A new poll starts fresh rings, so stale ticks never show.
+    private val historyEpoch = TimeSource.Monotonic.markNow()
 
     private fun pollTurntableViz(
         deck: Int, buf: FloatArray,
@@ -381,6 +368,7 @@ class SynthEngineMonitor(
         pulsarVizJob = monitoringScope.launch(dispatcherProvider.io) {
             val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
             val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
+            val trackHistory = VizHistoryResampler(VIZ_PULSAR_TRACK_0 until VIZ_PULSAR_TRACK_0 + PULSAR_NUM_TRACKS, VIZ_CHANNEL_COUNT)
             val posBuf = IntArray(1)
             var lastVoidGain = 1f
             var lastKrakenShift = -1
@@ -404,14 +392,12 @@ class SynthEngineMonitor(
                 nativeBridge.nativeGetPulsarActiveEngines(pulsarActiveEngines)
                 val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
                 for (t in 0 until PULSAR_NUM_TRACKS) {
-                    pollVizChannel(VIZ_PULSAR_TRACK_0 + t, pulsarReadPos, pulsarVizBuf, _pulsarTrackVizFlows[t], posBuf)
+                    val ch = VIZ_PULSAR_TRACK_0 + t
+                    pollVizChannel(ch, pulsarReadPos, pulsarVizBuf, _pulsarTrackVizFlows[t], posBuf, trackHistory)
                     val data = _pulsarTrackVizFlows[t].value
                     trackLevels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
                 }
-                publishHistory(_pulsarTrackHistory, pulsarReadPos) { ch ->
-                    if (ch >= VIZ_PULSAR_TRACK_0 && ch < VIZ_PULSAR_TRACK_0 + PULSAR_NUM_TRACKS)
-                        _pulsarTrackVizFlows[ch - VIZ_PULSAR_TRACK_0].value else null
-                }
+                publishHistory(_pulsarTrackHistory, trackHistory)
                 // Void Anomaly gain: a single live scalar (1.0 = idle), same channel
                 // shape as beat_phase below — only the latest sample matters, so read
                 // straight off the ring rather than accumulating a history flow.
@@ -589,46 +575,26 @@ class SynthEngineMonitor(
             val vizBuf = FloatArray(VIZ_BUF_SIZE)
             val readPositions = IntArray(VIZ_CHANNEL_COUNT)
             val posBuf = IntArray(1)
-            // The turntable poll appends to the DJ flow too, so history reads the DJ ring on its own.
-            val scopeDj = MutableStateFlow(FloatArray(0))
-            val djHistoryPos = IntArray(VIZ_CHANNEL_COUNT)
-            val historyEnds = IntArray(VIZ_CHANNEL_COUNT)
+            val history = VizHistoryResampler(VIZ_LFO..VIZ_TIDES_CH3, VIZ_CHANNEL_COUNT)
+            // The bus channels by id, each with its panel flow.
+            val channels = listOf(
+                VIZ_LFO to _lfoVizFlow, VIZ_WARPS_C to _warpsCarrierVizFlow, VIZ_WARPS_M to _warpsModVizFlow,
+                VIZ_WARPS_O to _warpsOutVizFlow, VIZ_DELAY_IN to _delayInVizFlow, VIZ_DELAY_FB to _delayFbVizFlow,
+                VIZ_DELAY_OUT to _delayOutVizFlow, VIZ_REVERB_IN to _reverbInVizFlow, VIZ_REVERB_OUT to _reverbOutVizFlow,
+                VIZ_FLUX_CV to _fluxCvVizFlow, VIZ_RESO_IN to _resoInVizFlow, VIZ_RESO_OUT to _resoOutVizFlow,
+                VIZ_DRUM_OUT to _drumOutVizFlow, VIZ_GRAINS_IN to _grainsInVizFlow, VIZ_GRAINS_OUT to _grainsOutVizFlow,
+                VIZ_LFO_CH1 to _lfoCh1VizFlow, VIZ_LFO_CH2 to _lfoCh2VizFlow, VIZ_LFO_CH3 to _lfoCh3VizFlow,
+                VIZ_BASS_OUT to _bassOutVizFlow, VIZ_MASTER_OUT to _masterOutVizFlow,
+                VIZ_HORN_IN to _hornInVizFlow, VIZ_HORN_OUT to _hornOutVizFlow,
+                VIZ_HORN_PHASE to _hornPhaseVizFlow, VIZ_WOOFER_PHASE to _wooferPhaseVizFlow,
+                VIZ_DJ_OUT to _djOutVizFlow,
+                VIZ_TIDES_CH0 to _tidesCh0VizFlow, VIZ_TIDES_CH1 to _tidesCh1VizFlow,
+                VIZ_TIDES_CH2 to _tidesCh2VizFlow, VIZ_TIDES_CH3 to _tidesCh3VizFlow,
+            )
             while (isActive) {
-                pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow, posBuf)
-                pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow, posBuf)
-                pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow, posBuf)
-                pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow, posBuf)
-                pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow, posBuf)
-                pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow, posBuf)
-                pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow, posBuf)
-                pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow, posBuf)
-                pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow, posBuf)
-                pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow, posBuf)
-                pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow, posBuf)
-                pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow, posBuf)
-                pollVizChannel(VIZ_DRUM_OUT, readPositions, vizBuf, _drumOutVizFlow, posBuf)
-                pollVizChannel(VIZ_GRAINS_IN, readPositions, vizBuf, _grainsInVizFlow, posBuf)
-                pollVizChannel(VIZ_GRAINS_OUT, readPositions, vizBuf, _grainsOutVizFlow, posBuf)
-                pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow, posBuf)
-                pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow, posBuf)
-                pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow, posBuf)
-                pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow, posBuf)
-                pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow, posBuf)
-                pollVizChannel(VIZ_HORN_IN, readPositions, vizBuf, _hornInVizFlow, posBuf)
-                pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow, posBuf)
-                pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow, posBuf)
-                pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow, posBuf)
-                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow, posBuf)
-                pollVizChannel(VIZ_DJ_OUT, djHistoryPos, vizBuf, scopeDj, posBuf)
-                pollVizChannel(VIZ_TIDES_CH0, readPositions, vizBuf, _tidesCh0VizFlow, posBuf)
-                pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow, posBuf)
-                pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow, posBuf)
-                pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow, posBuf)
-                readPositions.copyInto(historyEnds)
-                historyEnds[VIZ_DJ_OUT] = djHistoryPos[VIZ_DJ_OUT]
-                publishHistory(_scopeHistory, historyEnds) { ch ->
-                    if (ch == VIZ_DJ_OUT) scopeDj.value else scopeFlows[ch]?.value
-                }
+                // The turntable poll appends to the DJ flow too, but this poll's own reads fill the history.
+                for ((ch, flow) in channels) pollVizChannel(ch, readPositions, vizBuf, flow, posBuf, history)
+                publishHistory(_scopeHistory, history)
 
                 delay(VIZ_SCOPE_POLL_INTERVAL)
             }
@@ -756,6 +722,5 @@ class SynthEngineMonitor(
         private const val VIZ_PULSAR_KRAKEN = 39  // Kraken shift in effect (-1 = home)
         private const val VIZ_CHANNEL_COUNT = 40  // 29 + 8 pulsar tracks + beat_phase + void_gain + kraken
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
-        private val EMPTY_RING = FloatArray(0)
     }
 }

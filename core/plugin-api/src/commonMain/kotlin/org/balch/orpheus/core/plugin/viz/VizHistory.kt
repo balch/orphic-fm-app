@@ -41,12 +41,27 @@ object VizChannel {
 }
 
 /**
- * One poll's viz rings, indexed by [VizChannel] id: each channel's newest samples (one per audio
- * block, oldest first, empty when the poll skips it), the engine's absolute block count just past
- * its newest, and when the poll took them. Enough to scroll the rings at an even speed.
+ * One poll's viz rings, indexed by [VizChannel] id, with the tick count just past each channel's
+ * newest sample and when the poll took them. Enough to scroll the rings at an even speed.
+ *
+ * A ring holds [RING_SIZE] samples at [RATE] ticks a second whatever the device's audio buffer,
+ * tick `c` at `c and (RING_SIZE - 1)`, or is empty when the poll skips the channel. The poll writes
+ * the same arrays in place, so a reader stays within the newest [READABLE] samples of its [ends],
+ * clear of the next polls' writes.
  */
 class VizHistory(
     val samples: Array<FloatArray>,
     val ends: IntArray,
     val arrivedAt: TimeSource.Monotonic.ValueTimeMark,
-)
+) {
+    companion object {
+        /** Ticks a second: desktop's 48 kHz / 512-frame block rate, so a desktop ring maps block for tick. */
+        const val RATE = 93.75
+
+        /** About 43 s of ticks. A power of two, so slots survive the counts wrapping. */
+        const val RING_SIZE = 4096
+
+        /** The ring less ample room for the ticks later polls write past a reader's snapshot. */
+        const val READABLE = RING_SIZE - 1024
+    }
+}

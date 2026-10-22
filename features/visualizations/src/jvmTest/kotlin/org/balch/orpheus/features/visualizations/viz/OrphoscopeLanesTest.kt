@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import org.balch.orpheus.core.plugin.viz.VizHistory
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.abs
 import kotlin.test.Test
@@ -26,15 +27,28 @@ class OrphoscopeLanesTest {
         assertEquals(1f, laneLevel(2f))
     }
 
-    // Every ring here ends at sample 480, with the scroll's head there too.
+    @Test fun `a trace scrolls at one speed at any width`() {
+        val upright = visibleSamples(390f, 0f)
+        assertEquals(468, upright)
+        assertEquals(upright * 2, visibleSamples(780f, 0f))
+        assertEquals(scrollStride(upright, 390f), scrollStride(visibleSamples(780f, 0f), 780f))
+        // Zoomed all the way in, a tenth of the history.
+        assertEquals(46, visibleSamples(390f, 1f))
+        // Past what the ring holds, a very wide window shows all it can.
+        assertEquals(VizHistory.READABLE, visibleSamples(4000f, 0f))
+    }
+
+    // Every ring here ends at block 480, with the scroll's head there too: blocks 0..479 sit at
+    // their own slots.
     private val ends = IntArray(8) { 480 }
+    private fun ring() = FloatArray(VizHistory.RING_SIZE)
 
     @Test fun `lanes show only while a track has signal in the window`() {
         val lanes = OrphoscopeLanes(OrpheusColors.pulsarTracks)
-        assertFalse(lanes.anyLive(Array(8) { FloatArray(480) }, ends, 480.0, 480))
+        assertFalse(lanes.anyLive(Array(8) { ring() }, ends, 480.0, 480))
         assertFalse(lanes.anyLive(Array(8) { FloatArray(0) }, IntArray(8), 0.0, 480))
         // A hit that has scrolled out of a zoomed-in window no longer counts.
-        val old = Array(8) { FloatArray(480) }.also { it[3][10] = 0.4f }
+        val old = Array(8) { ring() }.also { it[3][10] = 0.4f }
         assertTrue(lanes.anyLive(old, ends, 480.0, 480))
         assertFalse(lanes.anyLive(old, ends, 480.0, 48))
     }
@@ -54,7 +68,7 @@ class OrphoscopeLanesTest {
     /** Each track's envelope lands in its own band, in its own colour: the lanes never share pixels. */
     @Test fun `every track draws inside its own lane`() {
         for (live in 0 until 8) {
-            val pixels = drawLanes(Array(8) { t -> FloatArray(480) { i -> if (t == live && i % 40 == 0) 1f else 0f } })
+            val pixels = drawLanes(Array(8) { t -> FloatArray(VizHistory.RING_SIZE) { i -> if (t == live && i < 480 && i % 40 == 0) 1f else 0f } })
             var envelope = 0
             for (x in 0 until width) for (y in 0 until height) {
                 val c = pixels[x, y]
@@ -69,7 +83,7 @@ class OrphoscopeLanesTest {
     }
 
     @Test fun `a silent lane keeps a flat trace in its colour`() {
-        val pixels = drawLanes(Array(8) { t -> FloatArray(480) { i -> if (t == 0 && i % 40 == 0) 1f else 0f } })
+        val pixels = drawLanes(Array(8) { t -> FloatArray(VizHistory.RING_SIZE) { i -> if (t == 0 && i < 480 && i % 40 == 0) 1f else 0f } })
         for (t in 1 until 8) {
             assertTrue(isTrace(pixels[width / 2, laneH * t + laneH / 2], colors[t]), "silent lane $t vanished")
         }

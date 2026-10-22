@@ -150,10 +150,6 @@ class SignalMonitorViz(
             // Dark background
             drawRect(OrpheusColors.fireworksBackground)
 
-            // Zoom: 0 = full 5sec history, 1 = last ~50 samples (waveform detail). A few samples
-            // short of the ring, so the clock's lag never runs the window off its oldest end.
-            val visibleSamples = (VISIBLE_MAX * (1f - _zoom * 0.9f)).toInt().coerceAtLeast(30)
-
             pump.update(clock.elapsedNow().inWholeNanoseconds / 1e9, engine.pulsarVizFlow.value)
             val tracks = trackHistory.value
             if (tracks != null) {
@@ -162,20 +158,21 @@ class SignalMonitorViz(
                     trackRings[t] = tracks.samples[VizChannel.PULSAR_TRACK_0 + t]
                     trackEnds[t] = laneClock.rel(tracks.ends[VizChannel.PULSAR_TRACK_0 + t])
                 }
+                // Between the header and the nav where a host reports a stage, else the window.
+                val stageLocal = stage?.bounds?.translate(-origin.x, -origin.y)
+                    ?.intersect(Rect(0f, 0f, w, h))
+                    ?.takeIf { it.width > 0f && it.height > 0f }
+                    ?: Rect(0f, 0f, w, h)
+                val inset = stageLocal.height * 0.04f
+                val area = Rect(
+                    stageLocal.left + margin, stageLocal.top + inset,
+                    stageLocal.right - margin, stageLocal.bottom - inset,
+                )
+                val visible = visibleSamples(lanes.traceWidth(this, area).toDp().value, _zoom)
                 // While Pulsar plays, its tracks are the whole picture: eight lanes over the stage,
                 // and the bus traces (delay, reverb, master and the rest) step aside.
-                if (lanes.anyLive(trackRings, trackEnds, head, visibleSamples)) {
-                    // Between the header and the nav where a host reports a stage, else the window.
-                    val stageLocal = stage?.bounds?.translate(-origin.x, -origin.y)
-                        ?.intersect(Rect(0f, 0f, w, h))
-                        ?.takeIf { it.width > 0f && it.height > 0f }
-                        ?: Rect(0f, 0f, w, h)
-                    val inset = stageLocal.height * 0.04f
-                    val area = Rect(
-                        stageLocal.left + margin, stageLocal.top + inset,
-                        stageLocal.right - margin, stageLocal.bottom - inset,
-                    )
-                    lanes.draw(this, trackRings, trackEnds, head, visibleSamples, area, _glow, pump.level)
+                if (lanes.anyLive(trackRings, trackEnds, head, visible)) {
+                    lanes.draw(this, trackRings, trackEnds, head, visible, area, _glow, pump.level)
                     return@Canvas
                 }
             }
@@ -188,11 +185,13 @@ class SignalMonitorViz(
             )
             val bus = busHistory.value ?: return@Canvas
             val busHead = busClock.position(bus.ends[VizChannel.MASTER_OUT], bus.arrivedAt, now)
-            val stride = scrollStride(visibleSamples)
-            val buckets = scrollBuckets(busHead, visibleSamples, stride)
-            val perSample = (traceRight - traceLeft) / visibleSamples
+            val traceDp = (traceRight - traceLeft).toDp().value
+            val visible = visibleSamples(traceDp, _zoom)
+            val stride = scrollStride(visible, traceDp)
+            val buckets = scrollBuckets(busHead, visible, stride)
+            val perSample = (traceRight - traceLeft) / visible
             val firstX = traceRight - (busHead - (buckets.first * stride + stride / 2.0)).toFloat() * perSample
-            val from = kotlin.math.floor(busHead).toInt() - visibleSamples
+            val from = kotlin.math.floor(busHead).toInt() - visible
 
             // Draw each channel overlaid at center — skip empty (bypassed) channels.
             // Two stroke passes (glow halo + crisp trace) keep this full-screen scope cheap to
@@ -207,8 +206,8 @@ class SignalMonitorViz(
 
                     // Skip silent (bypassed) channels — flat lines add cost, not signal.
                     var peak = 0f
-                    for (i in maxOf(0, from - (end - ring.size)) until ring.size) {
-                        val a = kotlin.math.abs(ring[i])
+                    for (k in maxOf(from, end - ring.size) until end) {
+                        val a = kotlin.math.abs(ring.block(k))
                         if (a > peak) peak = a
                     }
                     if (peak < 0.001f) return@forEachIndexed
@@ -241,10 +240,6 @@ class SignalMonitorViz(
     }
 
     companion object {
-        // The rings hold 480 samples; the window stays a little short so the clock's lag and a
-        // bucket of slack never reach past the oldest.
-        private const val VISIBLE_MAX = 460
-
         // A poll and a half behind the newest sample: the Pulsar poll runs at 60 Hz, the bus at 30.
         private const val LANE_LAG_SECONDS = 0.025
         private const val BUS_LAG_SECONDS = 0.05

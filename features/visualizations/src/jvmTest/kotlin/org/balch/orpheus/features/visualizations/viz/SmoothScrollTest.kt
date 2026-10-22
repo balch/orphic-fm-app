@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.visualizations.viz
 
+import org.balch.orpheus.core.plugin.viz.VizHistory
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.test.Test
@@ -45,24 +46,31 @@ class SmoothScrollTest {
         val clock = ScrollClock(lagSeconds = 0.025)
         run(clock, frames = 60, startEnd = 50_000)
         val (position, newest) = run(clock, frames = 1, startEnd = 3).single()
-        assertEquals(0, newest)
-        assertTrue(position <= 0.0 && position > -10.0, "restarted at $position")
+        assertEquals(3, newest)
+        assertTrue(position <= newest && position > newest - 10.0, "restarted at $position")
     }
 
     @Test fun `a bucket keeps its value as the ring scrolls past it`() {
-        // A 480-sample ring of a ramp, scrolled one sample at a time: bucket 300 (samples 900..902)
-        // must read the same whatever the ring's array offset.
+        // A ramp written into the ring a block at a time, as the poll does: bucket 300 (blocks
+        // 900..902) must read the same until the ring laps it.
         val stride = 3
+        val ring = FloatArray(VizHistory.RING_SIZE)
         val seen = mutableSetOf<Float>()
-        for (end in 910..1300) {
-            val ring = FloatArray(480) { i -> ((end - 480 + i) % 97) / 97f }
-            if (end - 480 <= 300 * stride) seen += bucketPeak(ring, end, 300, stride, signed = false)
+        for (end in 1..5000) {
+            ring[(end - 1) and (ring.size - 1)] = ((end - 1) % 97) / 97f
+            if (end >= 903 && end - ring.size <= 300 * stride) seen += bucketPeak(ring, end, 300, stride, signed = false)
         }
         assertEquals(1, seen.size, "bucket 300 read $seen")
     }
 
+    @Test fun `a clock's blocks keep their ring slots`() {
+        val clock = ScrollClock(lagSeconds = 0.025)
+        val (_, newest) = run(clock, frames = 1, startEnd = 70_001).single()
+        assertEquals(70_000 and (VizHistory.RING_SIZE - 1), (newest - 1) and (VizHistory.RING_SIZE - 1))
+    }
+
     @Test fun `a signed bucket keeps the sample furthest from zero`() {
-        val ring = floatArrayOf(0.2f, -0.7f, 0.5f)
+        val ring = floatArrayOf(0.2f, -0.7f, 0.5f, 0f)
         assertEquals(-0.7f, bucketPeak(ring, 3, 0, 3, signed = true))
         assertEquals(0.5f, bucketPeak(ring, 3, 0, 3, signed = false))
     }

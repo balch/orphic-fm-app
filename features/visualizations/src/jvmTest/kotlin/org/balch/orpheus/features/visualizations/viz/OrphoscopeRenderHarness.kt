@@ -49,10 +49,15 @@ class OrphoscopeRenderHarness {
         return level * exp(-since / decay)
     }
 
+    /** A history ring ending at block [end], laid out as [VizHistory] keeps one: block k at its slot. */
+    private fun ring(end: Int, sample: (Int) -> Float): FloatArray {
+        val mask = VizHistory.RING_SIZE - 1
+        return FloatArray(VizHistory.RING_SIZE) { slot -> sample(end - 1 - ((end - 1 - slot) and mask)) }
+    }
+
     /** One per-block peak history per track, as the engine's VIZ_PULSAR_TRACK rings carry. */
-    private fun groove(shift: Int): Array<FloatArray> = Array(8) { t ->
-        FloatArray(480) { i ->
-            val k = i + shift
+    private fun groove(end: Int): Array<FloatArray> = Array(8) { t ->
+        ring(end) { k ->
             when (t) {
                 0 -> hit(k, blocksPerBeat, 0, 0.7f, 6f)
                 1 -> hit(k, blocksPerBeat * 2, blocksPerBeat + blocksPerBeat / 2, 0.3f, 4f)
@@ -66,7 +71,8 @@ class OrphoscopeRenderHarness {
         }
     }
 
-    private fun bus(shift: Int, level: Float): FloatArray = FloatArray(480) { i -> hit(i + shift, blocksPerBeat, 0, level, 12f) + level * 0.3f }
+    private fun bus(end: Int, level: Float, offset: Int = 0): FloatArray =
+        ring(end) { k -> hit(k + offset, blocksPerBeat, 0, level, 12f) + level * 0.3f }
 
     private class Feed {
         val tracks = MutableStateFlow<VizHistory?>(null)
@@ -127,8 +133,8 @@ class OrphoscopeRenderHarness {
         val shift = end - 480
         Frame(
             end,
-            if (withPulsar) groove(shift) else Array(8) { FloatArray(480) },
-            listOf(bus(shift, 0.8f), bus(shift, 0.3f), bus(shift + 20, 0.2f), bus(shift, 0.25f), bus(shift + 30, 0.15f)),
+            if (withPulsar) groove(end) else Array(8) { FloatArray(VizHistory.RING_SIZE) },
+            listOf(bus(end, 0.8f), bus(end, 0.3f), bus(end, 0.2f, 20), bus(end, 0.25f), bus(end, 0.15f, 30)),
             if (withPulsar) grid(shift) else PulsarVizData(),
         )
     }
@@ -195,4 +201,6 @@ class OrphoscopeRenderHarness {
     @Test fun desktopBusesOnly() = run("desktop_buses_only", 1600, 1000, 1f, withPulsar = false)
     @Test fun phoneStageWithPulsar() =
         run("phone_stage_pulsar", 780, 1688, 2f, withPulsar = true, stage = Rect(0f, 220f, 780f, 1380f))
+    @Test fun phoneLandscapeStageWithPulsar() =
+        run("phone_landscape_stage_pulsar", 1688, 780, 2f, withPulsar = true, stage = Rect(0f, 100f, 1688f, 680f))
 }

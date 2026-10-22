@@ -9,7 +9,10 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.plugin.viz.VizHistory
+import kotlin.math.ceil
 import kotlin.math.log10
 
 /** Quietest peak a lane shows; anything below sits on the lane's centre line. */
@@ -24,11 +27,23 @@ internal fun laneLevel(peak: Float): Float {
     return ((20f * log10(peak) - LANE_FLOOR_DB) / -LANE_FLOOR_DB).coerceIn(0f, 1f)
 }
 
-/** Points a scrolled trace draws at most across its width; buckets merge samples beyond this. */
-internal const val MAX_SCROLL_POINTS = 130
+/**
+ * Samples a dp of trace shows at zoom 0, so a trace scrolls at one speed at any width: about 78 dp
+ * a second at [VizHistory.RATE] ticks, as a desktop's ~390 dp window showed 460 samples. A wider
+ * screen shows more history, up to what the ring holds.
+ */
+internal const val SAMPLES_PER_DP = 1.2f
 
-/** Samples a point merges so that [visible] samples take at most [MAX_SCROLL_POINTS] points. */
-internal fun scrollStride(visible: Int): Int = ((visible + MAX_SCROLL_POINTS - 1) / MAX_SCROLL_POINTS).coerceAtLeast(1)
+/** Samples a trace [widthDp] wide shows at [zoom]: 0 is the fixed speed, 1 a tenth of the history. */
+internal fun visibleSamples(widthDp: Float, zoom: Float): Int =
+    (widthDp * SAMPLES_PER_DP * (1f - zoom * 0.9f)).toInt().coerceIn(30, VizHistory.READABLE)
+
+/** Trace dp a point covers at least; buckets merge samples beyond this, so a shape reads alike at any width. */
+private const val POINT_SPACING_DP = 3f
+
+/** Samples a point merges so that [visible] samples across [widthDp] keep points [POINT_SPACING_DP] apart. */
+internal fun scrollStride(visible: Int, widthDp: Float): Int =
+    ceil(visible * POINT_SPACING_DP / widthDp.coerceAtLeast(1f)).toInt().coerceAtLeast(1)
 
 /**
  * The buckets a window of [visible] samples ending at [head] (scroll-relative) touches, first and
@@ -40,7 +55,7 @@ internal fun scrollBuckets(head: Double, visible: Int, stride: Int): IntRange =
 /** The loudest sample of [ring] (ending at [ringEnd], scroll-relative) at or after [from]. */
 internal fun ringPeakSince(ring: FloatArray, ringEnd: Int, from: Int): Float {
     var peak = 0f
-    for (i in maxOf(0, from - (ringEnd - ring.size)) until ring.size) if (ring[i] > peak) peak = ring[i]
+    for (k in maxOf(from, ringEnd - ring.size) until ringEnd) if (ring.block(k) > peak) peak = ring.block(k)
     return peak
 }
 
@@ -73,8 +88,11 @@ internal class StrokeCache {
  */
 internal class OrphoscopeLanes(private val colors: List<Color>) {
     private val paths = Array(colors.size) { Path() }
-    private val levels = FloatArray(MAX_SCROLL_POINTS + 8)
+    private var levels = FloatArray(0)
     private val traceStroke = StrokeCache()
+
+    /** The traces' width in [area], right of the meters, for sizing the window. */
+    fun traceWidth(density: Density, area: Rect): Float = with(density) { area.width - LANE_METER_WIDTH.toPx() * 2f }
 
     /**
      * True when any track has signal in the [visible] samples up to [head], which is when the
@@ -111,10 +129,12 @@ internal class OrphoscopeLanes(private val colors: List<Color>) {
         val traceLeft = area.left + meterWidth * 2f
         val traceW = area.right - traceLeft
         if (traceW <= 0f) return@with traceLeft
-        val stride = scrollStride(visible)
+        val stride = scrollStride(visible, traceW.toDp().value)
         val buckets = scrollBuckets(head, visible, stride)
         val perSample = traceW / visible
         val from = kotlin.math.floor(head).toInt() - visible
+        // Grows only when the window does (a wider screen or a zoom out), never per frame.
+        if (levels.size < buckets.last - buckets.first + 1) levels = FloatArray(buckets.last - buckets.first + 9)
 
         for (t in 0 until count) {
             val data = rings[t]
@@ -128,7 +148,7 @@ internal class OrphoscopeLanes(private val colors: List<Color>) {
             if (live) {
                 // A meter of the latest level at the lane's edge. A tint across the whole lane read
                 // the same but cost more than all eight traces together.
-                val latest = laneLevel(data[data.size - 1]) * half
+                val latest = laneLevel(data.block(end - 1)) * half
                 drawRect(
                     color.copy(alpha = 0.5f + glow * 0.4f),
                     Offset(area.left, cy - latest),
