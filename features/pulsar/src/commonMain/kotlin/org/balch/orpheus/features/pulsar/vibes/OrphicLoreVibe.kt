@@ -432,13 +432,17 @@ class OrphicLoreVibe : VibeProvider {
                 OrpheusEngine(
                     engineId = OrpheusEngineId.SPK,
                     volume = 0.24f,  // enters as a faint hum
-                    // SPK: harmonics picks the speech model (0 formant, .17 SAM, .33 LPC), so 0.13 is
-                    // mostly SAM; morph is the vowel (SAM: 0 a, .2 e, .4 i, .6 o, .8 u), pinned.
-                    timbre = 0.5f,
-                    harmonics = 0.13f, pinHarmonics = true,
-                    // Each sung note closes its vowel from "ah" to "eh" over 1.5 s...
-                    morph = 0f, pinMorph = true,
-                    morphRise = 0.2f, morphRiseTime = 1.5f,
+                    // SPK: harmonics picks the speech model (0 formant, .17 SAM, .33 LPC); .1667 is
+                    // pure SAM. Timbre shifts every formant up by 1 + 2.5x, so pinned at 0.2 the
+                    // vowels sit near natural; the MOOD range (0.4-0.8) pushed "ah" into "eh".
+                    timbre = 0.2f, pinTimbre = true,
+                    harmonics = 0.1667f, pinHarmonics = true,
+                    // SAM morph is the vowel, gliding only between neighbours: 0 "ah" (father),
+                    // .125 "eh", .25 "ih", .375 "ee", .5 "ah" (hut), .625 "oo". Each sung note
+                    // opens on the .5 "ah" and rounds toward "oh" over 1.5 s. The heavy sections
+                    // start on the 0 "ah" and rise further: ashore "eh", storm "ih", sirens "ee".
+                    morph = 0.5f, pinMorph = true,
+                    morphRise = 0.08f, morphRiseTime = 1.5f,
                     // ...and climbs an eighth tone over 2 s while DRONE swells it in.
                     pitchRise = 25f, pitchRiseTime = 2f,
                     // A singer's waver on top, fading in 0.3 s after each note starts.
@@ -723,9 +727,12 @@ class OrphicLoreVibe : VibeProvider {
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
                             // The Sirens dominate their section: twice the base level, a shallow
                             // breath, drier and drifting to the centre so they sit in front; the
-                            // organ steps back and out to the side for them.
+                            // organ steps back and out to the side for them. Their heaviest
+                            // vowel: each note glides "ah" through "eh" and "ih" to just short of
+                            // "ee", where the choir's upward grains would squeak.
                             5 to TrackSectionOverride(
                                 volume = 0.80f, pan = 0f, reverbSend = 0.45f, breatheBars = 2, breatheFloor = 0.85f,
+                                morph = 0f, morphRise = 0.3f,
                             ),
                             6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.45f, pan = -0.60f),
                         ),
@@ -770,7 +777,8 @@ class OrphicLoreVibe : VibeProvider {
                         trackOverrides = mapOf(
                             4 to TrackSectionOverride(lpgMode = LpgMode.PLUCK_REPEAT_16TH_OFF),
                             // The storm throws the Sirens and the organ wide; ithaca brings them home.
-                            5 to TrackSectionOverride(volume = 0.49f, pan = 0.55f),
+                            // One vowel short of the Sirens: "ah" to "ih".
+                            5 to TrackSectionOverride(volume = 0.49f, pan = 0.55f, morph = 0f, morphRise = 0.25f),
                             6 to TrackSectionOverride(compingStyle = CompingStyle.FUNK_STABS, volume = 0.6f, pan = -0.55f),
                             // The bell swings hard in the storm.
                             7 to TrackSectionOverride(volume = 0.5f),
@@ -819,7 +827,8 @@ class OrphicLoreVibe : VibeProvider {
                                 volume = 0.61f,
                                 pan = 0.20f,
                                 reverbSend = .7f,
-                                delaySend = 0.15f
+                                delaySend = 0.15f,
+                                morph = 0f, morphRise = 0.06f,  // "ah" with a hint of "eh"
                             ),
                             6 to TrackSectionOverride(pan = -0.20f),
                             7 to TrackSectionOverride( // across water
