@@ -42,8 +42,14 @@ internal fun dbToGain(db: Float): Float = 10.0.pow(db / 20.0).toFloat()
 /** Gain ceiling shared by live audition and capture: 1.5 (about +3.52 dB). */
 internal const val MAX_GAIN = 1.5f
 
+/** A closed fader: a level at or below this plays (and captures) as exact silence, while the layers stay finite. */
+const val SILENT_DB = -80f
+
+/** Fader dB to linear gain: 0 at or below [SILENT_DB], capped at [MAX_GAIN]. */
+internal fun levelGain(db: Float): Float = if (db <= SILENT_DB) 0f else dbToGain(db).coerceAtMost(MAX_GAIN)
+
 /** Whole-vibe fader gain as heard, capped at [MAX_GAIN]. */
-internal fun BenchLayers.vibeGain(t: Int): Float = dbToGain(vibeDb(t)).coerceAtMost(MAX_GAIN)
+internal fun BenchLayers.vibeGain(t: Int): Float = levelGain(vibeDb(t))
 
 internal fun Macro.vibeDefault(vibe: Vibe): Float = when (this) {
     Macro.ENERGY -> vibe.energy
@@ -96,11 +102,9 @@ fun BenchLayers.effective(vibe: Vibe, section: Int, t: Int, liveEnergy: Float = 
 
 private fun BenchLayers.vibeDb(t: Int): Float = vibe.levelDb.getOrNull(t) ?: 0f
 
-/** Linear gain for the audition fader path: 10^((vibe+section dB)/20), clamped 0..1.5. */
-fun BenchLayers.auditionGain(t: Int, section: Int): Float {
-    val db = vibeDb(t) + (sections[section]?.levelDb?.getOrNull(t) ?: 0f)
-    return dbToGain(db).coerceIn(0f, MAX_GAIN)
-}
+/** Linear gain for the audition fader path: 10^((vibe+section dB)/20), clamped 0..1.5, and 0 at [SILENT_DB]. */
+fun BenchLayers.auditionGain(t: Int, section: Int): Float =
+    levelGain(vibeDb(t) + (sections[section]?.levelDb?.getOrNull(t) ?: 0f))
 
 /**
  * Section absolute sends win first, then the whole-vibe ratio multiplies the result,

@@ -22,8 +22,9 @@ import org.balch.orpheus.features.pulsar.bench.MixBenchController
 interface MixBenchModule {
     companion object {
         /**
-         * The one controller the agent's mix tools and the desktop bench page share. Built on first injection,
-         * which comes after the feature graph exists; nothing eager asks for it. Desktop stops it at app exit.
+         * The one controller the agent's mix tools, the desktop bench page and the AI edition's TRACKS view share.
+         * Built on first use, always after the feature graph exists: the AI TRACKS sink asks from a coroutine
+         * just after startup, never from a constructor. Desktop stops it at app exit.
          */
         @Provides
         @SingleIn(AppScope::class)

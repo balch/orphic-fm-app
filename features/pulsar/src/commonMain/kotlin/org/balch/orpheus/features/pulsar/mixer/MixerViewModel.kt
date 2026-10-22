@@ -83,6 +83,7 @@ class MixerViewModel(
     playbackMode: PulsarPlaybackMode,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
+    trackGainSink: TrackGainSink,
 ) : MixerFeature {
 
     private val driveId = synthController.controlFlow(DistortionSymbol.DRIVE.controlId)
@@ -92,7 +93,8 @@ class MixerViewModel(
     private val keysGainId = synthController.controlFlow(PulsarSymbol.KEYS_GAIN.controlId)
     private val fxGainId   = synthController.controlFlow(PulsarSymbol.FX_GAIN.controlId)
 
-    private val tuning = TrackTuningController(synthController, pulsarFeature.vibeLoadCount, scope)
+    // Core edition: TrackTuningController writes audition gain. AI edition: edits go to the shared mix controller.
+    private val tuning = trackGainSink
 
     override val actions = MixerPanelActions(
         setGroupGain = ::onGroupGainChanged,

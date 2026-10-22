@@ -157,11 +157,12 @@ class MixBenchController(
 
     /**
      * Fader as heard: sets whichever layer the scope edits so vibe + section dB in the playing section equals [db].
-     * Reads and writes under one lock, so a scope change or section flip can't split the two.
+     * [inScope] edits that layer without touching the shared [scope]. Reads and writes under one lock,
+     * so a scope change or section flip can't split the two.
      */
-    suspend fun setHeardLevelDb(t: Int, db: Float) = edit(t) {
+    suspend fun setHeardLevelDb(t: Int, db: Float, inScope: Scope? = null) = edit(t) {
         owned += t
-        val s = editSection()
+        val s = editSection(inScope ?: _scope.value)
         _layers.value = _layers.value.let { l ->
             if (s == null) {
                 val sectionDb = l.sections[section]?.levelDb?.getOrNull(t) ?: 0f
@@ -283,6 +284,23 @@ class MixBenchController(
         restoreHeldMacros()
     }
 
+    /**
+     * The TRACKS view's reset: clears every vibe and section level, mute and solo, and hands every track's
+     * audition gain back to the app. Pans, sends, macros and the overlay stay.
+     */
+    suspend fun resetLevels() = lock.withLock {
+        val l = _layers.value
+        _layers.value = l.copy(
+            vibe = l.vibe.copy(levelDb = List(TRACKS) { 0f }),
+            sections = l.sections.mapValues { (_, layer) -> layer.copy(levelDb = List(TRACKS) { 0f }) },
+        )
+        _muted.value = emptySet()
+        _soloed.value = emptySet()
+        // With no level, mute or solo left, every track plays unity, so all of them go back to the app.
+        if (running) for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
+        owned.clear()
+    }
+
     // Touches only the meters and the tap's reader side, so it runs outside the lock.
     private suspend fun poll() {
         while (currentCoroutineContext().isActive) {
@@ -312,7 +330,7 @@ class MixBenchController(
         }
     }
 
-    // PulsarViewModel.applyVibe and TrackTuningController reset audition gain to 1.0 on every load,
+    // PulsarViewModel.applyVibe resets audition gain to 1.0 on every load (as does the core edition's TRACKS view),
     // and an engine rebuilt under the feature re-applies the vibe with the tap off.
     private suspend fun followVibeLoads() {
         pulsar.vibeLoadCount.collect { count ->
@@ -402,8 +420,8 @@ class MixBenchController(
     }
 
     /** The section a [Scope.SECTION] edit lands in, or null for the vibe layer. */
-    private fun editSection(): Int? =
-        section.takeIf { _scope.value == Scope.SECTION && it >= 0 && vibe.sectionScopeAvailable() }
+    private fun editSection(scope: Scope = _scope.value): Int? =
+        section.takeIf { scope == Scope.SECTION && it >= 0 && vibe.sectionScopeAvailable() }
 
     private fun gain(t: Int): Float {
         val solo = _soloed.value

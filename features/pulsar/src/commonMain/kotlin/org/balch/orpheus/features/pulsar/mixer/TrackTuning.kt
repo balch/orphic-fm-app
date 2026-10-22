@@ -1,14 +1,21 @@
 package org.balch.orpheus.features.pulsar.mixer
 
 import androidx.compose.runtime.Immutable
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
+import org.balch.orpheus.features.pulsar.PulsarFeature
 
 /**
  * Per-track mute, solo and level for the debug TRACKS view. Solo works like a mixing desk:
@@ -50,6 +57,29 @@ data class TrackTuning(
 }
 
 /**
+ * Where the TRACKS view's edits go and what it shows. The core edition writes audition gain itself
+ * ([DirectTrackGainSink]); the AI edition replaces it so the edits land in the shared mix controller.
+ */
+interface TrackGainSink {
+    val state: Flow<TrackTuning>
+    fun toggleMute(t: Int)
+    fun toggleSolo(t: Int)
+    /** [level] is linear gain, 0..[TrackTuning.MAX_LEVEL]. */
+    fun setLevel(t: Int, level: Float)
+    fun reset()
+}
+
+/** The default sink: a [TrackTuningController] that writes `track_N_audition_gain` directly. */
+@Inject
+@SingleIn(FeatureScope::class)
+@ContributesBinding(FeatureScope::class)
+class DirectTrackGainSink(
+    synthController: SynthController,
+    pulsarFeature: PulsarFeature,
+    scope: FeatureCoroutineScope,
+) : TrackGainSink by TrackTuningController(synthController, pulsarFeature.vibeLoadCount, scope)
+
+/**
  * Holds the session's [TrackTuning] and writes each track's gain to `track_N_audition_gain`.
  * Never touches `track_N_mute`, which PulsarFeature owns. Every change to [vibeLoads] clears the
  * state and re-pushes unity, so a tap that raced the load's own engine reset cannot leave a track silent.
@@ -58,14 +88,14 @@ class TrackTuningController(
     private val synthController: SynthController,
     vibeLoads: StateFlow<Int>,
     scope: CoroutineScope,
-) {
+) : TrackGainSink {
 
     private val gainIds = List(TrackTuning.TRACK_COUNT) {
         PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + it].controlId
     }
 
     private val _state = MutableStateFlow(TrackTuning())
-    val state: StateFlow<TrackTuning> = _state.asStateFlow()
+    override val state: StateFlow<TrackTuning> = _state.asStateFlow()
 
     init {
         // The plugin outlives this controller, so seat the engine on the untouched mix.
@@ -84,13 +114,13 @@ class TrackTuningController(
         }
     }
 
-    fun toggleMute(t: Int) = update { it.toggleMute(t) }
+    override fun toggleMute(t: Int) = update { it.toggleMute(t) }
 
-    fun toggleSolo(t: Int) = update { it.toggleSolo(t) }
+    override fun toggleSolo(t: Int) = update { it.toggleSolo(t) }
 
-    fun setLevel(t: Int, level: Float) = update { it.withLevel(t, level) }
+    override fun setLevel(t: Int, level: Float) = update { it.withLevel(t, level) }
 
-    fun reset() = update { TrackTuning() }
+    override fun reset() = update { TrackTuning() }
 
     private inline fun update(change: (TrackTuning) -> TrackTuning) {
         val old = _state.value

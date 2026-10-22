@@ -100,6 +100,7 @@ class MixerViewModelTracksViewTest {
             playbackMode = playbackMode,
             dispatcherProvider = dispatchers,
             scope = scope,
+            trackGainSink = DirectTrackGainSink(controller, pulsar, scope),
         )
     }
 
@@ -116,6 +117,24 @@ class MixerViewModelTracksViewTest {
         advanceUntilIdle()
         assertEquals(true, vm.stateFlow.value.tracksView)
     }
+
+    @Test
+    fun coreTracksViewWritesAuditionGainDirectly() = runTest(testDispatcher) {
+        val vm = makeViewModel()
+        backgroundScope.launch { vm.stateFlow.collect {} }
+        advanceUntilIdle()
+        // Construction seats every track on unity.
+        for (t in 0..7) assertEquals(1f, auditionGain(t), "track $t")
+        vm.actions.setTrackLevel(2, 0.5f)
+        vm.actions.toggleTrackMute(5)
+        advanceUntilIdle()
+        assertEquals(0.5f, auditionGain(2))
+        assertEquals(0f, auditionGain(5))
+        assertEquals(0.5f, vm.stateFlow.value.tuning.levels[2])
+    }
+
+    private fun auditionGain(t: Int) =
+        ports[PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + t].symbol]?.asFloat()
 
     private fun bass() = ports[PulsarSymbol.BASS_GAIN.symbol]?.asFloat()
     private fun drive() = ports[DistortionSymbol.DRIVE.symbol]?.asFloat()
