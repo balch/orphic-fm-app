@@ -74,6 +74,12 @@ class VibeGuideToolTest {
     }
 
     @Test
+    fun `fingerprint shows a non-zero levelDb to one decimal and omits zero`() {
+        assertTrue(vibeFingerprint(dogHouse.copy(levelDb = -2.9f)).contains("· level -2.9 dB ·"))
+        assertFalse(vibeFingerprint(dogHouse.copy(levelDb = 0f)).contains("level "), "a 0 dB trim should be omitted")
+    }
+
+    @Test
     fun `catalogSection lists one bullet per vibe with a header`() {
         val section = catalogSection(listOf(dogHouse))
         assertTrue(section.contains("Available vibes"), "missing catalog header: $section")
@@ -87,7 +93,7 @@ class VibeGuideToolTest {
         assertTrue(STATIC_GUIDE.contains("harmonics"), "guide missing the DX patch-bank gotcha")
         assertTrue(STATIC_GUIDE.contains("exactly 8 tracks"), "guide missing the 8-track invariant")
         assertTrue(STATIC_GUIDE.contains("ROOT_ONLY"), "guide missing the bass chordFollow invariant")
-    }
+        assertTrue(STATIC_GUIDE.contains("## 11. Mixing"), "guide missing the Mixing section")    }
 
     @Test
     fun `buildGuide concatenates the static guide and the catalog`() {

@@ -191,10 +191,10 @@ Also give every track an owner: a track in no member gets the full support duck 
 To peg a lead voice on the tonic while other tracks follow the progression — and as the standard
 fix when a lick lurches on leaping progressions — use trackOverrides keyed by the track index as a
 string: "trackOverrides": ${VibeGuideExamples.TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE}. All
-TrackSectionOverride fields are optional; only set what you need to change (density, volume, morph,
-reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode, chordFollow,
-holdProbability, holdLengthMin, holdLengthMax). Settings restore automatically when the section
-ends.
+TrackSectionOverride fields are optional; only set what you need to change (density, volume,
+pan (glides there at 0.15 pan units per second), morph, reverbSend, delaySend, envelopeProfile,
+compingStyle, sectionInversion, arpMode, chordFollow, holdProbability, holdLengthMin,
+holdLengthMax). Settings restore automatically when the section ends.
 
 Two of those have rules worth knowing. "density": 0 takes a track OUT for the section (a clean
 mute that works on any track); a POSITIVE density rebuilds the track's pattern at that density,
@@ -208,9 +208,11 @@ A simple 5-section shape: intro (sparse, low energy) → groove (full band, macr
 (energy × 1.3, complexity × 1.3) → breakdown (energy × 0.4, space × 1.5) → outro (sparse, fade).
 
 ## 8. Effects (VibeEffects)
-Two delay taps (delayTimeA/B as a fraction of one bar: 0.25 = 16th, 0.375 = dotted-8th, 0.5 = half
-bar) plus delayFeedback (0.2 = subtle, 0.5 = moderate, 0.7+ = building) and delayDamping (how dark
-each repeat gets — higher = darker). Reverb: reverbSize (0.3 = room, 0.6 = hall, 0.9 = cathedral),
+Two delay taps, delayTimeA/B, each 0..1 mapped to 0.01-2.0 seconds (seconds = 0.01 + value × 1.99).
+They ignore tempo, so convert a note value yourself: value = (seconds - 0.01) / 1.99, where one beat
+is 60 / bpm seconds. At 80 bpm an 8th is 0.375 s (0.18) and a dotted-8th 0.5625 s (0.28). Then
+delayFeedback (0.2 = subtle, 0.5 = moderate, 0.7+ = building). delayDamping currently does nothing.
+Reverb: reverbSize (0.3 = room, 0.6 = hall, 0.9 = cathedral),
 reverbDamping (low-pass on the tail), reverbBrightness (0.3 = warm/dark, 0.8 = shimmery). deepFloor
 sets the minimum DEEP multiplier even when the SPACE macro is at zero — use 0.2–0.4 to keep some
 effects presence even at the driest setting.
@@ -370,7 +372,97 @@ The highest-value part: translate a described feel into concrete parameter choic
   that lick cuts in occasionally, then reverts. Pool size + the lick anomaly must be ≤ 8 (MAX_LICK_POOL).
   `lickRotation` overrides the static `lick` while active.
 
-## 11. Invariants & failure modes
+### Mix (see section 11 for the targets)
+- Reggae / dub / roots, where the bass is the song: the bass is the loudest track, 0-3 LU above the
+  kick. Give its engines volume 0.9-1.0 and pull the other tracks down to make room; keep it dry
+  (reverbSend and delaySend under 0.1), at pan 0, with noteRangeLow/High about 28-47. The skank
+  (a Chordal track on comping style REGGAE_SKANK, arpMode NEVER) sits off-centre at pan about ±0.3
+  with delaySend 0.3-0.5; set delayTimeA/B to the 8th and the dotted-8th at the vibe's bpm (section
+  8) with delayFeedback 0.4-0.55. Drums stay mostly dry: kick and hats send nothing, while the snare
+  or rim gets the delay throw (delaySend 0.3-0.5, or only in a dub section through trackOverrides).
+  Warm reverb: effects.reverbBrightness 0.25-0.4. For dub space, give one texture a section `pan`
+  move (e.g. -0.5 in the verse, 0.5 in the dub section) so it drifts across while the bass holds
+  the centre.
+- Psychedelic / wide: spread the textures and pads to ±0.5-0.7 in balanced pairs (one left, one
+  right at the same depth). Give them section `pan` moves so the voices drift: a pad at -0.6 in one
+  section and 0.4 in the next crosses in about 7 s. delayFeedback 0.5-0.7 for long trails; space
+  0.6-0.75 and deep 0.65-0.8 with deepFloor 0.35-0.5 so the effects persist when the user turns
+  SPACE down; reverbSize 0.75-0.9. Keep the low end centred and clean: kick and bass at pan 0 with
+  sends under 0.15, and every pad and texture at noteRangeLow 48 or higher so the wash stays out of
+  40-120 Hz.
+
+## 11. Mixing
+A mixed vibe puts each part where the genre wants it and plays at the shared loudness.
+
+### The fields
+- `volume` (each OrpheusEngine, 0..1, max 1.0): the track's level in that slot. engineEdm plays at
+  high energy and engineSpace at low energy, and the two can measure up to ~9 dB apart at the same
+  volume (engine trims and patches differ). Set both so a track doesn't jump when energy crosses
+  between them.
+- `pan` (TrackVoice, -1 = hard left, 0 = centre, 1 = hard right; default 0).
+- `reverbSend`, `delaySend` (each OrpheusEngine, 0..1): post-fader sends to the shared reverb and
+  delay.
+- `reverbBrightness`: on each OrpheusEngine (that voice's tail) and in `effects` (the whole reverb).
+  Low = warm, high = shimmery.
+- `noteRangeLow` / `noteRangeHigh` (each OrpheusEngine, MIDI notes): a Chordal or Melodic voice with
+  no range plays from the genre range, which reaches down into the bass. Give every non-bass voice
+  its own range.
+- `levelDb` (top-level, -12..12 dB, default 0): a whole-vibe trim. It scales every track and the
+  storm, street and speech voices, sends included, so it changes loudness, not balance. Set it last.
+- Section `trackOverrides` (section 7): `volume` REPLACES the track's base volume for the section,
+  so to move a track by N dB scale its base and every section override for it by the same factor.
+  `pan` glides the track there at 0.15 pan units per second and back on exit, so moves drift across
+  bars. `reverbSend` / `delaySend` change that section's sends, e.g. a dub throw.
+
+### Targets
+- Kick and bass within about 3-5 LU of each other, except where the genre says otherwise: a
+  reggae / dub or "the bass is the song" vibe runs the bass hotter.
+- No track except kick and bass with more than about 40% of its energy in 40-120 Hz. A PAR or noise
+  voice left in the genre range turns to rumble; raise its noteRangeLow.
+- Kick, bass and the lead centred. Doubles and pads at ±0.3-0.6, with balanced sides (as much
+  on the left as on the right).
+- Loudness about -16 LUFS ±2. Aim for -16 ±0.5 when you set levelDb.
+- Past knee under about 3%. Above that the bus clipper is shaping the mix; pull levels down.
+- Tracks 5-7 at mid energy (0.45-0.55) sit in a -26 dB notch unless their role is Chordal or they
+  are Melodic and play the vibe's lick, and track 7 stays silent at default macros. A texture that
+  must be heard there needs one of those roles, or a moderate section `volume` boost.
+- The EDM and space slots can differ in loudness at the same volume (see `volume` above).
+- Track volume tops out at 1.0. If a track needs more, pull the others down.
+
+### The mix pass
+When the live mix tools are available (mix_read, mix_set, audio_analyze, mix_capture), run this
+pass after pulsar_apply_vibe succeeds and before your closing reply. Without them, set the fields
+from the targets above and stop there.
+1. The vibe plays once applied; if transport (action=state) says it is paused, call transport with
+   action=play. Call mix_read, wait about 3 s, and call mix_read again.
+2. Read lufsShort (the last 3 s) and lufsIntegrated (since metering started), pastKneePct, and per
+   channel relLu (LU against the dry mix; the kick-bass gap is the difference of their relLu),
+   subPct (under 40 Hz), lowPct (40-120 Hz) and pan. Call audio_analyze for spectra, low end and
+   stereo per track. Use section_jump to hear a high-energy and a low-energy section.
+3. Fix one thing at a time with mix_set (field level_db, pan, reverb or delay; scope=vibe for every
+   section, scope=section for the playing one; pan is always whole-vibe), then mix_read again.
+   level_db is the dB the track is heard at in the playing section (0 = as written, -30 to 3.5).
+4. Call mix_capture. On a vibe you made, it writes the moves into that vibe's JSON, archives it and
+   restarts the song; the live edits clear because the vibe now holds them.
+5. Set the loudness: mix_read every few seconds for about 30 s, then call pulsar_get_vibe with
+   'current' (it holds the captured moves) and add -16 - lufsIntegrated to its levelDb (a
+   template's trim carries over, so add to it), rounded to 0.1. Boosts land short because the bus
+   clipper compresses them, so overshoot a boost by about a quarter (a +4 dB need: write +5).
+   Re-apply with pulsar_apply_vibe and re-measure.
+6. Ask the user to listen. They judge the sound; the numbers only guide it.
+
+### Gotchas
+- The first mix_read starts the meters and returns silence; read again after about 3 s. A vibe load
+  (an apply or a capture), or ~10 s without a mix_read, restarts lufsIntegrated.
+- Meter channels 0-7 are tracks 0-7 by index. Their names (KICK, PERC, HIHAT, BASS, KEYS, PAD,
+  TEXT, FX) are fixed slot labels, not the vibe's instruments: find each part by its track's engine
+  and role in the JSON (audio_analyze's trackLabels lists the engines).
+- audio_analyze track stems are dry: after the fader and pan, before the reverb and delay sends.
+  Effect returns appear only in the bus and out stems, so judge sends there or by ear.
+- mix_set level_db is the heard level in the playing section. Whole-vibe loudness is `levelDb` in the
+  JSON.
+
+## 12. Invariants & failure modes
 - There are exactly 8 tracks. Do not add or remove tracks.
 - Progression / customProgression degrees are 0..6 (seven scale degrees).
 - Band matrices are square; chordTransitionMatrix is 7x7.

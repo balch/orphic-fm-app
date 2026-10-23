@@ -25,7 +25,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import kotlin.math.roundToInt
 
 /**
- * Render a 0..1 macro to a single decimal place. commonMain has no String.format, so we use the
+ * Render a macro or a dB trim to a single decimal place. commonMain has no String.format, so we use the
  * codebase's roundToInt idiom (cf. DistortionPanel's `(x * 100).roundToInt() / 100.0`).
  */
 internal fun oneDecimal(f: Float): String = ((f * 10).roundToInt() / 10.0).toString()
@@ -60,6 +60,8 @@ internal fun vibeFingerprint(vibe: Vibe): String {
             "energy ${oneDecimal(vibe.energy)} complexity ${oneDecimal(vibe.complexity)} " +
                 "space ${oneDecimal(vibe.space)} mood ${oneDecimal(vibe.mood)}",
         )
+        // A catalog vibe's loudness trim, so the agent sees that the templates are levelled.
+        if (vibe.levelDb != 0f) add("level ${oneDecimal(vibe.levelDb)} dB")
         add("engines [" + vibe.tracks.map { it.engineEdm.engineId.name }.distinct().joinToString("/") + "]") // slash-separated distinct engine ids, e.g. BD/SD/HH
         vibe.arrangement?.let { add("${it.sections.size} sections") }
         vibe.band?.let { add("band(${it.members.size})") }

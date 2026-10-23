@@ -68,7 +68,8 @@ breakdown, swap a track's comping in the chorus). It auto-restores when the sect
 Shape — an object keyed by the track index (0-7) as a string:
   "trackOverrides": ${VibeGuideExamples.TRACK_OVERRIDES_EXAMPLE}
 TrackSectionOverride fields (all optional, override only what you set):
-  density, volume, reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode,
+  density, volume, pan (-1..1; the track glides there at 0.15 pan units per second and back on
+  exit), morph, reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode,
   chordFollow, holdProbability, holdLengthMin, holdLengthMax.
 IMPORTANT — unlike the bare-string enum fields beside it, `compingStyle` is a polymorphic OBJECT,
 written exactly like Section.compingStyle in the schema above (NOT a bare string):

@@ -657,12 +657,12 @@ Existing vibes use the full list of explicit imports (no wildcard) — match tha
 The gain path: engine trim, then `volume` x `energyVolume` x notch, then the TRACKS mixer, then pan, then the DJ bus (pre-clipper drive 1.65, `clipDrive`), a soft clip, and a 35 Hz output HPF. Vibes are levelled to about -16 LUFS at master 1.0. Peaks run near -4.5 dBFS.
 
 Targets from `scripts/mix/measure.sh` (bounds taken from the live vibes in `summary.md` on 2026-10-20; most meet them, a few do not):
-- Kick and bass within about 3 LU of each other.
+- Kick and bass within about 3-5 LU of each other (a reggae or "the bass is the song" vibe can run the bass hotter).
 - No track except kick and bass with more than about 40% of its energy in 40-120 Hz.
 - Lead tracks pan centre. Doubles and pads sit at +/-0.3 to 0.6, with balanced sides.
 - Loudness within about 2 LU of -16 LUFS.
 - Pre-limit peak at or under +4 dBFS (live vibes sit between -0.3 and +6.6).
-- Under about 2% of samples past the knee (live vibes sit between 0% and 5%).
+- Under about 3% of samples past the knee (live vibes sit between 0% and 5%).
 
 Run `scripts/mix/measure.sh "<vibe name>"` before and after any level change. It re-dumps the vibe, so skip `NO_DUMP=1` after an edit. Results go to `liborpheus_dsp/test/output/vibe_measure/`.
 
@@ -700,7 +700,7 @@ Mix first:
 - Pan the layers: keep kick, bass and the lead centred, and give each side an equal share of the rest. The summary's pan table catches a lopsided or mono mix (all-zero pans read as correlation ~1.0).
 - `TrackSectionOverride.pan` moves a track per section. The engine glides it at 0.15 pan units per second, in and back out, so two sustained voices can drift past each other across sections (Orphic Lore's Sirens and Hammond, mirrored, the Sirens centred in their vamp). The harness JSON's per-section track `pan` shows the path.
 
-Then level-match: with the balance settled, set `levelDb = -16 - LUFS` (rounded to 0.1), re-measure, and nudge it until the vibe reads -16 ±0.5 LUFS (the harness plays the master at 1.0, as the DJ app does). Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track and the storm, rain, street and speech voices, sends included, so it changes loudness, not balance.
+Then level-match: with the balance settled, add `-16 - LUFS` to the vibe's current `levelDb` (rounded to 0.1), re-measure, and nudge it until the vibe reads -16 ±0.5 LUFS (the harness plays the master at 1.0, as the DJ app does). Boosts land short (the clipper compresses them), so overshoot a boost by about a quarter. `levelDb` scales every track and the storm, rain, street and speech voices, sends included, so it changes loudness, not balance.
 
 ## When things go wrong
 
