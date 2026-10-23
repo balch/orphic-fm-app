@@ -46,9 +46,8 @@ internal fun anomalyTag(a: Anomaly): String = when (a) {
 
 /**
  * One catalog line per vibe, auto-derived from its data — no curated blurbs. Segments are omitted
- * when the underlying field is absent (no arrangement / band / lick). Pairs with STATIC_GUIDE's
- * translation recipes: the guide teaches feel -> specs, this shows each vibe's actual specs, so the
- * agent runs the recipe in reverse to pick the closest starting template.
+ * when the underlying field is absent (no arrangement / band / lick). The lines are ideas to borrow
+ * from; new vibes start from a cast, never from one of these.
  */
 internal fun vibeFingerprint(vibe: Vibe): String {
     val parts = buildList {
@@ -60,7 +59,7 @@ internal fun vibeFingerprint(vibe: Vibe): String {
             "energy ${oneDecimal(vibe.energy)} complexity ${oneDecimal(vibe.complexity)} " +
                 "space ${oneDecimal(vibe.space)} mood ${oneDecimal(vibe.mood)}",
         )
-        // A catalog vibe's loudness trim, so the agent sees that the templates are levelled.
+        // A catalog vibe's loudness trim, so the agent sees that shipped vibes are levelled.
         if (vibe.levelDb != 0f) add("level ${oneDecimal(vibe.levelDb)} dB")
         add("engines [" + vibe.tracks.map { it.engineEdm.engineId.name }.distinct().joinToString("/") + "]") // slash-separated distinct engine ids, e.g. BD/SD/HH
         vibe.arrangement?.let { add("${it.sections.size} sections") }
@@ -76,13 +75,13 @@ internal fun vibeFingerprint(vibe: Vibe): String {
 
 /** The dynamic menu: a short header plus one bulleted fingerprint per injected vibe. */
 internal fun catalogSection(vibes: List<Vibe>): String {
-    val header = "Available vibes — pick the closest as your starting template:"
+    val header = "Shipped vibes, for ideas only, never a template:"
     return header + "\n" + vibes.joinToString("\n") { "- " + vibeFingerprint(it) }
 }
 
 /** The full guide string the tool returns: static composition guide, then the live vibe catalog. */
-internal fun buildGuide(vibes: List<Vibe>): String =
-    STATIC_GUIDE.trim() + "\n\n" + catalogSection(vibes)
+internal suspend fun buildGuide(vibes: List<Vibe>): String =
+    loadStaticGuide().trim() + "\n\n" + catalogSection(vibes)
 
 @LLMDescription("Arguments for fetching the Pulsar vibe guide. Takes no input — pass an empty object.")
 @Serializable
@@ -91,7 +90,7 @@ class VibeGuideArgs
 @LLMDescription("How Pulsar vibe controls shape the sound, feel->settings recipes, and a catalog of existing vibes.")
 @Serializable
 data class VibeGuideResult(
-    @property:LLMDescription("The composition guide plus a catalog of existing vibes. Read it, then pick the closest vibe as your starting template.")
+    @property:LLMDescription("The composition guide plus a catalog of the shipped vibes, for ideas only. Read it, then call pulsar_cast_vibe.")
     val guide: String,
 )
 
@@ -109,11 +108,10 @@ class VibeGuideTool(
             resultType = typeToken<VibeGuideResult>(),
             name = "pulsar_vibe_guide",
             description = """
-                Call this FIRST when asked to make or change a Pulsar beat-machine vibe, before
-                pulsar_get_vibe. It returns how each control shapes the sound, feel->settings recipes,
-                and a catalog of the existing vibes with their key/tempo/progression/engines. Use it to
-                learn the controls and to pick the closest-fitting vibe as your starting template, then
-                read that template with pulsar_get_vibe and edit it.
+                Call this FIRST when asked to make or change a Pulsar beat-machine vibe. It returns how
+                each control shapes the sound, feel->settings recipes, and a catalog of the shipped
+                vibes with their key/tempo/progression/engines. Use it to learn the controls; the
+                catalog is for ideas only. Then call pulsar_cast_vibe for a new vibe's skeleton.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeGuideArgs): VibeGuideResult =

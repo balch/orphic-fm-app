@@ -13,6 +13,8 @@ import kotlin.reflect.full.primaryConstructor
 fun valueToCodeBlock(value: Any?): CodeBlock = when {
     value == null -> CodeBlock.of("null")
     value is Boolean || value is Int -> CodeBlock.of("%L", value)
+    // As a string: KotlinPoet groups a Long's digits with underscores.
+    value is Long -> CodeBlock.of("%L", "${value}L")
     value is Float -> CodeBlock.of("%Lf", value)
     value is String -> CodeBlock.of("%S", value)
     value is IntRange -> CodeBlock.of("%L..%L", value.first, value.last)

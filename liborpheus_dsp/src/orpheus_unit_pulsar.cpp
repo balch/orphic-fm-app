@@ -5895,8 +5895,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         // ── Morph rise ──
-        // The same per-note ramp on morph: on SPK and VOWEL_FOF morph picks the vowel, so a
-        // rise sweeps it within each note. Added after every morph modulation, pinned or not.
+        // The same per-note ramp on morph: on SPK morph picks the vowel, so a rise sweeps it
+        // within each note (VOWEL_FOF's vowel is harmonics). Added after every morph modulation.
         if (ts.morph_rise != 0.0f) {
             mod_morph += advance_note_rise(ts.morph_rise, ts.morph_rise_time, ts.pending_retrig,
                                            ts.morph_rise_progress, ts.morph_rise_offset,

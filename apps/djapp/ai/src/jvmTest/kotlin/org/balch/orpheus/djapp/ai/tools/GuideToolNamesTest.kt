@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.SerialDescriptor
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.ai.tools.VibeGuideArgs
 import org.balch.orpheus.features.ai.tools.VibeGuideTool
 import org.balch.orpheus.features.pulsar.bench.UnavailableMixCaptureService
@@ -28,8 +29,8 @@ class GuideToolNamesTest {
         val registry = PortRegistry(emptySet())
         val d = OneDispatcher(Dispatchers.Unconfined)
         listOf(
-            MixReadTool({ error("unused") }, { error("unused") }), MixSetTool({ error("unused") }, { error("unused") }),
-            MixMuteTool { error("unused") }, MixSoloTool { error("unused") }, MixResetTool { error("unused") },
+            MixReadTool({ error("unused") }, { error("unused") }), MixSetTool({ error("unused") }, { error("unused") }, TurnBudget()),
+            MixMuteTool({ error("unused") }, TurnBudget()), MixSoloTool({ error("unused") }, TurnBudget()), MixResetTool { error("unused") },
             SectionJumpTool({ error("unused") }, { error("unused") }), SectionLoopTool { error("unused") },
             PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth),
             VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d), TransportTool({ error("unused") }, d),

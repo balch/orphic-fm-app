@@ -12,6 +12,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.NoMeterTap
 import org.balch.orpheus.core.controller.ControlEventOrigin
@@ -23,7 +25,9 @@ import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
 import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.djapp.ai.mcp.McpToolAdapter
 import org.balch.orpheus.djapp.di.MixBenchExit
+import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
@@ -33,6 +37,7 @@ import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -50,6 +55,7 @@ class MixToolsTest {
     private val synth = SynthController().apply {
         setDelegates(setter = { id, v -> ports[id.key] = v; true }, getter = { ports[it.key] })
     }
+    private val budget = TurnBudget()
     private val pulsar = FakePulsar(listOf(vibe("Night Drive"), vibe("Low Tide")))
     private val registry = PortRegistry(
         setOf(
@@ -78,7 +84,7 @@ class MixToolsTest {
     fun mixSetLevelRoutesToController() = runTest {
         pulsar.section(1)
         val c = controller()
-        val r = MixSetTool({ pulsar }, { c }).tool.execute(MixSetArgs(field = "level_db", value = -6.0206f, track = 2))
+        val r = MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "level_db", value = -6.0206f, track = 2))
         assertTrue(r.ok, r.message)
         assertTrue(r.captured)
         assertEquals("VIBE", r.scope)
@@ -93,7 +99,7 @@ class MixToolsTest {
     fun mixSetSectionScopeEditsThePlayingSection() = runTest {
         pulsar.section(1)
         val c = controller()
-        val r = MixSetTool({ pulsar }, { c }).tool.execute(MixSetArgs(field = "level_db", value = -3f, track = 5, scope = "section"))
+        val r = MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "level_db", value = -3f, track = 5, scope = "section"))
         assertTrue(r.ok, r.message)
         assertEquals("SECTION", r.scope)
         assertEquals(-3f, c.layers.value.sections.getValue(1).levelDb[5], 1e-5f)
@@ -104,7 +110,7 @@ class MixToolsTest {
     fun mixSetSectionSendClampsAndSaysSo() = runTest {
         pulsar.section(1)
         val c = controller()
-        val set = MixSetTool({ pulsar }, { c }).tool
+        val set = MixSetTool({ pulsar }, { c }, budget).tool
         val high = set.execute(MixSetArgs(field = "reverb", value = 1.4f, track = 2, scope = "section"))
         assertTrue(high.ok, high.message)
         assertTrue("clamped" in high.message, high.message)
@@ -120,7 +126,7 @@ class MixToolsTest {
     @Test
     fun mixSetMacroMovesKnob() = runTest {
         val c = controller()
-        val r = MixSetTool({ pulsar }, { c }).tool.execute(MixSetArgs(field = "macro", value = 0.7f, macro = "Energy"))
+        val r = MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "macro", value = 0.7f, macro = "Energy"))
         assertTrue(r.ok, r.message)
         assertTrue(r.captured)
         assertEquals("energy" to 0.7f, pulsar.macroWrites.last())
@@ -132,7 +138,7 @@ class MixToolsTest {
     fun editsDuringAnUnfollowedVibeLoadAskForAMixRead() = runTest {
         val c = controller()
         pulsar.applyVibe(pulsar.vibeFlow.value)
-        val set = MixSetTool({ pulsar }, { c }).tool
+        val set = MixSetTool({ pulsar }, { c }, budget).tool
         for (args in listOf(
             MixSetArgs(field = "level_db", value = -6f, track = 2),
             MixSetArgs(field = "pan", value = 0.5f, track = 2),
@@ -143,7 +149,7 @@ class MixToolsTest {
             assertFalse(r.ok, args.field)
             assertEquals(VIBE_LOADING, r.message)
         }
-        val mute = MixMuteTool { c }.tool.execute(MixTrackArgs(1))
+        val mute = MixMuteTool({ c }, budget).tool.execute(MixTrackArgs(1))
         assertFalse(mute.ok)
         assertEquals(VIBE_LOADING, mute.message)
         assertEquals(BenchLayers(), c.layers.value)
@@ -228,13 +234,13 @@ class MixToolsTest {
     @Test
     fun badArgsReturnErrors() = runTest {
         val c = controller()
-        val set = MixSetTool({ pulsar }, { c }).tool
+        val set = MixSetTool({ pulsar }, { c }, budget).tool
         val results = listOf(
             set.execute(MixSetArgs(field = "level_db", value = -3f, track = 9)).let { it.ok to it.message },
             set.execute(MixSetArgs(field = "volume", value = -3f, track = 1)).let { it.ok to it.message },
             set.execute(MixSetArgs(field = "macro", value = 0.5f, macro = "tempo")).let { it.ok to it.message },
             set.execute(MixSetArgs(field = "pan", value = 0f, track = 1, scope = "song")).let { it.ok to it.message },
-            MixMuteTool { c }.tool.execute(MixTrackArgs(9)).let { it.ok to it.message },
+            MixMuteTool({ c }, budget).tool.execute(MixTrackArgs(9)).let { it.ok to it.message },
             PortGetTool(registry, synth).tool.execute(PortGetArgs("$PULSAR_URI:nope")).let { it.ok to it.message },
             PortSetTool(registry, synth).tool.execute(PortSetArgs("nope", 1f)).let { it.ok to it.message },
             VibeLoadTool({ pulsar }, OneDispatcher(Dispatchers.Unconfined)).tool.execute(VibeLoadArgs("Nope")).let { it.ok to it.message },
@@ -275,7 +281,7 @@ class MixToolsTest {
             val c = MixBenchController(pulsar, synth, NoMeterTap, scope)
             val d = OneDispatcher(Dispatchers.Unconfined)
             val tools = listOf(
-                MixReadTool({ pulsar }, { c }), MixSetTool({ pulsar }, { c }), MixMuteTool { c }, MixSoloTool { c },
+                MixReadTool({ pulsar }, { c }), MixSetTool({ pulsar }, { c }, budget), MixMuteTool({ c }, budget), MixSoloTool({ c }, budget),
                 MixResetTool { c }, SectionJumpTool({ pulsar }, { c }), SectionLoopTool { c },
                 PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth),
                 VibeListTool { pulsar }, VibeLoadTool({ pulsar }, d), TransportTool({ error("unused") }, d),
@@ -302,7 +308,7 @@ class MixToolsTest {
             val c = MixBenchController(pulsar, synth, NoMeterTap, scope)
             val r = runBlocking {
                 c.start()
-                MixSetTool({ pulsar }, { c }).tool.execute(MixSetArgs(field = "macro", value = 0.1f, macro = "space", scope = "section"))
+                MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "macro", value = 0.1f, macro = "space", scope = "section"))
             }
             assertTrue(r.ok, r.message)
             assertEquals(0.65f, r.macroKnob)
@@ -331,5 +337,45 @@ class MixToolsTest {
         } finally {
             scope.cancel()
         }
+    }
+
+    @Test
+    fun mixEditBudgetRefusesThirteenth() = runTest {
+        val c = controller()
+        val set = MixSetTool({ pulsar }, { c }, budget).tool
+        val mute = MixMuteTool({ c }, budget).tool
+        val solo = MixSoloTool({ c }, budget).tool
+        repeat(4) { t ->
+            assertTrue(set.execute(MixSetArgs(field = "level_db", value = -1f - t, track = t)).ok)
+            assertTrue(mute.execute(MixTrackArgs(t)).ok)
+            assertTrue(solo.execute(MixTrackArgs(t)).ok)
+        }
+        val layers = c.layers.value
+        val refused = listOf(
+            set.execute(MixSetArgs(field = "level_db", value = -9f, track = 6)).let { Triple(it.ok, it.message, it.budgetSpent) },
+            mute.execute(MixTrackArgs(6)).let { Triple(it.ok, it.message, it.budgetSpent) },
+            solo.execute(MixTrackArgs(6)).let { Triple(it.ok, it.message, it.budgetSpent) },
+        )
+        assertEquals(List(3) { Triple(false, TurnBudget.SPENT, true) }, refused)
+        assertEquals(layers, c.layers.value)
+        assertFalse(6 in c.muted.value || 6 in c.soloed.value)
+        // A bad argument is refused before it spends anything.
+        budget.reset()
+        repeat(20) { mute.execute(MixTrackArgs(9)).let { assertFalse(it.ok); assertFalse(it.budgetSpent) } }
+        assertTrue(mute.execute(MixTrackArgs(6)).ok)
+    }
+
+    @Test
+    fun mcpCallsAreNotBudgeted() = runTest {
+        val c = controller()
+        val mute = MixMuteTool({ c }, budget).tool
+        repeat(12) { budget.tryMixEdit() }
+        assertFalse(mute.execute(MixTrackArgs(1)).ok, "an agent call is over budget")
+        // Over MCP there are no agent turns, so the budget would never reset: those calls skip it.
+        repeat(20) {
+            val r = McpToolAdapter.call(mute, buildJsonObject { put("track", JsonPrimitive(1)) })
+            assertNotEquals(true, r.isError, r.content.toString())
+        }
+        assertFalse(mute.execute(MixTrackArgs(1)).ok, "MCP calls leave the agent's budget as it was")
     }
 }

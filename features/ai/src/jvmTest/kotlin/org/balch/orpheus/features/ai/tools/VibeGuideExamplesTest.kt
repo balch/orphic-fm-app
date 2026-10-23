@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai.tools
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
 import org.balch.orpheus.features.pulsar.models.Band
 import org.balch.orpheus.features.pulsar.models.BandPresets
@@ -9,18 +10,37 @@ import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Pins every JSON example embedded in the agent-facing guide prose (STATIC_GUIDE,
+ * Pins every JSON example embedded in the agent-facing guide prose (guide,
  * TRACK_OVERRIDES_NOTE) against the real apply-path decoder (`vibeApplyJson`), so the prose can
  * never silently drift from the schema again. Each constant is checked twice: it DECODES to its
  * real target type with the expected values, and it is actually CONTAINED in the shipped guide
  * text (guards the interpolation wiring, not just the constant's own content).
  */
 class VibeGuideExamplesTest {
+
+    private val guide = runBlocking { loadStaticGuide() }
+
+    @Test
+    fun `guideLoadsFromResources`() {
+        assertTrue(guide.isNotBlank(), "the guide resource loaded empty")
+        assertTrue(guide.contains("## 1. The frame"), "guide missing section 1")
+    }
+
+    @Test
+    fun `an unknown placeholder throws`() {
+        assertFailsWith<IllegalStateException> { fillGuidePlaceholders("x {{NOPE}} y") }
+    }
+
+    @Test
+    fun `allPlaceholdersFilled`() {
+        assertFalse(guide.contains("{{"), "an unfilled placeholder is left in the guide")
+    }
 
     @Test
     fun `bare-degree shorthand decodes to ChordSteps with no glide`() {
@@ -77,53 +97,53 @@ class VibeGuideExamplesTest {
     }
 
     @Test
-    fun `STATIC_GUIDE teaches that a soloMode needs a band, and ships one to copy`() {
+    fun `guide teaches that a soloMode needs a band, and ships one to copy`() {
         assertTrue(
-            STATIC_GUIDE.contains(VibeGuideExamples.MINIMUM_BAND),
+            guide.contains(VibeGuideExamples.MINIMUM_BAND),
             "guide dropped the minimum-band example, so the agent has nothing to copy",
         )
         assertTrue(
-            STATIC_GUIDE.contains("DOES NOTHING WITHOUT A BAND"),
+            guide.contains("DOES NOTHING WITHOUT A BAND"),
             "guide no longer states that a soloMode is inert without a band",
         )
         assertTrue(
-            STATIC_GUIDE.contains("ONLY A Melodic-ROLE TRACK CAN LEAD A Jam"),
+            guide.contains("ONLY A Melodic-ROLE TRACK CAN LEAD A Jam"),
             "guide no longer warns that a chordal member cannot lead a jam",
         )
     }
 
     @Test
-    fun `STATIC_GUIDE contains every customProgression and trackOverrides example it teaches`() {
+    fun `guide contains every customProgression and trackOverrides example it teaches`() {
         assertTrue(
-            STATIC_GUIDE.contains(VibeGuideExamples.CUSTOM_PROGRESSION_SHORTHAND),
+            guide.contains(VibeGuideExamples.CUSTOM_PROGRESSION_SHORTHAND),
             "guide dropped the bare-degree shorthand example",
         )
         assertTrue(
-            STATIC_GUIDE.contains(VibeGuideExamples.CUSTOM_PROGRESSION_WITH_GLIDE),
+            guide.contains(VibeGuideExamples.CUSTOM_PROGRESSION_WITH_GLIDE),
             "guide dropped the per-chord glide object-form example",
         )
         assertTrue(
-            STATIC_GUIDE.contains(VibeGuideExamples.TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE),
+            guide.contains(VibeGuideExamples.TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE),
             "guide dropped the section-7 chordFollow pinning example",
         )
     }
 
     @Test
-    fun `STATIC_GUIDE describes chordTransitionMatrix as the flat 49-value form, not nested rows`() {
+    fun `guide describes chordTransitionMatrix as the flat 49-value form, not nested rows`() {
         assertTrue(
-            STATIC_GUIDE.contains("flat list of 49"),
+            guide.contains("flat list of 49"),
             "guide should describe chordTransitionMatrix as a flat 49-value list, not nested rows",
         )
         assertFalse(
-            STATIC_GUIDE.contains("7-element array of 7-element arrays"),
+            guide.contains("7-element array of 7-element arrays"),
             "guide still describes chordTransitionMatrix with the wrong nested shape",
         )
     }
 
     @Test
-    fun `STATIC_GUIDE ties per-chord glide to the chord-step object, not the track`() {
+    fun `guide ties per-chord glide to the chord-step object, not the track`() {
         assertTrue(
-            STATIC_GUIDE.contains("glideRate on the chord-step object"),
+            guide.contains("glideRate on the chord-step object"),
             "per-chord glide bullet should attribute glideRate to the ChordStep object inside customProgression",
         )
     }

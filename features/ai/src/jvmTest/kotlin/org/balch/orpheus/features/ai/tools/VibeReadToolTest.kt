@@ -7,6 +7,7 @@ import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VibeReadToolTest {
@@ -46,5 +47,19 @@ class VibeReadToolTest {
         val decoded = decodeVibe(vibeApplyJson, template.vibeJson)
         assertTrue(decoded.isSuccess, "template did not round-trip through apply: ${decoded.exceptionOrNull()?.message}")
         assertEquals(dogHouse, decoded.getOrThrow())
+    }
+
+    @Test
+    fun getVibeResultSaysReferenceOnly() {
+        val shipped = resolveVibeJson(json, "Dog House", dogHouse, listOf(dogHouse), listOf("Dog House"))
+        assertEquals(
+            "Reference only: borrow ideas, never start from this vibe. Start new vibes with pulsar_cast_vibe.",
+            shipped.note,
+        )
+        // 'current' is for tweaking what plays, so it carries no warning.
+        assertNull(resolveVibeJson(json, "current", dogHouse, listOf(dogHouse), listOf("Dog House")).note)
+        val tool = VibeReadTool { error("unused") }.tool
+        assertTrue("never start from" in tool.descriptor.description, tool.descriptor.description)
+        assertTrue("pulsar_cast_vibe" in tool.descriptor.description)
     }
 }

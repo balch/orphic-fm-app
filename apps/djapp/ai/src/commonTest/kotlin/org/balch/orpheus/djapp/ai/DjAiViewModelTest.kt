@@ -4,6 +4,7 @@ import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.features.ai.AgentActivityEvent
+import org.balch.orpheus.features.ai.composer.CastMode
 import org.balch.orpheus.features.pulsar.VibeCreateEvent
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -487,6 +488,27 @@ class DjAiViewModelTest {
     // ─────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────
+
+    @Test
+    fun castModeDefaultsToBedFixedAndSelectionSticksInState() {
+        assertEquals(CastMode.BED_FIXED, DjAiUiState().castMode)
+        assertEquals(CastMode.ALL_ROLLED, withCastMode(DjAiUiState(), CastMode.ALL_ROLLED).castMode)
+    }
+
+    @Test
+    fun savedCastModeLoadsOnlyOverTheDefault() {
+        assertEquals(CastMode.ALL_ROLLED, withSavedCastMode(DjAiUiState(), CastMode.ALL_ROLLED).castMode)
+        // The user tapped "everything rolled" before the saved BED_FIXED arrived: the tap stays.
+        val tapped = withCastMode(DjAiUiState(), CastMode.ALL_ROLLED)
+        assertEquals(CastMode.ALL_ROLLED, withSavedCastMode(tapped, CastMode.BED_FIXED).castMode)
+    }
+
+    @Test
+    fun savedCastModeParsesWithFallback() {
+        assertEquals(CastMode.ALL_ROLLED, castModeFromPref("ALL_ROLLED"))
+        assertEquals(CastMode.BED_FIXED, castModeFromPref(null))
+        assertEquals(CastMode.BED_FIXED, castModeFromPref("junk"))
+    }
 
     /** Build a minimal valid [Vibe] for test assertions. */
     private fun makeTestVibe(): Vibe {

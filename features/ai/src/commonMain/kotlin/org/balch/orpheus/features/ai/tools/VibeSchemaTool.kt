@@ -108,9 +108,9 @@ class VibeSchemaTool : ToolProvider {
                 Return the JSON schema for a Pulsar vibe: every field's type and the exact allowed
                 values for enum fields (album, rootNote, scaleType, envelopeType, genre.progressionStyle,
                 per-engine engineId, the track role kinds, etc.). Use this when unsure of a field's type or allowed values — e.g. 'album' is always STEALTH,
-                NOT a title (the title goes in 'name'). Use it together with pulsar_get_vibe, which gives
-                a concrete known-good template to edit.
-                Call pulsar_vibe_guide first for what the fields mean and which template to start from.
+                NOT a title (the title goes in 'name').
+                Call pulsar_vibe_guide first for what the fields mean, and pulsar_cast_vibe for a new
+                vibe's skeleton.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeSchemaArgs): VibeSchemaResult = VibeSchemaResult(schemaJson)

@@ -4,12 +4,15 @@ import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.models.LickRotation
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VibeGuideToolTest {
+
+    private val guide = runBlocking { loadStaticGuide() }
 
     private val dogHouse = DogHouseVibe().vibe
 
@@ -82,28 +85,29 @@ class VibeGuideToolTest {
     @Test
     fun `catalogSection lists one bullet per vibe with a header`() {
         val section = catalogSection(listOf(dogHouse))
-        assertTrue(section.contains("Available vibes"), "missing catalog header: $section")
+        assertTrue(section.contains("Shipped vibes, for ideas only, never a template"), "missing catalog header: $section")
         assertTrue(section.contains("- " + vibeFingerprint(dogHouse)), "missing bulleted fingerprint line: $section")
     }
 
     @Test
     fun `static guide carries the stable semantic markers`() {
         // Anchor the phrases that do the heavy lifting so the guide can't silently lose them.
-        assertTrue(STATIC_GUIDE.contains("Translation recipes"), "guide missing the recipes section")
-        assertTrue(STATIC_GUIDE.contains("harmonics"), "guide missing the DX patch-bank gotcha")
-        assertTrue(STATIC_GUIDE.contains("exactly 8 tracks"), "guide missing the 8-track invariant")
-        assertTrue(STATIC_GUIDE.contains("ROOT_ONLY"), "guide missing the bass chordFollow invariant")
-        assertTrue(STATIC_GUIDE.contains("## 11. Mixing"), "guide missing the Mixing section")    }
+        assertTrue(guide.contains("Translation recipes"), "guide missing the recipes section")
+        assertTrue(guide.contains("harmonics"), "guide missing the DX patch-bank gotcha")
+        assertTrue(guide.contains("exactly 8 tracks"), "guide missing the 8-track invariant")
+        assertTrue(guide.contains("ROOT_ONLY"), "guide missing the bass chordFollow invariant")
+        assertTrue(guide.contains("## 11. Mixing"), "guide missing the Mixing section")
+    }
 
     @Test
     fun `buildGuide concatenates the static guide and the catalog`() {
-        val guide = buildGuide(listOf(dogHouse))
-        assertTrue(guide.contains("Translation recipes"), "buildGuide dropped the static guide")
-        assertTrue(guide.contains("Available vibes"), "buildGuide dropped the catalog header")
-        assertTrue(guide.contains("- " + vibeFingerprint(dogHouse)), "buildGuide dropped the catalog lines")
+        val built = runBlocking { buildGuide(listOf(dogHouse)) }
+        assertTrue(built.contains("Translation recipes"), "buildGuide dropped the static guide")
+        assertTrue(built.contains("Shipped vibes, for ideas only, never a template"), "buildGuide dropped the catalog header")
+        assertTrue(built.contains("- " + vibeFingerprint(dogHouse)), "buildGuide dropped the catalog lines")
         // Static guide comes first, catalog second.
         assertTrue(
-            guide.indexOf("Translation recipes") < guide.indexOf("Available vibes"),
+            built.indexOf("Translation recipes") < built.indexOf("Shipped vibes, for ideas only, never a template"),
             "static guide should precede the catalog",
         )
     }

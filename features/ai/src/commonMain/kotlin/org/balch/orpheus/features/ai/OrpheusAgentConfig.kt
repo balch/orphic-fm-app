@@ -32,6 +32,7 @@ import kotlin.time.ExperimentalTime
 class OrpheusAgentConfig(
     private val toolSet: Set<ToolProvider>,
     private val aiModelProvider: AiModelProvider,
+    private val turnBudget: TurnBudget,
 ) {
     @OptIn(ExperimentalTime::class)
     val toolRegistry by lazy {
@@ -44,9 +45,9 @@ class OrpheusAgentConfig(
     val model: LLModel get() = aiModelProvider.currentKoogModel
 
     /**
-     * Session-global hard stop: total graph node executions across the WHOLE conversation (one Koog
-     * run()). A monotonic counter that never resets per turn, so this is the ultimate net, not a
-     * per-turn backstop. See [maxToolRoundsPerTurn] for the per-turn guard.
+     * Koog's node-execution cap. Koog counts it across the whole run(), so [agentStrategy] zeroes
+     * Koog's counter at each turn boundary, making this a per-turn net above [maxToolRoundsPerTurn]
+     * (a capped turn runs about 60 nodes).
      */
     val maxAgentIterations = 100
 
@@ -54,11 +55,11 @@ class OrpheusAgentConfig(
      * Per-turn backstop: the maximum number of tool-result round-trips the model may take within a
      * single user turn before the graph force-ends the turn (see [agentStrategy]). Resets at every
      * turn boundary. A non-terminating model (one that keeps calling tools instead of replying) is
-     * stopped here regardless of prompt adherence. Sized comfortably above the heaviest legitimate
-     * single-turn flow (the tutorial/explain workflow batches several synth_control calls per round,
-     * so it lands well under this) while still bounding a runaway build loop.
+     * stopped here regardless of prompt adherence. Sized above the heaviest legitimate single-turn
+     * flow: a cast, a build and two short listen-and-mix passes take about 20 rounds. [TurnBudget]
+     * caps applies and mix edits inside that.
      */
-    val maxToolRoundsPerTurn = 16
+    val maxToolRoundsPerTurn = 28
 
     /** Shown as Orpheus's reply when a turn is force-ended by [maxToolRoundsPerTurn]. */
     val turnToolBudgetMessage =
@@ -296,37 +297,47 @@ class OrpheusAgentConfig(
         ## Creating Pulsar vibes
         When the user asks for a new beat-machine vibe ("make a vibe like X", "a darker techno groove"),
         or to tweak the one playing ("slower", "swap the lead to a bell"):
-        Field values: enum fields must use exact allowed values — 'album' is always STEALTH
-        (NOT a title; the title goes in 'name'); rootNote/scaleType/envelopeType are also enums. When unsure
-        of a field's type or allowed values, call pulsar_vibe_schema — it returns the full schema (every
-        field's type and the exact enum vocabulary).
-        0. Call pulsar_vibe_guide FIRST. It returns how each control shapes the sound, the
-           feel->settings recipes, and a catalog of the existing vibes (key/tempo/progression/engines).
-           Use it to learn the controls and to choose the closest-fitting vibe as your starting template.
-        1. Call pulsar_get_vibe with the template name you chose from the catalog (or 'current' to
-           tweak what is playing) to get its full JSON.
-        2. Edit the returned JSON to match the request — bpm, rootNote, scaleType, genre.customProgression,
-           per-track engines, arrangement. Recall the reference song's key/tempo/progression yourself.
-        Instruments: keep each track's engine in its role family (drums BD/SD/HH; bass WSH/VCF/PD/VA;
-        keys DX2; lead DX3/WSH/FM; pad ENS/STR/CHD; texture MOD/PAR/SPK). For DX/DX2/DX3, 'harmonics'
-        picks a 32-patch bank (set it deliberately) — it is not a tone knob.
+        Every new vibe starts from pulsar_cast_vibe, never from a shipped vibe. pulsar_get_vibe with a
+        shipped name is reference only: borrow an idea from it, never copy it.
+        1. New vibe: call pulsar_vibe_guide, then pulsar_cast_vibe. Pass styleTags from the request
+           (rock, electro, ambient, reggae, psych, funk) and pins for anything the user named (a part
+           or an engine on a track). It returns a seed, a one-line summary per track and the skeleton
+           JSON. Go to step 3.
+        2. Tweak of the vibe playing now ("slower", "swap the lead to a bell"): call
+           pulsar_get_vibe('current'), change only what was asked, and go to step 4. Do not cast.
+        3. Compose on the skeleton: the frame (name, bpm, rootNote, scaleType), the groove, the
+           progression (genre.customProgression), the melodies, the arrangement's sections and the
+           effects. Recall a reference song's key, tempo and progression yourself. Keep the
+           skeleton's cast block unchanged: it records the roll so the vibe can be cast again.
+        4. Call pulsar_apply_vibe with the complete JSON. It applies and plays at once.
+        5. When the mix tools are available (transport, mix_read, mix_set, audio_analyze, mix_capture),
+           take one or two short listening passes, no more: transport play, mix_read once to start
+           the meters, audio_analyze (it records for the seconds you ask, so it is the wait), then
+           mix_read again for the levels, then small fixes with mix_set (or one re-apply that
+           changes the vibe's levelDb). A re-apply clears the live mix edits, so call mix_capture
+           before any re-apply.
+        6. Reply with the vibe's name, the seed (for a new vibe) and a sentence or two on its sound.
+           Then, when the mix tools are available, invite the user: open the Mixer tab, tweak, and tell me when you're back.
+        When the user says they are back, read the mix with mix_read (when it is available), say what
+        changed and suggest the next move.
+        A plain-text reply ends your turn and waits for the user, so send none until step 6; your text
+        reply is what ends the turn. The tools enforce a budget per turn: ${TurnBudget.MAX_APPLIES} applies, and
+        ${TurnBudget.MAX_MIX_EDITS} mix edits when those tools are available. A result with budgetSpent=true
+        means: do not retry, reply to the user now and let them listen.
+        Field values: enum fields must use exact allowed values. 'album' is always STEALTH (NOT a
+        title; the title goes in 'name'); rootNote/scaleType/envelopeType are also enums. When unsure
+        of a field's type or allowed values, call pulsar_vibe_schema: it returns the full schema
+        (every field's type and the exact enum vocabulary).
+        Instruments: the cast picks each track's engine. If you swap one, keep it in the track's role
+        family (the guide lists the families) and set its tone by moving the track's macroMap window or
+        pinning the knob (an unpinned knob ignores its JSON value). For DX/DX2/DX3, 'harmonics' picks a
+        32-patch bank (set it deliberately); it is not a tone knob.
         Per-section variation: to change ONE track within a section (pedal a hook on the tonic, drop a
         track's density in a breakdown, swap its comping in the chorus), set that Section's trackOverrides,
-        keyed by track index — e.g. "trackOverrides": {"4": {"chordFollow": "FIXED"}}. See pulsar_vibe_schema.
-        3. Call pulsar_apply_vibe with the complete edited JSON. It applies and plays immediately.
-        Build in a single turn: call pulsar_get_vibe and then pulsar_apply_vibe back to back. Do NOT send
-        a plain-text reply between those tool calls. A plain-text reply pauses you to wait for the user and
-        abandons the build half-finished. Save your one or two sentence description for AFTER
-        pulsar_apply_vibe succeeds.
-        STOP AFTER A SUCCESSFUL APPLY. Call pulsar_apply_vibe EXACTLY ONCE per request. The moment it
-        returns success=true the vibe is live and playing, so you are DONE: reply with your one or two
-        sentence description and end your turn. Do NOT call pulsar_get_vibe, pulsar_vibe_schema,
-        pulsar_apply_vibe, or any other tool again to verify, re-read, re-apply, polish, or refine the
-        vibe. Re-tune ONLY when the user comes back and explicitly asks for a change. Your text reply is
-        what ends the turn; without it you will loop forever.
-        Naming: always invent an evocative ORIGINAL name that captures the feel — never use a real
+        keyed by track index, e.g. "trackOverrides": {"4": {"chordFollow": "FIXED"}}. See pulsar_vibe_schema.
+        Naming: always invent an evocative ORIGINAL name that captures the feel; never use a real
         artist, band, song, or album name. If pulsar_apply_vibe returns success=false, fix the JSON per
-        the message and try again.
+        the message and try again, unless budgetSpent is true: then reply to the user now.
 
         ## Your Personality
         - Be poetic but concise. Use musical metaphors naturally.
@@ -416,7 +427,15 @@ class OrpheusAgentConfig(
             if (streamResponses) nodeRequestLLMStreaming else nodeRequestLLMBatched
         val nodeAssistantMessage by node<String, String> { message ->
             toolRoundsThisTurn = 0   // turn is ending; reset the per-turn tool budget
+            turnBudget.reset()       // and the apply / mix-edit caps the tools enforce
+            // Koog's node counter spans the whole run, so a long chat would hit maxAgentIterations.
+            stateManager.withStateLock { it.iterations = 0 }
             onAssistantMessage(message)
+        }
+        // A new run is a new turn: a run cancelled mid-turn (e.g. a model switch) leaves counts behind.
+        val nodeBeginRun by node<String, String> { input ->
+            turnBudget.reset()
+            input
         }
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
         val nodeSendToolResultStreaming by nodeLLMSendToolResultsStreaming("nodeSendToolResult").transform {
@@ -431,7 +450,8 @@ class OrpheusAgentConfig(
             if (streamResponses) nodeSendToolResultStreaming else nodeSendToolResultBatched
         val nodeCompressHistory by nodeLLMCompressHistory<ReceivedToolResults>()
 
-        edge(nodeStart forwardTo nodeRequestLLM)
+        edge(nodeStart forwardTo nodeBeginRun)
+        edge(nodeBeginRun forwardTo nodeRequestLLM)
 
         edge(
             nodeRequestLLM forwardTo nodeExecuteTool

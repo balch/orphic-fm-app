@@ -15,25 +15,31 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.models.Vibe
 
-@LLMDescription("Arguments for reading an existing Pulsar vibe as JSON, to use as a template to edit.")
+@LLMDescription("Arguments for reading a Pulsar vibe as JSON: 'current' to tweak what plays, or a shipped vibe for reference.")
 @Serializable
 data class VibeReadArgs(
-    @property:LLMDescription("Vibe display name to read, or the literal 'current' for the vibe playing now. Use a name from a previous result's availableNames.")
+    @property:LLMDescription("The literal 'current' for the vibe playing now, or a shipped vibe's display name (reference only). Use a name from a previous result's availableNames.")
     val name: String,
 )
 
-@LLMDescription("A Pulsar vibe serialized as JSON, plus the list of vibe names available as templates.")
+@LLMDescription("A Pulsar vibe serialized as JSON, plus the list of shipped vibe names.")
 @Serializable
 data class VibeReadResult(
     @property:LLMDescription("True if a vibe was found and returned.")
     val success: Boolean,
-    @property:LLMDescription("The vibe as JSON. Edit this and pass it to pulsar_apply_vibe. Empty when success is false.")
+    @property:LLMDescription("The vibe as JSON. For 'current', edit it and pass it to pulsar_apply_vibe. Empty when success is false.")
     val vibeJson: String,
-    @property:LLMDescription("All vibe names you can read as templates.")
+    @property:LLMDescription("All shipped vibe names you can read for reference.")
     val availableNames: List<String>,
     @property:LLMDescription("Human-readable status or error.")
     val message: String,
+    @property:LLMDescription("Set when a shipped vibe was read: how you may use it.")
+    val note: String? = null,
 )
+
+/** The [VibeReadResult.note] on every shipped vibe read, so the model never starts from one. */
+internal const val REFERENCE_ONLY_NOTE =
+    "Reference only: borrow ideas, never start from this vibe. Start new vibes with pulsar_cast_vibe."
 
 /** Pure resolution logic — no PulsarFeature needed, so it is unit-testable. */
 internal fun resolveVibeJson(
@@ -53,7 +59,7 @@ internal fun resolveVibeJson(
             availableNames = vibeNames,
             message = "No vibe named '$name'. Available: ${vibeNames.joinToString(", ")}",
         )
-    return VibeReadResult(true, json.encodeToString(match), vibeNames, "Template: ${match.name}")
+    return VibeReadResult(true, json.encodeToString(match), vibeNames, "Reference: ${match.name}", REFERENCE_ONLY_NOTE)
 }
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
@@ -66,7 +72,7 @@ class VibeReadTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
 ) : ToolProvider {
 
-    // Encode templates with the SAME config the apply path decodes with, so the template's class
+    // Encode shipped vibes with the SAME config the apply path decodes with, so their class
     // discriminator can never drift from what pulsar_apply_vibe expects. (coerceInputValues and the
     // polymorphic fallbacks on vibeApplyJson are decode-only — they don't change encode output.)
     private val json = vibeApplyJson
@@ -77,13 +83,13 @@ class VibeReadTool(
             resultType = typeToken<VibeReadResult>(),
             name = "pulsar_get_vibe",
             description = """
-                Read an existing Pulsar beat-machine vibe as JSON so you can edit it into a new vibe.
-                Call pulsar_vibe_guide first for what the fields mean and which template to start from.
-                Pass a known-good vibe name (or 'current' for what is playing) to get
-                a complete, valid template, then change only the fields you need and send it to
-                pulsar_apply_vibe. Never write a vibe from scratch — edit a template.
-                Keep each track's engine in its role family; for DX/DX2/DX3, 'harmonics' selects a
-                32-patch bank (set it deliberately), it is not a tone knob.
+                Read a Pulsar beat-machine vibe as JSON.
+                Pass 'current' to tweak the vibe playing now: change only the fields you need and send
+                it to pulsar_apply_vibe.
+                Pass a shipped vibe's name for reference only: borrow ideas (how it builds a singer,
+                a groove, a section), never start from this vibe. Start new vibes with pulsar_cast_vibe.
+                For DX/DX2/DX3, 'harmonics' selects a 32-patch bank (set it deliberately); it is not a
+                tone knob.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeReadArgs): VibeReadResult {

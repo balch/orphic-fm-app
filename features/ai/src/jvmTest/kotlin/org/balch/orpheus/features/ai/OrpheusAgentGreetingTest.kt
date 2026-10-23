@@ -72,7 +72,7 @@ class OrpheusAgentGreetingTest {
         val appScope = AppCoroutineScope(dispatcherProvider)
         val featureScope = FeatureCoroutineScope()
         val modelProvider = AiModelProvider(prefs, dispatcherProvider, appScope)
-        val config = OrpheusAgentConfig(toolSet = emptySet(), aiModelProvider = modelProvider)
+        val config = OrpheusAgentConfig(toolSet = emptySet(), aiModelProvider = modelProvider, turnBudget = TurnBudget())
         val agent = OrpheusAgent(
             config = config,
             aiKeyRepository = AiKeyRepository(prefs, dispatcherProvider),
