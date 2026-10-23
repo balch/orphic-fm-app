@@ -81,10 +81,9 @@ internal fun musicLoudness(trackLevels: FloatArray): Float {
 }
 
 /**
- * The track whose playhead times the beats: the most steps, lowest index on a tie. Steps are
- * exported clamped to the viz window, where a longer track's playhead parks at the last step, so
- * a track below the window wins over one at it. -1 when no track is playing. When every track sits
- * at the window the lowest index wins, and a true 64-step track there stalls the beats for half its loop.
+ * The track whose playhead times the beats: the most steps, lowest index on a tie. A longer track
+ * is exported a viz window's page at a time, so a track below the window, whose loop is all there,
+ * wins over one at it. -1 when no track is playing.
  */
 internal fun beatReferenceTrack(playheads: IntArray, stepCounts: IntArray): Int {
     var best = -1

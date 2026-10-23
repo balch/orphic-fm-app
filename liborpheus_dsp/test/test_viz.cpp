@@ -192,6 +192,52 @@ static bool test_pulsar_viz_clamps_to_window() {
     return pass;
 }
 
+// A track longer than the window exports the 32-step page its playhead is on, so its playhead
+// keeps moving and its hits stay visible: parked at 31, the Orphoscope pump and MusicPulse went
+// dead for the back half of every 64-step loop (Orphic Lore's bell).
+static bool test_pulsar_viz_pages_long_tracks() {
+    printf("\n=== Test: pulsar viz pages a 64-step track's window ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(SR);
+    bool pass = true;
+
+    auto& viz = engine->pulsar_viz;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        viz.playheads[t] = -1; viz.step_counts[t] = 0;
+        for (int s = 0; s < kMaxPulsarSteps; s++) { viz.step_gates[t][s] = false; viz.step_velocities[t][s] = 0.0f; }
+    }
+    // t0: 64 steps, on the back page. Step 8 is gated, step 40 is not, step 32 is.
+    viz.playheads[0] = 40; viz.step_counts[0] = 64;
+    viz.step_gates[0][8] = true;  viz.step_velocities[0][8] = 0.5f;
+    viz.step_gates[0][32] = true; viz.step_velocities[0][32] = 0.9f;
+    // t1: 48 steps, on its short back page of 16.
+    viz.playheads[1] = 35; viz.step_counts[1] = 48;
+    // t2: 64 steps, on the front page.
+    viz.playheads[2] = 8; viz.step_counts[2] = 64;
+    viz.step_gates[2][8] = true; viz.step_velocities[2][8] = 0.5f;
+
+    int   gates_out[kNumPulsarTracks * kPulsarVizSteps];
+    float vels_out[kNumPulsarTracks * kPulsarVizSteps];
+    int   playheads_out[kNumPulsarTracks];
+    int   step_counts_out[kNumPulsarTracks];
+    orpheus_engine_get_pulsar_viz(engine, gates_out, vels_out, playheads_out, step_counts_out);
+
+    auto expect = [&](bool ok, const char* what) { if (!ok) { printf("  FAIL: %s\n", what); pass = false; } };
+    expect(playheads_out[0] == 8, "t0 playhead 40 exports as 8 on the back page");
+    expect(step_counts_out[0] == 32, "t0 back page is 32 steps");
+    expect(gates_out[0] == 1 && std::fabs(vels_out[0] - 0.9f) < 1e-6f, "t0 page slot 0 is step 32");
+    expect(gates_out[8] == 0, "t0 page slot 8 is step 40, not step 8");
+    expect(playheads_out[1] == 3, "t1 playhead 35 exports as 3");
+    expect(step_counts_out[1] == 16, "t1 back page holds the 16 steps left");
+    const int t2 = 2 * kPulsarVizSteps;
+    expect(playheads_out[2] == 8 && step_counts_out[2] == 32, "t2 front page passes through");
+    expect(gates_out[t2 + 8] == 1 && std::fabs(vels_out[t2 + 8] - 0.5f) < 1e-6f, "t2 front page gates");
+    expect(playheads_out[3] == -1 && step_counts_out[3] == 0, "an idle track stays idle");
+
+    orpheus_engine_destroy(engine);
+    printf("pulsar viz paging: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_viz_tests() {
     printf("\n══════════════════════════════════════\n");
     printf("  SIGNAL VISUALIZATION TESTS\n");
@@ -204,6 +250,7 @@ bool run_viz_tests() {
     tally(test_viz_get_api_lapping());
     tally(test_viz_lfo_integration());
     tally(test_pulsar_viz_clamps_to_window());
+    tally(test_pulsar_viz_pages_long_tracks());
     printf("\nViz tests: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

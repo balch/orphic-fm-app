@@ -96,7 +96,7 @@ static constexpr int kNumMainVoices = 24;
 // Pulsar viz EXPORT width. The Kotlin<->native step-grid buffer contract is
 // kNumPulsarTracks * kPulsarVizSteps ints/floats (= 256). DECOUPLED from
 // kMaxPulsarSteps (the sequencer/lick cap, now 64): a >32-step pattern PLAYS in full,
-// but the on-screen step grid only exports/shows its first kPulsarVizSteps steps.
+// but the step grid exports kPulsarVizSteps at a time, the page the playhead is on.
 // Every viz consumer buffer (jni_bridge_desktop/android, IosAudioEngine,
 // SynthEngineMonitor, PulsarVizData) is sized to this, and the producer
 // orpheus_engine_get_pulsar_viz MUST clamp to it — otherwise it overruns those

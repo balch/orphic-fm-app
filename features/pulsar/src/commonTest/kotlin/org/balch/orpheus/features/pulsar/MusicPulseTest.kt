@@ -110,7 +110,7 @@ class MusicPulseTest {
         assertEquals(-1, beatReferenceTrack(IntArray(8) { -1 }, IntArray(8) { 16 }))
     }
 
-    // The viz window clamps at 32 steps, so a 64-step track's playhead parks at 31 for half its loop.
+    // The viz window is 32 steps, so a 64-step track shows a page at a time.
     @Test
     fun aTrackAtTheVizWindowYieldsToOneBelowIt() {
         assertEquals(1, beatReferenceTrack(IntArray(8) { 0 }, intArrayOf(32, 16, 32, 16, 16, 16, 16, 16)))
