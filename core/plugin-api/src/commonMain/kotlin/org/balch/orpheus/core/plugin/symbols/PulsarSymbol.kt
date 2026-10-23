@@ -408,6 +408,26 @@ enum class PulsarSymbol(
     TRACK_6_MORPH_RISE_TIME("track_6_morph_rise_time"),
     TRACK_7_MORPH_RISE_TIME("track_7_morph_rise_time"),
 
+    // Per-track double voice: cents between the two voices, 0 is off (8 entries, EDM slot)
+    TRACK_0_DOUBLE_DETUNE("track_0_double_detune"),
+    TRACK_1_DOUBLE_DETUNE("track_1_double_detune"),
+    TRACK_2_DOUBLE_DETUNE("track_2_double_detune"),
+    TRACK_3_DOUBLE_DETUNE("track_3_double_detune"),
+    TRACK_4_DOUBLE_DETUNE("track_4_double_detune"),
+    TRACK_5_DOUBLE_DETUNE("track_5_double_detune"),
+    TRACK_6_DOUBLE_DETUNE("track_6_double_detune"),
+    TRACK_7_DOUBLE_DETUNE("track_7_double_detune"),
+
+    // Per-track double voice: pan spread of the two voices, 0..1 (8 entries, EDM slot)
+    TRACK_0_DOUBLE_SPREAD("track_0_double_spread"),
+    TRACK_1_DOUBLE_SPREAD("track_1_double_spread"),
+    TRACK_2_DOUBLE_SPREAD("track_2_double_spread"),
+    TRACK_3_DOUBLE_SPREAD("track_3_double_spread"),
+    TRACK_4_DOUBLE_SPREAD("track_4_double_spread"),
+    TRACK_5_DOUBLE_SPREAD("track_5_double_spread"),
+    TRACK_6_DOUBLE_SPREAD("track_6_double_spread"),
+    TRACK_7_DOUBLE_SPREAD("track_7_double_spread"),
+
     // Vibe step count
     STEP_COUNT("step_count"),
 
@@ -1793,6 +1813,26 @@ enum class PulsarSymbol(
     TRACK_5_MORPH_RISE_TIME_SPACE("track_5_morph_rise_time_space"),
     TRACK_6_MORPH_RISE_TIME_SPACE("track_6_morph_rise_time_space"),
     TRACK_7_MORPH_RISE_TIME_SPACE("track_7_morph_rise_time_space"),
+
+    // Per-track double voice: cents between the two voices, 0 is off (8 entries, SPACE slot)
+    TRACK_0_DOUBLE_DETUNE_SPACE("track_0_double_detune_space"),
+    TRACK_1_DOUBLE_DETUNE_SPACE("track_1_double_detune_space"),
+    TRACK_2_DOUBLE_DETUNE_SPACE("track_2_double_detune_space"),
+    TRACK_3_DOUBLE_DETUNE_SPACE("track_3_double_detune_space"),
+    TRACK_4_DOUBLE_DETUNE_SPACE("track_4_double_detune_space"),
+    TRACK_5_DOUBLE_DETUNE_SPACE("track_5_double_detune_space"),
+    TRACK_6_DOUBLE_DETUNE_SPACE("track_6_double_detune_space"),
+    TRACK_7_DOUBLE_DETUNE_SPACE("track_7_double_detune_space"),
+
+    // Per-track double voice: pan spread of the two voices, 0..1 (8 entries, SPACE slot)
+    TRACK_0_DOUBLE_SPREAD_SPACE("track_0_double_spread_space"),
+    TRACK_1_DOUBLE_SPREAD_SPACE("track_1_double_spread_space"),
+    TRACK_2_DOUBLE_SPREAD_SPACE("track_2_double_spread_space"),
+    TRACK_3_DOUBLE_SPREAD_SPACE("track_3_double_spread_space"),
+    TRACK_4_DOUBLE_SPREAD_SPACE("track_4_double_spread_space"),
+    TRACK_5_DOUBLE_SPREAD_SPACE("track_5_double_spread_space"),
+    TRACK_6_DOUBLE_SPREAD_SPACE("track_6_double_spread_space"),
+    TRACK_7_DOUBLE_SPREAD_SPACE("track_7_double_spread_space"),
 
     // Pulsar dedicated effect parameters (pushed on vibe change)
     PULSAR_DELAY_TIME_A("pulsar_delay_time_a"),

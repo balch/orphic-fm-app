@@ -856,6 +856,8 @@ class PulsarViewModel(
     private val trackHarmonicsRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME.ordinal + it].controlId) }
     private val trackMorphRiseIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE.ordinal + it].controlId) }
     private val trackMorphRiseTimeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME.ordinal + it].controlId) }
+    private val trackDoubleDetuneIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_DETUNE.ordinal + it].controlId) }
+    private val trackDoubleSpreadIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_SPREAD.ordinal + it].controlId) }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val openingNoteFloorId = synthController.controlFlow(PulsarSymbol.OPENING_NOTE_FLOOR.controlId)
     private val trackMacroIds = (0..7).map { t ->
@@ -1056,6 +1058,8 @@ class PulsarViewModel(
     private val trackHarmonicsRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HARMONICS_RISE_TIME_SPACE.ordinal + it].controlId) }
     private val trackMorphRiseSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_SPACE.ordinal + it].controlId) }
     private val trackMorphRiseTimeSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME_SPACE.ordinal + it].controlId) }
+    private val trackDoubleDetuneSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_DETUNE_SPACE.ordinal + it].controlId) }
+    private val trackDoubleSpreadSpaceIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_SPREAD_SPACE.ordinal + it].controlId) }
 
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
@@ -1768,6 +1772,10 @@ class PulsarViewModel(
             trackMorphRiseSpaceIds[i].value = FloatValue(spa.morphRise)
             trackMorphRiseTimeIds[i].value = FloatValue(edm.morphRiseTime)
             trackMorphRiseTimeSpaceIds[i].value = FloatValue(spa.morphRiseTime)
+            trackDoubleDetuneIds[i].value = FloatValue(edm.doubleDetune)
+            trackDoubleDetuneSpaceIds[i].value = FloatValue(spa.doubleDetune)
+            trackDoubleSpreadIds[i].value = FloatValue(edm.doubleSpread)
+            trackDoubleSpreadSpaceIds[i].value = FloatValue(spa.doubleSpread)
             // Effective pin: vibe-author opt-in OR engine-enforced (DX-family
             // harmonics is a quantized 32-step patch selector — never let the
             // macro range slide between patches).
@@ -2229,6 +2237,10 @@ class PulsarViewModel(
             trackPinMorphSpaceIds[i].value = IntValue(if (o?.morph != null || spa.pinMorph) 1 else 0)
             trackMorphRiseIds[i].value = FloatValue(o?.morphRise ?: edm.morphRise)
             trackMorphRiseSpaceIds[i].value = FloatValue(o?.morphRise ?: spa.morphRise)
+            trackDoubleDetuneIds[i].value = FloatValue(o?.doubleDetune ?: edm.doubleDetune)
+            trackDoubleDetuneSpaceIds[i].value = FloatValue(o?.doubleDetune ?: spa.doubleDetune)
+            trackDoubleSpreadIds[i].value = FloatValue(o?.doubleSpread ?: edm.doubleSpread)
+            trackDoubleSpreadSpaceIds[i].value = FloatValue(o?.doubleSpread ?: spa.doubleSpread)
             trackEnvelopeIds[i].value = IntValue((o?.envelopeProfile ?: tv.envelopeProfile).id)
             next.delayEdm[i] = o?.delaySend ?: edm.delaySend
             next.reverbEdm[i] = o?.reverbSend ?: edm.reverbSend

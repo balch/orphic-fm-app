@@ -183,6 +183,13 @@ hold, which reads engineEdm only). They are what makes a voice sound alive:
   grainBlend 0.45. An upward grain is the voice sped up, so grains squeak above about F5 (MIDI 77):
   keep a grainFx voice's noteRangeHigh at 77 or under. MST grains its own wavetable and ignores
   grainFx.
+- Double voice: doubleDetune renders the voice twice, that many cents apart (0..50; 8-15 thickens a
+  singer or lead, 20+ is a wide chorus, 0 is off). doubleSpread 0..1 widens the pair around the track's own
+  pan, like a balance control on a stereo source; the spread part skips a track's wah. A section can
+  change both through TrackSectionOverride.doubleDetune / doubleSpread; changes glide over 50 ms, but
+  0 cuts the double instantly, so vary the amount rather than toggling it. It costs a second engine
+  on that track, so use it on one or two leads, not the drums. Ignored on MST. Each slot (engineEdm
+  and engineSpace) has its own. Orphic Lore's Sirens use 18 and 0.8.
 - Hold: holdProbability (0..1) with holdLengthMin and holdLengthMax (16th steps, default 2-8). It
   works only on tracks 5-7, on a generated Melodic track (not Chordal, and not one playing a lick),
   and only engineEdm's values are read: the SPACE voice's hold fields are ignored. It is the chance
@@ -367,7 +374,7 @@ string: "trackOverrides": {{TRACK_OVERRIDES_CHORD_FOLLOW_EXAMPLE}}. All
 TrackSectionOverride fields are optional; only set what you need to change (density, volume,
 pan (glides there at 0.15 pan units per second), morph, reverbSend, delaySend, envelopeProfile,
 compingStyle, sectionInversion, arpMode, chordFollow, holdProbability, holdLengthMin,
-holdLengthMax). Settings restore automatically when the section ends.
+holdLengthMax, doubleDetune, doubleSpread). Settings restore automatically when the section ends.
 
 Two of those have rules worth knowing. "density": 0 takes a track OUT for the section (a clean
 mute that works on any track); a POSITIVE density rebuilds the track's pattern at that density,

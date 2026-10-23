@@ -70,7 +70,8 @@ Shape — an object keyed by the track index (0-7) as a string:
 TrackSectionOverride fields (all optional, override only what you set):
   density, volume, pan (-1..1; the track glides there at 0.15 pan units per second and back on
   exit), morph, reverbSend, delaySend, envelopeProfile, compingStyle, sectionInversion, arpMode,
-  chordFollow, holdProbability, holdLengthMin, holdLengthMax.
+  chordFollow, holdProbability, holdLengthMin, holdLengthMax, doubleDetune (0..50 cents),
+  doubleSpread (0..1).
 IMPORTANT — unlike the bare-string enum fields beside it, `compingStyle` is a polymorphic OBJECT,
 written exactly like Section.compingStyle in the schema above (NOT a bare string):
   "compingStyle": ${VibeGuideExamples.COMPING_STYLE_EXAMPLE}
