@@ -28,6 +28,7 @@ import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
+import org.balch.orpheus.djapp.ai.songref.SongPasteStore
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.AgentActivityEventBus
 import org.balch.orpheus.features.ai.OrpheusAgent
@@ -102,12 +103,12 @@ internal fun clearRunOutput(s: DjAiUiState): DjAiUiState =
  * [DjAiFeedItem.Request] row (always id 0, always the top row), remember [draft] as
  * [DjAiUiState.lastPrompt] for the model-switch prefill, and blank the input.
  */
-internal fun startRun(s: DjAiUiState, draft: String): DjAiUiState =
+internal fun startRun(s: DjAiUiState, draft: String, shown: String = draft): DjAiUiState =
     clearRunOutput(s).copy(
         phase = DjAiPhase.GENERATING,
         promptDraft = "",
         lastPrompt = draft,
-        feed = listOf(DjAiFeedItem.Request(id = 0, text = draft)),
+        feed = listOf(DjAiFeedItem.Request(id = 0, text = shown)),
         nextId = 1,
     )
 
@@ -131,6 +132,7 @@ private fun friendly(tool: String): String = when (tool) {
     "pulsar_vibe_schema" -> "Vibe Schema"
     "pulsar_get_vibe" -> "Current Vibe"
     "pulsar_apply_vibe" -> "Apply Vibe"
+    "song_reference" -> "Song Reference"
     else -> tool.replace('_', ' ').replaceFirstChar { it.uppercase() }
 }
 
@@ -262,6 +264,7 @@ class DjAiViewModel(
     private val scope: FeatureCoroutineScope,
     private val mcpEndpointState: McpEndpointState,
     private val preferences: AppPreferencesRepository,
+    private val songPasteStore: SongPasteStore,
 ) : DjAiFeature {
 
     private val log = logging("DjAiViewModel")
@@ -348,15 +351,30 @@ class DjAiViewModel(
         val current = _uiState.value
         if (current.phase == DjAiPhase.GENERATING) return
         val draft = current.promptDraft.trim()
-        if (draft.isBlank()) return
+        // An Enter right after a big paste waits for its chip, so the prompt carries the pasteId.
+        references.whenAttached { send(draft) }
+    }
 
-        log.debug { "Submitting prompt: $draft" }
-        _uiState.update { startRun(it, draft) }
+    private fun send(draft: String) {
+        val current = _uiState.value
+        if (current.phase == DjAiPhase.GENERATING) return
+        val reference = current.reference
+        if (draft.isBlank() && reference == null) return
+
+        val shown = draft.ifBlank { "♪ song reference" }
+        log.debug { "Submitting prompt: $shown" }
+        _uiState.update { startRun(it, draft, shown) }
         agent.sendPrompt(PromptIntent(
-            prompt = "Make a Pulsar vibe: $draft",
-            displayText = draft,
+            prompt = agentPrompt(draft, reference),
+            displayText = shown,
         ))
     }
+
+    private val references = ReferenceAttacher(songPasteStore, scope, dispatcherProvider.default, _uiState)
+
+    private fun attachReference(text: String) = references.attach(text)
+
+    private fun detachReference() = references.detach()
 
     private fun saveKey(aiProvider: AiProvider, key: String) {
         scope.launch(dispatcherProvider.io) {
@@ -421,6 +439,8 @@ class DjAiViewModel(
         selectCastMode = ::selectCastMode,
         reset = ::reset,
         dismissError = ::dismissError,
+        attachReference = ::attachReference,
+        detachReference = ::detachReference,
     )
 
     companion object {

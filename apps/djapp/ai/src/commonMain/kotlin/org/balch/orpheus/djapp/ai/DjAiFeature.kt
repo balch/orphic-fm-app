@@ -71,6 +71,10 @@ sealed interface DjAiFeedItem {
     ) : DjAiFeedItem
 }
 
+/** The song page attached to the chat; the agent reads it by [id] through `song_reference`. */
+@Immutable
+data class SongPasteRef(val id: String, val lines: Int, val title: String?)
+
 /**
  * UI state for the DJ AI vibe-creation panel.
  *
@@ -87,6 +91,8 @@ sealed interface DjAiFeedItem {
  * @property availableModels All models the user may choose from.
  * @property isKeySet Whether an API key is configured for the current model's provider.
  * @property castMode How a new vibe is cast: bed fixed or everything rolled. Saved across launches.
+ * @property reference The attached song reference, kept across follow-up runs until detached.
+ * @property parsing Ticket of a paste still parsing into [reference]; null when none is.
  * @property mcpEndpoint The loopback MCP server's url and token; null until it listens (and on iOS).
  */
 @Immutable
@@ -102,6 +108,8 @@ data class DjAiUiState(
     val isKeySet: Boolean = false,
     val mcpEndpoint: McpEndpoint? = null,
     val castMode: CastMode = CastMode.BED_FIXED,
+    val reference: SongPasteRef? = null,
+    val parsing: Long? = null,
 )
 
 /**
@@ -124,6 +132,10 @@ data class DjAiPanelActions(
     val reset: () -> Unit,
     /** Dismiss the error banner without touching the feed's failure context. */
     val dismissError: () -> Unit,
+    /** Attach a big paste as the song reference, replacing any earlier one. */
+    val attachReference: (String) -> Unit,
+    /** Drop the attached song reference. */
+    val detachReference: () -> Unit,
 ) {
     companion object {
         val EMPTY = DjAiPanelActions(
@@ -135,6 +147,8 @@ data class DjAiPanelActions(
             selectCastMode = {},
             reset = {},
             dismissError = {},
+            attachReference = {},
+            detachReference = {},
         )
     }
 }

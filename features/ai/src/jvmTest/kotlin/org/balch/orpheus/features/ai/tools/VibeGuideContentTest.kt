@@ -51,6 +51,11 @@ class VibeGuideContentTest {
         "KICK", "PERC", "HIHAT", "KEYS", "TEXT", "FX", "IV", "VI", "VII", "MAX_LICK_POOL",
     )
 
+    // song_reference output values (PluckGrid, RhythmSource in :apps:djapp:ai's songref), which this module can't see.
+    private val songReferenceValues = setOf(
+        "DOWNBEATS", "EIGHTHS", "EIGHTH_OFFBEATS", "SIXTEENTHS", "SIXTEENTH_OFFBEATS", "TRIPLETS", "MIXED", "SPACING",
+    )
+
     private fun paragraphs(text: String) = text.split(Regex("""\n\s*\n"""))
 
     private val mixTool = Regex("""\b(?:mix|audio|section|ports?)_[a-z_]+\b|\btransport\b""")
@@ -84,7 +89,7 @@ class VibeGuideContentTest {
     fun everyEngineIdInGuideExists() {
         val tokens = Regex("""\b[A-Z][A-Z0-9_]*[A-Z0-9]\b""").findAll(guide).map { it.value }.toSet()
         val notes = Regex("""[A-G]\d""")
-        val known = prose + CastMode.entries.map { it.name }
+        val known = prose + songReferenceValues + CastMode.entries.map { it.name }
         val unknown = tokens.filterNot { t ->
             t in engineIds || t in known || notes.matches(t) || Regex("""\b$t\b""").containsMatchIn(schema)
         }
@@ -199,12 +204,12 @@ class VibeGuideContentTest {
     fun everyFieldTheNewSectionsNameIsReal() {
         val newSections = section("## A. Casting", "## 1. The frame")
         // Cast tool arguments and result fields, not vibe fields.
-        val toolFields = setOf("styleTags", "vibeJson")
+        val toolFields = setOf("styleTags", "vibeJson", "pasteId", "sameAs", "phraseSlots")
         val named = (Regex("`([A-Za-z]+)`").findAll(newSections) + Regex("""\b[a-z]+[A-Z][A-Za-z0-9]*\b""").findAll(newSections))
             .map { it.groupValues.last() }.toSet()
         val unknown = named.filterNot {
             it == "dB" || schema.contains("\"$it\":") || it in toolFields || Regex("""\b$it\b""").containsMatchIn(TRACK_OVERRIDES_NOTE)
         }
-        assertTrue(unknown.isEmpty(), "sections A-C name fields the schema lacks: $unknown")
+        assertTrue(unknown.isEmpty(), "sections A-D name fields the schema lacks: $unknown")
     }
 }

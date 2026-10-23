@@ -5,7 +5,8 @@ registers, EDM/SPACE pairs, starting levels) that already obeys the theory rules
 you compose on it: the frame, groove, progression, melodies, sections and effects. Never copy a
 shipped vibe or edit one into a new vibe. The catalog at the end is for ideas only ("how does that
 one build its singer?"). To tweak the vibe playing now, read it with pulsar_get_vibe('current').
-Sections A-C cover casting, the theory rules, drone beds and expressive voices; 1-12 cover the
+Sections A-C cover casting, the theory rules, drone beds and expressive voices, and D song
+references (a pasted tab or chord sheet); 1-12 cover the
 controls, and 13 the rest of them. The Reference part at the end holds deep dives (OSC, MST and
 grainFx, doubled parts) for when a vibe needs one. Set every value with intent: a vibe that changes
 only bpm and root sounds like the last one.
@@ -217,6 +218,36 @@ section's macroOverrides push it clearly to one side.
 - Give each slot its own expressive fields: grainFx and a deep mod LFO on the SPACE slot alone make
   the breakdown bloom.
 The two slots can measure up to about 9 dB apart at one volume (section 11), so set both.
+
+## D. Song references
+When the song_reference tool is available and the user pastes a tab or chord sheet (the request names a pasteId)
+or points at a file, call song_reference before building. Pass path only for a file the user named. It returns:
+- key: rootNote and scaleType to start from, and chords with their scale degree (for customProgression). key also
+  has confidence and alternatives; a low confidence means weigh your own memory of the song's key.
+- sections: the song's map in order (kind, repeats, sameAs for a repeat), each with its chords. Base the arrangement on it.
+- phraseSlots: one per lyric cue line, with its syllable count and chords. Each slot is one sung phrase: give a
+  lyric line one phrase per slot, about one note per syllable, and a rest (a breath) after it.
+- melodies: single-note tab lines (riffs, solos) as notes and a ready lick (steps, loopLength) with its lickOctave,
+  in the returned key. Call again with rootNote and scaleType to get degrees in the vibe's own key.
+- sections[].pluck: how the tab's guitar strikes its chords there. grid EIGHTH_OFFBEATS is the reggae skank on
+  every "&", SIXTEENTH_OFFBEATS the funk upticks on "e" and "a", TRIPLETS a shuffle or 12/8 roll, DOWNBEATS plain
+  hits (onsets lists which beats, 0 = the downbeat, so [1, 3] is 2 and 4). lpgMode is the matching voice mode.
+  MIXED means no single grid fits: use PLUCK. rhythm SPACING means the tab had no bar lines, so onsets count from
+  the first stroke and may sit shifted against the beat: decide the phase by the genre.
+A lick plays only stepCount / 4 beats: at the default stepCount 16 a lead hears just its first 4 beats. For a
+lyric line or solo set stepCount 64 (16 beats, 4 bars), keep every lick at 16 beats or less, and play a longer
+line from consecutive pool slots in consecutive sections. At 64, a section bar is 2 real bars (use even
+barsMin/barsMax) and chordsPerBar 4 is one chord per real bar.
+Tabs hold no sung pitches. Write the vocal melody from your memory of the song, shaped by the phrase slots and
+keyed to the real chords. Keep it recognisable, not a note-for-note copy.
+
+### Plucks shape the groove
+lpgMode on an OrpheusEngine (set engineEdm and engineSpace alike) decides how a voice speaks. PLUCK blooms once per
+note. The PLUCK_REPEAT modes re-pick whatever the voice holds on their grid, so a long note becomes a rhythm:
+_8TH_OFF the skank, _16TH_OFF upticks, _TRIPLET a roll, _8TH steady eighths, plain PLUCK_REPEAT every 16th.
+The pluck grid sets the feel more than the drums: an off-beat skank over a sparse kick reads as reggae, off-16ths
+over the same kit as funk. Put the song's pluck on the chord or riff voice, and change it for a section with that
+section's track override lpgMode (e.g. straight plucks in the verse, the skank in the chorus, triplets in a jam).
 
 ## 1. The frame
 - bpm: tempo. rootNote, scaleType: the key and mode (set the mode to the feel — PHRYGIAN/MINOR dark,

@@ -1,7 +1,8 @@
 # Vibe composer: distinct AI vibes, a wordless vocal lead, and mixing with the user
 
 > **Status:** piece 1 (shared guide, casting, tool and prompt reshaping) built on branch claude/orphic-mcp-audio,
-> 2026-10-23; piece 4 (double voice) built on claude/nifty-wescoff-953423 and cherry-picked here; pieces 2, 3 and 5 not built here.
+> 2026-10-23; piece 4 (double voice) and piece 2 (song reference) built on their own branches and cherry-picked here;
+> pieces 3 and 5 not built.
 > This is a dated snapshot of the design and its decisions; the code is the source of truth. Later changes
 > add a "Superseded by" line rather than editing the text.
 
