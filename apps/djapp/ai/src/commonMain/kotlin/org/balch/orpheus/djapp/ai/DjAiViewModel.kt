@@ -423,7 +423,7 @@ class DjAiViewModel(
         references.whenAttached { chat.send(draft, _uiState.value.reference, clearDraft = true) }
     }
 
-    private fun tryIdea(idea: Idea) = chat.send(idea.prompt, _uiState.value.reference)
+    private fun tryIdea(idea: Idea) = chat.send(idea.prompt, _uiState.value.reference, label = idea.text)
 
     private val references = ReferenceAttacher(songPasteStore, scope, dispatcherProvider.default, _uiState)
 

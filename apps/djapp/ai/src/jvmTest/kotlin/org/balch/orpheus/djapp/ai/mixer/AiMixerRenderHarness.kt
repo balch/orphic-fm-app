@@ -78,6 +78,8 @@ class AiMixerRenderHarness {
         )
     }
 
+    private fun ago(min: Int) = System.currentTimeMillis() - min * 60_000L
+
     private val state = AiMixerUiState(
         vibeName = "Rust Belt Sunrise",
         sections = listOf("intro", "groove", "drop"),
@@ -109,6 +111,24 @@ class AiMixerRenderHarness {
         notice = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope.",
         pins = setOf(3),
         agentTouched = setOf(5, 6),
+        history = listOf(
+            ChangeRow(
+                1, "you", "KICK · pan", "0.00", "0.04", "whole vibe", ago(3), on = true, covered = false,
+                writes = listOf(CaptureRow(Scope.VIBE, null, null, 0, CaptureField.PAN, null, 0f, 0.04f)),
+            ),
+            ChangeRow(2, "Orpheus", "TEXT · pan", "0.40", "0.34", "whole vibe", ago(3), on = false, covered = false),
+            PointRow(3, "before the TEXT cuts", ago(2)),
+            ChangeRow(4, "you", "TEXT · level", "-2.0 dB", "-7.3 dB", "First Light", ago(1), on = true, covered = true),
+            ChangeRow(
+                5, "Claude Code", "KICK · reverb", "0.08", "0.85", "Overhead", ago(0), on = true, covered = false,
+                writes = listOf(
+                    CaptureRow(Scope.SECTION, 2, "Overhead", 0, CaptureField.REVERB_SEND, null, 0.08f, 0.85f),
+                    CaptureRow(Scope.SECTION, 3, "Overhead II", 0, CaptureField.REVERB_SEND, null, 0.08f, 0.85f),
+                ),
+            ),
+        ),
+        onCount = 3,
+        loadedAtMs = ago(4),
     )
 
     // A different sine envelope per channel, with a little carrier wobble so the bins read as audio.
@@ -274,7 +294,14 @@ class AiMixerRenderHarness {
     @Test fun foldFull() = render("fold_full_1280x1153", 1280, 1153, scale = FOLD_SCALE)
 
     // The changes popover open from the header.
-    @Test fun foldChanges() = render("fold_changes_840x1100", 840, 1100, scale = FOLD_SCALE) { tap(CHANGES_TAG) }
+    @Test fun foldHistory() = render("fold_history_840x1100", 840, 1100, scale = FOLD_SCALE) { tap(HISTORY_TAG) }
+
+    // The History popover from the header, then the compact list scrolled to its History block.
+    @Test fun historyPopover() = render("history_popover_1280x800", 1280, 800) { tap(HISTORY_TAG) }
+
+    @Test fun historyCompact() = render("history_compact", 360, 780) {
+        repeat(3) { dragUp(x = 180f * 2, fromY = 700f * 2, dy = 600f * 2) }
+    }
 
     @Test fun desktop() = render("desktop", 1280, 800)
 

@@ -29,7 +29,7 @@ class AppGuideTool : ToolProvider {
             description = """
                 Call this when the user asks how the app works: the Mixer's controls, what its numbers (LUFS,
                 pre-clip, past knee, corr, a strip's LU) mean and how to fix them, Reset to file, Capture, pins,
-                the saved AI vibes list, or how an AI vibe becomes a vibe in the app's catalog.
+                History (turning changes off, points, rolling back), the saved AI vibes list, or how an AI vibe becomes a vibe in the app's catalog.
                 Returns the guide; answer from it, briefly.
             """.trimIndent(),
         ) {

@@ -9,6 +9,7 @@ import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 
@@ -39,7 +40,7 @@ data class MixCaptureResult(
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject
 // The service itself, not a provider: building it with the tools starts its load follower early.
-class MixCaptureTool(private val service: MixCaptureService) : ToolProvider {
+class MixCaptureTool(private val service: MixCaptureService, private val collabMixer: CollabMixer) : ToolProvider {
     override val tool: Tool<NoArgs, MixCaptureResult> by lazy {
         object : Tool<NoArgs, MixCaptureResult>(
             argsType = typeToken<NoArgs>(),
@@ -56,9 +57,17 @@ class MixCaptureTool(private val service: MixCaptureService) : ToolProvider {
             """.trimIndent(),
         ) {
             override suspend fun execute(args: NoArgs): MixCaptureResult = guarded({ MixCaptureResult(false, it) }) {
+                // A capture reads the controller's layers, so it saves the history, not a point being heard.
+                collabMixer.endHear()
                 val o = service.capture()
+                // A catalog vibe keeps playing the mix, so the History marks where the file was written.
+                if (o.ok && o.rows.isNotEmpty() && !o.appliedToAiVibe) collabMixer.markPoint(CAPTURED)
                 MixCaptureResult(o.ok, o.message, o.file, o.rows, o.stale, o.aiVibe, o.appliedToAiVibe)
             }
         }
+    }
+
+    companion object {
+        const val CAPTURED = "Captured"
     }
 }

@@ -129,22 +129,29 @@ internal class DjAiChat(
     private val turns = SynchronizedObject()
 
     /** A turn to open: the state before its Request row, the message, and a reference the agent has not been told about. */
-    private class Start(val base: DjAiUiState, val text: String, val reference: SongPasteRef?)
+    private class Start(val base: DjAiUiState, val text: String, val reference: SongPasteRef?, val label: String?)
 
     private class TurnEnd(val next: Start?)
 
     /**
      * Sends [text] as the user's next message, or queues it while a turn runs. [clearDraft] when it came from the
      * input; [confirmWipe] carries the user's "clear my mix" into the turn that sends it.
+     * [label] names the turn's History point; it defaults to [text].
      */
-    fun send(text: String, reference: SongPasteRef?, clearDraft: Boolean = false, confirmWipe: Boolean = false) {
+    fun send(
+        text: String,
+        reference: SongPasteRef?,
+        clearDraft: Boolean = false,
+        confirmWipe: Boolean = false,
+        label: String? = null,
+    ) {
         synchronized(turns) {
             val start = state.transition { s0 ->
                 if (text.isBlank() && fresh(s0, reference) == null) return@transition s0 to null
                 val s = (if (clearDraft) s0.copy(promptDraft = "", lastPrompt = text) else s0)
                     .copy(confirmWipeNext = s0.confirmWipeNext || confirmWipe)
                 when {
-                    s.phase == DjAiPhase.IDLE -> begin(s, text, reference)
+                    s.phase == DjAiPhase.IDLE -> begin(s, text, reference, label)
                     text.isBlank() -> s0 to null
                     else -> s.copy(queued = s.queued + text) to null
                 }
@@ -256,10 +263,10 @@ internal class DjAiChat(
     /** [reference] when the agent has not been told about it in this conversation. */
     private fun fresh(s: DjAiUiState, reference: SongPasteRef?) = reference?.takeIf { it.id != s.referenceSentId }
 
-    private fun begin(s: DjAiUiState, text: String, reference: SongPasteRef?): Pair<DjAiUiState, Start> {
+    private fun begin(s: DjAiUiState, text: String, reference: SongPasteRef?, label: String? = null): Pair<DjAiUiState, Start> {
         val announce = fresh(s, reference)
         val next = startTurn(s.copy(referenceSentId = announce?.id ?: s.referenceSentId), text.ifBlank { SONG_REFERENCE_SHOWN })
-        return next to Start(s, text, announce)
+        return next to Start(s, text, announce, label)
     }
 
     /** Runs [block] with true once the Mixer is on screen, or with false after [MIXER_WAIT_MS] if it never shows. */
@@ -275,7 +282,7 @@ internal class DjAiChat(
     private fun dispatch(start: Start) {
         val base = start.base
         val moves = collab.takeMovesForAgent()
-        collab.beginTurn()
+        collab.beginTurn((start.label ?: start.text).ifBlank { null })
         onTurnStarted()
         // beginTurn clears any confirmation, so the user's comes after it.
         if (base.confirmWipeNext) collab.confirmWipe()

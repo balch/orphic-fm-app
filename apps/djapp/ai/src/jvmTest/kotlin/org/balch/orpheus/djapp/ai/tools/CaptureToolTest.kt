@@ -10,6 +10,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.audio.dsp.NoMeterTap
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.HistoryChange
+import org.balch.orpheus.djapp.ai.collab.HistoryPoint
+import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.mcp.MixCaptureFlow
 import org.balch.orpheus.djapp.ai.mcp.repoRoot
 import org.balch.orpheus.features.ai.AiVibeArchive
@@ -27,6 +31,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -66,7 +71,9 @@ class CaptureToolTest {
             scope = if (follow) backgroundScope else null,
         )
 
-    private fun TestScope.tool(c: MixBenchController, archive: AiVibeArchive) = MixCaptureTool(flow(c, archive)).tool
+    private fun TestScope.mixer(c: () -> MixBenchController) = CollabRig(pulsar, c, backgroundScope).mixer
+
+    private fun TestScope.tool(c: MixBenchController, archive: AiVibeArchive) = MixCaptureTool(flow(c, archive), mixer { c }).tool
 
     /** A checkout holding just the Night Drive source. */
     private fun fakeRepo(): Pair<File, File> {
@@ -135,7 +142,7 @@ class CaptureToolTest {
         assertEquals(atLoad, f.baselineHash("Night Drive"))
         c.mix()
 
-        val r = MixCaptureTool(f).tool.execute(NoArgs())
+        val r = MixCaptureTool(f, mixer { c }).tool.execute(NoArgs())
 
         assertTrue(r.ok, r.message)
         assertEquals(true, r.stale)
@@ -149,7 +156,7 @@ class CaptureToolTest {
         val (repo, _) = fakeRepo()
         val c = controller()
         c.mix()
-        val r = MixCaptureTool(flow(c, FakeArchive(), repo)).tool.execute(NoArgs())
+        val r = MixCaptureTool(flow(c, FakeArchive(), repo), mixer { c }).tool.execute(NoArgs())
         assertTrue(r.ok, r.message)
         assertNull(r.stale)
     }
@@ -218,6 +225,43 @@ class CaptureToolTest {
     }
 
     @Test
+    fun captureOfShippedVibeDropsACapturedPoint() = runTest {
+        val c = controller()
+        val rig = CollabRig(pulsar, { c }, backgroundScope)
+        runCurrent()
+        rig.mixer.edit(EditOrigin.USER, MixControl.Level(4)) { setLevelDb(4, -6f) }
+
+        val r = MixCaptureTool(flow(c, FakeArchive()), rig.mixer).tool.execute(NoArgs())
+
+        assertTrue(r.ok, r.message)
+        assertFalse(r.appliedToAiVibe)
+        val (change, point) = rig.mixer.history.value.items
+        assertIs<HistoryChange>(change)
+        assertEquals("Captured", assertIs<HistoryPoint>(point).label)
+    }
+
+    @Test
+    fun captureDuringHearWritesTheHistoryNotThePreview() = runTest {
+        val c = controller()
+        val rig = CollabRig(pulsar, { c }, backgroundScope)
+        runCurrent()
+        rig.mixer.markPoint()
+        rig.mixer.edit(EditOrigin.USER, MixControl.Level(4)) { setLevelDb(4, -6f) }
+        val history = rig.mixer.history.value
+        assertTrue(rig.mixer.hear(history.items.first().id))
+        assertEquals(BenchLayers(), c.layers.value)
+
+        val r = MixCaptureTool(flow(c, FakeArchive()), rig.mixer).tool.execute(NoArgs())
+
+        assertTrue(r.ok, r.message)
+        assertNull(rig.mixer.hearing.value)
+        assertEquals(capture(catalog, history.layers()), r.rows)
+        assertTrue(r.rows.isNotEmpty())
+        assertEquals(history.layers(), c.layers.value)
+        assertEquals("Captured", assertIs<HistoryPoint>(rig.mixer.history.value.items.last()).label)
+    }
+
+    @Test
     fun captureWaitsForAVibeLoadToBeFollowed() = runTest {
         val c = controller()
         c.mix()
@@ -232,7 +276,7 @@ class CaptureToolTest {
 
     @Test
     fun unavailableServiceSaysSo() = runTest {
-        val tool = MixCaptureTool(UnavailableMixCaptureService()).tool
+        val tool = MixCaptureTool(UnavailableMixCaptureService(), mixer { error("unused") }).tool
         val r = tool.execute(NoArgs())
         assertFalse(r.ok)
         assertEquals("capture not available on this platform yet", r.message)

@@ -1011,6 +1011,16 @@ class DjAiViewModelTest {
         override suspend fun save(preferences: AppPreferences) { saved = preferences }
     }
 
+    @Test
+    fun sendBeginsTheTurnWithItsLabelOrItsText() {
+        val rig = ChatRig()
+        rig.chat.send("Make the pads wash over everything", null, label = "Wash the pads")
+        assertEquals("Wash the pads", rig.collab.turnLabel)
+        rig.reply("Done.")
+        rig.chat.send("Duck the drums", null)
+        assertEquals("Duck the drums", rig.collab.turnLabel)
+    }
+
     /** The conversation core with a recording agent, a real [MixCollab] and no coroutines. */
     private class ChatRig(initial: DjAiUiState = DjAiUiState(), scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined)) {
         val state = MutableStateFlow(initial)

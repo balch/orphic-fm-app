@@ -34,9 +34,11 @@ import org.balch.orpheus.djapp.ai.collab.CollabResult
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.MixCollab
 import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.tools.MixCaptureTool
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
+import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
@@ -48,7 +50,10 @@ import org.balch.orpheus.features.pulsar.bench.SendEdit
 private data class Local(val capture: MixerCapture? = null, val capturing: Boolean = false, val notice: String? = null)
 
 /** The VM's overlay with the shared collaboration marks: what the user pinned and what the agent touched. */
-private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>)
+private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>, val hist: Hist)
+
+/** The History timeline as the panel shows it. */
+private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long)
 
 /**
  * The mixer panel's state and edits over the shared [MixBenchController]. Every edit goes through [CollabMixer] as
@@ -97,7 +102,10 @@ class AiMixerViewModel(
         val bench = combine(c.layers, c.scope, c.muted, c.soloed, c.loopSection) { layers, sc, muted, soloed, loop ->
             Bench(layers, sc, muted, soloed, loop)
         }
-        val overlay = combine(local, collab.pins, collab.agentTouched, ::Overlay)
+        val hist = combine(collabMixer.history, collabMixer.hearing, pulsarFeature.vibeFlow) { h, hearing, vibe ->
+            Hist(historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }, hearing, h.onCount, h.loadedAtMs)
+        }
+        val overlay = combine(local, collab.pins, collab.agentTouched, hist, ::Overlay)
         emitAll(
             combine(bench, pulsarFeature.vibeFlow, sections, knobs, overlay) { b, vibe, section, k, o ->
                 mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k).copy(
@@ -106,6 +114,10 @@ class AiMixerViewModel(
                     notice = o.local.notice,
                     pins = o.pins,
                     agentTouched = o.agentTouched,
+                    history = o.hist.rows,
+                    hearing = o.hist.hearing,
+                    onCount = o.hist.onCount,
+                    loadedAtMs = o.hist.loadedAtMs,
                 )
             },
         )
@@ -150,6 +162,11 @@ class AiMixerViewModel(
         dismissNotice = { local.update { it.copy(notice = null) } },
         togglePin = collab::togglePin,
         dismissCapture = { local.update { it.copy(capture = null) } },
+        toggleChange = { id -> queue { collabMixer.toggleChange(id) } },
+        markPoint = { queue { collabMixer.markPoint() } },
+        hear = { id -> queue { collabMixer.hear(id) } },
+        endHear = { queue { collabMixer.endHear() } },
+        rollBack = { id -> queue { collabMixer.rollBack(id) } },
     )
 
     private fun sectionName(index: Int) = pulsarFeature.vibeFlow.value.arrangement?.sections?.getOrNull(index)?.name
@@ -192,7 +209,10 @@ class AiMixerViewModel(
         clearNotice()
         scope.launch(dispatchers.default) {
             val result = try {
+                // A capture reads the controller's layers, so it saves the history, not a point being heard.
+                collabMixer.endHear()
                 val o = captureService.capture()
+                if (o.ok && o.rows.isNotEmpty() && !o.appliedToAiVibe) collabMixer.markPoint(MixCaptureTool.CAPTURED)
                 MixerCapture(o.ok, o.message, o.file, o.rows.size, o.stale, o.appliedToAiVibe)
             } catch (e: CancellationException) {
                 throw e

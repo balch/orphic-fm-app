@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -109,8 +108,8 @@ internal fun stripTag(index: Int) = "mixer-strip-$index"
 
 internal const val AMBIENT_TAG = "mixer-ambient"
 internal const val BUS_TAG = "mixer-bus"
-internal const val CHANGES_TAG = "mixer-changes"
-internal const val CHANGES_SCRIM_TAG = "mixer-changes-scrim"
+internal const val HISTORY_TAG = "mixer-history"
+internal const val HISTORY_SCRIM_TAG = "mixer-history-scrim"
 
 /**
  * The AI edition's mixer: the desktop Mix Bench rebuilt natively. Meters are collected here once, while shown, and
@@ -242,22 +241,23 @@ private fun WideMixer(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .testTag(CHANGES_SCRIM_TAG)
+                    .testTag(HISTORY_SCRIM_TAG)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        onClickLabel = "Close changes",
+                        onClickLabel = "Close history",
                         onClick = closeChanges,
                     ),
             )
-            ChangesPopover(
+            HistoryPopover(
                 state,
+                actions,
                 onClose = closeChanges,
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = top, end = pad)
-                    .width(min(stripsWidth, 320.dp * textScale))
-                    .heightIn(max = (height - top - pad).coerceAtLeast(160.dp)),
+                    .width(min(stripsWidth, 560.dp * textScale))
+                    .height((height - top - pad).coerceAtLeast(160.dp)),
             )
         }
     }
@@ -300,7 +300,7 @@ private fun WideHeader(
             Title(state.vibeName, Modifier.weight(1f))
             if (oneRow) BusReadout(meters)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                MixerButton(changesLabel(state.changeCount), onChanges, Modifier.testTag(CHANGES_TAG))
+                MixerButton(changesLabel(state.historyChangeCount), onChanges, Modifier.testTag(HISTORY_TAG))
                 MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
                 MixerButton("Reset to file", actions.reset)
             }
@@ -308,43 +308,6 @@ private fun WideHeader(
         if (!oneRow) BusReadout(meters, textAlign = TextAlign.Start)
         state.capture?.let { CaptureResult(it, actions.dismissCapture, Modifier.fillMaxWidth()) }
         state.notice?.let { NoticeLine(it, actions.dismissNotice, Modifier.fillMaxWidth(), compact = tight) }
-    }
-}
-
-/** The pending changes over the strips, opened from the header's changes button. */
-@Composable
-private fun ChangesPopover(state: AiMixerUiState, onClose: () -> Unit, modifier: Modifier) {
-    val lines = remember(state.changes) { changeLines(state.changes) }
-    val shape = RoundedCornerShape(8.dp)
-    // Focus comes here on open, so the panel's Esc handler sees the keys.
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
-    Column(
-        modifier
-            .shadow(8.dp, shape)
-            .clip(shape)
-            .background(MixerInk.card)
-            .border(1.dp, MixerInk.line, shape)
-            // A pointer handler makes the card the hit target, so its taps never reach the close-on-tap scrim.
-            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
-            .focusRequester(focus)
-            .focusable()
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            ChangesTitle(Modifier.weight(1f))
-            Text(
-                "Close",
-                style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.text, FontWeight.SemiBold),
-                maxLines = 1,
-                modifier = Modifier.clickable(role = Role.Button, onClick = onClose).padding(4.dp),
-            )
-        }
-        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-            ChangesList(lines, Modifier.fillMaxWidth())
-        }
-        FaderNote()
     }
 }
 
@@ -603,11 +566,6 @@ private fun BusStrip(meters: State<MeterSnapshot>) {
 }
 
 @Composable
-internal fun ChangesTitle(modifier: Modifier = Modifier) {
-    Text("Changes", style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text, FontWeight.SemiBold), modifier = modifier)
-}
-
-@Composable
 internal fun SectionPanNote() {
     Text(
         "Pan has no per-section value: pan moves still land in the whole vibe.",
@@ -616,7 +574,7 @@ internal fun SectionPanNote() {
 }
 
 @Composable
-private fun FaderNote() {
+internal fun FaderNote() {
     Text(
         "Faders show the dB offset from the file (0 = as written). Pan and sends show the value heard in the playing section.",
         style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),

@@ -48,8 +48,8 @@ import org.balch.orpheus.djapp.ai.collab.MixCollab
 import org.balch.orpheus.djapp.ai.mixer.AiMixerFeature
 import org.balch.orpheus.djapp.ai.mixer.AiMixerUiState
 import org.balch.orpheus.djapp.ai.mixer.AiMixerViewModel
-import org.balch.orpheus.djapp.ai.mixer.CHANGES_SCRIM_TAG
-import org.balch.orpheus.djapp.ai.mixer.CHANGES_TAG
+import org.balch.orpheus.djapp.ai.mixer.HISTORY_SCRIM_TAG
+import org.balch.orpheus.djapp.ai.mixer.HISTORY_TAG
 import org.balch.orpheus.djapp.ai.mixer.EMPTY_METERS
 import org.balch.orpheus.djapp.ai.mixer.MixerTrack
 import org.balch.orpheus.djapp.ai.mixer.SHEET_MIXER_TAG
@@ -273,16 +273,16 @@ class AiSheetLayoutTest {
             assertEquals(0, escapesOut)
 
             // The Mixer's changes: Esc and a tap outside both hand focus back to the chat's input.
-            s.clickTag(CHANGES_TAG)
-            assertTrue(s.has(CHANGES_SCRIM_TAG))
+            s.clickTag(HISTORY_TAG)
+            assertTrue(s.has(HISTORY_SCRIM_TAG))
             assertFalse(s.inputFocused())
             s.key(Key.Escape)
-            assertFalse(s.has(CHANGES_SCRIM_TAG), "Esc should close the changes")
+            assertFalse(s.has(HISTORY_SCRIM_TAG), "Esc should close the changes")
             assertTrue(s.inputFocused())
             assertEquals(0, escapesOut)
-            s.clickTag(CHANGES_TAG)
-            s.clickTag(CHANGES_SCRIM_TAG)
-            assertFalse(s.has(CHANGES_SCRIM_TAG))
+            s.clickTag(HISTORY_TAG)
+            s.clickTag(HISTORY_SCRIM_TAG)
+            assertFalse(s.has(HISTORY_SCRIM_TAG))
             assertTrue(s.inputFocused())
 
             // With nothing open, Esc goes on to the sheet as before.

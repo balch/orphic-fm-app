@@ -85,7 +85,6 @@ internal fun CompactMixer(
     bottomOverhang: Dp = 0.dp,
 ) {
     var expanded by rememberSaveable { mutableIntStateOf(-1) }
-    val lines = remember(state.changes) { changeLines(state.changes) }
     val inline = width >= INLINE_SLIDERS_MIN
     val textScale = textScale()
     val grid = remember(textScale) { Grid(textScale) }
@@ -142,8 +141,9 @@ internal fun CompactMixer(
                     .padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                ChangesTitle()
-                ChangesList(lines, Modifier.fillMaxWidth())
+                val nowMs = rememberNowMs()
+                HistoryTitle(state, actions)
+                HistoryTimeline(state, actions, nowMs, Modifier.fillMaxWidth())
                 ChangesFooter(state, actions)
             }
         }

@@ -40,7 +40,7 @@ class GuideToolNamesTest {
             PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth, r.mixer, r.events),
             VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d, r.guard), TransportTool({ error("unused") }, d),
             AudioAnalyzeTool { error("unused") }, AudioCaptureTool(UnavailableStemCaptureService()),
-            MixCaptureTool(UnavailableMixCaptureService()),
+            MixCaptureTool(UnavailableMixCaptureService(), r.mixer),
         ).map { it.tool.descriptor.name }.toSet()
     }
 
@@ -62,6 +62,7 @@ class GuideToolNamesTest {
     fun theAppGuideNamesOnlyRealMixTools() {
         val appGuide = runBlocking { AppGuideTool().tool.execute(NoArgs()).guide }
         assertTrue(appGuide.contains("Reset to file") && appGuide.contains("Capture"), "the app guide lost its Mixer buttons")
+        assertTrue(appGuide.contains("## History"), "the app guide lost its History section")
         val named = Regex("""\b(?:mix|audio|section|ports?)_[a-z_]+\b""").findAll(appGuide).map { it.value }.toSet()
         assertTrue(named.containsAll(setOf("mix_reset", "mix_capture")), "the app guide no longer names mix_reset and mix_capture: $named")
         val unknown = named - toolNames

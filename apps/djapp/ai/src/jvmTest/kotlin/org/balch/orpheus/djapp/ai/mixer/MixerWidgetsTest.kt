@@ -253,8 +253,8 @@ class MixerWidgetsTest {
         }
         mixerScene(1280 - 440 - 16, 1000, FOLD_SCALE) {
             check("strips")
-            tap(CHANGES_TAG)
-            assertTrue(texts().any { it.first == "Changes" }, "the changes popover did not open")
+            tap(HISTORY_TAG)
+            assertTrue(texts().any { it.first.startsWith("History ·") }, "the history popover did not open")
             check("changes popover")
         }
         mixerScene(360, 780, FOLD_SCALE) { check("compact") }
@@ -313,15 +313,15 @@ class MixerWidgetsTest {
     }
 
     @Test
-    fun changesPopoverClosesOnScrimAndEsc() {
+    fun historyPopoverClosesOnScrimAndEsc() {
         mixerScene(1280 - 440 - 16, 1000, 1f) {
-            fun open() = texts().any { it.first == "Changes" }
-            tap(CHANGES_TAG)
+            fun open() = texts().any { it.first.startsWith("History ·") }
+            tap(HISTORY_TAG)
             assertTrue(open(), "the popover did not open")
-            assertEquals("Close changes", node(CHANGES_SCRIM_TAG).config.getOrNull(SemanticsActions.OnClick)?.label)
+            assertEquals("Close history", node(HISTORY_SCRIM_TAG).config.getOrNull(SemanticsActions.OnClick)?.label)
             tapAt(Offset(40f, 900f))
             assertTrue(!open(), "a tap outside should close the popover")
-            tap(CHANGES_TAG)
+            tap(HISTORY_TAG)
             assertTrue(open())
             key(Key.Escape)
             assertTrue(!open(), "Esc should close the popover")

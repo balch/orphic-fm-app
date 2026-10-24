@@ -5,6 +5,13 @@ import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.min
 import kotlin.math.roundToLong
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.HistoryChange
+import org.balch.orpheus.djapp.ai.collab.HistoryItem
+import org.balch.orpheus.djapp.ai.collab.HistoryPoint
+import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.collab.MixHistory
+import org.balch.orpheus.djapp.ai.collab.label
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.CaptureField
@@ -70,12 +77,93 @@ data class AiMixerUiState(
     val pins: Set<Int> = emptySet(),
     /** Tracks the agent changed this turn. */
     val agentTouched: Set<Int> = emptySet(),
+    /** The History timeline, oldest first. */
+    val history: List<HistoryRow> = emptyList(),
+    /** The point being heard while its button is held. */
+    val hearing: Int? = null,
+    val onCount: Int = 0,
+    /** When the vibe loaded, for the File row's age. */
+    val loadedAtMs: Long = 0L,
 ) {
     val sectionScope: Boolean get() = scope == Scope.SECTION && sectionScopeAvailable && section >= 0
 
     /** One per captured row, so one per "+" line of [changeLines]. */
     val changeCount: Int get() = changes.size
+
+    /** The changes History lists, for the header button: one edit can write several file values. */
+    val historyChangeCount: Int get() = history.count { it is ChangeRow }
 }
+
+/** One row of the History timeline. */
+sealed interface HistoryRow
+
+@Immutable
+data class ChangeRow(
+    val id: Int,
+    val who: String,
+    val label: String,
+    val before: String,
+    val after: String,
+    val where: String,
+    val atMs: Long,
+    val on: Boolean,
+    val covered: Boolean,
+    /** The file values Capture writes because of this change: those that would differ with it off. */
+    val writes: List<CaptureRow> = emptyList(),
+) : HistoryRow
+
+@Immutable
+data class PointRow(val id: Int, val label: String, val atMs: Long) : HistoryRow
+
+private fun EditOrigin.who() = when (this) {
+    EditOrigin.USER -> "you"
+    EditOrigin.AGENT -> "Orpheus"
+    EditOrigin.MCP -> "Claude Code"
+}
+
+/** "TEXT · level": the track and the field, as the timeline names a change. */
+private fun MixControl.historyLabel(trackNames: (Int) -> String): String {
+    val full = label(trackNames)
+    val t = track ?: return full
+    val name = trackNames(t)
+    return if (full.startsWith("$name ")) "$name · ${full.removePrefix("$name ")}" else full
+}
+
+fun historyRows(h: MixHistory, vibe: Vibe? = null, trackNames: (Int) -> String): List<HistoryRow> {
+    // Capture writes Now, so a change's share is what Now's rows lose when it alone is off.
+    val now = vibe?.let { capture(it, h.layers()) }.orEmpty()
+    fun writesOf(c: HistoryChange): List<CaptureRow> {
+        if (vibe == null || !c.on) return emptyList()
+        val without = capture(vibe, h.toggle(c.id).layers())
+        return now.filter { r -> without.none { it.sameField(r) && abs(it.new - r.new) <= 1e-4f } }
+    }
+    return h.items.map { item -> historyRow(h, item, trackNames, ::writesOf) }
+}
+
+private fun CaptureRow.sameField(o: CaptureRow) =
+    scope == o.scope && section == o.section && track == o.track && field == o.field && macro == o.macro
+
+private fun historyRow(
+    h: MixHistory,
+    item: HistoryItem,
+    trackNames: (Int) -> String,
+    writesOf: (HistoryChange) -> List<CaptureRow>,
+): HistoryRow =
+    when (item) {
+        is HistoryChange -> ChangeRow(
+            id = item.id,
+            who = item.origin.who(),
+            label = item.control.historyLabel(trackNames),
+            before = item.before,
+            after = item.after,
+            where = item.sectionName ?: "whole vibe",
+            atMs = item.atMs,
+            on = item.on,
+            covered = h.isCovered(item.id),
+            writes = writesOf(item),
+        )
+        is HistoryPoint -> PointRow(item.id, item.label, item.atMs)
+    }
 
 /** The header's changes button text. */
 fun changesLabel(count: Int): String = when (count) {
