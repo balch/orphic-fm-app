@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ArpDirection
@@ -26,6 +27,7 @@ import org.balch.orpheus.features.pulsar.models.EnvelopeType
 import org.balch.orpheus.features.pulsar.models.Evolution
 import org.balch.orpheus.features.pulsar.models.EvolutionTension
 import org.balch.orpheus.features.pulsar.models.FillType
+import org.balch.orpheus.features.pulsar.models.FogPattern
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.GrainMode
 import org.balch.orpheus.features.pulsar.models.GrainScatterMode
@@ -47,6 +49,7 @@ import org.balch.orpheus.features.pulsar.models.ProgressionStyle
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionFog
 import org.balch.orpheus.features.pulsar.models.SectionInversion
 import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.SectionWeather
@@ -548,7 +551,7 @@ public class AWhalesDreamVibe : VibeProvider {
               noteRangeLow = 28,
               noteRangeHigh = 47,
               reverbBrightness = 0.5f,
-              delayFeedback = null,
+              delayFeedback = 0.7f,
               glideRate = 0.15f,
               lpgMode = LpgMode.ENGINE_DEFAULT,
               lpgDecay = 0.5f,
@@ -601,7 +604,7 @@ public class AWhalesDreamVibe : VibeProvider {
               noteRangeLow = 28,
               noteRangeHigh = 47,
               reverbBrightness = 0.5f,
-              delayFeedback = null,
+              delayFeedback = 0.7f,
               glideRate = 0.15f,
               lpgMode = LpgMode.ENGINE_DEFAULT,
               lpgDecay = 0.5f,
@@ -828,12 +831,17 @@ public class AWhalesDreamVibe : VibeProvider {
                 max = 0.48f,
               ),
               moodHarmonics = MacroTarget(
-                min = 0.55f,
-                max = 0.85f,
+                min = 0.35f,
+                max = 0.95f,
               ),
               moodTimbre = MacroTarget(
-                min = 0.39f,
-                max = 0.69f,
+                min = 0.3f,
+                max = 0.8f,
+              ),
+              // Mood helps the whale sing: flat to sharp, level at the vibe's default mood (0.4).
+              moodPitch = MacroTarget(
+                min = -2.0f,
+                max = 3.0f,
               ),
             ),
             barStrategy = BarStrategy.MUTATE,
@@ -1190,8 +1198,8 @@ public class AWhalesDreamVibe : VibeProvider {
               holdLengthMax = 8,
               delaySend = 0.3f,
               reverbSend = 0.6f,
-              noteRangeLow = 60,
-              noteRangeHigh = 67,
+              noteRangeLow = 48,
+              noteRangeHigh = 60,
               reverbBrightness = 0.5f,
               delayFeedback = null,
               glideRate = 0.5f,
@@ -1243,8 +1251,8 @@ public class AWhalesDreamVibe : VibeProvider {
               holdLengthMax = 8,
               delaySend = 0.35f,
               reverbSend = 0.65f,
-              noteRangeLow = 60,
-              noteRangeHigh = 67,
+              noteRangeLow = 48,
+              noteRangeHigh = 60,
               reverbBrightness = 0.5f,
               delayFeedback = null,
               glideRate = 0.6f,
@@ -1284,11 +1292,11 @@ public class AWhalesDreamVibe : VibeProvider {
             role = TrackRole.Melodic(
               chordFollow = ChordFollow.FOLLOW,
               lickMode = LickMode.Fill,
-              lickDegreeOffset = 0,
+              lickDegreeOffset = -7,
               textureLine = false,
               wahLick = false,
               wahParams = null,
-              lickSource = LickSource.BASS,
+              lickSource = LickSource.LEAD,
             ),
             pan = -0.35f,
             density = 0.3f,
@@ -1321,6 +1329,10 @@ public class AWhalesDreamVibe : VibeProvider {
               moodTimbre = MacroTarget(
                 min = 0.4f,
                 max = 0.7f,
+              ),
+              moodPitch = MacroTarget(
+                min = -1.2f,
+                max = 1.8f,
               ),
             ),
             barStrategy = BarStrategy.REPEAT,
@@ -1681,6 +1693,174 @@ public class AWhalesDreamVibe : VibeProvider {
                 LickStep(
                   scaleDegree = -1,
                   duration = 1.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+              ),
+              loopLength = 16,
+            ),
+            // TODO(lick): pool slot 6, the fog horn bass riff for "pings": a short dum, a long held
+            // duuuum, a trailing dumm, rests between. Rough placeholder shape, not the real riff.
+            Lick(
+              steps = listOf(
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 1.5f,
+                  velocity = 0.9f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 1.0f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 8.0f,
+                  velocity = 0.85f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 1.0f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 3.0f,
+                  velocity = 0.7f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 1.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+              ),
+              loopLength = 16,
+            ),
+            // TODO(lick): pool slot 7, the slow-funk bass for "organ swell" and "slow pound":
+            // short notes, ghost notes, rests. Rough placeholder shape, not the real line.
+            Lick(
+              steps = listOf(
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 1.5f,
+                  velocity = 0.9f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 0.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 0.5f,
+                  velocity = 0.5f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 1.0f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 4,
+                  duration = 1.0f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 1.0f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 1.0f,
+                  velocity = 0.85f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 0.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 3,
+                  duration = 1.0f,
+                  velocity = 0.7f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 0.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 0.5f,
+                  velocity = 0.5f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 0.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 5,
+                  duration = 1.0f,
+                  velocity = 0.75f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 0.5f,
+                  velocity = 0.8f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = 0,
+                  duration = 2.0f,
+                  velocity = 0.9f,
+                  glideRate = -1.0f,
+                  hitProbability = 1.0f,
+                ),
+                LickStep(
+                  scaleDegree = -1,
+                  duration = 3.0f,
                   velocity = 0.8f,
                   glideRate = -1.0f,
                   hitProbability = 1.0f,
@@ -2117,15 +2297,15 @@ public class AWhalesDreamVibe : VibeProvider {
                   holdProbability = null,
                   holdLengthMin = null,
                   holdLengthMax = null,
-                  density = 0.0f,
+                  density = 0.45f,
                   volume = null,
                   pan = null,
                   morph = null,
                   morphRise = null,
                   doubleDetune = null,
                   doubleSpread = null,
-                  reverbSend = null,
-                  delaySend = null,
+                  reverbSend = 0.7f,
+                  delaySend = 0.6f,
                   envelopeProfile = null,
                   compingStyle = null,
                   sectionInversion = null,
@@ -2228,7 +2408,7 @@ public class AWhalesDreamVibe : VibeProvider {
               exitEffects = emptyList(),
               entryEffects = emptyList(),
               lickIndex = 0,
-              bassLineIndex = null,
+              bassLineIndex = 6,
               speech = emptyList(),
               street = null,
               volumeEnvelope = emptyList(),
@@ -2457,9 +2637,10 @@ public class AWhalesDreamVibe : VibeProvider {
               exitEffects = emptyList(),
               entryEffects = emptyList(),
               lickIndex = null,
-              bassLineIndex = null,
+              bassLineIndex = 7,
               speech = emptyList(),
               street = null,
+              fog = SectionFog(level = 0.6f, intervalBars = 4, pattern = FogPattern.DUM_DUUUM, distance = 0.55f),
               volumeEnvelope = emptyList(),
             ),
             Section(
@@ -2646,9 +2827,10 @@ public class AWhalesDreamVibe : VibeProvider {
               exitEffects = emptyList(),
               entryEffects = emptyList(),
               lickIndex = 0,
-              bassLineIndex = null,
+              bassLineIndex = 7,
               speech = emptyList(),
               street = null,
+              fog = SectionFog(level = 0.45f, intervalBars = 8, pattern = FogPattern.DUM_DUUUM, distance = 0.6f),
               volumeEnvelope = emptyList(),
             ),
             Section(
@@ -2785,6 +2967,7 @@ public class AWhalesDreamVibe : VibeProvider {
               bassLineIndex = 5,
               speech = emptyList(),
               street = null,
+              fog = SectionFog(level = 0.3f, intervalBars = 8, pattern = FogPattern.SINGLE, distance = 0.75f),
               volumeEnvelope = emptyList(),
             ),
             Section(
@@ -2996,6 +3179,7 @@ public class AWhalesDreamVibe : VibeProvider {
               bassLineIndex = null,
               speech = emptyList(),
               street = null,
+              fog = SectionFog(level = 0.25f, intervalBars = 8, pattern = FogPattern.SINGLE, distance = 0.9f),
               volumeEnvelope = emptyList(),
             ),
             Section(
@@ -3200,7 +3384,7 @@ public class AWhalesDreamVibe : VibeProvider {
                   holdProbability = null,
                   holdLengthMin = null,
                   holdLengthMax = null,
-                  density = 0.0f,
+                  density = 0.3f,
                   volume = null,
                   pan = null,
                   morph = null,
@@ -3216,9 +3400,9 @@ public class AWhalesDreamVibe : VibeProvider {
                   chordFollow = null,
                   lpgMode = null,
                   hits = null,
-                  breatheBars = 0,
-                  breatheFloor = 0.0f,
-                  breatheTimbreSpan = 0.0f,
+                  breatheBars = 4,
+                  breatheFloor = 0.05f,
+                  breatheTimbreSpan = 0.3f,
                 ),
               ),
               compingStyle = null,
@@ -3677,7 +3861,7 @@ public class AWhalesDreamVibe : VibeProvider {
                   holdProbability = null,
                   holdLengthMin = null,
                   holdLengthMax = null,
-                  density = 0.0f,
+                  density = 0.3f,
                   volume = null,
                   pan = null,
                   morph = null,
@@ -4220,11 +4404,11 @@ public class AWhalesDreamVibe : VibeProvider {
                   holdProbability = null,
                   holdLengthMin = null,
                   holdLengthMax = null,
-                  density = 0.0f,
+                  density = 0.35f,
                   volume = null,
                   pan = null,
-                  morph = null,
-                  morphRise = null,
+                  morph = 0.55f,
+                  morphRise = 0.35f,
                   doubleDetune = null,
                   doubleSpread = null,
                   reverbSend = null,
@@ -4307,6 +4491,12 @@ public class AWhalesDreamVibe : VibeProvider {
             floorBarsMax = 2.0f,
             rampUpBars = 1.5f,
             ghostIntensity = 0.4f,
+          ),
+          FogHornAnomaly(
+            probability = 0.04f,
+            intensity = 0.6f,
+            distance = 0.7f,
+            pattern = FogPattern.DUM_DUUUM,
           ),
         ),
         speech = null,
