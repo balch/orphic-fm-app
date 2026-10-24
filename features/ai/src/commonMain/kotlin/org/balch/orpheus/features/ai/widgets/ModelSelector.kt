@@ -28,13 +28,11 @@ import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**
- * Compact model-picker dropdown shared by the Orpheus AI Options panel and the DJ AI panel.
+ * Compact model-picker dropdown for the Orpheus AI Options panel.
  *
  * Emits a tappable pill (current model name, optional drop-down chevron) plus the anchored
- * [DropdownMenu] of [availableModels]. The two call sites differ only cosmetically, so the
- * chevron and horizontal padding are parameterized:
- * - Orpheus AiOptionsPanel: [showDropdownArrow] = true, 12.dp padding (chevron pushed right).
- * - DJ AI ConfigStrip: [showDropdownArrow] = false, 10.dp padding (bare text pill).
+ * [DropdownMenu] of [availableModels]. [showDropdownArrow] pushes a chevron right; without it
+ * the bare text pill hugs its text.
  */
 @Composable
 fun ModelSelector(

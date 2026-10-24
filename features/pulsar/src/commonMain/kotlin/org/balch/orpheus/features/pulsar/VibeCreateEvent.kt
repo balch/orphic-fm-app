@@ -12,7 +12,8 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 /** An agent-driven vibe-creation event, mirrored on the REPL's ReplCodeEvent. */
 sealed interface VibeCreateEvent {
     data object Generating : VibeCreateEvent
-    data class Generated(val vibe: Vibe) : VibeCreateEvent
+    /** [outsideTurn] when no in-app agent turn applied it (an MCP call). */
+    data class Generated(val vibe: Vibe, val outsideTurn: Boolean = false) : VibeCreateEvent
     data class Failed(val error: String) : VibeCreateEvent
 }
 
@@ -31,9 +32,9 @@ class VibeCreateEventBus() {
         _events.emit(VibeCreateEvent.Generating)
     }
 
-    suspend fun emitGenerated(vibe: Vibe) {
+    suspend fun emitGenerated(vibe: Vibe, outsideTurn: Boolean = false) {
         log.debug { "Generated ${vibe.name}" }
-        _events.emit(VibeCreateEvent.Generated(vibe))
+        _events.emit(VibeCreateEvent.Generated(vibe, outsideTurn))
     }
 
     suspend fun emitFailed(error: String) {

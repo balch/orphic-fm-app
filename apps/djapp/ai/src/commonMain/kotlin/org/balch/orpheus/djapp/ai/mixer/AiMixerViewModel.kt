@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -28,6 +29,11 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.CollabResult
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.MixCollab
+import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
@@ -41,9 +47,13 @@ import org.balch.orpheus.features.pulsar.bench.SendEdit
 /** The VM's own overlay on the controller-derived state. */
 private data class Local(val capture: MixerCapture? = null, val capturing: Boolean = false, val notice: String? = null)
 
+/** The VM's overlay with the shared collaboration marks: what the user pinned and what the agent touched. */
+private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>)
+
 /**
- * The mixer panel's state and edits over the shared [MixBenchController]. The controller is resolved lazily
- * (flows, edit consumer), never in the constructor, to avoid the DI cycle [org.balch.orpheus.djapp.ai.tools.MixReadTool] documents.
+ * The mixer panel's state and edits over the shared [MixBenchController]. Every edit goes through [CollabMixer] as
+ * [EditOrigin.USER]. The controller is resolved lazily (flows, edit consumer), never in the constructor, to avoid
+ * the DI cycle [org.balch.orpheus.djapp.ai.tools.MixReadTool] documents.
  */
 @Inject
 @SingleIn(FeatureScope::class)
@@ -54,20 +64,21 @@ class AiMixerViewModel(
     private val controllerProvider: () -> MixBenchController,
     private val pulsarFeature: PulsarFeature,
     private val captureService: MixCaptureService,
+    private val collabMixer: CollabMixer,
+    private val collab: MixCollab,
     private val scope: FeatureCoroutineScope,
     private val dispatchers: DispatcherProvider,
 ) : AiMixerFeature {
     private val log = logging("AiMixerViewModel")
     private val local = MutableStateFlow(Local())
-    private val edits = Channel<suspend MixBenchController.() -> Unit>(Channel.UNLIMITED)
+    private val edits = Channel<suspend () -> Unit>(Channel.UNLIMITED)
 
     init {
         scope.launch(dispatchers.default) {
-            val controller by lazy(controllerProvider)
             for (edit in edits) {
                 // One bad edit must not end the consumer: the scope is a SupervisorJob, so later edits would drop silently.
                 try {
-                    controller.edit()
+                    edit()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -86,10 +97,16 @@ class AiMixerViewModel(
         val bench = combine(c.layers, c.scope, c.muted, c.soloed, c.loopSection) { layers, sc, muted, soloed, loop ->
             Bench(layers, sc, muted, soloed, loop)
         }
+        val overlay = combine(local, collab.pins, collab.agentTouched, ::Overlay)
         emitAll(
-            combine(bench, pulsarFeature.vibeFlow, sections, knobs, local) { b, vibe, section, k, l ->
-                mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k)
-                    .copy(capture = l.capture, capturing = l.capturing, notice = l.notice)
+            combine(bench, pulsarFeature.vibeFlow, sections, knobs, overlay) { b, vibe, section, k, o ->
+                mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k).copy(
+                    capture = o.local.capture,
+                    capturing = o.local.capturing,
+                    notice = o.local.notice,
+                    pins = o.pins,
+                    agentTouched = o.agentTouched,
+                )
             },
         )
     }
@@ -104,31 +121,52 @@ class AiMixerViewModel(
         }
     }.flowOn(dispatchers.default)
 
+    override val agentEdits: Flow<MixControl> = collab.agentEdits
+
     override val actions = AiMixerActions(
-        setLevelDb = { t, db -> edit { refuse(setHeardLevelDb(t, db.coerceIn(MIN_DB, MAX_DB))) } },
-        setPan = { t, p -> edit { refuse(setPan(t, p)) } },
-        setReverb = { t, v -> edit { sendNotice(setHeardSend(t, v, reverb = true)) } },
-        setDelay = { t, v -> edit { sendNotice(setHeardSend(t, v, reverb = false)) } },
-        toggleMute = { t -> edit { refuse(toggleMute(t)) } },
-        toggleSolo = { t -> edit { refuse(toggleSolo(t)) } },
-        setMacro = { m, v -> edit { refuse(setMacro(m, v)) } },
+        setLevelDb = { t, db -> edit(MixControl.Level(t), onDone = ::refuse) { setHeardLevelDb(t, db.coerceIn(MIN_DB, MAX_DB)) } },
+        setPan = { t, p -> edit(MixControl.Pan(t), onDone = ::refuse) { setPan(t, p) } },
+        setReverb = { t, v -> edit(MixControl.Send(t, reverb = true), onDone = ::sendNotice) { setHeardSend(t, v, reverb = true) } },
+        setDelay = { t, v -> edit(MixControl.Send(t, reverb = false), onDone = ::sendNotice) { setHeardSend(t, v, reverb = false) } },
+        toggleMute = { t -> edit(MixControl.Mute(t), onDone = ::refuse) { toggleMute(t) } },
+        toggleSolo = { t -> edit(MixControl.Solo(t), onDone = ::refuse) { toggleSolo(t) } },
+        setMacro = { m, v -> edit(MixControl.MacroKnob(m), onDone = ::refuse) { setMacro(m, v) } },
         setScope = { s ->
-            edit {
+            edit(
+                MixControl.EditScope,
+                // The zero-send notice asks for section scope, so a scope change answers it.
+                onDone = { changed -> if (changed) local.update { if (it.notice == ZERO_SEND) it.copy(notice = null) else it } },
+            ) {
                 val before = scope.value
                 setScope(s)
-                // The zero-send notice asks for section scope, so a scope change answers it.
-                if (scope.value != before) local.update { if (it.notice == ZERO_SEND) it.copy(notice = null) else it }
+                scope.value != before
             }
         },
-        jumpTo = { s -> edit { jumpTo(s) } },
-        setLoop = { on -> edit { setLoop(on) } },
-        reset = { edit { resetToFile() } },
+        // The jump lands at the next bar line, so the move shows the section it is going to.
+        jumpTo = { s -> edit(MixControl.Section, shown = sectionName(s)) { jumpTo(s) } },
+        setLoop = { on -> edit(MixControl.Loop) { setLoop(on) } },
+        reset = { edit(MixControl.ResetToFile, shown = "file") { resetToFile() } },
         capture = ::capture,
         dismissNotice = { local.update { it.copy(notice = null) } },
+        togglePin = collab::togglePin,
+        dismissCapture = { local.update { it.copy(capture = null) } },
     )
 
-    private fun edit(block: suspend MixBenchController.() -> Unit) {
+    private fun sectionName(index: Int) = pulsarFeature.vibeFlow.value.arrangement?.sections?.getOrNull(index)?.name
+
+    private fun queue(block: suspend () -> Unit) {
         edits.trySend(block)
+    }
+
+    /** Queues a user edit; [onDone] gets what the controller returned. A user edit is never refused. */
+    private fun <T> edit(
+        control: MixControl,
+        shown: String? = null,
+        onDone: (T) -> Unit = {},
+        block: suspend MixBenchController.() -> T,
+    ) = queue {
+        val result = collabMixer.edit(EditOrigin.USER, control, shown, block)
+        if (result is CollabResult.Done) onDone(result.value)
     }
 
     private fun refuse(applied: Boolean) {
@@ -180,11 +218,16 @@ class AiMixerViewModel(
         private const val MAX_DB = 3.5f
         private const val ZERO_SEND = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope."
 
-        fun previewFeature(state: AiMixerUiState = AiMixerUiState(), meters: MeterSnapshot): AiMixerFeature =
+        fun previewFeature(
+            state: AiMixerUiState = AiMixerUiState(),
+            meters: MeterSnapshot,
+            agentEdits: Flow<MixControl> = emptyFlow(),
+        ): AiMixerFeature =
             object : AiMixerFeature {
                 override val stateFlow: StateFlow<AiMixerUiState> = MutableStateFlow(state)
                 override val actions: AiMixerActions = AiMixerActions.EMPTY
                 override val meters: Flow<MeterSnapshot> = MutableStateFlow(meters)
+                override val agentEdits: Flow<MixControl> = agentEdits
             }
 
         @Composable

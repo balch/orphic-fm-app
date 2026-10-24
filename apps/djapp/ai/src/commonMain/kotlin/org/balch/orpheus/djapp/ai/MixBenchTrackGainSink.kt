@@ -21,6 +21,9 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
@@ -39,33 +42,34 @@ import org.balch.orpheus.features.pulsar.mixer.TrackTuning
 @SingleIn(FeatureScope::class)
 @ContributesBinding(FeatureScope::class, replaces = [DirectTrackGainSink::class])
 class AiTrackGainSink(
+    collabMixer: CollabMixer,
     controllerProvider: () -> MixBenchController,
     pulsarFeature: PulsarFeature,
     scope: FeatureCoroutineScope,
     dispatchers: DispatcherProvider,
-) : TrackGainSink by MixBenchTrackGainSink(controllerProvider, pulsarFeature, scope, dispatchers.default)
+) : TrackGainSink by MixBenchTrackGainSink(collabMixer, controllerProvider, pulsarFeature, scope, dispatchers.default)
 
 /**
- * Turns TRACKS taps into [MixBenchController] edits, in order, and shows the controller's levels, mutes and solos
- * as heard in the playing section. The controller is resolved on the first edit or collection, never in a constructor.
- * One consumer on [editContext] runs the edits, so they land in tap order.
+ * Turns TRACKS taps into [MixBenchController] edits made as [EditOrigin.USER] through [collabMixer], in order, and shows
+ * the controller's levels, mutes and solos as heard in the playing section. The controller is resolved on the first edit
+ * or collection, never in a constructor. One consumer on [editContext] runs the edits, so they land in tap order.
  */
 class MixBenchTrackGainSink(
+    private val collabMixer: CollabMixer,
     private val controllerProvider: () -> MixBenchController,
     private val pulsar: PulsarFeature,
     scope: CoroutineScope,
     editContext: CoroutineContext = EmptyCoroutineContext,
 ) : TrackGainSink {
     private val log = logging("MixBenchTrackGainSink")
-    private val edits = Channel<suspend MixBenchController.() -> Unit>(Channel.UNLIMITED)
+    private val edits = Channel<suspend () -> Unit>(Channel.UNLIMITED)
 
     init {
         scope.launch(editContext) {
-            val controller by lazy(controllerProvider)
             for (edit in edits) {
                 // One bad edit must not end the consumer: the scope is a SupervisorJob, so later taps would drop silently.
                 try {
-                    controller.edit()
+                    edit()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -81,18 +85,18 @@ class MixBenchTrackGainSink(
         emitAll(combine(c.layers, c.muted, c.soloed, sections, ::tuning))
     }.distinctUntilChanged()
 
-    override fun toggleMute(t: Int) = send { toggleMute(t) }
+    override fun toggleMute(t: Int) = send(MixControl.Mute(t)) { toggleMute(t) }
 
-    override fun toggleSolo(t: Int) = send { toggleSolo(t) }
+    override fun toggleSolo(t: Int) = send(MixControl.Solo(t)) { toggleSolo(t) }
 
     // TRACKS shows no scope, so its moves are always whole-vibe, whatever scope the agent left set.
-    override fun setLevel(t: Int, level: Float) = send { setHeardLevelDb(t, levelToDb(level), Scope.VIBE) }
+    override fun setLevel(t: Int, level: Float) = send(MixControl.Level(t)) { setHeardLevelDb(t, levelToDb(level), Scope.VIBE) }
 
     /** Clears levels, mutes and solos only; the agent's pans, sends and macros stay. */
-    override fun reset() = send { resetLevels() }
+    override fun reset() = send(MixControl.ResetToFile, shown = "file") { resetLevels() }
 
-    private fun send(edit: suspend MixBenchController.() -> Unit) {
-        edits.trySend(edit)
+    private fun <T> send(control: MixControl, shown: String? = null, edit: suspend MixBenchController.() -> T) {
+        edits.trySend { collabMixer.edit(EditOrigin.USER, control, shown, edit) }
     }
 
     private fun tuning(layers: BenchLayers, muted: Set<Int>, soloed: Set<Int>, section: Int) = TrackTuning(

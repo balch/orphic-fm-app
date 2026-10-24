@@ -11,6 +11,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.djapp.ai.collab.CollabEvent
+import org.balch.orpheus.djapp.ai.collab.CollabEvents
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.CollabResult
+import org.balch.orpheus.djapp.ai.collab.DjVibeApplyGuard
+import org.balch.orpheus.djapp.ai.collab.MixCollab
+import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.collab.Refusal
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
@@ -25,6 +33,9 @@ import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 private const val TRACKS = 8
 private const val FADER_MIN_DB = -30f
 private const val FADER_MAX_DB = 3.5f
+
+/** The `refusal` field on a gated mix tool's result. */
+internal const val REFUSAL_FIELD = "Why the change was refused: MIXER_CLOSED, PINNED or USER_MOVED; message says what to do."
 
 /** A mix edit the controller refused because a vibe load is not yet followed. */
 internal const val VIBE_LOADING = "The vibe just changed; call mix_read, then try again."
@@ -137,6 +148,8 @@ data class MixSetResult(
     val macroHeard: Float? = null,
     @property:LLMDescription("True when this turn's mix edits are used up: do not retry, reply to the user now.")
     val budgetSpent: Boolean = false,
+    @property:LLMDescription(REFUSAL_FIELD)
+    val refusal: String? = null,
 )
 
 @LLMDescription("A track index.")
@@ -155,6 +168,8 @@ data class MixToggleResult(
     val soloed: List<Int> = emptyList(),
     @property:LLMDescription("True when this turn's mix edits are used up: do not retry, reply to the user now.")
     val budgetSpent: Boolean = false,
+    @property:LLMDescription(REFUSAL_FIELD)
+    val refusal: String? = null,
 )
 
 @LLMDescription("No arguments.")
@@ -166,6 +181,8 @@ class NoArgs
 data class MixStatusResult(
     val ok: Boolean,
     val message: String,
+    @property:LLMDescription("Why the change was refused: MIXER_CLOSED or WIPE_UNCONFIRMED; message says what to do.")
+    val refusal: String? = null,
 )
 
 @LLMDescription("Arguments for section_jump. Give section or name.")
@@ -183,6 +200,8 @@ data class SectionJumpResult(
     val ok: Boolean,
     val message: String,
     val section: MixSectionRef? = null,
+    @property:LLMDescription(REFUSAL_FIELD)
+    val refusal: String? = null,
 )
 
 @LLMDescription("Arguments for section_loop.")
@@ -198,6 +217,8 @@ data class SectionLoopResult(
     val ok: Boolean,
     val message: String,
     val loopSection: Int? = null,
+    @property:LLMDescription(REFUSAL_FIELD)
+    val refusal: String? = null,
 )
 
 /** Turns a thrown error into the tool's failure result, so a bad call never escapes as an exception. */
@@ -211,6 +232,30 @@ internal suspend inline fun <R> guarded(fail: (String) -> R, body: () -> R): R =
     }
 
 internal class ToolArgException(message: String) : Exception(message)
+
+/** Said with every gated mix tool, so the agent knows a refusal is not an error to retry. */
+internal const val GATE_RULES = "Refused (refusal set) while the Mixer is closed, on a strip the user pinned, or on a control the user moved this turn."
+
+/**
+ * Runs a mix tool's change through [CollabMixer] as whoever called the tool, and tells the chat about a refusal:
+ * a closed Mixer asks for it to open; a control the user moved this turn shows the value they left.
+ */
+internal suspend fun <T> CollabMixer.toolEdit(
+    events: CollabEvents,
+    control: MixControl,
+    shown: String? = null,
+    block: suspend MixBenchController.() -> T,
+): CollabResult<T> {
+    val result = edit(toolOrigin(), control, shown, block)
+    if (result is CollabResult.Refused) {
+        when (result.refusal) {
+            Refusal.MIXER_CLOSED -> events.emit(CollabEvent.OpenMixerRequested(result.reason))
+            Refusal.USER_MOVED -> events.emit(CollabEvent.AgentSkipped(control, userValue(control)))
+            Refusal.PINNED, Refusal.WIPE_UNCONFIRMED -> Unit
+        }
+    }
+    return result
+}
 
 internal fun badArg(message: String): Nothing = throw ToolArgException(message)
 
@@ -317,6 +362,8 @@ class MixSetTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
     private val controllerProvider: () -> MixBenchController,
     private val turnBudget: TurnBudget,
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
 ) : ToolProvider {
     override val tool: Tool<MixSetArgs, MixSetResult> by lazy {
         object : Tool<MixSetArgs, MixSetResult>(
@@ -330,6 +377,7 @@ class MixSetTool(
                 field=macro: energy, complexity, mood or space knob, 0-1.
                 scope=vibe edits every section; scope=section edits only the playing one. Omit scope to keep the last one.
                 mix_set, mix_mute and mix_solo share a budget of ${TurnBudget.MAX_MIX_EDITS} edits per turn.
+                $GATE_RULES
             """.trimIndent(),
         ) {
             override suspend fun execute(args: MixSetArgs): MixSetResult = guarded({ MixSetResult(false, it) }) {
@@ -342,30 +390,39 @@ class MixSetTool(
                 val macro = if (field == "macro") parseMacro(args.macro) else null
                 val newScope = args.scope?.let(::parseScope)
                 if (!turnBudget.allowMixEdit()) return@guarded MixSetResult(false, TurnBudget.SPENT, budgetSpent = true)
-                newScope?.let { c.setScope(it) }
+                val range = RANGES.getValue(field)
+                val value = args.value.coerceIn(range)
+                val control = when (field) {
+                    "level_db" -> MixControl.Level(track!!)
+                    "pan" -> MixControl.Pan(track!!)
+                    "reverb", "delay" -> MixControl.Send(track!!, reverb = field == "reverb")
+                    else -> MixControl.MacroKnob(macro!!)
+                }
+                val edit = collabMixer.toolEdit(events, control) {
+                    newScope?.let { setScope(it) }
+                    when (field) {
+                        "level_db" -> setHeardLevelDb(track!!, value)
+                        "pan" -> setPan(track!!, value)
+                        "reverb", "delay" -> when (setHeardSend(track!!, value, reverb = field == "reverb")) {
+                            SendEdit.APPLIED -> true
+                            SendEdit.VIBE_LOADING -> false
+                            SendEdit.ZERO_SEND ->
+                                badArg("This send is 0 here, so a whole-vibe edit can't scale it; use scope=section.")
+                        }
+                        else -> setMacro(macro!!, value)
+                    }
+                }
+                when (edit) {
+                    is CollabResult.Refused -> return@guarded MixSetResult(false, edit.reason, refusal = edit.refusal.name)
+                    is CollabResult.Done -> if (!edit.value) badArg(VIBE_LOADING)
+                }
                 val scope = c.scope.value
                 val notes = mutableListOf<String>()
                 if (scope == Scope.SECTION && !pulsar.vibeFlow.value.sectionScopeAvailable()) {
                     notes += "This vibe has fewer than two sections, so the edit went to the whole vibe."
                 }
-                val range = RANGES.getValue(field)
-                val value = args.value.coerceIn(range)
                 if (value != args.value) notes += "$field clamped to ${range.start}..${range.endInclusive} (asked ${args.value})."
-                val applied = when (field) {
-                    "level_db" -> c.setHeardLevelDb(track!!, value)
-                    "pan" -> {
-                        if (scope == Scope.SECTION) notes += "Pan is whole-vibe only."
-                        c.setPan(track!!, value)
-                    }
-                    "reverb", "delay" -> when (c.setHeardSend(track!!, value, reverb = field == "reverb")) {
-                        SendEdit.APPLIED -> true
-                        SendEdit.VIBE_LOADING -> false
-                        SendEdit.ZERO_SEND ->
-                            badArg("This send is 0 here, so a whole-vibe edit can't scale it; use scope=section.")
-                    }
-                    else -> c.setMacro(macro!!, value)
-                }
-                if (!applied) badArg(VIBE_LOADING)
+                if (field == "pan" && scope == Scope.SECTION) notes += "Pan is whole-vibe only."
                 val section = pulsar.arrangementStateFlow.value.sectionIndex
                 MixSetResult(
                     ok = true,
@@ -398,13 +455,18 @@ class MixSetTool(
 class MixMuteTool(
     private val controllerProvider: () -> MixBenchController,
     private val turnBudget: TurnBudget,
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
 ) : ToolProvider {
     override val tool: Tool<MixTrackArgs, MixToggleResult> by lazy {
         toggleTool(
             "mix_mute",
-            "Toggle mute on one track (0-7). Mutes stay through mix_reset; a vibe load clears them.",
+            "Toggle mute on one track (0-7). Mutes stay through mix_reset; a vibe load clears them. $GATE_RULES",
             controllerProvider,
             turnBudget,
+            collabMixer,
+            events,
+            MixControl::Mute,
         ) { toggleMute(it) }
     }
 }
@@ -414,13 +476,18 @@ class MixMuteTool(
 class MixSoloTool(
     private val controllerProvider: () -> MixBenchController,
     private val turnBudget: TurnBudget,
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
 ) : ToolProvider {
     override val tool: Tool<MixTrackArgs, MixToggleResult> by lazy {
         toggleTool(
             "mix_solo",
-            "Toggle solo on one track (0-7); any solo silences the unsoloed tracks. Solos stay through mix_reset; a vibe load clears them.",
+            "Toggle solo on one track (0-7); any solo silences the unsoloed tracks. Solos stay through mix_reset; a vibe load clears them. $GATE_RULES",
             controllerProvider,
             turnBudget,
+            collabMixer,
+            events,
+            MixControl::Solo,
         ) { toggleSolo(it) }
     }
 }
@@ -430,6 +497,9 @@ private fun toggleTool(
     description: String,
     controllerProvider: () -> MixBenchController,
     turnBudget: TurnBudget,
+    collabMixer: CollabMixer,
+    events: CollabEvents,
+    control: (Int) -> MixControl,
     toggle: suspend MixBenchController.(Int) -> Boolean,
 ): Tool<MixTrackArgs, MixToggleResult> = object : Tool<MixTrackArgs, MixToggleResult>(
     argsType = typeToken<MixTrackArgs>(),
@@ -440,15 +510,23 @@ private fun toggleTool(
     override suspend fun execute(args: MixTrackArgs): MixToggleResult = guarded({ MixToggleResult(false, it) }) {
         val track = requireTrack(args.track)
         if (!turnBudget.allowMixEdit()) return@guarded MixToggleResult(false, TurnBudget.SPENT, budgetSpent = true)
+        when (val edit = collabMixer.toolEdit(events, control(track)) { toggle(track) }) {
+            is CollabResult.Refused -> return@guarded MixToggleResult(false, edit.reason, refusal = edit.refusal.name)
+            is CollabResult.Done -> if (!edit.value) badArg(VIBE_LOADING)
+        }
         val c = controllerProvider()
-        if (!c.toggle(track)) badArg(VIBE_LOADING)
         MixToggleResult(true, "ok", c.muted.value.sorted(), c.soloed.value.sorted())
     }
 }
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject
-class MixResetTool(private val controllerProvider: () -> MixBenchController) : ToolProvider {
+class MixResetTool(
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
+    private val wipeGuard: DjVibeApplyGuard,
+    private val collab: MixCollab,
+) : ToolProvider {
     override val tool: Tool<NoArgs, MixStatusResult> by lazy {
         object : Tool<NoArgs, MixStatusResult>(
             argsType = typeToken<NoArgs>(),
@@ -457,12 +535,27 @@ class MixResetTool(private val controllerProvider: () -> MixBenchController) : T
             description = """
                 Reset the mix edits: levels, pans, sends and every section edit (section macros included) go back
                 to the vibe as written. Keeps mutes, solos and whole-vibe macro moves: those stay on the app's
-                knobs and a mix capture still writes them.
+                knobs and a mix capture still writes them. Pinned strips keep their edits. When it would clear levels,
+                pans or sends the user set, it is refused (WIPE_UNCONFIRMED) until they confirm. Refused while the Mixer is closed.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: NoArgs): MixStatusResult = guarded({ MixStatusResult(false, it) }) {
-                controllerProvider().resetToFile()
-                MixStatusResult(true, "Levels, pans, sends and section edits reset; mutes, solos and whole-vibe macro moves kept (a capture includes them).")
+                var wipe: CollabResult.Refused? = null
+                // The Mixer check runs first, so a closed Mixer never spends the user's confirmation.
+                val edit = collabMixer.toolEdit(events, MixControl.ResetToFile, shown = "file") {
+                    wipe = wipeGuard.resetRefusal()
+                    if (wipe != null) return@toolEdit false
+                    resetToFile(keep = collab.pins.value)
+                    true
+                }
+                val refused = (edit as? CollabResult.Refused) ?: wipe
+                if (refused != null) return@guarded MixStatusResult(false, refused.reason, refused.refusal.name)
+                val pinned = collab.pins.value
+                MixStatusResult(
+                    true,
+                    "Levels, pans, sends and section edits reset; mutes, solos and whole-vibe macro moves kept (a capture includes them)." +
+                        if (pinned.isEmpty()) "" else " Pinned tracks ${pinned.sorted().joinToString()} kept their edits.",
+                )
             }
         }
     }
@@ -472,14 +565,15 @@ class MixResetTool(private val controllerProvider: () -> MixBenchController) : T
 @Inject
 class SectionJumpTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
-    private val controllerProvider: () -> MixBenchController,
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
 ) : ToolProvider {
     override val tool: Tool<SectionJumpArgs, SectionJumpResult> by lazy {
         object : Tool<SectionJumpArgs, SectionJumpResult>(
             argsType = typeToken<SectionJumpArgs>(),
             resultType = typeToken<SectionJumpResult>(),
             name = "section_jump",
-            description = "Jump to an arrangement section at the next bar line, by index or name (see mix_read sections). A held section_loop moves with it.",
+            description = "Jump to an arrangement section at the next bar line, by index or name (see mix_read sections). A held section_loop moves with it. Refused while the Mixer is closed.",
         ) {
             override suspend fun execute(args: SectionJumpArgs): SectionJumpResult = guarded({ SectionJumpResult(false, it) }) {
                 val pulsar = pulsarFeatureProvider()
@@ -493,7 +587,9 @@ class SectionJumpTool(
                         ?: badArg("no section named \"${args.name}\"; sections: ${sections.joinToString { it.name }}")
                     else -> badArg("give section (index) or name")
                 }
-                controllerProvider().jumpTo(index)
+                // The jump lands at the next bar line, so the move shows the section it is going to.
+                val edit = collabMixer.toolEdit(events, MixControl.Section, shown = sections[index].name) { jumpTo(index) }
+                if (edit is CollabResult.Refused) return@guarded SectionJumpResult(false, edit.reason, refusal = edit.refusal.name)
                 SectionJumpResult(true, "Jumps at the next bar line.", pulsar.sectionRef(index))
             }
         }
@@ -502,18 +598,22 @@ class SectionJumpTool(
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject
-class SectionLoopTool(private val controllerProvider: () -> MixBenchController) : ToolProvider {
+class SectionLoopTool(
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
+) : ToolProvider {
     override val tool: Tool<SectionLoopArgs, SectionLoopResult> by lazy {
         object : Tool<SectionLoopArgs, SectionLoopResult>(
             argsType = typeToken<SectionLoopArgs>(),
             resultType = typeToken<SectionLoopResult>(),
             name = "section_loop",
-            description = "on=true holds the playing section (each move away jumps back at the next bar line); on=false releases it.",
+            description = "on=true holds the playing section (each move away jumps back at the next bar line); on=false releases it. Refused while the Mixer is closed.",
         ) {
             override suspend fun execute(args: SectionLoopArgs): SectionLoopResult = guarded({ SectionLoopResult(false, it) }) {
-                val c = controllerProvider()
-                c.setLoop(args.on)
-                val held = c.loopSection.value
+                val held = when (val edit = collabMixer.toolEdit(events, MixControl.Loop) { setLoop(args.on); loopSection.value }) {
+                    is CollabResult.Refused -> return@guarded SectionLoopResult(false, edit.reason, refusal = edit.refusal.name)
+                    is CollabResult.Done -> edit.value
+                }
                 SectionLoopResult(
                     ok = !args.on || held != null,
                     message = if (args.on && held == null) "No section is playing yet." else "ok",

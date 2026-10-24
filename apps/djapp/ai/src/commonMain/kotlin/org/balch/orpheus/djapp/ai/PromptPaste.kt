@@ -35,26 +35,24 @@ internal fun classifyDraftEdit(old: String, new: String): DraftEdit {
     var suffix = 0
     while (suffix < maxCommon - prefix && old[old.length - 1 - suffix] == new[new.length - 1 - suffix]) suffix++
     val inserted = new.substring(prefix, new.length - suffix)
+    // Only the inserted text changes, so lines added with Shift+Enter survive.
+    fun around(mid: String) = new.substring(0, prefix) + mid + new.substring(new.length - suffix)
 
     // Enter, or an IME composite commit ending in one newline, submits.
     val enter = inserted.length < BIG_MULTILINE_CHARS && inserted.endsWith("\n") && inserted.count { it == '\n' } == 1
-    if (enter) return DraftEdit.Text(new.filterNot { it == '\n' }, submit = true)
+    if (enter) return DraftEdit.Text(around(inserted.dropLast(1)), submit = true)
     val multiline = '\n' in inserted
     val big = inserted.length >= HUGE_PASTE_CHARS ||
         (multiline && (inserted.length >= BIG_MULTILINE_CHARS || inserted.lines().size >= BIG_MULTILINE_LINES))
     if (big) return DraftEdit.Reference(inserted, old)
-    if (multiline) return DraftEdit.Text(new.replace(NEWLINE_RUN, " "), submit = false)
+    if (multiline) return DraftEdit.Text(around(inserted.replace(NEWLINE_RUN, " ")), submit = false)
     return DraftEdit.Text(new, submit = false)
 }
 
-/** The prompt sent to the agent, naming the attached paste so it can call song_reference. */
+/** The message as written, naming the attached paste so the agent can call song_reference. */
 internal fun agentPrompt(draft: String, reference: SongPasteRef?): String {
-    if (reference == null) return "Make a Pulsar vibe: $draft"
-    val head = if (draft.isBlank()) {
-        "Make a Pulsar vibe inspired by the attached song reference."
-    } else {
-        "Make a Pulsar vibe: $draft"
-    }
+    if (reference == null) return draft
+    val head = draft.ifBlank { "Make a Pulsar vibe inspired by the attached song reference." }
     val title = pasteTitle(reference.title)?.let { ", \"$it\"" }.orEmpty()
     return "$head\n\nThe user attached a song reference (pasteId=\"${reference.id}\", ${reference.lines} lines$title). " +
         "Call song_reference with pasteId=\"${reference.id}\" before building."

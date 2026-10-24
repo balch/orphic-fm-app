@@ -26,6 +26,11 @@ import kotlinx.coroutines.test.setMain
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.MixCollab
+import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.collab.MixMove
 import org.balch.orpheus.djapp.ai.tools.FakePulsar
 import org.balch.orpheus.djapp.ai.tools.OneDispatcher
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
@@ -71,6 +76,7 @@ class AiMixerViewModelTest {
         val pulsar: FakePulsar,
         val controller: MixBenchController,
         val vm: AiMixerViewModel,
+        val collab: MixCollab,
         val tap: CountingTap,
     )
 
@@ -82,16 +88,19 @@ class AiMixerViewModelTest {
         val pulsar = FakePulsar(listOf(vibe))
         val tap = CountingTap()
         val controller = MixBenchController(pulsar, synth, tap, controllerScope).also { it.start() }
+        val collab = MixCollab()
         val vm = AiMixerViewModel(
             controllerProvider = { controller },
             pulsarFeature = pulsar,
             captureService = capture,
+            collabMixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope),
+            collab = collab,
             scope = FeatureCoroutineScope(),
             dispatchers = OneDispatcher(testDispatcher),
         )
         backgroundScope.launch { vm.stateFlow.collect {} }
         runCurrent()
-        return Rig(pulsar, controller, vm, tap)
+        return Rig(pulsar, controller, vm, collab, tap)
     }
 
     @Test
@@ -191,6 +200,17 @@ class AiMixerViewModelTest {
     }
 
     @Test
+    fun dismissCaptureClearsIt() = runTest(testDispatcher) {
+        val r = rig()
+        r.vm.actions.capture()
+        advanceUntilIdle()
+        assertNotNull(r.vm.stateFlow.value.capture)
+        r.vm.actions.dismissCapture()
+        advanceUntilIdle()
+        assertNull(r.vm.stateFlow.value.capture)
+    }
+
+    @Test
     fun resetKeepsMutes() = runTest(testDispatcher) {
         val r = rig()
         r.vm.actions.toggleMute(1)
@@ -202,5 +222,62 @@ class AiMixerViewModelTest {
         val s = r.vm.stateFlow.value
         assertTrue(s.tracks[1].muted)
         assertEquals(0f, s.tracks[2].levelDb)
+    }
+
+    @Test
+    fun pinActionTogglesPin() = runTest(testDispatcher) {
+        val r = rig()
+        r.vm.actions.togglePin(2)
+        advanceUntilIdle()
+        assertEquals(setOf(2), r.vm.stateFlow.value.pins)
+        assertEquals(setOf(2), r.collab.pins.value)
+        r.vm.actions.togglePin(2)
+        advanceUntilIdle()
+        assertTrue(r.vm.stateFlow.value.pins.isEmpty())
+    }
+
+    @Test
+    fun agentEditsReachThePanel() = runTest(testDispatcher) {
+        val r = rig()
+        val seen = mutableListOf<MixControl>()
+        backgroundScope.launch { r.vm.agentEdits.collect { seen += it } }
+        runCurrent()
+        r.collab.record(EditOrigin.AGENT, MixControl.Level(2), "0.0 dB", "-3.0 dB")
+        r.collab.record(EditOrigin.USER, MixControl.Level(1), "0.0 dB", "-3.0 dB")
+        r.collab.record(EditOrigin.MCP, MixControl.MacroKnob(Macro.MOOD), "0.40", "0.50")
+        runCurrent()
+        assertEquals(listOf(MixControl.Level(2), MixControl.MacroKnob(Macro.MOOD)), seen)
+    }
+
+    @Test
+    fun editsAreRecordedAsTheUsers() = runTest(testDispatcher) {
+        val r = rig()
+        val moves = mutableListOf<MixMove>()
+        backgroundScope.launch { r.collab.moves.collect { moves += it } }
+        runCurrent()
+        r.vm.actions.setLevelDb(3, -6f)
+        advanceUntilIdle()
+        val move = moves.single()
+        assertEquals(EditOrigin.USER, move.origin)
+        assertEquals(MixControl.Level(3), move.control)
+        assertEquals("0.0 dB", move.before)
+        assertEquals("-6.0 dB", move.after)
+    }
+
+    @Test
+    fun resetIsRecordedAsTheUsers() = runTest(testDispatcher) {
+        val r = rig()
+        val moves = mutableListOf<MixMove>()
+        backgroundScope.launch { r.collab.moves.collect { moves += it } }
+        runCurrent()
+        r.vm.actions.setLevelDb(3, -6f)
+        r.vm.actions.reset()
+        advanceUntilIdle()
+        runCurrent()
+        val move = moves.last()
+        assertEquals(EditOrigin.USER, move.origin)
+        assertEquals(MixControl.ResetToFile, move.control)
+        assertEquals("edited" to "file", move.before to move.after)
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[3])
     }
 }

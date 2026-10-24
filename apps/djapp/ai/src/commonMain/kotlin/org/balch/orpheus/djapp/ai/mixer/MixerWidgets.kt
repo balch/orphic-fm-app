@@ -1,5 +1,8 @@
 package org.balch.orpheus.djapp.ai.mixer
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,21 +16,32 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -37,17 +51,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -62,11 +82,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.max
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.roundToInt
+import org.balch.orpheus.djapp.LegibleText
+import org.balch.orpheus.djapp.LocalCanvasScale
+import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.legible
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
@@ -93,7 +117,18 @@ internal object MixerInk {
     val hot = OrpheusColors.mixerDistRed
     val onBright = OrpheusColors.almostBlack
     val tracks = OrpheusColors.pulsarTracks
+    val agent = OrpheusColors.neonCyan
+    val pin = OrpheusColors.echoLavender
 }
+
+/** Pills and chips, between the labels and the values. */
+private const val PILL_SP = 12f
+
+/** A strip knob's value while it is held. */
+private const val READOUT_SP = 15f
+
+/** The gap between two macro knobs. */
+internal val MACRO_KNOB_GAP = 10.dp
 
 /** A [MixerSlider]'s default row height. */
 internal val SLIDER_HEIGHT = 18.dp
@@ -116,18 +151,24 @@ internal fun silent(db: Double): Boolean = db <= -119.0
 internal fun meterFill(peakDb: Double): Float =
     if (silent(peakDb)) 0f else ((peakDb - METER_FLOOR_DB) / -METER_FLOOR_DB).coerceIn(0.0, 1.0).toFloat()
 
-internal fun dbText(db: Float): String = (if (db > 0f) "+" else "") + fixed(db, 1) + " dB"
+/** The column says dB, so the number goes alone. */
+internal fun dbText(db: Float): String = (if (db > 0f) "+" else "") + fixed(db, 1)
 
 internal fun panText(p: Float): String {
     val n = (abs(p) * 100f).roundToInt()
     return if (n == 0) "C" else (if (p < 0f) "L" else "R") + n
 }
 
-internal fun luText(lu: Double): String = if (silent(lu)) "- LU" else fixed(lu.toFloat(), 1) + " LU"
+internal fun luText(lu: Double): String = if (silent(lu)) "-" else fixed(lu.toFloat(), 1)
 
 internal fun faderTag(index: Int) = "mixer-fader-$index"
 
 internal fun macroTag(macro: Macro) = "mixer-macro-${macro.name}"
+
+internal fun pinTag(index: Int) = "mixer-pin-$index"
+
+/** The fader's least height: 72dp of travel inside its 6dp padding. */
+internal val MIN_FADER = 84.dp
 
 internal val NO_WAVE = FloatArray(0)
 
@@ -153,6 +194,123 @@ internal fun mixText(
     fontWeight = weight,
     fontFamily = if (mono) FontFamily.Monospace else null,
 ).proportional()
+
+/** What an agent edit lights up: a track's strip or row, a macro knob, or a section control. */
+internal sealed interface FlashTarget {
+    data class Track(val index: Int) : FlashTarget
+    data class Knob(val macro: Macro) : FlashTarget
+    data object Section : FlashTarget
+    data object Loop : FlashTarget
+    data object EditScope : FlashTarget
+}
+
+/** A count per target of the agent's and MCP's edits; each new count replays that target's flash. */
+@Stable
+internal class AgentFlashes {
+    private val counts = mutableStateMapOf<FlashTarget, Int>()
+
+    /** A reset flashes only [unpinned]: the agent's and MCP's resets skip pinned strips. */
+    fun flash(control: MixControl, unpinned: Collection<Int>) {
+        when (control) {
+            is MixControl.MacroKnob -> bump(FlashTarget.Knob(control.macro))
+            MixControl.Section -> bump(FlashTarget.Section)
+            MixControl.Loop -> bump(FlashTarget.Loop)
+            MixControl.EditScope -> bump(FlashTarget.EditScope)
+            MixControl.ResetToFile -> unpinned.forEach { bump(FlashTarget.Track(it)) }
+            else -> control.track?.let { bump(FlashTarget.Track(it)) }
+        }
+    }
+
+    private fun bump(target: FlashTarget) {
+        counts[target] = (counts[target] ?: 0) + 1
+    }
+
+    fun count(target: FlashTarget): Int = counts[target] ?: 0
+
+    fun track(index: Int): Int = count(FlashTarget.Track(index))
+}
+
+/** The factor [legible] divides out, with the same clamp: 1 at native density, larger on a shrunk canvas. */
+@Composable
+internal fun textScale(): Float = 1f / LocalCanvasScale.current.coerceIn(0.5f, 1f)
+
+internal const val FLASH_MS = 600
+
+internal val AgentFlashing = SemanticsPropertyKey<Boolean>("AgentFlashing")
+internal val AgentGlow = SemanticsPropertyKey<Boolean>("AgentGlow")
+
+/**
+ * The agent's marks on a control: a [FLASH_MS] highlight each time [flashKey] moves on, and a faint [glow] while
+ * set. Drawn over the content, so it shows on any background.
+ */
+@Composable
+internal fun agentMark(flashKey: Int, glow: Boolean, corner: Dp): Modifier {
+    val flash = remember { Animatable(0f) }
+    // A count already standing when this composes (a row scrolled back in) is not a new edit.
+    val first = remember { flashKey }
+    LaunchedEffect(flashKey) {
+        if (flashKey == first) return@LaunchedEffect
+        flash.snapTo(1f)
+        flash.animateTo(0f, tween(FLASH_MS, easing = LinearEasing))
+    }
+    val flashing by remember { derivedStateOf { flash.value > 0f } }
+    val isFlashing = flashing
+    return Modifier
+        .semantics {
+            this[AgentFlashing] = isFlashing
+            this[AgentGlow] = glow
+        }
+        .drawWithContent {
+            drawContent()
+            val r = CornerRadius(corner.toPx())
+            if (glow) {
+                drawRoundRect(MixerInk.agent.copy(alpha = 0.08f), cornerRadius = r)
+                drawRoundRect(MixerInk.agent.copy(alpha = 0.45f), cornerRadius = r, style = Stroke(1.dp.toPx()))
+            }
+            val f = flash.value
+            if (f > 0f) {
+                drawRoundRect(MixerInk.agent.copy(alpha = 0.3f * f), cornerRadius = r)
+                drawRoundRect(MixerInk.agent.copy(alpha = f), cornerRadius = r, style = Stroke(2.dp.toPx()))
+            }
+        }
+}
+
+/** A pin's least touch target, larger than its icon. */
+internal val PIN_TARGET = 32.dp
+
+/**
+ * A strip's or row's pin: filled while the agent must leave that track alone. It takes [size] in the layout, but
+ * its [PIN_TARGET] touch target spills past that, so the header does not grow. [anchor] says which way it spills:
+ * a pin in a clipped corner anchors there, so the clip never trims the target.
+ */
+@Composable
+internal fun PinToggle(
+    index: Int,
+    name: String,
+    pinned: Boolean,
+    onToggle: () -> Unit,
+    size: Dp = 18.dp,
+    anchor: Alignment = Alignment.Center,
+) {
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .wrapContentSize(anchor, unbounded = true)
+                .size(max(size, PIN_TARGET))
+                .testTag(pinTag(index))
+                .semantics { contentDescription = if (pinned) "Unpin $name" else "Pin $name" }
+                .toggleable(value = pinned, role = Role.Switch, onValueChange = { onToggle() }),
+            contentAlignment = anchor,
+        ) {
+            Icon(
+                if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                contentDescription = null,
+                tint = if (pinned) MixerInk.pin else MixerInk.dim,
+                modifier = Modifier.padding(1.dp).size(size - 2.dp),
+            )
+        }
+    }
+}
 
 /**
  * Nothing changes on down. Movement past touch slop along [vertical]'s axis claims the drag, which follows the
@@ -302,21 +460,22 @@ internal fun DbFader(
     onReset: () -> Unit,
     index: Int,
     modifier: Modifier = Modifier,
-    height: Dp = 140.dp,
+    height: Dp? = 140.dp,
     meter: (@Composable () -> Unit)? = null,
 ) {
     val hold = remember { mutableStateOf<Float?>(null) }
     val shown = hold.value ?: db
     val changed = faderChanged(hold.value, db)
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        // A null height takes what the column is given, at least MIN_FADER.
         Row(
-            Modifier.height(height).padding(vertical = 6.dp),
+            (if (height != null) Modifier.height(height) else Modifier.weight(1f).heightIn(min = MIN_FADER)).padding(vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             meter?.invoke()
             FaderTrack(index, vertical = true, hold, shown, changed, onDbChange, onReset, Modifier.width(26.dp).fillMaxHeight())
         }
-        Text(dbText(shown), style = mixText(10.sp, if (changed) MixerInk.changed else MixerInk.text), maxLines = 1)
+        Text(dbText(shown), style = mixText(legible(LegibleText.MIXER_VALUE), if (changed) MixerInk.changed else MixerInk.text), maxLines = 1)
     }
 }
 
@@ -335,11 +494,11 @@ internal fun DbFaderRow(
     val shown = hold.value ?: db
     val changed = faderChanged(hold.value, db)
     Row(modifier.height(32.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("level", style = mixText(9.sp, MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
+        Text("level", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
         FaderTrack(index, vertical = false, hold, shown, changed, onDbChange, onReset, Modifier.weight(1f).fillMaxHeight())
         Text(
             dbText(shown),
-            style = mixText(10.sp, if (changed) MixerInk.changed else MixerInk.text),
+            style = mixText(legible(LegibleText.MIXER_VALUE), if (changed) MixerInk.changed else MixerInk.text),
             maxLines = 1,
             textAlign = TextAlign.End,
             modifier = Modifier.width(valueWidth),
@@ -427,7 +586,7 @@ internal fun MixerSlider(
         ((range.start + frac * span) * 100f).roundToInt() / 100f
     }
     Row(modifier.height(height), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = mixText(9.sp, MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
+        Text(label, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
         Box(
             Modifier
                 .weight(1f)
@@ -446,7 +605,7 @@ internal fun MixerSlider(
         )
         Text(
             valueText(shown),
-            style = mixText(9.sp, MixerInk.text),
+            style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text),
             maxLines = 1,
             textAlign = TextAlign.End,
             modifier = Modifier.width(valueWidth),
@@ -472,19 +631,92 @@ internal fun MuteSoloButtons(
 private fun SmallToggle(text: String, on: Boolean, onColor: Color, onClick: () -> Unit) {
     Box(
         Modifier
-            .size(width = 24.dp, height = 20.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(if (on) onColor else MixerInk.chip)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .sizeIn(minWidth = 24.dp, minHeight = 20.dp)
+            .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = mixText(10.sp, if (on) MixerInk.onBright else MixerInk.text, FontWeight.Bold))
+        Text(text, style = mixText(legible(LegibleText.MIXER_MIN), if (on) MixerInk.onBright else MixerInk.text, FontWeight.Bold), maxLines = 1)
     }
 }
 
 /**
- * The four macro knobs. A changed knob turns amber and reads "0.60 ← 0.50" (value, then where reset lands);
- * double tap resets. A drag shows its own value and snaps back to the state on release.
+ * A strip's small pan or send knob. While held, [onHeld] gets the value under the finger (null on release) so the
+ * strip can show it large; double tap runs [onReset].
+ */
+@Composable
+internal fun StripKnob(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    onHeld: (Float?) -> Unit,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    onReset: (() -> Unit)? = null,
+) {
+    // RotaryKnob keeps its dragged value until its input changes, so a release re-keys it onto the state.
+    var generation by remember { mutableIntStateOf(0) }
+    val current by rememberUpdatedState(value)
+    val change by rememberUpdatedState(onValueChange)
+    val held by rememberUpdatedState(onHeld)
+    val reset by rememberUpdatedState(onReset)
+    Box(
+        modifier
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent(PointerEventPass.Initial)
+                        if (e.type == PointerEventType.Press) held(current)
+                        if (e.type == PointerEventType.Release && e.changes.none { it.pressed }) {
+                            held(null)
+                            generation++
+                        }
+                    }
+                }
+            }
+            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { reset?.invoke() }) },
+    ) {
+        key(generation) {
+            RotaryKnob(
+                value = value,
+                onValueChange = {
+                    held(it)
+                    change(it)
+                },
+                label = label,
+                labelStyle = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+                labelColor = MixerInk.dim,
+                range = range,
+                size = size,
+                progressColor = MixerInk.accent,
+                indicatorColor = MixerInk.accentSoft,
+                valueFormatter = null,
+                requireVerticalSlop = true,
+            )
+        }
+    }
+}
+
+/** A held knob's value, large, over the strip's wave. */
+@Composable
+internal fun KnobReadout(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = mixText(legible(READOUT_SP), MixerInk.text, FontWeight.Bold),
+        maxLines = 1,
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(MixerInk.surface)
+            .padding(horizontal = 4.dp),
+    )
+}
+
+/**
+ * The four macro knobs. A changed knob turns amber and its note reads "← 0.50", where reset lands; double tap
+ * resets. A drag shows its own value and snaps back to the state on release.
  */
 @Composable
 internal fun MixerMacroKnobs(
@@ -493,19 +725,24 @@ internal fun MixerMacroKnobs(
     modifier: Modifier = Modifier,
     knobSize: Dp = 46.dp,
     knobWidth: Dp = 88.dp,
+    flashes: AgentFlashes? = null,
 ) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        for (m in macros) key(m.macro) { MacroKnob(m, onSet, knobSize, knobWidth) }
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(MACRO_KNOB_GAP)) {
+        for (m in macros) {
+            key(m.macro) { MacroKnob(m, onSet, knobSize, knobWidth, flashes?.count(FlashTarget.Knob(m.macro)) ?: 0) }
+        }
     }
 }
 
 @Composable
-private fun MacroKnob(m: MixerMacro, onSet: (Macro, Float) -> Unit, knobSize: Dp, knobWidth: Dp) {
+private fun MacroKnob(m: MixerMacro, onSet: (Macro, Float) -> Unit, knobSize: Dp, knobWidth: Dp, flashKey: Int) {
     // RotaryKnob keeps its dragged value until its input changes, so a release re-keys it onto the state.
     var generation by remember { mutableIntStateOf(0) }
+    var held by remember { mutableStateOf<Float?>(null) }
     val set by rememberUpdatedState(onSet)
     val current by rememberUpdatedState(m)
     val color = if (m.changed) MixerInk.changed else MixerInk.accent
+    val mark = agentMark(flashKey, glow = false, corner = 8.dp)
     Column(Modifier.width(knobWidth), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier
@@ -513,7 +750,10 @@ private fun MacroKnob(m: MixerMacro, onSet: (Macro, Float) -> Unit, knobSize: Dp
                     awaitPointerEventScope {
                         while (true) {
                             val e = awaitPointerEvent(PointerEventPass.Initial)
-                            if (e.type == PointerEventType.Release && e.changes.none { it.pressed }) generation++
+                            if (e.type == PointerEventType.Release && e.changes.none { it.pressed }) {
+                                held = null
+                                generation++
+                            }
                         }
                     }
                 }
@@ -524,24 +764,35 @@ private fun MacroKnob(m: MixerMacro, onSet: (Macro, Float) -> Unit, knobSize: Dp
             key(generation) {
                 RotaryKnob(
                     value = m.value,
-                    onValueChange = { set(m.macro, it) },
+                    onValueChange = {
+                        held = it
+                        set(m.macro, it)
+                    },
                     label = m.macro.name,
-                    labelStyle = mixText(10.sp, weight = FontWeight.SemiBold),
+                    labelStyle = mixText(legible(LegibleText.MIXER_MIN), weight = FontWeight.SemiBold),
                     size = knobSize,
                     progressColor = color,
                     indicatorColor = color,
-                    valueFormatter = { v -> if (current.changed) "${f2(v)} ← ${f2(current.resetValue)}" else f2(v) },
+                    // Its own value text has a fixed size; the legible one is drawn below.
+                    valueFormatter = null,
                     // In the phone list a touch that starts here may be a scroll: nothing turns before slop.
                     requireVerticalSlop = true,
-                    modifier = Modifier.testTag(macroTag(m.macro)),
+                    modifier = Modifier.testTag(macroTag(m.macro)).then(mark),
                 )
             }
         }
         Text(
-            m.note,
-            style = mixText(9.sp, MixerInk.dim),
+            f2(held ?: m.value),
+            style = mixText(legible(LegibleText.MIXER_VALUE), if (m.changed) MixerInk.changed else MixerInk.text),
             maxLines = 1,
+        )
+        Text(
+            listOfNotNull(if (m.changed) "← ${f2(m.resetValue)}" else null, m.note.ifEmpty { null }).joinToString(" · "),
+            style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+            // Small knobs mean a short window: the note keeps to one line there.
+            maxLines = if (knobSize < 40.dp) 1 else 2,
             overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -558,10 +809,13 @@ internal fun SectionChips(
     onJump: (Int) -> Unit,
     onLoop: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    flashes: AgentFlashes? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val looping = looped != null
         Pill(
+            modifier = agentMark(flashes?.count(FlashTarget.Loop) ?: 0, glow = false, corner = 12.dp),
             text = if (looping) "Looping " + (sections.getOrNull(looped ?: -1) ?: "section") else "Loop section",
             fill = if (looping) MixerInk.changed else MixerInk.chip,
             textColor = if (looping) MixerInk.onBright else MixerInk.text,
@@ -569,7 +823,11 @@ internal fun SectionChips(
             maxWidth = 180.dp,
             onClick = { onLoop(!looping) },
         )
-        LazyRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // A jump lands at the next bar line, so the agent's jump flashes the whole row, not one chip.
+        LazyRow(
+            Modifier.weight(1f).then(agentMark(flashes?.count(FlashTarget.Section) ?: 0, glow = false, corner = 12.dp)),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             itemsIndexed(sections) { i, name ->
                 Pill(
                     text = name,
@@ -581,6 +839,7 @@ internal fun SectionChips(
                 )
             }
         }
+        trailing?.invoke()
     }
 }
 
@@ -607,7 +866,7 @@ internal fun Pill(
     ) {
         Text(
             text,
-            style = mixText(12.sp, if (enabled) textColor else textColor.copy(alpha = 0.35f)),
+            style = mixText(legible(PILL_SP), if (enabled) textColor else textColor.copy(alpha = 0.35f)),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -616,12 +875,16 @@ internal fun Pill(
 
 /** Whole vibe or the playing section (named); the section side is disabled when the vibe has under two sections. */
 @Composable
-internal fun ScopeToggle(state: AiMixerUiState, onScope: (Scope) -> Unit, modifier: Modifier = Modifier) {
+internal fun ScopeToggle(state: AiMixerUiState, onScope: (Scope) -> Unit, modifier: Modifier = Modifier, flashKey: Int = 0) {
     val available = state.sectionScopeAvailable
     val sectionOn = state.scope == Scope.SECTION && available
     val name = if (available && state.section >= 0) state.sections.getOrNull(state.section) ?: "section" else "section"
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("editing:", style = mixText(11.sp, MixerInk.dim), maxLines = 1)
+    Row(
+        modifier.then(agentMark(flashKey, glow = false, corner = 12.dp)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text("editing:", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1)
         Pill(
             text = "whole vibe",
             fill = if (!sectionOn) MixerInk.accent else MixerInk.chip,
@@ -651,20 +914,22 @@ internal fun BusReadout(
     meters: State<MeterSnapshot>,
     modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.End,
-    size: TextUnit = 14.sp,
+    nativeSize: Float = LegibleText.MIXER_VALUE,
 ) {
-    val text by remember(meters, size) { derivedStateOf { busText(meters.value, size) } }
+    val size = legible(nativeSize)
+    val liveSize = legible(LegibleText.MIXER_MIN)
+    val text by remember(meters, liveSize) { derivedStateOf { busText(meters.value, liveSize) } }
     Text(text, style = mixText(size, MixerInk.dim).copy(lineHeight = 1.5.em), textAlign = textAlign, modifier = modifier)
 }
 
-private fun busText(m: MeterSnapshot, size: TextUnit): AnnotatedString = buildAnnotatedString {
+private fun busText(m: MeterSnapshot, liveSize: TextUnit): AnnotatedString = buildAnnotatedString {
     fun lu(x: Double) = if (silent(x)) "-" else fixed(x.toFloat(), 1)
     fun value(s: String, color: Color = MixerInk.text) {
         withStyle(SpanStyle(color = color, fontWeight = FontWeight.SemiBold)) { append(s) }
     }
     fun live() {
         append(" ")
-        withStyle(SpanStyle(fontSize = size * 0.8f, background = MixerInk.chip, color = MixerInk.dim)) { append(" live ") }
+        withStyle(SpanStyle(fontSize = liveSize, background = MixerInk.chip, color = MixerInk.dim)) { append(" live ") }
     }
     append("LUFS short ")
     value(lu(m.lufsShort))
@@ -684,9 +949,9 @@ private fun busText(m: MeterSnapshot, size: TextUnit): AnnotatedString = buildAn
 @Composable
 internal fun LuText(meters: State<MeterSnapshot>, ch: Int, modifier: Modifier = Modifier) {
     val text by remember(meters, ch) {
-        derivedStateOf { meters.value.channels.getOrNull(ch)?.let { luText(it.relLu) } ?: "- LU" }
+        derivedStateOf { meters.value.channels.getOrNull(ch)?.let { luText(it.relLu) } ?: "-" }
     }
-    Text(text, style = mixText(9.sp, MixerInk.dim), maxLines = 1, modifier = modifier)
+    Text(text, style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.dim), maxLines = 1, modifier = modifier)
 }
 
 /** Channel [ch]'s peak in dBFS, for the DRY and OUT meters. */
@@ -698,7 +963,7 @@ internal fun PeakText(meters: State<MeterSnapshot>, ch: Int, modifier: Modifier 
             if (silent(pk)) "-" else fixed(pk.toFloat(), 1)
         }
     }
-    Text(text, style = mixText(9.sp, MixerInk.dim), maxLines = 1, modifier = modifier)
+    Text(text, style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.dim), maxLines = 1, modifier = modifier)
 }
 
 /** The pending changes as bench.js lists them: grey headers, red old values, green new ones, amber flags. */
@@ -706,7 +971,7 @@ internal fun PeakText(meters: State<MeterSnapshot>, ch: Int, modifier: Modifier 
 internal fun ChangesList(lines: List<ChangeLine>, modifier: Modifier = Modifier) {
     Column(modifier) {
         if (lines.isEmpty()) {
-            Text("No changes. Move a fader, pan, send or knob.", style = mixText(11.sp, MixerInk.dim))
+            Text("No changes. Move a fader, pan, send or knob.", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim))
             return@Column
         }
         for (line in lines) {
@@ -718,7 +983,7 @@ internal fun ChangesList(lines: List<ChangeLine>, modifier: Modifier = Modifier)
             }
             Text(
                 line.text,
-                style = mixText(10.5.sp, color, mono = true),
+                style = mixText(legible(LegibleText.MIXER_MIN), color, mono = true),
                 modifier = if (line.kind == ChangeKind.HEADER) Modifier.padding(top = 5.dp) else Modifier,
             )
         }
@@ -743,13 +1008,13 @@ internal fun MixerButton(
             .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = mixText(13.sp, if (enabled) MixerInk.text else MixerInk.dim), maxLines = 1)
+        Text(text, style = mixText(legible(LegibleText.MIXER_VALUE), if (enabled) MixerInk.text else MixerInk.dim), maxLines = 1)
     }
 }
 
 /** The capture outcome as the bench words it; red when it failed or the vibe file went stale. */
 @Composable
-internal fun CaptureResult(capture: MixerCapture, modifier: Modifier = Modifier) {
+internal fun CaptureResult(capture: MixerCapture, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val text = if (capture.ok && capture.file != null) {
         "Wrote ${capture.rows} rows to ${capture.file}" +
             (if (capture.appliedToAiVibe) "; the AI vibe now holds them, so the song restarts and mutes, solos and the loop clear" else "") +
@@ -758,25 +1023,47 @@ internal fun CaptureResult(capture: MixerCapture, modifier: Modifier = Modifier)
         capture.message
     }
     val bad = !capture.ok || capture.stale == true
-    Text(text, style = mixText(11.sp, if (bad) MixerInk.red else MixerInk.green), modifier = modifier)
+    // One line, so a capture never pushes the strips down; the semantics keep the whole text.
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text,
+            style = mixText(legible(LegibleText.MIXER_MIN), if (bad) MixerInk.red else MixerInk.green),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Text(
+            "×",
+            style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.dim, FontWeight.Bold),
+            maxLines = 1,
+            modifier = Modifier
+                .testTag(CAPTURE_DISMISS_TAG)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable(role = Role.Button, onClick = onDismiss)
+                .semantics { contentDescription = "Dismiss" }
+                .padding(horizontal = 4.dp),
+        )
+    }
 }
+
+internal const val CAPTURE_DISMISS_TAG = "mixer-capture-dismiss"
 
 /** A refused edit or send note, with a dismiss. */
 @Composable
-internal fun NoticeLine(notice: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+internal fun NoticeLine(notice: String, onDismiss: () -> Unit, modifier: Modifier = Modifier, compact: Boolean = false) {
     Row(
         modifier
             .clip(RoundedCornerShape(6.dp))
             .background(MixerInk.well)
             .border(1.dp, MixerInk.changed, RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = if (compact) 2.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(notice, style = mixText(11.sp, MixerInk.changed), modifier = Modifier.weight(1f))
+        Text(notice, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.changed), modifier = Modifier.weight(1f))
         Text(
             "Dismiss",
-            style = mixText(11.sp, MixerInk.text, FontWeight.SemiBold),
+            style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.text, FontWeight.SemiBold),
             maxLines = 1,
             modifier = Modifier.clickable(onClick = onDismiss).padding(4.dp),
         )

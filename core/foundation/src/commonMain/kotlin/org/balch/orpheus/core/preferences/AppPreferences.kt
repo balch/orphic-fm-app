@@ -14,6 +14,8 @@ data class AppPreferences(
     val selectedAiModel: String? = null,
     /** How the DJ AI casts a new vibe: "BED_FIXED" or "ALL_ROLLED". */
     val vibeCastMode: String = "BED_FIXED",
+    /** The DJ AI sheet's last mode: "CHAT" or "MIXER" (the Mixer beside the chat). */
+    val aiSheetMode: String = "CHAT",
     /** Per-panel signal visualization toggle (disabled by default). */
     val signalVizEnabled: Boolean = false,
     /** Master switch for Pulsar song-ending behavior (auto-end + advance). */

@@ -8,6 +8,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -91,6 +92,8 @@ data class VibeApplyResult(
     val appliedName: String? = null,
     @property:LLMDescription("True when this turn's applies are used up: do not retry, reply to the user now.")
     val budgetSpent: Boolean = false,
+    @property:LLMDescription("Set when the apply was refused rather than broken: WIPE_UNCONFIRMED means ask the user first, never fix the JSON.")
+    val refusal: String? = null,
 )
 
 /**
@@ -148,6 +151,8 @@ class VibeApplyTool(
     private val eventBus: VibeCreateEventBus,
     private val aiVibeArchive: AiVibeArchive,
     private val turnBudget: TurnBudget,
+    // Empty in Orpheus; the DJ app's AI edition asks before an apply wipes the user's live mix.
+    private val guards: Set<VibeApplyGuard>,
 ) : ToolProvider {
 
     private val json = vibeApplyJson
@@ -183,6 +188,12 @@ class VibeApplyTool(
         ) {
             override suspend fun execute(args: VibeApplyArgs): VibeApplyResult {
                 val decoded = decodeVibe(json, args.vibeJson)
+                // A guard refusal waits on the user, so it runs first and leaves the budget for the confirmed apply.
+                if (decoded.isSuccess) {
+                    for (guard in guards) {
+                        guard.refusal()?.let { return VibeApplyResult(false, it, refusal = VibeApplyGuard.REFUSAL) }
+                    }
+                }
                 // Only a vibe that decodes spends the budget, so fixing a rejected one stays possible.
                 if (decoded.isSuccess && !turnBudget.allowApply()) {
                     return VibeApplyResult(false, TurnBudget.SPENT, budgetSpent = true)
@@ -203,7 +214,7 @@ class VibeApplyTool(
                             val pulsar = pulsarFeatureProvider()
                             pulsar.applyVibe(vibe)
                             pulsar.actions.setMix(0.8f)
-                            eventBus.emitGenerated(vibe)
+                            eventBus.emitGenerated(vibe, outsideTurn = currentCoroutineContext()[TurnBudget.Exempt] != null)
                             VibeApplyResult(true, "Applied and playing '${vibe.name}'.", vibe.name)
                         } catch (e: CancellationException) {
                             throw e

@@ -83,4 +83,21 @@ class AiMixerStateTest {
             changeLines(listOf(row)),
         )
     }
+
+    @Test
+    fun changeCountMatchesChangeLines() {
+        val rows = listOf(
+            CaptureRow(Scope.VIBE, null, null, 3, CaptureField.VOLUME, null, 0.5f, 0.6f),
+            CaptureRow(Scope.VIBE, null, null, 3, CaptureField.PAN, null, 0f, 0.2f),
+            CaptureRow(Scope.SECTION, 1, "groove", 4, CaptureField.VOLUME, null, 0.9f, 1f, clampedDb = 1.5f),
+            CaptureRow(Scope.SECTION, 1, "groove", null, CaptureField.MACRO, Macro.SPACE, 1f, 1.2f),
+        )
+        val s = AiMixerUiState(changes = rows)
+        // Headers and flags are extra lines; the count is one per "+" line.
+        assertEquals(changeLines(rows).count { it.kind == ChangeKind.NEW }, s.changeCount)
+        assertEquals(4, s.changeCount)
+        assertEquals("4 changes", changesLabel(s.changeCount))
+        assertEquals("1 change", changesLabel(1))
+        assertEquals("No changes", changesLabel(0))
+    }
 }

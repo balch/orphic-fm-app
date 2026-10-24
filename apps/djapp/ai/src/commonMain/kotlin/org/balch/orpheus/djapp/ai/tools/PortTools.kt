@@ -12,12 +12,17 @@ import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.djapp.ai.collab.CollabEvents
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.CollabResult
+import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.core.plugin.ControlPort
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
-import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
+import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.features.pulsar.bench.Macro
 
 @LLMDescription("Arguments for ports_list.")
 @Serializable
@@ -93,6 +98,8 @@ data class PortSetResult(
     val captured: Boolean = false,
     @property:LLMDescription("The mix tool that would capture this change, when there is one.")
     val hint: String? = null,
+    @property:LLMDescription(REFUSAL_FIELD)
+    val refusal: String? = null,
 )
 
 private fun ControlPort.info(key: String, value: PortValue?) = PortInfo(
@@ -117,21 +124,41 @@ internal fun portFilter(filter: String?): (String) -> Boolean {
     return { regex.matches(it) }
 }
 
-private val MIX_PORT = Regex("""track_(\d)_(volume|pan|reverb_send|delay_send)(_space)?""")
-private val MACRO_PORTS = setOf("energy", "complexity", "mood", "space")
+private fun MutableMap<PluginControlId, MixControl>.block(first: PulsarSymbol, control: (Int) -> MixControl) {
+    for (t in 0 until 8) put(PulsarSymbol.entries[first.ordinal + t].controlId, control(t))
+}
+
+/** The mixer control each Pulsar level, pan, send and macro port writes over (both voice slots); mix_set captures these. */
+private val CAPTURED_PORT_CONTROLS: Map<PluginControlId, MixControl> = buildMap {
+    block(PulsarSymbol.TRACK_0_VOLUME, MixControl::Level)
+    block(PulsarSymbol.TRACK_0_VOLUME_SPACE, MixControl::Level)
+    block(PulsarSymbol.TRACK_0_PAN, MixControl::Pan)
+    block(PulsarSymbol.TRACK_0_REVERB_SEND_TRACK) { MixControl.Send(it, reverb = true) }
+    block(PulsarSymbol.TRACK_0_REVERB_SEND_SPACE) { MixControl.Send(it, reverb = true) }
+    block(PulsarSymbol.TRACK_0_DELAY_SEND) { MixControl.Send(it, reverb = false) }
+    block(PulsarSymbol.TRACK_0_DELAY_SEND_SPACE) { MixControl.Send(it, reverb = false) }
+    put(PulsarSymbol.ENERGY.controlId, MixControl.MacroKnob(Macro.ENERGY))
+    put(PulsarSymbol.COMPLEXITY.controlId, MixControl.MacroKnob(Macro.COMPLEXITY))
+    put(PulsarSymbol.MOOD.controlId, MixControl.MacroKnob(Macro.MOOD))
+    put(PulsarSymbol.SPACE.controlId, MixControl.MacroKnob(Macro.SPACE))
+}
+
+/** Every port a mixer control rides on: also the audition gain (the strip's level) and the section pan glide. */
+private val MIX_PORT_CONTROLS: Map<PluginControlId, MixControl> = CAPTURED_PORT_CONTROLS + buildMap {
+    block(PulsarSymbol.TRACK_0_AUDITION_GAIN, MixControl::Level)
+    block(PulsarSymbol.TRACK_0_PAN_GLIDE, MixControl::Pan)
+}
+
+/** The mixer control a write to [id] changes, or null for a port outside the mix. */
+internal fun mixControl(id: PluginControlId): MixControl? = MIX_PORT_CONTROLS[id]
 
 /** Names the mix tool that captures a change to [id], or null when none does. */
-internal fun mixHint(id: PluginControlId): String? {
-    if (id.uri != PULSAR_URI) return null
-    if (id.symbol in MACRO_PORTS) return "use mix_set field=macro macro=${id.symbol} to keep this"
-    val m = MIX_PORT.matchEntire(id.symbol) ?: return null
-    val field = when (m.groupValues[2]) {
-        "volume" -> "level_db"
-        "pan" -> "pan"
-        "reverb_send" -> "reverb"
-        else -> "delay"
-    }
-    return "use mix_set field=$field track=${m.groupValues[1]} to keep this"
+internal fun mixHint(id: PluginControlId): String? = when (val c = CAPTURED_PORT_CONTROLS[id]) {
+    is MixControl.MacroKnob -> "use mix_set field=macro macro=${c.macro.name.lowercase()} to keep this"
+    is MixControl.Level -> "use mix_set field=level_db track=${c.track} to keep this"
+    is MixControl.Pan -> "use mix_set field=pan track=${c.track} to keep this"
+    is MixControl.Send -> "use mix_set field=${if (c.reverb) "reverb" else "delay"} track=${c.track} to keep this"
+    else -> null
 }
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
@@ -196,6 +223,8 @@ class PortGetTool(
 class PortSetTool(
     private val portRegistry: PortRegistry,
     private val synthController: SynthController,
+    private val collabMixer: CollabMixer,
+    private val events: CollabEvents,
 ) : ToolProvider {
     override val tool: Tool<PortSetArgs, PortSetResult> by lazy {
         object : Tool<PortSetArgs, PortSetResult>(
@@ -205,7 +234,8 @@ class PortSetTool(
             description = """
                 Write one control port by its uri:symbol key (see ports_list); the value is clamped to its range.
                 A mix capture never includes these writes, and a vibe load can overwrite them. For track level,
-                pan, sends and the four macros use mix_set instead.
+                pan, sends and the four macros use mix_set instead; writes to those ports follow mix_set's rules:
+                $GATE_RULES
             """.trimIndent(),
         ) {
             override suspend fun execute(args: PortSetArgs): PortSetResult = guarded({ PortSetResult(false, it) }) {
@@ -219,7 +249,13 @@ class PortSetTool(
                     PortType.INT -> PortValue.IntValue(clamped.roundToInt())
                     PortType.BOOLEAN -> PortValue.BoolValue(clamped >= 0.5f)
                 }
-                synthController.setPluginControl(id, value, ControlEventOrigin.AI)
+                val control = mixControl(id)
+                if (control == null) {
+                    synthController.setPluginControl(id, value, ControlEventOrigin.AI)
+                } else {
+                    val edit = collabMixer.toolEdit(events, control) { synthController.setPluginControl(id, value, ControlEventOrigin.AI) }
+                    if (edit is CollabResult.Refused) return@guarded PortSetResult(false, edit.reason, key, refusal = edit.refusal.name)
+                }
                 val hint = mixHint(id)
                 PortSetResult(
                     ok = true,

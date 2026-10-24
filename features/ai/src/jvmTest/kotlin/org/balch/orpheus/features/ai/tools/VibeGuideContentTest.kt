@@ -56,7 +56,7 @@ class VibeGuideContentTest {
         "NOT", "ONE", "TWO", "OUT", "IS", "DO", "DOES", "CAN", "BE", "AT", "ARE", "ONLY", "MOST", "LAST", "EVERY",
         "WOULD", "WITHOUT", "NOTHING", "REPLACES", "POSITIVE", "GENERATED", "EMPTY", "STANDING", "SOLOIST",
         "MEMBERS", "ROLE", "TRACK", "ENGINE", "PITCH", "BAND", "LICK", "VOID", "WAH", "DECAY", "DEEP",
-        "JSON", "MIDI", "LU", "LUFS", "EDM", "SPACE", "MOOD", "BED", "LFO", "LPG",
+        "MIXER_CLOSED", "PINNED", "USER_MOVED", "WIPE_UNCONFIRMED", "JSON", "MIDI", "LU", "LUFS", "EDM", "SPACE", "MOOD", "BED", "LFO", "LPG",
         "KICK", "PERC", "HIHAT", "KEYS", "TEXT", "FX", "IV", "VI", "VII", "MAX_LICK_POOL",
     )
 
@@ -123,7 +123,7 @@ class VibeGuideContentTest {
         assertTrue(caps.contains("${TurnBudget.MAX_APPLIES} applies"), "the caps step lost the apply cap: $caps")
         assertTrue(Regex("""${TurnBudget.MAX_MIX_EDITS}\s+mix edits""").containsMatchIn(caps), "the caps step lost the mix-edit cap: $caps")
         assertTrue(mixPass.contains("mix_capture first"), "the mix pass lost the capture before a re-apply")
-        listOf(caps, steps.single { "Mixer tab" in it }).forEach {
+        listOf(caps, steps.single { "Open Mixer" in it }).forEach {
             assertTrue(Regex("""when the mix tools are\s+available""", RegexOption.IGNORE_CASE).containsMatchIn(it), "step is not conditional:\n$it")
         }
     }

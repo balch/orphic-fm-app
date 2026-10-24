@@ -32,6 +32,7 @@ kotlin {
             implementation(libs.compose.material.icons)
             implementation(libs.jetbrains.navigationevent.compose)
             implementation(libs.kmlogging)
+            implementation(libs.kotlinx.atomicfu)
             implementation(libs.metrox.viewmodel)
             implementation(libs.metrox.viewmodel.compose)
         }
