@@ -195,6 +195,7 @@ class DockRenderHarness {
                 CompositionLocalProvider(
                     LocalLiquidState provides liquidState,
                     LocalDensity provides Density(density * canvasScale(case)),
+                    LocalCanvasScale provides canvasScale(case),
                 ) {
                     Box(Modifier.fillMaxSize()) {
                         VizBackground(
