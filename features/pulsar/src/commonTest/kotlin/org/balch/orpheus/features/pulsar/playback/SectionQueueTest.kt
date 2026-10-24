@@ -26,7 +26,7 @@ class SectionQueueTest {
     }
 
     @Test
-    fun `the playing section, an out of range index and an armed outro are ignored`() {
+    fun `the playing section or an out of range index or an armed outro is ignored`() {
         assertFalse(queue.request(index = 1, currentSection = 1, sectionCount = 4, outroArmed = false))
         assertFalse(queue.request(index = 4, currentSection = 1, sectionCount = 4, outroArmed = false))
         assertFalse(queue.request(index = -1, currentSection = 1, sectionCount = 4, outroArmed = false))

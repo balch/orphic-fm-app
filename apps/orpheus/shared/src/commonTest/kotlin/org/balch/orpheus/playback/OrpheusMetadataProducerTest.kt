@@ -137,13 +137,13 @@ class OrpheusMetadataProducerTest {
         assertEquals(PlaybackMode.EVO.displayName, h.producer.subtitleFlow.value)
     }
 
-    @Test fun `AI active songFlow still reports the vibe name, not Orpheus`() = runTest {
+    @Test fun `AI active songFlow still reports the vibe name rather than Orpheus`() = runTest {
         val h = build(mode = PlaybackMode.DRONE, vibeName = "SongExclusiveVibe")
         assertEquals("Orpheus", h.producer.titleFlow.value)
         assertEquals("SongExclusiveVibe", h.producer.songFlow.value)
     }
 
-    @Test fun `song progress is Pulsar's, in every mode`() = runTest {
+    @Test fun `song progress is Pulsar's in every mode`() = runTest {
         val h = build(mode = PlaybackMode.DRONE)
         assertSame(h.pulsarMetadata.progressFlow, h.producer.progressFlow)
     }
