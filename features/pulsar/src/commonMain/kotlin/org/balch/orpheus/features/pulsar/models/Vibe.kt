@@ -261,6 +261,19 @@ data class Vibe(
         require(bassLickTracks == 0 || bassLine != null) {
             "$bassLickTracks track(s) set lickSource = BASS but Vibe.bassLine is null"
         }
+        // A section's bass pin swaps the bass line for a pool slot, so it needs both.
+        arrangement?.sections?.forEach { section ->
+            val idx = section.bassLineIndex ?: return@forEach
+            require(bassLine != null) {
+                "Section '${section.name}' sets bassLineIndex but Vibe.bassLine is null"
+            }
+            require(lickRotation != null) {
+                "Section '${section.name}' sets bassLineIndex but Vibe.lickRotation is null"
+            }
+            require(idx < lickRotation.pool.size) {
+                "Section '${section.name}' bassLineIndex $idx is outside lickRotation.pool (size ${lickRotation.pool.size})"
+            }
+        }
         // Per-track wah params only mean something on a track that opted into the insert.
         val orphanWah = tracks.withIndex().filter { (_, tv) ->
             val m = tv.role as? TrackRole.Melodic

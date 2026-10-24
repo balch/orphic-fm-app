@@ -906,6 +906,8 @@ struct SectionParam {
     int chords_per_bar_override = 0;
     // Per-section lick slot (-1 = roll as usual). Scores pin a theme per section.
     int lick_index = -1;
+    // Per-section pool slot for the BASS channel (slot 17; -1 = the authored bass line).
+    int bass_line_index = -1;
     // Per-section CompingHumanization override (applies to ALL CHORDAL tracks).
     bool has_comping_humanization_override = false;
     float comping_humanization_drop = 0.0f;
@@ -1287,6 +1289,12 @@ struct PulsarState {
     PulsarLickStep original_bass_line[kMaxLickSteps];
     float bass_line_mutation = 0.5f;
     int bass_line_octave = -1;
+    // The vibe's own bass line, kept so a section's pool pin (bass_line_index) can hand
+    // the channel back. bass_line_slot is the pool slot it sings, -1 = this authored line.
+    int authored_bass_line_length = 0;
+    int authored_bass_line_loop_length = 0;
+    PulsarLickStep authored_bass_line[kMaxLickSteps];
+    int bass_line_slot = -1;
 
     // Lick evolution spurt state
     bool in_spurt = false;

@@ -45,7 +45,9 @@ import org.balch.orpheus.features.pulsar.models.CompingHumanization
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
+import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickRotation
+import org.balch.orpheus.features.pulsar.models.LickSource
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
@@ -580,6 +582,29 @@ class PulsarSectionProgressionPushTest {
         val stride = Arrangement.SECTION_DATA_FIELDS
         assertEquals(0f, floatPort("section_data_${0 * stride + 26}"))
         assertEquals(3f, floatPort("section_data_${1 * stride + 26}"))
+    }
+
+    @Test
+    fun `bassLineIndex pushes as slot plus one at slot 17, and null pushes zero`() = runTest(testDispatcher) {
+        val line = Lick(steps = listOf(LickStep(scaleDegree = 0, duration = 1f)), loopLength = 4)
+        val sections = listOf(
+            Section(name = "verse", barsMin = 2, barsMax = 2, bassLineIndex = 2,
+                transitions = listOf(SectionTransition(1, 1f))),
+            Section(name = "chorus", barsMin = 2, barsMax = 2,
+                transitions = listOf(SectionTransition(0, 1f))),
+        )
+        val vibe = pushTestVibe(
+            sections = sections,
+            lickRotation = LickRotation(pool = List(3) { line }),
+            bassLine = line,
+        )
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        assertEquals(3f, floatPort("section_data_${0 * stride + 17}"))
+        assertEquals(0f, floatPort("section_data_${1 * stride + 17}"))
     }
 
     /**
@@ -1119,6 +1144,8 @@ private fun pushTestVibe(
     outroIndex: Int? = null,
     playOnce: Boolean = false,
     stepCount: Int = 16,
+    // Non-null turns track 3 into the BASS-source Fill track that reads it.
+    bassLine: Lick? = null,
 ): Vibe = Vibe(
     name = "Section Push Test",
     stepCount = stepCount,
@@ -1134,7 +1161,12 @@ private fun pushTestVibe(
         TrackVoice(
             engineEdm = OrpheusEngine(engineId = OrpheusEngineId.VA),
             engineSpace = OrpheusEngine(engineId = OrpheusEngineId.VA),
-            role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic(),
+            role = when {
+                it < 3 -> TrackRole.Percussive
+                it == 3 && bassLine != null ->
+                    TrackRole.Melodic(lickMode = LickMode.Fill, lickSource = LickSource.BASS)
+                else -> TrackRole.Melodic()
+            },
             duckingProfile = duckingProfiles[it],
         )
     },
@@ -1142,6 +1174,7 @@ private fun pushTestVibe(
     anomalies = anomalies,
     lickRotation = lickRotation,
     speech = speech,
+    bassLine = bassLine,
 )
 
 /** A vibe with `arrangement = null` (its default) — exercises pushArrangement's early return. */
