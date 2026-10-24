@@ -12,8 +12,9 @@ import kotlinx.serialization.Serializable
  *   **A NEGATIVE degree is a REST** for this step's full [duration], not a note below
  *   the root. It is the only way to author silence inside a figure ([Lick.loopLength]
  *   only pads silence onto the end), so a call-and-response reply opens with one.
- *   At high [Vibe.lickMutation] a rest can still turn into a note, with probability
- *   `mutation * 0.3` per cycle; set mutation to 0 for a rest that never moves.
+ *   Under [LickMutationMode.RANDOM] only, at high [Vibe.lickMutation] a rest can still turn
+ *   into a note, with probability `mutation * 0.3` per cycle; set mutation to 0 for a rest
+ *   that never moves. [LickMutationMode.CHORD_TONES] never fills a rest.
  * @param duration Note length in beats (0.25 = 16th, 0.5 = 8th, 1.0 = quarter)
  * @param velocity Hit strength 0-1 (lower = ghost note feel)
  * @param glideRate Optional per-note portamento. `-1f` (default) = use the active

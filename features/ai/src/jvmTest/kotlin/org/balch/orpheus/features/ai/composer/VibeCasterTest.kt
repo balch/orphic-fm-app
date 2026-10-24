@@ -361,6 +361,7 @@ class VibeCasterTest {
                                 assertEquals(18f, e.doubleDetune, at)
                                 assertEquals(0.8f, e.doubleSpread, at)
                             }
+                            // Relies on SLOT_PARTS rolling LEAD only on track 4.
                             i == 4 -> {
                                 leads++
                                 assertEquals(10f, e.doubleDetune, at)
@@ -494,30 +495,32 @@ class VibeCasterTest {
             }
         }
     }
+}
 
-    // ── Shipped vibes, off the compiled classpath (the no-DI pattern of VibeCatalogScan) ──
+// ── Shipped vibes, off the compiled classpath (the no-DI pattern of VibeCatalogScan) ──
 
-    private fun shippedVibes(): List<Vibe> {
-        val path = "org/balch/orpheus/features/pulsar/vibes"
-        val loader = javaClass.classLoader
-        val roots = loader.getResources(path).toList()
-        assertTrue(roots.isNotEmpty(), "found no classpath entry for $path, so nothing could be scanned")
-        val names = roots.flatMap { url ->
-            when (url.protocol) {
-                "file" -> File(url.toURI()).let { root ->
-                    root.walkTopDown().filter { it.isFile && it.name.endsWith(".class") }
-                        .map { "$path/" + it.relativeTo(root).invariantSeparatorsPath }.toList()
-                }
-                "jar" -> (url.openConnection() as JarURLConnection).jarFile.entries().toList()
-                    .map { it.name }.filter { it.startsWith("$path/") && it.endsWith(".class") }
-                else -> fail("cannot scan ${url.protocol} classpath entry $url")
+internal fun shippedVibes(): List<Vibe> = shippedVibeProviders().map { it.vibe }
+
+internal fun shippedVibeProviders(): List<VibeProvider> {
+    val path = "org/balch/orpheus/features/pulsar/vibes"
+    val loader = VibeProvider::class.java.classLoader
+    val roots = loader.getResources(path).toList()
+    assertTrue(roots.isNotEmpty(), "found no classpath entry for $path, so nothing could be scanned")
+    val names = roots.flatMap { url ->
+        when (url.protocol) {
+            "file" -> File(url.toURI()).let { root ->
+                root.walkTopDown().filter { it.isFile && it.name.endsWith(".class") }
+                    .map { "$path/" + it.relativeTo(root).invariantSeparatorsPath }.toList()
             }
-        }.filter { '$' !in it.substringAfterLast('/') }.distinct().sorted()
-        val classes = names.map { it.removeSuffix(".class").replace('/', '.') }
-            .mapNotNull { runCatching { Class.forName(it, false, loader) }.getOrNull() }
-            .filter { VibeProvider::class.java.isAssignableFrom(it) && !it.isInterface && !Modifier.isAbstract(it.modifiers) }
-        val providers = classes.map { it.getDeclaredConstructor().apply { isAccessible = true }.newInstance() as VibeProvider }
-        assertTrue(providers.size >= 40, "classpath scan found only ${providers.size} shipped vibes, so the check is hollow")
-        return providers.map { it.vibe }
-    }
+            "jar" -> (url.openConnection() as JarURLConnection).jarFile.entries().toList()
+                .map { it.name }.filter { it.startsWith("$path/") && it.endsWith(".class") }
+            else -> fail("cannot scan ${url.protocol} classpath entry $url")
+        }
+    }.filter { '$' !in it.substringAfterLast('/') }.distinct().sorted()
+    val classes = names.map { it.removeSuffix(".class").replace('/', '.') }
+        .mapNotNull { runCatching { Class.forName(it, false, loader) }.getOrNull() }
+        .filter { VibeProvider::class.java.isAssignableFrom(it) && !it.isInterface && !Modifier.isAbstract(it.modifiers) }
+    val providers = classes.map { it.getDeclaredConstructor().apply { isAccessible = true }.newInstance() as VibeProvider }
+    assertTrue(providers.size >= 40, "classpath scan found only ${providers.size} shipped vibes, so the check is hollow")
+    return providers
 }

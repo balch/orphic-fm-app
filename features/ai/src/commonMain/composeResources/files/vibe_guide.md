@@ -5,8 +5,8 @@ registers, EDM/SPACE pairs, starting levels) that already obeys the theory rules
 you compose on it: the frame, groove, progression, melodies, sections and effects. Never copy a
 shipped vibe or edit one into a new vibe. The catalog at the end is for ideas only ("how does that
 one build its singer?"). To tweak the vibe playing now, read it with pulsar_get_vibe('current').
-Sections A-C cover casting, the theory rules, drone beds and expressive voices, and D song
-references (a pasted tab or chord sheet); 1-12 cover the
+Sections A-C cover casting, the theory rules, drone beds and expressive voices, D song
+references (a pasted tab or chord sheet), and E melody lines and singers; 1-12 cover the
 controls, and 13 the rest of them. The Reference part at the end holds deep dives (OSC, MST and
 grainFx, doubled parts) for when a vibe needs one. Set every value with intent: a vibe that changes
 only bpm and root sounds like the last one.
@@ -17,7 +17,8 @@ harmonics/timbre/morph, the role (with chordFollow, and comping style, humanizat
 comp track), the note range, envelopeProfile, macroMap, pins, pan, density, volume, sends and
 barStrategy. The frame is a placeholder ("Untitled cast", 100 bpm, A MINOR, envelopeType BLEND,
 progressionStyle MODAL), and there is no arrangement, lick, bassLine, band or effects block: those
-are yours to write.
+are yours to write. It does set stepCount and chordsPerBar by the kind of vibe (section E), and
+doubles its leads and singers.
 
 Track slots (the engine ties some behaviour to the index):
 - 0: a kick about 70% of the time, else a pitched perc hit or a pad. 1: snare, perc or texture.
@@ -83,8 +84,10 @@ keeps each voice's harmonics/timbre/morph inside a sane range.
 The singers (VOWEL_FOF, and SPK as a lead) come with a sung waver: vibratoDepth 25 at 5.5 Hz,
 pitchRise 25 over 2 s, and a vowel that opens through each note over 1.5 s: morphRise 0.08 on SPK
 and harmonicsRise 0.15 on VOWEL_FOF, each on the knob that is that engine's vowel (section 3).
+A rolled singer also gets a detuned double (doubleDetune 18, doubleSpread 0.8) and a rolled lead
+a tighter one (10 and 0.4). A drone bed keeps its own voices, undoubled.
 
-The cast writes no lick and no bassLine; for melody lines, see section 10's Lick / riff recipes.
+The cast writes no lick and no bassLine; section E shows how to write them.
 
 ## B. Music theory guardrails
 The cast obeys all of these. CastRules checks the first six on every cast (the pads' energyDensity
@@ -234,10 +237,7 @@ or points at a file, call song_reference before building. Pass path only for a f
   hits (onsets lists which beats, 0 = the downbeat, so [1, 3] is 2 and 4). lpgMode is the matching voice mode.
   MIXED means no single grid fits: use PLUCK. rhythm SPACING means the tab had no bar lines, so onsets count from
   the first stroke and may sit shifted against the beat: decide the phase by the genre.
-A lick plays only stepCount / 4 beats: at the default stepCount 16 a lead hears just its first 4 beats. For a
-lyric line or solo set stepCount 64 (16 beats, 4 bars), keep every lick at 16 beats or less, and play a longer
-line from consecutive pool slots in consecutive sections. At 64, a section bar is 2 real bars (use even
-barsMin/barsMax) and chordsPerBar 4 is one chord per real bar.
+For the lyric line's stepCount, bar and chord maths, and a line longer than one window, see section E.
 Tabs hold no sung pitches. Write the vocal melody from your memory of the song, shaped by the phrase slots and
 keyed to the real chords. Keep it recognisable, not a note-for-note copy.
 
@@ -248,6 +248,280 @@ _8TH_OFF the skank, _16TH_OFF upticks, _TRIPLET a roll, _8TH steady eighths, pla
 The pluck grid sets the feel more than the drums: an off-beat skank over a sparse kick reads as reggae, off-16ths
 over the same kit as funk. Put the song's pluck on the chord or riff voice, and change it for a section with that
 section's track override lpgMode (e.g. straight plucks in the verse, the skank in the chorus, triplets in a jam).
+
+## E. Melody lines and singers
+A melody line is a Lick: a list of steps that a Melodic track with lickMode Fill or Squash plays.
+There are four kinds: a lyric line sings like words, a lead line plays off the song, a riff locks
+to the groove, and a jam improvises on all three. Not every vibe needs a sung line; a groove can
+live on a riff alone.
+
+### The bar and chord maths
+A Fill lick plays stepCount / 4 beats (4 steps a beat) and starts again: a shorter lick repeats to
+fill that window, a longer one is cut. A section bar is one loop of track 0, and the chord changes
+every stepCount / chordsPerBar steps (16 steps is one real bar).
+- At 16: a lick has 4 beats, a section bar is 1 real bar, and chordsPerBar 1 is one chord per bar.
+- At 32: 8 beats, a section bar is 2 real bars, and chordsPerBar 2 is one chord per real bar.
+- At 64: 16 beats (4 real bars), a section bar is still 2 real bars, since track 0's drums loop
+  32 steps, and chordsPerBar 4 is one chord per real bar. Use even barsMin and barsMax with
+  barStep 2, so every section holds whole 16-beat lines.
+A Chordal track 0, or one playing a Fill lick, loops the full stepCount instead, so at 64 its
+section bar is 4 real bars.
+
+The cast picks stepCount by the first rule that fits: leadLine true gives 64; the ambient tag
+gives 64, even with leadLine false; with leadLine left out, a lead on track 4 or a rolled singer
+anywhere gives 64 (a rolled VOWEL_FOF choir pad counts, a drone bed's choir does not); styleTags
+that are only loop styles (electro) give 16; anything else, leadLine false included, gives 32. It sets chordsPerBar to stepCount / 16, one chord per real bar. Pass
+leadLine true when the vibe will carry a lyric or lead line, false for a groove without one.
+
+A line longer than the window goes in consecutive lickRotation.pool slots, pinned with lickIndex in
+consecutive sections: the verse's first half on slot 1, its second half on slot 2.
+
+### The Lick fields
+- steps: each has a scaleDegree (0 is the root; a degree past the scale's size climbs an octave,
+  so in a 7-note scale 7 is the root an octave up), a duration in beats (0.25 a 16th, 0.5 an 8th,
+  1 a quarter), a velocity (0..1; about 0.3 is a ghost), a glideRate (0..1, a slide into this
+  note; leave it out to use the voice's own glideRate) and a hitProbability (the chance the note
+  plays; tension lifts it toward certain, and a lost roll leaves the next note struck clean).
+- A negative scaleDegree is a rest for its duration, the only way to put silence inside a line.
+- loopLength (beats): make it the steps' total, rests included, and the line repeats back to back
+  across the window. A larger value fills only steps' total / loopLength of the window, the line
+  still back to back (cut mid-line if it does not fit), and leaves the end silent: a breath only
+  when one pass nearly fills the window (loopLength about stepCount / 4). For a breath after every
+  phrase, end the phrase with a rest step.
+- lickMode on the track's role: Fill plays the line across the whole window; Squash packs it into
+  one bar, and at 32 or 64 the track's barStrategy writes it a second bar.
+- lickMutation (0..1, default 0.5) is how far each loop strays from the written line, one value
+  for the LEAD channel; bassLineMutation is the bass channel's. The Complexity knob scales both, so
+  at complexity 0 a line plays as written.
+- lickMutationMode CHORD_TONES keeps a line's shape: a rest never fills, a changed note moves at
+  most one scale step, and at its note-on a changed note lands on a tone of the chord sounding
+  then. RANDOM, the default, can fill a rest and jump to any degree. The mode covers every lick
+  channel. Use CHORD_TONES for any line that sings.
+- lickOctave (-1 centres the line on the genre's noteRangeLow..noteRangeHigh, 0-8 holds it in one
+  octave) is the LEAD channel's, bassLineOctave the bass channel's. A FOLLOW or ROOT_ONLY track
+  then folds each note into the octave above its own noteRangeLow; a FIXED track plays it as
+  rendered (Register, under Lyric line). lickDegreeOffset on a track's role shifts every
+  degree that track plays, so one line sounds in two places: Orphic Lore's lead plays the bass's
+  line 14 degrees (two octaves) up.
+
+### Which channel carries which line
+- LEAD: a track with lickSource LEAD (the default), usually the lead on track 4, plays lick, or
+  with lickRotation the pool slot of the section. A section's lickIndex pins a slot; without it
+  the pool rotates at each section. Every LEAD track with a lickMode plays the same line,
+  each at its own lickDegreeOffset (Orphic Lore's bass and lead).
+- BASS: a track with lickSource BASS plays bassLine. A section's bassLineIndex pins a pool slot
+  on this channel instead (it needs bassLine and lickRotation, and a slot inside the pool), so a
+  singer on BASS sings the lyric line while the lead plays the riff.
+There is no third channel, so other melodies take turns on LEAD by section. Pool size plus a lick
+anomaly is at most 8.
+
+### Lyric line
+- One phrase per lyric line, or per song_reference phrase slot, about one note per syllable: short
+  notes (0.25-0.5) on unstressed syllables, a long one (1-2 beats or more) on the line's last
+  stressed word.
+- A rest at the end of every line: the breath.
+- A contour that rises into the middle of the line and falls at its end, like a spoken sentence.
+- Call and answer between lines: the answer opens on a rest, as Stay Asleep's reply below does.
+- The chorus hook gets its own pool slot and returns in every chorus section through lickIndex,
+  or bassLineIndex for a singer on BASS. Vary a verse with a second slot, not with mutation.
+- lickMutation (bassLineMutation for a singer on BASS) at 0-0.1, with lickMutationMode
+  CHORD_TONES, so the words stay put.
+- Register: high (68-79) or top (78-91), above the drones and clear of the bass (section B).
+  lickOctave -1 centres the line on the genre's noteRangeLow..noteRangeHigh, not the track's (the
+  cast's genre 36-60 puts the root near 48). A FOLLOW or ROOT_ONLY track then folds each note into
+  the octave above its own noteRangeLow; a FIXED track does not. So on a FOLLOW singer (the cast's
+  kind) raise noteRangeLow and noteRangeHigh on both slots to lift the line (e.g. 68-79; the cast
+  may put a singer lower, SPK always in 58-69). A FIXED singer picks its register with lickOctave
+  0-8 (bassLineOctave on BASS) or lickDegreeOffset: the Sirens sing bassLineOctave 2 plus 23
+  degrees, F5 down to C5. Its own range still matters: it caps the grain choir (the Sirens use
+  69-77) and must pass section B's overlap rule against the pads and the lead. On a FIXED singer
+  the degrees are absolute, so write each one against its chord (the Sirens sing F E D C over
+  D C Bb A, a third above); on FOLLOW the engine moves the line with each chord root, so write it
+  once against the tonic.
+
+### Lead line
+- State a 2-4 note motif, then answer and develop it across slots: moved down a step (Symphony No. 5's
+  G G G Eb answered by F F F D), extended, or with its rhythm shifted by an 8th.
+- Slide on long notes. Glide is a time: glideRate 0.12 gets most of the way in about 80 ms, 0.28
+  in about 150 ms, 0.5 in about 350 ms. From about 0.38 a 16th note ends before it arrives, while
+  a long note at 0.5 (the Sirens' 4-beat anchors) still gets there. A note glides only when the
+  last gated step before it sounded: a rest in between keeps the slide (from the note before the
+  rest), but a step that loses its hitProbability roll leaves the next note struck clean.
+  pitchRise 100-200 over 0.3-0.5 s scoops into every note (section C).
+- Leave the line room for a Jam or LickBuilder section to take it further.
+- lickMutation 0.2-0.4. A sung line on the same LEAD channel wants 0-0.1, so then keep it low and
+  let the solo sections add the movement.
+
+### Riff
+- 1-2 bars, rhythm first: place the hits and rests, then pick the pitches. Lock it to the groove,
+  on the one and around the backbeat.
+- On the bass or a mid voice (58-69), repeating: loopLength equal to its steps' total, so a 1-bar
+  riff plays 4 times at stepCount 64.
+- lickMutation at most 0.3; a short Fill, or Squash.
+
+### Jam
+- When: after the song has stated its lines (a verse and a chorus at least), and at the energy
+  peaks. How long: 8-12 section bars at 64, with barStep 2.
+- The landing: the next section pins the lyric hook or the riff again with lickIndex, over
+  transitionBars 1-2, or a hard cut with transitionBars 0 (Orphic Lore's storm slams back home).
+- The modes. soloMode rolls its probability once at section entry, so use 0.9-1 for a jam that
+  must happen.
+  - Jam(probability, lickInfluence): in the scale, with its on-beat notes snapped to chord tones.
+    A lead that plays a line keeps it and fills the rests, sparse at first and busier as the
+    section goes on; a lead with no line gets a new one. Its phrase passes to the next soloist,
+    weighted by lickInfluence, and jamCarry true on the next jam section carries the same solo
+    across the seam instead of starting over.
+  - LickBuilder(probability, mutationRate): builds on the line, mutating it every bar, and passes
+    it from member to member.
+  - LongFill(probability, barsMin, barsMax): one member's spotlight on the line, no handoff.
+- A soloMode needs a band (section 7). handoffMatrix rows say who passes the lead to whom and
+  pullInMatrix who pulls whom in for a duet, in member order, with 0 on the diagonal. A five-piece
+  where the lead (track 4) and a singer (track 5) trade the front line:
+```json
+{
+  "members": [
+    { "name": "Drummer", "tracks": [0, 1, 2], "alwaysActive": true },
+    { "name": "Bassist", "tracks": [3] },
+    { "name": "Lead", "tracks": [4], "loudness": 0.65, "creativity": 0.6 },
+    { "name": "Singer", "tracks": [5], "loudness": 0.6, "creativity": 0.4 },
+    { "name": "Colour", "tracks": [6, 7] }
+  ],
+  "handoffMatrix": [0.0, 0.2, 0.4, 0.3, 0.1,  0.0, 0.0, 0.4, 0.4, 0.2,  0.0, 0.3, 0.0, 0.6, 0.1,  0.0, 0.3, 0.6, 0.0, 0.1,  0.0, 0.2, 0.4, 0.4, 0.0],
+  "pullInMatrix":  [0.0, 0.3, 0.2, 0.2, 0.1,  0.1, 0.0, 0.3, 0.3, 0.1,  0.1, 0.3, 0.0, 0.5, 0.1,  0.1, 0.3, 0.5, 0.0, 0.1,  0.1, 0.2, 0.3, 0.3, 0.0]
+}
+```
+- Three traps:
+  - A Jam or LickBuilder lead needs a track with the Melodic role, and not only ROOT_ONLY ones
+    (see section 7).
+  - A band needs two members that are not alwaysActive (see section 7).
+  - In a solo section a soloist thins to density 0.1-0.3, never 0 (see section 7).
+- A jam reuses the vibe's lines: the lead line is its opening statement (a Jam opens on the bare
+  line), the riff stays the bed under it, and the lyric hook is the return.
+
+### Singers and the double voice
+- SPK, the speech singer (Orphic Lore's Sirens): harmonics picks the speech model (0.1667 is the
+  clearest), timbre the formant (0.2 sounds natural), morph the vowel; pin all three. Add
+  vibratoDepth 25 at vibratoRate 5.5, pitchRise 25 over pitchRiseTime 2, and morphRise 0.08 over
+  morphRiseTime 1.5. A section's morph plus morphRise in trackOverrides gives it its own vowel.
+- VOWEL_FOF: the vowel is harmonics and morph is the voice type (section 3), so the vowel sweep is
+  harmonicsRise 0.1-0.25 over about 1.5 s.
+- A funky lead that does not sound like a voice (Orphic Lore's track 4): WSH in both slots,
+  lpgMode PLUCK with lpgDecay 0.5 and lpgColour 0.55 so every note is struck, glideRate 0 on the
+  voice so only the steps with their own glideRate slide, wahLick true on its role with the vibe's
+  lickWah as its pedal (rateDivision 4, centerHz 750, wet 0.9), and a section lpgMode
+  PLUCK_REPEAT_16TH_OFF in the peak, which re-picks its held notes on the off 16ths. CSAW or DX3
+  from section 3's lead family work the same way.
+- A person whistling: FM, where harmonics is the frequency ratio, timbre the modulation index and
+  morph the feedback. Pin timbre at its 0.15 floor (almost no modulation, so a near-pure sine) and
+  morph at 0.5 (no feedback), harmonics anywhere (0.5); pin all three. Add a waver (vibratoDepth
+  10-25 at vibratoRate 4.5-6.5), a small scoop (pitchRise 0-30 over pitchRiseTime 0.1-0.25) and
+  slides (glideRate 0.08-0.25), lpgMode unset or BYPASS so notes sustain, and a range inside 69-84
+  (the top turns shrill). A whistler is one person: no double, or doubleDetune under 5. Use it
+  only when the request asks for whistling or a folk, western, reggae or lo-fi feel suits it,
+  never as a default lead, and vary it each time: the range (69-76 low and breathy, 74-84 bright),
+  the waver, the slide, and whether one slot or both whistle (one slot lets energy trade it for
+  another voice). On track 7 it whistles only where that slot speaks (section 11); on track 4 or a
+  lick track it carries a line.
+- The double voice on every melody voice (a whistler aside): doubleDetune and doubleSpread on both slots, 18 and 0.8
+  on a singer (the Sirens), 8-12 and 0.3-0.5 on a lead; the cast writes 18 and 0.8 on its singers
+  and 10 and 0.4 on its leads. Vary it per section through TrackSectionOverride.doubleDetune and
+  doubleSpread, tight in a verse and wider in a chorus, and never set it to 0 there (0 cuts the
+  double at once).
+
+### Worked lines
+Shipped licks as JSON, their default fields left out. Read them for the shapes, then write your own.
+
+The Sirens' bassLine, in D minor at stepCount 64: one held anchor a bar (D C Bb A), sung 23
+degrees up as F E D C.
+Orphic Lore, val sirensDescent:
+```json
+{
+  "steps": [
+    { "scaleDegree": 7, "duration": 4, "velocity": 0.95, "glideRate": 0.5 },
+    { "scaleDegree": 6, "duration": 4, "velocity": 0.9, "glideRate": 0.5 },
+    { "scaleDegree": 5, "duration": 4, "velocity": 0.9, "glideRate": 0.5 },
+    { "scaleDegree": 4, "duration": 4, "velocity": 0.95, "glideRate": 0.25 }
+  ],
+  "loopLength": 16
+}
+```
+The verse and peak riff, played by the bass and by the wah lead 14 degrees up. Bar 1 is the one,
+an octave pop, ghosts at velocity 0.3 and notes pushed in at glideRate 0.12; bar 2 answers.
+Orphic Lore, val funkSketch:
+```json
+{
+  "steps": [
+    { "scaleDegree": 7, "duration": 0.25, "velocity": 0.95 },
+    { "scaleDegree": -1, "duration": 0.25 },
+    { "scaleDegree": 14, "duration": 0.25, "velocity": 0.75 },
+    { "scaleDegree": 7, "duration": 0.25, "velocity": 0.3 },
+    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 9, "duration": 0.25, "velocity": 0.85 },
+    { "scaleDegree": 10, "duration": 0.5, "velocity": 0.9, "glideRate": 0.12 },
+    { "scaleDegree": -1, "duration": 0.25 },
+    { "scaleDegree": 9, "duration": 0.25, "velocity": 0.35 },
+    { "scaleDegree": 7, "duration": 0.25, "velocity": 0.85 },
+    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 4, "duration": 0.5, "velocity": 0.9, "glideRate": 0.12 },
+    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 6, "duration": 0.25, "velocity": 0.8 },
+    { "scaleDegree": 7, "duration": 0.75, "velocity": 0.9, "glideRate": 0.12 },
+    { "scaleDegree": -1, "duration": 0.5 },
+    { "scaleDegree": 9, "duration": 0.25, "velocity": 0.85 },
+    { "scaleDegree": 10, "duration": 0.25, "velocity": 0.35 },
+    { "scaleDegree": 9, "duration": 0.25, "velocity": 0.8 },
+    { "scaleDegree": 7, "duration": 0.25, "velocity": 0.8 },
+    { "scaleDegree": -1, "duration": 1 }
+  ],
+  "loopLength": 8
+}
+```
+The answer on the bass channel (an electric piano), in E blues at stepCount 32. It waits 3 beats
+while the call speaks, and its hitProbability maybes change its shape each loop.
+Stay Asleep, val replyLick:
+```json
+{
+  "steps": [
+    { "scaleDegree": -1, "duration": 3 },
+    { "scaleDegree": 5, "duration": 0.25, "velocity": 0.4, "hitProbability": 0.7 },
+    { "scaleDegree": 4, "duration": 1, "velocity": 0.6, "glideRate": 0.15, "hitProbability": 0.85 },
+    { "scaleDegree": 5, "duration": 0.25, "velocity": 0.8, "hitProbability": 0.7 },
+    { "scaleDegree": 0, "duration": 0.25, "velocity": 0.6, "hitProbability": 0.7 },
+    { "scaleDegree": 4, "duration": 1.5, "velocity": 0.8, "glideRate": 0.15 }
+  ],
+  "loopLength": 8
+}
+```
+Pool slot 0, in C minor at stepCount 32: a motif (G G G Eb) answered a step lower (F F F D), with
+a 1-beat breath from loopLength 8.
+Symphony No. 5 in C Minor, val fateMotif:
+```json
+{
+  "steps": [
+    { "scaleDegree": 4, "duration": 0.5, "velocity": 0.95 },
+    { "scaleDegree": 4, "duration": 0.5, "velocity": 0.95 },
+    { "scaleDegree": 4, "duration": 0.5, "velocity": 0.95 },
+    { "scaleDegree": 2, "duration": 2, "velocity": 1 },
+    { "scaleDegree": 3, "duration": 0.5, "velocity": 0.9 },
+    { "scaleDegree": 3, "duration": 0.5, "velocity": 0.9 },
+    { "scaleDegree": 3, "duration": 0.5, "velocity": 0.9 },
+    { "scaleDegree": 1, "duration": 2, "velocity": 1 }
+  ],
+  "loopLength": 8
+}
+```
+A chorus section, invented but every field real: the lead plays the riff in pool slot 3, a singer
+on the bass channel (track 5) sings the chorus hook in slot 2, and the singer's double widens.
+```json
+{
+  "name": "chorus",
+  "barsMin": 4, "barsMax": 6, "barStep": 2,
+  "lickIndex": 3,
+  "bassLineIndex": 2,
+  "trackOverrides": { "5": { "doubleDetune": 24, "doubleSpread": 0.9 } },
+  "transitions": [{ "targetIndex": 1, "weight": 1.0, "transitionBars": 1 }]
+}
+```
 
 ## 1. The frame
 - bpm: tempo. rootNote, scaleType: the key and mode (set the mode to the feel — PHRYGIAN/MINOR dark,
@@ -391,7 +665,7 @@ Three traps make a band look present but do nothing:
 - ONLY A Melodic-ROLE TRACK CAN LEAD A Jam. A Jam renders an improvised melodic line, so the lead
   member must own at least one track whose role is Melodic. A melodic-sounding ENGINE is
   irrelevant — an organ on a Chordal track cannot lead a jam. Check the role, not the engine id.
-  (LongFill and LickBuilder are not filtered this way; only Jam.)
+  (LickBuilder is filtered the same way; only LongFill is not.)
 - TWO MEMBERS IS NOT A BAND. The engine refuses to hand the lead to an alwaysActive member, so an
   anchor plus one voice deadlocks. Always give a band at least two non-alwaysActive members.
 - DO NOT "density": 0 A WOULD-BE SOLOIST. In a section that declares a soloMode, zeroing a melodic
@@ -720,7 +994,7 @@ Controls and behaviours the sections above leave out. Section B's rules still ho
 ### Frame and groove
 - stepCount: 16 (one-bar patterns, the default), 32 (two-bar phrases) or 64 (four bars, the most).
   A Fill lick plays only stepCount / 4 beats, so any lead or lyric line longer than 4 beats needs
-  32 or 64 (section D has the bar and chord maths for 64).
+  32 or 64 (section E has the bar and chord maths).
 - rootNote takes enharmonic names: G_SHARP is A flat.
 - deep: 0.4-0.7 for a wet vibe, 0.2-0.3 for a dry, punchy one.
 - progressionStyle in plain terms: POP (I-IV-V-vi), BLUES (12-bar), JAZZ (ii-V-I), DARK (diminished
@@ -773,11 +1047,15 @@ Controls and behaviours the sections above leave out. Section B's rules still ho
 
 ### Lick steps
 - A lick is a list of steps, each a scaleDegree (0 is the root), a duration in beats and a velocity
-  (0..1), up to 64 steps. A negative degree is a rest; at high lickMutation a rest has about a
-  mutation × 0.3 chance of filling with a note.
+  (0..1), up to 64 steps. A negative degree is a rest; under lickMutationMode RANDOM, at high
+  lickMutation a rest has about a mutation × 0.3 chance of filling with a note.
 - lickMode Fill spreads the lick across its bars; Squash compresses it into one bar.
-- loopLength (beats) longer than the steps' total adds a rest at the end: a phrase, then space.
-- lickOctave: -1 (automatic, the middle of the track's range) or 0-8 to hold the lick in one octave.
+- loopLength (beats) longer than the steps' total fills only steps' total / loopLength of the
+  window, the line back to back, and leaves the end silent; for a breath after each phrase, end it
+  with a rest step.
+- lickOctave: -1 (automatic, the middle of the genre's noteRangeLow..noteRangeHigh) or 0-8 to hold
+  the lick in one octave. A FOLLOW or ROOT_ONLY track then folds each note into the octave above
+  its own noteRangeLow; a FIXED track does not.
 - With lickRotation, keep a static lick as well: without an arrangement the pool falls back to one
   pick at load.
 

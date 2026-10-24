@@ -114,6 +114,7 @@ object VibeCaster {
             }.also { panSum += it.pan }
         }.let { chooseArpeggiator(it, rnd) }
 
+        // LEAD rolls only on track 4 (SLOT_PARTS); a bed's voices never count.
         val hasLead = (filled[4] as? Slot.Rolled)?.voice?.part == Part.LEAD ||
             filled.any { (it as? Slot.Rolled)?.voice?.singer == true }
         val stepCount = castStepCount(tags, req.leadLine, hasLead)
