@@ -9,170 +9,31 @@ set(EURORACK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../eurorack"
     CACHE PATH "Path to Mutable Instruments eurorack repository")
 message(STATUS "Eurorack source: ${EURORACK_DIR}")
 
-# ── Source directories ────────────────────────────
-set(LIB_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
-set(LIB_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
-
-# ── Plaits engine sources ─────────────────────────
-file(GLOB PLAITS_ENGINE_SRC "${EURORACK_DIR}/plaits/dsp/engine/*.cc")
-file(GLOB PLAITS_ENGINE2_SRC "${EURORACK_DIR}/plaits/dsp/engine2/*.cc")
-file(GLOB PLAITS_SPEECH_SRC "${EURORACK_DIR}/plaits/dsp/speech/*.cc")
-file(GLOB PLAITS_PM_SRC "${EURORACK_DIR}/plaits/dsp/physical_modelling/*.cc")
-file(GLOB PLAITS_FM_SRC "${EURORACK_DIR}/plaits/dsp/fm/*.cc")
-set(PLAITS_SRC
-    ${PLAITS_ENGINE_SRC}
-    ${PLAITS_ENGINE2_SRC}
-    ${PLAITS_SPEECH_SRC}
-    ${PLAITS_PM_SRC}
-    ${PLAITS_FM_SRC}
-    "${EURORACK_DIR}/plaits/dsp/voice.cc"
-    "${EURORACK_DIR}/plaits/dsp/chords/chord_bank.cc"
-    "${EURORACK_DIR}/plaits/resources.cc"
-)
-
-# ── stmlib sources ────────────────────────────────
-set(STMLIB_SRC
-    "${EURORACK_DIR}/stmlib/dsp/atan.cc"
-    "${EURORACK_DIR}/stmlib/dsp/units.cc"
-    "${EURORACK_DIR}/stmlib/utils/random.cc"
-)
-
-# ── Clouds sources ────────────────────────────────
-set(CLOUDS_SRC
-    "${EURORACK_DIR}/clouds/dsp/granular_processor.cc"
-    "${EURORACK_DIR}/clouds/dsp/mu_law.cc"
-    "${EURORACK_DIR}/clouds/dsp/correlator.cc"
-    "${EURORACK_DIR}/clouds/dsp/pvoc/frame_transformation.cc"
-    "${EURORACK_DIR}/clouds/dsp/pvoc/phase_vocoder.cc"
-    "${EURORACK_DIR}/clouds/dsp/pvoc/stft.cc"
-    "${EURORACK_DIR}/clouds/resources.cc"
-)
-
-# ── Beads sources (Mist grain engine) ─────────────
-# Only the trigger generator and the tables are compiled; the grain player and
-# wavetable voice are header-only. The tape processor is not built.
-set(BEADS_SRC
-    "${EURORACK_DIR}/beads/dsp/trigger_generator.cc"
-    "${EURORACK_DIR}/beads/resources.cc"
-)
-
-# ── Rings sources ─────────────────────────────────
-set(RINGS_SRC
-    "${EURORACK_DIR}/rings/dsp/fm_voice.cc"
-    "${EURORACK_DIR}/rings/dsp/part.cc"
-    "${EURORACK_DIR}/rings/dsp/string_synth_part.cc"
-    "${EURORACK_DIR}/rings/dsp/string.cc"
-    "${EURORACK_DIR}/rings/dsp/resonator.cc"
-    "${EURORACK_DIR}/rings/resources.cc"
-)
-
-# ── Warps sources ─────────────────────────────────
-set(WARPS_SRC
-    "${EURORACK_DIR}/warps/dsp/modulator.cc"
-    "${EURORACK_DIR}/warps/dsp/oscillator.cc"
-    "${EURORACK_DIR}/warps/dsp/vocoder.cc"
-    "${EURORACK_DIR}/warps/dsp/filter_bank.cc"
-    "${EURORACK_DIR}/warps/resources.cc"
-)
-
-# ── Marbles sources ───────────────────────────────
-file(GLOB MARBLES_RANDOM_SRC "${EURORACK_DIR}/marbles/random/*.cc")
-set(MARBLES_SRC
-    ${MARBLES_RANDOM_SRC}
-    "${EURORACK_DIR}/marbles/ramp/ramp_extractor.cc"
-    "${EURORACK_DIR}/marbles/resources.cc"
-)
-
-# ── Streams sources (Lorenz attractor) ────────────
-set(STREAMS_SRC
-    "${EURORACK_DIR}/streams/lorenz_generator.cc"
-    "${EURORACK_DIR}/streams/resources.cc"
-)
-
-# ── Frames sources (PolyLFO) ─────────────────────
-set(FRAMES_SRC
-    "${EURORACK_DIR}/frames/poly_lfo.cc"
-    "${EURORACK_DIR}/frames/resources.cc"
-    "${LIB_SRC}/orpheus_frames_stub.cpp"
-)
-
-# ── Orpheus engine sources ────────────────────────
-set(ORPHEUS_SRC
-    "${LIB_SRC}/orpheus_engine.cpp"
-    "${LIB_SRC}/orpheus_engine_routing.cpp"
-    "${LIB_SRC}/orpheus_engine_voice.cpp"
-    "${LIB_SRC}/orpheus_graph.cpp"
-    "${LIB_SRC}/orpheus_monitor.cpp"
-    "${LIB_SRC}/orpheus_unit_basic.cpp"
-    "${LIB_SRC}/orpheus_unit_bender.cpp"
-    "${LIB_SRC}/orpheus_unit_clouds.cpp"
-    "${LIB_SRC}/orpheus_unit_delay.cpp"
-    "${LIB_SRC}/orpheus_unit_grids.cpp"
-    "${LIB_SRC}/orpheus_unit_lfo.cpp"
-    "${LIB_SRC}/orpheus_unit_looper.cpp"
-    "${LIB_SRC}/orpheus_unit_marbles.cpp"
-    "${LIB_SRC}/orpheus_unit_plaits.cpp"
-    "${LIB_SRC}/orpheus_unit_reverb.cpp"
-    "${LIB_SRC}/orpheus_unit_rings.cpp"
-    "${LIB_SRC}/orpheus_unit_warps.cpp"
-    "${LIB_SRC}/orpheus_unit_lorenz.cpp"
-    "${LIB_SRC}/orpheus_unit_poly_lfo.cpp"
-    "${LIB_SRC}/orpheus_unit_bass.cpp"
-    "${LIB_SRC}/orpheus_unit_overdrive.cpp"
-    "${LIB_SRC}/orpheus_unit_compressor.cpp"
-    "${LIB_SRC}/orpheus_patch.cpp"
-    "${LIB_SRC}/orpheus_resonator.cpp"
-    "${LIB_SRC}/orpheus_spectrum.cc"
-    "${LIB_SRC}/orpheus_scope.cc"
-)
-
-# ── WASM export wrappers ─────────────────────────
-set(WASM_SRC
-    "${CMAKE_CURRENT_SOURCE_DIR}/wasm_exports.cpp"
+# ── DSP library ───────────────────────────────────
+# Reuse the root static library so this build can never drift from its source list.
+add_subdirectory(
+    "${CMAKE_CURRENT_SOURCE_DIR}/../.."
+    "${CMAKE_CURRENT_BINARY_DIR}/liborpheus_dsp"
 )
 
 # ── WASM executable target ────────────────────────
-add_executable(orpheus_dsp
-    ${WASM_SRC}
-    ${ORPHEUS_SRC}
-    ${STMLIB_SRC}
-    ${PLAITS_SRC}
-    ${CLOUDS_SRC}
-    ${BEADS_SRC}
-    ${RINGS_SRC}
-    ${WARPS_SRC}
-    ${MARBLES_SRC}
-    ${STREAMS_SRC}
-    ${FRAMES_SRC}
+# Named apart from the library target; OUTPUT_NAME keeps the orpheus_dsp.js/.wasm artifacts.
+add_executable(orpheus_dsp_wasm
+    "${CMAKE_CURRENT_SOURCE_DIR}/wasm_exports.cpp"
 )
-
-target_include_directories(orpheus_dsp PRIVATE
-    "${LIB_INCLUDE}"
-    "${LIB_SRC}"
+target_link_libraries(orpheus_dsp_wasm PRIVATE orpheus_dsp)
+target_include_directories(orpheus_dsp_wasm PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src"
     "${EURORACK_DIR}"
 )
-
-# ── Compile flags ─────────────────────────────────
-target_compile_options(orpheus_dsp PRIVATE
-    -O3
-    -ffast-math
-    -Wno-unused-parameter
-    -Wno-sign-compare
-    -Wno-unused-variable
-    -Wno-missing-field-initializers
-    -Wno-unused-local-typedef
-    -Wno-unused-private-field
-    -Wno-char-subscripts
-    -Wno-tautological-compare
-    -Wno-implicit-const-int-float-conversion
-)
-
-# Define TEST to use non-ARM code paths in stmlib
-target_compile_definitions(orpheus_dsp PRIVATE TEST)
+target_compile_options(orpheus_dsp_wasm PRIVATE -O3 -ffast-math)
+# stmlib takes its non-ARM code paths under TEST, as in the library.
+target_compile_definitions(orpheus_dsp_wasm PRIVATE TEST)
 
 # ── Emscripten link flags ────────────────────────
 # Build as a JS module loadable in a Web Worker
-target_link_options(orpheus_dsp PRIVATE
+target_link_options(orpheus_dsp_wasm PRIVATE
     # Module output format
     -sMODULARIZE=1
     -sEXPORT_NAME=OrpheusDSP
@@ -195,7 +56,7 @@ target_link_options(orpheus_dsp PRIVATE
 )
 
 # Output files: orpheus_dsp.js + orpheus_dsp.wasm
-set_target_properties(orpheus_dsp PROPERTIES
+set_target_properties(orpheus_dsp_wasm PROPERTIES
     SUFFIX ".js"
     OUTPUT_NAME "orpheus_dsp"
 )
