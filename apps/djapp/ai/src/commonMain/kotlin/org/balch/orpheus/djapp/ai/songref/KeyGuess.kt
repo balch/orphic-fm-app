@@ -106,6 +106,7 @@ internal fun guessKey(
 
 // Stage 1: roots ranked by tonic evidence alone, so borrowed chords cannot pull the root away by fit.
 // Note evidence counts half when there are chords too; ties go to the first chord's root, then the lower pitch class.
+// Notes are each column's lowest (see parse).
 private fun rankTonics(chords: List<ParsedChord>, notes: List<Int>): List<Int> {
     val score = DoubleArray(12)
     if (chords.isNotEmpty()) {
@@ -124,6 +125,8 @@ private fun rankTonics(chords: List<ParsedChord>, notes: List<Int>): List<Int> {
         score[pcs.last()] += w
         score[pcs.first { counts[it] == most }] += w
         score[notes.min().mod(12)] += 0.5 * w
+        // A pitch class that fills the tab outweighs one that only ends it or sits lowest.
+        for (pc in 0..11) score[pc] += 2.0 * w * counts[pc] / pcs.size
     }
     val first = chords.firstOrNull()?.root
     return (0..11).sortedWith(compareByDescending<Int> { score[it] }.thenByDescending { it == first }.thenBy { it })

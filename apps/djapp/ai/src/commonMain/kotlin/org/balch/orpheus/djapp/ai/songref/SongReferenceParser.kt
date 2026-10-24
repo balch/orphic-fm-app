@@ -164,7 +164,8 @@ private fun parse(raw: String, rootNote: RootNote?, scaleType: ScaleType?): Song
 
     val blocks = sections.flatMap { it.blocks }
     val timed = blocks.map { timeNotes(it.systems) }
-    val noteMidis = timed.flatMap { (notes, _) -> notes.mapNotNull { it.midi } }
+    // Key evidence is each column's lowest note: a power chord's root, not the fifth the melody keeps on top.
+    val noteMidis = blocks.flatMap { b -> b.systems.flatMap { s -> s.columns.map { c -> c.notes.minOf { it.midi } } } }
     if (occurrences.isEmpty() && noteMidis.isEmpty()) return SongReference(ok = false, message = NOTHING_MUSICAL, source = source, warnings = warnings)
     val key = guessKey(occurrences.map { it.first }, noteMidis, tonality, rootNote, scaleType)
         ?: return SongReference(ok = false, message = NOTHING_MUSICAL, source = source, warnings = warnings)
