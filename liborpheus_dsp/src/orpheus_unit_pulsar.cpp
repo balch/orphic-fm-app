@@ -1392,7 +1392,9 @@ static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
                                ch.lick, ch.length, ch_mut,
                                section_seed ^ (t * 13331u),
                                ch.octave,
-                               ch.loop_length, 0, ch.mutation_mode);
+                               ch.loop_length,
+                               engine->pulsar_track_lick_degree_offset[t].load(std::memory_order_relaxed),
+                               ch.mutation_mode);
         }
         if (ts.playhead >= ts.step_count) ts.playhead = 0;
         regenerated++;
@@ -1861,6 +1863,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 // has to answer with the bass line, at bass mutation and bass octave. The
                 // sibling lick branch above already resolves `ch`; this call used to
                 // hardcode state->lick, so a BASS-source track here rendered the LEAD riff.
+                // The track's lickDegreeOffset applies here too, as on the lick branch.
                 apply_bar_strategy(ts, t, bar_strategy, (role == TrackRole::PERCUSSIVE), genre,
                                    static_cast<uint8_t>(root), scale,
                                    engine->pulsar_energy.load(std::memory_order_relaxed),
@@ -1868,7 +1871,9 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                    ch.lick, ch.length, ch_mut,
                                    base_seed ^ (t * 13331u),
                                    ch.octave,
-                                   ch.loop_length, 0, ch.mutation_mode);
+                                   ch.loop_length,
+                                   engine->pulsar_track_lick_degree_offset[t].load(std::memory_order_relaxed),
+                                   ch.mutation_mode);
             }
         }
 
@@ -5095,7 +5100,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                    ch.lick, ch.length, ch_mut,
                                                    reset_seed ^ (rt * 13331u),
                                                    ch.octave,
-                                                   ch.loop_length, 0, ch.mutation_mode);
+                                                   ch.loop_length,
+                                                   engine->pulsar_track_lick_degree_offset[rt].load(std::memory_order_relaxed),
+                                                   ch.mutation_mode);
                             }
                         }
                     }

@@ -495,6 +495,84 @@ static bool test_seam_rerenders_outgoing_lead() {
     return pass;
 }
 
+// 8. A generative CALL_RESPONSE track renders the vibe's lick with its lickDegreeOffset at
+// load, at a section's density regen and at the deja-vu reset. Two runs, offset 0 and +2,
+// must differ by exactly two scale degrees on every sounding step.
+enum class CrPath { LOAD, SECTION_DENSITY, DEJAVU };
+
+static StepSnap call_response_render(int offset, CrPath path) {
+    const int kTrack = 5;
+    OrpheusEngine* engine = make_seam_engine(2718, 0.0f);
+    engine->pulsar_step_count.store(32, std::memory_order_relaxed);
+    const int8_t degrees[4] = {0, 1, 2, 4};
+    for (int i = 0; i < 4; i++) engine->pulsar_lick[i] = {degrees[i], 1.0f, 0.8f, -1.0f};
+    engine->pulsar_lick_loop_length.store(0, std::memory_order_relaxed);
+    engine->pulsar_lick_mutation.store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_lick_length.store(4, std::memory_order_release);
+    engine->pulsar_track_lick_mode[kTrack].store(0, std::memory_order_relaxed);  // NONE: generative
+    engine->pulsar_track_bar_strategy[kTrack].store(static_cast<int>(BarStrategy::CALL_RESPONSE), std::memory_order_relaxed);
+    engine->pulsar_track_lick_degree_offset[kTrack].store(offset, std::memory_order_relaxed);
+    if (path == CrPath::SECTION_DENSITY) {
+        const SeamSection secs[2] = {{2, SoloModeId::NONE, 0.0f, -1, 1}, {4, SoloModeId::NONE, 0.0f, -1, 0}};
+        push_seam_sections(engine, secs, 2);
+        for (int i = 0; i < kMaxSections * kNumPulsarTracks; i++)
+            engine->pulsar_section_track_density[i].store(-1.0f, std::memory_order_relaxed);
+        engine->pulsar_section_track_density[1 * kNumPulsarTracks + kTrack].store(0.33f, std::memory_order_relaxed);
+    } else {
+        engine->pulsar_arrangement_active.store(0, std::memory_order_relaxed);
+    }
+
+    StepSnap out;
+    int bar = 0;
+    run_bars(engine, 8000, [&](PulsarState* ps) {
+        bar++;
+        switch (path) {
+            case CrPath::LOAD:
+                out = snap(ps->tracks[kTrack]);
+                return false;
+            case CrPath::SECTION_DENSITY:
+                if (ps->section_state.current_section != 1) return true;
+                if (ps->tracks[kTrack].generated_density == 0.33f) out = snap(ps->tracks[kTrack]);
+                return false;
+            case CrPath::DEJAVU:
+                if (bar == 2) { ps->loops_since_reset = 1000; return true; }
+                if (bar == 3 && ps->loops_since_reset == 0) out = snap(ps->tracks[kTrack]);
+                return bar < 3;
+        }
+        return false;
+    });
+    orpheus_engine_destroy(engine);
+    return out;
+}
+
+static bool test_call_response_keeps_degree_offset() {
+    printf("\n=== Test: a generative CALL_RESPONSE track keeps its lickDegreeOffset on every render ===\n");
+    const PulsarScale& sc = kPulsarScales[0];  // the fixture's minor scale on D
+    const uint8_t root = 2;
+    bool pass = true;
+    const CrPath paths[3] = {CrPath::LOAD, CrPath::SECTION_DENSITY, CrPath::DEJAVU};
+    const char* names[3] = {"load", "section density", "deja-vu reset"};
+    for (int p = 0; p < 3; p++) {
+        const StepSnap a = call_response_render(0, paths[p]);
+        const StepSnap b = call_response_render(2, paths[p]);
+        int sounding = 0, wrong = 0;
+        bool shape = a.count > 16 && a.count == b.count;
+        for (int s = 0; shape && s < a.count; s++) {
+            if (a.steps[s].gate != b.steps[s].gate) { shape = false; break; }
+            if (!a.steps[s].gate) continue;
+            sounding++;
+            const int d = midi_to_lick_degree(b.steps[s].note, root, sc) - midi_to_lick_degree(a.steps[s].note, root, sc);
+            if (((d - 2) % sc.count + sc.count) % sc.count != 0) wrong++;
+        }
+        const bool ok = shape && sounding >= 8 && wrong == 0;
+        printf("  %s: steps=%d sounding=%d off by other than 2 degrees=%d -- %s\n",
+               names[p], a.count, sounding, wrong, ok ? "OK" : "FAIL");
+        pass = pass && ok;
+    }
+    printf("  Overall -- %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_pulsar_section_seams_tests() {
     printf("\n=== Pulsar Section Seams ===\n");
     int passed = 0, failed = 0;
@@ -506,6 +584,7 @@ bool run_pulsar_section_seams_tests() {
     run(test_sololess_section_snaps_solo_offsets);
     run(test_jam_ornaments_every_lead_lick_track);
     run(test_seam_rerenders_outgoing_lead);
+    run(test_call_response_keeps_degree_offset);
     printf("\n  Pulsar Section Seams: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);
 }
