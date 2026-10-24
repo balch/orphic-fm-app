@@ -201,6 +201,21 @@ class TabParserTest {
         assertEquals(-1, lick.steps.first().scaleDegree); assertEquals(8, lick.loopLength)
     }
 
+    @Test fun crowdedBarTimesEighthsAndThePickupLeadsTheLoopBackIn() {
+        val (notes, rhythm) = timeNotes(findTabSystems(TabParserFixtures.STAB_RIFF))
+        assertEquals(RhythmSource.BARS, rhythm)
+        // The stabs keep only their note on the line's strings; the column with none drops out.
+        assertEquals(listOf(57, 55, 57, 55, 57, 57, 45, 55, 57, 55, 45, 52, 55), notes.map { it.midi })
+        assertEquals(List(6) { 0.5f } + 1f + List(3) { 0.5f } + 5.5f + 0.5f + 0.5f, notes.map { it.beats })
+    }
+
+    @Test fun pickupIntoAFullBarLaysOverItsEnd() {
+        val notes = timeNotes(findTabSystems(TabParserFixtures.PICKUP_BARS)).first
+        assertEquals(listOf(45, 48, 48), notes.map { it.midi }); assertEquals(listOf(1f, 2.5f, 0.5f), notes.map { it.beats })
+        val twice = timeNotes(findTabSystems(TabParserFixtures.PICKUP_BARS + TabParserFixtures.PICKUP_BARS)).first
+        assertEquals(listOf(45, 48, 48, 45, 48, 48), twice.map { it.midi }); assertEquals(listOf(1f, 2.5f, 0.5f, 1f, 2.5f, 0.5f), twice.map { it.beats })
+    }
+
     @Test fun lowercaseLowEStaysInItsSystem() {
         val lowE = RIFF_BARS.dropLast(1) + RIFF_BARS.last().replaceFirst("E|", "e|")
         val sys = findTabSystems(lowE).single()

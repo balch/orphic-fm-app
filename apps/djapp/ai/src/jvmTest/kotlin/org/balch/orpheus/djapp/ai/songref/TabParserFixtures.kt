@@ -208,6 +208,26 @@ internal object TabParserFixtures {
         E|-------------------------------------------------|-------------------------------------------------|
     """.trimIndent().lines()
 
+    // A two-note pickup, then three bars of eighths typed as one 47-column bar: a line on D and A answered by stabs on B and G.
+    val STAB_RIFF = """
+        e|-----|-----------------------------------------------|
+        B|-----|----------8---8--------------------------------|
+        G|-----|----------7---7--------------------------------|
+        D|---5-|7-5-7-5-7-7-----5-7-5--------------------------|
+        A|-7---|------------0---------0------------------------|
+        E|-----|-----------------------------------------------|
+    """.trimIndent().lines()
+
+    // A one-note pickup into a 17-column bar.
+    val PICKUP_BARS = """
+        e|-----|-----------------|
+        B|-----|-----------------|
+        G|-----|-----------------|
+        D|-----|-----------------|
+        A|---3-|-0---3-----------|
+        E|-----|-----------------|
+    """.trimIndent().lines()
+
     // Eight strokes four columns apart (4 Am then 4 D), no separator after the label and only a closing bar.
     val SKANK_NO_BARS = """
         e--0---0---0---0---2---2---2---2----|
