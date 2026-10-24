@@ -92,6 +92,21 @@ internal const val BED_PAD_DAMPING = 0.3f
 
 internal val STYLE_TAGS = setOf("rock", "electro", "ambient", "reggae", "psych", "funk")
 
+/** Styles built on a one-bar loop, so a cast with only these tags keeps stepCount 16. */
+internal val LOOP_STYLES = setOf("electro")
+
+/**
+ * The cast's stepCount, by the kind of vibe; first match wins. A Fill lick plays stepCount / 4
+ * beats, so a melody line wants 64 (16 beats) and a loop groove keeps 16.
+ */
+internal fun castStepCount(tags: List<String>, leadLine: Boolean?, hasLead: Boolean): Int = when {
+    leadLine == true -> 64
+    "ambient" in tags -> 64
+    leadLine == null && hasLead -> 64
+    tags.isNotEmpty() && tags.all { it in LOOP_STYLES } -> 16
+    else -> 32
+}
+
 /** A palette voice tagged with a requested style weighs this much more. */
 internal const val STYLE_VOICE_BOOST = 3f
 

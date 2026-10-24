@@ -41,6 +41,8 @@ data class CastRequest(
     /** Any of rock, electro, ambient, reggae, psych, funk. Others are ignored. */
     val styleTags: Set<String> = emptySet(),
     val pins: List<CastPin> = emptyList(),
+    /** True for a melody line (64 steps), false for a groove without one; null decides from the tags and cast. */
+    val leadLine: Boolean? = null,
 )
 
 data class CastResult(val vibe: Vibe, val seed: Long, val mode: CastMode, val summary: List<String>)
@@ -112,9 +114,13 @@ object VibeCaster {
             }.also { panSum += it.pan }
         }.let { chooseArpeggiator(it, rnd) }
 
+        val hasLead = (filled[4] as? Slot.Rolled)?.voice?.part == Part.LEAD ||
+            filled.any { (it as? Slot.Rolled)?.voice?.singer == true }
+        val stepCount = castStepCount(tags, req.leadLine, hasLead)
         val vibe = Vibe(
             name = PLACEHOLDER_NAME,
             tracks = tracks,
+            stepCount = stepCount,
             seed = (req.seed xor (req.seed ushr 32)).toInt().let { if (it == 0) 1 else it },
             bpm = 100f,
             envelopeType = EnvelopeType.BLEND,
@@ -127,6 +133,7 @@ object VibeCaster {
                 noteRangeHigh = 60,
                 rhythmDensity = RhythmPattern.BACKBEAT.density,
                 progressionStyle = ProgressionStyle.MODAL,
+                chordsPerBar = stepCount / 16,
             ),
             cast = CastProvenance(
                 seed = req.seed,
@@ -320,6 +327,9 @@ object VibeCaster {
             morphRiseTime = if (sing && !vowelOnHarmonics) 1.5f else 2f,
             harmonicsRise = if (vowelOnHarmonics) 0.15f else 0f,
             harmonicsRiseTime = if (vowelOnHarmonics) 1.5f else 2f,
+            // Leads get a detuned double; singers the Sirens' wider one.
+            doubleDetune = if (sing) 18f else if (v.part == Part.LEAD) 10f else 0f,
+            doubleSpread = if (sing) 0.8f else if (v.part == Part.LEAD) 0.4f else 0f,
         )
     }
 
