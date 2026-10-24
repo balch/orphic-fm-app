@@ -1049,6 +1049,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 else if (std::strcmp(macro, "mood_harm_max") == 0) m.mood_harm_max.store(value, std::memory_order_relaxed);
                 else if (std::strcmp(macro, "mood_timbre_min") == 0) m.mood_timbre_min.store(value, std::memory_order_relaxed);
                 else if (std::strcmp(macro, "mood_timbre_max") == 0) m.mood_timbre_max.store(value, std::memory_order_relaxed);
+                else if (std::strcmp(macro, "mood_pitch_min") == 0) m.mood_pitch_min.store(value, std::memory_order_relaxed);
+                else if (std::strcmp(macro, "mood_pitch_max") == 0) m.mood_pitch_max.store(value, std::memory_order_relaxed);
             }
         }
         else if (std::strncmp(symbol, "genre_density_", 14) == 0 && symbol[14] >= '0' && symbol[14] <= '7')

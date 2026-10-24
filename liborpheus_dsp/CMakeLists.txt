@@ -400,6 +400,7 @@ if(BUILD_TESTS)
         test/test_pulsar_mist.cpp
         test/test_pulsar_vibrato.cpp
         test/test_pulsar_pitch_rise.cpp
+        test/test_pulsar_mood_pitch.cpp
         test/test_pulsar_harmonics_rise.cpp
         test/test_pulsar_morph_rise.cpp
         test/test_pulsar_double.cpp

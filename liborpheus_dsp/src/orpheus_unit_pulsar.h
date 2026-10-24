@@ -74,6 +74,7 @@ struct PulsarTrackMacroMap {
     PulsarMacroTarget space_decay;
     PulsarMacroTarget mood_harmonics;
     PulsarMacroTarget mood_timbre;
+    PulsarMacroTarget mood_pitch;   // semitones added to the note; 0,0 = off
 };
 
 enum PulsarEnvelopeProfile : uint8_t {

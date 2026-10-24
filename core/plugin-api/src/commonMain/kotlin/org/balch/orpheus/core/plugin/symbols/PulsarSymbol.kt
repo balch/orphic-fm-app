@@ -451,6 +451,8 @@ enum class PulsarSymbol(
     TRACK_0_MACRO_MOOD_HARM_MAX("track_0_macro_mood_harm_max"),
     TRACK_0_MACRO_MOOD_TIMBRE_MIN("track_0_macro_mood_timbre_min"),
     TRACK_0_MACRO_MOOD_TIMBRE_MAX("track_0_macro_mood_timbre_max"),
+    TRACK_0_MACRO_MOOD_PITCH_MIN("track_0_macro_mood_pitch_min"),
+    TRACK_0_MACRO_MOOD_PITCH_MAX("track_0_macro_mood_pitch_max"),
 
     TRACK_1_MACRO_ENERGY_VOL_MIN("track_1_macro_energy_vol_min"),
     TRACK_1_MACRO_ENERGY_VOL_MAX("track_1_macro_energy_vol_max"),
@@ -466,6 +468,8 @@ enum class PulsarSymbol(
     TRACK_1_MACRO_MOOD_HARM_MAX("track_1_macro_mood_harm_max"),
     TRACK_1_MACRO_MOOD_TIMBRE_MIN("track_1_macro_mood_timbre_min"),
     TRACK_1_MACRO_MOOD_TIMBRE_MAX("track_1_macro_mood_timbre_max"),
+    TRACK_1_MACRO_MOOD_PITCH_MIN("track_1_macro_mood_pitch_min"),
+    TRACK_1_MACRO_MOOD_PITCH_MAX("track_1_macro_mood_pitch_max"),
 
     TRACK_2_MACRO_ENERGY_VOL_MIN("track_2_macro_energy_vol_min"),
     TRACK_2_MACRO_ENERGY_VOL_MAX("track_2_macro_energy_vol_max"),
@@ -481,6 +485,8 @@ enum class PulsarSymbol(
     TRACK_2_MACRO_MOOD_HARM_MAX("track_2_macro_mood_harm_max"),
     TRACK_2_MACRO_MOOD_TIMBRE_MIN("track_2_macro_mood_timbre_min"),
     TRACK_2_MACRO_MOOD_TIMBRE_MAX("track_2_macro_mood_timbre_max"),
+    TRACK_2_MACRO_MOOD_PITCH_MIN("track_2_macro_mood_pitch_min"),
+    TRACK_2_MACRO_MOOD_PITCH_MAX("track_2_macro_mood_pitch_max"),
 
     TRACK_3_MACRO_ENERGY_VOL_MIN("track_3_macro_energy_vol_min"),
     TRACK_3_MACRO_ENERGY_VOL_MAX("track_3_macro_energy_vol_max"),
@@ -496,6 +502,8 @@ enum class PulsarSymbol(
     TRACK_3_MACRO_MOOD_HARM_MAX("track_3_macro_mood_harm_max"),
     TRACK_3_MACRO_MOOD_TIMBRE_MIN("track_3_macro_mood_timbre_min"),
     TRACK_3_MACRO_MOOD_TIMBRE_MAX("track_3_macro_mood_timbre_max"),
+    TRACK_3_MACRO_MOOD_PITCH_MIN("track_3_macro_mood_pitch_min"),
+    TRACK_3_MACRO_MOOD_PITCH_MAX("track_3_macro_mood_pitch_max"),
 
     TRACK_4_MACRO_ENERGY_VOL_MIN("track_4_macro_energy_vol_min"),
     TRACK_4_MACRO_ENERGY_VOL_MAX("track_4_macro_energy_vol_max"),
@@ -511,6 +519,8 @@ enum class PulsarSymbol(
     TRACK_4_MACRO_MOOD_HARM_MAX("track_4_macro_mood_harm_max"),
     TRACK_4_MACRO_MOOD_TIMBRE_MIN("track_4_macro_mood_timbre_min"),
     TRACK_4_MACRO_MOOD_TIMBRE_MAX("track_4_macro_mood_timbre_max"),
+    TRACK_4_MACRO_MOOD_PITCH_MIN("track_4_macro_mood_pitch_min"),
+    TRACK_4_MACRO_MOOD_PITCH_MAX("track_4_macro_mood_pitch_max"),
 
     TRACK_5_MACRO_ENERGY_VOL_MIN("track_5_macro_energy_vol_min"),
     TRACK_5_MACRO_ENERGY_VOL_MAX("track_5_macro_energy_vol_max"),
@@ -526,6 +536,8 @@ enum class PulsarSymbol(
     TRACK_5_MACRO_MOOD_HARM_MAX("track_5_macro_mood_harm_max"),
     TRACK_5_MACRO_MOOD_TIMBRE_MIN("track_5_macro_mood_timbre_min"),
     TRACK_5_MACRO_MOOD_TIMBRE_MAX("track_5_macro_mood_timbre_max"),
+    TRACK_5_MACRO_MOOD_PITCH_MIN("track_5_macro_mood_pitch_min"),
+    TRACK_5_MACRO_MOOD_PITCH_MAX("track_5_macro_mood_pitch_max"),
 
     TRACK_6_MACRO_ENERGY_VOL_MIN("track_6_macro_energy_vol_min"),
     TRACK_6_MACRO_ENERGY_VOL_MAX("track_6_macro_energy_vol_max"),
@@ -541,6 +553,8 @@ enum class PulsarSymbol(
     TRACK_6_MACRO_MOOD_HARM_MAX("track_6_macro_mood_harm_max"),
     TRACK_6_MACRO_MOOD_TIMBRE_MIN("track_6_macro_mood_timbre_min"),
     TRACK_6_MACRO_MOOD_TIMBRE_MAX("track_6_macro_mood_timbre_max"),
+    TRACK_6_MACRO_MOOD_PITCH_MIN("track_6_macro_mood_pitch_min"),
+    TRACK_6_MACRO_MOOD_PITCH_MAX("track_6_macro_mood_pitch_max"),
 
     TRACK_7_MACRO_ENERGY_VOL_MIN("track_7_macro_energy_vol_min"),
     TRACK_7_MACRO_ENERGY_VOL_MAX("track_7_macro_energy_vol_max"),
@@ -556,6 +570,8 @@ enum class PulsarSymbol(
     TRACK_7_MACRO_MOOD_HARM_MAX("track_7_macro_mood_harm_max"),
     TRACK_7_MACRO_MOOD_TIMBRE_MIN("track_7_macro_mood_timbre_min"),
     TRACK_7_MACRO_MOOD_TIMBRE_MAX("track_7_macro_mood_timbre_max"),
+    TRACK_7_MACRO_MOOD_PITCH_MIN("track_7_macro_mood_pitch_min"),
+    TRACK_7_MACRO_MOOD_PITCH_MAX("track_7_macro_mood_pitch_max"),
 
     // Genre profile (13 entries)
     GENRE_DENSITY_0("genre_density_0"),
@@ -1862,12 +1878,15 @@ enum class PulsarSymbol(
         const val LICK_HIT_PROB_COUNT = 64
 
         /**
-         * Per-track macro-map symbols per track (7 targets × min/max), the ordinal
+         * Per-track macro-map symbols per track (8 targets × min/max), the ordinal
          * stride from [TRACK_0_MACRO_ENERGY_VOL_MIN]. Anything indexing the macro
          * block with `entries[... + t * stride + m]` MUST use this — a stale stride
          * silently registers/writes neighboring symbols (PulsarPlugin shipped with
          * stride 16 for a while, shadowing the genre + lick ports).
          */
-        const val TRACK_MACRO_STRIDE = 14
+        const val TRACK_MACRO_STRIDE = 16
+
+        /** Index of the first mood-pitch entry in a track's macro block; it and the next are semitones, not 0..1. */
+        const val TRACK_MACRO_MOOD_PITCH_OFFSET = 14
     }
 }

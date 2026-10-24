@@ -601,6 +601,9 @@ is effectively locked by the engine regardless of the macroMap range. complexity
 exception to "per track": swing shifts the single shared step clock, so only track 0's value is read
 and the other seven are ignored — set the groove you want on track 0.
 
+An optional eighth pair, moodPitch, bends the track's pitch by min..max semitones as the mood knob
+moves (default 0, 0 = off, clamped to ±24). Use a small range on a singer so mood helps it sing.
+
 ## 6. Tension arc (TensionProfile)
 innerBars sets the primary build-and-release cycle length (4 = tight phrase, 8 = longer, 16 = epic).
 outerBars adds a secondary envelope (0 = disabled; 16-32 for long macro arcs). outerDepth (0..1)

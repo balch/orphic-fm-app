@@ -964,7 +964,7 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_opening_note_floor{0};
 
     // Per-track macro maps (set by Kotlin on vibe load)
-    // 8 targets × 2 (min/max) = 16 floats per track
+    // 8 targets × 2 (min/max) = 16 floats per track (mood_pitch is in semitones)
     struct PulsarTrackMacroAtomic {
         std::atomic<float> energy_vol_min{0.5f}, energy_vol_max{1.0f};
         std::atomic<float> energy_density_min{0.3f}, energy_density_max{0.8f};
@@ -973,6 +973,7 @@ struct OrpheusEngine {
         std::atomic<float> space_decay_min{0.2f}, space_decay_max{0.5f};
         std::atomic<float> mood_harm_min{0.3f}, mood_harm_max{0.7f};
         std::atomic<float> mood_timbre_min{0.3f}, mood_timbre_max{0.7f};
+        std::atomic<float> mood_pitch_min{0.0f}, mood_pitch_max{0.0f};   // semitones
     };
     PulsarTrackMacroAtomic pulsar_track_macros[8];
 

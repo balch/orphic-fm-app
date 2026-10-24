@@ -36,6 +36,11 @@ data class TrackMacroMap(
     val spaceDecay: MacroTarget,
     val moodHarmonics: MacroTarget,
     val moodTimbre: MacroTarget,
+    /**
+     * Pitch bend in semitones at mood 0 and mood 1, added to the note after vibrato and pitch
+     * rise. (0, 0) leaves pitch alone. Within +-24; the audio thread clamps to that.
+     */
+    val moodPitch: MacroTarget = MacroTarget(0f, 0f),
 ) {
     companion object {
         val RHYTHM = TrackMacroMap(
