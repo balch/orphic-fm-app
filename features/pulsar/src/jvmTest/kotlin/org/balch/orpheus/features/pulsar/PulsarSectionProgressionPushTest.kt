@@ -58,6 +58,8 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.FootstepPace
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionFog
+import org.balch.orpheus.features.pulsar.models.FogPattern
 import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionTransition
 import org.balch.orpheus.features.pulsar.models.SectionWeather
@@ -1005,6 +1007,30 @@ class PulsarSectionProgressionPushTest {
         for (field in 27..30) {
             assertEquals(0f, floatPort("section_data_${1 * stride + field}"), "section 1 street field $field")
         }
+    }
+
+    @Test
+    fun `section fog reaches slots 50 to 54 and an absent fog is silent`() = runTest(testDispatcher) {
+        val fog = SectionFog(level = 0.6f, intervalBars = 6, pattern = FogPattern.SINGLE, pitch = -2f, distance = 0.8f)
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "murk", barsMin = 2, barsMax = 2, fog = fog,
+                    transitions = listOf(SectionTransition(1, 1f)),
+                ),
+                Section(name = "clear", barsMin = 2, barsMax = 2, transitions = listOf(SectionTransition(0, 1f))),
+            ),
+        )
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        assertEquals(0.6f, floatPort("section_data_${0 * stride + 50}"))
+        assertEquals(6f, floatPort("section_data_${0 * stride + 51}"))
+        assertEquals(0f, floatPort("section_data_${0 * stride + 52}"), "SINGLE marshals as 0")
+        assertEquals(-2f, floatPort("section_data_${0 * stride + 53}"))
+        assertEquals(0.8f, floatPort("section_data_${0 * stride + 54}"))
+        assertEquals(0f, floatPort("section_data_${1 * stride + 50}"), "an absent fog has level 0")
     }
 
     @Test

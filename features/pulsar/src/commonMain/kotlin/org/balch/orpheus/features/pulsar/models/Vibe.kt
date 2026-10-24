@@ -7,6 +7,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
@@ -213,6 +214,9 @@ data class Vibe(
         // anomaly type may appear at most once.
         require(anomalies.filterIsInstance<VoidAnomaly>().size <= 1) {
             "Vibe.anomalies may contain at most one VoidAnomaly"
+        }
+        require(anomalies.filterIsInstance<FogHornAnomaly>().size <= 1) {
+            "Vibe.anomalies may contain at most one FogHornAnomaly"
         }
         require(anomalies.filterIsInstance<WahAnomaly>().size <= 1) {
             "Vibe.anomalies may contain at most one WahAnomaly"

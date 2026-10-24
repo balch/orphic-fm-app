@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.pulsar
 
+import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
+import org.balch.orpheus.features.pulsar.models.SectionFog
 import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionWeather
 import org.balch.orpheus.features.pulsar.models.SpeechCue
@@ -193,6 +195,40 @@ class PulsarMarshalStrideTest {
         assertFailsWith<IllegalArgumentException> { SectionStreet(footsteps = 1.2f) }
         assertFailsWith<IllegalArgumentException> { SectionStreet(footstepEcho = -0.1f) }
         assertFailsWith<IllegalArgumentException> { SectionStreet(train = 2f) }
+    }
+
+    // --- pulsar_section_data slots 50-54: SectionFog ---
+
+    @Test
+    fun sectionFogFieldOrderMatchesFogSlotMarshal() {
+        // level(50), intervalBars(51), pattern(52), pitch(53), distance(54), appended after the
+        // volume envelope. A new field goes after distance.
+        val descriptor = SectionFog.serializer().descriptor
+        assertEquals(
+            listOf("level", "intervalBars", "pattern", "pitch", "distance"),
+            (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },
+        )
+    }
+
+    @Test
+    fun sectionFogRejectsValuesOutsideTheirRanges() {
+        assertFailsWith<IllegalArgumentException> { SectionFog(level = 1.2f) }
+        assertFailsWith<IllegalArgumentException> { SectionFog(intervalBars = 0) }
+        assertFailsWith<IllegalArgumentException> { SectionFog(intervalBars = 17) }
+        assertFailsWith<IllegalArgumentException> { SectionFog(pitch = -13f) }
+        assertFailsWith<IllegalArgumentException> { SectionFog(distance = 1.1f) }
+    }
+
+    // --- fog_data_$i: 6 floats (5 FogHornAnomaly fields + declared flag) ---
+
+    @Test
+    fun fogHornAnomalyFieldOrderAndBankSizeMatchMarshal() {
+        val descriptor = FogHornAnomaly.serializer().descriptor
+        assertEquals(
+            listOf("probability", "intensity", "distance", "pattern", "pitch"),
+            (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },
+        )
+        assertEquals(6, descriptor.elementsCount + 1, "fog_data bank is the class fields plus the declared flag")
     }
 
     // --- speech_cue_data_$i: 24 rows x 8 fields ---

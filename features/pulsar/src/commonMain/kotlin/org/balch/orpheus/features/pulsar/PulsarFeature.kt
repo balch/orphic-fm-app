@@ -71,6 +71,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
@@ -86,6 +87,7 @@ import org.balch.orpheus.features.pulsar.models.ChordFollow
 import org.balch.orpheus.features.pulsar.models.CompingStyle
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.EnvelopeProfile
+import org.balch.orpheus.features.pulsar.models.FogPattern
 import org.balch.orpheus.features.pulsar.models.FootstepPace
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.Lick
@@ -2361,7 +2363,8 @@ class PulsarViewModel(
      *   26=lick_index+1 (0=no override),
      *   27=street_footsteps, 28=street_run, 29=street_footstep_echo, 30=street_train,
      *   31=volume+1, 32..36=rampTo energy/complexity/space/mood/volume +1 (0 = unset),
-     *   37=volumeEnvelope point count, 38..49=(bar, level) pairs
+     *   37=volumeEnvelope point count, 38..49=(bar, level) pairs,
+     *   50=fog_level, 51=fog_interval_bars, 52=fog_pattern, 53=fog_pitch, 54=fog_distance (SectionFog)
      *
      * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
      *   0=targetIndex, 1=weight, 2=transitionBars
@@ -2558,6 +2561,14 @@ class PulsarViewModel(
                 setSection(38 + i * 2, point?.bar ?: 0f)
                 setSection(39 + i * 2, point?.level ?: 0f)
             }
+
+            // Slots 50-54: SectionFog, after the volume envelope. Absent = all zero (level 0 is silent).
+            val sectionFog = section.fog
+            setSection(50, sectionFog?.level ?: 0f)
+            setSection(51, (sectionFog?.intervalBars ?: 4).toFloat())
+            setSection(52, (sectionFog?.pattern?.ordinal ?: 0).toFloat())
+            setSection(53, sectionFog?.pitch ?: 0f)
+            setSection(54, sectionFog?.distance ?: 0.4f)
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.
@@ -3015,6 +3026,23 @@ class PulsarViewModel(
         stormData.forEachIndexed { i, v ->
             synthController.setPluginControl(
                 PluginControlId(PULSAR_URI, "storm_data_$i"), FloatValue(v)
+            )
+        }
+
+        // Fog Horn Anomaly config bank (absent => probability 0 = auto-firing disabled).
+        // Order MUST match the C++ unpack in orpheus_unit_pulsar.cpp load_vibe.
+        val fogAnomaly = vibe.anomalies.filterIsInstance<FogHornAnomaly>().firstOrNull()
+        val fogData = floatArrayOf(
+            fogAnomaly?.probability ?: 0f,
+            fogAnomaly?.intensity ?: 0.7f,
+            fogAnomaly?.distance ?: 0.5f,
+            (fogAnomaly?.pattern?.ordinal ?: FogPattern.DUM_DUUUM.ordinal).toFloat(),
+            fogAnomaly?.pitch ?: 0f,
+            if (fogAnomaly != null) 1f else 0f, // [5] declared flag — manual trigger fires only on declaring vibes
+        )
+        fogData.forEachIndexed { i, v ->
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "fog_data_$i"), FloatValue(v)
             )
         }
 

@@ -2,6 +2,7 @@ package org.balch.orpheus.features.pulsar.models
 
 import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
@@ -130,6 +131,33 @@ class AnomalyTest {
         assertTrue(encoded.contains("\"type\":\"storm\""), "missing storm discriminator: $encoded")
         val decoded = json.decodeFromString(Vibe.serializer(), encoded)
         assertEquals(vibe.anomalies, decoded.anomalies)
+    }
+
+    @Test
+    fun rejects_duplicate_fog_horn_anomaly() {
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(anomalies = listOf(FogHornAnomaly(probability = 0.04f), FogHornAnomaly(probability = 0.05f)))
+        }
+    }
+
+    @Test
+    fun fog_horn_anomaly_round_trips_with_its_discriminator() {
+        val vibe = base.copy(
+            anomalies = listOf(
+                FogHornAnomaly(probability = 0.05f, intensity = 0.6f, distance = 0.7f, pattern = FogPattern.SINGLE, pitch = -2f),
+            ),
+        )
+        val encoded = json.encodeToString(Vibe.serializer(), vibe)
+        assertTrue(encoded.contains("\"type\":\"fogHorn\""), "missing fogHorn discriminator: $encoded")
+        assertEquals(vibe.anomalies, json.decodeFromString(Vibe.serializer(), encoded).anomalies)
+    }
+
+    @Test
+    fun rejects_fog_horn_values_out_of_range() {
+        assertFailsWith<IllegalArgumentException> { FogHornAnomaly(probability = 1.1f) }
+        assertFailsWith<IllegalArgumentException> { FogHornAnomaly(probability = 0.1f, intensity = 1.1f) }
+        assertFailsWith<IllegalArgumentException> { FogHornAnomaly(probability = 0.1f, distance = -0.1f) }
+        assertFailsWith<IllegalArgumentException> { FogHornAnomaly(probability = 0.1f, pitch = 13f) }
     }
 
     @Test

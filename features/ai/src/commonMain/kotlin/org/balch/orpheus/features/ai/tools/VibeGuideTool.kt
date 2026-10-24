@@ -16,6 +16,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.CutAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.FilterAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.LickAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.ScratchAnomaly
+import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
@@ -42,6 +43,7 @@ internal fun anomalyTag(a: Anomaly): String = when (a) {
     is ScratchAnomaly -> "scratch"
     is FilterAnomaly -> "filter"
     is StormAnomaly -> "storm"
+    is FogHornAnomaly -> "fogHorn"
 }
 
 /**
