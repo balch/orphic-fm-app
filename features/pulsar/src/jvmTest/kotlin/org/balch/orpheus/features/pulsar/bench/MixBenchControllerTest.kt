@@ -224,11 +224,26 @@ class MixBenchControllerTest {
         assertEquals(1f, gain(2))
         assertEquals(BenchLayers(), c.layers.value)
         assertNull(feature.overlay)
-        // Mutes stay, so the muted track stays owned; the released one is never written again.
-        assertEquals(0f, gain(5))
+        // The mute clears too, so every track goes back to the app and none is written again.
+        assertEquals(1f, gain(5))
+        assertTrue(c.muted.value.isEmpty())
         gainWrites.clear()
         section(2); runCurrent()
-        assertEquals(setOf("track_5_audition_gain"), gainWrites.map { it.first }.toSet())
+        assertTrue(gainWrites.isEmpty(), "audition gain writes: $gainWrites")
+    }
+
+    @Test
+    fun resetClearsMutesAndSolosExceptOnPinnedStrips() = runTest {
+        val c = started()
+        c.toggleMute(5)
+        c.toggleMute(4)
+        c.toggleSolo(2)
+        c.resetToFile(keep = setOf(4))
+        assertEquals(setOf(4), c.muted.value)
+        assertTrue(c.soloed.value.isEmpty())
+        assertEquals(0f, gain(4))
+        for (t in (0 until 8) - 4) assertEquals(1f, gain(t), "track $t")
+        assertEquals(setOf(4), c.ownedTracks())
     }
 
     @Test
@@ -257,20 +272,33 @@ class MixBenchControllerTest {
     }
 
     @Test
-    fun resetKeepsWholeVibeMacroMovesSoCaptureStillWritesThem() = runTest {
+    fun resetPutsMacroKnobsBackToTheFile() = runTest {
         val c = started()
         c.setMacro(Macro.ENERGY, 0.7f)
         c.setLevelDb(2, -6f)
-        c.resetToFile()
-        // The knob still plays 0.7, so the layer that capture reads keeps it too.
-        assertEquals(0.7f, feature.macroKnob(Macro.ENERGY))
-        assertEquals(BenchLayers(vibe = VibeLayer(macros = mapOf(Macro.ENERGY to 0.7f))), c.layers.value)
-        assertEquals(0.7f, c.layers.value.heardEnergy(vibe, 0), 1e-6f)
+        // A knob moved outside the bench (the Pulsar panel, MIDI) goes back too.
+        feature.actions.setMood((vibe.mood + 0.3f).coerceAtMost(1f))
+        c.resetToFile(keep = setOf(2))
+        for (m in Macro.entries) assertEquals(m.vibeDefault(vibe), feature.macroKnob(m), "$m")
+        assertTrue(c.layers.value.vibe.macros.isEmpty())
+        // Only the pinned strip's level is left for a capture to write.
         val snap = c.captureSnapshot()!!
-        val row = capture(snap.vibe, snap.layers).single()
-        assertEquals(CaptureField.MACRO, row.field)
-        assertEquals(Macro.ENERGY, row.macro)
-        assertEquals(0.7f, row.new, 1e-6f)
+        val rows = capture(snap.vibe, snap.layers)
+        assertTrue(rows.isNotEmpty())
+        assertTrue(rows.none { it.field == CaptureField.MACRO }, "rows: $rows")
+    }
+
+    @Test
+    fun resetLeavesKnobsAlreadyOnTheFileUntouched() = runTest {
+        val c = started()
+        feature.actions.setEnergy(vibe.energy)
+        feature.actions.setComplexity(vibe.complexity)
+        feature.actions.setMood(vibe.mood)
+        feature.actions.setSpace(vibe.space)
+        c.setLevelDb(2, -6f)
+        feature.macroWrites.clear()
+        c.resetToFile()
+        assertTrue(feature.macroWrites.isEmpty(), "knob writes: ${feature.macroWrites}")
     }
 
     @Test

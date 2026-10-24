@@ -149,6 +149,19 @@ class CollabMixerTest {
     }
 
     @Test
+    fun aResetMovingKnobsBackIsOneMoveNotTheUsersKnobMoves() = runTest {
+        val r = rig()
+        r.pulsar.actions.setEnergy(0.8f)
+        runCurrent()
+        r.mixer.edit(EditOrigin.USER, MixControl.ResetToFile, shown = "file") { resetToFile() }
+        advanceUntilIdle()
+        runCurrent()
+        assertEquals(0.5f, r.pulsar.macroKnob(Macro.ENERGY))
+        assertEquals(listOf(MixControl.MacroKnob(Macro.ENERGY), MixControl.ResetToFile), r.moves.map { it.control })
+        assertTrue(r.collab.userChanged.value.isEmpty())
+    }
+
+    @Test
     fun knobWritesThatFollowAVibeLoadAreNotTheUsers() = runTest {
         val r = rig()
         r.pulsar.applyVibeByName("Low Tide")

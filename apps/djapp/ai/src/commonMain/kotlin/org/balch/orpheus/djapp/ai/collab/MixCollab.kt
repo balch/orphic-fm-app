@@ -138,7 +138,7 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
     /** True once per [confirmWipe]. */
     fun consumeWipeConfirmation(): Boolean = wipeConfirmed.getAndUpdate { false }
 
-    /** The user's changes a `mix_reset` would clear: levels, pans and sends of unpinned strips. */
+    /** The user's changes a `mix_reset` would clear: the mix of unpinned strips and the macro knobs. */
     fun userChangesClearedByReset(): Int {
         val pins = _pins.value
         return _userChanged.value.count { it.clearedByReset() && it.track !in pins }
@@ -158,28 +158,27 @@ class MixCollab internal constructor(private val nowMs: () -> Long) {
     }
 
     /**
-     * A user reset leaves nothing of theirs to protect and spends any confirmation; an agent or MCP reset
-     * clears only the user's changes it reset. Agent and MCP edits are never the user's.
+     * A reset clears the user's changes it reset, leaving pinned strips' own; a user reset also spends any
+     * confirmation. Agent and MCP edits are never the user's.
      */
     private fun trackUserChanges(origin: EditOrigin, control: MixControl, changed: Boolean) {
         when {
-            control == MixControl.ResetToFile && origin == EditOrigin.USER -> {
-                _userChanged.value = emptySet()
-                wipeConfirmed.value = false
-            }
             control == MixControl.ResetToFile -> {
                 val pins = _pins.value
                 _userChanged.update { set -> set.filterNot { it.clearedByReset() && it.track !in pins }.toSet() }
+                if (origin == EditOrigin.USER) wipeConfirmed.value = false
             }
             origin == EditOrigin.USER && changed -> _userChanged.update { it + control }
         }
     }
 
-    private fun MixControl.clearedByReset() = this is MixControl.Level || this is MixControl.Pan || this is MixControl.Send
-
     // A section jump, the loop and the edit scope lose nothing the user would miss.
     private fun MixControl.wipedByLoad() =
-        clearedByReset() || this is MixControl.Mute || this is MixControl.Solo || this is MixControl.MacroKnob
+        this is MixControl.Level || this is MixControl.Pan || this is MixControl.Send ||
+            this is MixControl.Mute || this is MixControl.Solo || this is MixControl.MacroKnob
+
+    // A reset clears what a load does; pinned strips are left out by the callers.
+    private fun MixControl.clearedByReset() = wipedByLoad()
 
     /** Folds a move into the pending entry for its (origin, control): first before, last after and time. */
     private fun log(move: MixMove) {
