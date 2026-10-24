@@ -429,8 +429,9 @@ on both apps and every platform.
   which also scopes the concrete type.
 - **Empty multibindings are an error by default**, unlike Dagger. Declare
   `@Multibinds(allowEmpty = true)` when empty is legitimate.
-- **Platform overrides need `replaces`.** `JvmAiVibeArchive` and `AndroidAiVibeArchive` both use
-  `@ContributesBinding(AppScope::class, replaces = [NoOpAiVibeArchive::class])`.
+- **Platform overrides need `replaces`.** `AiVibeFolder` (desktop and Android AI edition) uses
+  `@ContributesBinding(AppScope::class, binding = binding<AiVibeArchive>(), replaces = [NoOpAiVibeArchive::class])`,
+  and a second one for `SavedVibeLibrary` replacing `NoSavedVibes`.
 - **AppScope bindings that need a feature take `() -> T`.** `VibeNavigator` and the vibe tools
   take `pulsarFeatureProvider: () -> PulsarFeature`. Injecting the feature eagerly pulls the child
   graph into `AppScope` construction and Metro stack-overflows.

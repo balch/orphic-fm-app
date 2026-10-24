@@ -71,6 +71,8 @@ import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.kraken.KrakenPadSurface
 import org.balch.orpheus.features.pulsar.kraken.KrakenPadWidth
 import org.balch.orpheus.features.pulsar.kraken.KrakenTargetLabel
+import org.balch.orpheus.features.pulsar.savedVibeMenuRows
+import kotlin.time.Clock
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerStatus
 import org.balch.orpheus.features.timer.TimerViewModel
@@ -448,18 +450,28 @@ private fun TvVibePicker(
 ) {
     val state by pulsarFeature.stateFlow.collectAsStateWithLifecycle()
     val vibeList = remember { pulsarFeature.vibeList }
+    val saved by pulsarFeature.savedVibesFlow.collectAsStateWithLifecycle()
+    val nowMillis = remember(saved) { Clock.System.now().toEpochMilliseconds() }
     val effects = LocalLiquidEffects.current
+    val color = effects.title.titleColor.readableOnDark()
     TvInlinePicker(
         label = "Vibe",
         selectedDisplay = state.vibe.name,
         entries = vibeList,
         displayName = { it.name },
         onSelected = { pulsarFeature.actions.pickVibe(it) },
-        color = effects.title.titleColor.readableOnDark(),
+        color = color,
         modifier = modifier,
+        // Saved rows add a date and a trash beside the name.
+        menuWidth = if (saved.isEmpty()) 220.dp else 280.dp,
         previewFocused = previewFocused,
         onLongPress = pulsarFeature.actions.onTriggerAnomaly,
         showLabel = showLabel,
+        footer = { dismiss ->
+            savedVibeMenuRows(
+                saved, state.vibe.name, nowMillis, color, pulsarFeature::pickSavedVibe, pulsarFeature::deleteSavedVibe, dismiss,
+            )
+        },
     )
 }
 

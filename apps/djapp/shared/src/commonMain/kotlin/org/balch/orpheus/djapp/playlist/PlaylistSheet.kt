@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Shuffle
@@ -57,6 +58,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -85,9 +87,12 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.playback.PlaylistEdit
 import org.balch.orpheus.features.pulsar.playback.PlaylistView
+import org.balch.orpheus.features.pulsar.playback.SavedVibe
+import org.balch.orpheus.features.pulsar.playback.savedVibeDate
 import org.balch.orpheus.ui.theme.OrpheusColors
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import kotlin.time.Clock
 
 internal const val PlaylistTitle = "Magic ∞"
 
@@ -113,6 +118,7 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
     StageSheet(isLandscape, open, onDismiss) {
         val view by pulsar.playlistFlow.collectAsStateWithLifecycle()
         val nav by pulsar.vibeNavFlow.collectAsStateWithLifecycle()
+        val saved by pulsar.savedVibesFlow.collectAsStateWithLifecycle()
         val eightBall = LocalEightBall.current
         val fallbackPhrase = remember { EightBallPhrases.random() }
         // The header's phrase line tells the reveal where it sits, for its own phrase to fly to, and
@@ -138,6 +144,9 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
             },
             onPlay = pulsar::pickVibeByName,
             overhang = if (isLandscape) 0.dp else phoneBarOverhang(),
+            saved = saved,
+            onPlaySaved = pulsar::pickSavedVibe,
+            onDeleteSaved = pulsar::deleteSavedVibe,
         )
     }
 }
@@ -146,7 +155,8 @@ internal fun PlaylistSheet(pulsar: PulsarFeature, isLandscape: Boolean, open: Bo
  * NOW, Up next (≡ reorders, − sets aside) and Set aside (+ brings back), under the mini 8-ball, Shuffle
  * and the album chips (a tap queues that album). Stateless apart from a drag and a chip's lift. [overhang]
  * is how far chrome draws over the bottom edge: the list, Reset order with it, scrolls clear of it.
- * [phraseLine] rides the header's phrase, for the reveal to find and to hold back.
+ * [phraseLine] rides the header's phrase, for the reveal to find and to hold back. Last come the [saved]
+ * AI vibes: a tap plays one, the trash asks once and then deletes it.
  */
 @Composable
 internal fun PlaylistContent(
@@ -159,6 +169,9 @@ internal fun PlaylistContent(
     modifier: Modifier = Modifier,
     overhang: Dp = 0.dp,
     phraseLine: Modifier = Modifier,
+    saved: List<SavedVibe> = emptyList(),
+    onPlaySaved: (SavedVibe) -> Unit = {},
+    onDeleteSaved: (String) -> Unit = {},
 ) {
     val sections = remember(view, current) { playlistSections(view, current) }
     val albumOf = remember(view.albums) { view.albums.flatMap { (album, names) -> names.map { it to album } }.toMap() }
@@ -183,6 +196,9 @@ internal fun PlaylistContent(
         if (a >= 0 && b >= 0) drag = held.copy(rows = held.rows.toMutableList().apply { add(b, removeAt(a)) })
     }
     val canSetAside = rows.size > 1
+    // The saved AI vibe whose trash was tapped, asking before it goes; the dates read against this list's arrival.
+    var confirming by remember { mutableStateOf<String?>(null) }
+    val nowMillis = remember(saved) { Clock.System.now().toEpochMilliseconds() }
     val wobble = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val lift = remember(scope) { AlbumLift(scope) }
@@ -267,6 +283,26 @@ internal fun PlaylistContent(
                     )
                 }
             }
+            if (saved.isNotEmpty()) {
+                item(key = AiHeaderKey) { SectionHeader("AI vibes · ${saved.size}", Modifier.animateItem(placementSpec = PlaceSpring)) }
+                // Prefixed keys: an AI vibe may share a name with a catalog vibe above.
+                items(saved, key = { AiKeyPrefix + it.name.lowercase() }) { vibe ->
+                    SavedVibeRow(
+                        name = vibe.name,
+                        date = savedVibeDate(vibe.savedAtMillis, nowMillis),
+                        playing = vibe.name.equals(current, ignoreCase = true),
+                        confirming = confirming == vibe.name,
+                        onPlay = { onPlaySaved(vibe) },
+                        onAskDelete = { confirming = vibe.name },
+                        onKeep = { confirming = null },
+                        onDelete = {
+                            confirming = null
+                            onDeleteSaved(vibe.name)
+                        },
+                        modifier = Modifier.animateItem(placementSpec = PlaceSpring),
+                    )
+                }
+            }
             if (overhang > 0.dp) item(key = ResetKey) { ResetRow(onEdit, Modifier.animateItem(placementSpec = PlaceSpring)) }
         }
         // Pinned under the list, unless chrome overhangs the edge it would sit on.
@@ -286,6 +322,8 @@ private const val NowKey = "§now"
 private const val NextHeaderKey = "§next"
 private const val AsideHeaderKey = "§aside"
 private const val ResetKey = "§reset"
+private const val AiHeaderKey = "§ai"
+private const val AiKeyPrefix = "§ai:"
 
 /** Up next under a drag: [rows] as dragged from [from]. Once [dropped] they hold only while the rotation is still [from]. */
 private data class UpNextDrag(val rows: List<String>, val from: List<String>, val dropped: Boolean = false) {
@@ -486,6 +524,50 @@ private fun SetAsideRow(name: String, album: Album?, onRestore: () -> Unit, onPl
             )
             AlbumBadge(album)
             IconButton(onClick = onRestore) { Icon(Icons.Rounded.Add, contentDescription = "Bring back $name") }
+        }
+        RowDividerLine()
+    }
+}
+
+/** A saved AI vibe: tap the name to play, the trash turns the row into "Delete <name>? Delete / Keep". */
+@Composable
+private fun SavedVibeRow(
+    name: String,
+    date: String,
+    playing: Boolean,
+    confirming: Boolean,
+    onPlay: () -> Unit,
+    onAskDelete: () -> Unit,
+    onKeep: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth()
+                .background(
+                    if (!playing) SolidColor(Color.Transparent)
+                    else Brush.horizontalGradient(listOf(OrpheusColors.neonCyan.copy(alpha = 0.14f), Color.Transparent)),
+                )
+                .padding(start = 44.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (confirming) {
+                Text("Delete $name?", maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(vertical = 10.dp))
+                TextButton(onClick = onDelete) { Text("Delete", color = OrpheusColors.recordRed) }
+                TextButton(onClick = onKeep) { Text("Keep", color = MutedText) }
+            } else {
+                Text(
+                    name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (playing) OrpheusColors.neonCyan else Color.Unspecified,
+                    fontWeight = if (playing) FontWeight.SemiBold else null,
+                    modifier = Modifier.weight(1f).clickable(onClick = onPlay).padding(vertical = 10.dp),
+                )
+                Text(date, style = MaterialTheme.typography.labelSmall, color = MutedText, maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 6.dp))
+                IconButton(onClick = onAskDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete $name") }
+            }
         }
         RowDividerLine()
     }

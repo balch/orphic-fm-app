@@ -17,6 +17,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -43,6 +44,7 @@ import org.balch.orpheus.features.pulsar.VibeNavState
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.core.preferences.VibePlaylistPrefs
 import org.balch.orpheus.features.pulsar.playback.PlaylistView
+import org.balch.orpheus.features.pulsar.playback.SavedVibe
 import org.balch.orpheus.features.pulsar.playback.albumListing
 import org.balch.orpheus.features.pulsar.playback.VibeRotation
 import org.balch.orpheus.features.pulsar.playback.applyPlaylistEdit
@@ -86,6 +88,36 @@ class PlaylistSheetRenderHarness {
                 }
             }
         }
+    }
+
+    /** Three saved AI vibes under Set aside: the newest playing as NOW, and Velvet Static asking before a delete. */
+    @Test
+    fun renderSheetWithAiVibes() {
+        runCatching {
+            outDir.mkdirs()
+            val now = System.currentTimeMillis()
+            val base = PulsarViewModel.previewFeature().vibeList.first()
+            val saved = listOf(
+                SavedVibe("Neon Undertow", now - 3_600_000L, base.copy(name = "Neon Undertow")),
+                SavedVibe("Velvet Static", now - 86_400_000L, base.copy(name = "Velvet Static")),
+                SavedVibe("Ghost Signal Over The Harbor", now - 4 * 86_400_000L, base.copy(name = "Ghost Signal Over The Harbor")),
+            )
+            // The trash on the last row, tapped before the frame is kept.
+            val askDelete: ImageComposeScene.() -> Unit = {
+                var trash: SemanticsNode? = null
+                fun walk(n: SemanticsNode) {
+                    if (n.config.getOrNull(SemanticsProperties.ContentDescription)?.contains("Delete Velvet Static") == true) trash = n
+                    n.children.forEach(::walk)
+                }
+                walk(semanticsOwners.first().rootSemanticsNode)
+                checkNotNull(trash).config[SemanticsActions.OnClick].action?.invoke()
+            }
+            render("playlist-sheet-ai-vibes.png", 390, 1_160, act = askDelete) {
+                Surface(color = OrpheusColors.deepPurple, contentColor = OrpheusColors.onSurfaceDark) {
+                    PlaylistContent(view, "Neon Undertow", "Outlook groovy", onEdit = {}, onShuffle = {}, onPlay = {}, saved = saved)
+                }
+            }
+        }.onFailure { println("[render-harness] ai vibes skipped: $it") }
     }
 
     /** Anomalies queued under Dog House: its rows lifted, mid-flight, and settled at the top of Up next. */
@@ -179,11 +211,15 @@ class PlaylistSheetRenderHarness {
         }
     }
 
-    // Past the sheet's slide-in before the frame is kept; a [scroll] wheels the list at that pixel to its end.
-    private fun render(name: String, w: Int, h: Int, scroll: Offset? = null, content: @Composable () -> Unit) {
+    // Past the sheet's slide-in before the frame is kept; [act] then runs, and a [scroll] wheels the list at that pixel to its end.
+    private fun render(
+        name: String, w: Int, h: Int, scroll: Offset? = null, act: (ImageComposeScene.() -> Unit)? = null,
+        content: @Composable () -> Unit,
+    ) {
         val scene = ImageComposeScene(w * 2, h * 2, Density(2f)) { OrpheusTheme(content = content) }
         try {
             listOf(0L, 100L, 300L, 1_000L).forEach { ms -> scene.render(ms * 1_000_000L).close() }
+            act?.invoke(scene)
             if (scroll != null) {
                 // The wheel's scroll animates, so it runs on frames.
                 (0 until 40).forEach { i ->

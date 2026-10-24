@@ -1,14 +1,19 @@
 package org.balch.orpheus.djapp.playlist
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
+import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.playback.PlaylistEdit
 import org.balch.orpheus.features.pulsar.playback.PlaylistView
+import org.balch.orpheus.features.pulsar.playback.SavedVibe
 import org.balch.orpheus.features.pulsar.playback.VibeRotation
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.test.Test
@@ -26,15 +31,19 @@ class PlaylistContentTest {
     // Techno Wobble set aside, Dog House playing.
     private val view = PlaylistView(rotation = VibeRotation(order, order - "Techno Wobble"), albums = albums)
 
-    private class Sheet(view: PlaylistView, current: String) {
+    private class Sheet(view: PlaylistView, current: String, saved: List<SavedVibe> = emptyList()) {
         val edits = mutableListOf<PlaylistEdit>()
         val played = mutableListOf<String>()
+        val playedSaved = mutableListOf<SavedVibe>()
+        val deleted = mutableListOf<String>()
         var shuffles = 0
+        var saved by mutableStateOf(saved)
         val scene = ImageComposeScene(400, 900, Density(1f)) {
             OrpheusTheme {
                 PlaylistContent(
                     view = view, current = current, phrase = "Outlook groovy",
                     onEdit = { edits += it }, onShuffle = { shuffles++ }, onPlay = { played += it },
+                    saved = this.saved, onPlaySaved = { playedSaved += it }, onDeleteSaved = { deleted += it },
                 )
             }
         }.also { it.render() }
@@ -55,6 +64,16 @@ class PlaylistContentTest {
 
         fun click(label: String) {
             assertNotNull(labelled(label).config.getOrNull(SemanticsActions.OnClick), "\"$label\" is not clickable").action?.invoke()
+            scene.render()
+        }
+
+        /** Clicks the clickable node whose own text is exactly [text]. */
+        fun clickText(text: String) {
+            val node = nodes().firstOrNull { n ->
+                n.config.getOrNull(SemanticsProperties.Text)?.any { it.text == text } == true &&
+                    n.config.getOrNull(SemanticsActions.OnClick) != null
+            }
+            assertNotNull(node, "nothing clickable reads \"$text\"").config[SemanticsActions.OnClick].action?.invoke()
             scene.render()
         }
 
@@ -142,6 +161,66 @@ class PlaylistContentTest {
             assertEquals(1, sheet.shuffles)
             assertEquals(listOf<PlaylistEdit>(PlaylistEdit.Reset), sheet.edits)
             assertEquals(listOf("Rust Belt"), sheet.played)
+        } finally { sheet.close() }
+    }
+
+    // ==================== Saved AI vibes ====================
+
+    private val now = System.currentTimeMillis()
+    private val aiVibe = PulsarViewModel.previewFeature().vibeList.first()
+    private val saved = listOf(
+        SavedVibe("Ghost Signal", now, aiVibe.copy(name = "Ghost Signal")),
+        SavedVibe("Velvet Static", now - 3 * 86_400_000L, aiVibe.copy(name = "Velvet Static")),
+    )
+
+    @Test
+    fun aiVibesSectionSitsLast() {
+        val sheet = Sheet(view, "Dog House", saved)
+        try {
+            val header = sheet.labelled("AI VIBES · 2")
+            assertTrue(header.boundsInRoot.top > sheet.labelled("SET ASIDE · 1").boundsInRoot.top)
+            assertTrue(sheet.labelled("Techno Wobble").boundsInRoot.top < header.boundsInRoot.top, "set aside rows stay above")
+            assertTrue(sheet.labelled("Ghost Signal").boundsInRoot.top > header.boundsInRoot.top)
+            assertTrue(sheet.labelled("Velvet Static").boundsInRoot.top > sheet.labelled("Ghost Signal").boundsInRoot.top)
+            sheet.labelled("today")
+        } finally { sheet.close() }
+    }
+
+    @Test
+    fun tapPlaysTheSavedVibe() {
+        val sheet = Sheet(view, "Dog House", saved)
+        try {
+            sheet.clickText("Velvet Static")
+            assertEquals(listOf(saved[1]), sheet.playedSaved)
+            assertEquals(emptyList(), sheet.played, "a saved vibe is not a rotation pick")
+        } finally { sheet.close() }
+    }
+
+    @Test
+    fun deleteAsksThenRemoves() {
+        val sheet = Sheet(view, "Dog House", saved)
+        try {
+            sheet.click("Delete Ghost Signal")
+            assertEquals(emptyList(), sheet.deleted, "the trash only asks")
+            sheet.labelled("Delete Ghost Signal?")
+            sheet.clickText("Keep")
+            assertNull(sheet.find("Delete Ghost Signal?"))
+            sheet.click("Delete Ghost Signal")
+            sheet.clickText("Delete")
+            assertEquals(listOf("Ghost Signal"), sheet.deleted)
+            sheet.saved = saved.drop(1)
+            sheet.scene.render()
+            assertNull(sheet.find("Ghost Signal"))
+            sheet.labelled("AI VIBES · 1")
+        } finally { sheet.close() }
+    }
+
+    @Test
+    fun noSectionWhenEmpty() {
+        val sheet = Sheet(view, "Dog House")
+        try {
+            assertNull(sheet.find("AI VIBES · 0"))
+            assertNull(sheet.find("AI VIBES"))
         } finally { sheet.close() }
     }
 }

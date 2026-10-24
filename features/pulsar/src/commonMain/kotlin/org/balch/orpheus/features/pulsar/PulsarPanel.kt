@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -56,6 +57,7 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.pulsar.kraken.KrakenPad
 import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.playback.SavedVibe
 import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -70,6 +72,7 @@ import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.LabeledDropdown
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 // The grid tap handler when track editing is off: taps do nothing.
@@ -177,12 +180,15 @@ fun PulsarPanel(
         // this is the heaviest panel.
         if (!LocalTelevisionHardware.current) {
             val vibeList = remember { pulsar.vibeList }
+            val savedVibes by pulsar.savedVibesFlow.collectAsStateWithLifecycle()
+            val saved = remember(pulsar, savedVibes) { SavedVibeMenu(savedVibes, pulsar::pickSavedVibe, pulsar::deleteSavedVibe) }
             when (selectors) {
                 PulsarSelectors.All -> PulsarSelectorRow(
                     state = state,
                     actions = actions,
                     vibeList = vibeList,
                     voidGain = voidGain,
+                    saved = saved,
                 )
                 PulsarSelectors.VibeOnly, PulsarSelectors.VibeAndKraken -> Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -195,6 +201,7 @@ fun PulsarPanel(
                         actions = actions,
                         vibeList = vibeList,
                         voidGain = voidGain,
+                        saved = saved,
                         modifier = Modifier.weight(1f),
                         hero = true,
                     )
@@ -321,6 +328,7 @@ private fun PulsarSelectorRow(
     actions: PulsarPanelActions,
     vibeList: List<Vibe>,
     voidGain: Float,
+    saved: SavedVibeMenu,
 ) {
     PriorityFitSelectorRow(gap = 8.dp) {
         PulsarVibeDropdown(
@@ -328,6 +336,7 @@ private fun PulsarSelectorRow(
             actions = actions,
             vibeList = vibeList,
             voidGain = voidGain,
+            saved = saved,
             modifier = Modifier.layoutId(SelectorSlot.Vibe),
             valueMaxWidth = VibeValueMaxWidth,
         )
@@ -373,6 +382,14 @@ private fun PulsarSelectorRow(
     }
 }
 
+/** The saved AI vibes VIBE lists under the catalog, and what a pick or a delete does. */
+@Immutable
+private class SavedVibeMenu(
+    val vibes: List<SavedVibe>,
+    val onPick: (SavedVibe) -> Unit,
+    val onDelete: (String) -> Unit,
+)
+
 /** VIBE's dropdown, in [PulsarSelectorRow] or alone across the row for [PulsarSelectors.VibeOnly]. */
 @Composable
 private fun PulsarVibeDropdown(
@@ -380,6 +397,7 @@ private fun PulsarVibeDropdown(
     actions: PulsarPanelActions,
     vibeList: List<Vibe>,
     voidGain: Float,
+    saved: SavedVibeMenu,
     modifier: Modifier = Modifier,
     valueMaxWidth: Dp = Dp.Unspecified,
     hero: Boolean = false,
@@ -388,6 +406,7 @@ private fun PulsarVibeDropdown(
     // dropdown cosmicPurple; once the duck starts, voidGain from the audio thread
     // dips below 1 and deepens the tint, breathing back as the mix returns.
     val anomalyArmed by actions.anomalyArmed.collectAsStateWithLifecycle()
+    val nowMillis = remember(saved.vibes) { Clock.System.now().toEpochMilliseconds() }
     EnumDropdown(
         label = "VIBE",
         selectedDisplay = state.vibe.name,
@@ -399,9 +418,14 @@ private fun PulsarVibeDropdown(
         onLongPress = actions.onTriggerAnomaly,
         highlight = maxOf(if (anomalyArmed) 0.35f else 0f, 1f - voidGain),
         valueMaxWidth = valueMaxWidth,
-        // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge.
-        menuWidth = 200.dp,
+        // Fits the widest catalog name ("Kaleidoscope Drift") at labelLarge; saved rows add a date and a trash.
+        menuWidth = if (saved.vibes.isEmpty()) 200.dp else 260.dp,
         hero = hero,
+        footer = { dismiss ->
+            savedVibeMenuRows(
+                saved.vibes, state.vibe.name, nowMillis, OrpheusColors.cosmicPurple, saved.onPick, saved.onDelete, dismiss,
+            )
+        },
     )
 }
 

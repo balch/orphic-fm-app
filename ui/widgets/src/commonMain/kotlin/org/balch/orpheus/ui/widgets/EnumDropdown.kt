@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -177,6 +178,8 @@ private class AnchoredMenuPositionProvider(private val gapPx: Int) : PopupPositi
  *   of a row one long value can take, so the row stays predictable at any name length. The arrow
  *   sits outside it and is never pushed off.
  * @param hero see [LabeledDropdown]'s; also sizes the value and arrow up to match.
+ * @param footer extra rows under [entries] in the open menu, e.g. VIBE's saved AI vibes; its
+ *   `dismiss` closes the menu.
  */
 @Composable
 fun <T> EnumDropdown(
@@ -197,6 +200,7 @@ fun <T> EnumDropdown(
     // keeps the popup on screen without making browsing feel cramped.
     menuMaxHeight: Dp = 400.dp,
     hero: Boolean = false,
+    footer: (LazyListScope.(dismiss: () -> Unit) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val backgroundColor by animateColorAsState(
@@ -257,6 +261,7 @@ fun <T> EnumDropdown(
                     expanded = false
                 },
                 onDismiss = { expanded = false },
+                footer = footer,
             )
         }
     }
@@ -283,6 +288,7 @@ fun <T> EnumDropdown(
  * @param onLongPress fires on a long press; the Vibe picker arms the Void Anomaly with it.
  * @param showLabel false drops the "LABEL: " prefix, leaving a narrow bar's room to the value. The
  *   arrow still names [label] to a screen reader.
+ * @param footer as [EnumDropdown]'s: extra rows under [entries], e.g. the Vibe picker's saved AI vibes.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -300,6 +306,7 @@ fun <T> TvInlinePicker(
     locked: Boolean = false,
     onLongPress: (() -> Unit)? = null,
     showLabel: Boolean = true,
+    footer: (LazyListScope.(dismiss: () -> Unit) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
@@ -380,6 +387,7 @@ fun <T> TvInlinePicker(
                     expanded = false
                 },
                 onDismiss = { expanded = false },
+                footer = footer,
             )
         }
     }
@@ -395,6 +403,7 @@ private fun <T> EnumDropdownMenu(
     menuMaxHeight: Dp,
     onSelected: (T) -> Unit,
     onDismiss: () -> Unit,
+    footer: (LazyListScope.(dismiss: () -> Unit) -> Unit)? = null,
 ) {
     // Every menu this app opens from a panel comes through here, so the keep-awake lives here
     // rather than at each call site: a popup renders in its own window and would not fade with
@@ -476,6 +485,7 @@ private fun <T> EnumDropdownMenu(
                             )
                         }
                     }
+                    footer?.invoke(this, onDismiss)
                 }
 
                 // The bar cannot simply fillMaxHeight() alongside the list: this Box wraps its

@@ -120,6 +120,9 @@ import org.balch.orpheus.features.pulsar.models.lickDegreeOffset
 import org.balch.orpheus.features.pulsar.models.lickMode
 import org.balch.orpheus.features.pulsar.models.textureLine
 import org.balch.orpheus.features.pulsar.playback.PulsarTransitionRunner
+import org.balch.orpheus.features.pulsar.playback.EmptySavedVibes
+import org.balch.orpheus.features.pulsar.playback.SavedVibe
+import org.balch.orpheus.features.pulsar.playback.SavedVibeLibrary
 import org.balch.orpheus.features.pulsar.playback.SectionQueue
 import org.balch.orpheus.features.pulsar.playback.SongEndingEventSource
 import org.balch.orpheus.features.pulsar.playback.SongEndingPreferences
@@ -348,6 +351,16 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     fun pickVibeByName(name: String) {
         vibeList.firstOrNull { it.name == name }?.let(actions.pickVibe)
     }
+
+    /** Saved AI vibes, newest first, listed under the catalog but never in the rotation. Empty by default. */
+    val savedVibesFlow: StateFlow<List<SavedVibe>>
+        get() = EmptySavedVibes
+
+    /** Plays [saved] as a pick from a list. When it ends, the rotation carries on. */
+    fun pickSavedVibe(saved: SavedVibe) = actions.pickVibe(saved.vibe)
+
+    /** Sets aside every save of [name]; a playing one keeps playing. A no-op for previews and fakes. */
+    fun deleteSavedVibe(name: String) {}
 
     /**
      * Each vibe change the navigator accepts, as its transition starts: which way and who asked.
@@ -591,14 +604,15 @@ class PulsarViewModel(
     private val vibePlaylistStore: VibePlaylistStore = VibePlaylistStore.InMemory(),
     // Unbound in the app graphs, so the shipped albums; tests pass their own listing.
     albumCatalog: AlbumCatalog = AlbumCatalog.Default,
+    // Default keeps direct test construction terse; the app graphs bind NoSavedVibes or the AI edition's folder.
+    private val savedVibeLibrary: SavedVibeLibrary = SavedVibeLibrary.InMemory(),
 ) : PulsarFeature {
 
     // The injected set filtered + ordered through VibeCatalog (the green-light map):
     // WIP/uncataloged vibes are curated out, catalog position = picker order, and the
     // first LIVE entry is the fresh-install default. curate() touches only the cheap
     // `name` accessor — no Vibe construction forced; vibeList below still realizes the
-    // actual Vibe data only on first iteration. (Saved/user vibes will merge inside the
-    // catalog when persistence lands — see VibeCatalog's KDoc hooks.)
+    // actual Vibe data only on first iteration. Saved AI vibes stay out of it: see savedVibesFlow.
     private val curatedProviders: List<VibeProvider> =
         VibeCatalog.curate(vibeProviders, visibleThrough = vibeCatalogPolicy.catalogLevel)
 
@@ -651,6 +665,13 @@ class PulsarViewModel(
 
     override fun pickVibeByName(name: String) {
         curatedProviders.firstOrNull { it.name.value == name }?.let { actions.pickVibe(it.vibe) }
+    }
+
+    // Kept apart from curatedProviders, so a saved vibe never reaches the rotation or the albums.
+    override val savedVibesFlow: StateFlow<List<SavedVibe>> = savedVibeLibrary.saved
+
+    override fun deleteSavedVibe(name: String) {
+        scope.launch { savedVibeLibrary.delete(name) }
     }
 
     // Id -> provider, resolved once at construction (these instances live for the
