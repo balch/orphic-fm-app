@@ -145,7 +145,8 @@ inline void bar_strategy_call_response(
     int lick_octave = -1,
     uint8_t note_range_low = 36, uint8_t note_range_high = 72,
     int lick_loop_length = 0,
-    int lick_degree_offset = 0)
+    int lick_degree_offset = 0,
+    LickMutationMode mutation_mode = LickMutationMode::RANDOM)
 {
     if (lick_length <= 0) return;
 
@@ -155,6 +156,8 @@ inline void bar_strategy_call_response(
     }
 
     int half = total_step_count / 2;
+    // Same CHORD_TONES rules as generate_lick_pattern, in both the call and the response.
+    const bool chord_tones = (mutation_mode == LickMutationMode::CHORD_TONES);
 
     // Compute duty cycle: how many steps of each half the lick fills.
     // lick_loop_length is in beats — convert to sequencer steps for comparison.
@@ -196,7 +199,7 @@ inline void bar_strategy_call_response(
 
             if (degree < 0) {
                 // Rest — at high mutation, might become a note
-                if (mutate_chance < lick_mutation * 0.3f) {
+                if (!chord_tones && mutate_chance < lick_mutation * 0.3f) {
                     degree = static_cast<int>(pattern_rand(call_seed) % 5);
                     vel = 0.5f + pattern_rand01(call_seed) * 0.3f;
                 } else {
@@ -205,7 +208,7 @@ inline void bar_strategy_call_response(
                 }
             } else if (mutate_chance < lick_mutation) {
                 float intensity = lick_mutation * pattern_rand01(call_seed);
-                if (intensity > 0.7f) {
+                if (intensity > 0.7f && !chord_tones) {
                     degree = static_cast<int>(pattern_rand(call_seed) % 7);
                 } else if (intensity > 0.3f) {
                     int shift = static_cast<int>(pattern_rand(call_seed) % 3) - 1;
@@ -214,6 +217,7 @@ inline void bar_strategy_call_response(
                 vel += (pattern_rand01(call_seed) - 0.5f) * 0.2f * lick_mutation;
                 vel = std::max(0.2f, std::min(1.0f, vel));
             }
+            const bool mutated = chord_tones && degree != ls.scale_degree;
 
             int octave = 0;
             int d = degree + lick_degree_offset;  // per-track parallel harmony (sounding notes only)
@@ -230,6 +234,7 @@ inline void bar_strategy_call_response(
                 steps[step_pos] = make_step(midi_note, vel, true, gate_frac);
                 steps[step_pos].glide_rate = ls.glide_rate;
                 steps[step_pos].from_lick = true;
+                steps[step_pos].mutated = mutated;
             }
             step_pos += slots;
         }
@@ -265,7 +270,7 @@ inline void bar_strategy_call_response(
             }
 
             if (degree < 0) {
-                if (mutate_chance < resp_mutation * 0.3f) {
+                if (!chord_tones && mutate_chance < resp_mutation * 0.3f) {
                     degree = static_cast<int>(pattern_rand(resp_seed) % 5);
                     vel = 0.5f + pattern_rand01(resp_seed) * 0.3f;
                 } else {
@@ -274,7 +279,7 @@ inline void bar_strategy_call_response(
                 }
             } else if (mutate_chance < resp_mutation) {
                 float intensity = resp_mutation * pattern_rand01(resp_seed);
-                if (intensity > 0.7f) {
+                if (intensity > 0.7f && !chord_tones) {
                     degree = static_cast<int>(pattern_rand(resp_seed) % 7);
                 } else if (intensity > 0.3f) {
                     int shift = static_cast<int>(pattern_rand(resp_seed) % 3) - 1;
@@ -283,6 +288,7 @@ inline void bar_strategy_call_response(
                 vel += (pattern_rand01(resp_seed) - 0.5f) * 0.2f * resp_mutation;
                 vel = std::max(0.2f, std::min(1.0f, vel));
             }
+            const bool mutated = chord_tones && degree != ls.scale_degree;
 
             // Apply transformation
             switch (transform) {
@@ -307,6 +313,7 @@ inline void bar_strategy_call_response(
                 steps[step_pos] = make_step(midi_note, vel, true, gate_frac);
                 steps[step_pos].glide_rate = ls.glide_rate;
                 steps[step_pos].from_lick = true;
+                steps[step_pos].mutated = mutated;
             }
             step_pos += slots;
         }
@@ -356,7 +363,8 @@ inline void apply_bar_strategy(
     uint32_t seed,
     int lick_octave = -1,
     int lick_loop_length = 0,
-    int lick_degree_offset = 0)
+    int lick_degree_offset = 0,
+    LickMutationMode mutation_mode = LickMutationMode::RANDOM)
 {
     int bar1_len = ts.step_count;  // bar 1 length (already generated)
 
@@ -386,7 +394,8 @@ inline void apply_bar_strategy(
                                            lick_octave,
                                            genre.note_range_low, genre.note_range_high,
                                            lick_loop_length,
-                                           lick_degree_offset);
+                                           lick_degree_offset,
+                                           mutation_mode);
             } else {
                 // Fallback: just repeat if no lick loaded
                 bar_strategy_repeat(ts.steps, bar1_len);
@@ -423,7 +432,8 @@ inline void render_lick_into_track(
     int lick_octave,
     uint8_t note_range_low, uint8_t note_range_high,
     int lick_loop_length,
-    int lick_degree_offset = 0)
+    int lick_degree_offset = 0,
+    LickMutationMode mutation_mode = LickMutationMode::RANDOM)
 {
     ts.step_count = step_count;
     if (bar_strategy == BarStrategy::CALL_RESPONSE) {
@@ -432,13 +442,15 @@ inline void render_lick_into_track(
                                    root, scale, seed ^ (static_cast<uint32_t>(track_index) * 7919u),
                                    lick_octave, note_range_low, note_range_high,
                                    lick_loop_length,
-                                   lick_degree_offset);
+                                   lick_degree_offset,
+                                   mutation_mode);
     } else {
         generate_lick_pattern(ts.steps, ts.step_count,
                               lick, lick_length, lick_mutation,
                               root, scale, seed ^ (static_cast<uint32_t>(track_index) * 7919u),
                               0, lick_octave, note_range_low, note_range_high,
                               lick_loop_length,
-                              lick_degree_offset);
+                              lick_degree_offset,
+                              mutation_mode);
     }
 }

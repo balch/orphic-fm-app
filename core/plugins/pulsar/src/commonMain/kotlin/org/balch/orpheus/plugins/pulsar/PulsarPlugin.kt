@@ -61,6 +61,7 @@ class PulsarPlugin : DspPlugin {
     private var _envelopeMode = 0  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     private var _seed = 0
     private var _lickMutation = 0.5f
+    private var _lickMutationMode = 0  // 0 = RANDOM, 1 = CHORD_TONES
     private var _lickOctave = -1  // -1 = auto (midpoint of noteRange)
     private var _trackEdm = intArrayOf(21, 22, 23, 9, 14, 14, 17, 20)
     private var _trackSpace = intArrayOf(20, 17, 23, 19, 6, 14, 17, 19)
@@ -291,6 +292,9 @@ class PulsarPlugin : DspPlugin {
         }
         controlPort(PulsarSymbol.LICK_MUTATION) {
             floatType { default = 0.5f; min = 0f; max = 1f; get { _lickMutation }; set { _lickMutation = it } }
+        }
+        controlPort(PulsarSymbol.LICK_MUTATION_MODE) {
+            intType { default = 0; get { _lickMutationMode }; set { _lickMutationMode = it } }
         }
         controlPort(PulsarSymbol.LICK_OCTAVE) {
             intType { default = -1; get { _lickOctave }; set { _lickOctave = it } }

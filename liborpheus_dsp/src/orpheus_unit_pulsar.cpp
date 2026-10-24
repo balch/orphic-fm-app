@@ -851,14 +851,18 @@ struct LickChannel {
     int loop_length;
     float mutation;
     int octave;
+    LickMutationMode mutation_mode;  // vibe-wide, the same for both channels
 };
 static LickChannel track_lick_channel(PulsarState* state, OrpheusEngine* engine, int t) {
+    const LickMutationMode mode =
+        engine->pulsar_lick_mutation_mode.load(std::memory_order_relaxed) == 1
+            ? LickMutationMode::CHORD_TONES : LickMutationMode::RANDOM;
     if (engine->pulsar_track_lick_source[t].load(std::memory_order_relaxed) == 1) {
         return { state->bass_line, state->bass_line_length, state->bass_line_loop_length,
-                 state->bass_line_mutation, state->bass_line_octave };
+                 state->bass_line_mutation, state->bass_line_octave, mode };
     }
     return { state->lick, state->lick_length, state->lick_loop_length,
-             state->lick_mutation, state->lick_octave };
+             state->lick_mutation, state->lick_octave, mode };
 }
 
 // Eligible-track mask for the wah anomaly, read LIVE from the pushed atomics (same
@@ -1133,7 +1137,8 @@ static void render_track_lick(PulsarState* state, OrpheusEngine* engine, const L
                            ch_mut, ctx.root, *ctx.scale, seed,
                            rts.bar_strategy, ctx.step_count, ch.octave,
                            ctx.range_lo, ctx.range_hi, ch.loop_length,
-                           engine->pulsar_track_lick_degree_offset[rt].load(std::memory_order_relaxed));
+                           engine->pulsar_track_lick_degree_offset[rt].load(std::memory_order_relaxed),
+                           ch.mutation_mode);
     if (carry_ghosts) lick_growth::carry_ghosts(before, before_count, rts.steps, rts.step_count);
 }
 
@@ -1387,7 +1392,7 @@ static int apply_section_densities(PulsarState* state, OrpheusEngine* engine,
                                ch.lick, ch.length, ch_mut,
                                section_seed ^ (t * 13331u),
                                ch.octave,
-                               ch.loop_length);
+                               ch.loop_length, 0, ch.mutation_mode);
         }
         if (ts.playhead >= ts.step_count) ts.playhead = 0;
         regenerated++;
@@ -1792,7 +1797,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                                ch.octave,
                                                genre.note_range_low, genre.note_range_high,
                                                ch.loop_length,
-                                               lick_deg_off);
+                                               lick_deg_off, ch.mutation_mode);
                 } else {
                     generate_lick_pattern(ts.steps, ts.step_count, ch.lick, ch.length,
                                           ch_mut, static_cast<uint8_t>(root), scale,
@@ -1800,7 +1805,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                           ch.octave,
                                           genre.note_range_low, genre.note_range_high,
                                           ch.loop_length,
-                                          lick_deg_off);
+                                          lick_deg_off, ch.mutation_mode);
                 }
                 // No bar strategy — FILL owns the full pattern
             } else {
@@ -1812,7 +1817,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                       ch.octave,
                                       genre.note_range_low, genre.note_range_high,
                                       ch.loop_length,
-                                      lick_deg_off);
+                                      lick_deg_off, ch.mutation_mode);
                 // Apply bar strategy for bar 2
                 if (step_count_config > 16) {
                     apply_bar_strategy(ts, t, bar_strategy, (role == TrackRole::PERCUSSIVE), genre,
@@ -1823,7 +1828,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                        base_seed ^ (t * 13331u),
                                        ch.octave,
                                        ch.loop_length,
-                                       lick_deg_off);
+                                       lick_deg_off, ch.mutation_mode);
                 }
             }
         } else {
@@ -1863,7 +1868,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                    ch.lick, ch.length, ch_mut,
                                    base_seed ^ (t * 13331u),
                                    ch.octave,
-                                   ch.loop_length);
+                                   ch.loop_length, 0, ch.mutation_mode);
             }
         }
 
@@ -4612,7 +4617,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                             std::memory_order_relaxed)),
                                         ch.loop_length,
                                         engine->pulsar_track_lick_degree_offset[t].load(
-                                            std::memory_order_relaxed));
+                                            std::memory_order_relaxed),
+                                        ch.mutation_mode);
                                 };
                                 if (hook_driven) render_bare_hook(mt, mt_ch);
                                 // Render around the lead track's current register.
@@ -5063,7 +5069,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                    rg.note_range_low, rg.note_range_high,
                                                    ch.loop_length,
                                                    engine->pulsar_track_lick_degree_offset[rt].load(
-                                                       std::memory_order_relaxed));
+                                                       std::memory_order_relaxed),
+                                                   ch.mutation_mode);
                         } else {
                             float hold_prob = engine->pulsar_track_hold_probability[rt].load(std::memory_order_relaxed);
                             int hold_min = engine->pulsar_track_hold_length_min[rt].load(std::memory_order_relaxed);
@@ -5088,7 +5095,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                    ch.lick, ch.length, ch_mut,
                                                    reset_seed ^ (rt * 13331u),
                                                    ch.octave,
-                                                   ch.loop_length);
+                                                   ch.loop_length, 0, ch.mutation_mode);
                             }
                         }
                     }
@@ -5343,6 +5350,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                             // ── Tonal tension: modify MIDI note before pitch glide ──
                             int midi_note = step.note;
+
+                            // CHORD_TONES: a mutated lick note lands on the chord under it. FIXED
+                            // snaps to the sounding chord; FOLLOW and ROOT_ONLY snap to I and then
+                            // move with the chord below. The note already carries lickDegreeOffset.
+                            if (step.from_lick && step.mutated && ts.role != TrackRole::PERCUSSIVE) {
+                                const int chord_ref = (ts.chord_follow == ChordFollowMode::FIXED)
+                                    ? state->chord_state.progression[state->chord_state.chord_index] : 0;
+                                midi_note = snap_note_to_chord_tone(midi_note, live_root,
+                                                                    kPulsarScales[live_scale], chord_ref);
+                            }
 
                             // Chord progression transposition (melodic tracks, mode-dependent)
                             if (ts.role != TrackRole::PERCUSSIVE && ts.chord_follow != ChordFollowMode::FIXED) {

@@ -84,6 +84,9 @@ enum class ScaleType(val scaleIndex: Int) {
  * @param tracks Exactly 8 tracks. See [TrackVoice] for per-track tuning.
  * @param lick Optional lead riff pattern. Tracks with `lickMode` set to Squash or Fill play this.
  * @param lickMutation How much the lick varies on repeat, 0-1. 0 = exact, 0.5 = moderate drift.
+ * @param lickMutationMode How that variation moves notes. [LickMutationMode.CHORD_TONES] keeps a
+ *   line's rests and shape and lands its changed notes on the chord. Applies to every lick
+ *   channel: [lick], the [lickRotation] pool and [bassLine].
  * @param lickOctave MIDI octave for the lick. -1 = auto (midpoint of noteRange), 0-8 = explicit.
  * @param lickRotation Rotation pool that swaps the lead lick per section. See [LickRotation].
  * @param bassLine Optional second authored pattern, rendered by tracks whose
@@ -151,6 +154,7 @@ data class Vibe(
     val tracks: List<TrackVoice>,
     val lick: Lick? = null,
     val lickMutation: Float = 0.5f,
+    val lickMutationMode: LickMutationMode = LickMutationMode.RANDOM,
     val lickOctave: Int = -1,
     val lickRotation: LickRotation? = null,
     val bassLine: Lick? = null,

@@ -1014,6 +1014,7 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_lick_loop_length{0};   // beats; 0 = no rest padding
     LickStepAtomic pulsar_lick[kMaxLickSteps];     // not atomic; guarded by length write order
     std::atomic<float> pulsar_lick_mutation{0.5f};
+    std::atomic<int> pulsar_lick_mutation_mode{0};  // LickMutationMode: 0 = RANDOM, 1 = CHORD_TONES
     std::atomic<int> pulsar_lick_octave{-1};       // -1 = auto (midpoint of noteRange)
 
     // Lick pool (Fire Sky .5f rotation + optional anomaly), Pattern-B string-pushed.

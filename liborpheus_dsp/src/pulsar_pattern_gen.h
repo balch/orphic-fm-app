@@ -720,7 +720,8 @@ inline void generate_lick_pattern(
     int lick_octave = -1,
     uint8_t note_range_low = 36, uint8_t note_range_high = 72,
     int lick_loop_length = 0,
-    int lick_degree_offset = 0)
+    int lick_degree_offset = 0,
+    LickMutationMode mutation_mode = LickMutationMode::RANDOM)
 {
     // Clear all steps first (rests by default)
     for (int i = 0; i < step_count; i++) {
@@ -755,6 +756,9 @@ inline void generate_lick_pattern(
     // Gate fires on the first step; remaining steps within the duration are rests.
     int step_pos = 0;
     int lick_idx = 0;
+    // CHORD_TONES keeps the line's breaths and its shape: no rest fills, and the
+    // random-degree jump becomes the same one-step move as the milder branch.
+    const bool chord_tones = (mutation_mode == LickMutationMode::CHORD_TONES);
 
     while (step_pos < play_steps) {
         int li = lick_idx % lick_length;
@@ -773,7 +777,7 @@ inline void generate_lick_pattern(
 
         if (degree < 0) {
             // Rest — at high mutation, might become a note
-            if (mutate_chance < mutation * 0.3f) {
+            if (!chord_tones && mutate_chance < mutation * 0.3f) {
                 degree = static_cast<int>(pattern_rand(seed) % 5);
                 vel = 0.5f + pattern_rand01(seed) * 0.3f;
             } else {
@@ -783,7 +787,7 @@ inline void generate_lick_pattern(
             }
         } else if (mutate_chance < mutation) {
             float intensity = mutation * pattern_rand01(seed);
-            if (intensity > 0.7f) {
+            if (intensity > 0.7f && !chord_tones) {
                 degree = static_cast<int>(pattern_rand(seed) % 7);
             } else if (intensity > 0.3f) {
                 int shift = static_cast<int>(pattern_rand(seed) % 3) - 1;
@@ -795,6 +799,7 @@ inline void generate_lick_pattern(
             dur += (pattern_rand01(seed) - 0.5f) * 0.3f * mutation;
             dur = std::max(0.1f, std::min(2.0f, dur));
         }
+        const bool mutated = chord_tones && degree != ls.scale_degree;
 
         // Quantize scale degree to MIDI note. The per-track degree offset shifts
         // sounding notes only (rests bailed out above): parallel diatonic harmony
@@ -820,11 +825,13 @@ inline void generate_lick_pattern(
             steps[step_pos].glide_rate = ls.glide_rate;
             steps[step_pos].hit_probability = ls.hit_probability;
             steps[step_pos].from_lick = true;
+            steps[step_pos].mutated = mutated;
         }
         for (int h = 1; h < slots && (step_pos + h) < step_count; h++) {
             steps[step_pos + h] = make_step(midi_note, vel, true, 1.0f);
             steps[step_pos + h].hold = (h < slots - 1);
             steps[step_pos + h].from_lick = true;
+            steps[step_pos + h].mutated = mutated;
         }
         step_pos += slots;
     }
