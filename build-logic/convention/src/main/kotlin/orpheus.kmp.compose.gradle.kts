@@ -98,3 +98,9 @@ dependencies {
 configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
     exclude(group = "dev.atsushieno", module = "libremidi-panama")
 }
+// Compose's CMP-4906 check fails a wasmJs browser test that reaches Skiko without an executable
+// binary. Every module here reaches it through Compose, but no wasm test renders Compose UI
+// (ui-test is jvmTest only), so the webpack bundle it asks for buys nothing. Re-enable it if one does.
+tasks.matching { it.name.startsWith("checkComposeUiTestConfigurationFor") }.configureEach {
+    enabled = false
+}
