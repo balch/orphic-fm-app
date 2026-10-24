@@ -59,6 +59,22 @@ class GuideToolNamesTest {
     }
 
     @Test
+    fun theAppGuideNamesOnlyRealMixTools() {
+        val appGuide = runBlocking { AppGuideTool().tool.execute(NoArgs()).guide }
+        assertTrue(appGuide.contains("Reset to file") && appGuide.contains("Capture"), "the app guide lost its Mixer buttons")
+        val named = Regex("""\b(?:mix|audio|section|ports?)_[a-z_]+\b""").findAll(appGuide).map { it.value }.toSet()
+        assertTrue(named.containsAll(setOf("mix_reset", "mix_capture")), "the app guide no longer names mix_reset and mix_capture: $named")
+        val unknown = named - toolNames
+        assertTrue(unknown.isEmpty(), "the app guide names tools the AI edition lacks: $unknown")
+        // The numbers table maps the Mixer's readout to mix_read fields, which must stay real.
+        val fields = MixMeters.serializer().descriptor.fields + MixChannelMeter.serializer().descriptor.fields
+        listOf("lufsShort", "lufsIntegrated", "preClipPeakDb", "pastKneePct", "correlation", "relLu", "peakDb", "subPct", "lowPct").forEach {
+            assertTrue(Regex("""\b$it\b""").containsMatchIn(appGuide), "precondition: the app guide reads $it")
+            assertTrue(it in fields, "mix_read has no meter field $it")
+        }
+    }
+
+    @Test
     fun everyMeterFieldTheGuideReadsExists() {
         val fields = MixMeters.serializer().descriptor.fields + MixChannelMeter.serializer().descriptor.fields +
             AudioAnalyzeResult.serializer().descriptor.fields

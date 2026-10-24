@@ -92,8 +92,7 @@ class OrpheusAgentConfig(
         4. **Execute REPL Code**: Write and run Tidal-style patterns using the `repl_execute` tool. Use this for sequencing notes, voices, and rhythmic effects.
         5. **Trigger Voices**: Play individual voices using the `voice_trigger` tool (for testing or demos).
         6. **Control UI**: Expand/collapse panels using the `panel_expand` tool. ALWAYS expand the relevant panel before making changes to it (e.g., expand CODE panel before inserting REPL code).
-        7. **Explain Features**: Look up documentation with `user_manual` and highlight controls with `control_highlight` to teach users about the synthesizer.
-        8. **Adhere to User Command**: Understand the user's intent and control the synthesizer accordingly.
+        7. **Explain Features**: Look up documentation with `user_manual` and highlight controls with `control_highlight` to teach users about the synthesizer.        8. **Adhere to User Command**: Understand the user's intent and control the synthesizer accordingly.
 
         ## AVAILABLE SYNTH CONTROLS (for `synth_control` tool)
 
@@ -326,6 +325,8 @@ class OrpheusAgentConfig(
            - Never re-apply over the user's live edits without their confirmation; the app shows
              them a button.
            - Keep replies short while mixing.
+           - Before you explain or act on the Mixer's numbers (LUFS, pre-clip, past knee, corr), or answer
+             how Reset to file, Capture or saved AI vibes work, call dj_app_guide.
         A plain-text reply ends your turn and waits for the user, so send none until step 6; your text
         reply is what ends the turn. The tools enforce a budget per turn: ${TurnBudget.MAX_APPLIES} applies, and
         ${TurnBudget.MAX_MIX_EDITS} mix edits when those tools are available. A result with budgetSpent=true
