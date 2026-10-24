@@ -48,6 +48,7 @@ object VibeNames {
     val NATALIS_SHIMMER = VibeName("Natalis Shimmer")
     val ORPHIC_LORE = VibeName("Orphic Lore")
     val OUROBOROS_BLOOM = VibeName("Ouroboros Bloom")
+    val RUNNING_OUT = VibeName("Running Out")
     val RUST_BELT = VibeName("Rust Belt")
     val RUST_BELT_OG = VibeName("Rust Belt OG")
     val SIXTIES_REBEL = VibeName("Sixties Rebel")
