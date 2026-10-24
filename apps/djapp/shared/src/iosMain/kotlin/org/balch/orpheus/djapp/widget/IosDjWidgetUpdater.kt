@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjAppHost
-import org.balch.orpheus.djapp.di.DjAppGraphIos
+import org.balch.orpheus.djapp.di.IosDjGraph
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerStatus
@@ -22,7 +22,7 @@ import org.balch.orpheus.features.timer.TimerStatus
  * different sink. Android recomposes the Glance widget in-process; here the
  * snapshot is written to a file and WidgetKit is asked to reload.
  */
-class IosDjWidgetUpdater(private val graph: DjAppGraphIos) {
+class IosDjWidgetUpdater(private val graph: IosDjGraph) {
 
     private val log = logging("IosDjWidgetUpdater")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

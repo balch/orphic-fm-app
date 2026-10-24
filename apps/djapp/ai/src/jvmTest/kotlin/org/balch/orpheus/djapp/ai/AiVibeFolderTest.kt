@@ -28,7 +28,7 @@ class AiVibeFolderTest {
     // IO runs on the test's own dispatcher, so the start-up scan has finished once the scheduler idles.
     private fun TestScope.folder(now: () -> Long = { 0L }): AiVibeFolder {
         val io = UnconfinedTestDispatcher(testScheduler)
-        return AiVibeFolder(dir, io, backgroundScope, now).also { advanceUntilIdle() }
+        return AiVibeFolder(FileAiVibeDir(dir), io, backgroundScope, now).also { advanceUntilIdle() }
     }
 
     @Test

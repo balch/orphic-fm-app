@@ -14,7 +14,7 @@ For DSP code specifically: understand whether values are linear vs exponential, 
 
 ## Dependency Injection
 
-See `docs/di-architecture.md` for the Metro layout: the seven `@DependencyGraph` declarations and
+See `docs/di-architecture.md` for the Metro layout: the eight `@DependencyGraph` declarations and
 where each is declared, the three scopes (`AppScope`, `FeatureScope`, `HeaderPanelScope`), the
 supporting types (`FeatureGraphHolder`, `FeatureCollection`, `SynthFeatureRegistry`,
 `InjectedViewModelFactory`), the per-app binding differences, the eager-root list, and the
