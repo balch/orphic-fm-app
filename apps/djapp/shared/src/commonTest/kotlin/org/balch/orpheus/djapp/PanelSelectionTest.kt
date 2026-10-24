@@ -32,7 +32,7 @@ class PanelSelectionTest {
 
     @Test
     fun repeatedTapsKeepCyclingThroughTheOldest() {
-        var pair = listOf(DjTab, MixTab)
+        var pair = listOf<DjRoute>(DjTab, MixTab)
         pair = togglePanel(pair, HornTab, capacity = PortraitPairCapacity)
         pair = togglePanel(pair, TimerTab, capacity = PortraitPairCapacity)
         assertEquals(listOf(HornTab, TimerTab), pair)
