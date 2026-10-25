@@ -8,6 +8,12 @@ import org.balch.orpheus.core.di.FeatureScope
 fun interface VibeApplyGuard {
     suspend fun refusal(): String?
 
+    /** Runs once the apply is going ahead, just before it replaces what plays. */
+    suspend fun beforeApply() {}
+
+    /** The apply that [beforeApply] announced threw, so nothing was replaced. */
+    fun applyFailed() {}
+
     companion object {
         /** The result's `refusal` for a guarded apply: a guard only stops an apply that would clear the user's live mix. */
         const val REFUSAL = "WIPE_UNCONFIRMED"

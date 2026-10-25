@@ -85,6 +85,11 @@ class CollabMixer internal constructor(
      */
     private val historyLock = Mutex()
     private val _history = MutableStateFlow(MixHistory())
+
+    /** What an apply about to run will replace, kept for the load it causes ([forLoad]); see [keepBeforeApply]. */
+    private data class Kept(val forLoad: Int, val before: BeforeApply)
+
+    private val kept = MutableStateFlow<Kept?>(null)
     private val _hearing = MutableStateFlow<Int?>(null)
 
     /** Every layer edit made through [edit] since the vibe loaded. */
@@ -174,14 +179,49 @@ class CollabMixer internal constructor(
         historyLock.withLock { endHearLocked() }
     }
 
-    /** Drops every item after the point and plays what is left. False, changing nothing, for an unknown point or during a vibe load. */
+    /**
+     * Keeps the vibe playing now and its timeline for the next load, which an [origin] apply is about to cause, so the
+     * new vibe's timeline can roll back to them ([MixHistory.BEFORE_APPLY]). [dropBeforeApply] when the apply fails.
+     */
+    suspend fun keepBeforeApply(origin: EditOrigin) = historyLock.withLock {
+        endHearLocked()
+        val p = pulsar
+        kept.value = Kept(p.vibeLoadCount.value + 1, BeforeApply(p.vibeFlow.value, _history.value, origin, nowMs()))
+    }
+
+    fun dropBeforeApply() {
+        kept.value = null
+    }
+
+    /**
+     * Drops every item after the point and plays what is left. [MixHistory.BEFORE_APPLY] instead loads the vibe the
+     * apply replaced and brings back its timeline. False, changing nothing, for an unknown point or during a vibe load.
+     */
     suspend fun rollBack(pointId: Int): Boolean = historyLock.withLock {
+        if (pointId == MixHistory.BEFORE_APPLY) return@withLock restoreBeforeApply()
         if (loadPending() || !isPoint(pointId)) return@withLock false
         endHearLocked()
         val old = _history.value
         val next = old.rollBackTo(pointId)
         val dropped = old.changes.filter { it.on } - next.changes.toSet()
         playHistory(next, dropped.map { it.control }.distinct())
+    }
+
+    // Under [historyLock]. The load claims a fresh timeline, which the replaced vibe's then overwrites. Its layers wait
+    // for the controller to follow the load: before that it refuses them as edits for the vibe being replaced.
+    private suspend fun restoreBeforeApply(): Boolean {
+        if (loadPending()) return false
+        val before = _history.value.beforeApply ?: return false
+        endHearLocked()
+        kept.value = null
+        pulsar.applyVibe(before.vibe)
+        syncVibeLoad()
+        _history.value = before.history
+        val c = controller
+        if (!c.awaitLoadFollowed() || !applyLayers(before.history.layers())) {
+            log.warn { "rollback to before the apply: '${before.vibe.name}' loaded, but its mix edits did not reach the engine" }
+        }
+        return true
     }
 
     // Under [historyLock]. Records the layer fields the edit wrote; a reset keeps only the changes that survived it.
@@ -285,7 +325,10 @@ class CollabMixer internal constructor(
             if (handled >= count) return false
             if (handledLoad.compareAndSet(handled, count)) {
                 if (handled >= 0) collab.clearForNewVibe()
-                _history.value = MixHistory(loadedAtMs = nowMs())
+                // At or past its load (other loads may have landed unclaimed since), kept goes into this timeline.
+                val k = kept.value?.takeIf { count >= it.forLoad }
+                if (k != null) kept.value = null
+                _history.value = MixHistory(loadedAtMs = nowMs(), beforeApply = k?.before)
                 _hearing.value = null
                 return true
             }

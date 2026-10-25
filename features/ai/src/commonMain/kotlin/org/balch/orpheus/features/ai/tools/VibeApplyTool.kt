@@ -219,6 +219,7 @@ class VibeApplyTool(
                         try {
                             log.debug { "Applying agent vibe '${vibe.name}'" }
                             val pulsar = pulsarFeatureProvider()
+                            for (guard in guards) guard.beforeApply()
                             pulsar.applyVibe(vibe)
                             pulsar.actions.setMix(0.8f)
                             eventBus.emitGenerated(vibe, outsideTurn = currentCoroutineContext()[TurnBudget.Exempt] != null)
@@ -227,6 +228,7 @@ class VibeApplyTool(
                             throw e
                         } catch (e: Exception) {
                             log.warn { "Vibe apply failed after decode: ${e.message}" }
+                            for (guard in guards) guard.applyFailed()
                             eventBus.emitFailed(e.message ?: "unknown error")
                             errorLog.record(AgentErrorSource.VIBE, "Could not apply vibe: ${e.message}", name)
                             VibeApplyResult(false, "Could not apply vibe: ${e.message}", null)

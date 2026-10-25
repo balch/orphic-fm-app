@@ -5,6 +5,7 @@ import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.LayerWrite
 import org.balch.orpheus.features.pulsar.bench.valueOf
 import org.balch.orpheus.features.pulsar.bench.with
+import org.balch.orpheus.features.pulsar.models.Vibe
 
 /** One row of the Mixer's History timeline: a change or a marked point. */
 sealed interface HistoryItem {
@@ -34,6 +35,17 @@ data class HistoryPoint(
     val label: String,
 ) : HistoryItem
 
+/**
+ * What an agent's or MCP's apply replaced: the vibe that played and its whole timeline, so a rollback can bring both
+ * back. Its [history] can hold an earlier [BeforeApply] of its own, so applies undo one at a time.
+ */
+data class BeforeApply(
+    val vibe: Vibe,
+    val history: MixHistory,
+    val origin: EditOrigin,
+    val atMs: Long,
+)
+
 /** The Mixer's edit timeline. The bench layers are always the replay of the changes that are on. */
 data class MixHistory(
     val items: List<HistoryItem> = emptyList(),
@@ -41,6 +53,8 @@ data class MixHistory(
     val pointCount: Int = 0,
     /** When the vibe this history belongs to loaded. */
     val loadedAtMs: Long = 0L,
+    /** Set when an agent or MCP apply loaded this vibe: what it replaced, below [FILE] in the timeline. */
+    val beforeApply: BeforeApply? = null,
 ) {
     val changes: List<HistoryChange> get() = items.filterIsInstance<HistoryChange>()
     val onCount: Int get() = changes.count { it.on }
@@ -130,6 +144,8 @@ data class MixHistory(
     companion object {
         /** The id of the written file state, before any change. */
         const val FILE = 0
+        /** The id of [beforeApply]: the vibe and mix the apply replaced. */
+        const val BEFORE_APPLY = -1
         const val FOLD_MS = 2000L
     }
 }

@@ -53,7 +53,7 @@ private data class Local(val capture: MixerCapture? = null, val capturing: Boole
 private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>, val hist: Hist)
 
 /** The History timeline as the panel shows it. */
-private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long)
+private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long, val beforeApply: BeforeApplyRow?)
 
 /**
  * The mixer panel's state and edits over the shared [MixBenchController]. Every edit goes through [CollabMixer] as
@@ -103,7 +103,7 @@ class AiMixerViewModel(
             Bench(layers, sc, muted, soloed, loop)
         }
         val hist = combine(collabMixer.history, collabMixer.hearing, pulsarFeature.vibeFlow) { h, hearing, vibe ->
-            Hist(historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }, hearing, h.onCount, h.loadedAtMs)
+            Hist(historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }, hearing, h.onCount, h.loadedAtMs, beforeApplyRow(h))
         }
         val overlay = combine(local, collab.pins, collab.agentTouched, hist, ::Overlay)
         emitAll(
@@ -118,6 +118,7 @@ class AiMixerViewModel(
                     hearing = o.hist.hearing,
                     onCount = o.hist.onCount,
                     loadedAtMs = o.hist.loadedAtMs,
+                    beforeApply = o.hist.beforeApply,
                 )
             },
         )

@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
@@ -74,6 +75,63 @@ class CollabHistoryTest {
         assertEquals(1, c.section)
         assertEquals("verse", c.sectionName)
         assertEquals(setOf<LayerField>(LayerField.SectionLevel(1, 2)), c.writes.keys)
+    }
+
+    /** An agent apply as `pulsar_apply_vibe` makes it, with the DJ guard's hook first. */
+    private suspend fun TestScope.agentApply(r: Rig, name: String) {
+        r.mixer.keepBeforeApply(EditOrigin.AGENT)
+        pulsar.applyVibe(pulsar.vibeList.first { it.name == name })
+        runCurrent()
+    }
+
+    @Test
+    fun anAgentApplyCanBeRolledBackWithItsMix() = runTest {
+        val r = rig()
+        r.level(2, -4f)
+        r.mixer.edit(EditOrigin.USER, MixControl.MacroKnob(Macro.ENERGY)) { setMacro(Macro.ENERGY, 0.7f) }
+        val mixBefore = r.history
+
+        agentApply(r, "Low Tide")
+        r.level(5, -2f, EditOrigin.AGENT)
+        val before = assertNotNull(r.history.beforeApply)
+        assertEquals("Night Drive", before.vibe.name)
+        assertEquals(mixBefore, before.history)
+        assertEquals(EditOrigin.AGENT, before.origin)
+
+        assertTrue(r.mixer.rollBack(MixHistory.BEFORE_APPLY))
+        runCurrent()
+        assertEquals("Night Drive", pulsar.vibeFlow.value.name)
+        assertEquals(mixBefore, r.history)
+        r.assertReplay()
+        assertEquals(-4f, r.controller.layers.value.vibe.levelDb[2])
+        assertEquals(0.7f, pulsar.macroKnob(Macro.ENERGY))
+    }
+
+    @Test
+    fun appliesUndoOneAtATime() = runTest {
+        val r = rig()
+        agentApply(r, "Low Tide")
+        agentApply(r, "Night Drive")
+        assertEquals("Low Tide", r.history.beforeApply?.vibe?.name)
+        assertTrue(r.mixer.rollBack(MixHistory.BEFORE_APPLY))
+        runCurrent()
+        assertEquals("Low Tide", pulsar.vibeFlow.value.name)
+        assertEquals("Night Drive", r.history.beforeApply?.vibe?.name)
+    }
+
+    @Test
+    fun aLoadWithoutAnApplyKeepsNothingAndAFailedApplyLeavesNoStaleKeep() = runTest {
+        val r = rig()
+        pulsar.applyVibe(pulsar.vibeList[1])
+        runCurrent()
+        assertNull(r.history.beforeApply)
+        assertFalse(r.mixer.rollBack(MixHistory.BEFORE_APPLY))
+
+        r.mixer.keepBeforeApply(EditOrigin.AGENT)
+        r.mixer.dropBeforeApply()
+        pulsar.applyVibe(pulsar.vibeList[0])
+        runCurrent()
+        assertNull(r.history.beforeApply)
     }
 
     @Test
