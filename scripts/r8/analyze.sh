@@ -3,7 +3,7 @@
 #
 # Flow:
 #   1. Clear previous run, archive prior result -> history.txt
-#   2. ./gradlew assembleRelease with the R8 dump-keep-radius system property
+#   2. ./gradlew <release task> with the R8 dump-keep-radius system property
 #   3. Convert generated .pb -> keepruleradius.json
 #   4. Compute Optimization / Obfuscation / Shrinking scores -> analysis_result.txt
 #   5. Print top-impact + subsumed rules
@@ -14,13 +14,15 @@
 #
 # Usage:
 #   ./scripts/r8/analyze.sh                          # default: :apps:orpheus:androidApp:assembleRelease
-#   ./scripts/r8/analyze.sh <gradle-task>            # e.g. :apps:djapp:androidApp:assembleRelease
+#   ./scripts/r8/analyze.sh <gradle-task> [args...]  # e.g. :apps:djapp:androidApp:assembleOgRelease -Porphic.liveVibesOnly=true
+#   (DJ app: one edition per run; OG needs the switch, AI is :apps:djapp:androidApp:assembleAiRelease without it.)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT_DIR="$ROOT/tmp/r8analysis"
 SCRIPT_DIR="$ROOT/scripts/r8"
 GRADLE_TASK="${1:-:apps:orpheus:androidApp:assembleRelease}"
+[ $# -gt 0 ] && shift
 
 cd "$ROOT"
 
@@ -45,7 +47,7 @@ rm -f "$OUT_DIR/keepruleradius.json"
 rm -f "$OUT_DIR"/*.pb 2>/dev/null || true
 
 echo "==> Running $GRADLE_TASK with R8 dump-keep-radius"
-./gradlew "$GRADLE_TASK" \
+./gradlew "$GRADLE_TASK" ${1+"$@"} \
     "-Dcom.android.tools.r8.dumpkeepradiustodirectory=$OUT_DIR"
 
 PB_COUNT=$(find "$OUT_DIR" -name "*.pb" -type f 2>/dev/null | wc -l | tr -d ' ')

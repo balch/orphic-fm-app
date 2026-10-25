@@ -26,7 +26,7 @@ Two different tasks push them, which is why "publish a build" and "change the li
 acts:
 
 ```bash
-./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal -Porphic.liveVibesOnly=true
 ```
 
 That uploads the AAB **and** `release-notes/` for that release only. Title, descriptions and

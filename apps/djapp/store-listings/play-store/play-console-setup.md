@@ -416,7 +416,7 @@ git tag -a v1.0.0 -m "v1.0.0 — first closed beta"
 git push origin v1.0.0     # only after merging to main
 
 # Rebuild the AAB. versionName will now be "v1.0.0".
-./gradlew :apps:djapp:androidApp:bundleRelease
+./gradlew :apps:djapp:androidApp:bundleOgRelease -Porphic.liveVibesOnly=true
 ```
 
 `versionCode` is `git rev-list --count HEAD` and increments automatically with
@@ -435,7 +435,7 @@ views.
 |---|---|---|
 | "App bundle is not signed correctly" | First upload but you signed with a debug key | Confirm `keystore.properties` exists at repo root before building. The release build silently falls back to debug signing if it's missing. |
 | "Version code XXX has already been used" | You re-uploaded the same AAB | Make a commit (any commit) to bump `git rev-list --count HEAD`, rebuild. |
-| "Your app contains ads" review failure | Some SDK we pulled in declares an ad component | Run `./gradlew :apps:djapp:androidApp:bundleRelease --scan`, search the dependency tree for `com.google.android.gms:play-services-ads*`. None should be present. |
+| "Your app contains ads" review failure | Some SDK we pulled in declares an ad component | Run `./gradlew :apps:djapp:androidApp:bundleOgRelease -Porphic.liveVibesOnly=true --scan` (AI edition: `bundleAiRelease`, no switch), search the dependency tree for `com.google.android.gms:play-services-ads*`. None should be present. |
 | Pre-launch report flags missing English version of release notes | You only filled in one locale | Add at least an `en-US` entry. |
 | "Listing requires phone screenshots" | Track creation but no screenshots uploaded | See §3. |
 | Closed testing time-counter not advancing | Testers aren't actually opening the app | The 14-day window only counts days when ≥12 testers have the app installed and have opened it at least once. Send a reminder. |
