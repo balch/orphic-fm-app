@@ -1,3 +1,4 @@
+import org.balch.orpheus.buildlogic.VibeSourceTrace
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -121,5 +122,168 @@ kotlin {
             // VibePortDumpRenderHarness replays the plugin's port defaults, as the app's engine start does.
             implementation(projects.core.plugins.pulsar)
         }
+    }
+}
+
+// ── OG release: live vibes only ───────────────────────────────────────────────
+// A removable file declares only non-LIVE vibes (VibeSourceTrace in build-logic). Under
+// -Porphic.liveVibesOnly=true those files leave every source set, and their Metro
+// contributions with them. verifyVibeSourceTrace (Guard 1) keeps the cut compilable.
+//
+//   ./gradlew :features:pulsar:printRemovableVibes
+//   ./gradlew :features:pulsar:verifyVibeSourceTrace
+object VibeTraceFiles {
+    fun trace(catalog: File, sources: Iterable<File>): Pair<Map<String, String>, VibeSourceTrace.Result> {
+        val statuses = VibeSourceTrace.catalogStatuses(catalog.readText())
+        val files = sources.filter { it.isFile }.associate { it.absolutePath to it.readText() }
+        return statuses to VibeSourceTrace.removable(files, statuses)
+    }
+}
+
+abstract class RemovableVibeSources : ValueSource<Set<String>, RemovableVibeSources.Params> {
+    interface Params : ValueSourceParameters {
+        val catalog: RegularFileProperty
+        val sources: ConfigurableFileCollection
+    }
+
+    // Runs on every build, so a catalog flip or a new vibe file invalidates the configuration cache.
+    override fun obtain(): Set<String> =
+        VibeTraceFiles.trace(parameters.catalog.get().asFile, parameters.sources).second.removable
+}
+
+abstract class VibeTraceTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val catalog: RegularFileProperty
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val pulsarSources: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val rootDirectory: DirectoryProperty
+
+    protected fun relative(path: String) = File(path).relativeTo(rootDirectory.get().asFile).path
+}
+
+@DisableCachingByDefault(because = "Cheap text scan")
+abstract class VerifyVibeSourceTrace : VibeTraceTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val repoMainSources: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val stamp: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val (statuses, result) = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources)
+        val problems = mutableListOf<String>()
+        if (statuses.values.none { it == "LIVE" } || result.vibeFiles == 0 || result.removable.isEmpty()) {
+            problems += "Implausible trace: ${statuses.size} catalog entries, ${result.vibeFiles} vibe files, " +
+                "${result.removable.size} removable"
+        }
+        val catalogText = catalog.get().asFile.readText()
+        val entryCalls = VibeSourceTrace.catalogEntryCalls(catalogText)
+        if (entryCalls != statuses.size) {
+            problems += "VibeCatalog.kt has $entryCalls CatalogEntry( calls but ${statuses.size} parsed entries:" +
+                " write each as `VibeNames.X to CatalogEntry(VibeStatus.Y, ...)`"
+        }
+        val contributions = pulsarSources.filter { it.isFile }.sumOf { VibeSourceTrace.providerContributions(it.readText()) }
+        if (contributions != result.names) {
+            problems += "$contributions VibeProvider contributions but ${result.names} traced names: every VibeProvider" +
+                " must declare `override val name: VibeName = VibeNames.X`"
+        }
+        result.mixed.forEach { (path, hidden) ->
+            problems += "${relative(path)} mixes LIVE and non-LIVE vibes (non-LIVE: ${hidden.sorted().joinToString()})." +
+                " Move the non-LIVE vibes to their own file"
+        }
+        val declarations = result.removable.flatMap { VibeSourceTrace.topLevelDeclarations(File(it).readText()) }.toSet()
+        repoMainSources.filter { it.isFile && it.absolutePath !in result.removable }.forEach { file ->
+            val refs = VibeSourceTrace.referencesTo(declarations, file.readText())
+            if (refs.isNotEmpty()) {
+                problems += "${relative(file.absolutePath)} references removable ${refs.sorted().joinToString()}"
+            }
+        }
+        if (problems.isNotEmpty()) {
+            throw GradleException("Vibe source trace failed (Guard 1):\n" + problems.joinToString("\n") { "  - $it" })
+        }
+        stamp.get().asFile.writeText("${result.removable.size} removable of ${result.vibeFiles} vibe files\n")
+    }
+}
+
+@DisableCachingByDefault(because = "Prints to the console")
+abstract class PrintRemovableVibes : VibeTraceTask() {
+    @get:OutputFile
+    abstract val removableClasses: RegularFileProperty
+
+    @TaskAction
+    fun print() {
+        val result = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources).second
+        val packageLine = Regex("^package\\s+([\\w.]+)", RegexOption.MULTILINE)
+        val classLine = Regex(
+            "^(?:@\\w+(?:\\([^)]*\\))?\\s+)*(?:(?:public|internal|private|data|sealed|abstract|open|enum|" +
+                "annotation|value|inline|expect|actual|fun)\\s+)*(?:class|interface|object)\\s+(\\w+)",
+            RegexOption.MULTILINE,
+        )
+        val classes = result.removable.flatMap { path ->
+            val text = File(path).readText()
+            val pkg = packageLine.find(text)?.groupValues?.get(1)?.let { "$it." } ?: ""
+            // Plus the file facade top-level funs and vals compile into; absent if the file has none.
+            classLine.findAll(text).map { pkg + it.groupValues[1] }.toList() + "$pkg${File(path).nameWithoutExtension}Kt"
+        }.distinct().sorted()
+        removableClasses.get().asFile.writeText(classes.joinToString("\n", postfix = "\n"))
+        println("${result.removable.size} removable vibe files (of ${result.vibeFiles}):")
+        result.removable.map(::relative).sorted().forEach { println("  $it") }
+        println("${classes.size} classes -> ${relative(removableClasses.get().asFile.absolutePath)}")
+    }
+}
+
+val vibeCatalogFile = layout.projectDirectory.file(
+    "src/commonMain/kotlin/org/balch/orpheus/features/pulsar/vibes/VibeCatalog.kt",
+)
+val pulsarMainSources = fileTree("src") { include("*Main/**/*.kt") }
+val repoMainSourceTree = fileTree(rootDir) {
+    include("**/src/*Main/**/*.kt", "**/src/main/**/*.kt")
+    exclude("**/build/**", ".claude/**", ".git/**", "build-logic/**", "**/.gradle/**")
+}
+
+fun VibeTraceTask.traceInputs() {
+    catalog.set(vibeCatalogFile)
+    pulsarSources.from(pulsarMainSources)
+    rootDirectory.set(rootDir)
+}
+
+val verifyVibeSourceTrace = tasks.register<VerifyVibeSourceTrace>("verifyVibeSourceTrace") {
+    description = "Guard 1: non-LIVE vibe sources can be dropped without breaking any main source"
+    group = "verification"
+    traceInputs()
+    repoMainSources.from(repoMainSourceTree)
+    stamp.set(layout.buildDirectory.file("vibe-trace/verified.txt"))
+}
+
+tasks.register<PrintRemovableVibes>("printRemovableVibes") {
+    description = "List vibe sources -Porphic.liveVibesOnly=true drops, and their classes"
+    group = "help"
+    traceInputs()
+    removableClasses.set(layout.buildDirectory.file("vibe-trace/removable-classes.txt"))
+    outputs.upToDateWhen { false }
+}
+
+tasks.named("jvmTest") { dependsOn(verifyVibeSourceTrace) }
+
+if (providers.gradleProperty("orphic.liveVibesOnly").orNull == "true") {
+    val removable = providers.of(RemovableVibeSources::class) {
+        parameters {
+            catalog.set(vibeCatalogFile)
+            sources.from(pulsarMainSources)
+        }
+    }.get()
+    kotlin.sourceSets.configureEach {
+        kotlin.exclude { it.file.absolutePath in removable }
+    }
+    // The source-set filter misses AGP's KMP android compile, so filter every compile task too.
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompileTool<*>>().configureEach {
+        exclude { it.file.absolutePath in removable }
     }
 }
