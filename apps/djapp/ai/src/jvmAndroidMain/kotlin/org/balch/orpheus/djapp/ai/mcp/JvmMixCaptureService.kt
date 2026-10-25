@@ -21,6 +21,8 @@ import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.UnavailableMixCaptureService
+import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
+import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.bench.capture
 
 /**
@@ -81,19 +83,21 @@ internal class MixCaptureFlow(
 
     override fun baselineHash(vibeName: String): String? = synchronized(baselines) { baselines[vibeName] }
 
-    override suspend fun capture(): CaptureOutcome = serial.withLock {
+    override suspend fun capture(file: Vibe?, vibeRows: List<VibeFieldChange>): CaptureOutcome = serial.withLock {
         val pulsar = pulsarFeatureProvider()
         val snap = controllerProvider().captureSnapshot()
             ?: return@withLock CaptureOutcome(false, "A vibe is loading; capture again once it plays.", null, emptyList(), null, false)
-        val vibe = snap.vibe
+        // The file's vibe, not the playing one: vibe rows are changes on top of it.
+        val vibe = file ?: snap.vibe
         val rows = capture(vibe, snap.layers)
         val ai = vibe.name !in pulsar.vibeNames
         val written = withContext(dispatchers.io) {
-            writer.write(vibe, rows, if (ai) null else baselineHash(vibe.name), aiVibe = ai)
+            writer.write(vibe, rows, if (ai) null else baselineHash(vibe.name), aiVibe = ai, vibeRows = vibeRows)
         }
+        val counts = "${rows.size} rows" + if (vibeRows.isEmpty()) "" else " and ${vibeRows.size} vibe field changes"
         CaptureOutcome(
-            true, "Wrote ${rows.size} rows for \"${vibe.name}\"; the live mix is unchanged." + clampNote(rows),
-            written.file.absolutePath, rows, written.capture.stale, ai,
+            true, "Wrote $counts for \"${vibe.name}\"; the live mix is unchanged." + clampNote(rows),
+            written.file.absolutePath, rows, written.capture.stale, ai, vibeRows,
         )
     }
 

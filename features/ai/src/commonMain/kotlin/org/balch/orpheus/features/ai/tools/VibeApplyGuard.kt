@@ -3,16 +3,14 @@ package org.balch.orpheus.features.ai.tools
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Multibinds
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.models.Vibe
 
 /** Asked before `pulsar_apply_vibe` replaces what plays: a non-null message refuses the apply and is what the agent reads. */
 fun interface VibeApplyGuard {
     suspend fun refusal(): String?
 
-    /** Runs once the apply is going ahead, just before it replaces what plays. */
-    suspend fun beforeApply() {}
-
-    /** The apply that [beforeApply] announced threw, so nothing was replaced. */
-    fun applyFailed() {}
+    /** Non-null: [vibe] was handled as an edit of the playing vibe, so the normal apply (archive, load, events) is skipped. */
+    suspend fun applyAsEdit(vibe: Vibe): VibeApplyResult? = null
 
     companion object {
         /** The result's `refusal` for a guarded apply: a guard only stops an apply that would clear the user's live mix. */

@@ -8,6 +8,11 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import org.balch.orpheus.djapp.ai.collab.VibeEditResult
+import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
+import org.balch.orpheus.features.pulsar.models.ScaleType
+import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.core.audio.dsp.NoMeterTap
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.djapp.ai.collab.CollabMixer
@@ -125,6 +130,56 @@ class CaptureToolTest {
     }
 
     @Test
+    fun flowUsesFileVibeForVibeJson() = runTest {
+        val c = controller()
+        c.mixDirect()
+        val file = catalog.copy(bpm = 90f)
+        val change = VibeFieldChange("bpm", JsonPrimitive(90f), JsonPrimitive(96f))
+
+        val r = flow(c).capture(file, listOf(change))
+
+        assertTrue(r.ok, r.message)
+        assertEquals(listOf(change), r.vibeRows)
+        assertEquals(capture(file, c.layers.value), r.rows)
+        assertTrue("1 vibe" in r.message, r.message)
+        val written = Json.decodeFromString(CaptureFile.serializer(), File(assertNotNull(r.file)).readText())
+        assertEquals(file, Json.decodeFromString(Vibe.serializer(), written.vibeJson))
+        assertEquals(listOf(change), written.vibeRows)
+    }
+
+    @Test
+    fun captureWithOnlyVibeRowsWritesFile() = runTest {
+        val c = controller()
+        val change = VibeFieldChange("bpm", JsonPrimitive(120f), JsonPrimitive(96f))
+
+        val r = flow(c).capture(catalog, listOf(change))
+
+        assertTrue(r.ok, r.message)
+        assertTrue(r.rows.isEmpty())
+        assertNotNull(r.file)
+        assertEquals(listOf(change), r.vibeRows)
+    }
+
+    @Test
+    fun captureToolReturnsVibeRows() = runTest {
+        val c = controller()
+        val m = mixer(c)
+        assertIs<VibeEditResult.Applied>(m.editVibe(EditOrigin.USER, catalog.copy(scaleType = ScaleType.MAJOR)))
+        runCurrent()
+
+        val r = MixCaptureTool(flow(c), m).tool.execute(NoArgs())
+
+        assertTrue(r.ok, r.message)
+        assertEquals(listOf("scaleType"), r.vibeRows.map { it.path })
+        assertTrue(r.rows.isEmpty())
+        val written = Json.decodeFromString(CaptureFile.serializer(), File(assertNotNull(r.file)).readText())
+        assertEquals(r.vibeRows, written.vibeRows)
+        // The rows were read against the file, so vibeJson is the file's vibe and not the edited one playing.
+        assertEquals(catalog, Json.decodeFromString(Vibe.serializer(), written.vibeJson))
+        assertEquals(0, m.history.value.uncapturedCount)
+    }
+
+    @Test
     fun catalogCaptureAddsCaptureRow() = runTest {
         val c = controller()
         val m = mixer(c)
@@ -163,7 +218,7 @@ class CaptureToolTest {
 
         assertTrue(r.ok, r.message)
         assertNull(r.file)
-        assertEquals("No new mix changes since the last capture; nothing written.", r.message)
+        assertEquals("No new mix or sound changes since the last capture; nothing written.", r.message)
         assertEquals(items, m.history.value.items)
         assertEquals(files, dir.listFiles().orEmpty().size)
     }
@@ -190,7 +245,8 @@ class CaptureToolTest {
     fun failedCaptureAddsNoPoint() = runTest {
         val c = controller()
         val refuse = object : MixCaptureService {
-            override suspend fun capture() = CaptureOutcome(false, "nope", null, emptyList(), null, false)
+            override suspend fun capture(file: Vibe?, vibeRows: List<VibeFieldChange>) =
+                CaptureOutcome(false, "nope", null, emptyList(), null, false)
         }
         val m = mixer(c, refuse)
         m.mix(c)

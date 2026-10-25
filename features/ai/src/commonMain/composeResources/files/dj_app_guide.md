@@ -87,8 +87,7 @@ Android apps; on iOS it reports that it is not available yet.
   a new change above it. With no uncaptured changes, Capture adds nothing.
 - Mixes persist per vibe: loading another vibe keeps this one's changes, and they come back when
   the same unchanged vibe loads again, even after the app restarts. A re-apply of an edited vibe
-  (for example a new `levelDb`) starts with a clean mix; the "before apply" row in History can roll
-  back to the old vibe and its edits, and capture files stay on disk.
+  (for example a new `levelDb`) starts with a clean mix; capture files stay on disk.
 - The app also captures before and after your turn when you change the mix, as "before: ..." and
   "after: ..." checkpoints, so the user can go back to the mix from before.
 

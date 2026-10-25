@@ -4,9 +4,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.HistoryPoint
+import org.balch.orpheus.djapp.ai.collab.HistoryVibeEdit
 import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.collab.MixHistory
+import org.balch.orpheus.djapp.ai.collab.PointKind
 import org.balch.orpheus.djapp.ai.tools.vibe
 import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.LayerWrite
@@ -187,5 +195,93 @@ class AiMixerStateTest {
         assertEquals(1, uncapturedOn(rows))
         assertEquals(" · 1 uncaptured of 3 changes on", nowDetail(rows, h.onCount))
         assertEquals(" · 3 of 3 changes on", nowDetail(historyRows(none.rec(3, 4_000L)) { "T$it" }, 3))
+    }
+
+    private fun vibeEdit(id: Int, path: String, before: JsonElement, after: JsonElement, on: Boolean = true) =
+        HistoryVibeEdit(id, atMs = id * 1_000L, origin = EditOrigin.AGENT, path = path, before = before, after = after, updatedMs = id * 1_000L, on = on)
+
+    private fun vibeRows(vararg edits: HistoryVibeEdit) =
+        historyRows(MixHistory(items = edits.toList(), nextId = 100), v) { "T$it" }.filterIsInstance<VibeEditRow>()
+
+    @Test
+    fun vibeRowLabels() {
+        val num = JsonPrimitive(0.5)
+        val rows = vibeRows(
+            vibeEdit(1, "tracks[2].engineEdm.engineId", JsonPrimitive("VA"), JsonPrimitive("FM")),
+            vibeEdit(2, "arrangement.sections[2].trackOverrides.2.morph", num, JsonPrimitive(0.8)),
+            vibeEdit(3, "bpm", JsonPrimitive(120), JsonPrimitive(96)),
+            vibeEdit(4, "genre.swingAmount", num, JsonPrimitive(0.1)),
+        )
+        assertEquals(
+            listOf("T2 · EDM engine", "chorus · T2 morph", "bpm", "genre.swingAmount"),
+            rows.map { it.label },
+        )
+        assertEquals("Orpheus", rows[0].who)
+        assertEquals(2_000L, rows[1].atMs)
+    }
+
+    @Test
+    fun vibeRowLabelsFallBackToTrackAndSectionNames() {
+        val num = JsonPrimitive(0.5)
+        val rows = vibeRows(
+            vibeEdit(1, "arrangement.sections[2].compingStyle", JsonPrimitive("A"), JsonPrimitive("B")),
+            vibeEdit(2, "tracks[4].envelopeProfile", num, JsonPrimitive(0.8)),
+            vibeEdit(3, "arrangement.sections[40].compingStyle", JsonPrimitive("A"), JsonPrimitive("B")),
+        )
+        assertEquals(listOf("chorus · compingStyle", "T4 · envelopeProfile", "section 40 · compingStyle"), rows.map { it.label })
+    }
+
+    @Test
+    fun vibeRowShortValues() {
+        val steps = JsonArray(List(16) { JsonPrimitive(it) })
+        val rows = vibeRows(
+            vibeEdit(1, "bpm", JsonPrimitive(120f), JsonPrimitive(96f)),
+            vibeEdit(7, "genre.swingAmount", JsonPrimitive(0.5f), JsonPrimitive(96.256f)),
+            vibeEdit(2, "scaleType", JsonPrimitive("MINOR"), JsonPrimitive("MAJOR")),
+            vibeEdit(3, "tracks[1].mute", JsonPrimitive(false), JsonPrimitive(true)),
+            vibeEdit(4, "tracks[1].steps", steps, JsonArray(List(8) { JsonPrimitive(it) })),
+            vibeEdit(5, "genre", JsonObject(mapOf("a" to JsonPrimitive(1))), JsonObject(mapOf("a" to JsonPrimitive(2)))),
+            vibeEdit(6, "tracks[1].note", JsonNull, JsonPrimitive(3)),
+        )
+        assertEquals(
+            listOf("120" to "96", "0.50" to "96.26", "MINOR" to "MAJOR", "false" to "true", "(16 steps)" to "(8 steps)", "(changed)" to "(changed)", "(none)" to "3"),
+            rows.map { it.before to it.after },
+        )
+    }
+
+    @Test
+    fun vibeRowsCarryOnAndCapturedLikeChanges() {
+        val h = MixHistory(
+            items = listOf(
+                vibeEdit(1, "bpm", JsonPrimitive(120.0), JsonPrimitive(96.0)),
+                HistoryPoint(2, 2_000L, "Captured", PointKind.CAPTURE, "a.json"),
+                vibeEdit(3, "scaleType", JsonPrimitive("MINOR"), JsonPrimitive("MAJOR"), on = false),
+            ),
+            nextId = 4,
+        )
+        val rows = historyRows(h, v) { "T$it" }
+        val (a, b) = rows.filterIsInstance<VibeEditRow>()
+        assertTrue(a.on && a.captured)
+        assertFalse(b.on || b.captured)
+    }
+
+    @Test
+    fun nowDetailCountsVibeRows() {
+        val h = MixHistory()
+            .record(EditOrigin.USER, MixControl.Pan(1), null, null, "0.00", "0.40", mapOf(LayerField.VibePan(1) to LayerWrite(0f, 0.4f)), 1_000L)
+            .capture(2_000L, "Captured", "a.json")
+            .let {
+                it.copy(
+                    items = it.items + listOf(
+                        vibeEdit(50, "bpm", JsonPrimitive(120.0), JsonPrimitive(96.0)),
+                        vibeEdit(51, "scaleType", JsonPrimitive("MINOR"), JsonPrimitive("MAJOR")),
+                        vibeEdit(52, "rootNote", JsonPrimitive("A"), JsonPrimitive("C"), on = false),
+                    ),
+                )
+            }
+        val rows = historyRows(h, v) { "T$it" }
+        assertEquals(2, uncapturedOn(rows))
+        assertEquals(" · 2 uncaptured of 4 changes on", nowDetail(rows, h.onCount))
+        assertEquals(4, AiMixerUiState(history = rows).historyChangeCount)
     }
 }

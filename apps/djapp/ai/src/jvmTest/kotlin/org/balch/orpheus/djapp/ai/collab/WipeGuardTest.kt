@@ -131,7 +131,7 @@ class WipeGuardTest {
     fun vibeLoadWithLiveEditsIsNotRefused() = runTest {
         val r = rig()
         r.userEdits()
-        val load = VibeLoadTool({ pulsar }, OneDispatcher(UnconfinedTestDispatcher(testScheduler)), r.collab.guard).tool
+        val load = VibeLoadTool({ pulsar }, OneDispatcher(UnconfinedTestDispatcher(testScheduler))).tool
         val loaded = load.execute(VibeLoadArgs("Low Tide"))
         assertTrue(loaded.ok, loaded.message)
         assertNull(loaded.refusal)

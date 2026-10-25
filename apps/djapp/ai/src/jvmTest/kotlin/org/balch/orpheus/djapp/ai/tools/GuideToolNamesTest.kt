@@ -40,9 +40,10 @@ class GuideToolNamesTest {
             MixResetTool(r.mixer, r.events, r.guard, r.collab),
             SectionJumpTool({ error("unused") }, r.mixer, r.events), SectionLoopTool(r.mixer, r.events),
             PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth, r.mixer, r.events),
-            VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d, r.guard), TransportTool({ error("unused") }, d),
+            VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d), TransportTool({ error("unused") }, d),
             AudioAnalyzeTool { error("unused") }, AudioCaptureTool(UnavailableStemCaptureService()),
             MixCaptureTool(UnavailableMixCaptureService(), r.mixer),
+            VibeEditTool(TurnBudget(),r.mixer),
             // MCP only, but the app guide explains it to the user.
             MixClearChangesTool { error("unused") },
         ).map { it.tool.descriptor.name }.toSet()
@@ -60,6 +61,16 @@ class GuideToolNamesTest {
         )
         val unknown = named - toolNames
         assertTrue(unknown.isEmpty(), "the guide names tools the AI edition lacks: $unknown (tools: $toolNames)")
+    }
+
+    @Test
+    fun guideNamesExistingTools() {
+        assertTrue("pulsar_edit_vibe" in toolNames)
+        val description = VibeEditTool(TurnBudget(),CollabRig(FakePulsar(listOf(vibe("Night Drive"))), { error("unused") }, CoroutineScope(Job().apply { cancel() })).mixer)
+            .tool.descriptor.description
+        val named = Regex("""\b(?:mix|audio|section|ports?)_[a-z_]+\b""").findAll(description).map { it.value }.toSet()
+        assertTrue("mix_set" in named, "the edit tool no longer points levels and sends at mix_set")
+        assertTrue((named - toolNames).isEmpty(), "pulsar_edit_vibe names tools the AI edition lacks: ${named - toolNames}")
     }
 
     @Test

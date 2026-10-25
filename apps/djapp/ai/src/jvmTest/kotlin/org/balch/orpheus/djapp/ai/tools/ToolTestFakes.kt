@@ -21,6 +21,7 @@ import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
+import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.GenreProfile
@@ -58,7 +59,11 @@ internal class FakePulsar(override val vibeList: List<Vibe>) : PulsarFeature {
         setMood = { macroWrites += "mood" to it; stateFlow.value = stateFlow.value.copy(mood = it) },
     )
 
+    /** Runs before each apply lands, so a test can race another load in; clear it inside to run once. */
+    var beforeApply: ((Vibe) -> Unit)? = null
+
     override fun applyVibe(vibe: Vibe) {
+        beforeApply?.invoke(vibe)
         vibeFlow.value = vibe
         benchMacros = emptyMap()
         vibeLoadCount.value++
@@ -94,7 +99,7 @@ internal class CountingCapture(var fail: Boolean = false) : MixCaptureService {
     var calls = 0
         private set
 
-    override suspend fun capture(): CaptureOutcome {
+    override suspend fun capture(file: Vibe?, vibeRows: List<VibeFieldChange>): CaptureOutcome {
         calls++
         if (fail) error("disk full")
         return CaptureOutcome(true, "ok", "/tmp/capture.json", emptyList(), null, aiVibe = false)

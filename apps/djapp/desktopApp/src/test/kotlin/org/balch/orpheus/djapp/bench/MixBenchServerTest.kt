@@ -30,6 +30,7 @@ import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
+import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
 import org.balch.orpheus.features.pulsar.bench.OverviewCache
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -146,7 +147,7 @@ class MixBenchServerTest {
         val out = File(root, "app-captures/x.json")
         var calls = 0
         val service = object : MixCaptureService {
-            override suspend fun capture(): CaptureOutcome {
+            override suspend fun capture(file: Vibe?, vibeRows: List<VibeFieldChange>): CaptureOutcome {
                 calls++
                 return CaptureOutcome(true, "applied", out.path, emptyList(), null, aiVibe = true)
             }
@@ -171,7 +172,7 @@ class MixBenchServerTest {
         File(vibes, "BenchVibe.kt").writeText("val v = Vibe(name = VibeNames.BENCH)\n")
         // The service recorded a different hash at load, so the source changed since: the page must say so too.
         val service = object : MixCaptureService {
-            override suspend fun capture() = error("unused")
+            override suspend fun capture(file: Vibe?, vibeRows: List<VibeFieldChange>) = error("unused")
             override fun baselineHash(vibeName: String) = if (vibeName == "bench") "deadbeef" else null
         }
         val s = MixBenchServer(controller, feature, NoTransport, CaptureWriter(root, root), OverviewCache(root, launch = { 1 }), vibes, captureService = service)

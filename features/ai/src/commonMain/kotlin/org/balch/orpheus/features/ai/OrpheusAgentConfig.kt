@@ -315,8 +315,7 @@ class OrpheusAgentConfig(
            mix_read again for the levels, then, when the Mixer is open, small fixes with mix_set (or
            one re-apply that changes the vibe's levelDb). Mix edits are saved per vibe and return when the same unchanged
            vibe loads again, but a re-apply of an edited vibe (a levelDb change) starts with a clean mix. Call
-           mix_capture first so the user's edits reach a capture file; the History's "before apply" row can also
-           roll back to the old vibe and its edits.
+           mix_capture first so the user's edits reach a capture file.
         6. Reply with the vibe's name, the seed (for a new vibe) and a sentence or two on its sound.
         When the mix tools are available, you mix together with the user:
            - Each user message starts with bracketed lines: whether the Mixer is open, the pinned

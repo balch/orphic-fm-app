@@ -10,6 +10,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import org.balch.orpheus.features.pulsar.mkMinimalVibe
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalog
@@ -82,6 +85,22 @@ class CaptureWriterTest {
         assertFalse(back.aiVibe)
         assertEquals(vibe, Json.decodeFromString(Vibe.serializer(), back.vibeJson))
         assertNull(CaptureWriter(dir, repoRoot = null).sourceHash("Orphic Lore"))
+    }
+
+    @Test fun writerWritesVibeRows() {
+        val change = VibeFieldChange("tracks[2].engineEdm.harmonics", JsonPrimitive(0.3), JsonPrimitive(0.6))
+        val written = writer(fakeRepo()).write(vibe, listOf(row), "x", vibeRows = listOf(change))
+        val back = Json.decodeFromString(CaptureFile.serializer(), written.file.readText())
+        assertEquals(listOf(change), back.vibeRows)
+        assertEquals(listOf(change), written.capture.vibeRows)
+    }
+
+    @Test fun oldCaptureWithoutVibeRowsStillDecodes() {
+        val written = writer(fakeRepo()).write(vibe, listOf(row), "x")
+        val old = JsonObject(Json.parseToJsonElement(written.file.readText()).jsonObject - "vibeRows")
+        val back = Json.decodeFromString(CaptureFile.serializer(), old.toString())
+        assertEquals(emptyList(), back.vibeRows)
+        assertEquals(listOf(row), back.rows)
     }
 
     @Test fun captureKeepsSourceWithRepo() {

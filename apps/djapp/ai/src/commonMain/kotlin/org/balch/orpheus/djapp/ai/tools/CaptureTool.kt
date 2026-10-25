@@ -12,6 +12,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.djapp.ai.collab.CollabMixer
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
+import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
 
 @LLMDescription("What mix_capture saved.")
 @Serializable
@@ -26,6 +27,11 @@ data class MixCaptureResult(
             "clampedDb > 0: the heard gain passed 1.0, so the written volume is that many dB quieter than heard.",
     )
     val rows: List<CaptureRow> = emptyList(),
+    @property:LLMDescription(
+        "One row per changed vibe field other than the mix: path (e.g. tracks[2].engineEdm.harmonics), " +
+            "old (the file's value) and new, as JSON.",
+    )
+    val vibeRows: List<VibeFieldChange> = emptyList(),
     @property:LLMDescription(
         "True: the vibe's Kotlin source changed since the app loaded it, so old values may not match it. " +
             "Null: can't tell (no repo checkout, an AI vibe, or a load the app did not record).",
@@ -46,7 +52,8 @@ class MixCaptureTool(@Suppress("UNUSED_PARAMETER") service: MixCaptureService, p
             name = "mix_capture",
             description = """
                 Save the live mix edits (levels, pans, sends, macros and delay settings from mix_set) as vibe field changes in a
-                capture file, and return the rows. Mutes and solos are not captured.
+                capture file, and return the rows. Sound edits made with pulsar_edit_vibe are captured too, as vibe
+                field rows. Mutes and solos are not captured.
                 Only the file is written, for applying to the vibe's source later; the live mix stays as it is, and the
                 captured rows stay in the History marked captured. Works the same for catalog and AI-made vibes.
                 With no new mix changes since the last capture, or while a vibe is loading, nothing is written (ok=true, no file).
@@ -56,12 +63,12 @@ class MixCaptureTool(@Suppress("UNUSED_PARAMETER") service: MixCaptureService, p
                 // The mixer ends any hear and adds the History's CAPTURE point.
                 val o = collabMixer.capture()
                 if (o == null) MixCaptureResult(true, NOTHING_NEW)
-                else MixCaptureResult(o.ok, o.message, o.file, o.rows, o.stale, o.aiVibe)
+                else MixCaptureResult(o.ok, o.message, o.file, o.rows, o.vibeRows, o.stale, o.aiVibe)
             }
         }
     }
 
     companion object {
-        const val NOTHING_NEW = "No new mix changes since the last capture; nothing written."
+        const val NOTHING_NEW = "No new mix or sound changes since the last capture; nothing written."
     }
 }

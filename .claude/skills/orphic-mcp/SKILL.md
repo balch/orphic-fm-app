@@ -103,7 +103,7 @@ The user can mix in the app while you drive it, and the in-app agent sees their 
 - **Pins:** the user can pin a strip in the Mixer. Edits to a pinned strip are refused with `PINNED`, over MCP too, and the message says the user pinned it. Do not retry: ask the user. `mix_reset` skips pinned strips. Pins last until the user unpins or another vibe loads.
 - **Moves made mid-turn:** the in-app agent skips a control the user just moved (`USER_MOVED`). MCP has no turn, so this does not apply: your edit lands and overwrites the user's value. Read before you set, and leave a control alone if the user is on it.
 - **The Mixer need not be open** for MCP edits (`MIXER_CLOSED` is for the in-app agent), but the user sees nothing move unless it is. Say what you changed.
-- **Loads keep the mix:** change sets persist per vibe and come back when the same unchanged vibe loads again. A re-apply of an edited vibe starts clean (History's "before apply" row can roll it back, and capture files stay on disk). Pins clear on a load. Only Clear All and `mix_clear_changes` empty a change set.
+- **Loads keep the mix:** change sets persist per vibe and come back when the same unchanged vibe loads again. A re-apply of an edited vibe starts clean (capture files stay on disk). Pins clear on a load. Only Clear All and `mix_clear_changes` empty a change set.
 - Your edits flash on the strips like the in-app agent's, and the in-app agent sees them marked (Claude Code).
 
 ## Mixing workflow

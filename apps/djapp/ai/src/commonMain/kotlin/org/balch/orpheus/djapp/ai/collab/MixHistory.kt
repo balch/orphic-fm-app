@@ -2,6 +2,11 @@ package org.balch.orpheus.djapp.ai.collab
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import org.balch.orpheus.features.pulsar.bench.diffTree
+import org.balch.orpheus.features.pulsar.bench.patched
+import org.balch.orpheus.features.pulsar.bench.toTree
+import org.balch.orpheus.features.pulsar.bench.withMixerFieldsOf
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.LayerWrite
@@ -33,6 +38,20 @@ data class HistoryChange(
     val on: Boolean = true,
 ) : HistoryItem
 
+/** One edited vibe field on top of the vibe's file: [path] as in `VibeFieldChange`, with the values either side. */
+@Serializable
+@SerialName("vibe")
+data class HistoryVibeEdit(
+    override val id: Int,
+    override val atMs: Long,
+    val origin: EditOrigin,
+    val path: String,
+    val before: JsonElement,
+    val after: JsonElement,
+    val updatedMs: Long,
+    val on: Boolean = true,
+) : HistoryItem
+
 /** A user's ◆ Mark, or a CAPTURE the mix was saved at. */
 @Serializable
 enum class PointKind { MARK, CAPTURE }
@@ -48,17 +67,6 @@ data class HistoryPoint(
     val captureFile: String? = null,
 ) : HistoryItem
 
-/**
- * What an agent's or MCP's apply replaced: the vibe that played and its whole timeline, so a rollback can bring both
- * back. Its [history] can hold an earlier [BeforeApply] of its own, so applies undo one at a time.
- */
-data class BeforeApply(
-    val vibe: Vibe,
-    val history: MixHistory,
-    val origin: EditOrigin,
-    val atMs: Long,
-)
-
 /** The Mixer's edit timeline. The bench layers are always the replay of the changes that are on. */
 data class MixHistory(
     val items: List<HistoryItem> = emptyList(),
@@ -66,8 +74,6 @@ data class MixHistory(
     val pointCount: Int = 0,
     /** When the vibe this history belongs to loaded. */
     val loadedAtMs: Long = 0L,
-    /** Set when an agent or MCP apply loaded this vibe: what it replaced, below [FILE] in the timeline. */
-    val beforeApply: BeforeApply? = null,
 ) {
     val changes: List<HistoryChange> get() = items.filterIsInstance<HistoryChange>()
     val onCount: Int get() = changes.count { it.on }
@@ -78,6 +84,12 @@ data class MixHistory(
 
     /** The changes above the newest capture, the ones a capture would still save. */
     val uncaptured: List<HistoryChange> get() = items.drop(newestCaptureIndex + 1).filterIsInstance<HistoryChange>()
+
+    val vibeEdits: List<HistoryVibeEdit> get() = items.filterIsInstance<HistoryVibeEdit>()
+
+    /** Mix changes and vibe rows above the newest capture, what a capture would still save. */
+    val uncapturedCount: Int
+        get() = items.drop(newestCaptureIndex + 1).count { it is HistoryChange || it is HistoryVibeEdit }
 
     /** True when the change sits at or below the newest capture, so it is frozen. */
     fun isCaptured(id: Int): Boolean {
@@ -121,6 +133,48 @@ data class MixHistory(
         return copy(items = items + change, nextId = nextId + 1)
     }
 
+    /**
+     * Folds [edited], the vibe now playing, into the vibe rows above the newest point. Rows are one per changed field
+     * against [file] plus the rows below that point; mixer fields are never rows. Off rows are never touched.
+     */
+    fun recordVibe(origin: EditOrigin, file: Vibe, edited: Vibe, nowMs: Long): MixHistory {
+        val from = items.indexOfLast { it is HistoryPoint } + 1
+        val base = file.patched(items.take(from).onVibeRows().map { it.path to it.after })
+        val diff = diffTree(base.toTree(), edited.withMixerFieldsOf(base).toTree()).associateBy { it.path }
+        val kept = mutableListOf<HistoryItem>()
+        val refolded = mutableListOf<HistoryVibeEdit>()
+        for ((i, item) in items.withIndex()) {
+            if (i < from || item !is HistoryVibeEdit || !item.on) { kept += item; continue }
+            val d = diff[item.path] ?: continue
+            if (d.new == item.after) kept += item
+            else refolded += item.copy(origin = origin, after = d.new, updatedMs = nowMs)
+        }
+        val have = (kept.drop(from) + refolded).filterIsInstance<HistoryVibeEdit>().filter { it.on }.map { it.path }.toSet()
+        var id = nextId
+        val added = diff.values.filter { it.path !in have }.map {
+            HistoryVibeEdit(id++, nowMs, origin, it.path, it.old, it.new, nowMs)
+        }
+        return copy(items = kept + refolded + added, nextId = id)
+    }
+
+    /** The file with the on vibe rows applied in order. */
+    fun effective(file: Vibe): Vibe = file.withRows(items)
+
+    /** The vibe as it stood at the point: the on vibe rows before it. [FILE] gives [file]. */
+    fun effectiveAt(file: Vibe, pointId: Int): Vibe {
+        if (pointId == FILE) return file
+        val i = items.indexOfFirst { it.id == pointId }
+        return if (i < 0) effective(file) else file.withRows(items.take(i))
+    }
+
+    // No rows gives the file itself, not its JSON round trip, so callers can compare it with the vibe playing.
+    private fun Vibe.withRows(list: List<HistoryItem>): Vibe {
+        val rows = list.onVibeRows()
+        return if (rows.isEmpty()) this else patched(rows.map { it.path to it.after })
+    }
+
+    private fun List<HistoryItem>.onVibeRows() = filterIsInstance<HistoryVibeEdit>().filter { it.on }
+
     /** Appends a CAPTURE point that names the saved [file]; it does not count as a Mark. */
     fun capture(nowMs: Long, label: String, file: String?): MixHistory = copy(
         items = items + HistoryPoint(nextId, nowMs, label, PointKind.CAPTURE, file),
@@ -128,7 +182,16 @@ data class MixHistory(
     )
 
     fun toggle(id: Int): MixHistory =
-        copy(items = items.map { if (it is HistoryChange && it.id == id) it.copy(on = !it.on) else it })
+        copy(
+            items = items.map {
+                when {
+                    it.id != id -> it
+                    it is HistoryChange -> it.copy(on = !it.on)
+                    it is HistoryVibeEdit -> it.copy(on = !it.on)
+                    else -> it
+                }
+            },
+        )
 
     /** Marks a point; a null [label] names it "Point N" in order. */
     fun mark(nowMs: Long, label: String? = null): MixHistory = copy(
@@ -181,7 +244,5 @@ data class MixHistory(
     companion object {
         /** The id of the written file state, before any change. */
         const val FILE = 0
-        /** The id of [beforeApply]: the vibe and mix the apply replaced. */
-        const val BEFORE_APPLY = -1
     }
 }

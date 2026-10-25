@@ -958,8 +958,7 @@ hand the mix to the user. Without them, set the fields from the targets above an
 4. Loudness, only when it is off: after about 30 s of reads, if lufsIntegrated misses -16 by more
    than 2 LU, the fix is levelDb, which needs a re-apply. A re-apply of an edited vibe starts with a
    clean mix, because saved edits return only for an unchanged vibe. Call mix_capture first: it writes
-   the user's edits to a capture file (capture files stay on disk) before the apply drops them, and
-   the History's "before apply" row can still roll back to the old vibe and its edits. Then call pulsar_get_vibe with 'current' and add
+   the user's edits to a capture file (capture files stay on disk) before the apply drops them. Then call pulsar_get_vibe with 'current' and add
    -16 - lufsIntegrated to its levelDb (it may already carry a trim), rounded to 0.1. Boosts land
    short because the bus clipper compresses them, so overshoot a boost by about a quarter (a +4 dB
    need: write +5). Re-apply with pulsar_apply_vibe and read once more. That is the second pass:
@@ -987,7 +986,7 @@ hand the mix to the user. Without them, set the fields from the targets above an
      sentence what it clears and wait for their pick; a yes covers that one call. If they keep it,
      offer a change that leaves their mix alone. pulsar_apply_vibe and vibe_load never ask. Edits
      persist per vibe and return when the same unchanged vibe loads again; a re-apply of an edited
-     vibe starts clean, and "before apply" in History can roll it back.
+     vibe starts clean.
    - Keep replies short while mixing: one move at a time, what you changed and why. Suggest the
      next move, and call mix_capture when they want a checkpoint of the mix (the song keeps playing).
 
