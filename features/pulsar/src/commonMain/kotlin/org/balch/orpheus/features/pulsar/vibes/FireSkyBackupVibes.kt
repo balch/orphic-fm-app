@@ -33,21 +33,6 @@ class FireSkyOgVibe : VibeProvider {
     }
 }
 
-@Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class FireSkyCxVibe : VibeProvider {
-    override val name: VibeName = VibeNames.FIRE_SKY_CX
-
-    override val vibe: Vibe by lazy {
-        FireSkyVibeBase().vibe.copy(
-            name = name.value,
-            lick = tweakLick,
-            lickMutation = 0.60f,
-            stepCount = 32
-        )
-    }
-}
-
 /**
  * Fire Sky .5f — a flat 60 BPM Fire Sky (no half-time — every section, including
  * intro/build, runs at the same tempo, and the build's exit scratch is off) that

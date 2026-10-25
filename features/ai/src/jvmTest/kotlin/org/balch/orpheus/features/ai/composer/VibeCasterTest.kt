@@ -521,6 +521,6 @@ internal fun shippedVibeProviders(): List<VibeProvider> {
         .mapNotNull { runCatching { Class.forName(it, false, loader) }.getOrNull() }
         .filter { VibeProvider::class.java.isAssignableFrom(it) && !it.isInterface && !Modifier.isAbstract(it.modifiers) }
     val providers = classes.map { it.getDeclaredConstructor().apply { isAccessible = true }.newInstance() as VibeProvider }
-    assertTrue(providers.size >= 40, "classpath scan found only ${providers.size} shipped vibes, so the check is hollow")
+    assertTrue(providers.size >= 20, "classpath scan found only ${providers.size} shipped vibes, so the check is hollow")
     return providers
 }

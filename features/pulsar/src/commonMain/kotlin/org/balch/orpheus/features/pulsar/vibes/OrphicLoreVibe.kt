@@ -504,7 +504,7 @@ class OrphicLoreVibe : VibeProvider {
                         ),
                         role = TrackRole.Chordal(
                             chordFollow = ChordFollow.FOLLOW,
-                            // PAD + NEVER, like the organ beds in Blacktop Boogie and Black Cat: one
+                            // PAD + NEVER, like the organ beds in earlier vibes: one
                             // held tonewheel note per chord. A roll on this single-voice organ sounded
                             // plucked, each note cutting off the last.
                             comping = ChordComping(

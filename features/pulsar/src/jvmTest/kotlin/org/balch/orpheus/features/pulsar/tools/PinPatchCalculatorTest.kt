@@ -150,7 +150,7 @@ class PinPatchCalculatorTest {
      */
     @Test
     fun shipped_vibe_anchors_resolve_to_expected_patches() {
-        // DogHouseVibe track 4 EDM / SwampSwaggerVibe (comments say idx 18)
+        // DogHouseVibe track 4 EDM (comment says idx 18)
         assertEquals(17, patchIndex(0.551f))
         // ArmyStompVibe lead EDM (comment says idx 5)
         assertEquals(4, patchIndex(0.153f))
@@ -161,7 +161,7 @@ class PinPatchCalculatorTest {
     }
 
     /**
-     * BellTollsVibe and DailyDriftVibe both pin `0.582f`, which sits within
+     * BellTollsVibe pins `0.582f`, which sits within
      * 0.0002 of bucket 19's lower edge (0.58211). It is the one shipped anchor
      * whose result depends on the previously loaded patch, so it is pinned
      * separately rather than folded into the stable set above.

@@ -41,7 +41,7 @@ class CaptureWriterTest {
     }
 
     @Test fun findsVibeInMultiVibeFile() {
-        assertEquals("CompLabVibe.kt", findVibeSource(vibesDir, "Comp Jazz")?.name)
+        assertEquals("FireSkyBackupVibes.kt", findVibeSource(vibesDir, "Fire Sky .5f")?.name)
         assertEquals("FifthSymphonyVibe.kt", findVibeSource(vibesDir, "Symphony No. 5 in C Minor")?.name)
         assertNull(findVibeSource(vibesDir, "No Such Vibe"))
     }

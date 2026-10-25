@@ -182,7 +182,7 @@ Panel glyph to preset key to Pulsar field (`features/voice/.../VoiceColumn.kt`, 
     as phase modulation at index `morph * 8`. `fmShape` sets the modulator wave: 0 sine, 0.5
     triangle, 1 square. Pick `fmFreeHz` to copy a panel LFO or free-running source, `fmRatio` to
     copy partner-voice FM. The panel's actual source signal is not reproduced.
-  - examples in the repo: `ModPioneerVibe.kt`, `StayAsleepVibe.kt` (`engineId = OrpheusEngineId.OSC`).
+  - examples in the repo: `StayAsleepVibe.kt` (`engineId = OrpheusEngineId.OSC`).
 - Chaos engines (200-204) render on Pulsar and use the same three knobs, pins honored.
 
 ### Effects

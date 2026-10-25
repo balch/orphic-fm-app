@@ -33,10 +33,7 @@ import kotlin.test.assertTrue
  *     at least one section. Catches accidental regressions during refactors.
  *
  * The catalog list below mirrors the active `@ContributesIntoSet(... binding<VibeProvider>())`
- * registrations under `features/pulsar/.../vibes/`. Note: some vibe files (e.g.
- * `GarageBlitzVibe.kt`, `CompLabVibe.kt`) keep their class bodies inside
- * block-comment `/* … */` markers — those classes are not part of the live
- * catalog and intentionally not exercised here.
+ * registrations under `features/pulsar/.../vibes/`.
  *
  * If you add a new VibeProvider and the count assertion fires, append it to
  * [allVibes] below.
