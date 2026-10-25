@@ -1181,13 +1181,15 @@ struct OrpheusEngine {
     // Density is a pattern-GENERATION input, so a change here regenerates the affected
     // track's pattern at the section boundary; see regenerate_track_density().
     std::atomic<float> pulsar_section_track_density[kMaxSections * kNumPulsarTracks] = {};
-    // Per-section per-track breathe cycle: three trailing families on the same
+    // Per-section per-track breathe cycle: four trailing families on the same
     // per-track index. 0 is the natural "off" for all three, so unlike density they
     // need no sentinel — bars 0 means the track does not breathe this section.
     // See pulsar_breathe.h; bars are loop-units (16 steps), floor and span are 0-1.
     std::atomic<float> pulsar_section_track_breathe_bars[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<float> pulsar_section_track_breathe_floor[kMaxSections * kNumPulsarTracks] = {};
     std::atomic<float> pulsar_section_track_breathe_timbre_span[kMaxSections * kNumPulsarTracks] = {};
+    // Nonzero = the phase glides through each bar instead of stepping at the bar line.
+    std::atomic<float> pulsar_section_track_breathe_smooth[kMaxSections * kNumPulsarTracks] = {};
     // Per-section per-track pinned hits: a 64-bit step mask as four 16-bit words, since a
     // float carries integers exactly only to 2^24. Index (s * kNumPulsarTracks + t) * 4 + w,
     // word w = mask bits [16w, 16w + 15]. All-zero = no pin, so it needs no sentinel.

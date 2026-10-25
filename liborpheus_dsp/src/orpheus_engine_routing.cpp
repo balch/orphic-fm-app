@@ -1445,7 +1445,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         // The three breathe families share the "section_track_breathe_" prefix, so each
         // compare has to run past it into the field name or the first branch swallows
-        // all three. See pulsar_breathe.h for what they mean.
+        // the rest. See pulsar_breathe.h for what they mean.
         else if (std::strncmp(symbol, "section_track_breathe_bars_", 27) == 0) {
             int idx = std::atoi(symbol + 27);
             if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
@@ -1460,6 +1460,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             int idx = std::atoi(symbol + 34);
             if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
                 engine->pulsar_section_track_breathe_timbre_span[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_track_breathe_smooth_", 29) == 0) {
+            int idx = std::atoi(symbol + 29);
+            if (idx >= 0 && idx < kMaxSections * kNumPulsarTracks)
+                engine->pulsar_section_track_breathe_smooth[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_transitions_", 20) == 0) {
             int idx = std::atoi(symbol + 20);

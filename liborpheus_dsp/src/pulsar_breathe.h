@@ -40,6 +40,17 @@ inline float breathe_phase(int bars_since_entry, int bars) {
     return static_cast<float>(m) / static_cast<float>(bars);
 }
 
+// The smooth cycle (breathe_smooth): the phase also moves through the bar, so bars 1
+// rises and falls once per bar and longer cycles glide instead of stepping.
+// bar_fraction is 0..1 through the current loop-unit.
+inline float breathe_phase_smooth(int bars_since_entry, float bar_fraction, int bars) {
+    if (bars <= 0) return 0.0f;
+    int m = bars_since_entry % bars;
+    if (m < 0) m += bars;
+    const float f = bar_fraction < 0.0f ? 0.0f : (bar_fraction > 1.0f ? 1.0f : bar_fraction);
+    return (static_cast<float>(m) + f) / static_cast<float>(bars);
+}
+
 // EAR-TUNE(user reviews; Claude drafted): the breathe curve. Pure raised cosine,
 // starting at the TOP on section entry (the hook sinks first). Swap the shape here.
 // Returns the normalized envelope: 1 at the top of the swell, 0 at the bottom.

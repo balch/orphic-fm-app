@@ -2170,6 +2170,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                         engine->pulsar_section_track_breathe_floor[tbase + t].load(std::memory_order_relaxed));
                     sec.track_breathe_timbre_span[t] = clamp01(
                         engine->pulsar_section_track_breathe_timbre_span[tbase + t].load(std::memory_order_relaxed));
+                    sec.track_breathe_smooth[t] =
+                        engine->pulsar_section_track_breathe_smooth[tbase + t].load(std::memory_order_relaxed) > 0.5f;
                     // Pinned hits: four 16-bit words, clamped before the cast so a bad
                     // wire value (NaN included) cannot spill into a neighbouring word.
                     uint64_t hits = 0;
@@ -2855,6 +2857,11 @@ static void resolve_breathe_block(PulsarState* state, float sample_rate) {
     // Same guard as the rest of the track-override family: the bank keeps a previous
     // vibe's values on the null-arrangement path, so it must not be read there.
     const bool have_section = arr.active && cur >= 0 && cur < arr.section_count;
+    // How far track 0 is through its loop: the smooth phase's position inside the bar.
+    const PulsarTrackState& clock = state->tracks[0];
+    const float bar_fraction = clock.step_count > 0
+        ? std::clamp(static_cast<float>(clock.playhead) / static_cast<float>(clock.step_count), 0.0f, 1.0f)
+        : 0.0f;
     uint8_t mask = 0;
     for (int t = 0; t < kNumPulsarTracks; t++) {
         const int bars = have_section ? arr.sections[cur].track_breathe_bars[t] : 0;
@@ -2869,8 +2876,10 @@ static void resolve_breathe_block(PulsarState* state, float sample_rate) {
         }
         const SectionParam& sec = arr.sections[cur];
         mask |= static_cast<uint8_t>(1u << t);
-        state->breathe_env_target[t] =
-            orpheus::breathe_envelope(orpheus::breathe_phase(state->breathe_bar, bars));
+        const float phase = sec.track_breathe_smooth[t]
+            ? orpheus::breathe_phase_smooth(state->breathe_bar, bar_fraction, bars)
+            : orpheus::breathe_phase(state->breathe_bar, bars);
+        state->breathe_env_target[t] = orpheus::breathe_envelope(phase);
         state->breathe_floor[t] = sec.track_breathe_floor[t];
         state->breathe_span[t]  = sec.track_breathe_timbre_span[t];
     }
@@ -6534,8 +6543,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Breathe swell ──
         // Scales the rendered buffer rather than the mix gain below, so the dry mix,
         // the bus stem, the fx sends and the level meter cannot disagree about how far
-        // the track has sunk. One-poled per SAMPLE: the phase only moves at bar
-        // boundaries, and a per-block step of the full swing would click. Skipped
+        // the track has sunk. One-poled per SAMPLE: the phase moves at bar boundaries
+        // (or each step, when smooth), and a per-block step of the full swing would click. Skipped
         // outright when this track has no breathe override — that skip, not a computed
         // 1.0, is what keeps a no-breathe vibe bit-identical.
         if (state->breathe_mask & (1u << t)) {

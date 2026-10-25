@@ -325,7 +325,7 @@ class PulsarSectionProgressionPushTest {
             probability = 0.15f, durationBarsMin = 1, durationBarsMax = 3,
             intensity = 0.8f, distance = 0.35f,
         )
-        val breathe = TrackSectionOverride(breatheBars = 4, breatheFloor = 0.2f, breatheTimbreSpan = 0.5f)
+        val breathe = TrackSectionOverride(breatheBars = 4, breatheFloor = 0.2f, breatheTimbreSpan = 0.5f, breatheSmooth = true)
 
         val vibe = pushTestVibe(
             sections = listOf(
@@ -384,10 +384,12 @@ class PulsarSectionProgressionPushTest {
         assertEquals(breathe.breatheBars.toFloat(), floatPort("section_track_breathe_bars_$overriddenIdx"))
         assertEquals(breathe.breatheFloor, floatPort("section_track_breathe_floor_$overriddenIdx"))
         assertEquals(breathe.breatheTimbreSpan, floatPort("section_track_breathe_timbre_span_$overriddenIdx"))
+        assertEquals(1f, floatPort("section_track_breathe_smooth_$overriddenIdx"))
         val plainIdx = 0 * 8 + 3
         assertEquals(0f, floatPort("section_track_breathe_bars_$plainIdx"))
         assertEquals(0f, floatPort("section_track_breathe_floor_$plainIdx"))
         assertEquals(0f, floatPort("section_track_breathe_timbre_span_$plainIdx"))
+        assertEquals(0f, floatPort("section_track_breathe_smooth_$plainIdx"))
     }
 
     /**
@@ -515,7 +517,7 @@ class PulsarSectionProgressionPushTest {
         for (field in 21..25) {
             assertEquals(0f, floatPort("section_data_${0 * stride + field}"), "weather field $field")
         }
-        for (field in listOf("bars", "floor", "timbre_span")) {
+        for (field in listOf("bars", "floor", "timbre_span", "smooth")) {
             assertEquals(0f, floatPort("section_track_breathe_${field}_0"), "breathe $field")
         }
     }
