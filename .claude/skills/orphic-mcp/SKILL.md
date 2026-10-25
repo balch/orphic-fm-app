@@ -44,6 +44,7 @@ disown
 - `pulsar_cast_vibe`: rolls an 8-track skeleton. Args `mode` (BED_FIXED or ALL_ROLLED; omit for the user's saved mode), `seed` (omit for a random roll), `styleTags` (rock, electro, ambient, reggae, psych, funk) and `pins` (`{track, role, engine}`). Returns `seed`, `summary` (one line per track) and `vibeJson`.
 - `pulsar_apply_vibe`, `pulsar_get_vibe`, `pulsar_vibe_schema`, the other `pulsar_*` tools, `start_composition`: the rest of the vibe-authoring tools.
 - `agent_errors`: the in-app agent's last 100 failures, newest last: AGENT (LLM/API error or a crash in the run), TOOL (a tool call that threw or had bad arguments) and VIBE (`pulsar_apply_vibe` rejections). `clear: true` empties it after reading. MCP only; the in-app agent never sees it.
+- `ai_cost`: what the in-app AI has spent, per song (the vibe playing when each turn ended) per model, plus recent rows: one per agent turn or ideas refresh, with real provider token counts and a USD estimate from `AiPrices` (`core/ai/.../AiPricing.kt`). `song` filters. MCP only. The same rows are in `~/.config/orpheus-dj/ai-usage/turns.jsonl`; `python3 -I scripts/ai/cost_report.py` prints the per-song baseline from that file without the app running.
 - `audio_analyze`: record the next 0.5-15 s (default 5) and measure each stem: level, third-octave spectrum, envelope, onsets, low end and stereo. `stems` and `kinds` narrow it.
 - `audio_capture`: record the next 0.5-30 s (default 10) to one WAV per stem plus `stems.json`, for offline analysis. `stems` narrows it.
 - The 13 stems:

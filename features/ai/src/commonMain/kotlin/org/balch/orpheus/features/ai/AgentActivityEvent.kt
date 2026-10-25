@@ -7,13 +7,15 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.ai.usage.AiTurnUsage
 
 /** A live agent activity event for the VIBE panel feed. */
 sealed interface AgentActivityEvent {
     /** [args] is the call's arguments as JSON, when known. */
     data class ToolStarted(val tool: String, val args: String? = null) : AgentActivityEvent
     data class ToolCompleted(val tool: String) : AgentActivityEvent
-    data class Assistant(val text: String) : AgentActivityEvent
+    /** [usage] is the turn this reply ends, when it made an LLM call. */
+    data class Assistant(val text: String, val usage: AiTurnUsage? = null) : AgentActivityEvent
     data class Reasoning(val text: String) : AgentActivityEvent
 
     /** Agent/LLM failure (e.g. an API 4xx). Consumers must end their "generating" state. */
@@ -32,7 +34,7 @@ class AgentActivityEventBus {
 
     fun emitToolStarted(tool: String, args: String? = null) { _events.tryEmit(AgentActivityEvent.ToolStarted(tool, args)) }
     fun emitToolCompleted(tool: String) { _events.tryEmit(AgentActivityEvent.ToolCompleted(tool)) }
-    fun emitAssistant(text: String) { _events.tryEmit(AgentActivityEvent.Assistant(text)) }
+    fun emitAssistant(text: String, usage: AiTurnUsage? = null) { _events.tryEmit(AgentActivityEvent.Assistant(text, usage)) }
     fun emitReasoning(text: String) { _events.tryEmit(AgentActivityEvent.Reasoning(text)) }
     fun emitError(message: String) { _events.tryEmit(AgentActivityEvent.Error(message)) }
 }

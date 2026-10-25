@@ -41,9 +41,9 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
@@ -58,6 +58,7 @@ import org.balch.orpheus.djapp.ai.ActionKind
 import org.balch.orpheus.djapp.ai.DjAiFeedItem
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.copyPlainText
+import org.balch.orpheus.features.ai.usage.AiTurnUsage
 
 /** How close (px) the previous tail's bottom edge must be to the viewport bottom to count as "at the bottom". */
 private const val FOLLOW_TAIL_SLACK_PX = 24
@@ -168,7 +169,7 @@ internal fun ChatFeed(
                     ChatInk.tool,
                     singleLine = true,
                 )
-                is DjAiFeedItem.Reply -> ReplyRow(item.text)
+                is DjAiFeedItem.Reply -> ReplyRow(item.text, item.usage)
                 is DjAiFeedItem.Move -> OneLine(
                     "${item.origin.who()}: ${item.label} ${item.before} → ${item.after}",
                     if (item.origin == EditOrigin.USER) ChatInk.move else ChatInk.agentMove,
@@ -249,12 +250,17 @@ private fun RequestBubble(text: String, queued: Boolean = false) {
     }
 }
 
-/** The agent's reply: rendered Markdown at chat size, under a small marker. */
+/** The agent's reply: rendered Markdown at chat size, under a small marker, with the turn's cost below it. */
 @Composable
-private fun ReplyRow(text: String) {
+private fun ReplyRow(text: String, usage: AiTurnUsage?) {
     Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.Top) {
         Text("✦", style = chatStyle(LegibleText.CHAT_BODY, ChatInk.accent), modifier = Modifier.padding(end = 8.dp))
-        ChatMarkdown(text, chatStyle(LegibleText.CHAT_BODY), Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            ChatMarkdown(text, chatStyle(LegibleText.CHAT_BODY), Modifier.fillMaxWidth())
+            if (usage != null) {
+                Text(turnCostLabel(usage), style = chatStyle(LegibleText.SECONDARY, ChatInk.dim), modifier = Modifier.padding(top = 2.dp))
+            }
+        }
     }
 }
 

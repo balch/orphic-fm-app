@@ -46,6 +46,7 @@ import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.djapp.ai.OrphicFiles
 import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.usage.AiCostLedger
 import org.balch.orpheus.features.ai.AgentErrorLog
 
 /**
@@ -56,11 +57,13 @@ import org.balch.orpheus.features.ai.AgentErrorLog
 interface McpToolAccess {
     val mcpToolProviders: Set<ToolProvider>
     val agentErrorLog: AgentErrorLog
+    val aiCostLedger: AiCostLedger
 }
 
 /**
- * The AI edition's loopback MCP server: every koog [ToolProvider] in FeatureScope plus [AgentErrorsTool] and
- * [MixClearChangesTool], served at `http://127.0.0.1:<port>/mcp` with a bearer token, `mcp.json` under [OrphicFiles.root].
+ * The AI edition's loopback MCP server: every koog [ToolProvider] in FeatureScope plus [AgentErrorsTool],
+ * [MixClearChangesTool] and [AiCostTool], served at `http://127.0.0.1:<port>/mcp` with a bearer token, `mcp.json` under
+ * [OrphicFiles.root].
  * Starts with the app, stops on process exit; [McpEndpointState] carries the endpoint once it listens.
  */
 @SingleIn(AppScope::class)
@@ -87,7 +90,8 @@ class OrphicMcpServer(
     ) {
         val access = holder.featureGraph as? McpToolAccess
             ?: error("FeatureGraph does not merge McpToolAccess; is :apps:djapp:ai on the graph's classpath?")
-        access.mcpToolProviders + AgentErrorsTool(access.agentErrorLog) + MixClearChangesTool(collabMixer)
+        access.mcpToolProviders + AgentErrorsTool(access.agentErrorLog) + MixClearChangesTool(collabMixer) +
+            AiCostTool(access.aiCostLedger)
     }
 
     init {

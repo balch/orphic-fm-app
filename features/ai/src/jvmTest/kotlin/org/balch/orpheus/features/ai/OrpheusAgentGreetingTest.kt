@@ -18,6 +18,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
+import org.balch.orpheus.features.ai.usage.AiUsageMeter
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -83,6 +84,7 @@ class OrpheusAgentGreetingTest {
             scope = featureScope,
             greetingMode = mode,
             errorLog = AgentErrorLog(),
+            usageMeter = AiUsageMeter(emptySet()),
         )
         return agent to {
             featureScope.cancel()

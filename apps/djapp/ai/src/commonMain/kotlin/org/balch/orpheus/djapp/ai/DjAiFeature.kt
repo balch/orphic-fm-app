@@ -8,6 +8,7 @@ import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.ideas.Idea
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.features.ai.composer.CastMode
+import org.balch.orpheus.features.ai.usage.AiTurnUsage
 
 /** Lifecycle phase of the DJ AI chat. */
 enum class DjAiPhase {
@@ -74,10 +75,11 @@ sealed interface DjAiFeedItem {
         val summary: String? = null,
     ) : DjAiFeedItem
 
-    /** The agent's reply, which ends its turn. */
+    /** The agent's reply, which ends its turn; [usage] is what that turn spent, when known. */
     data class Reply(
         override val id: Long,
         val text: String,
+        val usage: AiTurnUsage? = null,
     ) : DjAiFeedItem
 
     /** A mixer move by [origin], e.g. "BASS level" from [before] to [after]; a drag updates one row in place. */

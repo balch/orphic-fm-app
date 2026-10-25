@@ -28,6 +28,7 @@ import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.params.LLMParams
+import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.serialization.kotlinx.toKotlinxJsonObject
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
@@ -72,6 +73,8 @@ import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
 import org.balch.orpheus.features.ai.session.AgentSessionStats
 import org.balch.orpheus.features.ai.session.SessionUsage
+import org.balch.orpheus.features.ai.usage.AiTurnOutcome
+import org.balch.orpheus.features.ai.usage.AiUsageMeter
 import kotlin.time.ExperimentalTime
 
 private const val ANTHROPIC_THINKING_BUDGET = 4096   // ≥1024, counts toward maxTokens; tune for latency/quality
@@ -148,6 +151,7 @@ class OrpheusAgent(
     private val scope: FeatureCoroutineScope,
     private val greetingMode: AgentGreetingMode,
     private val errorLog: AgentErrorLog,
+    private val usageMeter: AiUsageMeter,
 ) {
     private val logger = logging("OrpheusAgent")
 
@@ -313,6 +317,7 @@ class OrpheusAgent(
     @OptIn(ExperimentalCoroutinesApi::class)
     fun restart() {
         // Cancel the current run before re-arming, regardless of greeting mode.
+        usageMeter.endTurn(AiTurnOutcome.STOPPED)
         currentAgentJob?.cancel()
         currentAgentJob = null
 
@@ -375,7 +380,7 @@ class OrpheusAgent(
         val strategy = config.agentStrategy(
             name = "OrpheusAgent",
             onAssistantMessage = { message ->
-                agentActivityEventBus.emitAssistant(message)
+                agentActivityEventBus.emitAssistant(message, usageMeter.endTurn(AiTurnOutcome.REPLIED))
                 send(agentMessageToState(message))
                 val userPrompt = userIntent.first()
                 userIntent.resetReplayCache()
@@ -408,6 +413,7 @@ class OrpheusAgent(
             // Error handling handler
             handleEvents {
                 onAgentExecutionFailed { ctx ->
+                    usageMeter.endTurn(if (ctx.error is CancellationException) AiTurnOutcome.STOPPED else AiTurnOutcome.FAILED)
                     if (ctx.error is CancellationException) {
                         logger.debug { "Agent execution cancelled" }
                     } else {
@@ -429,6 +435,13 @@ class OrpheusAgent(
             // Usage tracking handler
             handleEvents {
                 onToolCallCompleted { _ -> trackToolCall() }
+                // Real token counts per LLM call: batched calls carry them on the response, streamed ones on the End frame.
+                onLLMCallCompleted { ctx ->
+                    ctx.response?.let { usageMeter.onCall(ctx.model.id, ctx.model.provider, it.metaInfo) }
+                }
+                onLLMStreamingFrameReceived { ctx ->
+                    (ctx.streamFrame as? StreamFrame.End)?.let { usageMeter.onCall(ctx.model.id, ctx.model.provider, it.metaInfo) }
+                }
             }
         }.run(prompt)
     }.onEach {
