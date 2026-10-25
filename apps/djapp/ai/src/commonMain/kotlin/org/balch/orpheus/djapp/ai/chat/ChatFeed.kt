@@ -71,7 +71,7 @@ private val TOP_FADE = 40.dp
 /** The accept and decline labels of an [ActionKind] card. */
 internal fun ActionKind.buttons(): Pair<String, String> = when (this) {
     ActionKind.OPEN_MIXER -> "Open Mixer" to "Not now"
-    ActionKind.CONFIRM_WIPE -> "Clear and apply" to "Keep my mix"
+    ActionKind.CONFIRM_WIPE -> "Clear All" to "Keep my mix"
 }
 
 /**

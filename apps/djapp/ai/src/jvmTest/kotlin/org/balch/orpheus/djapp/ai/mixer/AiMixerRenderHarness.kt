@@ -106,7 +106,6 @@ class AiMixerRenderHarness {
             file = "~/.config/orpheus-dj/mix-captures/rust-belt-sunrise-1.json",
             rows = 4,
             stale = false,
-            appliedToAiVibe = false,
         ),
         notice = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope.",
         pins = setOf(3),

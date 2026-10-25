@@ -302,7 +302,7 @@ private fun WideHeader(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 MixerButton(changesLabel(state.historyChangeCount), onChanges, Modifier.testTag(HISTORY_TAG))
                 MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
-                MixerButton("Reset to file", actions.reset)
+                MixerButton("Clear All", actions.reset)
             }
         }
         if (!oneRow) BusReadout(meters, textAlign = TextAlign.Start)
@@ -587,7 +587,7 @@ internal fun ChangesFooter(state: AiMixerUiState, actions: AiMixerActions) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
-            MixerButton("Reset to file", actions.reset)
+            MixerButton("Clear All", actions.reset)
         }
         state.capture?.let { CaptureResult(it, actions.dismissCapture, Modifier.fillMaxWidth()) }
         state.notice?.let { NoticeLine(it, actions.dismissNotice, Modifier.fillMaxWidth()) }

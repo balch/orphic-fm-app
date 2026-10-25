@@ -1,38 +1,42 @@
 package org.balch.orpheus.djapp.ai.collab
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.features.pulsar.bench.DelayFx
 import org.balch.orpheus.features.pulsar.bench.Macro
 
 /** Who made an edit to the mixer. */
+@Serializable
 enum class EditOrigin { USER, AGENT, MCP }
 
 /** One mixer control an edit can touch. [track] is null for controls that belong to no track. */
+@Serializable
 sealed interface MixControl {
     val track: Int?
 
-    data class Level(override val track: Int) : MixControl
-    data class Pan(override val track: Int) : MixControl
-    data class Send(override val track: Int, val reverb: Boolean) : MixControl
-    data class Mute(override val track: Int) : MixControl
-    data class Solo(override val track: Int) : MixControl
-    data class MacroKnob(val macro: Macro) : MixControl {
+    @Serializable @SerialName("level") data class Level(override val track: Int) : MixControl
+    @Serializable @SerialName("pan") data class Pan(override val track: Int) : MixControl
+    @Serializable @SerialName("send") data class Send(override val track: Int, val reverb: Boolean) : MixControl
+    @Serializable @SerialName("mute") data class Mute(override val track: Int) : MixControl
+    @Serializable @SerialName("solo") data class Solo(override val track: Int) : MixControl
+    @Serializable @SerialName("macro") data class MacroKnob(val macro: Macro) : MixControl {
         override val track: Int? = null
     }
     /** The Pulsar delay's time A, time B or feedback; [Send] is a track's delay send. */
-    data class DelaySetting(val param: DelayFx) : MixControl {
+    @Serializable @SerialName("delay") data class DelaySetting(val param: DelayFx) : MixControl {
         override val track: Int? = null
     }
-    data object Section : MixControl {
+    @Serializable @SerialName("section") data object Section : MixControl {
         override val track: Int? = null
     }
-    data object Loop : MixControl {
+    @Serializable @SerialName("loop") data object Loop : MixControl {
         override val track: Int? = null
     }
-    data object EditScope : MixControl {
+    @Serializable @SerialName("scope") data object EditScope : MixControl {
         override val track: Int? = null
     }
     /** A reset of the mix edits as a whole; its "after" is always "file". */
-    data object ResetToFile : MixControl {
+    @Serializable @SerialName("clearAll") data object ClearAll : MixControl {
         override val track: Int? = null
     }
 }
@@ -53,5 +57,5 @@ fun MixControl.label(trackNames: (Int) -> String): String = when (this) {
     MixControl.Section -> "section"
     MixControl.Loop -> "loop"
     MixControl.EditScope -> "edit scope"
-    MixControl.ResetToFile -> "reset to file"
+    MixControl.ClearAll -> "clear all"
 }

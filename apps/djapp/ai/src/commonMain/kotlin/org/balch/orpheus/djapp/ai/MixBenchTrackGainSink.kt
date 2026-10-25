@@ -93,7 +93,7 @@ class MixBenchTrackGainSink(
     override fun setLevel(t: Int, level: Float) = send(MixControl.Level(t)) { setHeardLevelDb(t, levelToDb(level), Scope.VIBE) }
 
     /** Clears levels, mutes and solos only; the agent's pans, sends and macros stay. */
-    override fun reset() = send(MixControl.ResetToFile, shown = "file") { resetLevels() }
+    override fun reset() = send(MixControl.ClearAll, shown = "file") { resetLevels() }
 
     private fun <T> send(control: MixControl, shown: String? = null, edit: suspend MixBenchController.() -> T) {
         edits.trySend { collabMixer.edit(EditOrigin.USER, control, shown, edit) }

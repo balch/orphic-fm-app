@@ -120,7 +120,7 @@ internal fun HistoryTimeline(state: AiMixerUiState, actions: AiMixerActions, now
     val rows = state.history
     val changeCount = rows.count { it is ChangeRow }
     Column(modifier) {
-        NowLine(state.onCount, changeCount)
+        NowLine(nowDetail(rows, state.onCount))
         // Rows stay oldest-first in state, so a point's "after" is still the rows that follow it there.
         for (i in rows.indices.reversed()) {
             when (val row = rows[i]) {
@@ -134,7 +134,8 @@ internal fun HistoryTimeline(state: AiMixerUiState, actions: AiMixerActions, now
                     actions = actions,
                     rolling = rolling == row.id,
                     onRolling = { rolling = it },
-                    diamond = MixerInk.changed,
+                    diamond = if (row.capture) MixerInk.accentSoft else MixerInk.changed,
+                    border = if (row.capture) MixerInk.accentSoft else MixerInk.changed,
                 )
             }
         }
@@ -241,6 +242,7 @@ private fun ChangeLine(row: ChangeRow, nowMs: Long, actions: AiMixerActions) {
                     } else if (row.on) {
                         WritesToggle(row, open) { open = !open }
                     }
+                    if (row.captured) Text("captured", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.accentSoft), textAlign = TextAlign.End)
                 }
             }
             if (open && row.writes.isNotEmpty()) {
@@ -298,6 +300,7 @@ private fun PointLine(
     onRolling: (Int?) -> Unit,
     last: Boolean = false,
     diamond: Color,
+    border: Color = if (id == MixHistory.FILE) MixerInk.line else MixerInk.changed,
     /** The rollback question; null asks to throw away the [changesAfter] changes. A point with its own text has no hear. */
     confirm: String? = null,
 ) {
@@ -312,7 +315,7 @@ private fun PointLine(
                 .padding(vertical = 3.dp)
                 .clip(shape)
                 .background(MixerInk.card)
-                .border(1.dp, if (id == MixHistory.FILE) MixerInk.line else MixerInk.changed, shape)
+                .border(1.dp, border, shape)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -385,11 +388,11 @@ private fun HistoryButton(text: String, onClick: () -> Unit, modifier: Modifier 
 }
 
 @Composable
-private fun NowLine(on: Int, total: Int) {
-    val text = remember(on, total) {
+private fun NowLine(detail: String) {
+    val text = remember(detail) {
         buildAnnotatedString {
             withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MixerInk.text)) { append("Now") }
-            withStyle(SpanStyle(color = MixerInk.dim)) { append(" · $on of $total changes on") }
+            withStyle(SpanStyle(color = MixerInk.dim)) { append(detail) }
         }
     }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

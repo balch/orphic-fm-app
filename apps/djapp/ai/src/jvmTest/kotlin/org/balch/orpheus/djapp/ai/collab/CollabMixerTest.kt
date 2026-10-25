@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.djapp.ai.tools.FakePulsar
+import org.balch.orpheus.djapp.ai.tools.MemoryChangeStore
 import org.balch.orpheus.djapp.ai.tools.vibe
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.bench.Macro
@@ -38,11 +39,13 @@ class CollabMixerTest {
         val moves: List<MixMove>,
     )
 
-    private suspend fun TestScope.rig(): Rig {
-        val pulsar = FakePulsar(listOf(vibe("Night Drive"), vibe("Low Tide").copy(energy = 0.9f)))
+    private val night = vibe("Night Drive")
+
+    private suspend fun TestScope.rig(store: MixChangeStore = NoMixChangeStore()): Rig {
+        val pulsar = FakePulsar(listOf(night, vibe("Low Tide").copy(energy = 0.9f)))
         val controller = MixBenchController(pulsar, synth, NoTap, backgroundScope).also { it.start() }
         val collab = MixCollab().apply { setMixerVisible(true) }
-        val mixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope)
+        val mixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope, changeStore = { store })
         val moves = mutableListOf<MixMove>()
         backgroundScope.launch { collab.moves.collect { moves += it } }
         runCurrent()
@@ -153,11 +156,11 @@ class CollabMixerTest {
         val r = rig()
         r.pulsar.actions.setEnergy(0.8f)
         runCurrent()
-        r.mixer.edit(EditOrigin.USER, MixControl.ResetToFile, shown = "file") { resetToFile() }
+        r.mixer.edit(EditOrigin.USER, MixControl.ClearAll, shown = "file") { resetToFile() }
         advanceUntilIdle()
         runCurrent()
         assertEquals(0.5f, r.pulsar.macroKnob(Macro.ENERGY))
-        assertEquals(listOf(MixControl.MacroKnob(Macro.ENERGY), MixControl.ResetToFile), r.moves.map { it.control })
+        assertEquals(listOf(MixControl.MacroKnob(Macro.ENERGY), MixControl.ClearAll), r.moves.map { it.control })
         assertTrue(r.collab.userChanged.value.isEmpty())
     }
 
@@ -213,6 +216,114 @@ class CollabMixerTest {
         r.collab.togglePin(3)
         runCurrent()
         assertEquals(setOf(3), r.collab.pins.value)
+    }
+
+    @Test
+    fun changeSetSurvivesVibeSwitch() = runTest {
+        val r = rig(MemoryChangeStore())
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
+        r.mixer.markPoint()
+        val saved = r.mixer.history.value.items
+        r.pulsar.applyVibeByName("Low Tide")
+        runCurrent()
+        assertTrue(r.mixer.history.value.items.isEmpty())
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[1])
+
+        r.pulsar.applyVibeByName("Night Drive")
+        runCurrent()
+        assertEquals(saved, r.mixer.history.value.items)
+        assertEquals(1, r.mixer.history.value.pointCount)
+        assertEquals(r.mixer.history.value.layers(), r.controller.layers.value)
+        assertEquals(-4f, r.controller.layers.value.vibe.levelDb[1])
+    }
+
+    @Test
+    fun restoredChangeSetReplaysAfterLoadFollows() = runTest {
+        val store = MemoryChangeStore()
+        val first = rig(store)
+        first.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
+        val saved = first.mixer.history.value.items
+
+        // A relaunch: a new mixer restores the set at its first claim and replays it once the controller follows.
+        val r = rig(store)
+        runCurrent()
+        assertEquals(saved, r.mixer.history.value.items)
+        assertEquals(-4f, r.controller.layers.value.vibe.levelDb[1])
+
+        // An edit that claims the load first plays the restored set before its own block.
+        r.pulsar.applyVibeByName("Low Tide")
+        runCurrent()
+        r.pulsar.applyVibeByName("Night Drive")
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -6f) }
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(2)) { setHeardLevelDb(2, -2f) }
+        runCurrent()
+        assertEquals("-4.0 dB", r.moves.first { it.after == "-6.0 dB" }.before)
+        assertEquals(listOf(MixControl.Level(1), MixControl.Level(2)), r.mixer.history.value.changes.map { it.control })
+        assertEquals(r.mixer.history.value.layers(), r.controller.layers.value)
+        assertEquals(-6f, r.controller.layers.value.vibe.levelDb[1])
+        assertEquals(-2f, r.controller.layers.value.vibe.levelDb[2])
+    }
+
+    @Test
+    fun changedVibeStartsEmpty() = runTest {
+        val store = MemoryChangeStore()
+        val first = rig(store)
+        first.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
+        // The vibe was edited since: the saved set is for the old content.
+        store.sets["Night Drive"] = night.copy(bpm = 96f) to first.mixer.history.value
+
+        val r = rig(store)
+        runCurrent()
+        assertTrue(r.mixer.history.value.items.isEmpty())
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[1])
+        assertTrue("Night Drive" !in store.sets)
+    }
+
+    @Test
+    fun clearAllKeepsPinnedTracks() = runTest {
+        val r = rig(MemoryChangeStore())
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(4)) { setHeardLevelDb(4, -6f) }
+        r.collab.togglePin(4)
+        r.mixer.edit(EditOrigin.USER, MixControl.ClearAll, shown = "file") { resetToFile(keep = r.collab.pins.value) }
+        assertEquals(listOf(MixControl.Level(4)), r.mixer.history.value.changes.map { it.control })
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[1])
+        assertEquals(-6f, r.controller.layers.value.vibe.levelDb[4])
+    }
+
+    @Test
+    fun clearChangesIgnoresPins() = runTest {
+        val store = MemoryChangeStore()
+        val r = rig(store)
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(4)) { setHeardLevelDb(4, -6f) }
+        r.collab.togglePin(4)
+        r.mixer.markPoint()
+        assertTrue(r.mixer.hear(MixHistory.FILE))
+
+        assertTrue(r.mixer.clearChanges())
+        assertTrue(r.mixer.history.value.items.isEmpty())
+        assertNull(r.mixer.hearing.value)
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[1])
+        assertEquals(0f, r.controller.layers.value.vibe.levelDb[4])
+        assertTrue("Night Drive" !in store.sets)
+        assertEquals(setOf(4), r.collab.pins.value, "pins are left alone")
+    }
+
+    @Test
+    fun clearChangesForOtherVibeRemovesStoreOnly() = runTest {
+        val store = MemoryChangeStore()
+        val r = rig(store)
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(1)) { setHeardLevelDb(1, -4f) }
+        r.pulsar.applyVibeByName("Low Tide")
+        runCurrent()
+        r.mixer.edit(EditOrigin.USER, MixControl.Level(2)) { setHeardLevelDb(2, -2f) }
+        assertTrue("Night Drive" in store.sets)
+
+        assertTrue(r.mixer.clearChanges("Night Drive"))
+        assertTrue("Night Drive" !in store.sets)
+        assertEquals(1, r.mixer.history.value.changes.size, "the playing vibe's set stays")
+        assertEquals(-2f, r.controller.layers.value.vibe.levelDb[2])
     }
 
     @Test

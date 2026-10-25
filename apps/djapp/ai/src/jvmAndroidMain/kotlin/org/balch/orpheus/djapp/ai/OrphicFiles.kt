@@ -9,4 +9,5 @@ import java.io.File
 class OrphicFiles(val root: File, val mcpJsonHint: String) {
     val mixCaptures = File(root, "mix-captures")
     val stemCaptures = File(root, "stem-captures")
+    val mixChanges = File(root, "mix-changes")
 }

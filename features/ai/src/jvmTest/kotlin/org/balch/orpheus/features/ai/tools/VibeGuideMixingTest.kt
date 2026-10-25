@@ -80,7 +80,7 @@ class VibeGuideMixingTest {
 
     @Test
     fun `guide mentions pins and skips and the wipe confirmation`() {
-        listOf("PINNED", "USER_MOVED", "WIPE_UNCONFIRMED", "Clear and apply", "Keep my mix", "never ask them to keep their hands off")
+        listOf("PINNED", "USER_MOVED", "WIPE_UNCONFIRMED", "Clear All", "Keep my mix", "never ask them to keep their hands off")
             .forEach { assertTrue(Regex(it.split(" ").joinToString("""\s+""") { w -> Regex.escape(w) }).containsMatchIn(handover), "hand-over lost \"$it\"") }
     }
 

@@ -80,12 +80,12 @@ class ChatColumnRenderTest {
 
     @Test
     fun actionCardShowsBothButtons() = scene {
-        for (label in listOf("Open Mixer", "Not now", "Clear and apply", "Keep my mix")) {
+        for (label in listOf("Open Mixer", "Not now", "Clear All", "Keep my mix")) {
             assertTrue(texts().any { it == label }, "no $label button in ${texts()}")
         }
         // The answered card's buttons are off, and it says which was chosen.
         assertEquals(true, disabled("Keep my mix"))
-        assertEquals(true, disabled("Clear and apply"))
+        assertEquals(true, disabled("Clear All"))
         assertEquals(false, disabled("Open Mixer"))
         assertTrue(texts().any { it == "You chose: Keep my mix" }, "${texts()}")
     }

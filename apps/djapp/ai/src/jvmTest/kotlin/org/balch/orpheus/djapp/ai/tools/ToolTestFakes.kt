@@ -11,7 +11,10 @@ import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.djapp.ai.collab.CollabEvents
 import org.balch.orpheus.djapp.ai.collab.CollabMixer
 import org.balch.orpheus.djapp.ai.collab.DjVibeApplyGuard
+import org.balch.orpheus.djapp.ai.collab.MixChangeStore
 import org.balch.orpheus.djapp.ai.collab.MixCollab
+import org.balch.orpheus.djapp.ai.collab.MixHistory
+import org.balch.orpheus.djapp.ai.collab.NoMixChangeStore
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
@@ -94,7 +97,27 @@ internal class CountingCapture(var fail: Boolean = false) : MixCaptureService {
     override suspend fun capture(): CaptureOutcome {
         calls++
         if (fail) error("disk full")
-        return CaptureOutcome(true, "ok", "/tmp/capture.json", emptyList(), null, aiVibe = false, appliedToAiVibe = false)
+        return CaptureOutcome(true, "ok", "/tmp/capture.json", emptyList(), null, aiVibe = false)
+    }
+}
+
+/** Change sets kept in memory; one saved for a vibe that no longer equals the loaded one reads as none. */
+internal class MemoryChangeStore : MixChangeStore {
+    val sets = mutableMapOf<String, Pair<Vibe, MixHistory>>()
+
+    override fun get(vibe: Vibe): MixHistory? {
+        val (saved, history) = sets[vibe.name] ?: return null
+        if (saved == vibe) return history
+        sets.remove(vibe.name)
+        return null
+    }
+
+    override fun put(vibe: Vibe, history: MixHistory) {
+        if (history.items.isEmpty()) sets.remove(vibe.name) else sets[vibe.name] = vibe to history
+    }
+
+    override fun remove(vibeName: String) {
+        sets.remove(vibeName)
     }
 }
 
@@ -105,9 +128,11 @@ internal class CollabRig(
     scope: CoroutineScope,
     val capture: CountingCapture = CountingCapture(),
     nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    val changeStore: MixChangeStore = NoMixChangeStore(),
+    captureService: () -> MixCaptureService = { capture },
 ) {
     val collab = MixCollab().apply { setMixerVisible(true) }
     val events = CollabEvents()
-    val mixer = CollabMixer(controller, { pulsar }, collab, scope, nowMs)
-    val guard = DjVibeApplyGuard(collab, mixer, events, capture)
+    val mixer = CollabMixer(controller, { pulsar }, collab, scope, nowMs, { changeStore }, captureService)
+    val guard = DjVibeApplyGuard(collab, mixer, events)
 }

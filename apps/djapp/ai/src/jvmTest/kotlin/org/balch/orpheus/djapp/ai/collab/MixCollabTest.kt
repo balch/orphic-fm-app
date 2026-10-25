@@ -3,6 +3,7 @@ package org.balch.orpheus.djapp.ai.collab
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
@@ -162,6 +163,15 @@ class MixCollabTest {
     }
 
     @Test
+    fun aVibeLoadLetsTheTurnBeClaimedAgain() {
+        collab.beginTurn("Brighter")
+        val first = assertNotNull(collab.claimTurn())
+        assertNull(collab.claimTurn())
+        collab.clearForNewVibe()
+        assertEquals(first, collab.claimTurn())
+    }
+
+    @Test
     fun vibeLoadClearsUserMovedThisTurn() {
         collab.setMixerVisible(true)
         collab.beginTurn()
@@ -222,7 +232,7 @@ class MixCollabTest {
         collab.beginTurn()
         assertFalse(collab.consumeWipeConfirmation(), "a new turn drops the old confirmation")
         collab.confirmWipe()
-        collab.record(EditOrigin.USER, MixControl.ResetToFile, "edited", "file")
+        collab.record(EditOrigin.USER, MixControl.ClearAll, "edited", "file")
         assertFalse(collab.consumeWipeConfirmation(), "the user's own reset spends it")
     }
 
@@ -235,18 +245,18 @@ class MixCollabTest {
     }
 
     @Test
-    fun onlyTheMixCountsTowardALoadsWipe() {
+    fun onlyTheMixCountsTowardAResetsWipe() {
         collab.record(EditOrigin.USER, MixControl.Section, "groove", "drop")
         collab.record(EditOrigin.USER, MixControl.Loop, "off", "on")
         collab.record(EditOrigin.USER, MixControl.EditScope, "whole vibe", "section")
-        assertEquals(0, collab.userChangesWipedByLoad())
+        assertEquals(0, collab.userChangesClearedByReset())
         collab.record(EditOrigin.USER, MixControl.Level(2), "0.0 dB", "-1.0 dB")
         collab.record(EditOrigin.USER, MixControl.Pan(2), "C", "L20")
         collab.record(EditOrigin.USER, MixControl.Send(2, reverb = false), "0.10", "0.30")
         collab.record(EditOrigin.USER, MixControl.Mute(3), "off", "on")
         collab.record(EditOrigin.USER, MixControl.Solo(4), "off", "on")
         collab.record(EditOrigin.USER, MixControl.MacroKnob(Macro.SPACE), "0.50", "0.70")
-        assertEquals(6, collab.userChangesWipedByLoad())
+        assertEquals(6, collab.userChangesClearedByReset())
     }
 
     @Test
@@ -273,10 +283,10 @@ class MixCollabTest {
         collab.togglePin(4)
         // A reset clears mutes, solos and macro knobs too; only the pinned strip stays, so it is not counted.
         assertEquals(3, collab.userChangesClearedByReset())
-        collab.record(EditOrigin.AGENT, MixControl.ResetToFile, "edited", "file")
+        collab.record(EditOrigin.AGENT, MixControl.ClearAll, "edited", "file")
         assertEquals(setOf(MixControl.Send(4, reverb = true), MixControl.Mute(4)), collab.userChanged.value)
         collab.record(EditOrigin.USER, MixControl.Level(2), "0.0 dB", "-2.0 dB")
-        collab.record(EditOrigin.USER, MixControl.ResetToFile, "edited", "file")
+        collab.record(EditOrigin.USER, MixControl.ClearAll, "edited", "file")
         // The user's own reset leaves the pinned strip's changes too.
         assertEquals(setOf(MixControl.Send(4, reverb = true), MixControl.Mute(4)), collab.userChanged.value)
     }

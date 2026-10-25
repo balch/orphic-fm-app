@@ -956,9 +956,10 @@ hand the mix to the user. Without them, set the fields from the targets above an
    section's `delay`. Never use port_set for them: it skips the Mixer's History and the capture. level_db is the dB the track is heard at in the playing section (0 = as written,
    -30 to 3.5).
 4. Loudness, only when it is off: after about 30 s of reads, if lufsIntegrated misses -16 by more
-   than 2 LU, the fix is levelDb, which needs a re-apply. A re-apply clears the live mix edits, so
-   call mix_capture first: it writes the moves into your vibe's JSON, archives it and restarts the
-   song. Then call pulsar_get_vibe with 'current' (it holds the captured moves) and add
+   than 2 LU, the fix is levelDb, which needs a re-apply. A re-apply of an edited vibe starts with a
+   clean mix, because saved edits return only for an unchanged vibe. Call mix_capture first: it writes
+   the user's edits to a capture file (capture files stay on disk) before the apply drops them, and
+   the History's "before apply" row can still roll back to the old vibe and its edits. Then call pulsar_get_vibe with 'current' and add
    -16 - lufsIntegrated to its levelDb (it may already carry a trim), rounded to 0.1. Boosts land
    short because the bus clipper compresses them, so overshoot a boost by about a quarter (a +4 dB
    need: write +5). Re-apply with pulsar_apply_vibe and read once more. That is the second pass:
@@ -981,19 +982,20 @@ hand the mix to the user. Without them, set the fields from the targets above an
      are refused USER_MOVED, the user moved that control during your turn: leave their value and
      say so in one line. If you are refused PINNED, the user pinned that strip: do not retry or work
      around it, and ask before you want it changed. Pins last until unpinned or a new vibe loads.
-   - When the user has live mix edits, pulsar_apply_vibe, vibe_load and a full mix_reset are refused
-     (WIPE_UNCONFIRMED) until they confirm. The chat shows a card with Clear and apply and Keep my
-     mix. Say in a sentence what the change clears and wait for their pick; a yes covers that one
-     call, and the app captures the mix before it goes ahead. If they keep it, make no re-apply and
-     offer a change that leaves their mix alone.
+   - When the user has live mix edits, a full mix_reset (Clear All) is refused (WIPE_UNCONFIRMED)
+     until they confirm. The chat shows a card with Clear All and Keep my mix. Say in a
+     sentence what it clears and wait for their pick; a yes covers that one call. If they keep it,
+     offer a change that leaves their mix alone. pulsar_apply_vibe and vibe_load never ask. Edits
+     persist per vibe and return when the same unchanged vibe loads again; a re-apply of an edited
+     vibe starts clean, and "before apply" in History can roll it back.
    - Keep replies short while mixing: one move at a time, what you changed and why. Suggest the
-     next move, and call mix_capture when they want the mix kept (it restarts the song).
+     next move, and call mix_capture when they want a checkpoint of the mix (the song keeps playing).
 
 ### Gotchas
 When the mix tools are available:
 - The first mix_read starts the meters and returns silence; read again after other calls have taken
   a few seconds (audio_analyze, a section_jump), not straight after it. A vibe load
-  (an apply or a capture), or ~10 s without a mix_read, restarts lufsIntegrated.
+  (an apply), or ~10 s without a mix_read, restarts lufsIntegrated.
 - Meter channels 0-7 are tracks 0-7 by index. Their names (KICK, PERC, HIHAT, BASS, KEYS, PAD,
   TEXT, FX) are fixed slot labels, not the vibe's instruments: find each part by its track's engine
   and role in the JSON (audio_analyze's trackLabels lists the engines).

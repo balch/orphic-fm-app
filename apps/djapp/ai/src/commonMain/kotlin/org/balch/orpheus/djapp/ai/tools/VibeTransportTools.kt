@@ -90,15 +90,14 @@ class VibeLoadTool(
             resultType = typeToken<VibeLoadResult>(),
             name = "vibe_load",
             description = """
-                Load a vibe by name (see vibe_list) at once, with no transition. Clears mix edits, mutes, solos and pins,
-                so when the user has changed the mix it is refused (WIPE_UNCONFIRMED) until they confirm.
+                Load a vibe by name (see vibe_list) at once, with no transition. Clears pins, mutes and solos; the
+                History keeps each vibe's mix edits and brings them back when it loads again.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeLoadArgs): VibeLoadResult = guarded({ VibeLoadResult(false, it) }) {
                 val pulsar = pulsarFeatureProvider()
                 val name = pulsar.vibeNames.firstOrNull { it.equals(args.name.trim(), ignoreCase = true) }
                     ?: badArg("no vibe named \"${args.name}\"; see vibe_list")
-                wipeGuard.wipeRefusal()?.let { return@guarded VibeLoadResult(false, it.reason, refusal = it.refusal.name) }
                 wipeGuard.beforeApply()
                 val loaded = runCatching { withContext(dispatchers.main) { pulsar.applyVibeByName(name) } }
                     .onFailure { wipeGuard.applyFailed() }

@@ -831,7 +831,7 @@ class DjAiViewModelTest {
         assertEquals("This clears your mix: 3 changes.", card.text)
 
         rig.chat.onAction(card.id, accept = true)
-        assertEquals("Yes, clear my mix and apply.", rig.sent.last().displayText)
+        assertEquals("Yes, clear my mix.", rig.sent.last().displayText)
         // Confirmed after beginTurn, which clears any confirmation: the agent's turn can spend it.
         assertTrue(rig.collab.consumeWipeConfirmation())
     }
@@ -844,11 +844,11 @@ class DjAiViewModelTest {
         val card = rig.state.value.feed.filterIsInstance<DjAiFeedItem.Action>().single()
         assertEquals("This clears your mix: 1 change.", card.text)
         rig.chat.onAction(card.id, accept = true)
-        assertEquals(listOf("Yes, clear my mix and apply."), rig.state.value.queued)
+        assertEquals(listOf("Yes, clear my mix."), rig.state.value.queued)
         assertTrue(!rig.collab.consumeWipeConfirmation(), "the running turn is not authorised")
 
         rig.reply("Want me to clear it?")
-        assertEquals("Yes, clear my mix and apply.", rig.sent.last().displayText)
+        assertEquals("Yes, clear my mix.", rig.sent.last().displayText)
         assertTrue(rig.collab.consumeWipeConfirmation())
     }
 
@@ -860,7 +860,7 @@ class DjAiViewModelTest {
         rig.reply("Go ahead?")
         val card = rig.state.value.feed.filterIsInstance<DjAiFeedItem.Action>().single()
         rig.chat.onAction(card.id, accept = false)
-        assertEquals("Keep my mix; don't re-apply.", rig.sent.last().displayText)
+        assertEquals("Keep my mix.", rig.sent.last().displayText)
         assertTrue(!rig.collab.consumeWipeConfirmation())
     }
 

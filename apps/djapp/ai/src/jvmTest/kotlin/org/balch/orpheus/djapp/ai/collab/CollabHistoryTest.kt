@@ -18,6 +18,7 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.djapp.ai.mixer.f2
 import org.balch.orpheus.djapp.ai.tools.CollabRig
 import org.balch.orpheus.djapp.ai.tools.FakePulsar
+import org.balch.orpheus.djapp.ai.tools.MemoryChangeStore
 import org.balch.orpheus.djapp.ai.tools.vibe
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.LayerField
@@ -37,9 +38,9 @@ class CollabHistoryTest {
 
     private var clock = 1_000L
 
-    private suspend fun TestScope.rig(): Rig {
+    private suspend fun TestScope.rig(store: MixChangeStore = NoMixChangeStore()): Rig {
         val controller = MixBenchController(pulsar, synth, NoMeterTap, backgroundScope).also { it.start() }
-        val collab = CollabRig(pulsar, { controller }, backgroundScope, nowMs = { clock })
+        val collab = CollabRig(pulsar, { controller }, backgroundScope, nowMs = { clock }, changeStore = store)
         runCurrent()
         return Rig(controller, collab)
     }
@@ -226,7 +227,7 @@ class CollabHistoryTest {
         r.collab.collab.togglePin(4)
         r.mixer.markPoint()
 
-        r.mixer.edit(EditOrigin.USER, MixControl.ResetToFile, shown = "file") { resetToFile(keep = r.collab.collab.pins.value) }
+        r.mixer.edit(EditOrigin.USER, MixControl.ClearAll, shown = "file") { resetToFile(keep = r.collab.collab.pins.value) }
 
         val c = r.history.changes.single()
         assertEquals(MixControl.Level(4), c.control)
@@ -240,7 +241,7 @@ class CollabHistoryTest {
         r.level(2, -4f)
         assertTrue(r.mixer.toggleChange(r.history.changes.single().id))
 
-        r.mixer.edit(EditOrigin.USER, MixControl.ResetToFile, shown = "file") { resetToFile(keep = r.collab.collab.pins.value) }
+        r.mixer.edit(EditOrigin.USER, MixControl.ClearAll, shown = "file") { resetToFile(keep = r.collab.collab.pins.value) }
 
         assertTrue(r.history.changes.isEmpty())
         r.assertReplay()
@@ -253,7 +254,7 @@ class CollabHistoryTest {
         assertTrue(r.mixer.toggleChange(r.history.changes.single().id))
         r.collab.collab.togglePin(2)
 
-        r.mixer.edit(EditOrigin.USER, MixControl.ResetToFile, shown = "file") { resetToFile(keep = r.collab.collab.pins.value) }
+        r.mixer.edit(EditOrigin.USER, MixControl.ClearAll, shown = "file") { resetToFile(keep = r.collab.collab.pins.value) }
 
         assertFalse(r.history.changes.single().on)
         r.assertReplay()
@@ -279,6 +280,8 @@ class CollabHistoryTest {
     @Test
     fun macroRowBeforeIsTheEarlierMixerValue() = runTest {
         val r = rig()
+        val start = pulsar.macroKnob(Macro.MOOD)
+        val startShown = f2(start)
         r.mixer.edit(EditOrigin.USER, MixControl.MacroKnob(Macro.MOOD)) { setMacro(Macro.MOOD, 0.3f) }
         clock += 10_000L
         pulsar.actions.setMood(0.2f)
@@ -286,10 +289,11 @@ class CollabHistoryTest {
 
         r.mixer.edit(EditOrigin.USER, MixControl.MacroKnob(Macro.MOOD)) { setMacro(Macro.MOOD, 0.7f) }
 
-        val c = r.history.changes.last()
-        assertEquals(f2(0.3f), c.before)
+        // The second edit folds into the first row, which keeps the first before.
+        val c = r.history.changes.single()
+        assertEquals(startShown, c.before)
         assertTrue(r.mixer.toggleChange(c.id))
-        assertEquals(0.3f, pulsar.macroKnob(Macro.MOOD))
+        assertEquals(start, pulsar.macroKnob(Macro.MOOD))
     }
 
     @Test
@@ -390,31 +394,154 @@ class CollabHistoryTest {
 
     private fun Rig.pointLabels() = history.items.filterIsInstance<HistoryPoint>().map { it.label }
 
-    @Test
-    fun agentTurnDropsAPointBeforeItsFirstMove() = runTest {
-        val r = rig()
-        r.collab.collab.setMixerVisible(true)
-        r.collab.collab.beginTurn("Pull the pads back")
-        r.level(1, -3f, EditOrigin.AGENT)
-        r.mixer.edit(EditOrigin.AGENT, MixControl.Pan(2)) { setPan(2, 0.4f) }
+    private fun Rig.captureLabels() =
+        history.items.filterIsInstance<HistoryPoint>().filter { it.kind == PointKind.CAPTURE }.map { it.label }
 
-        assertEquals(listOf("before: Pull the pads back"), r.pointLabels())
-        assertTrue(r.history.items.first() is HistoryPoint)
-        assertEquals(2, r.history.changes.size)
-        // A new turn drops its own point.
+    private suspend fun TestScope.agentTurn(r: Rig, label: String, block: suspend () -> Unit) {
+        r.collab.collab.beginTurn(label)
+        // A real turn outlasts the collector, which must see it begin.
+        runCurrent()
+        block()
         r.collab.collab.endTurn()
-        r.collab.collab.beginTurn("Brighter")
-        r.level(3, -2f, EditOrigin.AGENT)
-        assertEquals(listOf("before: Pull the pads back", "before: Brighter"), r.pointLabels())
+        runCurrent()
     }
 
     @Test
-    fun agentTurnWithoutMovesDropsNoPoint() = runTest {
+    fun agentTurnBracketsChangesWithCaptures() = runTest {
         val r = rig()
-        r.collab.collab.setMixerVisible(true)
-        r.collab.collab.beginTurn("Nothing")
-        r.level(1, 0f, EditOrigin.AGENT)
-        assertTrue(r.history.items.isEmpty())
+        r.level(4, -1f)
+        agentTurn(r, "Pull the pads back") {
+            r.level(1, -3f, EditOrigin.AGENT)
+            r.mixer.edit(EditOrigin.AGENT, MixControl.Pan(2)) { setPan(2, 0.4f) }
+        }
+        val kinds = r.history.items.map { item ->
+            when (item) {
+                is HistoryPoint -> "${item.kind} ${item.label}"
+                is HistoryChange -> "change ${item.origin}"
+            }
+        }
+        assertEquals(
+            listOf("change USER", "CAPTURE before: Pull the pads back", "change AGENT", "change AGENT", "CAPTURE after: Pull the pads back"),
+            kinds,
+        )
+        assertEquals(2, r.collab.capture.calls)
+    }
+
+    @Test
+    fun queuedTurnsEachGetTheirOwnCaptures() = runTest {
+        val r = rig()
+        val c = r.collab.collab
+        c.beginTurn("A")
+        runCurrent()
+        r.level(1, -3f, EditOrigin.AGENT)
+        // As DjAiChat queues the next turn: no suspension between the two.
+        c.endTurn()
+        c.beginTurn("B")
+        r.level(2, -3f, EditOrigin.AGENT)
+        runCurrent()
+        c.endTurn()
+        runCurrent()
+        val kinds = r.history.items.map { if (it is HistoryPoint) it.label else "change" }
+        // "after: A" is the newest row, so B needs no before-capture.
+        assertEquals(listOf("change", "after: A", "change", "after: B"), kinds)
+    }
+
+    @Test
+    fun aTurnWithoutALabelStillCaptures() = runTest {
+        val r = rig()
+        r.level(4, -1f)
+        r.collab.collab.beginTurn(null)
+        runCurrent()
+        r.level(1, -3f, EditOrigin.AGENT)
+        r.collab.collab.endTurn()
+        runCurrent()
+        assertEquals(listOf("before: song reference", "after: song reference"), r.captureLabels())
+    }
+
+    @Test
+    fun noBeforeCaptureWhenNewestIsCapture() = runTest {
+        val r = rig()
+        r.level(4, -1f)
+        r.mixer.capture()
+        agentTurn(r, "Brighter") { r.level(1, -3f, EditOrigin.AGENT) }
+        assertEquals(listOf(CollabMixer.CAPTURED, "after: Brighter"), r.captureLabels())
+    }
+
+    @Test
+    fun noBeforeCaptureOnCleanHistory() = runTest {
+        val r = rig()
+        agentTurn(r, "Brighter") { r.level(1, -3f, EditOrigin.AGENT) }
+        assertEquals(listOf("after: Brighter"), r.captureLabels())
+    }
+
+    @Test
+    fun turnWithoutNetChangeAddsNoAfterCapture() = runTest {
+        val r = rig()
+        r.level(4, -1f)
+        agentTurn(r, "Nothing") { r.level(1, 0f, EditOrigin.AGENT) }
+        assertEquals(listOf("before: Nothing"), r.captureLabels())
+    }
+
+    @Test
+    fun mcpEditsNeverAutoCapture() = runTest {
+        val r = rig()
+        r.level(4, -1f)
+        agentTurn(r, "Pull the pads back") { r.level(1, -3f, EditOrigin.MCP) }
+        assertTrue(r.captureLabels().isEmpty())
+        assertEquals(0, r.collab.capture.calls)
+    }
+
+    @Test
+    fun beforeApplyRollbackKeepsEachVibesStore() = runTest {
+        val store = MemoryChangeStore()
+        val r = rig(store)
+        r.level(2, -4f)
+        val aSet = r.history
+
+        agentApply(r, "Low Tide")
+        r.level(5, -2f)
+        val bSet = r.history
+
+        assertTrue(r.mixer.rollBack(MixHistory.BEFORE_APPLY))
+        runCurrent()
+        assertEquals("Night Drive", pulsar.vibeFlow.value.name)
+        assertEquals(-4f, r.controller.layers.value.vibe.levelDb[2])
+        assertEquals(aSet, store.sets["Night Drive"]?.second)
+        assertEquals(bSet, store.sets["Low Tide"]?.second)
+    }
+
+    @Test
+    fun aTurnThatAppliesThenMixesCapturesOnTheNewVibe() = runTest {
+        val store = MemoryChangeStore()
+        val r = rig(store)
+        r.level(2, -4f)
+        agentTurn(r, "Swap and fix") {
+            agentApply(r, "Low Tide")
+            r.level(5, -2f, EditOrigin.AGENT)
+        }
+        assertEquals("Low Tide", pulsar.vibeFlow.value.name)
+        val newest = assertIs<HistoryPoint>(r.history.items.last())
+        assertEquals(PointKind.CAPTURE, newest.kind)
+        assertEquals("after: Swap and fix", newest.label)
+        val old = assertNotNull(store.sets["Night Drive"]).second
+        assertTrue(old.items.none { it is HistoryPoint && it.kind == PointKind.CAPTURE })
+    }
+
+    @Test
+    fun aTurnThatLeavesForAnotherVibeWritesNoAfterOnIt() = runTest {
+        val store = MemoryChangeStore()
+        val r = rig(store)
+        // Low Tide keeps an uncaptured user row in the store.
+        agentApply(r, "Low Tide")
+        r.level(3, -5f)
+        agentApply(r, "Night Drive")
+        agentTurn(r, "Then leave") {
+            r.level(1, -3f, EditOrigin.AGENT)
+            agentApply(r, "Low Tide")
+        }
+        assertEquals("Low Tide", pulsar.vibeFlow.value.name)
+        assertEquals(MixControl.Level(3), r.history.changes.single().control)
+        assertTrue(r.captureLabels().none { it.startsWith("after:") })
     }
 
     @Test
@@ -431,6 +558,7 @@ class CollabHistoryTest {
         val r = rig()
         r.collab.collab.setMixerVisible(true)
         r.collab.collab.beginTurn("Make the pads wash over everything and the drums duck underneath")
+        r.level(4, -1f)
         r.level(1, -3f, EditOrigin.AGENT)
         val label = r.pointLabels().single()
         assertEquals("before: Make the pads wash over everything and…", label)
@@ -442,6 +570,7 @@ class CollabHistoryTest {
         val r = rig()
         r.collab.collab.setMixerVisible(true)
         r.collab.collab.beginTurn("Pads down\nbass up")
+        r.level(4, -1f)
         r.level(1, -3f, EditOrigin.AGENT)
         assertEquals(listOf("before: Pads down bass up"), r.pointLabels())
     }

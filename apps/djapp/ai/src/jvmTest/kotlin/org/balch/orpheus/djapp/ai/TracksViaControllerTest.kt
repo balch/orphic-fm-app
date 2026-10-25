@@ -332,7 +332,7 @@ class TracksViaControllerTest {
         assertEquals(0f, c.layers.value.vibe.levelDb[2])
         val move = moves.last()
         assertEquals(EditOrigin.USER, move.origin)
-        assertEquals(MixControl.ResetToFile, move.control)
+        assertEquals(MixControl.ClearAll, move.control)
         assertEquals("edited" to "file", move.before to move.after)
     }
 }

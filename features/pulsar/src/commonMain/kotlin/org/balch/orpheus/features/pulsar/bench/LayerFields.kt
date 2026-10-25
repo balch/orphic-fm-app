@@ -1,36 +1,41 @@
 package org.balch.orpheus.features.pulsar.bench
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 /** One value a bench edit can move: a vibe-layer or section-layer level, pan, send ratio, macro or delay setting. */
+@Serializable
 sealed interface LayerField {
     val track: Int?
     val section: Int?
 
-    data class VibeLevel(override val track: Int) : LayerField { override val section: Int? get() = null }
-    data class VibePan(override val track: Int) : LayerField { override val section: Int? get() = null }
-    data class VibeReverb(override val track: Int) : LayerField { override val section: Int? get() = null }
-    data class VibeDelay(override val track: Int) : LayerField { override val section: Int? get() = null }
-    data class VibeMacro(val macro: Macro) : LayerField {
+    @Serializable @SerialName("VibeLevel") data class VibeLevel(override val track: Int) : LayerField { override val section: Int? get() = null }
+    @Serializable @SerialName("VibePan") data class VibePan(override val track: Int) : LayerField { override val section: Int? get() = null }
+    @Serializable @SerialName("VibeReverb") data class VibeReverb(override val track: Int) : LayerField { override val section: Int? get() = null }
+    @Serializable @SerialName("VibeDelay") data class VibeDelay(override val track: Int) : LayerField { override val section: Int? get() = null }
+    @Serializable @SerialName("VibeMacro") data class VibeMacro(val macro: Macro) : LayerField {
         override val track: Int? get() = null
         override val section: Int? get() = null
     }
-    data class SectionLevel(override val section: Int, override val track: Int) : LayerField
-    data class SectionReverb(override val section: Int, override val track: Int) : LayerField
-    data class SectionDelay(override val section: Int, override val track: Int) : LayerField
-    data class SectionMacro(override val section: Int, val macro: Macro) : LayerField {
+    @Serializable @SerialName("SectionLevel") data class SectionLevel(override val section: Int, override val track: Int) : LayerField
+    @Serializable @SerialName("SectionReverb") data class SectionReverb(override val section: Int, override val track: Int) : LayerField
+    @Serializable @SerialName("SectionDelay") data class SectionDelay(override val section: Int, override val track: Int) : LayerField
+    @Serializable @SerialName("SectionMacro") data class SectionMacro(override val section: Int, val macro: Macro) : LayerField {
         override val track: Int? get() = null
     }
     /** The delay's time or feedback for the whole vibe; [VibeDelay] is a track's send. */
-    data class VibeDelayFx(val param: DelayFx) : LayerField {
+    @Serializable @SerialName("VibeDelayFx") data class VibeDelayFx(val param: DelayFx) : LayerField {
         override val track: Int? get() = null
         override val section: Int? get() = null
     }
     /** The delay's time or feedback in one section; [SectionDelay] is a track's send. */
-    data class SectionDelayFx(override val section: Int, val param: DelayFx) : LayerField {
+    @Serializable @SerialName("SectionDelayFx") data class SectionDelayFx(override val section: Int, val param: DelayFx) : LayerField {
         override val track: Int? get() = null
     }
 }
 
 /** A field's value before and after an edit; null reads as "as written". */
+@Serializable
 data class LayerWrite(val before: Float?, val after: Float?)
 
 private const val TRACKS = 8

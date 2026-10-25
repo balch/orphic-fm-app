@@ -11,6 +11,7 @@ import org.balch.orpheus.djapp.ai.collab.HistoryItem
 import org.balch.orpheus.djapp.ai.collab.HistoryPoint
 import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.collab.MixHistory
+import org.balch.orpheus.djapp.ai.collab.PointKind
 import org.balch.orpheus.djapp.ai.collab.label
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
@@ -56,7 +57,6 @@ data class MixerCapture(
     val file: String?,
     val rows: Int,
     val stale: Boolean?,
-    val appliedToAiVibe: Boolean,
 )
 
 @Immutable
@@ -120,10 +120,26 @@ data class ChangeRow(
     val covered: Boolean,
     /** The file values Capture writes because of this change: those that would differ with it off. */
     val writes: List<CaptureRow> = emptyList(),
+    /** At or below the newest capture checkpoint, so it is saved in a capture file. */
+    val captured: Boolean = false,
 ) : HistoryRow
 
 @Immutable
-data class PointRow(val id: Int, val label: String, val atMs: Long) : HistoryRow
+data class PointRow(val id: Int, val label: String, val atMs: Long, val capture: Boolean = false) : HistoryRow
+
+/** The on changes above the newest capture row, or null when the timeline has no capture. */
+fun uncapturedOn(rows: List<HistoryRow>): Int? {
+    val at = rows.indexOfLast { it is PointRow && it.capture }
+    if (at < 0) return null
+    return rows.drop(at + 1).count { it is ChangeRow && it.on }
+}
+
+/** The Now line after "Now": " · N uncaptured of M changes on" once a capture exists, else " · N of M changes on". */
+fun nowDetail(rows: List<HistoryRow>, onCount: Int): String {
+    val total = rows.count { it is ChangeRow }
+    val uncaptured = uncapturedOn(rows) ?: return " · $onCount of $total changes on"
+    return " · $uncaptured uncaptured of $total changes on"
+}
 
 private fun EditOrigin.who() = when (this) {
     EditOrigin.USER -> "you"
@@ -171,8 +187,9 @@ private fun historyRow(
             on = item.on,
             covered = h.isCovered(item.id),
             writes = writesOf(item),
+            captured = h.isCaptured(item.id),
         )
-        is HistoryPoint -> PointRow(item.id, item.label, item.atMs)
+        is HistoryPoint -> PointRow(item.id, item.label, item.atMs, item.kind == PointKind.CAPTURE)
     }
 
 /** The header's changes button text. */

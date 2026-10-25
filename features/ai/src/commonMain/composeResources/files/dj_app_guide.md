@@ -50,12 +50,12 @@ or "0.94 corr means it is nearly mono; the pads could spread wider".
 
 **Reading them.** The first `mix_read` starts the meters and returns silence; read again after a
 few seconds of other work (`audio_analyze` records for the seconds you ask, so it is the wait). A
-vibe load, a Capture, or about 10 s with no `mix_read` restarts `lufsIntegrated`.
+vibe load, or about 10 s with no `mix_read` restarts `lufsIntegrated`.
 
 **Acting on them.** One fix at a time, then read again:
 - **Too loud or too quiet** (integrated off -16 by more than 2 LU): every vibe is levelled to
   about -16 so the playlist plays at one level. On an AI vibe, the fix is the vibe's `levelDb`:
-  `mix_capture`, then `pulsar_get_vibe` with 'current', add -16 minus `lufsIntegrated` to its
+  `pulsar_get_vibe` with 'current', add -16 minus `lufsIntegrated` to its
   `levelDb`, and re-apply ("The mix pass" in `pulsar_vibe_guide` section 11 has the details). On a shipped vibe, say
   so and suggest the developer trims it; pulling every fader down is a poor substitute.
 - **Past knee over 3%, or pre-clip red**: the limiter is squashing the mix. Pull the loudest
@@ -67,14 +67,13 @@ vibe load, a Capture, or about 10 s with no `mix_read` restarts `lufsIntegrated`
 - The user judges the sound; the numbers only guide it. Do not chase a number the user likes the
   sound of.
 
-## Reset to file
+## Clear All
 
 Puts the mix back to the vibe as it was loaded: levels, pans, sends, section edits, mutes, solos
-and the four macro knobs. Pinned strips keep their own edits, mutes and solos. `mix_reset` does
-the same; it is refused until the user confirms when it would clear changes they made.
-
-"File" means the vibe as it is loaded now. After a Capture on an AI vibe, that is the captured
-version (see below), so Reset to file goes back to the captured mix, not the original one.
+and the four macro knobs, and it empties the vibe's saved changes. Pinned strips keep their own
+edits, mutes and solos. `mix_reset` does the same; it is refused until the user confirms when it
+would clear changes they made. `mix_clear_changes` is MCP-only (Claude Code uses it once the rows
+are in the vibe's source); you cannot call it.
 
 ## Capture
 
@@ -82,22 +81,21 @@ Saves the Mixer's edits: levels, pans, sends and macro moves, for the whole vibe
 Mutes and solos are not saved. `mix_capture` does the same. Capture works in the desktop and
 Android apps; on iOS it reports that it is not available yet.
 
-- **An AI vibe** (one made in this chat, or a saved one): the edits are written into the vibe
-  itself, the vibe is saved again, and it reloads. The song restarts from the top, and mutes,
-  solos and the section loop clear, because the vibe now holds the mix. With no edits, Capture
-  changes nothing.
-- **A shipped vibe**: Capture only writes a capture file for the developer, who copies it into
-  the vibe's source. The live mix stays as it is, and Reset to file still goes back to the shipped
-  values.
-- If the vibe changes while a capture runs, the edits are not written into it; the capture file
-  still has them.
-
-Call `mix_capture` before you re-apply a vibe: a re-apply clears the live mix edits.
+- Capture writes a capture file for the developer and adds a "Captured" checkpoint to History. It
+  does not change the vibe, restart the song or clear the mix; the live mix stays as it is.
+- The changes under a checkpoint are saved in its file, and a new edit of the same control starts
+  a new change above it. With no uncaptured changes, Capture adds nothing.
+- Mixes persist per vibe: loading another vibe keeps this one's changes, and they come back when
+  the same unchanged vibe loads again, even after the app restarts. A re-apply of an edited vibe
+  (for example a new `levelDb`) starts with a clean mix; the "before apply" row in History can roll
+  back to the old vibe and its edits, and capture files stay on disk.
+- The app also captures before and after your turn when you change the mix, as "before: ..." and
+  "after: ..." checkpoints, so the user can go back to the mix from before.
 
 ## History
 
 The Changes button opens History: every mix change since the vibe loaded, newest first. Now is at
-the top, with "N of M changes on", and File (the vibe as loaded) at the bottom.
+the top, and File (the vibe as loaded) at the bottom.
 
 - **A change** is one level, pan, send or macro move, whole vibe or section. Each row says who made
   it ("you" is the user, "Orpheus" is you, "Claude Code" is a change over MCP), the control ("TEXT · level"), before → after, where it applies, and how long ago. A drag folds into
@@ -110,21 +108,21 @@ the top, with "N of M changes on", and File (the vibe as loaded) at the bottom.
   later change sets the same control, so turning this one off is silent until that one is off too.
   The user turning a change off reaches you as the user moving those controls. Turning a macro change
   off returns the knob to the vibe's value (or the earlier Mixer value), not to a move made on the main screen.
-- **Points**: "◆ Mark point" drops one at Now. Capture of a shipped vibe drops "Captured". Before your
-  first level, pan, send or macro move in a turn, a point named "before: " plus the user's message (or the idea's text)
-  is dropped, so the user can go back to the mix from before that idea.
+- **Points**: "◆ Mark point" drops one at Now. Capture drops a "Captured" checkpoint, and a turn of
+  yours that changes the mix drops a "before: " checkpoint (the user's message) and an "after: " one, so
+  the user can go back to the mix from before that idea. Changes under the newest checkpoint show a
+  small "captured" tag, and Now counts the uncaptured ones.
 - **hear**, on a point or File, plays the mix as it was there while held; letting go comes back
   to Now. **roll back here** throws away every change after the point, after the user confirms.
-- Nothing in History is saved: Capture writes the changes that are on. Reset to file drops the
-  changes it clears and every point (a pinned strip's changes stay). A vibe load starts a fresh
-  History, and so do a Capture of an AI vibe and an idea that re-applies the vibe, since both reload it.
+- History is saved per vibe and comes back when the same unchanged vibe loads again. Capture writes the changes
+  that are on. Clear All drops the changes and every point (a pinned strip's changes stay).
 
 You cannot turn changes off, hear a point or roll back yourself. When the user wants to compare or
 undo, point them to the change's dot or the point's buttons in History.
 
 ## Saved AI vibes
 
-Every vibe you apply is saved on the device, and so is each captured version. They are listed at
+Every vibe you apply is saved on the device. They are listed at
 the bottom of the Playlist sheet, the VIBE menu and the Vibe picker under "AI VIBES", newest
 first, one entry per name (the newest version), with the day it was saved. Tap one to play it.
 They never join the automatic rotation. The trash icon asks "Delete <name>?" before it removes one.
@@ -136,9 +134,11 @@ under an old name replaces that entry.
 
 The user cannot do this inside the app. It is a developer step on a computer with the project:
 
-1. Make the vibe here, mix it in the Mixer, and press Capture so the saved vibe holds the mix.
-2. The developer pulls the saved vibes off the desktop app or the phone with the project's
-   `grab-ai-vibes` script, which turns each one into a vibe in the code, marked work in progress.
+1. Make the vibe here, mix it in the Mixer, and press Capture. The capture file holds the mix; the
+   saved vibe does not change.
+2. The developer applies the capture to the saved vibe, pulls the saved vibes off the desktop app or
+   the phone with the project's `grab-ai-vibes` script, and turns each one into a vibe in the code,
+   marked work in progress.
 3. Work-in-progress vibes play only in development builds. After it is tuned and passes a
    listening test, the developer marks it live, and it ships in a release.
 

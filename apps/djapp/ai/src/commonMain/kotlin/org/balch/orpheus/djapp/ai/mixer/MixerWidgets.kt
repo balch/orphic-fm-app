@@ -216,7 +216,7 @@ internal class AgentFlashes {
             MixControl.Section -> bump(FlashTarget.Section)
             MixControl.Loop -> bump(FlashTarget.Loop)
             MixControl.EditScope -> bump(FlashTarget.EditScope)
-            MixControl.ResetToFile -> unpinned.forEach { bump(FlashTarget.Track(it)) }
+            MixControl.ClearAll -> unpinned.forEach { bump(FlashTarget.Track(it)) }
             else -> control.track?.let { bump(FlashTarget.Track(it)) }
         }
     }
@@ -1017,7 +1017,6 @@ internal fun MixerButton(
 internal fun CaptureResult(capture: MixerCapture, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val text = if (capture.ok && capture.file != null) {
         "Wrote ${capture.rows} rows to ${capture.file}" +
-            (if (capture.appliedToAiVibe) "; the AI vibe now holds them, so the song restarts and mutes, solos and the loop clear" else "") +
             (if (capture.stale == true) " (STALE: the vibe file changed since load)" else "")
     } else {
         capture.message

@@ -313,8 +313,10 @@ class OrpheusAgentConfig(
            take one or two short listening passes, no more: transport play, mix_read once to start
            the meters, audio_analyze (it records for the seconds you ask, so it is the wait), then
            mix_read again for the levels, then, when the Mixer is open, small fixes with mix_set (or
-           one re-apply that changes the vibe's levelDb). A re-apply clears the live mix edits, so call mix_capture
-           before any re-apply.
+           one re-apply that changes the vibe's levelDb). Mix edits are saved per vibe and return when the same unchanged
+           vibe loads again, but a re-apply of an edited vibe (a levelDb change) starts with a clean mix. Call
+           mix_capture first so the user's edits reach a capture file; the History's "before apply" row can also
+           roll back to the old vibe and its edits.
         6. Reply with the vibe's name, the seed (for a new vibe) and a sentence or two on its sound.
         When the mix tools are available, you mix together with the user:
            - Each user message starts with bracketed lines: whether the Mixer is open, the pinned
@@ -324,11 +326,12 @@ class OrpheusAgentConfig(
            - A refusal of PINNED or USER_MOVED means leave that control alone; mention it briefly.
            - Set the delay's time and feedback with mix_set (delay_time_a, delay_time_b, delay_feedback),
              never port_set: only mix_set edits reach the Mixer's History and the capture.
-           - Never re-apply over the user's live edits without their confirmation; the app shows
-             them a button.
+           - Mix edits are saved per vibe. A capture (mix_capture, or the Capture button) is a checkpoint
+             in History, not a change to the vibe; the user can go back to any checkpoint.
+           - Only a full mix_reset (Clear All) needs the user's confirmation; the app shows them a button.
            - Keep replies short while mixing.
            - Before you explain or act on the Mixer's numbers (LUFS, pre-clip, past knee, corr), or answer
-             how Reset to file, Capture or saved AI vibes work, call dj_app_guide.
+             how Clear All, Capture or saved AI vibes work, call dj_app_guide.
         A plain-text reply ends your turn and waits for the user, so send none until step 6; your text
         reply is what ends the turn. The tools enforce a budget per turn: ${TurnBudget.MAX_APPLIES} applies,
         ${TurnBudget.MAX_REJECTED_APPLIES} fixes of a rejected vibe, and ${TurnBudget.MAX_MIX_EDITS} mix edits when those tools are available. A result with budgetSpent=true

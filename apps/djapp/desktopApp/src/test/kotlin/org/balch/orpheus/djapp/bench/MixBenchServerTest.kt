@@ -148,7 +148,7 @@ class MixBenchServerTest {
         val service = object : MixCaptureService {
             override suspend fun capture(): CaptureOutcome {
                 calls++
-                return CaptureOutcome(true, "applied", out.path, emptyList(), null, aiVibe = true, appliedToAiVibe = true)
+                return CaptureOutcome(true, "applied", out.path, emptyList(), null, aiVibe = true)
             }
         }
         val s = MixBenchServer(controller, feature, NoTransport, CaptureWriter(root, root), OverviewCache(root, launch = { 1 }), null, captureService = service)
@@ -156,7 +156,7 @@ class MixBenchServerTest {
         try {
             val reply = post(u, """{"op":"capture"}""")
             assertEquals(1, calls)
-            assertTrue(reply.contains("\"appliedToAiVibe\":true"), reply)
+            assertTrue(reply.contains("\"aiVibe\":true"), reply)
             assertTrue(reply.contains(out.path), reply)
             assertTrue(File(root, "build/mix-bench/captures").listFiles().isNullOrEmpty())
         } finally {

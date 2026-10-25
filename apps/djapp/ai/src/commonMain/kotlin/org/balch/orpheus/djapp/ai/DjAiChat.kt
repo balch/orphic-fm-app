@@ -26,8 +26,8 @@ private const val STOPPED = "Stopped."
 private const val OPEN_MIXER_CARD = "Open the Mixer so I can make that change."
 private const val MIXER_IS_OPEN = "The Mixer is open."
 private const val MIXER_STILL_CLOSED = "The Mixer is still closed."
-private const val CLEAR_AND_APPLY = "Yes, clear my mix and apply."
-private const val KEEP_MY_MIX = "Keep my mix; don't re-apply."
+private const val CLEAR_MY_MIX = "Yes, clear my mix."
+private const val KEEP_MY_MIX = "Keep my mix."
 private const val RECAP_MESSAGES = 12
 private const val RECAP_CHARS = 300
 
@@ -35,7 +35,7 @@ private const val RECAP_CHARS = 300
 internal const val MIXER_WAIT_MS = 2_000L
 
 /** What the chat's buttons send; a stopped turn drops these instead of handing them back to the input. */
-private val BUTTON_MESSAGES = setOf(MIXER_IS_OPEN, MIXER_STILL_CLOSED, CLEAR_AND_APPLY, KEEP_MY_MIX)
+private val BUTTON_MESSAGES = setOf(MIXER_IS_OPEN, MIXER_STILL_CLOSED, CLEAR_MY_MIX, KEEP_MY_MIX)
 
 /** The Mixer's own strip names, so feed rows and the agent's context name strips as the Mixer does. */
 internal fun mixerTrackName(track: Int): String = BenchMeters.CHANNEL_NAMES.getOrElse(track) { "T$track" }
@@ -212,7 +212,7 @@ internal class DjAiChat(
         } ?: return
         when (card.kind) {
             ActionKind.OPEN_MIXER -> if (accept) whenMixerShows { open -> send(if (open) MIXER_IS_OPEN else MIXER_STILL_CLOSED, null) }
-            ActionKind.CONFIRM_WIPE -> if (accept) send(CLEAR_AND_APPLY, null, confirmWipe = true) else send(KEEP_MY_MIX, null)
+            ActionKind.CONFIRM_WIPE -> if (accept) send(CLEAR_MY_MIX, null, confirmWipe = true) else send(KEEP_MY_MIX, null)
         }
     }
 
