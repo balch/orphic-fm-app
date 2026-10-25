@@ -41,6 +41,7 @@ import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.FireSkyVibe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.encodeToString
@@ -49,6 +50,7 @@ import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -356,6 +358,29 @@ class PulsarSectionBpmTest {
                     "session 1, not $intro * 0.72",
             )
         }
+
+    @Test
+    fun `savedVibeMissingFromBuildFallsBackToLive`() = runTest(testDispatcher) {
+        // An OG release build lacks WIP and SHELF vibes: a saved name with no provider must
+        // land on the first LIVE curated vibe, not throw.
+        val savedJson = persistJson.encodeToString(
+            PulsarUiState(
+                vibe = sectionedVibe(bpm = 100f, mults = listOf(1.0f)),
+                vibeName = "Long Gone Shelf Vibe",
+                bpm = 100f,
+            )
+        )
+        val vm = makeViewModel(
+            vibe = FireSkyVibe().vibe,
+            globalTempo = GlobalTempo(StubAudioEngine()),
+            providers = setOf(DogHouseVibe(), FireSkyVibe()),
+            prefs = StubPrefs(AppPreferences(lastPulsarJson = savedJson)),
+        )
+        advanceUntilIdle()
+
+        // Dog House is the first LIVE entry in VibeCatalog order, ahead of the initial Fire Sky.
+        assertEquals(DogHouseVibe().vibe.name, vm.vibeFlow.value.name)
+    }
 }
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
