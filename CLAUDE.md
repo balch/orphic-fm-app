@@ -54,17 +54,18 @@ See `.claude/skills/dsp-implementation/` for C++ unit creation, engine atomics, 
 |---|---|
 | A UI tweak (layout, labels, colours) | only the covering classes: `./gradlew :<module>:jvmTest --tests '*TracksLayoutTest*'` (seconds) |
 | Kotlin in one module | `./gradlew :<module>:jvmTest` |
-| Kotlin across modules, before committing | `./gradlew jvmTest` (minutes) |
+| Kotlin across modules | each touched module's `jvmTest` |
 | A screenshot to look at | that harness alone: `--tests '*DockRenderHarness*' -PrenderHarness` |
 | C++ DSP | the suites you touched, then `orpheus_dsp_test -j` |
 | A C++ header that Kotlin tests parse (`pulsar_limits.h`, `orpheus_unit_pulsar.h`, `orpheus_engine.h`) | the C++ suite plus `./gradlew :features:pulsar:jvmTest` |
-| Before merging to main, or code touching iOS/Android/wasm source sets | `./gradlew allTests` |
+| Code in iOS/Android/wasm source sets | that target's compile for the touched module, e.g. `:<module>:compileKotlinWasmJs` |
+| Landing on main | the touched modules' tests once more after the rebase. Nothing bigger: no bare `jvmTest`, no `allTests` |
 
-**The UI tests are expensive.** `:apps:djapp:shared:jvmTest` renders Compose scenes off screen at phone, tablet and TV sizes (`TracksLayoutTest`, `FrameBudgetTest`, ...). Don't rerun it for each tweak: run the covering classes with `--tests`, save the full run for once before landing, and say up front when a run will take minutes.
+**The UI tests are expensive.** `:apps:djapp:shared:jvmTest` renders Compose scenes off screen at phone, tablet and TV sizes (`TracksLayoutTest`, `FrameBudgetTest`, ...). Don't rerun it for each tweak: run the covering classes with `--tests`, save the full run for a device build, and say up front when a run will take minutes.
 
 `*RenderHarness` classes write PNGs to look at and assert nothing. They took ~4.5 of the djapp suite's ~7 minutes, so every `Test` task skips them unless `-PrenderHarness` is set (root `build.gradle.kts`). A render that checks something real belongs in a `*Test` class, so it keeps running (e.g. `FaceMorphRenderTest`).
 
-`allTests` is ~8,400 tasks: it reruns the shared `commonTest` code on every target, including a Kotlin/Native iOS test link per module. Don't use it as the everyday loop.
+`allTests` is ~8,400 tasks: it reruns the shared `commonTest` code on every target, including a Kotlin/Native iOS test link per module, and runs out of compiler heap on this machine. Run it only when the user asks. The one failure it catches that jvmTest misses, commas or dots in backticked commonTest names, a grep catches: `git grep -nE 'fun \`[^\`]*[.,;:/<>\\[]' -- '*/commonTest/*'`.
 
 `orpheus_engine.h` forward-declares `PulsarState` instead of including `orpheus_unit_pulsar.h`, so Pulsar header edits rebuild ~57 TUs instead of ~140. A TU that needs Pulsar types includes `orpheus_unit_pulsar.h` (tests: `test_pulsar_helpers.h`) itself.
 
