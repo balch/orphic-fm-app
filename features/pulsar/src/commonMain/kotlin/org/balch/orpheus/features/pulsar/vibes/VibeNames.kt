@@ -52,6 +52,7 @@ object VibeNames {
     val RUNNING_OUT = VibeName("Running Out")
     val RUST_BELT = VibeName("Rust Belt")
     val RUST_BELT_OG = VibeName("Rust Belt OG")
+    val SIMIAN_SWAGGER = VibeName("Simian Swagger")
     val SIXTIES_REBEL = VibeName("Sixties Rebel")
     val SPACE_AND_DRUMS = VibeName("Space & Drums")
     val STAY_ASLEEP = VibeName("Stay Asleep")
