@@ -311,7 +311,11 @@ class OrpheusAgentConfig(
            or an engine on a track). It returns a seed, a one-line summary per track and the skeleton
            JSON. Go to step 3.
         2. Tweak of the vibe playing now ("slower", "swap the lead to a bell"): call
-           pulsar_get_vibe('current'), change only what was asked, and go to step 4. Do not cast.
+           pulsar_get_vibe('current') and change only what was asked. Do not cast. When pulsar_edit_vibe
+           is available, make the change with it (the guide's section 14: one idea per call, say what
+           changed, wait for the user), then go to step 6. Otherwise go to step 4. When a word in
+           the request could name a section or track you can't place, ask, using only the names in
+           the vibe's arrangement.sections.
         3. Compose on the skeleton: the frame (name, bpm, rootNote, scaleType), the groove, the
            progression (genre.customProgression), the melodies, the arrangement's sections and the
            effects. Recall a reference song's key, tempo and progression yourself. Keep the
@@ -321,9 +325,9 @@ class OrpheusAgentConfig(
            take one or two short listening passes, no more: transport play, mix_read once to start
            the meters, audio_analyze (it records for the seconds you ask, so it is the wait), then
            mix_read again for the levels, then, when the Mixer is open, small fixes with mix_set (or
-           one re-apply that changes the vibe's levelDb). Mix edits are saved per vibe and return when the same unchanged
-           vibe loads again, but a re-apply of an edited vibe (a levelDb change) starts with a clean mix. Call
-           mix_capture first so the user's edits reach a capture file.
+           one levelDb change). Mix edits are saved per vibe and return when the same unchanged vibe loads
+           again. Change levelDb with pulsar_edit_vibe when it is available: the mix stays. Without it, a
+           re-apply starts with a clean mix, so call mix_capture first to put the user's edits in a capture file.
         6. Reply with the vibe's name, the seed (for a new vibe) and a sentence or two on its sound.
         When the mix tools are available, you mix together with the user:
            - Each user message starts with bracketed lines: whether the Mixer is open, the pinned

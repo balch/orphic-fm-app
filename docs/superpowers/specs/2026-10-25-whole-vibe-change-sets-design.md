@@ -1,6 +1,6 @@
 # Whole-vibe change sets: the in-app AI edits any part of a vibe
 
-Date: 2026-10-25 · Status: design, not built. This is a dated snapshot; the code is the source of truth.
+Date: 2026-10-25 · Status: built on branch claude/whole-vibe-edits 2026-10-25, not app-tested. This is a dated snapshot; the code is the source of truth.
 Builds on `2026-10-25-mix-change-sets-design.md` (per-vibe change sets, Capture rows, roll back here).
 
 ## Why
@@ -91,6 +91,25 @@ Mix rows already have the full workflow: History, Capture, then the `apply-mix-c
 - The path syntax and where the diff/patch code lives (`features/pulsar` is the natural home, since the `Vibe` model is there).
 - How a vibe row reads in History (for example "Track 2 · EDM engine: MST → STR").
 - Whether `pulsar_apply_vibe`'s same-name diff shares code with `pulsar_edit_vibe` (it should).
+
+## Rulings made during the build
+
+From planning:
+- Mixer-owned paths in an edit are refused or dropped, never turned into mix rows, so `mix_set` keeps the only dB logic.
+- `BeforeApply.vibe` held the file vibe, so a restore would not hash the effective vibe and delete the set. Superseded: BeforeApply was removed (below).
+
+From the tasks:
+- Task 4, not Task 3, changes the `captureLocked` call; Task 3 only moves the uncaptured check to `uncapturedCount`.
+- The tool's result type is `VibeEditToolResult`; `VibeEditResult` stays CollabMixer's.
+- Container rows that carry mixer leaves are stripped first (`mixerChanges`, `withMixerFieldsOf`), so `diffVibe` stays generic.
+- `recordVibe` turns an object emptied by that stripping back into the file's null, so no phantom row appears.
+- `editVibe` skips the Mixer-closed check: a sound edit is a chat action and works with the Mixer closed.
+- The app knows its own loads by vibe instance identity, not by a load count.
+- `pulsar_edit_vibe` sends no vibe-created or vibe-failed events and no chat-feed move; History rows and the tool reply carry the edit.
+- The user ruled to remove BeforeApply entirely (row, rollback, keep/restore, guard hooks): they never want the vibe from before an AI-created one back.
+- `VibeEdit.value` is JSON-encoded text, since koog cannot put a `JsonElement` in a tool schema.
+- The turn budget is checked before `applyAsEdit`, so a same-name apply cannot pass the apply cap.
+- A vibe row shows whole numbers as written (96) and other numbers to 2 decimals.
 
 ## Done looks like
 

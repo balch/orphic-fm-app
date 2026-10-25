@@ -4,10 +4,12 @@ Every new vibe starts from a cast. pulsar_cast_vibe rolls an 8-track skeleton (v
 registers, EDM/SPACE pairs, starting levels) that already obeys the theory rules in section B, and
 you compose on it: the frame, groove, progression, melodies, sections and effects. Never copy a
 shipped vibe or edit one into a new vibe. The catalog at the end is for ideas only ("how does that
-one build its singer?"). To tweak the vibe playing now, read it with pulsar_get_vibe('current').
+one build its singer?"). To tweak the vibe playing now, read it with pulsar_get_vibe('current')
+(section 14).
 Sections A-C cover casting, the theory rules, drone beds and expressive voices, D song
 references (a pasted tab or chord sheet), and E melody lines and singers; 1-12 cover the
-controls, and 13 the rest of them. The Reference part at the end holds deep dives (OSC, MST and
+controls, and 13 the rest of them. 14 is editing the vibe that plays, and 15 the voices, comping,
+tension and sections each kind of vibe uses. The Reference part at the end holds deep dives (OSC, MST and
 grainFx, doubled parts) for when a vibe needs one. Set every value with intent: a vibe that changes
 only bpm and root sounds like the last one.
 
@@ -956,13 +958,13 @@ hand the mix to the user. Without them, set the fields from the targets above an
    section's `delay`. Never use port_set for them: it skips the Mixer's History and the capture. level_db is the dB the track is heard at in the playing section (0 = as written,
    -30 to 3.5).
 4. Loudness, only when it is off: after about 30 s of reads, if lufsIntegrated misses -16 by more
-   than 2 LU, the fix is levelDb, which needs a re-apply. A re-apply of an edited vibe starts with a
-   clean mix, because saved edits return only for an unchanged vibe. Call mix_capture first: it writes
-   the user's edits to a capture file (capture files stay on disk) before the apply drops them. Then call pulsar_get_vibe with 'current' and add
-   -16 - lufsIntegrated to its levelDb (it may already carry a trim), rounded to 0.1. Boosts land
-   short because the bus clipper compresses them, so overshoot a boost by about a quarter (a +4 dB
-   need: write +5). Re-apply with pulsar_apply_vibe and read once more. That is the second pass:
-   stop there.
+   than 2 LU, the fix is levelDb. Call pulsar_get_vibe with 'current' and add -16 - lufsIntegrated
+   to its levelDb (it may already carry a trim), rounded to 0.1. Boosts land short because the bus
+   clipper compresses them, so overshoot a boost by about a quarter (a +4 dB need: write +5). When
+   pulsar_edit_vibe is available, write it with that (path levelDb): the user's mix stays. Without
+   it, the fix is a re-apply, which starts with a clean mix: call mix_capture first, so the user's
+   edits reach a capture file (capture files stay on disk), then re-apply with pulsar_apply_vibe.
+   Read once more. That is the second pass: stop there.
 5. In the app, each turn allows {{MAX_APPLIES}} applies and, when the mix tools are available,
    {{MAX_MIX_EDITS}} mix edits (mix_set, mix_mute, mix_solo). When a tool says the budget is spent,
    do not retry: reply to the user now.
@@ -985,8 +987,8 @@ hand the mix to the user. Without them, set the fields from the targets above an
      until they confirm. The chat shows a card with Clear All and Keep my mix. Say in a
      sentence what it clears and wait for their pick; a yes covers that one call. If they keep it,
      offer a change that leaves their mix alone. pulsar_apply_vibe and vibe_load never ask. Edits
-     persist per vibe and return when the same unchanged vibe loads again; a re-apply of an edited
-     vibe starts clean.
+     persist per vibe and return when the same unchanged vibe loads again. A pulsar_edit_vibe edit,
+     or an apply under the playing vibe's name, keeps them; a new vibe starts clean.
    - Keep replies short while mixing: one move at a time, what you changed and why. Suggest the
      next move, and call mix_capture when they want a checkpoint of the mix (the song keeps playing).
 
@@ -1002,6 +1004,9 @@ When the mix tools are available:
   Effect returns appear only in the bus and out stems, so judge sends there or by ear.
 - mix_set level_db is the heard level in the playing section. Whole-vibe loudness is `levelDb` in the
   JSON.
+- section_jump lands at the next bar line, which at a slow tempo is several seconds away. Until
+  mix_read's section names the one you jumped to, its levels and a section-scope mix_set belong to
+  the old section. Read again (or audio_analyze for the wait) before you trust or set anything.
 
 ## 12. Invariants & failure modes
 - There are exactly 8 tracks. Do not add or remove tracks.
@@ -1136,6 +1141,202 @@ chorus may sound like another instrument). On other engines it does nothing.
 - INDEPENDENT on too many tracks: nothing locks in.
 - progressionDriftRange too high: the chords wander aimlessly.
 - Texture tracks too dense: they crowd out the groove.
+
+## 14. Editing the playing vibe
+When pulsar_edit_vibe is available, change the vibe that plays now with it, and keep
+pulsar_apply_vibe for a new vibe. Each changed field becomes a History row on top of the vibe's
+file: the user can turn it off, hear and roll back to the points around it, and capture it. The
+vibe keeps its name and its mix rows. Each edit restarts the song from the top. The loop:
+1. pulsar_get_vibe('current'): the vibe as it plays, earlier edits included.
+2. Listen first when it helps and the mix tools are available: audio_analyze for the track,
+   section_jump to the section the user means. When you can't tell which section or track they
+   mean, ask, offering only names from arrangement.sections (and track numbers from tracks).
+   Never suggest a section the vibe doesn't have.
+3. One pulsar_edit_vibe call for one musical idea. It may change several fields. Each value is
+   JSON text: {"edits": [{"path": "tracks[4].engineEdm.lpgMode", "value": "\"PLUCK\""},
+   {"path": "arrangement.sections[3].trackOverrides.2.morph", "value": "0.7"}]}.
+4. Say in plain words what changed, then wait. Refine from what the user says next. Never offer
+   several versions to compare.
+
+What an edit may change (the Mixer's fields go through mix_set, when the mix tools are available):
+- Anything in the frame, groove, tracks, sections, tension, effects, licks, bassLine and chords,
+  levelDb included.
+- Not the Mixer's fields: each engine's volume, reverbSend and delaySend, pan, the energy,
+  complexity, mood and space macros, a section's macro and rampTo multipliers, and the delay's
+  times and feedback. Use mix_set for those. The edit refuses such a path, and drops and names
+  mixer fields inside a bigger value.
+- Not the structure. Sections cannot be added, removed, reordered or renamed, and there are 8
+  tracks. When a request needs that, ask the user whether to make a brand new vibe in that
+  direction. On a yes, cast it and apply it under a new original name; the playing vibe's
+  History stays as it was.
+- "Go back" or "undo that" means the History point "before: <their message>" from that turn. You
+  cannot roll back yourself: point the user at that point's "roll back here". If they ask you to
+  undo it, edit the fields back to the values you read before; a field back at its file value
+  leaves History.
+- pulsar_apply_vibe under the playing vibe's name is recorded the same way, with mixer fields
+  dropped. pulsar_edit_vibe is better: it sends only what changes.
+- An edit spends one of the {{MAX_APPLIES}} applies a turn allows. Section B's rules and section
+  4's DX patch rule still hold.
+
+Sound words to fields:
+- A track's timbre ("too bright", "sounds like bagpipes"):
+  - engineId on engineEdm and engineSpace, inside the part's family (section 3). Keep the two
+    slots a pair (section B).
+  - harmonics, timbre and morph. An unpinned knob plays from its macroMap window (section A),
+    so move macroMap.moodHarmonics or moodTimbre ({"min": 0.2, "max": 0.4}), or pin the knob.
+    On DX, DX2 and DX3, harmonics is the patch (section 4).
+  - lpgMode, lpgDecay and lpgColour (section C): PLUCK strikes each note and lets it decay; a
+    lower lpgColour is darker.
+  - envelopeProfile: RHYTHM and MELODIC are short, DRONE and EFFECT sustain.
+  - doubleDetune and doubleSpread thicken a voice; noteRangeLow and noteRangeHigh move its register.
+- Note length ("longer", "hold it", "random lengths"): hold (section C) only works on tracks 5-7
+  when the track plays no lick, so check its lickMode first. A track with lickMode Fill or Squash
+  ignores hold, and a section density other than 0 (0 still mutes it): lengthen or thin the lick's
+  own notes instead, or set lickMode None so hold and density take over. For
+  long sung tones use holdProbability 0.6-0.8 with lengths 8-16; the default 2-8 is not "longer".
+  A random length is a wide gap between holdLengthMin and holdLengthMax.
+- Louder when the track's fader is already at +3.5 (mix_read levelDb): the fader can't go higher,
+  and the engine volume is the Mixer's. Lower the tracks around it with mix_set in that section,
+  or raise the vibe's levelDb by edit and lower the rest. A sparse track (low density) meters low
+  because it is silent most of the time: judge it by its peak or by ear, not its LU.
+- Worked: "track 4 sounds like bagpipes, make it a thin guitar". The pipes are DX3 at harmonics
+  0.1991 (FM pipes). A plucked lead from the same family is WSH with lpgMode PLUCK, lpgDecay
+  0.5 and lpgColour 0.55, as Orphic Lore's lead plays. One edit sets, on engineEdm (and on
+  engineSpace if it plays the pipes too): engineId "WSH", pinHarmonics false (DX pins it),
+  lpgMode "PLUCK", lpgDecay 0.5, lpgColour 0.55, doubleDetune 0 (one string), plus
+  envelopeProfile "MELODIC" on the track.
+- Growth section over section ("build in complexity"):
+  - the macros: when the mix tools are available, section_jump to each section in turn and
+    mix_set field=macro, scope=section, complexity and energy a little higher each time. The
+    capture writes them as that section's macroOverrides, and scales its rampTo with them.
+  - per-section track changes, as edits: trackOverrides density (0 keeps a track out of the
+    early sections), morph, lpgMode (a re-pick grid in the peak), compingStyle, arpMode,
+    doubleDetune; the section's compingStyle, chordsPerBar, tensionOverride and lickIndex; a
+    soloMode on the peak. Section 15 has the shapes the shipped vibes use.
+
+## 15. Choosing by vibe and riff
+What the shipped vibes of each kind use, so an edit or a new cast can lean the same way. Each
+claim names the shipped vibe that does it. "Untested" marks a pairing that only the cast
+palette (its styleTags) or an earlier section suggests: no shipped vibe of that kind plays it,
+so tell the user it is a try and listen together. Section
+B's rules come first. Track slots are as in section A: drums 0-2, bass 3, lead or comp 4,
+pads, comps or textures 5-6, FX 7.
+
+Any kind, the riff decides the voice:
+- A busy 16th riff wants a short, plucky, dry voice: lpgMode PLUCK on WSH, PD or OSC, envelopeProfile
+  MELODIC, sends low. Orphic Lore's funkSketch on its PD bass and WSH lead; Stay Asleep's OSC bass.
+- A held or legato line wants a sustained engine: envelopeProfile DRONE or lpgMode SUSTAINED,
+  glideRate 0.25-0.5. Orphic Lore's Sirens (SPK, DRONE, glide 0.5); Space & Drums' DX2 on SUSTAINED.
+- A chordal riff (stabs, skank) goes on a Chordal comp track with a comp engine (CHD, DX2, DX3,
+  VA) and the comping style that matches it: Bell Tolls' CHD skank, Rust Belt's CHD and Fire
+  Sky's VA on ROCK_DOWNBEATS. A held chord re-picked by a PLUCK_REPEAT grid also works (section D).
+- A riff on the bass: the bass carries the lick and the comp stays sparse (Voltage Strut, Orphic Lore).
+- Building any kind: keep tracks out early with section trackOverrides density 0 (Stay Asleep,
+  Orphic Lore's opening), raise the section energy and complexity multipliers toward the peak
+  (Stay Asleep: 1.15 and 1.2, then 1.35 and 1.3), switch the lead or comp to a re-pick grid and
+  FUNK_STABS in the peak (Orphic Lore), put a Jam or LickBuilder there, then drop to a low
+  section (energy about 0.4-0.55, space 1.3-1.5) before the outro.
+
+Rock (Dog House, Velvet Leash, Fire Sky, Rust Belt):
+- Frame: 84-96 bpm, PHRYGIAN, MINOR, DORIAN or BLUES, backbeat (rhythmDensity 0.67), swing
+  0.04-0.10, BLUES, DARK or MODAL progression, stepCount 32.
+- Drums: BD, SD, HH; kick and hat MUTATE, snare FILL (Dog House, Rust Belt).
+- Bass: WSH with STR on the SPACE slot (Dog House, Velvet Leash, Fire Sky), or PD (Rust Belt).
+  PLUCK on the EDM side (Velvet Leash, Fire Sky, Rust Belt), REPEAT (Dog House, Rust Belt).
+- Lead: WSH on PLUCK or PLUCK_REPEAT_16TH_OFF (Fire Sky), FM (Rust Belt), DX2 on PLUCK (Velvet
+  Leash). Untested in rock: CSAW, DX3 at 0.888.
+- Comp: one ROCK_DOWNBEATS track (BLUES_SHUFFLE in Dog House) on DX, DX3, VA or CHD, with
+  arpMode AUTO (an arp on DX, DX3 and VA, a block chord on CHD), arpSpeed 0.10-0.15,
+  FIRST_INVERSION, drop 0.15-0.2, fills TURNAROUND every 6-8 bars. A second chord voice is a
+  PAD (Rust Belt's DX3 and ENS).
+- FX and pads: NSE or PAR on track 7 (Fire Sky, Rust Belt), GRN, STR and ENS on 5-6.
+- Tension: innerBars 8, outerBars 32, octaveShift true, chromaticPassing 0.10-0.12 (Fire Sky,
+  Rust Belt). Dog House and Velvet Leash use innerBars 4, which gives up the octave climax
+  (section 6).
+- Sections: 6-8. Intro 2-4 bars, verse 3-10, chorus 2-6, a Jam solo of 4-16 bars after the
+  chorus, breakdown 4, outro 4-6. Fire Sky puts a 2-bar LongFill lead-in before the solo, with a
+  tensionOverride of innerBars 2 and halfLick JAM_INVERTED.
+
+Funk (Filter Funk, Voltage Strut):
+- Frame: 110-126 bpm, MINOR or PHRYGIAN, dense 16ths (rhythmDensity 1.0), swing 0.03-0.04.
+- Drums: BD or an FM kick, SD or PD snare with NSE on the SPACE slot, HH or PAR hats. Extra
+  Percussive voices (PAR, NSE, GRN) in place of pads: Voltage Strut has no pad.
+- Bass: VCF (Filter Funk) or WSH playing the lick (Voltage Strut).
+- Lead and keys: WSH (Filter Funk), DX2 walking its patches on ENERGY with harmonicsMacroRange
+  0.05 (Voltage Strut).
+- Comp: ENS (TRN on the SPACE slot) on FUNK_STABS, SECOND_INVERSION, arpMode AUTO at arpSpeed
+  0.1, fills DOUBLE_TIME every 6 bars (Filter Funk). Untested in funk: GOSPEL_STABS, DX2
+  e-piano, VA stab and STR plucked chord, all funk-tagged.
+- Tension: innerBars 4, outerBars 16, outerDepth 0.5-0.7, timbre evolution on 85-90% of steps,
+  so the tone breathes.
+- Sections: 5. Groove or intro, a build of 4-8 bars, a LickBuilder or Jam peak of 8-12 bars,
+  then a drop or break of 2-6 bars (Filter Funk adds an outro).
+
+Electro and club (Techno Wobble):
+- Frame: 84 bpm, HARMONIC_MINOR, four on the floor (rhythmDensity 0.33), swing 0, DARK.
+- Drums: BD and SD on REPEAT, HH on MUTATE; NSE as a Percussive FX track.
+- Bass: WSH on PLUCK with STR on the SPACE slot, REPEAT.
+- Comp: WSH and STR on ROCK_DOWNBEATS, arpMode NEVER, ROOT_POSITION; sections switch it to
+  BLUES_SHUFFLE (stab) and PAD (fall, drift). The grind humanizes it (drop 0.3); stab, fall and
+  drift swap in a clean one (drop 0.05).
+- FX: DX3 and GRN as a DRONE, MOD on WILD on track 7.
+- Untested in club: NES, TOY, SWM and NSE textures, FM, WTB and CSAW leads, all electro-tagged.
+- Tension: innerBars 8, outerBars 32, outerDepth 0.8, timing 0.10, octaveShift false so the
+  bass stays deep.
+- Sections: 5. A 2-bar pulse intro (tensionOverride innerBars 2), a long grind (6-10 bars), a
+  LickBuilder stab (4-8), then fall and drift.
+
+Ambient and space (A Whale's Dream, Lost In Space, Space & Drums):
+- Frame: 64-78 bpm, PHRYGIAN or DORIAN, rhythmDensity 0-0.55, swing 0, DRONE or MODAL
+  progression, stepCount 32-64.
+- Drums: few or pitched. Lost In Space and Space & Drums play BD as a Melodic track (ROOT_ONLY
+  in Space & Drums); A Whale's Dream keeps BD (MOD on the SPACE slot), SD and HH.
+- Bass: PD (Lost In Space, Space & Drums, on DRONE there), or VCF with STR on the SPACE slot
+  (A Whale's Dream).
+- Keys and pads: mostly Melodic DRONE tracks, not comping: ENS, STR, GRN, DX2 (sustained and
+  FIXED in Space & Drums). A Whale's Dream has one Chordal PAD (VA, WTB on the SPACE slot).
+- FX: SWM, PAR, TRN and WTB, MOD, an SPK on WILD on track 7 (Space & Drums).
+- Comping: PAD only, as section B says.
+- Tension: innerBars 8, outerBars 16-32, timing 0.02-0.1, octaveShift false, no chromatic
+  passing; Lost In Space and Space & Drums peak early (attackPoint 0.25) and release slowly
+  (releaseSpeed 0.8).
+- Sections: long ones (Lost In Space: 3 sections of 6-20 bars). A LickBuilder or Jam in the
+  middle (Space & Drums' ascend), then a low, wide section (void: energy 0.4, space 1.5) and a
+  fade. A Whale's Dream plays 11 sections once (playOnce), 5 of them swelling with rampTo, with
+  peaks at energy 1.3 and 1.4 and its last jam just before the end.
+
+Psych (Orphic Lore, A Whale's Dream):
+- Orphic Lore: 102 bpm, MINOR, stepCount 64, DARK. PD bass and WSH lead play one riff, both
+  with wahLick; an SPK singer with grainFx; a DX3 PAD; a DX2 comp with arpMode ALWAYS and grainFx.
+- Tension: innerBars 8, outerBars 32.
+- Sections: 8. Three Jams in the middle and late (winds, sirens, storm), each with a re-pick grid
+  (PLUCK_REPEAT_8TH_OFF, then PLUCK_REPEAT_16TH_OFF) and FUNK_STABS. The last, storm, is the
+  climax with its own tensionOverride; a calm return and an outro follow.
+- Untested in psych: TRN bass, DX3 FM pipes lead, VOWEL_FOF, QUESTION_MARK, SWM and TRIPLE_TRIANGLE,
+  all psych-tagged. Pan and send moves as in section 10's psychedelic mix.
+
+Reggae and dub (Bell Tolls):
+- Frame: 78 bpm, MINOR_PENTATONIC, backbeat, swing 0.05, MODAL.
+- Drums: BD, SD, HH. Bass: PD, dark (harmonics 0.18), glideRate 0.35, the loudest track
+  (section 10's reggae mix).
+- Comp: two CHD tracks. REGGAE_SKANK on ROOT_POSITION, drop 0.06, fills ASCENDING_ARP every 8
+  bars at skip 0.5; a FUNK_STABS bubble on FIRST_INVERSION, drop 0.35. The chorus switches the
+  comping to SKA_UPSTROKES.
+- Lead: DX2 with DX3 on the SPACE slot. Texture: ENS with STR on the SPACE slot.
+- Tension: innerBars 8, outerBars 24, timing 0.08, spurtChance 0.22.
+- Sections: intro 2, groove 8-10, chorus 4 (LickBuilder), dub 4-6, Jam solo 8-10, outro 4.
+- Untested in reggae: VA bass, DX2 e-piano or marimba, DX3 organ, TRIPLE_TRIANGLE or STR on the skank,
+  MOD bells, and a PLUCK_REPEAT_8TH_OFF skank on a held chord, all from the palette or section D.
+
+Blues, minimal and cinematic (Stay Asleep):
+- Frame: 80 bpm, BLUES, swing 0.30, backbeat, DRONE progression.
+- Voices: an OSC bass on PLUCK, a DX2 e-piano reply on SUSTAINED (track 4), a second SD on
+  track 5, OSC and NSE drones on FIXED (tracks 6 and 7).
+- Tension: innerBars 4 and outerBars 4, volume 0.9 for one crescendo per section, timing 0, no
+  octave shift or passing tones.
+- Sections: 6, played once, 2-6 bars each. Tracks enter by section (density 0 early). The
+  climax, chase, runs energy 1.35 and complexity 1.3 with PLUCK_REPEAT_8TH_OFF; escape and
+  awake drop to energy 0.5-0.55 and space 1.3-1.4.
 
 ## Reference: deep dives
 Read these only when a vibe needs one: OSC, MST and grainFx in detail, and doubled parts. Section

@@ -16,6 +16,8 @@ How to compose a vibe (casting, the music-theory rules, drone beds, expressive v
 
 Read it before composing. This skill does not repeat it. The guide speaks JSON; the Kotlin names are the same fields (see "Kotlin authoring" below for the few spellings that differ). Its section B rules (one register per sustained voice, the bass holds the root, consonant pads, one arpeggiator, EDM/SPACE pairs, comping that breathes) apply to Kotlin vibes too.
 
+For which drum, bass, keys/comp and FX voices, comping style, tension shape and section plan suit a kind of vibe (rock, funk, club, ambient, psych, reggae, blues) and the riff it plays, read the guide's section 15, "Choosing by vibe and riff". Each claim there names the shipped vibe it comes from, and untested pairings are marked. Section 14 covers editing the vibe that plays, over MCP with `pulsar_edit_vibe`.
+
 ## No copying: every new vibe starts from a cast
 
 Never copy another `*Vibe.kt`, or edit one into a new vibe. Shipped vibes are for ideas only ("how does Orphic Lore build its singer?"). A new vibe starts from a cast skeleton with a stated seed:
