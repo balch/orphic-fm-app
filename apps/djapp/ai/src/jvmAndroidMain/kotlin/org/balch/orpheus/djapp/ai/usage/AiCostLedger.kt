@@ -90,17 +90,25 @@ fun rollUp(records: List<AiCostRecord>): List<SongModelCost> =
 @ContributesIntoSet(FeatureScope::class, binding = binding<AiTurnSink>())
 class AiCostLedger internal constructor(
     private val file: File,
+    private val totals: AiCostTotals,
     private val song: () -> String,
 ) : AiTurnSink {
     // Lazy provider: injecting PulsarFeature eagerly would build it with the agent.
     @Inject
-    constructor(files: OrphicFiles, pulsarProvider: () -> PulsarFeature) :
-        this(File(files.root, "$DIR/$FILE"), { pulsarProvider().stateFlow.value.vibeName })
+    constructor(files: OrphicFiles, totals: AiCostTotals, pulsarProvider: () -> PulsarFeature) :
+        this(File(files.root, "$DIR/$FILE"), totals, { pulsarProvider().stateFlow.value.vibeName })
 
     private val log = logging("AiCostLedger")
 
+    init {
+        // The file is a few hundred bytes a turn; reading it once here keeps the header total right after a relaunch.
+        runCatching { totals.seedSongs(read().groupBy { it.song }.mapValues { (_, rs) -> rs.sumOf { it.costUsd ?: 0.0 } }) }
+            .onFailure { log.error(it) { "Could not read AI cost totals" } }
+    }
+
     override fun record(turn: AiTurnUsage) {
         val record = AiCostRecord.of(turn, runCatching(song).getOrNull()?.ifBlank { null } ?: NO_SONG)
+        record.costUsd?.let { totals.addSong(record.song, it) }
         runCatching {
             synchronized(this) {
                 file.parentFile?.mkdirs()

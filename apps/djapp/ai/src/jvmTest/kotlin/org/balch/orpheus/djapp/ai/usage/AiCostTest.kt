@@ -6,6 +6,7 @@ import org.balch.orpheus.core.ai.AiTokenUsage
 import org.balch.orpheus.djapp.ai.DjAiFeedItem
 import org.balch.orpheus.djapp.ai.DjAiPhase
 import org.balch.orpheus.djapp.ai.DjAiUiState
+import org.balch.orpheus.djapp.ai.chat.sessionCostLabel
 import org.balch.orpheus.djapp.ai.chat.turnCostLabel
 import org.balch.orpheus.djapp.ai.chat.usd
 import org.balch.orpheus.djapp.ai.mcp.AiCostArgs
@@ -33,24 +34,56 @@ class AiCostTest {
     fun turnsAreTaggedWithThePlayingVibeAndSurviveANewLedger() {
         val file = tempFile()
         var song = "Running Out"
-        val ledger = AiCostLedger(file) { song }
+        val ledger = AiCostLedger(file, AiCostTotals()) { song }
         ledger.record(turn("claude-opus-5-5", 0.05))
         song = " "
         ledger.record(turn("claude-opus-5-5", 0.02))
 
-        val reread = AiCostLedger(file) { "ignored" }.read()
+        val reread = AiCostLedger(file, AiCostTotals()) { "ignored" }.read()
         assertEquals(listOf("Running Out", AiCostLedger.NO_SONG), reread.map { it.song })
         assertEquals(AiPrices.AS_OF, reread.first().pricesAsOf)
         assertEquals(9_000, reread.first().cacheReadTokens)
     }
 
     @Test
+    fun songTotalsSeedFromTheFileAndGrowWithEachTurn() {
+        val file = tempFile()
+        AiCostLedger(file, AiCostTotals()) { "Whale" }.record(turn("claude-opus-5-5", 0.10))
+
+        val costs = AiCostTotals()
+        val ledger = AiCostLedger(file, costs) { "Whale" }
+        assertTrue(abs(costs.songs.value.getValue("Whale") - 0.10) < 1e-9)
+        ledger.record(turn("claude-opus-5-5", 0.05))
+        ledger.record(turn("mystery", null))
+        assertTrue(abs(costs.songs.value.getValue("Whale") - 0.15) < 1e-9)
+    }
+
+    @Test
+    fun sessionTotalsCountEachModelsPricedTurns() {
+        val totals = AiCostTotals()
+        totals.record(turn("claude-haiku-5-5", 0.02))
+        totals.record(turn("claude-haiku-5-5", 0.03))
+        totals.record(turn("mystery", null))
+        assertEquals(setOf("claude-haiku-5-5"), totals.sessionByModel.value.keys)
+        assertTrue(abs(totals.sessionByModel.value.getValue("claude-haiku-5-5") - 0.05) < 1e-9)
+    }
+
+    @Test
+    fun theHeaderShowsTheModelsSpendAndATotalOnlyOnceAnotherModelSpent() {
+        assertEquals(null, sessionCostLabel(emptyMap(), "claude-haiku-5-5"))
+        assertEquals(" · $0.210", sessionCostLabel(mapOf("claude-haiku-5-5" to 0.21), "claude-haiku-5-5"))
+        val both = mapOf("claude-haiku-5-5" to 0.21, "gemini-flash-latest" to 0.17)
+        assertEquals(" · $0.170 · total $0.380", sessionCostLabel(both, "gemini-flash-latest"))
+        assertEquals(" · total $0.380", sessionCostLabel(both, "claude-opus-5-5"))
+    }
+
+    @Test
     fun aBadLineIsSkippedNotFatal() {
         val file = tempFile()
-        AiCostLedger(file) { "A" }.record(turn("claude-haiku-5-5", 0.001))
+        AiCostLedger(file, AiCostTotals()) { "A" }.record(turn("claude-haiku-5-5", 0.001))
         file.appendText("{not json\n")
-        AiCostLedger(file) { "A" }.record(turn("claude-haiku-5-5", 0.001))
-        assertEquals(2, AiCostLedger(file) { "A" }.read().size)
+        AiCostLedger(file, AiCostTotals()) { "A" }.record(turn("claude-haiku-5-5", 0.001))
+        assertEquals(2, AiCostLedger(file, AiCostTotals()) { "A" }.read().size)
     }
 
     @Test
@@ -78,7 +111,7 @@ class AiCostTest {
     fun theMcpToolFiltersBySongIgnoringCase() = runBlocking {
         val file = tempFile()
         var song = "Whale"
-        val ledger = AiCostLedger(file) { song }
+        val ledger = AiCostLedger(file, AiCostTotals()) { song }
         ledger.record(turn("claude-opus-5-5", 0.10))
         song = "Bubblegum"
         ledger.record(turn("claude-opus-5-5", 0.20))

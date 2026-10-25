@@ -15,6 +15,20 @@ internal fun turnCostLabel(u: AiTurnUsage): String = buildString {
     if (u.calls > 1) append(" · ").append(u.calls).append(" calls")
 }
 
+/**
+ * The header's cost after the model name: what [modelId] has spent since launch, plus the total across models once
+ * another model has spent too, e.g. " · $0.210 · total $0.380". Null before anything is spent.
+ */
+internal fun sessionCostLabel(byModel: Map<String, Double>, modelId: String): String? {
+    if (byModel.isEmpty()) return null
+    val mine = byModel[modelId]
+    val total = byModel.values.sum()
+    return buildString {
+        if (mine != null) append(" · ").append(usd(mine))
+        if (byModel.keys.any { it != modelId }) append(" · total ").append(usd(total))
+    }
+}
+
 /** Cents get three places, fractions of a cent four, so a cheap Haiku turn never reads as $0.000. */
 internal fun usd(v: Double): String {
     val places = if (v < 0.01) 4 else 3

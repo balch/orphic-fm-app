@@ -79,12 +79,19 @@ internal fun ChatSettings(state: DjAiUiState, actions: DjAiPanelActions, onClose
         }
         Section("Model") {
             for (model in state.availableModels) {
-                Choice(model.displayName, selected = model == state.selectedModel) {
+                val spent = state.sessionCostByModel[model.llmModel.id]?.let { " · ${usd(it)}" } ?: ""
+                Choice(model.displayName + spent, selected = model == state.selectedModel) {
                     if (model != state.selectedModel) {
                         actions.selectModel(model)
                         onClose()
                     }
                 }
+            }
+            if (state.sessionCostByModel.isNotEmpty()) {
+                Text(
+                    "Spent since launch: ${usd(state.sessionCostByModel.values.sum())} (estimate)",
+                    style = chatStyle(LegibleText.SECONDARY, ChatInk.dim),
+                )
             }
         }
         Section("API key") {

@@ -165,6 +165,8 @@ data class DjAiUiState(
     val ideas: List<Idea> = emptyList(),
     val mixerVisible: Boolean = false,
     val pins: Set<Int> = emptySet(),
+    /** Estimated USD the AI has spent since the app started, by model id; a model that spent nothing is absent. */
+    val sessionCostByModel: Map<String, Double> = emptyMap(),
     internal val recapNext: Boolean = false,
     internal val confirmWipeNext: Boolean = false,
     internal val referenceSentId: String? = null,

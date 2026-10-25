@@ -95,7 +95,7 @@ internal fun CompactMixer(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         item(key = "header") {
-            Header(state.vibeName, meters, stacked = width < WIDE_MIN)
+            Header(state.vibeName, state.aiCostUsd, meters, stacked = width < WIDE_MIN)
         }
         item(key = "macros") {
             KnobsAndChips(
