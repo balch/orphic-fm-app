@@ -10,6 +10,7 @@ import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.djapp.DomeWiggleLaunch
+import org.balch.orpheus.djapp.share.SharedTextInbox
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
@@ -54,4 +55,7 @@ interface DjAppGraph : ViewModelGraph {
 
     /** Mix capture to app storage on the desktop and Android AI editions; elsewhere [UnavailableMixCaptureService]. */
     val mixCaptureService: MixCaptureService
+
+    /** Text shared into the app from outside; the AI chat takes it as a song reference. */
+    val sharedTextInbox: SharedTextInbox
 }

@@ -41,6 +41,7 @@ import org.balch.orpheus.djapp.ai.ideas.vibeSummary
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.djapp.ai.songref.SongPasteStore
+import org.balch.orpheus.djapp.share.SharedTextInbox
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.AgentActivityEventBus
 import org.balch.orpheus.features.ai.OrpheusAgent
@@ -273,6 +274,7 @@ class DjAiViewModel(
     private val songPasteStore: SongPasteStore,
     private val collab: MixCollab,
     private val collabEvents: CollabEvents,
+    private val sharedTextInbox: SharedTextInbox,
     ideasGenerator: IdeasGenerator,
     // Lazy providers, as in MixReadTool: the feature and the AppScope controller would close a DI cycle.
     private val pulsarFeatureProvider: () -> PulsarFeature,
@@ -307,7 +309,14 @@ class DjAiViewModel(
         onTurnEnded = { ideas.onTurnEnded(::ideasInput) },
     )
 
+    private val references = ReferenceAttacher(songPasteStore, scope, dispatcherProvider.default, _uiState)
+
     init {
+        // A tab shared from another app joins this conversation as the chip; nothing is sent.
+        scope.launch(dispatcherProvider.default) {
+            drainSharedText(sharedTextInbox, _uiState, references)
+        }
+
         scope.launch(dispatcherProvider.default) {
             activityEventBus.events.collect { chat.onActivity(it) }
         }
@@ -424,8 +433,6 @@ class DjAiViewModel(
     }
 
     private fun tryIdea(idea: Idea) = chat.send(idea.prompt, _uiState.value.reference, label = idea.text)
-
-    private val references = ReferenceAttacher(songPasteStore, scope, dispatcherProvider.default, _uiState)
 
     private fun attachReference(text: String) = references.attach(text)
 

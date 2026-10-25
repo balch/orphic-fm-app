@@ -93,6 +93,21 @@ class PromptPasteTest {
         assertNull(state.value.reference); assertEquals(emptyList(), store.ids())
     }
 
+    @Test fun shareWaitsForPendingSend() = runTest {
+        val store = SongPasteStore()
+        val state = MutableStateFlow(DjAiUiState())
+        val attacher = ReferenceAttacher(store, this, StandardTestDispatcher(testScheduler), state)
+        var sent: SongPasteRef? = null
+        // The paste stays mid-parse until the scheduler runs; the Enter waits on it.
+        attacher.attach(sheet(1))
+        attacher.whenAttached { sent = state.value.reference }
+        attacher.attachAfterPendingSend("Shared Tab\nG C D\nEm\nAm")
+        assertNull(sent); assertNull(state.value.reference)
+        advanceUntilIdle()
+        assertEquals("Kettle Morning 1", sent?.title)
+        assertEquals("Shared Tab", state.value.reference?.title)
+    }
+
     private fun lines(n: Int) = (1..n).joinToString("\n") { "ab" }
 
     @Test fun compositeCommitWithOneTrailingNewlineSubmits() =
