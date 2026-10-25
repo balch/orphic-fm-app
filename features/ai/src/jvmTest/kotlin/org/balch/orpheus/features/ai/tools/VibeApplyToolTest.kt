@@ -209,12 +209,25 @@ class VibeApplyToolTest {
     fun aRejectedVibeDoesNotSpendTheApplyBudget() = runBlocking {
         val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
         val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), emptySet(), AgentErrorLog()).tool
-        repeat(5) {
+        repeat(TurnBudget.MAX_REJECTED_APPLIES) {
             val rejected = tool.execute(VibeApplyArgs("{ not a vibe }"))
             assertFalse(rejected.success)
             assertFalse(rejected.budgetSpent, "a rejected vibe is fixable, not a spent budget")
         }
         assertTrue(tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe))).success)
+    }
+
+    @Test
+    fun rejectionsPastTheCapTellTheAgentToStop() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        val budget = TurnBudget()
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), budget, emptySet(), AgentErrorLog()).tool
+        val results = List(TurnBudget.MAX_REJECTED_APPLIES + 1) { tool.execute(VibeApplyArgs("")) }
+        assertTrue(results.none { it.success })
+        assertEquals(List(TurnBudget.MAX_REJECTED_APPLIES) { false } + true, results.map { it.budgetSpent })
+        assertTrue("vibeJson was empty" in results.first().message, results.first().message)
+        budget.reset()
+        assertFalse(tool.execute(VibeApplyArgs("")).budgetSpent, "a new turn gets fresh fixes")
     }
 
     @Test

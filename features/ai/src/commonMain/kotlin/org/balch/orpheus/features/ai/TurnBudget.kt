@@ -18,10 +18,12 @@ import kotlin.coroutines.CoroutineContext
 class TurnBudget {
     private val applies = AtomicInt(0)
     private val mixEdits = AtomicInt(0)
+    private val rejections = AtomicInt(0)
 
     fun reset() {
         applies.store(0)
         mixEdits.store(0)
+        rejections.store(0)
     }
 
     /** Spends one vibe apply; false once [MAX_APPLIES] are spent this turn. */
@@ -29,6 +31,12 @@ class TurnBudget {
 
     /** Spends one mix edit; false once [MAX_MIX_EDITS] are spent this turn. */
     fun tryMixEdit(): Boolean = mixEdits.addAndFetch(1) <= MAX_MIX_EDITS
+
+    /** Counts one rejected vibe; false once more than [MAX_REJECTED_APPLIES] were rejected this turn. */
+    fun tryReject(): Boolean = rejections.addAndFetch(1) <= MAX_REJECTED_APPLIES
+
+    /** [tryReject], except that a call running under [Exempt] is always allowed and never counted. */
+    suspend fun allowReject(): Boolean = isExempt() || tryReject()
 
     /** [tryApply], except that a call running under [Exempt] is always allowed and never counted. */
     suspend fun allowApply(): Boolean = isExempt() || tryApply()
@@ -46,6 +54,8 @@ class TurnBudget {
     companion object {
         const val MAX_APPLIES = 3
         const val MAX_MIX_EDITS = 12
+        /** Rejected vibes the agent may fix and resend in one turn before it must stop and tell the user. */
+        const val MAX_REJECTED_APPLIES = 3
         const val SPENT = "This turn's budget is spent: reply to the user now and let them listen."
     }
 }

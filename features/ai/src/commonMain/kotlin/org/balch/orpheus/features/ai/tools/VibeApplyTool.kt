@@ -186,11 +186,15 @@ class VibeApplyTool(
                 window (moodHarmonics, moodTimbre, spaceDecay) or by pinning the knob: an unpinned
                 knob ignores its JSON value (pulsar_vibe_guide section A).
                 If this returns success=false, read the message, fix the JSON, and call again, unless
-                budgetSpent is true: then reply to the user now.
+                budgetSpent is true: then reply to the user now. A turn allows ${TurnBudget.MAX_REJECTED_APPLIES} fixes of a rejected vibe.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeApplyArgs): VibeApplyResult {
-                val decoded = decodeVibe(json, args.vibeJson)
+                val decoded = if (args.vibeJson.isBlank()) {
+                    Result.failure(IllegalArgumentException("vibeJson was empty: send the complete vibe JSON"))
+                } else {
+                    decodeVibe(json, args.vibeJson)
+                }
                 // A guard refusal waits on the user, so it runs first and leaves the budget for the confirmed apply.
                 if (decoded.isSuccess) {
                     for (guard in guards) {
@@ -232,7 +236,12 @@ class VibeApplyTool(
                         log.warn { "Vibe rejected: ${e.message}" }
                         eventBus.emitFailed(e.message ?: "unknown error")
                         errorLog.record(AgentErrorSource.VIBE, "Could not build vibe: ${e.message}", name)
-                        VibeApplyResult(false, "Could not build vibe: ${e.message}", null)
+                        // A rejected vibe is fixable, but only MAX_REJECTED_APPLIES times a turn.
+                        if (turnBudget.allowReject()) {
+                            VibeApplyResult(false, "Could not build vibe: ${e.message}", null)
+                        } else {
+                            VibeApplyResult(false, REJECTS_SPENT + e.message, null, budgetSpent = true)
+                        }
                     },
                 )
             }
@@ -240,4 +249,9 @@ class VibeApplyTool(
     }
 
     private val log = logging("VibeApplyTool")
+
+    private companion object {
+        const val REJECTS_SPENT = "Still rejected after ${TurnBudget.MAX_REJECTED_APPLIES} fixes this turn. Stop, reply to the " +
+            "user, and tell them in plain words what kept failing. Last error: "
+    }
 }

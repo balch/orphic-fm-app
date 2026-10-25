@@ -328,8 +328,8 @@ class OrpheusAgentConfig(
            - Before you explain or act on the Mixer's numbers (LUFS, pre-clip, past knee, corr), or answer
              how Reset to file, Capture or saved AI vibes work, call dj_app_guide.
         A plain-text reply ends your turn and waits for the user, so send none until step 6; your text
-        reply is what ends the turn. The tools enforce a budget per turn: ${TurnBudget.MAX_APPLIES} applies, and
-        ${TurnBudget.MAX_MIX_EDITS} mix edits when those tools are available. A result with budgetSpent=true
+        reply is what ends the turn. The tools enforce a budget per turn: ${TurnBudget.MAX_APPLIES} applies,
+        ${TurnBudget.MAX_REJECTED_APPLIES} fixes of a rejected vibe, and ${TurnBudget.MAX_MIX_EDITS} mix edits when those tools are available. A result with budgetSpent=true
         means: do not retry, reply to the user now and let them listen.
         Field values: enum fields must use exact allowed values. 'album' is always STEALTH (NOT a
         title; the title goes in 'name'); rootNote/scaleType/envelopeType are also enums. When unsure
