@@ -26,4 +26,9 @@ object DjAiHost {
         if (!DjAppHost.isGraphAlive) DjAppHost.useGraph { createGraphFactory<DjAppGraphIosAi.Factory>().create() }
         DjAppHost.bootGraph()
     }
+
+    /** Hands a tab left by the share extension to the inbox. Call after [bootGraph], on each scene activation. */
+    fun collectSharedTab() {
+        readAndDeleteSharedTab()?.let { DjAppHost.requireGraph().sharedTextInbox.offer(it) }
+    }
 }
