@@ -32,7 +32,7 @@ class VibeCatalogTest {
     fun wipAndUnlistedProvidersAreHiddenByDefault() {
         val providers = setOf<VibeProvider>(
             LazyGuardProvider("Dog House"),          // LIVE in catalog
-            LazyGuardProvider("Corner Office"),      // WIP in catalog
+            LazyGuardProvider("Tremolo Tide"),       // WIP in catalog
             LazyGuardProvider("Totally Unknown"),    // not cataloged
         )
         val curated = VibeCatalog.curate(providers)
@@ -44,10 +44,10 @@ class VibeCatalogTest {
         // visibleThrough = WIP = debug builds / the desktop ear-test harness at `-Pcatalog=wip`.
         val providers = setOf<VibeProvider>(
             LazyGuardProvider("Dog House"),
-            LazyGuardProvider("Corner Office"),
+            LazyGuardProvider("Tremolo Tide"),
         )
         val curated = VibeCatalog.curate(providers, visibleThrough = VibeStatus.WIP)
-        assertEquals(setOf("Dog House", "Corner Office"), curated.map { it.name.value }.toSet())
+        assertEquals(setOf("Dog House", "Tremolo Tide"), curated.map { it.name.value }.toSet())
     }
 
     @Test
