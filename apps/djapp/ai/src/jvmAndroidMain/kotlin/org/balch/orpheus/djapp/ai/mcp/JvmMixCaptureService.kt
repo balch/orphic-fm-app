@@ -13,11 +13,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.djapp.ai.OrphicFiles
+import org.balch.orpheus.djapp.ai.collab.UncapturedMixHold
 import org.balch.orpheus.features.ai.AiVibeArchive
 import org.balch.orpheus.features.ai.tools.vibeApplyJson
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
+import org.balch.orpheus.features.pulsar.bench.CaptureSnapshot
 import org.balch.orpheus.features.pulsar.bench.CaptureWriter
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
@@ -41,6 +43,7 @@ class JvmMixCaptureService(
     archive: AiVibeArchive,
     dispatchers: DispatcherProvider,
     files: OrphicFiles,
+    hold: UncapturedMixHold,
 ) : MixCaptureService by MixCaptureFlow(
     pulsarFeatureProvider,
     controllerProvider,
@@ -48,6 +51,7 @@ class JvmMixCaptureService(
     dispatchers,
     CaptureWriter(files.mixCaptures, repoRoot()),
     CoroutineScope(SupervisorJob() + dispatchers.io),
+    hold::markCaptured,
 )
 
 /** `<repo>/liborpheus_dsp` from the run task, so its parent is the checkout; null when unset, as on Android. */
@@ -58,6 +62,7 @@ internal fun repoRoot(dspDir: String? = System.getProperty("orpheus.dsp.sourceDi
  * The capture flow behind [JvmMixCaptureService]: rows from the bench layers, a file through [writer], and for
  * an AI vibe the rows written into the vibe, archived and re-applied. One capture runs at a time.
  * [scope] runs the load follower that records each vibe's source hash; null leaves it to [recordLoad].
+ * [onCaptured] gets the snapshot each written capture took, so a song end knows the mix is kept.
  */
 internal class MixCaptureFlow(
     private val pulsarFeatureProvider: () -> PulsarFeature,
@@ -66,6 +71,7 @@ internal class MixCaptureFlow(
     private val dispatchers: DispatcherProvider,
     private val writer: CaptureWriter,
     scope: CoroutineScope? = null,
+    private val onCaptured: (CaptureSnapshot) -> Unit = {},
 ) : MixCaptureService {
     private val serial = Mutex()
     // Per vibe name, the source hash at its first load this run (null: no source). Guarded by itself.
@@ -98,6 +104,8 @@ internal class MixCaptureFlow(
         val written = withContext(dispatchers.io) {
             writer.write(vibe, rows, if (ai) null else baselineHash(vibe.name), aiVibe = ai)
         }
+        // The file holds the mix now; an AI vibe's re-apply below clears it anyway.
+        onCaptured(snap)
         fun outcome(ok: Boolean, message: String, applied: Boolean = false) =
             CaptureOutcome(ok, message + clampNote(rows), written.file.absolutePath, rows, written.capture.stale, ai, applied)
 

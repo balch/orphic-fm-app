@@ -27,8 +27,14 @@ import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.models.Vibe
 
-/** What a capture reads: the vibe, its bench layers, and the vibe load they belong to. */
-data class CaptureSnapshot(val vibe: Vibe, val layers: BenchLayers, val loadCount: Int)
+/** What a capture reads: the vibe, its bench layers, and the vibe load they belong to. Mutes and solos are not captured. */
+data class CaptureSnapshot(
+    val vibe: Vibe,
+    val layers: BenchLayers,
+    val loadCount: Int,
+    val muted: Set<Int> = emptySet(),
+    val soloed: Set<Int> = emptySet(),
+)
 
 /** How [MixBenchController.setHeardSend] went. */
 enum class SendEdit { APPLIED, ZERO_SEND, VIBE_LOADING }
@@ -296,7 +302,7 @@ class MixBenchController(
 
     /** The vibe and the layers a capture reads, taken together; null while a vibe load is not yet followed. */
     suspend fun captureSnapshot(): CaptureSnapshot? = lock.withLock {
-        if (loadInFlight()) null else CaptureSnapshot(vibe, _layers.value, pulsar.vibeLoadCount.value)
+        if (loadInFlight()) null else CaptureSnapshot(vibe, _layers.value, pulsar.vibeLoadCount.value, _muted.value, _soloed.value)
     }
 
     suspend fun toggleMute(t: Int) = edit(t) {

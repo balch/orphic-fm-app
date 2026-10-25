@@ -14,6 +14,7 @@ import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.HistoryChange
 import org.balch.orpheus.djapp.ai.collab.HistoryPoint
 import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.collab.UncapturedMixHold
 import org.balch.orpheus.djapp.ai.mcp.MixCaptureFlow
 import org.balch.orpheus.djapp.ai.mcp.repoRoot
 import org.balch.orpheus.features.ai.AiVibeArchive
@@ -290,5 +291,28 @@ class CaptureToolTest {
         assertEquals(repo.absoluteFile, repoRoot(File(repo, "liborpheus_dsp").path))
         assertNull(repoRoot(null))
         assertNull(repoRoot(File(dir, "liborpheus_dsp").path))
+    }
+
+    @Test
+    fun songEndHoldsUncapturedEditsUntilACaptureTakesThem() = runTest {
+        val c = controller()
+        val hold = UncapturedMixHold({ c }, { pulsar })
+        assertFalse(hold.holdsSong(), "a clean mix lets the song move on")
+        c.toggleMute(1)
+        assertTrue(hold.holdsSong(), "a load clears mutes too")
+        c.toggleMute(1)
+        assertFalse(hold.holdsSong())
+
+        c.mix()
+        assertTrue(hold.holdsSong())
+        val flow = MixCaptureFlow(
+            { pulsar }, { c }, FakeArchive(), OneDispatcher(StandardTestDispatcher(testScheduler)), CaptureWriter(dir, null),
+            onCaptured = hold::markCaptured,
+        )
+        assertTrue(flow.capture().ok)
+        assertFalse(hold.holdsSong(), "the capture file has this mix")
+
+        c.setLevelDb(4, -3f)
+        assertTrue(hold.holdsSong(), "an edit after the capture is not in the file")
     }
 }

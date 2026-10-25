@@ -130,18 +130,51 @@ class PulsarSongEndingReapplyTest {
                 "would double-advance the vibe mid-transition",
         )
     }
+
+    @Test
+    fun `restartSong retracts the latched outro and starts a fresh song without a load`() = runTest {
+        val harness = ReapplyHarness(this)
+        harness.armAndEndSong()
+
+        harness.songEnding.restartSong()
+
+        assertEquals(PortValue.IntValue(-1), harness.outroRequestPort(), "only -1 clears C++'s latch without a load")
+        assertEquals(false, harness.songEnding.endingTriggeredForTest)
+        assertEquals(-1, harness.songEnding.finalSectionIndexForTest)
+        assertEquals(0L, harness.songEnding.playingMillisForTest)
+    }
+
+    @Test
+    fun `after restartSong a play-once terminal outro re-arms only once the jump has left it`() = runTest {
+        val harness = ReapplyHarness(this, mkTerminalOutroVibe("Once", playOnce = true))
+        harness.playbackController.play()
+        harness.tick(0, 3)
+        harness.tick(1, 0)
+        assertTrue(harness.songEnding.endingTriggeredForTest, "sanity: a play-once pass arms on reaching the outro")
+
+        harness.songEnding.restartSong()
+        // The jump lands at the next bar line, so a tick or two still reports the outro.
+        harness.tick(1, 1)
+        assertEquals(false, harness.songEnding.endingTriggeredForTest, "must not re-arm the outro it is leaving")
+        assertEquals(PortValue.IntValue(-1), harness.outroRequestPort())
+
+        harness.tick(0, 0)
+        harness.tick(1, 0)
+        assertTrue(harness.songEnding.endingTriggeredForTest, "the next pass ends as usual")
+    }
 }
 
 /**
  * Fire-Sky-shaped vibe: a body section that loops, plus a TERMINAL outro
  * (no transitions) named as `outroIndex`. Only an outro request can reach it.
  */
-private fun mkTerminalOutroVibe(name: String): Vibe =
+private fun mkTerminalOutroVibe(name: String, playOnce: Boolean = false): Vibe =
     mkMinimalVibe(name).copy(
         arrangement = Arrangement(
             introIndex = 0,
             outroIndex = 1,
             lengthSeconds = 120..166,  // Fire Sky's window
+            playOnce = playOnce,
             sections = listOf(
                 Section(
                     name = "body",
@@ -152,8 +185,10 @@ private fun mkTerminalOutroVibe(name: String): Vibe =
         ),
     )
 
-private class ReapplyHarness(private val testScope: TestScope) {
-    val vibe: Vibe = mkTerminalOutroVibe("Fire Sky")
+private class ReapplyHarness(
+    private val testScope: TestScope,
+    val vibe: Vibe = mkTerminalOutroVibe("Fire Sky"),
+) {
     val feature = FakePulsarFeature(vibeList = listOf(vibe), initial = vibe)
     val prefs = MutablePrefs()
 
@@ -197,7 +232,7 @@ private class ReapplyHarness(private val testScope: TestScope) {
     /** One bar tick inside the outro section, without looping back. */
     fun tickOutro(barsElapsed: Int) = tick(1, barsElapsed)
 
-    private fun tick(sectionIndex: Int, barsElapsed: Int) {
+    fun tick(sectionIndex: Int, barsElapsed: Int) {
         // PulsarSongEnding now reads arrangement state via PulsarSession, which is
         // fed by the SynthEngine — not FakePulsarFeature.arrangementStateFlow.
         synthEngine.pulsarArrangementStateFlow.value = PulsarArrangementState(

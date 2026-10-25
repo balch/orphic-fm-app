@@ -103,6 +103,8 @@ internal class StubSongEndingEventSource :
         vibeAppliedCount++
         onVibeAppliedObserver()
     }
+
+    override fun restartSong() {}
 }
 
 /**

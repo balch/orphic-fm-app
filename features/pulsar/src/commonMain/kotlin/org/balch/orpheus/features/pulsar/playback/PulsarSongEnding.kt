@@ -73,6 +73,12 @@ interface SongEndingEventSource {
      * arrangement so the cleared port precedes the `arrangement_generation` fence.
      */
     fun onVibeApplied()
+
+    /**
+     * The song starts over without a load: the same reset as [onVibeApplied], plus retracting the
+     * outro C++ latched, since only a load clears that. The caller jumps to the first section.
+     */
+    fun restartSong()
 }
 
 /**
@@ -124,6 +130,8 @@ class PulsarSongEnding(
     @Volatile private var lastObservedBarsElapsed: Int = -1
     @Volatile private var songEndedEmitted: Boolean = false
     @Volatile private var armedManually: Boolean = false
+    /** The section [restartSong] left, until the jump lands; the terminal-outro net must not re-arm it meanwhile. */
+    @Volatile private var restartFromSection: Int = -1
 
     // Hooks for tests; production paths use real wall-clock + Random.
     internal var nowMillis: () -> Long = { currentTimeMillis() }
@@ -185,6 +193,7 @@ class PulsarSongEnding(
         if (state.sectionIndex < 0) return  // unknown / no arrangement
         // No vibe pushed yet — no song to end. Snapshotted so one tick reads one vibe.
         val vibe = pulsarSession.vibeFlow.value ?: return
+        if (restartFromSection >= 0 && state.sectionIndex != restartFromSection) restartFromSection = -1
 
         // SongEnded fires when the final section ENDS: it either transitioned out, or looped
         // back to bar 0 (a terminal section, which the C++ Markov picker re-enters forever).
@@ -261,7 +270,7 @@ class PulsarSongEnding(
         // arrangement, not the optional timed auto-end, and detection alone cannot un-trap the
         // engine. Gated on minVibeSeconds so an early walk doesn't cut the song short, except
         // for a play-once pass, whose length is the song's.
-        if (!_endingTriggered.value) {
+        if (!_endingTriggered.value && restartFromSection < 0) {
             val arr = vibe.arrangement
             val outroIdx = arr?.outroIndex ?: -1
             val outroSection = arr?.sections?.getOrNull(outroIdx)
@@ -316,6 +325,26 @@ class PulsarSongEnding(
      * is owned exclusively by [PulsarTransitionRunner].
      */
     override fun onVibeApplied() {
+        restartFromSection = -1
+        resetSong()
+        // Defensive: tell C++ to drop any stale outro request from the previous vibe.
+        synthController.setPluginControl(
+            PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
+            IntValue(0),
+        )
+    }
+
+    override fun restartSong() {
+        restartFromSection = lastObservedSectionIndex
+        resetSong()
+        // C++ consumes the port each bar: below zero clears outro_triggered.
+        synthController.setPluginControl(
+            PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
+            IntValue(-1),
+        )
+    }
+
+    private fun resetSong() {
         playingMillis = 0L
         lastTickMillis = if (playbackController.state.value == PlaybackState.Playing) {
             nowMillis()
@@ -328,11 +357,6 @@ class PulsarSongEnding(
         lastObservedBarsElapsed = -1
         songEndedEmitted = false
         armedManually = false
-        // Defensive: tell C++ to drop any stale outro request from the previous vibe.
-        synthController.setPluginControl(
-            PulsarSymbol.ARRANGEMENT_OUTRO_REQUEST.controlId,
-            IntValue(0),
-        )
     }
 
     /**

@@ -34,6 +34,8 @@ class PulsarSongAdvancerTest {
             resolvedStyleFlow
         override fun armOutro() {}
         override fun onVibeApplied() {}
+        var restarts = 0
+        override fun restartSong() { restarts++ }
     }
 
     /** Records calls into the runner so tests can assert on resolved [TransitionSpec]. */
@@ -69,8 +71,10 @@ class PulsarSongAdvancerTest {
         prefs: StubTransitionPreferences = StubTransitionPreferences(),
         runner: PulsarTransitionRunner = RecordingRunner(),
         dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
+        holds: Set<SongEndHold> = emptySet(),
     ): PulsarSongAdvancer = PulsarSongAdvancer(
         feature, source, prefs, makeVibeNavigator(feature, runner, prefs, dispatcher), makeAppCoroutineScope(dispatcher),
+        holds,
     )
 
     @Test
@@ -110,6 +114,37 @@ class PulsarSongAdvancerTest {
         advanceUntilIdle()
 
         assertEquals(listOf("A"), applied, "the song starts over rather than moving on")
+    }
+
+    @Test
+    fun `a held SongEnded restarts the song in place without a load`() = runTest {
+        val vibes = listOf(mkMinimalVibe("A"), mkMinimalVibe("B"))
+        val feature = FakePulsarFeature(vibes, vibes[0])
+        val source = FakeSongEndingEventSource()
+        var held = true
+        val advancer = makeAdvancer(feature, source, holds = setOf(SongEndHold { held }))
+        advanceUntilIdle()
+        @Suppress("UNUSED_EXPRESSION") advancer
+        val loads = feature.vibeLoadCount.value
+
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceUntilIdle()
+        assertEquals("A", feature.vibeFlow.value.name)
+        assertEquals(loads, feature.vibeLoadCount.value, "no load, so the edits stay")
+        assertEquals(1, source.restarts)
+        assertEquals(listOf(0), feature.jumps, "back to the intro")
+
+        // A repeat would reload too, so it is held the same way.
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A", repeat = true))
+        advanceUntilIdle()
+        assertEquals(loads, feature.vibeLoadCount.value)
+        assertEquals(2, source.restarts)
+
+        held = false
+        source.emitter.tryEmit(SongEndingEvent.SongEnded("A"))
+        advanceUntilIdle()
+        assertEquals("B", feature.vibeFlow.value.name, "a clean mix advances as before")
+        assertEquals(2, source.restarts)
     }
 
     @Test
