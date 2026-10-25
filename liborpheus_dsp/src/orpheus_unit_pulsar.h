@@ -13,6 +13,7 @@
 #include "pulsar_storm.h"
 #include "pulsar_street.h"
 #include "pulsar_fog.h"
+#include "pulsar_section_delay.h"
 #include "pulsar_speech.h"
 #include "orpheus_wah_core.h"
 #include "tides2/poly_slope_generator.h"
@@ -946,6 +947,7 @@ struct SectionParam {
     SectionStreetParam street;
     // Fog horn bed (slots 31-35): sounds a phrase on a bar interval; nothing to blend.
     SectionFogParam fog;
+    section_delay::Param delay;
 };
 
 struct ArrangementParams {

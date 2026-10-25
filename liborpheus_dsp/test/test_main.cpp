@@ -152,6 +152,7 @@ static TestSuite suites[] = {
     {"pulsar_pitch_rise", run_pulsar_pitch_rise_tests, true},
     {"pulsar_mood_pitch", run_pulsar_mood_pitch_tests, true},
     {"pulsar_fog", run_pulsar_fog_tests, true},
+    {"pulsar_section_delay", run_pulsar_section_delay_tests, true},
     {"pulsar_harmonics_rise", run_pulsar_harmonics_rise_tests, true},
     {"pulsar_morph_rise", run_pulsar_morph_rise_tests, true},
     {"pulsar_double",   run_pulsar_double_tests,   true},

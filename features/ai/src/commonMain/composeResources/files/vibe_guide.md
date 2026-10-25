@@ -646,6 +646,11 @@ macroOverrides.volume scales the whole mix for the section, and volumeEnvelope (
 outro that fades to silence: [{bar:0,level:1},{bar:4,level:0.4},{bar:5.5,level:0}]. Both need at
 least two sections, and an envelope's last point must not pass the section's barsMin.
 
+A section's delay ({timeA, timeB, feedback}, each optional, same scales as the vibe's effects)
+replaces the vibe's delay while it plays: long, deep echoes for a breakdown, tight ones for the
+drop. It glides to the next section's delay over the transition's pre-roll, so the echoes bend
+in pitch on the way; give the transition a transitionBars when the times differ a lot.
+
 soloMode on a section activates the band's soloist: Jam(probability) for free improvisation,
 LickBuilder(probability, mutationRate) for melodic construction, LongFill for extended fills.
 

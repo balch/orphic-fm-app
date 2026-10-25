@@ -58,6 +58,7 @@ import org.balch.orpheus.features.pulsar.models.ScaleType
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
 import org.balch.orpheus.features.pulsar.models.FootstepPace
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionDelay
 import org.balch.orpheus.features.pulsar.models.SectionFog
 import org.balch.orpheus.features.pulsar.models.FogPattern
 import org.balch.orpheus.features.pulsar.models.SectionStreet
@@ -1031,6 +1032,28 @@ class PulsarSectionProgressionPushTest {
         assertEquals(-2f, floatPort("section_data_${0 * stride + 53}"))
         assertEquals(0.8f, floatPort("section_data_${0 * stride + 54}"))
         assertEquals(0f, floatPort("section_data_${1 * stride + 50}"), "an absent fog has level 0")
+    }
+
+    @Test
+    fun `section delay reaches slots 55 to 57 plus one and unset fields stay zero`() = runTest(testDispatcher) {
+        val vibe = pushTestVibe(
+            sections = listOf(
+                Section(
+                    name = "echo", barsMin = 2, barsMax = 2,
+                    delay = SectionDelay(timeA = 0.5f, feedback = 0.7f),
+                    transitions = listOf(SectionTransition(1, 1f)),
+                ),
+                Section(name = "dry", barsMin = 2, barsMax = 2, transitions = listOf(SectionTransition(0, 1f))),
+            ),
+        )
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        val stride = Arrangement.SECTION_DATA_FIELDS
+        assertEquals(1.5f, floatPort("section_data_${0 * stride + 55}"))
+        assertEquals(0f, floatPort("section_data_${0 * stride + 56}"), "an unset timeB keeps the vibe's")
+        assertEquals(1.7f, floatPort("section_data_${0 * stride + 57}"))
+        assertEquals(0f, floatPort("section_data_${1 * stride + 55}"), "an absent delay is unset")
     }
 
     @Test

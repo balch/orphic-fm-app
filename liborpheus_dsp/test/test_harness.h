@@ -607,6 +607,7 @@ bool run_pulsar_vibrato_tests();
 bool run_pulsar_pitch_rise_tests();
 bool run_pulsar_mood_pitch_tests();
 bool run_pulsar_fog_tests();
+bool run_pulsar_section_delay_tests();
 bool run_pulsar_harmonics_rise_tests();
 bool run_pulsar_slot_tests();
 bool run_pulsar_section_ramp_tests();
