@@ -31,3 +31,8 @@ tasks.withType<KotlinCompile>().configureEach {
         jvmTarget.set(JvmTarget.JVM_21)
     }
 }
+
+dependencies {
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlin.testJunit)
+}
