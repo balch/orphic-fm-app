@@ -91,6 +91,8 @@ class MixBenchController(
     // Ownership, all under [lock]: what the controller writes over the app.
     private val owned = mutableSetOf<Int>()
     private var overlayOwned = false
+    /** True once a delay edit wrote the delay ports; they go back to the vibe on reset, stop and a new vibe. */
+    private var delayOwned = false
     /** Engine-only macro values the playing section holds, as last passed to [PulsarFeature.setBenchMacros]. */
     private var held: Map<Macro, Float> = emptyMap()
 
@@ -116,6 +118,7 @@ class MixBenchController(
         }
         pushGains()
         if (overlayOwned) pushOverlay()
+        if (delayOwned) pushDelay()
         applySectionMacros()
     }
 
@@ -129,6 +132,7 @@ class MixBenchController(
         _loopSection.value = null
         for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         if (overlayOwned) pulsar.setMixOverlay(null)
+        if (delayOwned) pulsar.setBenchDelay(emptyMap(), emptyMap())
         restoreHeldMacros()
     }
 
@@ -259,6 +263,22 @@ class MixBenchController(
         true
     }
 
+    /**
+     * The delay's time or feedback ([DelayFx] scale), absolute. [Scope.VIBE] stands in for the vibe's value, which a
+     * section with its own SectionDelay still overrides; [Scope.SECTION] sets the playing section's. [inScope] edits
+     * that layer without touching the shared [scope]. Returns false, changing nothing, while a vibe load is in flight.
+     */
+    suspend fun setDelayFx(p: DelayFx, v: Float, inScope: Scope? = null): Boolean = lock.withLock {
+        if (loadInFlight()) return@withLock false
+        val value = v.coerceIn(0f, p.max)
+        val s = editSection(inScope ?: _scope.value)
+        val l = _layers.value
+        _layers.value = if (s == null) l.copy(vibe = l.vibe.copy(delayFx = l.vibe.delayFx + (p to value)))
+        else l.withSection(s) { it.copy(delayFx = it.delayFx + (p to value)) }
+        pushDelay()
+        true
+    }
+
     /** The vibe and the layers a capture reads, taken together; null while a vibe load is not yet followed. */
     suspend fun captureSnapshot(): CaptureSnapshot? = lock.withLock {
         if (loadInFlight()) null else CaptureSnapshot(vibe, _layers.value, pulsar.vibeLoadCount.value)
@@ -313,6 +333,7 @@ class MixBenchController(
         if (running) for (t in released) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         pushGains()
         if (keep.isEmpty()) releaseOverlay() else if (overlayOwned) pushOverlay()
+        releaseDelay()
         restoreHeldMacros()
     }
 
@@ -338,6 +359,7 @@ class MixBenchController(
                 it is LayerField.SectionReverb || it is LayerField.SectionDelay
         }
         if (sends || overlayOwned) pushOverlay()
+        if (delayOwned || changed.any { it is LayerField.VibeDelayFx || it is LayerField.SectionDelayFx }) pushDelay()
         if (running) {
             for (f in changed) {
                 if (f is LayerField.VibeMacro) setKnob(f.macro, layers.vibe.macros[f.macro] ?: f.macro.vibeDefault(vibe))
@@ -386,6 +408,7 @@ class MixBenchController(
                 // Layers from a vibe the load follower has not cleared yet must not touch the new vibe's knobs.
                 if (!running || pulsar.vibeLoadCount.value != loadsApplied) return@withLock
                 pushGains()
+                if (delayOwned) pushDelay()
                 applySectionMacros()
                 val loop = _loopSection.value
                 if (loop != null && s >= 0 && s != loop) pulsar.jumpToSection(loop)
@@ -476,6 +499,8 @@ class MixBenchController(
         if (running) for (t in owned) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         owned.clear()
         releaseOverlay()
+        // A load writes the vibe's delay through flows that skip an unchanged value, so hand the ports back here.
+        releaseDelay()
         // The feature drops its copy on a load too; telling it covers any path that didn't.
         if (held.isNotEmpty()) pulsar.setBenchMacros(emptyMap())
         held = emptyMap()
@@ -530,6 +555,18 @@ class MixBenchController(
         if (!overlayOwned) return
         overlayOwned = false
         if (running) pulsar.setMixOverlay(null)
+    }
+
+    private fun pushDelay() {
+        delayOwned = true
+        val l = _layers.value
+        if (running) pulsar.setBenchDelay(l.vibe.delayFx, l.sections[section]?.delayFx.orEmpty())
+    }
+
+    private fun releaseDelay() {
+        if (!delayOwned) return
+        delayOwned = false
+        if (running) pulsar.setBenchDelay(emptyMap(), emptyMap())
     }
 
     /**

@@ -47,7 +47,7 @@ class MixCaptureTool(private val service: MixCaptureService, private val collabM
             resultType = typeToken<MixCaptureResult>(),
             name = "mix_capture",
             description = """
-                Save the live mix edits (levels, pans, sends and macros from mix_set) as vibe field changes in a
+                Save the live mix edits (levels, pans, sends, macros and delay settings from mix_set) as vibe field changes in a
                 capture file, and return the rows. Mutes and solos are not captured.
                 A catalog vibe (in vibe_list): only the file is written, for applying to the vibe's source later;
                 the live mix stays as it is.

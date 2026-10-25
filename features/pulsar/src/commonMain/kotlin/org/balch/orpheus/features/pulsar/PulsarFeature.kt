@@ -77,6 +77,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.SwellAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.TapeAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
+import org.balch.orpheus.features.pulsar.bench.DelayFx
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixOverlay
 import org.balch.orpheus.features.pulsar.kraken.KRAKEN_TARGET_COUNT
@@ -454,6 +455,13 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
      * A macro left out plays [macroKnob] again. A no-op default for preview and stub implementations.
      */
     fun setBenchMacros(values: Map<Macro, Float>) {}
+
+    /**
+     * Mix Bench delay settings, written to the engine only. [vibe] stands in for the vibe's own values, so a
+     * section that sets its own [SectionDelay][org.balch.orpheus.features.pulsar.models.SectionDelay] still wins;
+     * [section] wins over everything while the playing section holds it. Empty maps hand the delay back to the vibe.
+     */
+    fun setBenchDelay(vibe: Map<DelayFx, Float>, section: Map<DelayFx, Float>) {}
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -2312,6 +2320,19 @@ class PulsarViewModel(
         val write = synthController.pluginPortSetter ?: return
         for (m in touched) write(macroSymbol(m).controlId, FloatValue(values[m] ?: macroKnob(m)))
         if (Macro.SPACE in touched) pushEffectiveSends(deepId.value.asFloat())
+    }
+
+    // Like setBenchMacros: the vibe ports take the bench value or the control flow's (the vibe's), and
+    // the bench ports (-1 = none) carry the section value past the arrangement's own SectionDelay.
+    override fun setBenchDelay(vibe: Map<DelayFx, Float>, section: Map<DelayFx, Float>) {
+        val write = synthController.pluginPortSetter ?: return
+        val flows = listOf(pulsarDelayTimeAId, pulsarDelayTimeBId, pulsarDelayFeedbackId)
+        for (p in DelayFx.entries) {
+            val port = PulsarSymbol.entries[PulsarSymbol.PULSAR_DELAY_TIME_A.ordinal + p.ordinal]
+            write(port.controlId, FloatValue(vibe[p] ?: flows[p.ordinal].value.asFloat()))
+            val bench = PulsarSymbol.entries[PulsarSymbol.PULSAR_BENCH_DELAY_TIME_A.ordinal + p.ordinal]
+            write(bench.controlId, FloatValue(section[p] ?: -1f))
+        }
     }
 
     /** The bench overlay sees the section's pan as the vibe's, so a drift and a bench pan compose. */

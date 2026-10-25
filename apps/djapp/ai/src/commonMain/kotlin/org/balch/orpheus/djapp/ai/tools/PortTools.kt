@@ -149,6 +149,16 @@ private val MIX_PORT_CONTROLS: Map<PluginControlId, MixControl> = CAPTURED_PORT_
     block(PulsarSymbol.TRACK_0_PAN_GLIDE, MixControl::Pan)
 }
 
+/** Delay ports port_set refuses, each with the mix_set call that sets it: a raw write would skip History and the capture. */
+private val DELAY_SETTING_PORTS: Map<PluginControlId, String> = buildMap {
+    val fields = listOf("delay_time_a", "delay_time_b", "delay_feedback")
+    for ((i, f) in fields.withIndex()) {
+        val use = "use mix_set field=$f (scope=vibe or section)"
+        put(PulsarSymbol.entries[PulsarSymbol.PULSAR_DELAY_TIME_A.ordinal + i].controlId, use)
+        put(PulsarSymbol.entries[PulsarSymbol.PULSAR_BENCH_DELAY_TIME_A.ordinal + i].controlId, use)
+    }
+}
+
 /** The mixer control a write to [id] changes, or null for a port outside the mix. */
 internal fun mixControl(id: PluginControlId): MixControl? = MIX_PORT_CONTROLS[id]
 
@@ -234,7 +244,8 @@ class PortSetTool(
             description = """
                 Write one control port by its uri:symbol key (see ports_list); the value is clamped to its range.
                 A mix capture never includes these writes, and a vibe load can overwrite them. For track level,
-                pan, sends and the four macros use mix_set instead; writes to those ports follow mix_set's rules:
+                pan, sends and the four macros use mix_set instead; writes to those ports follow mix_set's rules.
+                The delay's time and feedback ports are refused: use mix_set field=delay_time_a, delay_time_b or delay_feedback.
                 $GATE_RULES
             """.trimIndent(),
         ) {
@@ -249,6 +260,7 @@ class PortSetTool(
                     PortType.INT -> PortValue.IntValue(clamped.roundToInt())
                     PortType.BOOLEAN -> PortValue.BoolValue(clamped >= 0.5f)
                 }
+                DELAY_SETTING_PORTS[id]?.let { badArg("$key goes through the mixer: $it, so History and the capture keep it.") }
                 val control = mixControl(id)
                 if (control == null) {
                     synthController.setPluginControl(id, value, ControlEventOrigin.AI)

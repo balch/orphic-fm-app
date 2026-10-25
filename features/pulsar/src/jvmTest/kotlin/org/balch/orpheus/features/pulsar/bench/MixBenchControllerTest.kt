@@ -272,6 +272,33 @@ class MixBenchControllerTest {
     }
 
     @Test
+    fun delaySettingsFollowTheSectionAndGoBackOnResetAndLoad() = runTest {
+        section(1)
+        val c = started()
+        assertTrue(c.setDelayFx(DelayFx.TIME_A, 0.6f, inScope = Scope.VIBE))
+        assertTrue(c.setDelayFx(DelayFx.FEEDBACK, 2f, inScope = Scope.SECTION))
+        assertEquals(mapOf(DelayFx.TIME_A to 0.6f), feature.benchDelayVibe)
+        // Clamped to the delay's ceiling, and held only while section 1 plays.
+        assertEquals(mapOf(DelayFx.FEEDBACK to 0.95f), feature.benchDelaySection)
+        section(2); runCurrent()
+        assertEquals(mapOf(DelayFx.TIME_A to 0.6f), feature.benchDelayVibe)
+        assertTrue(feature.benchDelaySection.isEmpty())
+        section(1); runCurrent()
+        assertEquals(mapOf(DelayFx.FEEDBACK to 0.95f), feature.benchDelaySection)
+
+        c.resetToFile()
+        assertTrue(feature.benchDelayVibe.isEmpty())
+        assertTrue(feature.benchDelaySection.isEmpty())
+        assertEquals(BenchLayers(), c.layers.value)
+
+        c.setDelayFx(DelayFx.TIME_B, 0.3f, inScope = Scope.SECTION)
+        assertEquals(mapOf(DelayFx.TIME_B to 0.3f), feature.benchDelaySection)
+        feature.applyVibe(vibe); runCurrent()
+        assertTrue(feature.benchDelaySection.isEmpty())
+        assertEquals(BenchLayers(), c.layers.value)
+    }
+
+    @Test
     fun resetPutsMacroKnobsBackToTheFile() = runTest {
         val c = started()
         c.setMacro(Macro.ENERGY, 0.7f)

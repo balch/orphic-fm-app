@@ -172,6 +172,19 @@ internal class FakePulsarFeature(
         benchMacros = values
     }
 
+    /** The last [setBenchDelay] maps: the whole-vibe stand-ins and the playing section's values. */
+    var benchDelayVibe: Map<org.balch.orpheus.features.pulsar.bench.DelayFx, Float> = emptyMap()
+        private set
+    var benchDelaySection: Map<org.balch.orpheus.features.pulsar.bench.DelayFx, Float> = emptyMap()
+        private set
+    override fun setBenchDelay(
+        vibe: Map<org.balch.orpheus.features.pulsar.bench.DelayFx, Float>,
+        section: Map<org.balch.orpheus.features.pulsar.bench.DelayFx, Float>,
+    ) {
+        benchDelayVibe = vibe
+        benchDelaySection = section
+    }
+
     /** What the engine plays for [m]: the bench's section value, else the knob. */
     fun engineMacro(m: org.balch.orpheus.features.pulsar.bench.Macro): Float = benchMacros[m] ?: macroKnob(m)
 }

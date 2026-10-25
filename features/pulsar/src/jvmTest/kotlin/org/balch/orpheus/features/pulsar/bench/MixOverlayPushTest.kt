@@ -134,6 +134,30 @@ class MixOverlayPushTest {
         assertEquals(0.35f, overlaid.last { it.first == "track_5_pan" }.second)
     }
 
+    // Bench delay: the vibe ports take the whole-vibe value, the bench ports the section's; empty maps hand both back.
+    @Test
+    fun benchDelayWritesTheVibeAndBenchPorts() = runTest(testDispatcher) {
+        writes.clear()
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), lore, scope, MemoryPrefs())
+        vm.actions.setVibe(lore)
+        advanceUntilIdle()
+        fun last(symbol: String) = writes.last { it.first == symbol }.second
+
+        vm.setBenchDelay(mapOf(DelayFx.TIME_A to 0.6f), mapOf(DelayFx.FEEDBACK to 0.8f))
+        advanceUntilIdle()
+        assertEquals(0.6f, last("pulsar_delay_time_a"))
+        assertEquals(lore.effects.delayTimeB, last("pulsar_delay_time_b"))
+        assertEquals(0.8f, last("pulsar_bench_delay_feedback"))
+        assertEquals(-1f, last("pulsar_bench_delay_time_a"))
+
+        vm.setBenchDelay(emptyMap(), emptyMap())
+        advanceUntilIdle()
+        assertEquals(lore.effects.delayTimeA, last("pulsar_delay_time_a"))
+        assertEquals(-1f, last("pulsar_bench_delay_feedback"))
+        scope.cancel()
+    }
+
     // Section-held macros: the engine and the sends play them; the knob and the save never see them.
     @Test
     fun benchMacrosReachTheEngineButNeverTheSavedState() = runTest(testDispatcher) {

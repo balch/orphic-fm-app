@@ -1462,6 +1462,10 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_section_delay_time_a{-1.0f};
     std::atomic<float> pulsar_section_delay_time_b{-1.0f};
     std::atomic<float> pulsar_section_delay_feedback{-1.0f};
+    // Mix Bench edits from the Kotlin mixer, never persisted. >= 0 wins over the section and vibe values.
+    std::atomic<float> pulsar_bench_delay_time_a{-1.0f};
+    std::atomic<float> pulsar_bench_delay_time_b{-1.0f};
+    std::atomic<float> pulsar_bench_delay_feedback{-1.0f};
 
     float pulsar_delay_time_a_smooth{0.0f};
     float pulsar_delay_time_b_smooth{0.0f};

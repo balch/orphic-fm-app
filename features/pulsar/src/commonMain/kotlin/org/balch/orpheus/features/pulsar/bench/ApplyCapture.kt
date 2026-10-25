@@ -3,6 +3,7 @@ package org.balch.orpheus.features.pulsar.bench
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.Section
+import org.balch.orpheus.features.pulsar.models.SectionDelay
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.TrackVoice
 import org.balch.orpheus.features.pulsar.models.Vibe
@@ -28,6 +29,12 @@ private fun Vibe.applyVibeRow(r: CaptureRow): Vibe {
             Macro.SPACE -> copy(space = n)
         }
     }
+    when (r.field) {
+        CaptureField.DELAY_TIME_A -> return copy(effects = effects.copy(delayTimeA = n))
+        CaptureField.DELAY_TIME_B -> return copy(effects = effects.copy(delayTimeB = n))
+        CaptureField.DELAY_FEEDBACK -> return copy(effects = effects.copy(delayFeedback = n))
+        else -> {}
+    }
     return track(r) { t ->
         when (r.field) {
             CaptureField.VOLUME -> t.copy(engineEdm = t.engineEdm.copy(volume = n))
@@ -37,7 +44,9 @@ private fun Vibe.applyVibeRow(r: CaptureRow): Vibe {
             CaptureField.REVERB_SEND_SPACE -> t.space { copy(reverbSend = n) }
             CaptureField.DELAY_SEND -> t.edm { copy(delaySend = n) }
             CaptureField.DELAY_SEND_SPACE -> t.space { copy(delaySend = n) }
-            CaptureField.MACRO, CaptureField.MACRO_RAMP -> badRow(r, "no whole-vibe ${r.field} field")
+            CaptureField.MACRO, CaptureField.MACRO_RAMP,
+            CaptureField.DELAY_TIME_A, CaptureField.DELAY_TIME_B, CaptureField.DELAY_FEEDBACK,
+            -> badRow(r, "no whole-vibe ${r.field} field")
         }
     }
 }
@@ -51,6 +60,9 @@ private fun Vibe.applySectionRow(r: CaptureRow): Vibe = section(r) { s ->
         CaptureField.DELAY_SEND -> s.override(r) { copy(delaySend = n) }
         CaptureField.MACRO -> s.copy(macroOverrides = s.macroOverrides.with(r, n))
         CaptureField.MACRO_RAMP -> s.copy(rampTo = s.rampTo.with(r, n))
+        CaptureField.DELAY_TIME_A -> s.copy(delay = (s.delay ?: SectionDelay()).copy(timeA = n))
+        CaptureField.DELAY_TIME_B -> s.copy(delay = (s.delay ?: SectionDelay()).copy(timeB = n))
+        CaptureField.DELAY_FEEDBACK -> s.copy(delay = (s.delay ?: SectionDelay()).copy(feedback = n))
         else -> badRow(r, "no section ${r.field} field")
     }
 }

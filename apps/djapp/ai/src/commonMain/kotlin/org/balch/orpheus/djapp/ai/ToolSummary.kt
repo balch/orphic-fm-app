@@ -33,6 +33,7 @@ internal fun toolSummary(tool: String, args: String?, trackName: (Int) -> String
                 "pan" -> "${track() ?: "?"} pan ${CollabMixer.panText(v)}"
                 "reverb", "delay" -> "${track() ?: "?"} ${str("field")} ${f2(v)}"
                 "macro" -> "${str("macro") ?: "macro"} ${f2(v)}"
+                "delay_time_a", "delay_time_b", "delay_feedback" -> "${str("field")} ${f2(v)}"
                 else -> return null
             }
             if (str("scope") == "section") "$what · section" else what
