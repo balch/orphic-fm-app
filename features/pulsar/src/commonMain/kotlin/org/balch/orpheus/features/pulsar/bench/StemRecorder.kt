@@ -124,7 +124,7 @@ class StemRecorder(
         try {
             val buf = FloatArray(DRAIN_FRAMES * StemLayout.FLOATS_PER_FRAME)
             // A re-arm keeps undrained frames, so start from an empty ring and this enable's drop count.
-            while (tap.drain(buf) > 0) Unit
+            while (tap.drain(buf) > 0) { /* discard */ }
             val droppedBase = tap.dropped()
             if (!tap.arm(total)) return result(false, ARM_FAILED)
 
