@@ -119,6 +119,61 @@ if (providers.gradleProperty("trackEdit").orNull.toBoolean()) {
     }
 }
 
+// OG release ships only LIVE vibes (see :features:pulsar's orphic.liveVibesOnly); AI keeps them all.
+val liveVibesOnly = providers.gradleProperty("orphic.liveVibesOnly").orNull == "true"
+tasks.configureEach {
+    when {
+        name == "preOgReleaseBuild" && !liveVibesOnly ->
+            doFirst { throw GradleException("OG release needs -Porphic.liveVibesOnly=true") }
+        name == "preAiReleaseBuild" && liveVibesOnly ->
+            doFirst { throw GradleException("AI release ships every vibe; drop -Porphic.liveVibesOnly=true") }
+    }
+}
+
+// Proves the cut against R8's mapping: no removable vibe class (or file facade)
+// survives, and a LIVE vibe does, so a check against the wrong file can't pass.
+val ogReleaseMapping = mutableMapOf<String, Provider<RegularFile>>()
+androidComponents {
+    onVariants(selector().withName("ogRelease")) { variant ->
+        ogReleaseMapping[variant.name] = variant.artifacts.get(SingleArtifact.OBFUSCATION_MAPPING_FILE)
+    }
+}
+
+val verifyOgReleaseHasOnlyLiveVibes = tasks.register("verifyOgReleaseHasOnlyLiveVibes") {
+    group = "verification"
+    description = "Fails if the OG release R8 mapping keeps a non-LIVE vibe class."
+
+    val mapping = ogReleaseMapping.getValue("ogRelease")
+    val removableList = rootProject.layout.projectDirectory.file("features/pulsar/build/vibe-trace/removable-classes.txt")
+    dependsOn(":features:pulsar:printRemovableVibes")
+    inputs.file(mapping)
+    inputs.file(removableList)
+
+    doLast {
+        val liveControl = "org.balch.orpheus.features.pulsar.vibes.DogHouseVibe"
+        val removable = removableList.asFile.readLines().map { it.trim() }.filter { it.isNotEmpty() }
+        require(removable.isNotEmpty()) { "Empty removable-classes list at ${removableList.asFile}" }
+        val originals = mapping.get().asFile.readLines()
+            .filter { !it.startsWith(" ") && !it.startsWith("#") && " -> " in it }
+            .map { it.substringBefore(" -> ") }
+            .toSet()
+        require(liveControl in originals) {
+            "Expected LIVE $liveControl in the ogRelease mapping; this check would pass against any mapping"
+        }
+        val kept = removable.filter { it in originals }
+        if (kept.isNotEmpty()) {
+            throw GradleException(
+                "OG release keeps non-LIVE vibe classes (build with -Porphic.liveVibesOnly=true):\n" +
+                    kept.joinToString("\n") { "  - $it" },
+            )
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == "bundleOgRelease" || name == "assembleOgRelease") dependsOn(verifyOgReleaseHasOnlyLiveVibes)
+}
+
 // Google Play Developer API publishing (Gradle Play Publisher).
 // Run: ./gradlew :apps:djapp:androidApp:publishReleaseBundle
 play {
