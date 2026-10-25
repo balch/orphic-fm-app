@@ -1,5 +1,7 @@
 package org.balch.orpheus.features.ai.tools
 
+import org.balch.orpheus.features.ai.AgentErrorLog
+import org.balch.orpheus.features.ai.AgentErrorSource
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import ai.koog.serialization.typeToken
@@ -153,6 +155,7 @@ class VibeApplyTool(
     private val turnBudget: TurnBudget,
     // Empty in Orpheus; the DJ app's AI edition asks before an apply wipes the user's live mix.
     private val guards: Set<VibeApplyGuard>,
+    private val errorLog: AgentErrorLog,
 ) : ToolProvider {
 
     private val json = vibeApplyJson
@@ -221,12 +224,14 @@ class VibeApplyTool(
                         } catch (e: Exception) {
                             log.warn { "Vibe apply failed after decode: ${e.message}" }
                             eventBus.emitFailed(e.message ?: "unknown error")
+                            errorLog.record(AgentErrorSource.VIBE, "Could not apply vibe: ${e.message}", name)
                             VibeApplyResult(false, "Could not apply vibe: ${e.message}", null)
                         }
                     },
                     onFailure = { e ->
                         log.warn { "Vibe rejected: ${e.message}" }
                         eventBus.emitFailed(e.message ?: "unknown error")
+                        errorLog.record(AgentErrorSource.VIBE, "Could not build vibe: ${e.message}", name)
                         VibeApplyResult(false, "Could not build vibe: ${e.message}", null)
                     },
                 )

@@ -1,5 +1,6 @@
 package org.balch.orpheus.djapp.ai.collab
 
+import org.balch.orpheus.features.ai.AgentErrorLog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -49,7 +50,7 @@ class WipeGuardTest {
     }
 
     private fun applyTool(r: Rig) =
-        VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), setOf(r.collab.guard)).tool
+        VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), setOf(r.collab.guard), AgentErrorLog()).tool
 
     private fun json(name: String) = vibeApplyJson.encodeToString(vibe(name))
 

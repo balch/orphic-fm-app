@@ -42,6 +42,7 @@ disown
 - `pulsar_vibe_guide`: the composition guide, plus a catalog of shipped vibes for ideas only.
 - `pulsar_cast_vibe`: rolls an 8-track skeleton. Args `mode` (BED_FIXED or ALL_ROLLED; omit for the user's saved mode), `seed` (omit for a random roll), `styleTags` (rock, electro, ambient, reggae, psych, funk) and `pins` (`{track, role, engine}`). Returns `seed`, `summary` (one line per track) and `vibeJson`.
 - `pulsar_apply_vibe`, `pulsar_get_vibe`, `pulsar_vibe_schema`, the other `pulsar_*` tools, `start_composition`: the rest of the vibe-authoring tools.
+- `agent_errors`: the in-app agent's last 100 failures, newest last: AGENT (LLM/API error or a crash in the run), TOOL (a tool call that threw or had bad arguments) and VIBE (`pulsar_apply_vibe` rejections). `clear: true` empties it after reading. MCP only; the in-app agent never sees it.
 - `audio_analyze`: record the next 0.5-15 s (default 5) and measure each stem: level, third-octave spectrum, envelope, onsets, low end and stereo. `stems` and `kinds` narrow it.
 - `audio_capture`: record the next 0.5-30 s (default 10) to one WAV per stem plus `stems.json`, for offline analysis. `stems` narrows it.
 - The 13 stems:
