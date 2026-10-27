@@ -126,6 +126,68 @@ static bool test_evo_timbre_sweep_respects_the_authored_window() {
     return pass;
 }
 
+// evolutionWeight blends the evolution target into the macro value instead of scaling the
+// window, so a fractional weight keeps the MOOD knob in charge of the tone. With evo low == high
+// the target is fixed at 0.80 whatever the tension, so weight 0.5 must land halfway from the
+// mood value (0.30): the old scaled-window form put it at 0.80, the same as weight 1.
+static bool test_evo_weight_blends_toward_the_target() {
+    printf("\n  evolutionWeight blends evolution into the mood value\n");
+    bool pass = true;
+    const int kTrack = 4;
+    const int kBlocks = 1024;
+
+    auto render_high = [&](float weight) {
+        OrpheusEngine* engine = ab_make_playing_engine();
+        setup_fixture_blues(engine);
+        engine->pulsar_track_engine_edm[kTrack].store(20, std::memory_order_relaxed);
+        engine->pulsar_track_engine_space[kTrack].store(20, std::memory_order_relaxed);
+        engine->pulsar_track_macros[kTrack].mood_timbre_min.store(0.30f, std::memory_order_relaxed);
+        engine->pulsar_track_macros[kTrack].mood_timbre_max.store(0.30f, std::memory_order_relaxed);
+        engine->pulsar_tension_evo_timbre_low.store(0.80f, std::memory_order_relaxed);
+        engine->pulsar_tension_evo_timbre_high.store(0.80f, std::memory_order_relaxed);
+        engine->pulsar_tension_evo_timbre_prob.store(1.0f, std::memory_order_relaxed);
+        engine->pulsar_track_evo_weight[kTrack].store(weight, std::memory_order_relaxed);
+        engine->pulsar_seed.store(0xBEA7, std::memory_order_relaxed);
+        trigger_vibe_load(engine);
+        GraphUnit unit = ab_make_pulsar_unit();
+        float hi = -2.0f;
+        for (int b = 0; b < kBlocks; b++) {
+            unit_process_pulsar(&unit, engine, kAbBlockSize, kAbSampleRate);
+            float v = engine->pulsar_track_mod_timbre_debug[kTrack].load(std::memory_order_relaxed);
+            if (v > hi) hi = v;
+        }
+        orpheus_engine_destroy(engine);
+        return hi;
+    };
+
+    // Same RNG hygiene as the window test above: later suites inherit the global state.
+    const uint32_t saved_rng = stmlib::Random::state();
+    stmlib::Random::Seed(saved_rng);
+    const float off = render_high(0.0f);
+    stmlib::Random::Seed(saved_rng);
+    const float half = render_high(0.5f);
+    stmlib::Random::Seed(saved_rng);
+    const float full = render_high(1.0f);
+    stmlib::Random::Seed(saved_rng);
+
+    // Accent boost adds up to 0.09 on top of any of these.
+    printf("    weight 0 -> %.3f, 0.5 -> %.3f, 1 -> %.3f\n", off, half, full);
+    if (full < 0.78f) {
+        printf("      FAIL: weight 1 no longer reaches the evolution target\n");
+        pass = false;
+    }
+    if (half < 0.52f || half > 0.66f) {
+        printf("      FAIL: weight 0.5 should sit halfway between mood (0.30) and target (0.80)\n");
+        pass = false;
+    }
+    if (off > 0.40f) {
+        printf("      FAIL: weight 0 should leave the mood value alone\n");
+        pass = false;
+    }
+    if (pass) printf("    PASS: weight blends, 1 replaces, 0 is off\n");
+    return pass;
+}
+
 // apply_mod's bias recentres `base` toward the engine's range centre so a large swing is not
 // clipped asymmetrically. The three call sites passed a literal 1.0f, so the bias ran at full
 // strength even at modLfoDepth 0, where there is no swing to recentre. The swing term was
@@ -777,6 +839,7 @@ bool run_pulsar_texture_tests() {
     // inserting a scoring test ahead of them silently renumbers the suite.
     if (test_mod_lfo_depth_scales_bias_not_swing()) pass++; else fail++;
     if (test_evo_timbre_sweep_respects_the_authored_window()) pass++; else fail++;
+    if (test_evo_weight_blends_toward_the_target()) pass++; else fail++;
     if (test_soloist_on_texture_slot_escapes_the_notch()) pass++; else fail++;
     if (test_soloist_on_fx_slot_fires()) pass++; else fail++;
     if (test_lick_track_on_texture_slot_escapes_the_notch()) pass++; else fail++;
