@@ -802,6 +802,11 @@ The highest-value part: translate a described feel into concrete parameter choic
   ignores timbre.
 - Clean / polished: VA or PD on the bass, CHD or VA on the comp, with the moodHarmonics window mid
   (0.4-0.6) and moodTimbre low (0.2-0.4), or pinned there.
+- Round bass the MOOD knob still wahs: on PD, timbre is distortion amount (squared), so the stock
+  MELODIC moodTimbre (0.4-0.8) twangs. Give the bass its own window, moodTimbre about (0.12, 0.50),
+  lock moodHarmonics at (0.5, 0.5) so the modulator ratio stays near unison and never goes clangy,
+  and set evolutionWeight 0 so tension doesn't replace the timbre on random steps. Don't pin it:
+  a pin takes the knob away from MOOD. Shipped in Rust Belt.
 - Rare void / breakdown that drops to near-silence and swells back: add a `{"type":"void", ...}`
   entry to `anomalies` with probability 0.04, floorLevel ~0.05, ghostIntensity ~0.5 for a ghost of
   the arrangement flickering through (needs an arrangement). See section 9.
@@ -1067,7 +1072,12 @@ Controls and behaviours the sections above leave out. Section B's rules still ho
   explicitly instead of -1.
 - Pin or window: a pin (pinHarmonics, pinTimbre, pinMorph) locks the value and stops both tension
   drift and the LFO walk; a window with min == max locks the knob but keeps tension drift; a narrow
-  window keeps everything moving inside limits.
+  window keeps everything moving inside limits. A pin also stops the user's MOOD knob reaching that
+  knob, so when MOOD should still sweep the tone, narrow the window instead of pinning.
+- Tension evolution replaces timbre and morph outright on the steps it picks (a random share per
+  step, set by the evolution probabilities). It doesn't add to them. On a track carrying the hook
+  that reads as the tone flickering note to note and the MOOD knob seeming not to work. Set
+  evolutionWeight 0 to keep that track out of it.
 
 ### Comping fields
 - comping style: PAD, FUNK_STABS, ROCK_DOWNBEATS, SKA_UPSTROKES, BLUES_SHUFFLE, JAZZ_COMP,

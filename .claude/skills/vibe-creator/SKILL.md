@@ -185,6 +185,16 @@ TrackVoice(
 
 The auto-evolution rule lives in `orpheus_unit_pulsar.cpp`: `evo_weight = (mm.mood_timbre.max_value > 0.001f) ? 1.0f : 0.0f`.
 
+**A round bass that MOOD still wahs** (the guide's "Round bass" recipe, from `RustBeltVibe.kt`). Prefer this to pinning: a pin cuts the knob off from MOOD.
+
+```kotlin
+macroMap = TrackMacroMap.MELODIC.copy(
+    moodHarmonics = MacroTarget(0.5f, 0.5f),   // PD modulator ratio held near unison
+    moodTimbre = MacroTarget(0.12f, 0.50f),    // stock 0.4-0.8 twangs on PD
+),
+evolutionWeight = 0f,  // tension would replace timbre on random steps and override MOOD
+```
+
 ### `Band` presets
 
 The guide's section 7 covers how a band works and its three traps. In Kotlin, `BandPresets` (`models/BandPresets.kt`) builds a working cast from track indices alone — no hand-written matrices:
