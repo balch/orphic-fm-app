@@ -16,11 +16,11 @@ import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.Vibe
-import org.balch.orpheus.features.pulsar.vibes.AWhalesDreamVibe
+import org.balch.orpheus.features.pulsar.vibes.WhalesDreamVibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
 
 class VibeDiffTest {
-    private val whale: Vibe = AWhalesDreamVibe().vibe
+    private val whale: Vibe = WhalesDreamVibe().vibe
     private val minimal = mkMinimalVibe("Diff")
 
     private fun Vibe.withSection(section: Section) =
