@@ -125,18 +125,28 @@ kotlin {
     }
 }
 
-// ── OG release: live vibes only ───────────────────────────────────────────────
-// A removable file declares only non-LIVE vibes (VibeSourceTrace in build-logic). Under
-// -Porphic.liveVibesOnly=true those files leave every source set, and their Metro
-// contributions with them. verifyVibeSourceTrace (Guard 1) keeps the cut compilable.
+// ── Vibe source cuts: OG release and EXCLUSIVE ────────────────────────────────
+// A removable file declares only vibes its build's cut leaves out (VibeSourceTrace in build-logic):
+// -Porphic.liveVibesOnly=true (OG release) keeps only LIVE, and EXCLUSIVE vibes need
+// -Porphic.exclusiveVibes=true on every build. Removable files leave every source set, and their
+// Metro contributions with them. verifyVibeSourceTrace (Guard 1) keeps each cut compilable.
 //
 //   ./gradlew :features:pulsar:printRemovableVibes
 //   ./gradlew :features:pulsar:verifyVibeSourceTrace
+val vibeCut = VibeSourceTrace.Cut(
+    liveOnly = providers.gradleProperty("orphic.liveVibesOnly").orNull == "true",
+    exclusive = providers.gradleProperty("orphic.exclusiveVibes").orNull == "true",
+)
+
 object VibeTraceFiles {
-    fun trace(catalog: File, sources: Iterable<File>): Pair<Map<String, String>, VibeSourceTrace.Result> {
+    fun trace(
+        catalog: File,
+        sources: Iterable<File>,
+        cut: VibeSourceTrace.Cut,
+    ): Pair<Map<String, String>, VibeSourceTrace.Result> {
         val statuses = VibeSourceTrace.catalogStatuses(catalog.readText())
         val files = sources.filter { it.isFile }.associate { it.absolutePath to it.readText() }
-        return statuses to VibeSourceTrace.removable(files, statuses)
+        return statuses to VibeSourceTrace.removable(files, statuses, cut)
     }
 }
 
@@ -144,11 +154,15 @@ abstract class RemovableVibeSources : ValueSource<Set<String>, RemovableVibeSour
     interface Params : ValueSourceParameters {
         val catalog: RegularFileProperty
         val sources: ConfigurableFileCollection
+        val liveOnly: Property<Boolean>
+        val exclusive: Property<Boolean>
     }
 
     // Runs on every build, so a catalog flip or a new vibe file invalidates the configuration cache.
-    override fun obtain(): Set<String> =
-        VibeTraceFiles.trace(parameters.catalog.get().asFile, parameters.sources).second.removable
+    override fun obtain(): Set<String> {
+        val cut = VibeSourceTrace.Cut(parameters.liveOnly.get(), parameters.exclusive.get())
+        return VibeTraceFiles.trace(parameters.catalog.get().asFile, parameters.sources, cut).second.removable
+    }
 }
 
 abstract class VibeTraceTask : DefaultTask() {
@@ -177,7 +191,7 @@ abstract class VerifyVibeSourceTrace : VibeTraceTask() {
 
     @TaskAction
     fun verify() {
-        val (statuses, result) = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources)
+        val (statuses, result) = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources, VibeSourceTrace.Cut.OG_RELEASE)
         val problems = mutableListOf<String>()
         if (statuses.values.none { it == "LIVE" } || result.vibeFiles == 0 || result.removable.isEmpty()) {
             problems += "Implausible trace: ${statuses.size} catalog entries, ${result.vibeFiles} vibe files, " +
@@ -194,15 +208,19 @@ abstract class VerifyVibeSourceTrace : VibeTraceTask() {
             problems += "$contributions VibeProvider contributions but ${result.names} traced names: every VibeProvider" +
                 " must declare `override val name: VibeName = VibeNames.X`"
         }
-        result.mixed.forEach { (path, hidden) ->
-            problems += "${relative(path)} mixes LIVE and non-LIVE vibes (non-LIVE: ${hidden.sorted().joinToString()})." +
-                " Move the non-LIVE vibes to their own file"
-        }
-        val declarations = result.removable.flatMap { VibeSourceTrace.topLevelDeclarations(File(it).readText()) }.toSet()
-        repoMainSources.filter { it.isFile && it.absolutePath !in result.removable }.forEach { file ->
-            val refs = VibeSourceTrace.referencesTo(declarations, file.readText())
-            if (refs.isNotEmpty()) {
-                problems += "${relative(file.absolutePath)} references removable ${refs.sorted().joinToString()}"
+        for (cut in VibeSourceTrace.Cut.dropping) {
+            val cutResult = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources, cut).second
+            val label = "liveOnly=${cut.liveOnly}, exclusive=${cut.exclusive}"
+            cutResult.mixed.forEach { (path, hidden) ->
+                problems += "[$label] ${relative(path)} mixes kept and dropped vibes (dropped: " +
+                    "${hidden.sorted().joinToString()}). Move each status's vibes to their own file"
+            }
+            val declarations = cutResult.removable.flatMap { VibeSourceTrace.topLevelDeclarations(File(it).readText()) }.toSet()
+            repoMainSources.filter { it.isFile && it.absolutePath !in cutResult.removable }.forEach { file ->
+                val refs = VibeSourceTrace.referencesTo(declarations, file.readText())
+                if (refs.isNotEmpty()) {
+                    problems += "[$label] ${relative(file.absolutePath)} references removable ${refs.sorted().joinToString()}"
+                }
             }
         }
         if (problems.isNotEmpty()) {
@@ -217,9 +235,14 @@ abstract class PrintRemovableVibes : VibeTraceTask() {
     @get:OutputFile
     abstract val removableClasses: RegularFileProperty
 
+    /** -Porphic.exclusiveVibes=true: the OG release keeps EXCLUSIVE vibes, so they aren't listed. */
+    @get:Input
+    abstract val exclusive: Property<Boolean>
+
     @TaskAction
     fun print() {
-        val result = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources).second
+        val cut = VibeSourceTrace.Cut(liveOnly = true, exclusive = exclusive.get())
+        val result = VibeTraceFiles.trace(catalog.get().asFile, pulsarSources, cut).second
         val packageLine = Regex("^package\\s+([\\w.]+)", RegexOption.MULTILINE)
         val classLine = Regex(
             "^(?:@\\w+(?:\\([^)]*\\))?\\s+)*(?:(?:public|internal|private|data|sealed|abstract|open|enum|" +
@@ -255,7 +278,7 @@ fun VibeTraceTask.traceInputs() {
 }
 
 val verifyVibeSourceTrace = tasks.register<VerifyVibeSourceTrace>("verifyVibeSourceTrace") {
-    description = "Guard 1: non-LIVE vibe sources can be dropped without breaking any main source"
+    description = "Guard 1: every vibe source cut can be dropped without breaking any main source"
     group = "verification"
     traceInputs()
     repoMainSources.from(repoMainSourceTree)
@@ -266,17 +289,20 @@ tasks.register<PrintRemovableVibes>("printRemovableVibes") {
     description = "List vibe sources -Porphic.liveVibesOnly=true drops, and their classes"
     group = "help"
     traceInputs()
+    exclusive.set(vibeCut.exclusive)
     removableClasses.set(layout.buildDirectory.file("vibe-trace/removable-classes.txt"))
     outputs.upToDateWhen { false }
 }
 
 tasks.named("jvmTest") { dependsOn(verifyVibeSourceTrace) }
 
-if (providers.gradleProperty("orphic.liveVibesOnly").orNull == "true") {
+if (vibeCut.dropsAnything) {
     val removable = providers.of(RemovableVibeSources::class) {
         parameters {
             catalog.set(vibeCatalogFile)
             sources.from(pulsarMainSources)
+            liveOnly.set(vibeCut.liveOnly)
+            exclusive.set(vibeCut.exclusive)
         }
     }.get()
     kotlin.sourceSets.configureEach {

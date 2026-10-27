@@ -32,6 +32,18 @@ class VibeSourceTraceTest {
     }
 
     @Test
+    fun exclusiveFileNeedsTheSwitchOnEveryBuild() {
+        val files = mapOf("E.kt" to vibe("SPECIAL"), "W.kt" to vibe("WIP_ONE"))
+        val withExclusive = statuses + ("SPECIAL" to "EXCLUSIVE")
+        fun cut(liveOnly: Boolean, exclusive: Boolean) =
+            VibeSourceTrace.removable(files, withExclusive, VibeSourceTrace.Cut(liveOnly, exclusive)).removable
+        assertEquals(setOf("E.kt"), cut(liveOnly = false, exclusive = false))
+        assertEquals(emptySet(), cut(liveOnly = false, exclusive = true))
+        assertEquals(setOf("E.kt", "W.kt"), cut(liveOnly = true, exclusive = false))
+        assertEquals(setOf("W.kt"), cut(liveOnly = true, exclusive = true))
+    }
+
+    @Test
     fun commentMentionIsNotAReference() {
         assertTrue(VibeSourceTrace.referencesTo(setOf("FooVibe"), "// see FooVibe\n/* FooVibe */").isEmpty())
     }

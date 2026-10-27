@@ -1,8 +1,8 @@
 package org.balch.orpheus.buildlogic
 
 /**
- * Regex-only trace of which pulsar vibe sources an OG release can drop (every vibe they declare is
- * non-LIVE). Pure text in, text out so it stays configuration-cache safe.
+ * Regex-only trace of which pulsar vibe sources a build can drop (every vibe they declare has a
+ * status its [VibeSourceTrace.Cut] leaves out). Pure text in, text out so it stays configuration-cache safe.
  */
 object VibeSourceTrace {
     data class Result(
@@ -48,8 +48,33 @@ object VibeSourceTrace {
     fun vibeNamesIn(source: String): Set<String> =
         vibeName.findAll(stripComments(source)).map { it.groupValues[1] }.toSet()
 
+    /**
+     * The catalog statuses one build compiles. An OG release ([liveOnly]) keeps only LIVE, any other
+     * build keeps every tier, and EXCLUSIVE vibes need [exclusive] on every build.
+     */
+    data class Cut(val liveOnly: Boolean, val exclusive: Boolean) {
+        fun keeps(status: String?): Boolean = when (status) {
+            "LIVE" -> true
+            "EXCLUSIVE" -> exclusive
+            else -> !liveOnly
+        }
+
+        val dropsAnything: Boolean get() = liveOnly || !exclusive
+
+        companion object {
+            val OG_RELEASE = Cut(liveOnly = true, exclusive = false)
+
+            /** Every cut that drops a file; Guard 1 checks each one. */
+            val dropping = listOf(
+                OG_RELEASE,
+                Cut(liveOnly = true, exclusive = true),
+                Cut(liveOnly = false, exclusive = false),
+            )
+        }
+    }
+
     /** Keys are paths, values file text. A name missing from [statuses] counts as non-LIVE. */
-    fun removable(files: Map<String, String>, statuses: Map<String, String>): Result {
+    fun removable(files: Map<String, String>, statuses: Map<String, String>, cut: Cut = Cut.OG_RELEASE): Result {
         val removable = linkedSetOf<String>()
         val mixed = linkedMapOf<String, Set<String>>()
         var vibeFiles = 0
@@ -59,9 +84,9 @@ object VibeSourceTrace {
             if (names.isEmpty()) continue
             vibeFiles++
             nameCount += names.size
-            val (live, hidden) = names.partition { statuses[it] == "LIVE" }
+            val (kept, hidden) = names.partition { cut.keeps(statuses[it]) }
             when {
-                live.isEmpty() -> removable += path
+                kept.isEmpty() -> removable += path
                 hidden.isNotEmpty() -> mixed[path] = hidden.toSet()
             }
         }

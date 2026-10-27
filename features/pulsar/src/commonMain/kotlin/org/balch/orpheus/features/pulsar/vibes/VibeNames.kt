@@ -7,7 +7,6 @@ import org.balch.orpheus.features.pulsar.models.VibeName
  * Add one here with a new vibe.
  */
 object VibeNames {
-    val A_WHALES_DREAM = VibeName("A Whale's Dream")
     val AETHER_NATALIS = VibeName("Aether Natalis")
     val ALBATROSS_SONAR = VibeName("Albatross Sonar")
     val ARMY_STOMP = VibeName("Army Stomp")
@@ -38,4 +37,5 @@ object VibeNames {
     val TREMOLO_TIDE = VibeName("Tremolo Tide")
     val VELVET_LEASH = VibeName("Velvet Leash")
     val VOLTAGE_STRUT = VibeName("Voltage Strut")
+    val WHALES_DREAM = VibeName("Whale's Dream")
 }
