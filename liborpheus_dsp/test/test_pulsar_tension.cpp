@@ -678,6 +678,68 @@ static bool test_random_spurt_fires() {
     return ok;
 }
 
+// A ROOT_ONLY track plays only the chord root, so a chromatic nudge can only land a held
+// wrong root (Rust Belt's bass played C#/D# against a D vamp). Chromatic passing must skip it.
+// The same track on FOLLOW is the control that proves the nudge fires at all.
+struct ChromaticTally { int notes = 0; int out_of_scale = 0; };
+
+static ChromaticTally render_chromatic_track3(int chord_follow) {
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_energy.store(0.8f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_track_chord_follow[3].store(chord_follow, std::memory_order_relaxed);
+    engine->pulsar_tension_inner_bars.store(4, std::memory_order_relaxed);
+    engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
+    engine->pulsar_tension_chromatic_passing.store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_seed.store(99, std::memory_order_relaxed);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+    trigger_vibe_load(engine);
+
+    const int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
+    const int si = std::clamp(engine->pulsar_scale_index.load(std::memory_order_relaxed),
+                              0, kNumPulsarScales - 1);
+    const PulsarScale& sc = kPulsarScales[si];
+    auto in_scale = [&](int note) {
+        int pc = ((note - root) % 12 + 12) % 12;
+        for (int i = 0; i < sc.count; i++) if (sc.degrees[i] == pc) return true;
+        return false;
+    };
+
+    ChromaticTally tally;
+    float last = -1.0f;
+    for (int i = 0; i < 6000; i++) {
+        unit_process_pulsar(&unit, engine, 256, 48000.0f);
+        PulsarState* ps = engine->pulsar_state;
+        if (!ps) continue;
+        const float n = ps->tracks[3].target_pitch;
+        if (ps->tracks[3].pending_retrig || n != last) {
+            tally.notes++;
+            if (!in_scale(static_cast<int>(n))) tally.out_of_scale++;
+        }
+        last = n;
+    }
+    orpheus_engine_destroy(engine);
+    return tally;
+}
+
+static bool test_chromatic_passing_skips_root_only() {
+    printf("\n=== Test: chromatic passing skips ROOT_ONLY tracks ===\n");
+    const ChromaticTally root_only = render_chromatic_track3(1);  // ROOT_ONLY
+    const ChromaticTally follow = render_chromatic_track3(0);     // FOLLOW, the control
+    printf("  ROOT_ONLY: %d/%d out of scale; FOLLOW control: %d/%d out of scale\n",
+           root_only.out_of_scale, root_only.notes, follow.out_of_scale, follow.notes);
+    bool pass = root_only.notes > 20 && root_only.out_of_scale == 0 && follow.out_of_scale > 0;
+    printf("  %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // ── TENS-2: evolution smoother decays over multiple bars (releaseSpeed) ──
 //
 // The evo smoother must step ONCE PER BAR (not per audio block) so a high
@@ -1030,6 +1092,7 @@ bool run_pulsar_tension_tests() {
     tally(test_original_lick_immutable());
     tally(test_random_spurt_fires());
     tally(test_tension_evo_release_speed_decays_over_bars());
+    tally(test_chromatic_passing_skips_root_only());
     // conductor tension_drive
     tally(test_tension_drive_raises_intensity_above_baseline());
     tally(test_tension_drive_negative_clamps_and_holds_floor());

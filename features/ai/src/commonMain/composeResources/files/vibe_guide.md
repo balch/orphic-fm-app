@@ -615,7 +615,9 @@ Important: innerBars < 7 disables the octave climax and spurt behaviours — the
 still runs but its peak-time events (octave shift, chromatic passing, spurts) are gated off. Keep
 innerBars >= 8 if you want those moments. volume (0..1) = how much tension affects track gains;
 timing (0..1) = how much it tightens or loosens step timing. tonal.octaveShift and tonal.keyShift
-let tension briefly push the melody up an octave or shift key at the peak.
+let tension briefly push the melody up an octave or shift key at the peak. tonal.chromaticPassing
+moves a random note a semitone up or down (chance = value x tension), not toward the next chord,
+and skips ROOT_ONLY tracks, which play only the root.
 
 tonal.halfLick is an enum, NOT a boolean. "OFF" = the lick plays its full length. "JAM" = loop only
 the lick's first bar so the opening figure repeats while its tone evolves, then re-lock to bar 1 on
@@ -1262,8 +1264,8 @@ Rock (Dog House, Velvet Leash, Fire Sky, Rust Belt):
   FIRST_INVERSION, drop 0.15-0.2, fills TURNAROUND every 6-8 bars. A second chord voice is a
   PAD (Rust Belt's DX3 and ENS).
 - FX and pads: NSE or PAR on track 7 (Fire Sky, Rust Belt), GRN, STR and ENS on 5-6.
-- Tension: innerBars 8, outerBars 32, octaveShift true, chromaticPassing 0.10-0.12 (Fire Sky,
-  Rust Belt). Dog House and Velvet Leash use innerBars 4, which gives up the octave climax
+- Tension: innerBars 8, outerBars 32, octaveShift true, chromaticPassing 0.10 (Fire Sky; Rust
+  Belt turned it off). Dog House and Velvet Leash use innerBars 4, which gives up the octave climax
   (section 6).
 - Sections: 6-8. Intro 2-4 bars, verse 3-10, chorus 2-6, a Jam solo of 4-16 bars after the
   chorus, breakdown 4, outro 4-6. Fire Sky puts a 2-bar LongFill lead-in before the solo, with a
