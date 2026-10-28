@@ -413,6 +413,7 @@ if(BUILD_TESTS)
         test/test_pulsar_pan_glide.cpp
         test/test_pulsar_pad_restrike.cpp
         test/test_pulsar_engine_swap.cpp
+        test/test_pulsar_slot_lock.cpp
         test/test_pulsar_audition_gain.cpp
         test/test_pulsar_grain_fx.cpp
         test/test_pulsar_lick_growth.cpp
