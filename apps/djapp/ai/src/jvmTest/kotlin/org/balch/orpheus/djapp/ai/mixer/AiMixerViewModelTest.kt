@@ -33,7 +33,12 @@ import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.EngineSlot
+import org.balch.orpheus.features.pulsar.bench.knobPath
+import org.balch.orpheus.features.pulsar.bench.lockPath
+import org.balch.orpheus.features.pulsar.models.SlotLock
+import kotlinx.serialization.json.JsonPrimitive
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
@@ -422,14 +427,73 @@ class AiMixerViewModelTest {
     }
 
     @Test
-    fun pickingAnEnginePicksThatSlotForTheKnobs() = runTest(testDispatcher) {
+    fun pickingAnEngineLeavesTheLockAlone() = runTest(testDispatcher) {
         val r = rig(splitVibe()).also { it.pulsar.retunes = true }
-        assertEquals(EngineSlot.EDM, r.vm.stateFlow.value.tracks[4].slot)
-        r.vm.actions.setEngine(4, EngineSlot.SPACE, OrpheusEngineId.VOWEL_FOF)
+        val heard = r.vm.stateFlow.value.tracks[4].slot
+        r.vm.actions.setEngine(4, if (heard == EngineSlot.EDM) EngineSlot.SPACE else EngineSlot.EDM, OrpheusEngineId.VOWEL_FOF)
         advanceUntilIdle()
         val t = r.vm.stateFlow.value.tracks[4]
+        assertEquals(SlotLock.AUTO, t.slotLock)
+        assertEquals(heard, t.slot, "the knobs still show the slot playing")
+        assertEquals(SlotLock.AUTO, r.pulsar.vibeFlow.value.tracks[4].slotLock)
+        assertTrue(r.mixer.history.value.vibeEdits.none { it.path == lockPath(4) })
+    }
+
+    @Test
+    fun lockingATrackEditsItsSlotLockRow() = runTest(testDispatcher) {
+        val r = rig(splitVibe()).also { it.pulsar.retunes = true }
+        val loads = r.pulsar.vibeLoadCount.value
+        r.vm.actions.setSlotLock(4, SlotLock.SPACE)
+        advanceUntilIdle()
+        val rows = r.mixer.history.value.vibeEdits
+        assertEquals(listOf(lockPath(4)), rows.map { it.path })
+        assertEquals(JsonPrimitive("SPACE"), rows.single().after)
+        assertEquals(loads, r.pulsar.vibeLoadCount.value, "a lock retunes; it never reloads the vibe")
+        assertEquals(SlotLock.SPACE, r.pulsar.vibeFlow.value.tracks[4].slotLock)
+        val t = r.vm.stateFlow.value.tracks[4]
+        assertEquals(SlotLock.SPACE, t.slotLock)
         assertEquals(EngineSlot.SPACE, t.slot)
-        assertEquals(OrpheusEngineId.VOWEL_FOF, t.voice.first().engineId, "the knobs now edit the engine just picked")
+        assertTrue(t.knobsLive)
+        assertNull(r.vm.stateFlow.value.notice)
+    }
+
+    @Test
+    fun autoEditsTheRowBack() = runTest(testDispatcher) {
+        val r = rig(splitVibe()).also { it.pulsar.retunes = true }
+        r.vm.actions.setSlotLock(4, SlotLock.EDM)
+        advanceUntilIdle()
+        r.vm.actions.setSlotLock(4, SlotLock.AUTO)
+        advanceUntilIdle()
+        assertTrue(r.mixer.history.value.vibeEdits.all { it.path == lockPath(4) })
+        assertEquals(SlotLock.AUTO, r.pulsar.vibeFlow.value.tracks[4].slotLock)
+        assertEquals(SlotLock.AUTO, r.vm.stateFlow.value.tracks[4].slotLock)
+        assertFalse(r.vm.stateFlow.value.tracks[4].knobsLive)
+    }
+
+    @Test
+    fun aLockInSectionScopeSaysItChangesTheWholeVibe() = runTest(testDispatcher) {
+        val r = rig().also { it.pulsar.retunes = true }
+        r.vm.actions.setScope(Scope.SECTION)
+        advanceUntilIdle()
+        r.vm.actions.setSlotLock(2, SlotLock.EDM)
+        advanceUntilIdle()
+        assertEquals(SlotLock.EDM, r.pulsar.vibeFlow.value.tracks[2].slotLock)
+        assertEquals("Engines change the whole vibe.", r.vm.stateFlow.value.notice)
+    }
+
+    @Test
+    fun voiceKnobUnderAutoWritesNothing() = runTest(testDispatcher) {
+        val r = rig().also { it.pulsar.retunes = true }
+        r.vm.actions.setVoiceKnob(2, EngineKnob.TIMBRE, 0.8f)
+        r.vm.actions.setVoiceKnob(2, EngineKnob.MORPH, null)
+        advanceUntilIdle()
+        assertTrue(r.mixer.history.value.vibeEdits.isEmpty(), "an AUTO track's knobs are off")
+        // Locked, the same turn lands.
+        r.vm.actions.setSlotLock(2, SlotLock.EDM)
+        advanceUntilIdle()
+        r.vm.actions.setVoiceKnob(2, EngineKnob.TIMBRE, 0.8f)
+        advanceUntilIdle()
+        assertTrue(r.mixer.history.value.vibeEdits.any { it.path == knobPath(2, EngineSlot.EDM, EngineKnob.TIMBRE) })
     }
 
     @Test
@@ -442,5 +506,15 @@ class AiMixerViewModelTest {
         assertEquals("The engine did not change. Try again once the vibe has loaded.", r.vm.stateFlow.value.notice)
         assertEquals(OrpheusEngineId.VA, r.pulsar.vibeFlow.value.tracks[2].engineEdm.engineId)
         assertTrue(r.mixer.history.value.vibeEdits.isEmpty())
+    }
+
+    @Test
+    fun refusedLockShowsItsOwnNotice() = runTest(testDispatcher) {
+        val r = rig()
+        r.pulsar.beforeRetune = { r.pulsar.vibeLoadCount.value++ }
+        r.vm.actions.setSlotLock(2, SlotLock.EDM)
+        advanceUntilIdle()
+        assertEquals("The lock did not change. Try again once the vibe has loaded.", r.vm.stateFlow.value.notice)
+        assertEquals(SlotLock.AUTO, r.pulsar.vibeFlow.value.tracks[2].slotLock)
     }
 }

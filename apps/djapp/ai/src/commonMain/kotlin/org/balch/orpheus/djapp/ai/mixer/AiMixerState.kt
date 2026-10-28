@@ -43,6 +43,7 @@ import org.balch.orpheus.features.pulsar.bench.macroView
 import org.balch.orpheus.features.pulsar.bench.pinned
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 import org.balch.orpheus.features.pulsar.bench.vibeDefault
+import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 @Immutable
@@ -58,10 +59,12 @@ data class MixerTrack(
     val muted: Boolean,
     val soloed: Boolean,
     val silenced: Boolean,
-    /** The engine slot the voice knobs edit, picked by the strip's switch or else the one playing. */
+    /** The slot the knobs show: the locked one, else the one energy picks. */
     val slot: EngineSlot = EngineSlot.EDM,
-    /** True while [slot] is the one playing, as the energy macro picks it. */
-    val slotHeard: Boolean = true,
+    /** Holds the track on one engine; under AUTO energy picks and the knobs are off. */
+    val slotLock: SlotLock = SlotLock.AUTO,
+    /** A knob or pin row on either slot moves this track's sound off the file. */
+    val voiceChanged: Boolean = false,
     val edmEngine: String = "",
     val spaceEngine: String = "",
     /** The ids behind [edmEngine] and [spaceEngine], for the strip's engine pickers. */
@@ -69,7 +72,10 @@ data class MixerTrack(
     val spaceEngineId: OrpheusEngineId = OrpheusEngineId.VA,
     /** Harmonics, timbre and morph of [slot]'s engine, in that order. */
     val voice: List<MixerVoiceKnob> = emptyList(),
-)
+) {
+    /** The knobs tune [slot] only while the track is locked to it. */
+    val knobsLive: Boolean get() = slotLock != SlotLock.AUTO
+}
 
 /**
  * One sound knob on a strip. [value] is what plays: the authored value when [pinned], else the macro's ([source]).
@@ -326,13 +332,9 @@ fun changesLabel(count: Int): String = when (count) {
     else -> "$count changes"
 }
 
-/**
- * What the voice knobs need beyond the vibe: the slot playing ([heard]), the strips whose switch picked a slot, and
- * the vibe paths History rows move off the file.
- */
+/** What the voice knobs need beyond the vibe: the slot energy picks ([heard]) and the vibe paths History rows move off the file. */
 data class VoiceView(
     val heard: EngineSlot = EngineSlot.EDM,
-    val picks: Map<Int, EngineSlot> = emptyMap(),
     val edited: Set<String> = emptySet(),
 )
 
@@ -357,7 +359,11 @@ fun mixerState(
     val tracks = vibe.tracks.indices.map { t ->
         val track = vibe.tracks[t]
         val e = layers.effective(vibe, section, t, knobs[Macro.ENERGY] ?: vibe.energy)
-        val slot = voice.picks[t] ?: voice.heard
+        val slot = when (track.slotLock) {
+            SlotLock.AUTO -> voice.heard
+            SlotLock.EDM -> EngineSlot.EDM
+            SlotLock.SPACE -> EngineSlot.SPACE
+        }
         val engine = track.engine(slot)
         val voiceKnobs = EngineKnob.entries.map { k ->
             val pinned = engine.pinned(k)
@@ -396,7 +402,10 @@ fun mixerState(
             soloed = t in soloed,
             silenced = t in muted || (soloed.isNotEmpty() && t !in soloed),
             slot = slot,
-            slotHeard = slot == voice.heard,
+            slotLock = track.slotLock,
+            voiceChanged = EngineSlot.entries.any { s ->
+                EngineKnob.entries.any { k -> knobPath(t, s, k) in voice.edited || knobPinPath(t, s, k) in voice.edited }
+            },
             edmEngine = track.engineEdm.engineId.name,
             spaceEngine = track.engineSpace.engineId.name,
             edmEngineId = track.engineEdm.engineId,

@@ -32,6 +32,7 @@ import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.capture
 import org.balch.orpheus.features.pulsar.bench.knobPath
 import org.balch.orpheus.features.pulsar.bench.withEngineKnob
+import org.balch.orpheus.features.pulsar.models.SlotLock
 
 class AiMixerStateTest {
     private val v = vibe("Mixer")
@@ -321,16 +322,42 @@ class AiMixerStateTest {
         assertEquals(OrpheusEngineId.VA, s.tracks[3].spaceEngineId)
     }
 
+    private fun locked(track: Int, lock: SlotLock) =
+        v.copy(tracks = v.tracks.toMutableList().also { it[track] = it[track].copy(slotLock = lock) })
+
     @Test
-    fun aPickedSlotWinsOverTheHeardOne() {
+    fun autoShowsTheHeardSlotWithKnobsOff() {
+        val s = mixerState(v, 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, emptyMap(), VoiceView(heard = EngineSlot.SPACE))
+        val t = s.tracks[4]
+        assertEquals(SlotLock.AUTO, t.slotLock)
+        assertEquals(EngineSlot.SPACE, t.slot)
+        assertFalse(t.knobsLive)
+    }
+
+    @Test
+    fun aLockPicksTheKnobSlot() {
         val s = mixerState(
-            v, 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, emptyMap(),
-            VoiceView(heard = EngineSlot.EDM, picks = mapOf(4 to EngineSlot.SPACE)),
+            locked(4, SlotLock.EDM), 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, emptyMap(),
+            VoiceView(heard = EngineSlot.SPACE),
         )
-        assertEquals(EngineSlot.SPACE, s.tracks[4].slot)
-        assertFalse(s.tracks[4].slotHeard)
-        assertEquals(EngineSlot.EDM, s.tracks[3].slot)
-        assertTrue(s.tracks[3].slotHeard)
+        val t = s.tracks[4]
+        assertEquals(SlotLock.EDM, t.slotLock)
+        assertEquals(EngineSlot.EDM, t.slot)
+        assertTrue(t.knobsLive)
+        assertEquals(EngineSlot.SPACE, s.tracks[3].slot)
+        assertFalse(s.tracks[3].knobsLive)
+    }
+
+    @Test
+    fun changedCountsBothSlots() {
+        val s = mixerState(
+            locked(4, SlotLock.EDM), 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, emptyMap(),
+            VoiceView(heard = EngineSlot.EDM, edited = setOf(knobPath(4, EngineSlot.SPACE, EngineKnob.TIMBRE))),
+        )
+        val t = s.tracks[4]
+        assertTrue(t.voice.none { it.changed }, "the EDM knobs are on the file")
+        assertTrue(t.voiceChanged, "a SPACE knob row still counts")
+        assertFalse(s.tracks[3].voiceChanged)
     }
 
     @Test

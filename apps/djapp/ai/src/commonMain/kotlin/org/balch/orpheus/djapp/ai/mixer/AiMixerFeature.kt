@@ -10,6 +10,7 @@ import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
+import org.balch.orpheus.features.pulsar.models.SlotLock
 
 /** What the mixer panel can do. Track-indexed edits are whole-vibe or section per [AiMixerUiState.scope]. */
 data class AiMixerActions(
@@ -33,10 +34,10 @@ data class AiMixerActions(
     val hear: (Int) -> Unit = {},
     val endHear: () -> Unit = {},
     val rollBack: (Int) -> Unit = {},
-    /** Turns a voice knob on the strip's picked slot and pins it; a null value returns knob and pin to the file. */
+    /** Turns a voice knob on the track's locked slot and pins it; a null value returns knob and pin to the file. Off under AUTO. */
     val setVoiceKnob: (Int, EngineKnob, Float?) -> Unit = { _, _, _ -> },
-    /** The strip's EDM / SPACE switch: which slot its voice knobs edit. */
-    val pickSlot: (Int, EngineSlot) -> Unit = { _, _ -> },
+    /** Holds a track on its EDM or SPACE engine, or back to AUTO; a vibe row that plays on. */
+    val setSlotLock: (Int, SlotLock) -> Unit = { _, _ -> },
     /** Swaps a slot's engine from the strip's picker; the song plays on and the swap lands on the track's next note. */
     val setEngine: (track: Int, slot: EngineSlot, engine: OrpheusEngineId) -> Unit = { _, _, _ -> },
 ) {

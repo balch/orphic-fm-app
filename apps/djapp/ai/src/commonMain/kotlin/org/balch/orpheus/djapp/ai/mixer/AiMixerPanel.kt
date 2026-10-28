@@ -193,6 +193,7 @@ fun AiMixerPanel(
                     )
                     VoicePopover(
                         voiceTrack,
+                        pinned = voiceTrack.index in state.pins,
                         feature.actions,
                         onClose = closeVoice,
                         Modifier.align(Alignment.Center).padding(16.dp),

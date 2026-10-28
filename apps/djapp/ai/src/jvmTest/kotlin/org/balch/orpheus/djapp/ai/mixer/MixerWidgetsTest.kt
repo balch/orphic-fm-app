@@ -53,8 +53,11 @@ import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
 import org.balch.orpheus.features.pulsar.bench.ChannelMeter
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
+import org.balch.orpheus.features.pulsar.bench.knobMeaning
+import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -321,16 +324,119 @@ class MixerWidgetsTest {
                         assertTrue(natural <= picker.width, "$label is clipped by its pill at $w: pill $picker text needs $natural")
                         assertTrue(picker.width > picker.height, "$tag is a pill: $picker")
                     }
-                    // The pill stands at the height of the slot label, so the header grows no taller than before.
+                    // The pill stands at the height of its row's label; a dot marks the slot playing.
                     val pop = bounds(VOICE_POPOVER_TAG)
-                    val slotText = texts().filter { (text, b) -> text.startsWith("•") && pop.contains(b.center) }
-                    assertTrue(slotText.isNotEmpty(), "the heard dot stays at $w")
-                    assertTrue(bounds(enginePickTag(t, EngineSlot.EDM)).height <= slotText.first().second.height + 1f, "pill taller than its line at $w")
-                    assertTrue(texts().any { it.first == "• EDM" } && texts().any { it.first == "  SPC" }, "the pop-out keeps the slot labels")
+                    val inPop = texts().filter { (_, b) -> pop.contains(b.center) }
+                    val rowLabel = inPop.last { it.first == "EDM" }
+                    assertTrue(bounds(enginePickTag(t, EngineSlot.EDM)).height <= rowLabel.second.height + 1f, "pill taller than its line at $w")
+                    assertTrue(inPop.any { it.first == "SPACE" }, "the pop-out names both slots at $w")
+                    assertEquals(1, inPop.count { it.first == PLAYING_DOT }, "one dot marks the slot playing at $w")
                     assertTrue(texts().none { it.first.contains("VOWEL_FOF") })
                     tapAt(texts().first { it.first == "Done" }.second.center)
                     assertTrue(nodes().none { it.config.getOrNull(SemanticsProperties.TestTag) == VOICE_POPOVER_TAG }, "Done closes it")
                 }
+            }
+        }
+    }
+
+    /** [mixState] with sound knobs on every track and KEYS held by [lock]. */
+    private fun voiced(lock: SlotLock = SlotLock.AUTO) = mixState.copy(
+        tracks = mixState.tracks.map { t ->
+            val id = OrpheusEngineId.VA
+            t.copy(
+                slotLock = if (t.index == 4) lock else SlotLock.AUTO,
+                slot = if (t.index == 4 && lock == SlotLock.SPACE) EngineSlot.SPACE else EngineSlot.EDM,
+                edmEngineId = id,
+                spaceEngineId = OrpheusEngineId.WTB,
+                voice = EngineKnob.entries.map { k ->
+                    val m = knobMeaning(id, k)
+                    MixerVoiceKnob(k, id, m.short, m.long, 0.5f, "0.50", pinned = false, changed = false, source = Macro.MOOD, active = m.active)
+                },
+            )
+        },
+    )
+
+    @Test
+    fun popoutShowsTheLockEnginesKnobsAndMix() {
+        val locks = mutableListOf<Pair<Int, SlotLock>>()
+        val turns = mutableListOf<Float?>()
+        val pinned = mutableListOf<Int>()
+        val actions = AiMixerActions.EMPTY.copy(
+            setSlotLock = { t, l -> locks += t to l },
+            setVoiceKnob = { _, _, v -> turns += v },
+            togglePin = { pinned += it },
+        )
+        mixerScene(1280, 1000, 1f, feature(actions, state = voiced())) {
+            tap(voiceButtonTag(4))
+            for (lock in SlotLock.entries) node(slotLockTag(4, lock))
+            assertEquals(true, node(slotLockTag(4, SlotLock.AUTO)).config.getOrNull(SemanticsProperties.Selected))
+            assertEquals(false, node(slotLockTag(4, SlotLock.EDM)).config.getOrNull(SemanticsProperties.Selected))
+            for (slot in EngineSlot.entries) node(enginePickTag(4, slot))
+            val pop = bounds(VOICE_POPOVER_TAG)
+            val mix = bounds(VOICE_MIX_TAG)
+            assertTrue(pop.contains(mix.center), "the MIX block sits in the pop-out")
+            val inMix = texts().filter { (_, b) -> mix.contains(b.center) }.map { it.first }
+            for (label in listOf("level", "pan", "reverb", "delay", "M", "S")) assertTrue(label in inMix, "MIX lacks $label: $inMix")
+            val pin = nodeIn(VOICE_MIX_TAG, pinTag(4))
+            assertTrue(pin.boundsInRoot.width > 0f && pop.contains(pin.boundsInRoot.center))
+            // Under Auto the knobs are off, and say how to wake them.
+            for (k in 0..2) {
+                assertTrue(SemanticsProperties.Disabled in node(voiceKnobTag(4, k)).config, "knob $k should be disabled under Auto")
+            }
+            assertTrue(texts().any { it.first == "Lock EDM or SPACE to tune its knobs" })
+            assertTrue(texts().any { it.first == "Dim knobs follow MOOD or SPACE; double-tap returns one to the file." })
+            val knob = bounds(voiceKnobTag(4, 1))
+            drag(knob.center, knob.center - Offset(0f, 60f))
+            assertEquals(emptyList(), turns, "a knob turned under Auto")
+
+            tap(slotLockTag(4, SlotLock.EDM))
+            assertEquals(listOf(4 to SlotLock.EDM), locks)
+            tapAt(pin.boundsInRoot.center)
+            assertEquals(listOf(4), pinned)
+        }
+        mixerScene(1280, 1000, 1f, feature(actions, state = voiced(SlotLock.EDM))) {
+            tap(voiceButtonTag(4))
+            assertEquals(true, node(slotLockTag(4, SlotLock.EDM)).config.getOrNull(SemanticsProperties.Selected))
+            for (k in 0..2) assertTrue(SemanticsProperties.Disabled !in node(voiceKnobTag(4, k)).config, "knob $k is live once locked")
+            assertTrue(texts().none { it.first == "Lock EDM or SPACE to tune its knobs" })
+        }
+    }
+
+    @Test
+    fun doubleTapOnAVoiceKnobUnderAutoWritesNothing() {
+        val turns = mutableListOf<Triple<Int, EngineKnob, Float?>>()
+        val actions = AiMixerActions.EMPTY.copy(setVoiceKnob = { t, k, v -> turns += Triple(t, k, v) })
+        mixerScene(1280, 1000, 1f, feature(actions, state = voiced())) {
+            tap(voiceButtonTag(4))
+            val knob = bounds(voiceKnobTag(4, 1)).center
+            tapAt(knob)
+            tapAt(knob)
+            assertEquals(emptyList(), turns, "a double tap on an AUTO track's knob wrote")
+        }
+    }
+
+    @Test
+    fun popoutScrollsOnAShortWindow() {
+        // KICK, the top row, so the short list still shows it. 640 is the phone floor the spec names; at 400 the
+        // pop-out must scroll.
+        for (h in listOf(640, 400)) {
+            val pinned = mutableListOf<Int>()
+            mixerScene(360, h, 1f, feature(AiMixerActions.EMPTY.copy(togglePin = { pinned += it }), state = voiced())) {
+                if (nodes().none { it.config.getOrNull(SemanticsProperties.TestTag) == voiceButtonTag(0) }) tap(rowTag(0))
+                tap(voiceButtonTag(0))
+                val pop = bounds(VOICE_POPOVER_TAG)
+                assertTrue(pop.top >= 0f && pop.bottom <= h, "the pop-out $pop leaves the $h window")
+                fun done() = texts().firstOrNull { it.first == "Done" && it.second.height > 0f && pop.contains(it.second.center) }
+                assertNotNull(done(), "Done shows on open at $h")
+                fun pin() = nodeIn(VOICE_MIX_TAG, pinTag(0)).boundsInRoot.takeIf { it.height > 0f && pop.contains(it.center) }
+                if (h == 400) assertEquals(null, pin(), "the pin should start below the fold at $h")
+                // The left padding is the column's own, so the drag scrolls rather than moving a slider.
+                repeat(3) { drag(Offset(pop.left + 5f, pop.bottom - 20f), Offset(pop.left + 5f, pop.top + 20f)) }
+                tapAt(assertNotNull(pin(), "the pin never scrolled into view at $h").center)
+                assertEquals(listOf(0), pinned, "the pin did not toggle at $h")
+                repeat(3) { drag(Offset(pop.left + 5f, pop.top + 20f), Offset(pop.left + 5f, pop.bottom - 20f)) }
+                tapAt(assertNotNull(done(), "Done never scrolled back at $h").second.center)
+                assertTrue(nodes().none { it.config.getOrNull(SemanticsProperties.TestTag) == VOICE_POPOVER_TAG }, "Done closes it at $h")
             }
         }
     }
@@ -461,10 +567,18 @@ class MixerWidgetsTest {
     }
 
     private class Rig(scene: ImageComposeScene) {
-        private val touch = Touch(scene)
+        val touch = Touch(scene)
         private val scene = scene
 
         fun frame() = touch.frame()
+
+        /** A touch drag in ten steps, then the frames a fling needs to settle. */
+        fun drag(from: Offset, to: Offset) {
+            touch.pointer(PointerEventType.Press, from)
+            for (k in 1..10) touch.pointer(PointerEventType.Move, from + (to - from) * (k / 10f))
+            touch.pointer(PointerEventType.Release, to)
+            repeat(60) { frame() }
+        }
 
         fun nodes(): List<SemanticsNode> {
             val out = mutableListOf<SemanticsNode>()
@@ -474,6 +588,14 @@ class MixerWidgetsTest {
         }
 
         fun node(tag: String) = assertNotNull(nodes().firstOrNull { it.config.getOrNull(SemanticsProperties.TestTag) == tag }, tag)
+
+        /** The node tagged [tag] inside [parent]'s subtree, where a tag is used twice (a strip's and the pop-out's pin). */
+        fun nodeIn(parent: String, tag: String): SemanticsNode {
+            val out = mutableListOf<SemanticsNode>()
+            fun walk(n: SemanticsNode) { out += n; n.children.forEach(::walk) }
+            walk(node(parent))
+            return assertNotNull(out.firstOrNull { it.config.getOrNull(SemanticsProperties.TestTag) == tag }, "$tag in $parent")
+        }
 
         fun bounds(tag: String): Rect = node(tag).boundsInRoot
 
