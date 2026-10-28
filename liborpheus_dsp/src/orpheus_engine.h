@@ -829,9 +829,9 @@ struct OrpheusEngine {
     // Mirrors PulsarTrackState::engine_index — written unconditionally by
     // unit_process_pulsar each block (after the energy-driven slot decision,
     // even when edm == spa or the crossfade zone keeps the prior choice).
-    // Initialized from pulsar_track_engine_edm in set_port whenever Kotlin
-    // assigns the EDM slot, so downstream units (e.g. pulsar_delay) never
-    // read a stale 0 on the first audio block after a vibe load.
+    // Seeded from pulsar_track_engine_edm in set_port while Pulsar is stopped or
+    // mix-gated, so readers never see a stale 0; a mid-play write leaves it on the
+    // live engine until the track adopts the new id.
     std::atomic<int> pulsar_track_active_engine[8]{};
     // 1 while the track plays its SPACE slot. Published beside the engine id because
     // a track with the same engine in both slots still has two sets of params.

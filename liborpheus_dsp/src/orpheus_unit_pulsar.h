@@ -388,6 +388,12 @@ struct PulsarTrackState {
     // the same engine in both slots needs this flag to tell its slots apart.
     bool space_slot = false;
     int engine_index;
+    // The engine ids this track renders with. A changed port waits for the track's next
+    // note-on, or 16 steps, so a live swap never cuts a sounding note.
+    int live_engine_edm = 0;
+    int live_engine_space = 0;
+    // Samples since a pending engine change was seen; -1 when none.
+    int engine_swap_wait = -1;
     float volume;
     float pan;
     // Where pan is gliding, and the port write counts last seen (see pulsar_track_pan_glide).

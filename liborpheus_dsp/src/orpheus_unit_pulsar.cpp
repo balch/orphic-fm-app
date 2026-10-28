@@ -1661,6 +1661,9 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         // the track played last vibe, not the one this load is switching to.
         ts.engine_index = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
         ts.space_slot = false;
+        ts.live_engine_edm = ts.engine_index;
+        ts.live_engine_space = engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed);
+        ts.engine_swap_wait = -1;
 
         // Read per-track voice config from atomics
         ts.volume = engine->pulsar_track_volume[t].load(std::memory_order_relaxed);
@@ -3027,6 +3030,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.playhead = 0;
             ts.engine_index = 0;
             ts.space_slot = false;
+            ts.live_engine_edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+            ts.live_engine_space = engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed);
+            ts.engine_swap_wait = -1;
             ts.volume = 0.0f;
             ts.pan = 0.0f;
             ts.harmonics = 0.0f;
@@ -3716,10 +3722,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         ts.restrike_on_chord = ts.role == TrackRole::CHORDAL
             && engine->pulsar_track_restrike_on_chord_change[t].load(std::memory_order_relaxed) != 0;
 
-        // ── Apply engine selection from atomics (immediate UI response) ──
+        // ── Apply engine selection: the slot flips at once, a new engine id waits ──
         {
-            int edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
-            int spa = engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed);
+            const bool port_changed =
+                engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed) != ts.live_engine_edm
+                || engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed) != ts.live_engine_space;
+            ts.engine_swap_wait = port_changed ? std::max(ts.engine_swap_wait, 0) + num_frames : -1;
+            const int edm = ts.live_engine_edm;
+            const int spa = ts.live_engine_space;
             if (energy > 0.6f) {
                 ts.space_slot = false;
             } else if (energy < 0.4f) {
@@ -5064,11 +5074,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 // Same-engine tracks skip the roll (it would shift mutation_seed for every
                 // vibe) and keep their slot between 0.4 and 0.6.
                 for (int vt = 0; vt < kNumPulsarTracks; vt++) {
-                    int edm = engine->pulsar_track_engine_edm[vt].load(std::memory_order_relaxed);
-                    int spa = engine->pulsar_track_engine_space[vt].load(std::memory_order_relaxed);
+                    PulsarTrackState& vts = state->tracks[vt];
+                    const int edm = vts.live_engine_edm;
+                    const int spa = vts.live_engine_space;
                     if (edm == spa) continue;
 
-                    PulsarTrackState& vts = state->tracks[vt];
                     if (vts.is_soloist) {
                         // Soloists: lock to EDM unless energy is clearly low
                         vts.space_slot = (energy < 0.25f);
@@ -5771,6 +5781,18 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ts.current_pitch = ts.target_pitch;
                 ts.glide_rate = 0.0f;
             }
+        }
+
+        // A pending engine id lands on this block's note-on, or after 16 steps with a forced
+        // strike so self-enveloped engines sound. Every engine_index reader below sees it.
+        if (ts.engine_swap_wait >= 0
+            && (ts.pending_retrig || ts.engine_swap_wait >= 16.0 * samples_per_step)) {
+            if (ts.voice_active) ts.pending_retrig = true;
+            ts.live_engine_edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+            ts.live_engine_space = engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed);
+            ts.engine_swap_wait = -1;
+            ts.engine_index = ts.space_slot ? ts.live_engine_space : ts.live_engine_edm;
+            engine->pulsar_track_active_engine[t].store(ts.engine_index, std::memory_order_relaxed);
         }
 
         // Score firing moved out of this per-track loop: with a flat voice pool a chord's
