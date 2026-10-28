@@ -168,18 +168,17 @@ Panel glyph to preset key to Pulsar field (`features/voice/.../VoiceColumn.kt`, 
   - harmonics is self-feedback (`freq += prev_output * harmonics * 200 Hz`). Pulsar clamps it to
     0.35 (`kOscModRange.harmonics_max`), so panel values above 0.35 are capped.
   - timbre crossfades triangle (0) to square (1), the same on the panel and Pulsar.
-  - morph differs. On the panel it is a plus or minus morph*25 cent detune between the pair
-    (`orpheus_unit_plaits.cpp` ~360-365). On a Pulsar OSC track there is no detune: morph is the
-    FM depth, and only when FM is on (`fmRatio > 0` or `fmFreeHz > 0`). With both 0, morph does
-    nothing. Unpinned, morph follows the SPACE macro (see the `OrpheusEngine.kt` KDoc), so set
-    `pinMorph = true` for an authored depth. A Pulsar OSC track has one morph, so choose between the
-    panel's pair detune (panel morph) and the panel's FM depth (`modSourceLevel`); it cannot carry both.
+  - morph is the pair detune on both: plus or minus morph*25 cents between the pair
+    (`orpheus_unit_plaits.cpp` ~360-365). Pulsar renders it as the double voice (`doubleDetune` +
+    morph*50 cents, capped at 50; `doubleSpread` pans the pair). Unpinned, morph follows the SPACE
+    macro (see the `OrpheusEngine.kt` KDoc), so set `pinMorph = true` to copy the panel value.
   - notes below MIDI 40 are folded up by octaves (`kOscModRange.note_min`), so keep `noteRangeLow >= 40`.
   - panel FM (mod source `FM`, `LFO`, `FLUX` or `TIDES` on an OSC pair) adds `source * level * 200 Hz`
     to the carrier (`orpheus_unit_plaits.cpp` ~407-417). The nearest Pulsar settings: `fmFreeHz > 0`
-    is a free-running modulator at that rate with `morph * 200 Hz` deviation, so `morph` = the pair's
-    `modSourceLevel`; `fmRatio` (0..16, integers stay in tune) is the same idea locked to the note
-    as phase modulation at index `morph * 8`. `fmShape` sets the modulator wave: 0 sine, 0.5
+    is a free-running modulator at that rate with `fmDepth * 200 Hz` deviation, so `fmDepth` = the
+    pair's `modSourceLevel`; `fmRatio` (0..16, integers stay in tune) is the same idea locked to the
+    note as phase modulation at index `fmDepth * 8`. `fmDepth` is used as written; only `morphRise`
+    moves it. `fmShape` sets the modulator wave: 0 sine, 0.5
     triangle, 1 square. Pick `fmFreeHz` to copy a panel LFO or free-running source, `fmRatio` to
     copy partner-voice FM. The panel's actual source signal is not reproduced.
   - examples in the repo: `StayAsleepVibe.kt` (`engineId = OrpheusEngineId.OSC`).
@@ -210,8 +209,8 @@ Tell the user what Pulsar cannot reproduce, with the nearest workaround:
 - Main delay coloring the mix: on the Orpheus graph Pulsar audio also passes through the main
   dual delay, so the panel colors what you hear. The DJ app graph has no main delay. Copy the
   delay times into `VibeEffects` and expect a different tail.
-- OSC engine: the pair detune (panel morph) has no Pulsar equivalent, panel FM sources are only
-  approximated by `fmRatio` / `fmFreeHz`, harmonics caps at 0.35 and notes fold up below MIDI 40.
+- OSC engine: panel FM sources are only approximated by `fmRatio` / `fmFreeHz` / `fmDepth`,
+  harmonics caps at 0.35 and notes fold up below MIDI 40. The pair detune (morph) carries over.
 - Macros and tension evolution dragging unpinned values: pin what matters.
 - Opt-in Pulsar fields that may help (vibrato, pitch rise, harmonics rise), if the branch being
   edited has them. Check `OrpheusEngine.kt` and `VibeEffects.kt` before citing one.

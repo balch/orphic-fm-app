@@ -291,7 +291,7 @@ class StayAsleepVibe : VibeProvider {
                     // cycle is the same two wails. Breathe sinks it from the second cycle:
                     // 6 over this section's 4 cycles is 1.0 / 0.75 / 0.25 / 0, and never rises.
                     6 to TrackSectionOverride(
-                        density = 1f, morph = 1.0f, reverbSend = 0.35f,
+                        density = 1f, reverbSend = 0.35f,
                         breatheBars = 6, breatheFloor = 0f,
                     ),
                     7 to TrackSectionOverride(volume = 0.10f),
@@ -470,8 +470,8 @@ class StayAsleepVibe : VibeProvider {
                 //
                 // harmonics/timbre are deliberately NOT authored. On OSC both are macro- and
                 // evolution-driven on this track, so a static would be a value the gate never
-                // lets through. The ranges below are where they really live. Morph is the
-                // exception: it is the FM index, pinned so it can be shaped per note.
+                // lets through. The ranges below are where they really live. Morph (the
+                // detune) is pinned at 0; fmDepth is the FM index, shaped per note.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.OSC,
                     volume = 0.90f,
@@ -487,9 +487,9 @@ class StayAsleepVibe : VibeProvider {
                     fmShape = 0.20f,          // mostly sine: the index envelope below carries the bite
                     // FM that moves: each note hits at index 0.30 * 8 = 2.4 rad, then falls to
                     // 0.06 (about 0.5 rad, nearly pure) over 150 ms. Bite on the attack, a
-                    // round ring under the slide. Pinned, so Space and the tension sweep can't
-                    // hold the index steady over the note. EAR-TUNE(user owns after ear test)
-                    morph = 0.30f,
+                    // round ring under the slide. EAR-TUNE(user owns after ear test)
+                    fmDepth = 0.30f,
+                    morph = 0f,
                     pinMorph = true,
                     morphRise = -0.24f,
                     morphRiseTime = 0.15f,
@@ -604,7 +604,7 @@ class StayAsleepVibe : VibeProvider {
                     )
                 },
                 // Track 6 — THE SIREN. OSC in free-run FM is a real frequency sweep of
-                // morph × 200 Hz at fmFreeHz, so one held note wails. Holds only exist on
+                // fmDepth × 200 Hz at fmFreeHz, so one held note wails. Holds only exist on
                 // tracks 5-7, and the OSC gate stays high through a hold, so a wail spans it.
                 //
                 // Every note-on resets the sweep to phase 0, so the hold has to outlast the
@@ -618,7 +618,8 @@ class StayAsleepVibe : VibeProvider {
                     volume = 0.10f,
                     fmFreeHz = 1f / 3f,       // two wails per 32-step cycle at 80 BPM
                     fmShape = 0f,             // sine sweep
-                    morph = 1f,               // full ±200 Hz; sections set their own depth
+                    fmDepth = 1f,             // full ±200 Hz
+                    morph = 0f,
                     pinMorph = true,
                     timbre = 0.35f,           // mostly triangle, a little edge
                     pinTimbre = true,

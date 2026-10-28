@@ -9,6 +9,11 @@ data class OrpheusEngine(
     val volume: Float = .8f,
     val harmonics: Float = 0.5f,
     val timbre: Float = 0.5f,
+    /**
+     * On [OrpheusEngineId.OSC] morph is the Orpheus panel's duo detune: the voice renders twice,
+     * ±morph × 25 cents apart, through the double voice. It adds `morph × 50` cents to
+     * [doubleDetune], capped at 50. FM depth is [fmDepth].
+     */
     val morph: Float = 0.5f,
     val modLfoRate: Float = 0.2f,
     val modLfoDepth: Float = 0.0f,
@@ -94,13 +99,7 @@ data class OrpheusEngine(
     /**
      * Modulator frequency as a multiple of the carrier. `0f` = FM off.
      * Integer values (1, 2, 3) are harmonic; fractional (1.5, 2.7) go clangy.
-     * Effective only on [OrpheusEngineId.OSC].
-     *
-     * FM depth is **[morph]** on OSC tracks, not a field of its own. Unpinned,
-     * morph resolves from the SPACE macro through the track's `spaceDecay` range,
-     * so the SPACE knob sweeps FM index live and the authored [morph] is inert.
-     * Set [pinMorph] to make the authored value the depth. Accent never reaches
-     * morph — the velocity boost applies to harmonics and timbre only.
+     * Effective only on [OrpheusEngineId.OSC]. How much FM is [fmDepth].
      */
     val fmRatio: Float = 0f,
     /** Modulator waveform: 0 sine, 0.5 triangle, 1 square. Higher = brighter. */
@@ -111,6 +110,12 @@ data class OrpheusEngine(
      * Timbre then changes with every note, which is why ratio mode is default.
      */
     val fmFreeHz: Float = 0f,
+    /**
+     * OSC FM depth, 0..1: index `fmDepth × 8` rad in ratio mode, `fmDepth × 200` Hz of sweep in
+     * free-run mode. 0 is FM off. Used as authored: no macro or tension reaches it, only
+     * [morphRise], which on OSC moves this depth instead of [morph].
+     */
+    val fmDepth: Float = 0f,
     /**
      * Mist ([OrpheusEngineId.MST]), or any engine with [grainFx]; otherwise inert. On a Mist track
      * [harmonics] picks the wavetable bank, [timbre] the position in it, and [morph]
@@ -156,8 +161,9 @@ data class OrpheusEngine(
     /**
      * Amount added to morph over each note, -1..1, then held. 0 is off. On SPK morph picks the
      * vowel, so this sweeps it within each note; on VOWEL_FOF harmonics is the vowel and morph the
-     * voice type. A note-on glides back over 80 ms. On OSC morph is the FM index, so a negative
-     * rise is a pluck's FM decay, and there a note-on snaps back so each attack hits at full index.
+     * voice type. A note-on glides back over 80 ms. On OSC the rise moves [fmDepth], not morph (the
+     * detune), so a negative rise is a pluck's FM decay; a note-on snaps back so each attack hits at
+     * full index.
      */
     val morphRise: Float = 0f,
     /** Seconds the sweep takes to reach the full [morphRise]. */
@@ -174,6 +180,7 @@ data class OrpheusEngine(
         require(fmRatio in 0f..16f) { "fmRatio must be 0..16, was $fmRatio" }
         require(fmShape in 0f..1f) { "fmShape must be 0..1, was $fmShape" }
         require(fmFreeHz in 0f..2000f) { "fmFreeHz must be 0..2000, was $fmFreeHz" }
+        require(fmDepth in 0f..1f) { "fmDepth must be 0..1, was $fmDepth" }
         require(grainScatter in 0f..1f) { "grainScatter must be 0..1, was $grainScatter" }
         require(grainRate in 0f..1f) { "grainRate must be 0..1, was $grainRate" }
         require(grainShape in 0f..1f) { "grainShape must be 0..1, was $grainShape" }

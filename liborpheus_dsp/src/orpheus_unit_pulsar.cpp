@@ -3781,6 +3781,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.fm_ratio   = PULSAR_PICK(fm_ratio);
             ts.fm_shape   = PULSAR_PICK(fm_shape);
             ts.fm_free_hz = PULSAR_PICK(fm_free_hz);
+            const float fm_depth = PULSAR_PICK(fm_depth);
+            ts.fm_depth = scope_is_finite(fm_depth) ? std::clamp(fm_depth, 0.0f, 1.0f) : 0.0f;
             ts.grain_mode          = PULSAR_PICK(grain_mode);
             ts.grain_scatter_mode  = PULSAR_PICK(grain_scatter_mode);
             ts.grain_voicing       = PULSAR_PICK(grain_voicing);
@@ -6130,13 +6132,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Morph rise ──
         // The same per-note ramp on morph: on SPK morph picks the vowel, so a rise sweeps it
         // within each note (VOWEL_FOF's vowel is harmonics). Added after every morph modulation.
-        // On OSC morph is the FM index, and a falling rise is a pluck's FM decay: the note-on
-        // snaps back so every attack gets its full index rather than swelling into it.
+        // On OSC the rise moves the FM depth instead of morph (the detune), and a falling rise
+        // is a pluck's FM decay: the note-on snaps back so every attack gets its full index.
+        float osc_fm_depth = ts.fm_depth;
         if (ts.morph_rise != 0.0f) {
-            mod_morph += advance_note_rise(ts.morph_rise, ts.morph_rise_time, ts.pending_retrig,
-                                           ts.morph_rise_progress, ts.morph_rise_offset,
-                                           ts.morph_rise_return_from, ts.morph_rise_return_progress,
-                                           num_frames, sample_rate, ts.engine_index < 0);
+            const float rise = advance_note_rise(ts.morph_rise, ts.morph_rise_time, ts.pending_retrig,
+                                                 ts.morph_rise_progress, ts.morph_rise_offset,
+                                                 ts.morph_rise_return_from, ts.morph_rise_return_progress,
+                                                 num_frames, sample_rate, ts.engine_index < 0);
+            if (ts.engine_index < 0) osc_fm_depth += rise;
+            else                     mod_morph += rise;
         }
 
         // ── Render voice ──
@@ -6170,7 +6175,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // the track's own, or the detuned double's second set in state->dbl. Scalars are
         // copied so no local's address escapes; that keeps the wah loops' codegen unchanged.
         // `note_on` is the set's note-on: ts.pending_retrig, plus the double's activation edge.
-        auto render_engine = [&ts, mod_harmonics, mod_timbre, mod_morph, sample_rate, num_frames,
+        auto render_engine = [&ts, mod_harmonics, mod_timbre, mod_morph, osc_fm_depth, sample_rate, num_frames,
                               gate_for_render, active_lpg_mode, is_self_env, accent_for_render](
                                  auto& vs, float note, float* out, bool note_on) {
             if (ts.engine_index >= 100 && ts.engine_index < 200) {
@@ -6241,7 +6246,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     const int g_pre = ts.gate_pre_boundary ? 1 : 0;
                     osc::process_osc_block(
                         vs.osc_state, note,
-                        clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
+                        clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(osc_fm_depth),
                         ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
                         g_pre,
                         sample_rate, out, trig_off);
@@ -6253,7 +6258,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
                 osc::process_osc_block(
                     vs.osc_state, note,
-                    clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
+                    clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(osc_fm_depth),
                     ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
                     gate_for_render,
                     sample_rate, out + trig_off, num_frames - trig_off);
@@ -6314,7 +6319,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         // Detuned double: voice A at note - d/2, voice B at note + d/2, as an equal-power mid in
         // track_buffer and a side in double_side, which is only read while the double is active.
-        const bool double_active = ts.double_detune > 0.0f && ts.engine_index != kMistEngineId;
+        // On OSC morph is the Orpheus panel's duo detune, +-morph*25 cents, so it adds
+        // kOscMorphDetuneCents * morph to the authored doubleDetune, capped at the double's max.
+        const float double_detune = (ts.engine_index < 0)
+            ? std::min(ts.double_detune + kOscMorphDetuneCents * clamp01(mod_morph), kDoubleDetuneMaxCents)
+            : ts.double_detune;
+        const bool double_active = double_detune > 0.0f && ts.engine_index != kMistEngineId;
         float double_side[kMaxFrames];
         if (ts.engine_index == kMistEngineId) {
             // Mist: one call per block. The kernel builds its own per-sample gate from
@@ -6344,11 +6354,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         } else if (double_active) {
             // Live changes glide at block rate; turning on snaps to the targets.
             if (!ts.double_prev_active) {
-                ts.double_detune_smooth = ts.double_detune;
+                ts.double_detune_smooth = double_detune;
                 ts.double_spread_smooth = ts.double_spread;
             } else {
                 const float c = block_smooth_coeff(sample_rate, num_frames, kDoubleGlideSeconds);
-                ts.double_detune_smooth += c * (ts.double_detune - ts.double_detune_smooth);
+                ts.double_detune_smooth += c * (double_detune - ts.double_detune_smooth);
                 ts.double_spread_smooth += c * (ts.double_spread - ts.double_spread_smooth);
             }
             const float half = ts.double_detune_smooth * 0.005f;   // half the cents, in semitones

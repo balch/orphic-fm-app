@@ -67,7 +67,7 @@ class PulsarPluginLickPortsTest {
         // OSC track lost its FM mid-session while harmonics/timbre/morph came back.
         val plugin = PulsarPlugin()
         val registered = plugin.ports.map { it.symbol }.toSet()
-        for (family in listOf("FM_RATIO", "FM_SHAPE", "FM_FREE_HZ")) {
+        for (family in listOf("FM_RATIO", "FM_SHAPE", "FM_FREE_HZ", "FM_DEPTH")) {
             for (suffix in listOf("", "_SPACE")) {
                 val symbols = PulsarSymbol.entries.filter {
                     it.name.matches(Regex("TRACK_[0-7]_$family$suffix"))

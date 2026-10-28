@@ -1,6 +1,7 @@
 // Opt-in per-track morph rise: each note-on adds up to `morph_rise` to the track's morph over
-// `morph_rise_time` seconds, then holds, and a note-on glides back over 80 ms (snaps on OSC). Read from the
-// per-block morph debug publish, with morph pinned so nothing else moves it.
+// `morph_rise_time` seconds, then holds, and a note-on glides back over 80 ms. Read from the
+// per-block morph debug publish, with morph pinned so nothing else moves it. On OSC the rise moves
+// the FM depth instead of morph (the detune) and a note-on snaps it back.
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/orpheus_graph.h"
@@ -28,6 +29,7 @@ struct MRiseSetup {
 struct MRiseRun {
     std::vector<float> morph;
     std::vector<float> progress;   // morph_rise_progress after each block
+    std::vector<float> offset;     // morph_rise_offset after each block: the rise added this block
 };
 
 static MRiseRun run_mrise(const MRiseSetup& s) {
@@ -70,6 +72,7 @@ static MRiseRun run_mrise(const MRiseSetup& s) {
         const PulsarTrackState& ts = engine->pulsar_state->tracks[kRiseTrack];
         r.morph.push_back(engine->pulsar_track_mod_morph_debug[kRiseTrack].load(std::memory_order_relaxed));
         r.progress.push_back(ts.morph_rise_progress);
+        r.offset.push_back(ts.morph_rise_offset);
     }
     orpheus_engine_destroy(engine);
     return r;
@@ -183,19 +186,24 @@ static bool test_mrise_note_on_glides_back() {
 }
 
 static bool test_mrise_osc_note_on_snaps() {
-    printf("\n=== Test: on OSC a note-on snaps a falling rise back to the pinned FM index ===\n");
+    printf("\n=== Test: on OSC the rise moves FM depth, not morph, and a note-on snaps it back ===\n");
     MRiseSetup on;
-    on.engine_edm = on.engine_space = -1;  // OSC: morph is the FM index
+    on.engine_edm = on.engine_space = -1;  // OSC: morph is the detune, the rise goes to FM depth
     on.pinned = 0.5f;
     on.rise_edm = on.rise_space = -0.3f;
-    on.time = 0.1f;  // done well inside every note, so each later note-on starts from 0.2
+    on.time = 0.1f;  // done well inside every note, so each later note-on starts from -0.3
     const MRiseRun rise = run_mrise(on);
     const std::vector<int> ons = mrise_note_ons(rise);
     float worst = 0.0f;
-    for (size_t k = 1; k < ons.size(); k++)
-        worst = std::max(worst, std::fabs(rise.morph[ons[k]] - 0.5f));
-    printf("  note-ons=%zu worst note-on deviation from 0.5=%.4f\n", ons.size(), worst);
-    const bool ok = ons.size() >= 3 && worst < 1e-4f;
+    for (size_t k = 1; k < ons.size(); k++) worst = std::max(worst, std::fabs(rise.offset[ons[k]]));
+    float reached = 0.0f, morph_drift = 0.0f;
+    for (size_t i = 0; i < rise.morph.size(); i++) {
+        reached = std::min(reached, rise.offset[i]);
+        morph_drift = std::max(morph_drift, std::fabs(rise.morph[i] - 0.5f));
+    }
+    printf("  note-ons=%zu worst note-on offset=%.4f, deepest offset=%.3f, morph drift=%.4f\n",
+           ons.size(), worst, reached, morph_drift);
+    const bool ok = ons.size() >= 3 && worst < 1e-4f && reached < -0.29f && morph_drift < 1e-6f;
     printf("Morph rise OSC snap: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }

@@ -187,13 +187,13 @@ static bool test_fm_off_is_off() {
     // FM off via ratio 0.
     osc::process_osc_block(a, 60.0f, 0.3f, 0.5f, 1.0f,
                            0.0f, 0.5f, 0.0f, 1, 48000.0f, out_a, 1024);
-    // FM off, and morph is irrelevant when ratio is 0.
+    // FM off, and depth is irrelevant when ratio is 0.
     osc::process_osc_block(b, 60.0f, 0.3f, 0.5f, 0.0f,
                            0.0f, 0.5f, 0.0f, 1, 48000.0f, out_b, 1024);
     double max_diff = 0.0;
     for (int i = 0; i < 1024; i++)
         max_diff = std::max(max_diff, (double)std::fabs(out_a[i] - out_b[i]));
-    printf("  max diff with morph 1.0 vs 0.0 at ratio 0: %.3e\n", max_diff);
+    printf("  max diff with depth 1.0 vs 0.0 at ratio 0: %.3e\n", max_diff);
     bool ok = (max_diff < 1e-6);
     printf("FM off: %s\n", ok ? "PASS" : "FAIL");
     return ok;
@@ -228,10 +228,10 @@ static bool test_ratio_mode_holds_index_across_notes() {
 // Spread of one render divided by the carrier period, the same normalization
 // test_ratio_mode_holds_index_across_notes uses. Raw spread scales with the
 // carrier, so unnormalized it measures pitch rather than modulation.
-static double normalized_spread(float note, float morph, float fm_free_hz,
+static double normalized_spread(float note, float depth, float fm_free_hz,
                                 float* buf, int n) {
     PulsarOscState st;
-    osc::process_osc_block(st, note, 0.0f, 0.0f, morph,
+    osc::process_osc_block(st, note, 0.0f, 0.0f, depth,
                            0.0f, 0.0f, fm_free_hz, 1, 48000.0f, buf, n);
     double f = 440.0 * std::pow(2.0, (note - 69.0) / 12.0);
     return spectral_spread(buf, n) * (48000.0 / f);
@@ -339,7 +339,7 @@ static bool test_feedback_holds_pitch_at_the_clamp_ceiling() {
         PulsarOscState st;
         // FM fully off: ratio 0 and free-run 0, so this isolates self-feedback.
         osc::process_osc_block(st, notes[k], kOscModRange.harmonics_max,
-                               /*timbre=*/1.0f, /*morph=*/0.0f,
+                               /*timbre=*/1.0f, /*fm_depth=*/0.0f,
                                /*fm_ratio=*/0.0f, /*fm_shape=*/0.0f,
                                /*fm_free_hz=*/0.0f, 1, (float)kSr,
                                out, kSkip + kMeasure);
@@ -360,7 +360,7 @@ static bool test_all_settings_sweep_is_finite() {
     int checked = 0;
     static float out[65536];
     // Converged worst-case |DC| is 0.3533 at note=40 harm=0.35 timbre=1.00
-    // morph=0: self-feedback skews a square wave's duty cycle toward -1 while
+    // depth=0: self-feedback skews a square wave's duty cycle toward -1 while
     // still swinging the full range, so it is asymmetry, not a freeze. It read
     // 0.5503 before the feedback path was DC blocked; two thirds of the skew
     // survives, which is the growl the harmonics knob exists for.
@@ -376,7 +376,7 @@ static bool test_all_settings_sweep_is_finite() {
     for (float note = kOscModRange.note_min; note <= 96.0f; note += 8.0f)
     for (float harm = 0.0f; harm <= kOscModRange.harmonics_max; harm += kOscModRange.harmonics_max / 2.0f)
     for (float timb = 0.0f; timb <= 1.0f; timb += 0.5f)
-    for (float morph = 0.0f; morph <= 1.0f; morph += 0.5f)
+    for (float depth = 0.0f; depth <= 1.0f; depth += 0.5f)
     for (float ratio = 0.0f; ratio <= 8.0f; ratio += 2.0f)
     for (float shape = 0.0f; shape <= 1.0f; shape += 0.5f) {
         // 32 periods is sized for convergence, not merely for whole cycles:
@@ -388,7 +388,7 @@ static bool test_all_settings_sweep_is_finite() {
         if (n > 65536) n = 65536;
 
         PulsarOscState st;
-        osc::process_osc_block(st, note, harm, timb, morph,
+        osc::process_osc_block(st, note, harm, timb, depth,
                                ratio, shape, 0.0f, 1, 48000.0f, out, n);
         bool bad = false;
         double sum = 0.0;
@@ -397,8 +397,8 @@ static bool test_all_settings_sweep_is_finite() {
             // kEngine0OutGain, not 1.0: the kernel's own ceiling, so a lost or
             // doubled output gain shows up as a sweep failure.
             if (!std::isfinite(out[i]) || std::fabs(out[i]) > kEngine0OutGain + 1e-6f) {
-                printf("  BAD note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f -> %.4f\n",
-                       note, harm, timb, morph, ratio, shape, out[i]);
+                printf("  BAD note=%.0f h=%.2f t=%.2f d=%.2f r=%.1f s=%.1f -> %.4f\n",
+                       note, harm, timb, depth, ratio, shape, out[i]);
                 ok = false;
                 bad = true;
                 break;
@@ -411,8 +411,8 @@ static bool test_all_settings_sweep_is_finite() {
             double dc = std::fabs(sum / n);
             if (dc > worst_dc) worst_dc = dc;
             if (dc > kMaxDcOffset) {
-                printf("  DC note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f n=%d -> dc=%.4f range=%.4f min=%.4f max=%.4f\n",
-                       note, harm, timb, morph, ratio, shape, n, sum / n, max_v - min_v, min_v, max_v);
+                printf("  DC note=%.0f h=%.2f t=%.2f d=%.2f r=%.1f s=%.1f n=%d -> dc=%.4f range=%.4f min=%.4f max=%.4f\n",
+                       note, harm, timb, depth, ratio, shape, n, sum / n, max_v - min_v, min_v, max_v);
                 ok = false;
             }
             // Freeze guard: RULING 2's real failure is self-feedback pinning
@@ -420,8 +420,8 @@ static bool test_all_settings_sweep_is_finite() {
             // near-constant output (a thump) rather than a tone.
             double range = max_v - min_v;
             if (range <= 0.05) {
-                printf("  FROZEN note=%.0f h=%.2f t=%.2f m=%.2f r=%.1f s=%.1f n=%d -> range %.4f\n",
-                       note, harm, timb, morph, ratio, shape, n, range);
+                printf("  FROZEN note=%.0f h=%.2f t=%.2f d=%.2f r=%.1f s=%.1f n=%d -> range %.4f\n",
+                       note, harm, timb, depth, ratio, shape, n, range);
                 ok = false;
             }
         }

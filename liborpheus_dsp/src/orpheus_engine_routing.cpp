@@ -808,6 +808,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_fm_free_hz[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "fm_free_hz_space") == 0)
                 engine->pulsar_track_fm_free_hz_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_depth") == 0)
+                engine->pulsar_track_fm_depth[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fm_depth_space") == 0)
+                engine->pulsar_track_fm_depth_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "grain_mode") == 0)
                 engine->pulsar_track_grain_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "grain_mode_space") == 0)
