@@ -38,6 +38,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -155,6 +156,38 @@ class MixOverlayPushTest {
         advanceUntilIdle()
         assertEquals(lore.effects.delayTimeA, last("pulsar_delay_time_a"))
         assertEquals(-1f, last("pulsar_bench_delay_feedback"))
+        scope.cancel()
+    }
+
+    // A voice knob retunes the playing vibe: its ports move, the load count and the song do not.
+    @Test
+    fun retuneWritesTheKnobPortsWithoutALoad() = runTest(testDispatcher) {
+        writes.clear()
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), lore, scope)
+        vm.actions.setVibe(lore)
+        advanceUntilIdle()
+        val loads = vm.vibeLoadCount.value
+        writes.clear()
+
+        val tuned = lore.withEngineKnob(2, EngineSlot.EDM, EngineKnob.HARMONICS, 0.2f)
+            .withEngineKnob(2, EngineSlot.SPACE, EngineKnob.MORPH, 0.8f)
+        assertTrue(vm.retuneVibe(tuned))
+        advanceUntilIdle()
+
+        assertEquals(loads, vm.vibeLoadCount.value)
+        assertEquals(tuned, vm.vibeFlow.value)
+        val last = writes.toMap()
+        assertEquals(0.2f, last["track_2_harmonics"])
+        assertEquals(1f, last["track_2_pin_harmonics"])
+        assertEquals(0.8f, last["track_2_morph_space"])
+        assertEquals(1f, last["track_2_pin_morph_space"])
+        assertTrue(writes.none { it.first.startsWith("track_3_") }, "an unchanged track is not re-pushed")
+        assertTrue(writes.none { it.first == "vibe_generation" }, "no reload")
+
+        // Anything but a knob field is a reload's job.
+        assertFalse(vm.retuneVibe(tuned.copy(bpm = tuned.bpm + 1f)))
+        assertEquals(tuned, vm.vibeFlow.value)
         scope.cancel()
     }
 

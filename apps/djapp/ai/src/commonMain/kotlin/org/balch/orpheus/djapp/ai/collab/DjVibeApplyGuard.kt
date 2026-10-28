@@ -28,7 +28,7 @@ class DjVibeApplyGuard(
         val file = collabMixer.fileVibe() ?: return null
         if (!file.name.equals(vibe.name, ignoreCase = true)) return null
         return when (val r = collabMixer.editVibe(collabMixer.toolOrigin(), vibe)) {
-            is VibeEditResult.Applied -> VibeApplyResult(true, vibeEditedMessage(file.name, r.rows, r.ignoredMixerPaths), file.name)
+            is VibeEditResult.Applied -> VibeApplyResult(true, vibeEditedMessage(file.name, r.rows, r.ignoredMixerPaths, r.restarted), file.name)
             is VibeEditResult.Refused -> VibeApplyResult(false, withNewVibePointer(r.reason, r.structure))
             is VibeEditResult.Invalid -> VibeApplyResult(false, r.message)
         }

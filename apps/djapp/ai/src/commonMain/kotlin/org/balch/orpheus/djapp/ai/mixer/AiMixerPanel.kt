@@ -66,6 +66,7 @@ import org.balch.orpheus.djapp.ai.chat.rememberOverlayFocus
 import org.balch.orpheus.djapp.ai.chat.usd
 import org.balch.orpheus.djapp.legible
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 
 /** Full strips need this width and [WIDE_MIN_HEIGHT]; anything smaller gets the compact list. */
@@ -231,6 +232,7 @@ private fun WideMixer(
                             underChips = if (beside) scopeToggle else null,
                         )
                         if (state.sectionScope) SectionPanNote()
+                        VoiceNote()
                     }
                 },
                 strips = { Strips(state, meters, actions, flashes, stripWidth, wave, tight) },
@@ -469,12 +471,12 @@ private fun TrackStrip(
             // A small pin leaves the name room on a narrow strip; its touch target stays PIN_TARGET.
             PinToggle(i, track.name, pinned, { actions.togglePin(i) }, size = 12.dp, anchor = Alignment.TopEnd)
         }
-        Text(
-            track.engine,
-            style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
+        SlotHeader(track) { actions.pickSlot(i, it) }
+        VoiceKnobRow(
+            track,
+            onSet = { t, k, v -> actions.setVoiceKnob(t, EngineKnob.entries[k], v) },
+            onHeld = { readout = it },
+            size = ((width - 6.dp) / 3 - 6.dp).coerceIn(18.dp, 30.dp),
         )
         Box(Modifier.padding(vertical = if (tight) TIGHT_WAVE_PAD else WAVE_PAD).fillMaxWidth().height(wave), contentAlignment = Alignment.Center) {
             MixerWave({ meters.waveOf(i) }, color, Modifier.fillMaxSize())
@@ -571,6 +573,15 @@ private fun BusStrip(meters: State<MeterSnapshot>) {
 internal fun SectionPanNote() {
     Text(
         "Pan has no per-section value: pan moves still land in the whole vibe.",
+        style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+    )
+}
+
+@Composable
+internal fun VoiceNote() {
+    Text(
+        "Track sound knobs: dim ones follow MOOD or SPACE, and turning one pins it from what you hear. Double-tap " +
+            "returns it to the file. The switch picks the EDM or SPACE engine; • marks the one playing.",
         style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
     )
 }

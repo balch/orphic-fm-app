@@ -1,5 +1,25 @@
 package org.balch.orpheus.djapp.ai.mixer
 
+import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.OrpheusEngineId.BD
+import org.balch.orpheus.core.audio.OrpheusEngineId.CHD
+import org.balch.orpheus.core.audio.OrpheusEngineId.DX
+import org.balch.orpheus.core.audio.OrpheusEngineId.FM
+import org.balch.orpheus.core.audio.OrpheusEngineId.GRN
+import org.balch.orpheus.core.audio.OrpheusEngineId.HH
+import org.balch.orpheus.core.audio.OrpheusEngineId.MOD
+import org.balch.orpheus.core.audio.OrpheusEngineId.NSE
+import org.balch.orpheus.core.audio.OrpheusEngineId.SD
+import org.balch.orpheus.core.audio.OrpheusEngineId.STR
+import org.balch.orpheus.core.audio.OrpheusEngineId.VA
+import org.balch.orpheus.core.audio.OrpheusEngineId.VOWEL_FOF
+import org.balch.orpheus.core.audio.OrpheusEngineId.WTB
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
+import org.balch.orpheus.features.pulsar.bench.knobMeaning
+import org.balch.orpheus.features.pulsar.bench.knobSteps
+import org.balch.orpheus.features.pulsar.bench.knobValueText
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +81,22 @@ class AiMixerRenderHarness {
     }
 
     private val engines = listOf("BD/BD", "SD/HH", "HH/HH", "VA/FM", "CHD/WT", "STR/MOD", "GRN/NOI", "SPK/MST")
+    private val slots = listOf(
+        BD to BD, SD to HH, HH to HH, VA to FM, CHD to WTB, STR to MOD, GRN to NSE, DX to VOWEL_FOF,
+    )
+
+    // A mix of pinned, macro-led and edited knobs; track 5 has its switch on the Space engine, which is not playing.
+    private fun voiceOf(t: Int, id: OrpheusEngineId) = EngineKnob.entries.mapIndexed { k, knob ->
+        val meaning = knobMeaning(id, knob)
+        val value = (0.15f + 0.3f * k + 0.04f * t).coerceAtMost(0.95f)
+        val pinned = (t + k) % 3 == 0 || knobSteps(id, knob) != null
+        MixerVoiceKnob(
+            knob = knob, engineId = id, label = meaning.short, meaning = meaning.long, value = value,
+            valueText = knobValueText(id, knob, value, ::f2), pinned = pinned, changed = t == 3 && k == 0,
+            source = if (pinned) null else if (knob == EngineKnob.MORPH) Macro.SPACE else Macro.MOOD,
+            active = meaning.active, steps = knobSteps(id, knob),
+        )
+    }
 
     private val tracks = BenchMeters.CHANNEL_NAMES.take(8).mapIndexed { t, name ->
         MixerTrack(
@@ -75,6 +111,11 @@ class AiMixerRenderHarness {
             muted = t == 1,
             soloed = t == 4,
             silenced = t != 4,
+            slot = if (t == 5) EngineSlot.SPACE else EngineSlot.EDM,
+            slotHeard = t != 5,
+            edmEngine = slots[t].first.name,
+            spaceEngine = slots[t].second.name,
+            voice = voiceOf(t, if (t == 5) slots[t].second else slots[t].first),
         )
     }
 

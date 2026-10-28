@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -34,26 +35,41 @@ import org.balch.orpheus.djapp.ai.collab.CollabResult
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.MixCollab
 import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.collab.VibeEditResult
 import org.balch.orpheus.djapp.ai.tools.MixCaptureTool
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
 import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
+import org.balch.orpheus.features.pulsar.bench.macroView
+import org.balch.orpheus.features.pulsar.bench.slotAt
+import org.balch.orpheus.features.pulsar.bench.vibeDefault
 
 /** The VM's own overlay on the controller-derived state. */
-private data class Local(val capture: MixerCapture? = null, val capturing: Boolean = false, val notice: String? = null)
+private data class Local(
+    val capture: MixerCapture? = null,
+    val capturing: Boolean = false,
+    val notice: String? = null,
+    /** Strips whose switch picked a slot; the rest follow the slot playing. Cleared on each vibe load. */
+    val slotPicks: Map<Int, EngineSlot> = emptyMap(),
+)
 
 /** The VM's overlay with the shared collaboration marks: what the user pinned and what the agent touched. */
 private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>, val hist: Hist)
 
 /** The History timeline as the panel shows it. */
-private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long)
+private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long, val edited: Set<String>)
+
+/** One voice knob on one slot: the key its pending value is held under until the edit queue reaches it. */
+private data class VoiceKey(val track: Int, val slot: EngineSlot, val knob: EngineKnob)
 
 /**
  * The mixer panel's state and edits over the shared [MixBenchController]. Every edit goes through [CollabMixer] as
@@ -78,7 +94,20 @@ class AiMixerViewModel(
     private val local = MutableStateFlow(Local())
     private val edits = Channel<suspend () -> Unit>(Channel.UNLIMITED)
 
+    // A drag sends a value per frame and each vibe edit re-encodes the vibe, so only the newest per knob is applied.
+    // A null value is a reset to the file.
+    private val pendingVoice = MutableStateFlow<Map<VoiceKey, Float?>>(emptyMap())
+
     init {
+        scope.launch(dispatchers.default) {
+            var seen = pulsarFeature.vibeLoadCount.value
+            pulsarFeature.vibeLoadCount.collect {
+                if (it != seen) {
+                    seen = it
+                    local.update { l -> l.copy(slotPicks = emptyMap()) }
+                }
+            }
+        }
         scope.launch(dispatchers.default) {
             for (edit in edits) {
                 // One bad edit must not end the consumer: the scope is a SupervisorJob, so later edits would drop silently.
@@ -104,12 +133,18 @@ class AiMixerViewModel(
         }
         val hist = combine(collabMixer.history, collabMixer.hearing, pulsarFeature.vibeFlow) { h, hearing, vibe ->
             val rows = historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }
-            Hist(rows, hearing, h.onCount + h.vibeEdits.count { it.on }, h.loadedAtMs)
+            Hist(rows, hearing, h.onCount + h.vibeEdits.count { it.on }, h.loadedAtMs, h.vibeEdits.filter { it.on }.map { it.path }.toSet())
         }
         val overlay = combine(local, collab.pins, collab.agentTouched, hist, ::Overlay)
+        // The slot playing, followed with the engine's own hold between 0.4 and 0.6 energy.
+        var heard: EngineSlot? = null
         emitAll(
             combine(bench, pulsarFeature.vibeFlow, sections, knobs, overlay) { b, vibe, section, k, o ->
-                mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k).copy(
+                val energy = b.layers.macroView(vibe, section, Macro.ENERGY, k[Macro.ENERGY] ?: Macro.ENERGY.vibeDefault(vibe)).heard
+                val slot = slotAt(energy, heard ?: if (energy >= 0.5f) EngineSlot.EDM else EngineSlot.SPACE)
+                heard = slot
+                val voice = VoiceView(slot, o.local.slotPicks, o.hist.edited)
+                mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k, voice).copy(
                     capture = o.local.capture,
                     capturing = o.local.capturing,
                     notice = o.local.notice,
@@ -173,7 +208,27 @@ class AiMixerViewModel(
         hear = { id -> queue { collabMixer.hear(id) } },
         endHear = { queue { collabMixer.endHear() } },
         rollBack = { id -> queue { collabMixer.rollBack(id) } },
+        setVoiceKnob = ::setVoiceKnob,
+        pickSlot = { t, slot -> local.update { it.copy(slotPicks = it.slotPicks + (t to slot)) } },
     )
+
+    private fun setVoiceKnob(track: Int, knob: EngineKnob, value: Float?) {
+        val slot = stateFlow.value.tracks.getOrNull(track)?.slot ?: return
+        pendingVoice.update { it + (VoiceKey(track, slot, knob) to value) }
+        queue(::applyVoiceKnobs)
+    }
+
+    // Takes every pending knob at once; the queued calls after the first find nothing left.
+    private suspend fun applyVoiceKnobs() {
+        val batch = pendingVoice.getAndUpdate { emptyMap() }
+        for ((key, value) in batch) {
+            when (val r = collabMixer.editEngineKnob(EditOrigin.USER, key.track, key.slot, key.knob, value)) {
+                is VibeEditResult.Applied -> clearNotice()
+                is VibeEditResult.Refused -> local.update { it.copy(notice = VIBE_LOADING) }
+                is VibeEditResult.Invalid -> log.warn { "voice knob ${key.knob} on track ${key.track}: ${r.message}" }
+            }
+        }
+    }
 
     private fun sectionName(index: Int) = pulsarFeature.vibeFlow.value.arrangement?.sections?.getOrNull(index)?.name
 

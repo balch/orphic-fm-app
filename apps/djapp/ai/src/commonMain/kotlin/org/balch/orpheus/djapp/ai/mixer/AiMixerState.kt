@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.HistoryChange
 import org.balch.orpheus.djapp.ai.collab.HistoryItem
@@ -26,9 +27,20 @@ import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.Scope
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.capture
 import org.balch.orpheus.features.pulsar.bench.effective
+import org.balch.orpheus.features.pulsar.bench.engine
+import org.balch.orpheus.features.pulsar.bench.knob
+import org.balch.orpheus.features.pulsar.bench.knobMeaning
+import org.balch.orpheus.features.pulsar.bench.knobPath
+import org.balch.orpheus.features.pulsar.bench.knobPinPath
+import org.balch.orpheus.features.pulsar.bench.knobSteps
+import org.balch.orpheus.features.pulsar.bench.knobValueText
+import org.balch.orpheus.features.pulsar.bench.macroValue
 import org.balch.orpheus.features.pulsar.bench.macroView
+import org.balch.orpheus.features.pulsar.bench.pinned
 import org.balch.orpheus.features.pulsar.bench.sectionScopeAvailable
 import org.balch.orpheus.features.pulsar.bench.vibeDefault
 import org.balch.orpheus.features.pulsar.models.Vibe
@@ -46,6 +58,38 @@ data class MixerTrack(
     val muted: Boolean,
     val soloed: Boolean,
     val silenced: Boolean,
+    /** The engine slot the voice knobs edit, picked by the strip's switch or else the one playing. */
+    val slot: EngineSlot = EngineSlot.EDM,
+    /** True while [slot] is the one playing, as the energy macro picks it. */
+    val slotHeard: Boolean = true,
+    val edmEngine: String = "",
+    val spaceEngine: String = "",
+    /** Harmonics, timbre and morph of [slot]'s engine, in that order. */
+    val voice: List<MixerVoiceKnob> = emptyList(),
+)
+
+/**
+ * One sound knob on a strip. [value] is what plays: the authored value when [pinned], else the macro's ([source]).
+ * [changed] means a History row moves it or its pin off the file.
+ */
+@Immutable
+data class MixerVoiceKnob(
+    val knob: EngineKnob,
+    val engineId: OrpheusEngineId,
+    val label: String,
+    val meaning: String,
+    val value: Float,
+    val valueText: String,
+    val pinned: Boolean,
+    val changed: Boolean,
+    /** MOOD or SPACE while unpinned, else null. */
+    val source: Macro?,
+    /** False when the engine ignores this knob. */
+    val active: Boolean = true,
+    /** The playing section's own morph plays here instead of the engine's. */
+    val heldBySection: Boolean = false,
+    /** Patch count for a selector knob (DX harmonics), else null. */
+    val steps: Int? = null,
 )
 
 @Immutable
@@ -194,7 +238,13 @@ private val SECTION_FIELD = Regex("""arrangement\.sections\[(\d+)]\.(.+)""")
 internal fun vibePathLabel(path: String, vibe: Vibe?, trackNames: (Int) -> String): String {
     TRACK_ENGINE.matchEntire(path)?.let { m ->
         val (track, slot, field) = m.destructured
-        return "${trackNames(track.toInt())} · ${if (slot == "Edm") "EDM" else "Space"} ${if (field == "engineId") "engine" else field}"
+        val name = when {
+            field == "engineId" -> "engine"
+            // A voice knob's pin reads as its knob: "harmonics pin".
+            field.startsWith("pin") && field.length > 3 -> field.drop(3).replaceFirstChar { it.lowercase() } + " pin"
+            else -> field
+        }
+        return "${trackNames(track.toInt())} · ${if (slot == "Edm") "EDM" else "Space"} $name"
     }
     SECTION_OVERRIDE.matchEntire(path)?.let { m ->
         val (section, track, field) = m.destructured
@@ -272,6 +322,16 @@ fun changesLabel(count: Int): String = when (count) {
     else -> "$count changes"
 }
 
+/**
+ * What the voice knobs need beyond the vibe: the slot playing ([heard]), the strips whose switch picked a slot, and
+ * the vibe paths History rows move off the file.
+ */
+data class VoiceView(
+    val heard: EngineSlot = EngineSlot.EDM,
+    val picks: Map<Int, EngineSlot> = emptyMap(),
+    val edited: Set<String> = emptySet(),
+)
+
 /** The bench page's state view, for the panel. [knobs] are the app's macro knobs. */
 fun mixerState(
     vibe: Vibe,
@@ -282,12 +342,43 @@ fun mixerState(
     soloed: Set<Int>,
     loopSection: Int?,
     knobs: Map<Macro, Float>,
+    voice: VoiceView = VoiceView(),
 ): AiMixerUiState {
     val sectionScopeAvailable = vibe.sectionScopeAvailable()
     val inSection = scope == Scope.SECTION && sectionScopeAvailable && section >= 0
+    val heardMacro = { m: Macro -> layers.macroView(vibe, section, m, knobs[m] ?: m.vibeDefault(vibe)).heard }
+    val mood = heardMacro(Macro.MOOD)
+    val space = heardMacro(Macro.SPACE)
+    val sectionOverrides = vibe.arrangement?.sections?.getOrNull(section)?.trackOverrides
     val tracks = vibe.tracks.indices.map { t ->
         val track = vibe.tracks[t]
         val e = layers.effective(vibe, section, t, knobs[Macro.ENERGY] ?: vibe.energy)
+        val slot = voice.picks[t] ?: voice.heard
+        val engine = track.engine(slot)
+        val voiceKnobs = EngineKnob.entries.map { k ->
+            val pinned = engine.pinned(k)
+            val sectionMorph = sectionOverrides?.get(t)?.morph?.takeIf { k == EngineKnob.MORPH }
+            val value = sectionMorph ?: if (pinned) engine.knob(k) else track.macroValue(k, mood, space)
+            val meaning = knobMeaning(engine.engineId, k)
+            MixerVoiceKnob(
+                knob = k,
+                engineId = engine.engineId,
+                label = meaning.short,
+                meaning = meaning.long,
+                value = value,
+                valueText = knobValueText(engine.engineId, k, value, ::f2),
+                pinned = pinned,
+                changed = knobPath(t, slot, k) in voice.edited || knobPinPath(t, slot, k) in voice.edited,
+                source = when {
+                    pinned || sectionMorph != null -> null
+                    k == EngineKnob.MORPH -> Macro.SPACE
+                    else -> Macro.MOOD
+                },
+                active = meaning.active,
+                heldBySection = sectionMorph != null,
+                steps = knobSteps(engine.engineId, k),
+            )
+        }
         MixerTrack(
             index = t,
             name = BenchMeters.CHANNEL_NAMES.getOrElse(t) { "T$t" },
@@ -300,6 +391,11 @@ fun mixerState(
             muted = t in muted,
             soloed = t in soloed,
             silenced = t in muted || (soloed.isNotEmpty() && t !in soloed),
+            slot = slot,
+            slotHeard = slot == voice.heard,
+            edmEngine = track.engineEdm.engineId.name,
+            spaceEngine = track.engineSpace.engineId.name,
+            voice = voiceKnobs,
         )
     }
     val macros = Macro.entries.map { m ->

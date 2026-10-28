@@ -32,6 +32,10 @@ import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.LayerField
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
+import org.balch.orpheus.features.pulsar.bench.withEngineKnob
+import org.balch.orpheus.features.pulsar.bench.withEngineKnobOf
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.Scope
@@ -57,7 +61,8 @@ sealed interface CollabResult<out T> {
 
 /** How [CollabMixer.editVibe] went: the fields it changed and the Mixer-owned ones it left alone, or why it refused. */
 sealed interface VibeEditResult {
-    data class Applied(val rows: Int, val ignoredMixerPaths: List<String>) : VibeEditResult
+    /** [restarted] is false when only engine knobs changed, so the song played on. */
+    data class Applied(val rows: Int, val ignoredMixerPaths: List<String>, val restarted: Boolean = true) : VibeEditResult
     data class Refused(val reason: String, val structure: Boolean = false) : VibeEditResult
 
     /** The edits could not be patched onto the vibe, or the result is not a valid vibe. */
@@ -228,23 +233,33 @@ class CollabMixer internal constructor(
 
     /**
      * Records [edited], the whole playing vibe as an edit wants it, as vibe rows on top of its file, then plays the
-     * effective vibe, which restarts the song. Mixer-owned fields are left to the Mixer and named in the result.
+     * effective vibe, which restarts the song unless only engine knobs changed. Mixer-owned fields are left to the Mixer
+     * and named in the result.
      * Refused, changing nothing, for another vibe's name or a change to the section or track structure.
      */
-    suspend fun editVibe(origin: EditOrigin, edited: Vibe): VibeEditResult = editVibeWith(origin) { edited }
+    suspend fun editVibe(origin: EditOrigin, edited: Vibe): VibeEditResult = editVibeWith(origin) { _, _ -> edited }
 
     /**
      * Like [editVibe], but patches [edits] (path to value) onto the effective vibe under the lock, so rows above a
      * heard point are kept. [VibeEditResult.Invalid] when a path or value does not fit the vibe.
      */
     suspend fun editVibe(origin: EditOrigin, edits: List<Pair<String, JsonElement>>): VibeEditResult =
-        editVibeWith(origin) { it.patched(edits) }
+        editVibeWith(origin) { _, effective -> effective.patched(edits) }
 
-    private suspend fun editVibeWith(origin: EditOrigin, build: (effective: Vibe) -> Vibe): VibeEditResult = historyLock.withLock {
+    /**
+     * Turns [knob] on [track]'s [slot] engine to [value] and pins it, so the value plays over MOOD or SPACE; a null
+     * [value] puts the knob and its pin back to the file. The rows land like [editVibe]'s, and the song plays on.
+     */
+    suspend fun editEngineKnob(origin: EditOrigin, track: Int, slot: EngineSlot, knob: EngineKnob, value: Float?): VibeEditResult =
+        editVibeWith(origin) { file, effective ->
+            if (value == null) effective.withEngineKnobOf(file, track, slot, knob) else effective.withEngineKnob(track, slot, knob, value)
+        }
+
+    private suspend fun editVibeWith(origin: EditOrigin, build: (file: Vibe, effective: Vibe) -> Vibe): VibeEditResult = historyLock.withLock {
         syncVibeLoad()
         val file = historyVibe ?: return@withLock VibeEditResult.Refused(NOT_PLAYING)
         val edited = try {
-            build(vibeOrNull { _history.value.effective(file) } ?: file)
+            build(file, vibeOrNull { _history.value.effective(file) } ?: file)
         } catch (e: Exception) {
             return@withLock VibeEditResult.Invalid(e.message ?: "The edit does not fit the vibe.")
         }
@@ -269,10 +284,11 @@ class CollabMixer internal constructor(
             return@withLock VibeEditResult.Refused("The edit does not fit the vibe: ${e.message}")
         }
         if (target == current) return@withLock VibeEditResult.Applied(0, ignored)
+        val loads = pulsar.vibeLoadCount.value
         // A load racing in from another thread refuses the play; then nothing is kept.
         if (!play(target, next.layers())) return@withLock VibeEditResult.Refused(NOT_PLAYING)
         commit(next)
-        VibeEditResult.Applied(diffTree(current.toTree(), target.toTree()).size, ignored)
+        VibeEditResult.Applied(diffTree(current.toTree(), target.toTree()).size, ignored, pulsar.vibeLoadCount.value != loads)
     }
 
     /** The playing vibe as its file holds it, without the History's vibe rows; null before the first load. */
@@ -443,11 +459,13 @@ class CollabMixer internal constructor(
         _hearing.value = null
     }
 
-    // Under [historyLock]. Plays [vibe] with [layers] over it. Another vibe than the one playing is loaded first as an
-    // own load (the song restarts), and is true from then on: a timed-out follow leaves the mix to [replayRestored].
-    // False, playing nothing, while a load is unclaimed: an own load must never revert a vibe the user just picked.
+    // Under [historyLock]. Plays [vibe] with [layers] over it. One that differs only in engine knobs retunes the song in
+    // place; any other is loaded first as an own load (the song restarts), and is true from then on: a timed-out follow
+    // leaves the mix to [replayRestored]. False, playing nothing, while a load is unclaimed: an own load must never
+    // revert a vibe the user just picked.
     private suspend fun play(vibe: Vibe, layers: BenchLayers): Boolean {
         if (vibe == pulsar.vibeFlow.value) return applyLayers(layers)
+        if (pulsar.vibeLoadCount.value == handledLoad.value && pulsar.retuneVibe(vibe)) return applyLayers(layers)
         if (!applyOwn(vibe)) return false
         if (controller.awaitLoadFollowed() && applyLayers(layers)) {
             replayFor = -1
