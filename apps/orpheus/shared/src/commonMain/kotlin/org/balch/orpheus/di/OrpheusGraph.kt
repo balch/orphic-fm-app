@@ -6,6 +6,7 @@ import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.features.StartupInitializer
 import org.balch.orpheus.core.playback.PlaybackController
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
 import org.balch.orpheus.util.ConsoleLogger
@@ -27,6 +28,9 @@ interface OrpheusGraph : ViewModelGraph {
     val consoleLogger: ConsoleLogger
     val globalTempo: GlobalTempo
     val controlHighlightEventBus: ControlHighlightEventBus
+
+    /** The engine pickers' Recent list is saved here (App provides it as LocalEngineRecents). */
+    val appPreferencesRepository: AppPreferencesRepository
 
     /** Every platform has a real media session behind `MediaSessionManager`, not just Android. */
     val playbackController: PlaybackController

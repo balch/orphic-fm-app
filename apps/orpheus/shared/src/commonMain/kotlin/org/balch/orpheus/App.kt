@@ -34,6 +34,8 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.LocalSignalVizEnabled
 import org.balch.orpheus.ui.viz.LocalSignalVizGlow
 import org.balch.orpheus.ui.widgets.VizBackground
+import org.balch.orpheus.ui.widgets.engine.LocalEngineRecents
+import org.balch.orpheus.ui.widgets.engine.rememberEngineRecents
 
 @Composable
 fun App(
@@ -56,6 +58,7 @@ fun App(
 
             // Double liquid state: one for the viz effects, one for the dialog glass effect
             val dialogLiquidState = rememberLiquidState()
+            val engineRecents = rememberEngineRecents(graph.appPreferencesRepository)
 
             // Get AI feature for chat dialog state
             val aiFeature: AiOptionsFeature = registry.feature<AiOptionsFeature>()
@@ -79,6 +82,7 @@ fun App(
                     LocalLiquidEffects provides liquidEffects,
                     LocalSignalVizEnabled provides signalVizEnabled,
                     LocalSignalVizGlow provides (1f - vizState.knob2Value),
+                    LocalEngineRecents provides engineRecents,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Wrap main content in a liquefiable box for the dialog to "see" through

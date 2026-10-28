@@ -32,6 +32,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":ui:theme"))
             api(project(":core:foundation"))
+            api(project(":core:audio"))
 
             implementation(libs.compose.material.icons)
 

@@ -379,6 +379,20 @@ object OrpheusColors {
     val engineYellow = Color(0xFFFFD54F)         // String
     val engineOrange = Color(0xFFFF8A65)         // Modal
 
+    // Engine picker popover and sheet: an opaque reading surface, mint chips, gold current pick
+    val pickerSurface = Color(0xFF0D0B14)
+    val pickerField = Color(0xFF1B1726)
+    val pickerOutline = Color(0xFF3A3150)
+    val pickerTileOutline = Color(0xFF2C2540)
+    val pickerSelectedRow = Color(0xFF2A2140)
+    val pickerRule = Color(0xFF1E1A2B)
+    val pickerSection = Color(0xFF6F6688)
+    val pickerMuted = Color(0xFF8A809F)
+    val pickerChipText = Color(0xFFB9B0CC)
+    val pickerText = Color(0xFFE8E4F0)
+    val pickerMint = Color(0xFF4EF0B0)
+    val pickerGold = Color(0xFFFFD23E)
+
     // Aquarium colors
     val aquariumDeep = Color(0xFF0A1628)       // Deep ocean background
     val aquariumTeal = Color(0xFF0E4D64)       // Teal mid-water
