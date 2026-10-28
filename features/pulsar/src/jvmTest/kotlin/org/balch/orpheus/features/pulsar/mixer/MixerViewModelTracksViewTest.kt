@@ -14,10 +14,8 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeatureStatePersistence
-import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.plugin.PortValue
-import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.BaseAppPreferencesRepository
@@ -65,13 +63,9 @@ class MixerViewModelTracksViewTest {
         },
     )
 
-    private val otherVibe = vibe.copy(name = "Mixer Tracks View Other")
+    private val pulsar = FakePulsarFeature(listOf(vibe), vibe)
 
-    private val pulsar = FakePulsarFeature(listOf(vibe, otherVibe), vibe)
-
-    private fun makeViewModel(
-        playbackMode: PulsarPlaybackMode = PulsarPlaybackMode.EXPLICIT,
-    ): MixerViewModel {
+    private fun makeViewModel(): MixerViewModel {
         val controller = SynthController().apply {
             setDelegates(
                 setter = { id, value -> ports[id.symbol] = value; true },
@@ -97,7 +91,6 @@ class MixerViewModelTracksViewTest {
             persistence = FeatureStatePersistence(prefs, dispatchers, scope),
             engagementTracker = DefaultEngagementTracker(),
             restoreStrategy = RestoreStrategy.PRESET,
-            playbackMode = playbackMode,
             dispatcherProvider = dispatchers,
             scope = scope,
             trackGainSink = DirectTrackGainSink(controller, pulsar, scope),
@@ -135,86 +128,4 @@ class MixerViewModelTracksViewTest {
 
     private fun auditionGain(t: Int) =
         ports[PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + t].symbol]?.asFloat()
-
-    private fun bass() = ports[PulsarSymbol.BASS_GAIN.symbol]?.asFloat()
-    private fun drive() = ports[DistortionSymbol.DRIVE.symbol]?.asFloat()
-
-    private fun perc() = ports[PulsarSymbol.PERC_MIX.symbol]?.asFloat()
-
-    /** Pulls BASS, PERC and DIST off their defaults and flips to TRACKS. */
-    private fun MixerViewModel.dialIn() {
-        actions.setGroupGain(MixerGroup.BASS, 0.2f)
-        actions.setGroupGain(MixerGroup.PERC, 0.4f)
-        actions.setDrive(0.9f)
-        actions.setTracksView(true)
-    }
-
-    @Test
-    fun switchingToADifferentVibeResetsTheFadersButKeepsDistAndPerc() = runTest(testDispatcher) {
-        pulsar.applyVibe(vibe) // the startup restore
-        val vm = makeViewModel()
-        backgroundScope.launch { vm.stateFlow.collect {} }
-        advanceUntilIdle()
-        vm.dialIn()
-        advanceUntilIdle()
-
-        pulsar.applyVibe(otherVibe)
-        advanceUntilIdle()
-
-        assertEquals(0.75f, bass())
-        assertEquals(0.4f, perc())
-        assertEquals(0.9f, drive())
-        assertEquals(0.9f, ports[DistortionSymbol.MIX.symbol]?.asFloat())
-        // The view is a session choice: only an app start puts it back on BAND.
-        assertEquals(true, vm.stateFlow.value.tracksView)
-    }
-
-    @Test
-    fun reapplyingTheSameVibeKeepsTheMix() = runTest(testDispatcher) {
-        pulsar.applyVibe(vibe)
-        val vm = makeViewModel()
-        backgroundScope.launch { vm.stateFlow.collect {} }
-        advanceUntilIdle()
-        vm.dialIn()
-        advanceUntilIdle()
-
-        // Preset reload, graph-ready re-apply and engine rebuild all land here.
-        pulsar.applyVibe(vibe)
-        advanceUntilIdle()
-
-        assertEquals(0.2f, bass())
-        assertEquals(0.9f, drive())
-        assertEquals(true, vm.stateFlow.value.tracksView)
-    }
-
-    @Test
-    fun startupRestoreAfterConstructionIsNotASwitch() = runTest(testDispatcher) {
-        // The mixer is built before the restore runs, and the restored vibe differs from the default.
-        val vm = makeViewModel()
-        backgroundScope.launch { vm.stateFlow.collect {} }
-        advanceUntilIdle()
-        vm.actions.setDrive(0.9f)
-        advanceUntilIdle()
-
-        pulsar.applyVibe(otherVibe)
-        advanceUntilIdle()
-
-        assertEquals(0.9f, drive())
-    }
-
-    @Test
-    fun orpheusNeverResetsSinceDistortionSharesTheDrivePorts() = runTest(testDispatcher) {
-        pulsar.applyVibe(vibe)
-        val vm = makeViewModel(PulsarPlaybackMode.MIX_GATED)
-        backgroundScope.launch { vm.stateFlow.collect {} }
-        advanceUntilIdle()
-        vm.dialIn()
-        advanceUntilIdle()
-
-        pulsar.applyVibe(otherVibe)
-        advanceUntilIdle()
-
-        assertEquals(0.2f, bass())
-        assertEquals(0.9f, drive())
-    }
 }

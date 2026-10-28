@@ -15,14 +15,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeatureStatePersistence
-import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
@@ -35,9 +33,6 @@ import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
 
 private const val DEFAULT_DRIVE = 0.30f
-
-/** Console-fader unity: 0.75 travel = 1× gain, matching the engine atomics' default. */
-private const val UNITY_FADER = 0.75f
 
 /** Internal MVI intents for the Mixer panel. */
 private sealed interface MixerIntent {
@@ -80,7 +75,6 @@ class MixerViewModel(
     persistence: FeatureStatePersistence,
     private val engagementTracker: EngagementTracker,
     private val restoreStrategy: RestoreStrategy,
-    playbackMode: PulsarPlaybackMode,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
     trackGainSink: TrackGainSink,
@@ -204,28 +198,6 @@ class MixerViewModel(
         // so this value sticks for new users and gets overwritten for existing ones.
         driveId.value = FloatValue(DEFAULT_DRIVE)
         mixId.value = FloatValue(DEFAULT_DRIVE)
-
-        // DJ app only: switching to a different vibe puts BASS/KEYS/FX back at unity; DIST and PERC
-        // are the listener's taste and carry over. Same-vibe re-applies (launch restore, preset
-        // reload, engine rebuild) keep the mix. Orpheus never resets: its Distortion panel shares DRIVE/MIX.
-        if (playbackMode == PulsarPlaybackMode.EXPLICIT) {
-            // Count 0 means the startup restore has not run yet; its load seats the name silently.
-            var seenVibe = pulsarFeature.vibeFlow.value.name.takeIf { pulsarFeature.vibeLoadCount.value > 0 }
-            scope.launch {
-                pulsarFeature.vibeLoadCount.collect { loads ->
-                    if (loads == 0) return@collect
-                    val name = pulsarFeature.vibeFlow.value.name
-                    if (seenVibe != null && name != seenVibe) resetMix()
-                    seenVibe = name
-                }
-            }
-        }
-    }
-
-    private fun resetMix() {
-        bassGainId.value = FloatValue(UNITY_FADER)
-        keysGainId.value = FloatValue(UNITY_FADER)
-        fxGainId.value = FloatValue(UNITY_FADER)
     }
 
     private fun onGroupGainChanged(group: MixerGroup, value: Float) {
