@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.pulsar
 
+import org.balch.orpheus.core.audio.FmPatchNames
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.Vibe
 

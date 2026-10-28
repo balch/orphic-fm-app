@@ -1,9 +1,9 @@
 package org.balch.orpheus.djapp.vibeinfo
 
+import org.balch.orpheus.core.audio.FmPatchNames
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
-import org.balch.orpheus.features.pulsar.FmPatchNames
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.RootNote

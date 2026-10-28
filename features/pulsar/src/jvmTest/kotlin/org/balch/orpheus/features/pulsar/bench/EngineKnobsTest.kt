@@ -7,8 +7,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import org.balch.orpheus.core.audio.FmPatchNames
 import org.balch.orpheus.core.audio.OrpheusEngineId
-import org.balch.orpheus.features.pulsar.FmPatchNames
 import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.models.Vibe
