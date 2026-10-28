@@ -1,5 +1,5 @@
 // A changed engine port waits for the track's next note-on before it sounds, or after
-// 16 steps adopts with a forced strike, so a live swap never cuts a sounding note.
+// 16 steps adopts on the next bar line with a forced strike, so a live swap never cuts a note.
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
 #include "../src/orpheus_graph.h"
@@ -28,11 +28,16 @@ constexpr int kBarBlocks = 16 * 6000 / kFrames + 1;   // the latch's 16-step bou
 constexpr float kSteadyEnergy = 1.0f;
 constexpr int kTailBlocks = 8;
 
+bool is_dx(int id) { return id >= 2 && id <= 4; }
+
 struct Block {
     int active_engine;
     bool pending_retrig;
     bool voice_active;
     int trigger_offset;
+    bool pin_harmonics;
+    int bar_pos;       // the track's step in its bar after the block
+    int boundary_at;   // sample of the block's step boundary; -1 when none
 };
 
 OrpheusEngine* make_engine(int track, int engine_id, float energy) {
@@ -95,11 +100,18 @@ std::vector<Block> run(OrpheusEngine* engine, int track, int blocks, std::vector
     std::vector<Block> rec;
     rec.reserve(blocks);
     out_l.reserve(static_cast<size_t>(blocks) * kFrames);
+    int prev_playhead = -1;
     for (int i = 0; i < blocks; i++) {
         unit_process_pulsar(&unit, engine, kFrames, 48000.0f);
         const PulsarTrackState& ts = engine->pulsar_state->tracks[track];
+        // A step is longer than a block, so a moved playhead means one boundary, and the
+        // accumulator holds the samples since it: boundary = frames - 1 - floor(accumulator).
+        const int boundary_at = ts.playhead != prev_playhead
+            ? kFrames - 1 - static_cast<int>(std::floor(engine->pulsar_state->clock_accumulator)) : -1;
+        prev_playhead = ts.playhead;
         rec.push_back({engine->pulsar_track_active_engine[track].load(), ts.pending_retrig,
-                       ts.voice_active, ts.trigger_offset});
+                       ts.voice_active, ts.trigger_offset, ts.pin_harmonics,
+                       ((ts.playhead - ts.wrap_start) % 16 + 16) % 16, boundary_at});
         out_l.insert(out_l.end(), engine->pulsar_out_l, engine->pulsar_out_l + kFrames);
         if (poke) poke(i, rec.back());
     }
@@ -165,14 +177,21 @@ static bool held_pad_swaps(int to_engine) {
     OrpheusEngine* engine = make_pad_engine(kVa);
     const int write_block = kBarBlocks * 2 + 50;
     std::vector<float> out_l;
-    const auto rec = run(engine, kPadTrack, write_block + kBarBlocks * 3, out_l, [&](int i, const Block&) {
+    const auto rec = run(engine, kPadTrack, write_block + kBarBlocks * 4, out_l, [&](int i, const Block&) {
         if (i == write_block) {
             engine->pulsar_track_engine_edm[kPadTrack].store(to_engine, std::memory_order_relaxed);
             engine->pulsar_track_engine_space[kPadTrack].store(to_engine, std::memory_order_relaxed);
         }
     });
     const int adopt = first_block_on(rec, write_block + 1, to_engine);
-    bool ok = adopt > write_block && adopt - write_block <= kBarBlocks;
+    bool ok = adopt > write_block && adopt - write_block <= 2 * kBarBlocks;
+    // The forced strike lands on the bar line's boundary sample.
+    const bool on_bar = adopt >= 0 && rec[adopt].bar_pos == 0 && rec[adopt].boundary_at >= 0
+        && rec[adopt].trigger_offset == rec[adopt].boundary_at;
+    ok &= on_bar;
+    if (adopt >= 0)
+        printf("  adopt block: bar pos %d, boundary %d, trigger offset %d\n", rec[adopt].bar_pos,
+               rec[adopt].boundary_at, rec[adopt].trigger_offset);
     float p = 0.0f;
     if (adopt >= 0) {
         // Past the cut VA note's tail through the output filters (gone within ~6 blocks),
@@ -187,37 +206,75 @@ static bool held_pad_swaps(int to_engine) {
     return ok;
 }
 
-static bool test_held_pad_swaps_within_a_bar() {
-    printf("\n=== Test: a held PAD swaps to STR within a bar and strikes it ===\n");
+static bool test_held_pad_swaps_on_a_bar_line() {
+    printf("\n=== Test: a held PAD swaps to STR on a bar line and strikes it ===\n");
     const bool ok = held_pad_swaps(kStr);
     printf("Held pad to STR: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
 static bool test_held_pad_swaps_into_dx() {
-    printf("\n=== Test: a held PAD swaps to DX within a bar and strikes it ===\n");
+    printf("\n=== Test: a held PAD swaps to DX on a bar line and strikes it ===\n");
     const bool ok = held_pad_swaps(kDx);
     printf("Held pad to DX: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
-static bool test_silent_track_adopts_after_a_bar() {
-    printf("\n=== Test: a track with no note-ons adopts a new engine after a bar ===\n");
+static bool test_silent_track_adopts_on_a_bar_line() {
+    printf("\n=== Test: a track with no note-ons adopts a new engine on a bar line ===\n");
     OrpheusEngine* engine = make_silent_engine();
     const int write_block = 40;
     std::vector<float> out_l;
     int note_ons = 0;
-    const auto rec = run(engine, kMelodicTrack, write_block + kBarBlocks * 2, out_l, [&](int i, const Block& b) {
+    const auto rec = run(engine, kMelodicTrack, write_block + kBarBlocks * 3, out_l, [&](int i, const Block& b) {
         if (b.pending_retrig) note_ons++;
         if (i == write_block)
             engine->pulsar_track_engine_edm[kMelodicTrack].store(kVowelFof, std::memory_order_relaxed);
     });
     const int adopt = first_block_on(rec, write_block + 1, kVowelFof);
-    const bool ok = note_ons == 0 && adopt > write_block && adopt - write_block <= kBarBlocks;
-    printf("  note-ons %d (want 0), write at block %d, engine %d at block %d\n",
-           note_ons, write_block, kVowelFof, adopt);
+    const bool on_bar = adopt >= 0 && rec[adopt].bar_pos == 0 && rec[adopt].boundary_at >= 0;
+    const bool ok = note_ons == 0 && adopt > write_block && adopt - write_block <= 2 * kBarBlocks && on_bar;
+    printf("  note-ons %d (want 0), write at block %d, engine %d at block %d (bar pos %d, boundary %d)\n",
+           note_ons, write_block, kVowelFof, adopt, adopt >= 0 ? rec[adopt].bar_pos : -1,
+           adopt >= 0 ? rec[adopt].boundary_at : -1);
     orpheus_engine_destroy(engine);
     printf("Silent track adopts: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// The retune writes the raw pin (0 here); the DX force must follow the engine that sounds.
+static bool pin_follows_engine(int from, int to) {
+    OrpheusEngine* engine = make_pad_engine(from);
+    engine->pulsar_track_pin_harmonics[kPadTrack].store(0, std::memory_order_relaxed);
+    engine->pulsar_track_pin_harmonics_space[kPadTrack].store(0, std::memory_order_relaxed);
+    const int write_block = kBarBlocks * 2 + 50;
+    std::vector<float> out_l;
+    const auto rec = run(engine, kPadTrack, write_block + kBarBlocks * 4, out_l, [&](int i, const Block&) {
+        if (i == write_block) {
+            engine->pulsar_track_engine_edm[kPadTrack].store(to, std::memory_order_relaxed);
+            engine->pulsar_track_engine_space[kPadTrack].store(to, std::memory_order_relaxed);
+        }
+    });
+    const int adopt = first_block_on(rec, write_block + 1, to);
+    bool ok = adopt > write_block;
+    int bad = 0, first_bad = -1;
+    for (int i = 1; i < static_cast<int>(rec.size()); i++) {
+        if (rec[i].pin_harmonics == is_dx(rec[i].active_engine)) continue;
+        if (first_bad < 0) first_bad = i;
+        bad++;
+    }
+    ok &= bad == 0;
+    printf("  %d -> %d: write at block %d, adopted at block %d, pin off the engine on %d blocks"
+           " (first %d)\n", from, to, write_block, adopt, bad, first_bad);
+    orpheus_engine_destroy(engine);
+    return ok;
+}
+
+static bool test_pin_follows_adopted_engine() {
+    printf("\n=== Test: the DX harmonics pin flips with the adopted engine, not the port ===\n");
+    bool ok = pin_follows_engine(kDx, kVa);
+    ok &= pin_follows_engine(kVa, kDx);
+    printf("Pin follows engine: %s\n", ok ? "PASS" : "FAIL");
     return ok;
 }
 
@@ -316,9 +373,10 @@ bool run_pulsar_engine_swap_tests() {
     printf("\n=== Pulsar Engine Swap Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
     if (test_swap_waits_for_note_on()) suite_pass++; else suite_fail++;
-    if (test_held_pad_swaps_within_a_bar()) suite_pass++; else suite_fail++;
+    if (test_held_pad_swaps_on_a_bar_line()) suite_pass++; else suite_fail++;
     if (test_held_pad_swaps_into_dx()) suite_pass++; else suite_fail++;
-    if (test_silent_track_adopts_after_a_bar()) suite_pass++; else suite_fail++;
+    if (test_silent_track_adopts_on_a_bar_line()) suite_pass++; else suite_fail++;
+    if (test_pin_follows_adopted_engine()) suite_pass++; else suite_fail++;
     if (test_vibe_load_snaps_latch()) suite_pass++; else suite_fail++;
     if (test_mid_play_write_keeps_mirror()) suite_pass++; else suite_fail++;
     if (test_swap_step_no_bigger_than_note_on()) suite_pass++; else suite_fail++;

@@ -401,7 +401,8 @@ struct PulsarTrackState {
     uint32_t pan_writes_seen = 0;
     uint32_t pan_glide_writes_seen = 0;
     float harmonics, timbre, morph;
-    // Effective pin flags resolved from per-slot atomics + DX engine enforcement.
+    // Effective pin flags resolved from per-slot atomics. The DX-family harmonics pin is
+    // forced in C++ from the adopted engine (orpheus_unit_pulsar.cpp, is_dx_engine).
     // True = bypass all modulation (lerp_macro, evolution, accent, LFO) for that param.
     bool pin_harmonics;
     bool pin_timbre;

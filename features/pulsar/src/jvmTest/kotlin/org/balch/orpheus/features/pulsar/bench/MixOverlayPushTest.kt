@@ -223,6 +223,34 @@ class MixOverlayPushTest {
         scope.cancel()
     }
 
+    // A VA -> DX retune writes the vibe's raw pin: C++ forces the DX pin once the new engine sounds.
+    @Test
+    fun retuneToDxWritesTheRawHarmonicsPin() = runTest(testDispatcher) {
+        writes.clear()
+        val track = lore.tracks[4]
+        val onVa = lore.copy(
+            tracks = lore.tracks.toMutableList().also {
+                it[4] = track.copy(engineEdm = track.engineEdm.copy(engineId = OrpheusEngineId.VA, pinHarmonics = false))
+            },
+        )
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), onVa, scope)
+        vm.actions.setVibe(onVa)
+        advanceUntilIdle()
+
+        val toDx = onVa.copy(
+            tracks = onVa.tracks.toMutableList().also {
+                it[4] = it[4].copy(engineEdm = it[4].engineEdm.copy(engineId = OrpheusEngineId.DX))
+            },
+        )
+        assertTrue(vm.retuneVibe(toDx))
+        advanceUntilIdle()
+
+        assertEquals(2f, writes.last { it.first == "track_4_engine_edm" }.second)
+        assertEquals(0f, writes.last { it.first == "track_4_pin_harmonics" }.second)
+        scope.cancel()
+    }
+
     // Section-held macros: the engine and the sends play them; the knob and the save never see them.
     @Test
     fun benchMacrosReachTheEngineButNeverTheSavedState() = runTest(testDispatcher) {
