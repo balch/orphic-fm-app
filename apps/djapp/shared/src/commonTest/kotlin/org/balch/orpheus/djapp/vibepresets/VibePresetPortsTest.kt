@@ -96,13 +96,6 @@ class VibePresetPortsTest {
             PresetField.HORN_DEPTH.key to 0.4f,
             PresetField.HORN_MIX.key to 0.5f,
             PresetField.HORN_BRAKE.key to 1f,
-            PresetField.DJ_WET_A.key to 0.1f,
-            PresetField.DJ_WET_B.key to 0.9f,
-            PresetField.DJ_SOURCE_A.key to 2f,
-            PresetField.DJ_SOURCE_B.key to 4f,
-            PresetField.DJ_CROSSFADER.key to 0.25f,
-            PresetField.DJ_DELAY_SEND.key to 0.35f,
-            PresetField.DJ_REVERB_SEND.key to 0.55f,
             PresetField.PULSAR_ENERGY.key to 0.65f,
             PresetField.PULSAR_COMPLEXITY.key to 0.75f,
             PresetField.PULSAR_MOOD.key to 0.85f,
@@ -131,24 +124,39 @@ class VibePresetPortsTest {
     }
 
     @Test
-    fun brakeAndSourcesWriteIntValues() {
+    fun brakeAndIndexesWriteIntValues() {
         ports().write(
             mapOf(
                 PresetField.HORN_BRAKE.key to 1f,
-                PresetField.DJ_SOURCE_A.key to 2f,
-                PresetField.DJ_SOURCE_B.key to 3.2f,
-                PresetField.PULSAR_ROOT.key to 5f,
+                PresetField.PULSAR_ROOT.key to 5.2f,
                 PresetField.PULSAR_SCALE.key to 1f,
                 PresetField.PULSAR_ENVELOPE.key to 2f,
             ),
         )
 
         assertEquals(IntValue(1), portOf(HornSymbol.BRAKE.controlId))
-        assertEquals(IntValue(2), portOf(DjSymbol.SOURCE_A.controlId))
-        assertEquals(IntValue(3), portOf(DjSymbol.SOURCE_B.controlId))
         assertEquals(IntValue(5), portOf(PulsarSymbol.ROOT_NOTE.controlId))
         assertEquals(IntValue(1), portOf(PulsarSymbol.SCALE.controlId))
         assertEquals(IntValue(2), portOf(PulsarSymbol.ENVELOPE_MODE.controlId))
+    }
+
+    @Test
+    fun djPanelIsNeitherReadNorWritten() {
+        val djKeys = listOf(
+            DjSymbol.WET_A, DjSymbol.WET_B, DjSymbol.SOURCE_A, DjSymbol.SOURCE_B,
+            DjSymbol.CROSSFADER, DjSymbol.DELAY_SEND, DjSymbol.REVERB_SEND,
+        ).map { it.controlId.key }.toSet()
+
+        // Keys an older preset stored before the DJ panel was left out.
+        ports().write(
+            mapOf(
+                "dj.wetA" to 0.1f, "dj.wetB" to 0.9f, "dj.sourceA" to 2f, "dj.sourceB" to 4f,
+                "dj.crossfader" to 0.25f, "dj.delaySend" to 0.35f, "dj.reverbSend" to 0.55f,
+            ),
+        )
+
+        assertTrue(setterWrites.none { (key, _) -> key in djKeys }, "DJ ports written: $setterWrites")
+        assertTrue(ports().read(TrackTuning()).keys.none { it.startsWith("dj.") })
     }
 
     @Test

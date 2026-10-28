@@ -82,9 +82,9 @@ class PresetChangesTest {
     }
 
     @Test
-    fun chipFormatsSourceAsInteger() {
-        val chip = PresetChange(PresetField.DJ_SOURCE_A, 1f, 3f).chipText()
+    fun chipFormatsScaleAsInteger() {
+        val chip = PresetChange(PresetField.PULSAR_SCALE, 1f, 3f).chipText()
 
-        assertEquals("DJ: SOURCE A 1→3", chip)
+        assertEquals("PULSAR: SCALE 1→3", chip)
     }
 }

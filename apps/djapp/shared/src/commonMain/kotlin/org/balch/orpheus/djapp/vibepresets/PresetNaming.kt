@@ -37,8 +37,6 @@ private fun PresetChange.size(): Float = when {
     field == PresetField.PULSAR_ROOT ||
         field == PresetField.PULSAR_SCALE ||
         field == PresetField.PULSAR_ENVELOPE ||
-        field == PresetField.DJ_SOURCE_A ||
-        field == PresetField.DJ_SOURCE_B ||
         field == PresetField.HORN_BRAKE ||
         field.key.endsWith(".mute") ||
         field.key.endsWith(".solo") -> 1f
