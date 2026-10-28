@@ -624,7 +624,8 @@ class RustBeltVibe : VibeProvider {
                                 arpMode = ArpMode.AUTO,          // CHD = native block chords
                                 arpSpeed = 0.15f,
                                 arpDirection = ArpDirection.UP,
-                                sectionInversion = SectionInversion.FIRST_INVERSION,
+                                // No inversion: mood-driven timbre voices the chord an octave above
+                                // the D2 stab root, and that octave is the jangle.
                                 humanization = CompingHumanization(
                                     dropProbability = 0.18f,
                                     ghostProbability = 0.22f,     // lazy chank ghosts
