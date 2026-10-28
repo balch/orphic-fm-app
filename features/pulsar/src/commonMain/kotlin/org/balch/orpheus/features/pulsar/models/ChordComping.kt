@@ -137,7 +137,7 @@ data class CompingHumanization(
 
 /**
  * Voicing stance for chord stabs — which chord tone is the "lowest."
- * Drives CHD engine morph parameter or reorders arp sequence on mono engines.
+ * Drives CHD engine timbre (its inversion) or reorders arp sequence on mono engines.
  */
 @Serializable
 enum class SectionInversion {

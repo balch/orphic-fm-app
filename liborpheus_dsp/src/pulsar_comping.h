@@ -18,6 +18,20 @@ inline bool engine_has_native_chord(int engine_id) {
     return engine_id == 14;
 }
 
+// CHD voices its inversion from timbre (plaits ChordBank::ComputeChordInversion): 20 cells,
+// each lifting the next-lowest tone an octave, so cell 8 is root position at the played pitch.
+// Cell edges are clean voicings; inside a cell the lifted tone crossfades between octaves.
+inline float chd_inversion_timbre(SectionInversionId inversion, float follow) {
+    switch (inversion) {
+        case SectionInversionId::ROOT_POSITION:    return 0.40f;
+        case SectionInversionId::FIRST_INVERSION:  return 0.45f;
+        case SectionInversionId::SECOND_INVERSION: return 0.50f;
+        // The bank has no spread voicing; mid-cell sounds the root in both octaves.
+        case SectionInversionId::OPEN_VOICING:     return 0.425f;
+        default:                                   return follow;
+    }
+}
+
 // A track's playable register: per-track range, else the genre's, else a final fallback.
 // Both the fills and the humanizer bound their pitches with this, so it lives in one place
 // rather than being re-derived at each call site.
