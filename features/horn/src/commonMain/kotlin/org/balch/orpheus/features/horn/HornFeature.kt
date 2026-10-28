@@ -42,6 +42,14 @@ fun interface HornPanelAvailability {
     fun isVisible(): Boolean
 }
 
+/**
+ * Whether the saved MIX comes back at launch. The DJ app says no: its horn starts off on every
+ * vibe unless the vibe's preset sets it, and a late restore would switch it back on.
+ */
+fun interface HornMixRestore {
+    fun restoresMix(): Boolean
+}
+
 @Immutable
 @Serializable
 data class HornUiState(
@@ -127,6 +135,7 @@ class HornViewModel(
     private val restoreStrategy: RestoreStrategy,
     // Default keeps direct test construction terse; an app binding always wins over it.
     private val panelAvailability: HornPanelAvailability = HornPanelAvailability { true },
+    private val mixRestore: HornMixRestore = HornMixRestore { true },
 ) : HornFeature {
 
     private val speedFlow = synthController.controlFlow(HornSymbol.SPEED.controlId)
@@ -177,7 +186,11 @@ class HornViewModel(
                 // A horn no screen can reach stays silent; the other knobs still restore so
                 // the panel comes back as it was left. Saving this state writes mix 0 back,
                 // which is the intent: the last thing this app did was run without a horn.
-                mixFlow.value = FloatValue(if (panelAvailability.isVisible()) saved.mix else 0f)
+                // Without a mix restore the port is left alone, so a preset that got there first keeps it.
+                when {
+                    !panelAvailability.isVisible() -> mixFlow.value = FloatValue(0f)
+                    mixRestore.restoresMix() -> mixFlow.value = FloatValue(saved.mix)
+                }
                 brakeFlow.value = IntValue(if (saved.brake) 1 else 0)
             },
         )

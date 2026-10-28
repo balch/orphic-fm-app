@@ -36,7 +36,7 @@ class HornHiddenPanelTest {
 
     private val savedHorn = """{"speed":0.35,"ratio":0.45,"depth":0.46,"mix":1.0,"brake":false}"""
 
-    private fun makeVm(visible: Boolean): HornViewModel {
+    private fun makeVm(visible: Boolean, restoresMix: Boolean = true): HornViewModel {
         val controller = SynthController().apply {
             setDelegates(
                 setter = { id, value -> ports[id.symbol] = value; true },
@@ -56,6 +56,7 @@ class HornHiddenPanelTest {
             persistence = persistence,
             restoreStrategy = RestoreStrategy.USER_PREFERENCES,
             panelAvailability = HornPanelAvailability { visible },
+            mixRestore = HornMixRestore { restoresMix },
         )
     }
 
@@ -76,6 +77,15 @@ class HornHiddenPanelTest {
         assertEquals(0.0f, mixPort(), "a horn no screen can reach must not run")
         assertEquals(0.0f, vm.stateFlow.value.mix)
         assertEquals(0.35f, vm.stateFlow.value.speed, "the other knobs still restore for when the panel returns")
+    }
+
+    @Test
+    fun `without a mix restore the saved mix stays out and the port is left alone`() = runTest(testDispatcher) {
+        ports[HornSymbol.MIX.symbol] = PortValue.FloatValue(0.4f)
+        val vm = makeVm(visible = true, restoresMix = false)
+        advanceUntilIdle()
+        assertEquals(0.4f, mixPort(), "the restore overwrote a mix set before it landed")
+        assertEquals(0.35f, vm.stateFlow.value.speed, "the other knobs still restore")
     }
 }
 

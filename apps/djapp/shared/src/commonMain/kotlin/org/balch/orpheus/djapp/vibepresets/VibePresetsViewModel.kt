@@ -203,6 +203,9 @@ class VibePresetsViewModel(
     }
 
     private fun takeBaseline(vibe: String) {
+        // The horn starts off on each new vibe, so it is off in the original; a selected preset
+        // applied after this turns it back on. A same-vibe re-apply keeps a live horn.
+        if (vibe != baselineVibe) ports.write(HORN_OFF)
         baseline.value = ports.read(TrackTuning())
         baselineVibe = vibe
         presetOverBaseline = false
@@ -301,6 +304,8 @@ class VibePresetsViewModel(
     private fun VibePresetSlot.oldestId(): Int? = presets.minByOrNull { it.capturedAtMs }?.id
 
     companion object {
+        private val HORN_OFF = mapOf(PresetField.HORN_MIX.key to 0f)
+
         fun previewFeature(state: VibePresetsUiState = VibePresetsUiState()): VibePresetsFeature =
             object : VibePresetsFeature {
                 override val stateFlow: StateFlow<VibePresetsUiState> = MutableStateFlow(state)
