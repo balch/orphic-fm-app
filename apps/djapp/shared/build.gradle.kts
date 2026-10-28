@@ -88,6 +88,7 @@ kotlin {
             implementation(libs.liquid)
             implementation(libs.reorderable)
             implementation(libs.kmlogging)
+            implementation(libs.kotlinx.atomicfu)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.collections.immutable)
@@ -103,6 +104,10 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
+        }
+        jvmTest.dependencies {
+            // runComposeUiTest: the preset bar's long press and the sheets' text field need real input.
+            implementation(libs.compose.ui.test)
         }
     }
 }

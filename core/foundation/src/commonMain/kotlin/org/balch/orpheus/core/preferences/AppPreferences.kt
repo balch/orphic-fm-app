@@ -69,6 +69,10 @@ data class AppPreferences(
      * action degrades gracefully instead of failing deserialization.
      */
     val reviewEngagementTotals: Map<String, Int> = emptyMap(),
+    /** The DJ app's saved mixes per vibe name; never keyed by content hash. */
+    val vibePresets: Map<String, VibePresetSlot> = emptyMap(),
+    /** Whether the DJ app's preset bar is shown. Presets load either way. */
+    val vibePresetBarShown: Boolean = false,
 )
 
 

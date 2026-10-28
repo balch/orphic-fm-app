@@ -143,6 +143,9 @@ fun PulsarPanel(
     gridHeight: Dp = PulsarGridHeight,
     // False (the DJ app by default) makes grid taps no-ops and keeps the detail strip hidden.
     trackEditing: Boolean = true,
+    // A host's control in the PERC knob's place on the transport row (the DJ app's PRESETS
+    // toggle); null keeps PERC.
+    transportLead: (@Composable () -> Unit)? = null,
 ) {
     // Held as State, not unwrapped: the flow emits every 16ms during playback, and the grid
     // reads it in its draw phase. The one field this panel reads in composition goes through
@@ -271,7 +274,7 @@ fun PulsarPanel(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.Bottom,
         ) {
-            PulsarTransportKnobs(state = state, actions = actions)
+            PulsarTransportKnobs(state = state, actions = actions, lead = transportLead)
 
             // Shows the active transition style when auto-end is on, PLAYS when off. Tap opens
             // the settings sheet. Long press arms the outro now, skipping the playing-time and
@@ -643,23 +646,29 @@ private fun PulsarVoiceDetailStrip(
 }
 
 /**
- * PERC/BPM/DEEP transport knobs. Always visible, unlike the ENDING control beside them.
+ * PERC/BPM/DEEP transport knobs. Always visible, unlike the ENDING control beside them. A [lead]
+ * takes PERC's place; it should be no taller than ENDING, which sets the row's height.
  */
 @Composable
 private fun PulsarTransportKnobs(
     state: PulsarUiState,
     actions: PulsarPanelActions,
+    lead: (@Composable () -> Unit)?,
 ) {
-    HorizontalRotaryKnob(
-        value = state.percMix,
-        onValueChange = actions.setPercMix,
-        label = "PERC",
-        controlId = PulsarSymbol.PERC_MIX.controlId.key,
-        size = 28.dp,
-        progressColor = OrpheusColors.cosmicPurple.lighten(),
-        labelSide = LabelSide.START,
-        valueFormatter = null,
-    )
+    if (lead != null) {
+        lead()
+    } else {
+        HorizontalRotaryKnob(
+            value = state.percMix,
+            onValueChange = actions.setPercMix,
+            label = "PERC",
+            controlId = PulsarSymbol.PERC_MIX.controlId.key,
+            size = 28.dp,
+            progressColor = OrpheusColors.cosmicPurple.lighten(),
+            labelSide = LabelSide.START,
+            valueFormatter = null,
+        )
+    }
 
     HorizontalRotaryKnob(
         value = state.bpm,
