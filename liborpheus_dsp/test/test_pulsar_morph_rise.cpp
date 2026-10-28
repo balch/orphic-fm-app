@@ -1,5 +1,5 @@
 // Opt-in per-track morph rise: each note-on adds up to `morph_rise` to the track's morph over
-// `morph_rise_time` seconds, then holds, and a note-on glides back over 80 ms. Read from the
+// `morph_rise_time` seconds, then holds, and a note-on glides back over 80 ms (snaps on OSC). Read from the
 // per-block morph debug publish, with morph pinned so nothing else moves it.
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
@@ -182,6 +182,24 @@ static bool test_mrise_note_on_glides_back() {
     return ok;
 }
 
+static bool test_mrise_osc_note_on_snaps() {
+    printf("\n=== Test: on OSC a note-on snaps a falling rise back to the pinned FM index ===\n");
+    MRiseSetup on;
+    on.engine_edm = on.engine_space = -1;  // OSC: morph is the FM index
+    on.pinned = 0.5f;
+    on.rise_edm = on.rise_space = -0.3f;
+    on.time = 0.1f;  // done well inside every note, so each later note-on starts from 0.2
+    const MRiseRun rise = run_mrise(on);
+    const std::vector<int> ons = mrise_note_ons(rise);
+    float worst = 0.0f;
+    for (size_t k = 1; k < ons.size(); k++)
+        worst = std::max(worst, std::fabs(rise.morph[ons[k]] - 0.5f));
+    printf("  note-ons=%zu worst note-on deviation from 0.5=%.4f\n", ons.size(), worst);
+    const bool ok = ons.size() >= 3 && worst < 1e-4f;
+    printf("Morph rise OSC snap: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_morph_rise_tests() {
     printf("\n=== Pulsar Morph Rise Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
@@ -190,5 +208,6 @@ bool run_pulsar_morph_rise_tests() {
     if (test_mrise_climbs_then_holds()) suite_pass++; else suite_fail++;
     if (test_mrise_negative_moves_down()) suite_pass++; else suite_fail++;
     if (test_mrise_note_on_glides_back()) suite_pass++; else suite_fail++;
+    if (test_mrise_osc_note_on_snaps()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
