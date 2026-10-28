@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -276,6 +277,10 @@ fun EnginePickerButton(
     glowEnergy: Float = 0f,
     size: Dp = 28.dp,
     anchorSize: Dp = size,
+    // A wider [width] with a rounded [shape] makes a pill; [size] stays its height. The ring pops up centered on it.
+    width: Dp = size,
+    shape: Shape = CircleShape,
+    anchorWidth: Dp = if (width == size) anchorSize else width,
     labelStyle: TextStyle = TextStyle(
         fontSize = 9.sp,
         fontWeight = FontWeight.Bold,
@@ -323,10 +328,10 @@ fun EnginePickerButton(
 
         Box(
             modifier = Modifier
-                .size(size)
-                .clip(CircleShape)
+                .size(width, size)
+                .clip(shape)
                 .background(color.copy(alpha = buttonBgAlpha))
-                .border(1.dp, color.copy(alpha = buttonBorderAlpha), CircleShape)
+                .border(1.dp, color.copy(alpha = buttonBorderAlpha), shape)
                 .drawBehind {
                     // Glow drawn behind the button — no extra layout space
                     if (smoothedGlow.value > 0.01f) {
@@ -406,6 +411,7 @@ fun EnginePickerButton(
                 color = color,
                 config = activeConfig,
                 anchorSize = anchorSize,
+                anchorWidth = anchorWidth,
             )
         }
     }
@@ -431,15 +437,17 @@ fun VoiceEnginePickerPopup(
     color: Color,
     config: PickerConfig = VOICE_PICKER_CONFIG,
     anchorSize: Dp = 28.dp,
+    anchorWidth: Dp = anchorSize,
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
     val offsetPx = with(density) { (-(PICKER_SIZE - anchorSize) / 2).roundToPx() }
+    val offsetXPx = with(density) { (-(PICKER_SIZE - anchorWidth) / 2).roundToPx() }
     val liquidState = LocalDialogLiquidState.current ?: rememberLiquidState()
 
     Popup(
         alignment = Alignment.TopStart,
-        offset = IntOffset(offsetPx, offsetPx),
+        offset = IntOffset(offsetXPx, offsetPx),
         properties = PopupProperties(focusable = false)
     ) {
         Box(

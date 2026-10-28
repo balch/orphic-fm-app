@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.LocalCanvasScale
 import org.balch.orpheus.djapp.ai.collab.MixControl
@@ -52,6 +53,7 @@ import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
 import org.balch.orpheus.features.pulsar.bench.ChannelMeter
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
@@ -280,6 +282,56 @@ class MixerWidgetsTest {
         mixerScene(360, 780, 1f, feature) {
             tap(pinTag(2))
             assertEquals(listOf(5, 2), pinned)
+        }
+    }
+
+    @Test
+    fun slotLinesShowEnginePickers() {
+        // Four-letter, three-letter and two-letter names, in both slots.
+        val engines = mapOf(
+            3 to (OrpheusEngineId.TRIPLE_SAW to OrpheusEngineId.VOWEL_FOF),
+            4 to (OrpheusEngineId.CSAW to OrpheusEngineId.WTB),
+            5 to (OrpheusEngineId.VA to OrpheusEngineId.MST),
+        )
+        val labels = mapOf(
+            3 to ("3SAW" to "VOW"), 4 to ("CSAW" to "WTB"), 5 to ("VA" to "MST"),
+        )
+        val tracks = mixState.tracks.map { t ->
+            val (edm, space) = engines[t.index] ?: return@map t
+            t.copy(edmEngine = edm.name, spaceEngine = space.name, edmEngineId = edm, spaceEngineId = space)
+        }
+        val feature = feature(state = mixState.copy(tracks = tracks))
+        for ((w, scale) in listOf(1280 - 440 - 16 to FOLD_SCALE, 1280 to 1f)) {
+            mixerScene(w, 1000, scale, feature) {
+                for ((t, pair) in labels) {
+                    // The pickers live in the track's sound pop-out.
+                    tap(voiceButtonTag(t))
+                    for ((slot, label) in listOf(EngineSlot.EDM to pair.first, EngineSlot.SPACE to pair.second)) {
+                        val tag = enginePickTag(t, slot)
+                        val picker = bounds(tag)
+                        assertTrue(picker.width > 0f && picker.height > 0f, "$tag has no size at $w: $picker")
+                        val shown = nodes().filter { n ->
+                            n.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text == label } && picker.contains(n.boundsInRoot.center)
+                        }
+                        assertEquals(1, shown.size, "$tag should show $label at $w")
+                        val results = mutableListOf<TextLayoutResult>()
+                        shown.single().config.getOrNull(SemanticsActions.GetTextLayoutResult)!!.action!!.invoke(results)
+                        val ink = results.single()
+                        val natural = ink.multiParagraph.maxIntrinsicWidth
+                        assertTrue(natural <= picker.width, "$label is clipped by its pill at $w: pill $picker text needs $natural")
+                        assertTrue(picker.width > picker.height, "$tag is a pill: $picker")
+                    }
+                    // The pill stands at the height of the slot label, so the header grows no taller than before.
+                    val pop = bounds(VOICE_POPOVER_TAG)
+                    val slotText = texts().filter { (text, b) -> text.startsWith("•") && pop.contains(b.center) }
+                    assertTrue(slotText.isNotEmpty(), "the heard dot stays at $w")
+                    assertTrue(bounds(enginePickTag(t, EngineSlot.EDM)).height <= slotText.first().second.height + 1f, "pill taller than its line at $w")
+                    assertTrue(texts().any { it.first == "• EDM" } && texts().any { it.first == "  SPC" }, "the pop-out keeps the slot labels")
+                    assertTrue(texts().none { it.first.contains("VOWEL_FOF") })
+                    tapAt(texts().first { it.first == "Done" }.second.center)
+                    assertTrue(nodes().none { it.config.getOrNull(SemanticsProperties.TestTag) == VOICE_POPOVER_TAG }, "Done closes it")
+                }
+            }
         }
     }
 

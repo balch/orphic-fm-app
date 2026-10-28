@@ -48,7 +48,7 @@ class EngineKnobsTest {
         val switched = whale.withEngineId(4, OrpheusEngineId.VOWEL_FOF)
         assertEquals(OrpheusEngineId.VOWEL_FOF, switched.tracks[4].engineEdm.engineId)
         assertTrue(whale.retunesTo(switched))
-        assertEquals(enginePath(4, EngineSlot.EDM), "tracks[4].engineEdm.engineId")
+        assertEquals("tracks[4].engineEdm.engineId", enginePath(4, EngineSlot.EDM))
     }
 
     @Test fun anEngineSwitchWithABpmChangeDoesNotRetune() {
