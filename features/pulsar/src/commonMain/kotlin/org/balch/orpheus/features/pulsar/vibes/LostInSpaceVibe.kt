@@ -43,6 +43,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VolumePoint
 import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 
 /**
@@ -1223,9 +1224,29 @@ public class LostInSpaceVibe : VibeProvider {
             bpmMultiplier = 1.0f,
             bpmRampBars = 0,
           ),
+          // 3: vanish — the song's ending (outro, terminal; reached only when armed). Dissolve's
+          // macros with the dry mix fading to silence, so the reverb and delay carry out alone.
+          // Dissolve itself is also a mid-song section, so the fade can't live there.
+          Section(
+            name = "vanish",
+            barsMin = 8,
+            barsMax = 8,
+            macroOverrides = MacroOverrides(
+              energy = 0.3f,
+              complexity = 0.7f,
+              space = 1.4f,
+              mood = 1.1f,
+            ),
+            volumeEnvelope = listOf(
+              VolumePoint(bar = 0f, level = 1f),
+              VolumePoint(bar = 4f, level = 0.5f),
+              VolumePoint(bar = 6f, level = 0.15f),
+              VolumePoint(bar = 7.5f, level = 0f),
+            ),
+          ),
         ),
         introIndex = 0,
-        outroIndex = 2,
+        outroIndex = 3,
         defaultSectionBars = 8,
         lengthSeconds = 180..300,
         transitionOut = null,

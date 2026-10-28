@@ -45,6 +45,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VolumePoint
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
@@ -247,10 +248,16 @@ class BellTollsVibe : VibeProvider {
                     3 to TrackSectionOverride(chordFollow = ChordFollow.FOLLOW),
                 ),
             ),
-            // 5 OUTRO: Just drums + bass locking in — classic reggae opening.
+            // 5 OUTRO: Just drums + bass locking in — classic reggae opening. A short
+            // fade: the mix is gone a half bar before the end, leaving the dub reverb.
             Section(
                 name = "outro",
                 barsMin = 4, barsMax = 4,
+                volumeEnvelope = listOf(
+                    VolumePoint(bar = 0f, level = 1f),
+                    VolumePoint(bar = 2f, level = 0.5f),
+                    VolumePoint(bar = 3.5f, level = 0f),
+                ),
                 // energy ×0.55 keeps the closing one-drop tight (see dub
                 // section note); the song should end locked-in, not loose.
                 macroOverrides = MacroOverrides(

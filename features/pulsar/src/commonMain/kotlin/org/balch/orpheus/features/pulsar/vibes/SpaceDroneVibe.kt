@@ -40,6 +40,7 @@ import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.models.VibeEffects
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
+import org.balch.orpheus.features.pulsar.models.VolumePoint
 import org.balch.orpheus.features.pulsar.models.bandMatrix
 import org.balch.orpheus.features.pulsar.models.chords
 import org.balch.orpheus.features.pulsar.models.row
@@ -152,12 +153,19 @@ class SpaceDroneVibe : VibeProvider {
                 customProgression = moveProgression,
                 chordsPerBar = moveChordsPerBar,
             ),
-            // 5:
+            // 5: fadeout — the dry mix fades to silence by the last bar, so the reverb and
+            // delay tails carry out alone (terminal; reached only when the outro is armed).
             Section(
                 name = "fadeout",
                 barsMin = 6, barsMax = 6,
                 macroOverrides = MacroOverrides(
                     energy = 0.5f, complexity = 1.2f, space = 1.05f, mood = .5f,
+                ),
+                volumeEnvelope = listOf(
+                    VolumePoint(bar = 0f, level = 1f),
+                    VolumePoint(bar = 3f, level = 0.55f),
+                    VolumePoint(bar = 4.5f, level = 0.2f),
+                    VolumePoint(bar = 5.5f, level = 0f),
                 ),
                 customProgression = endProgression,
                 chordsPerBar = endChordsPerBar,
