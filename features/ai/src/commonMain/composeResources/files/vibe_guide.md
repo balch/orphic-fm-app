@@ -1161,7 +1161,8 @@ When pulsar_edit_vibe is available, change the vibe that plays now with it, and 
 pulsar_apply_vibe for a new vibe. Each changed field becomes a History row on top of the vibe's
 file: the user can turn it off, hear and roll back to the points around it, and capture it. The
 vibe keeps its name and its mix rows. Each edit restarts the song from the top, except one that
-changes only engine harmonics, timbre, morph or their pins, which plays on live. The loop:
+changes only an engine, or its harmonics, timbre, morph or pins, which plays on live (a new
+engine from its track's next note). The loop:
 1. pulsar_get_vibe('current'): the vibe as it plays, earlier edits included.
 2. Listen first when it helps and the mix tools are available: audio_analyze for the track,
    section_jump to the section the user means. When you can't tell which section or track they

@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
+import org.balch.orpheus.features.pulsar.bench.enginePath
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.Vibe
 
@@ -178,5 +179,81 @@ class CollabEngineKnobTest {
         assertNotNull(r.mixer.capture())
         assertEquals(listOf("tracks[2].engineEdm.pinTimbre", "tracks[2].engineEdm.timbre"), rows.map { it.path }.sorted())
         assertEquals(JsonPrimitive(0.3f), rows.single { it.path.endsWith(".timbre") }.new)
+    }
+
+    private val engine4 = enginePath(4, EngineSlot.EDM)
+    private val Rig.engine4Id get() = pulsar.vibeFlow.value.tracks[4].engineEdm.engineId
+
+    private suspend fun Rig.switchEngine(): VibeEditResult =
+        mixer.editVibe(EditOrigin.USER, listOf(engine4 to JsonPrimitive("VOWEL_FOF")))
+
+    @Test
+    fun anEngineEditPlaysOn() = runTest {
+        val r = rig()
+        val loads = r.loads
+
+        val result = assertIs<VibeEditResult.Applied>(r.switchEngine())
+        runCurrent()
+
+        assertEquals(false, result.restarted)
+        assertEquals(loads, r.loads)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, r.engine4Id)
+        assertEquals(listOf(engine4), r.paths())
+        assertEquals(1, r.history.items.count { it is HistoryVibeEdit })
+    }
+
+    @Test
+    fun togglingAndRollingBackAnEngineRowPlayOn() = runTest {
+        val r = rig()
+        r.mixer.markPoint()
+        val point = r.history.items.filterIsInstance<HistoryPoint>().single().id
+        r.switchEngine()
+        val loads = r.loads
+        val row = r.history.vibeEdits.single()
+
+        assertTrue(r.mixer.toggleChange(row.id))
+        assertEquals(night.tracks[4].engineEdm.engineId, r.engine4Id)
+        assertEquals(loads, r.loads)
+
+        assertTrue(r.mixer.toggleChange(row.id))
+        assertEquals(OrpheusEngineId.VOWEL_FOF, r.engine4Id)
+        assertEquals(loads, r.loads)
+
+        assertTrue(r.mixer.rollBack(point))
+        assertEquals(night.tracks[4].engineEdm.engineId, r.engine4Id)
+        assertEquals(loads, r.loads)
+    }
+
+    @Test
+    fun hearingAPointBeforeAnEngineRowPlaysOn() = runTest {
+        val r = rig()
+        r.mixer.markPoint()
+        val point = r.history.items.filterIsInstance<HistoryPoint>().single().id
+        r.switchEngine()
+        val loads = r.loads
+
+        assertTrue(r.mixer.hear(point))
+        runCurrent()
+        assertEquals(night.tracks[4].engineEdm.engineId, r.engine4Id)
+        assertEquals(loads, r.loads)
+
+        r.mixer.endHear()
+        runCurrent()
+        assertEquals(OrpheusEngineId.VOWEL_FOF, r.engine4Id)
+        assertEquals(loads, r.loads)
+    }
+
+    @Test
+    fun anEngineAndBpmEditRestarts() = runTest {
+        val r = rig()
+        val loads = r.loads
+        val result = assertIs<VibeEditResult.Applied>(
+            r.mixer.editVibe(EditOrigin.USER, listOf(engine4 to JsonPrimitive("VOWEL_FOF"), "bpm" to JsonPrimitive(96))),
+        )
+        runCurrent()
+        assertEquals(true, result.restarted)
+        assertEquals(loads + 1, r.loads)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, r.engine4Id)
+        assertEquals(96f, r.pulsar.vibeFlow.value.bpm)
     }
 }

@@ -38,9 +38,22 @@ class EngineKnobsTest {
         val e = whale.tracks[0].engineEdm
         val volume = whale.copy(tracks = whale.tracks.toMutableList().also { it[0] = it[0].copy(engineEdm = e.copy(volume = e.volume + 0.1f)) })
         assertFalse(whale.retunesTo(volume))
-        val engine = whale.copy(tracks = whale.tracks.toMutableList().also { it[0] = it[0].copy(engineEdm = e.copy(engineId = OrpheusEngineId.STR)) })
-        assertFalse(whale.retunesTo(engine), "an engine switch reloads")
         assertFalse(whale.retunesTo(knob.copy(bpm = whale.bpm + 1f)))
+    }
+
+    private fun Vibe.withEngineId(track: Int, id: OrpheusEngineId) =
+        copy(tracks = tracks.toMutableList().also { it[track] = it[track].copy(engineEdm = it[track].engineEdm.copy(engineId = id)) })
+
+    @Test fun anEngineSwitchRetunes() {
+        val switched = whale.withEngineId(4, OrpheusEngineId.VOWEL_FOF)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, switched.tracks[4].engineEdm.engineId)
+        assertTrue(whale.retunesTo(switched))
+        assertEquals(enginePath(4, EngineSlot.EDM), "tracks[4].engineEdm.engineId")
+    }
+
+    @Test fun anEngineSwitchWithABpmChangeDoesNotRetune() {
+        val switched = whale.withEngineId(4, OrpheusEngineId.VOWEL_FOF)
+        assertFalse(whale.retunesTo(switched.copy(bpm = whale.bpm + 1f)))
     }
 
     @Test fun dxHarmonicsSnapsToTheMiddleOfItsPatch() {

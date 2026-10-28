@@ -92,6 +92,8 @@ fun knobPath(track: Int, slot: EngineSlot, knob: EngineKnob) = "tracks[$track].$
 
 fun knobPinPath(track: Int, slot: EngineSlot, knob: EngineKnob) = "tracks[$track].${slot.pathKey}.${knob.pinField}"
 
+fun enginePath(track: Int, slot: EngineSlot): String = "tracks[$track].${slot.pathKey}.engineId"
+
 private fun Vibe.withEngine(track: Int, slot: EngineSlot, change: (OrpheusEngine) -> OrpheusEngine): Vibe {
     val tv = tracks[track]
     val next = if (slot == EngineSlot.EDM) tv.copy(engineEdm = change(tv.engineEdm)) else tv.copy(engineSpace = change(tv.engineSpace))
@@ -114,13 +116,13 @@ fun Vibe.withEngineKnobOf(file: Vibe, track: Int, slot: EngineSlot, knob: Engine
 }
 
 private fun OrpheusEngine.knobsOf(o: OrpheusEngine) = copy(
-    harmonics = o.harmonics, timbre = o.timbre, morph = o.morph,
+    engineId = o.engineId, harmonics = o.harmonics, timbre = o.timbre, morph = o.morph,
     pinHarmonics = o.pinHarmonics, pinTimbre = o.pinTimbre, pinMorph = o.pinMorph,
 )
 
 /**
- * True when [to] differs from this vibe only in its engines' harmonics, timbre, morph and their pins. The engine reads
- * those every block, so they can change under a playing song with no reload.
+ * True when [to] differs from this vibe only in its engines' ids, harmonics, timbre, morph and their pins. The engine
+ * reads the knobs every block and adopts a new id on the track's next note, so they change under a playing song.
  */
 fun Vibe.retunesTo(to: Vibe): Boolean {
     if (to.tracks.size != tracks.size) return false

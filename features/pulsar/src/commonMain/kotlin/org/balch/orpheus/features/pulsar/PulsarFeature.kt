@@ -400,9 +400,10 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     fun setBaseBpm(bpm: Float) {}
 
     /**
-     * Plays [vibe] in place of the playing one without a reload, when the two differ only in engine harmonics, timbre,
-     * morph and their pins ([retunesTo]): the song keeps its place and [vibeLoadCount] stays. False, changing nothing,
-     * for any other difference. Previews and fakes return false, so callers reload instead.
+     * Plays [vibe] in place of the playing one without a reload, when the two differ only in engine ids, harmonics,
+     * timbre, morph and their pins ([retunesTo]): the song keeps its place and [vibeLoadCount] stays, and a new engine
+     * sounds from its track's next note. False, changing nothing, for any other difference. Previews and fakes return
+     * false, so callers reload instead.
      */
     fun retuneVibe(vibe: Vibe): Boolean = false
 
@@ -2382,7 +2383,10 @@ class PulsarViewModel(
         _vibeFlow.value = vibe
         val overrides = vibe.arrangement?.sections?.getOrNull(pushedSection)?.trackOverrides
         vibe.tracks.forEachIndexed { i, tv ->
-            if (tv != old.tracks[i]) pushEngineKnobs(i, tv.engineEdm, tv.engineSpace, overrides?.get(i)?.morph)
+            if (tv == old.tracks[i]) return@forEachIndexed
+            trackEdmIds[i].value = IntValue(tv.engineEdm.engineId.id)
+            trackSpaceIds[i].value = IntValue(tv.engineSpace.engineId.id)
+            pushEngineKnobs(i, tv.engineEdm, tv.engineSpace, overrides?.get(i)?.morph)
         }
         return true
     }
