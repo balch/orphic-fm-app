@@ -61,12 +61,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.ai.chat.rememberOverlayFocus
 import org.balch.orpheus.djapp.ai.chat.usd
 import org.balch.orpheus.djapp.legible
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
-import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 
 /** Full strips need this width and [WIDE_MIN_HEIGHT]; anything smaller gets the compact list. */
@@ -137,19 +139,65 @@ fun AiMixerPanel(
             flashes.flash(control, latest.tracks.map { it.index }.filter { it !in latest.pins })
         }
     }
-    BoxWithConstraints(modifier) {
+    // The track whose sound panel is popped out, or -1.
+    var voiceOpen by rememberSaveable { mutableIntStateOf(-1) }
+    val voiceTrack = state.tracks.firstOrNull { it.index == voiceOpen }
+    val overlay = rememberOverlayFocus()
+    val openVoice = { i: Int ->
+        overlay.onOpen()
+        voiceOpen = i
+    }
+    val closeVoice = {
+        voiceOpen = -1
+        overlay.onClose()
+    }
+    // Composed after the sheet's handler, so Back closes the panel before the sheet.
+    NavigationBackHandler(
+        rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = voiceTrack != null,
+        onBackCompleted = closeVoice,
+    )
+    BoxWithConstraints(
+        modifier
+            .onPreviewKeyEvent { overlay.onPreviewKey(it, voiceTrack != null) { voiceOpen = -1 } }
+            .focusRequester(overlay.host)
+            .focusable(),
+    ) {
         val wideHeight = maxHeight - bottomOverhang
-        val wide = maxWidth >= WIDE_MIN && wideHeight >= WIDE_MIN_HEIGHT
+        val width = maxWidth
+        val wide = width >= WIDE_MIN && wideHeight >= WIDE_MIN_HEIGHT
         Surface(
             Modifier.fillMaxSize().padding(bottom = if (wide) bottomOverhang else 0.dp),
             shape = shape,
             color = MixerInk.surface,
             contentColor = MixerInk.text,
         ) {
-            if (wide) {
-                WideMixer(state, meters, feature.actions, flashes, maxWidth, wideHeight)
-            } else {
-                CompactMixer(state, meters, feature.actions, flashes, maxWidth, bottomOverhang = bottomOverhang)
+            Box(Modifier.fillMaxSize()) {
+                if (wide) {
+                    WideMixer(state, meters, feature.actions, flashes, width, wideHeight, openVoice)
+                } else {
+                    CompactMixer(state, meters, feature.actions, flashes, width, openVoice, bottomOverhang = bottomOverhang)
+                }
+                if (voiceTrack != null) {
+                    // A clear scrim: the strips' meters stay readable while the knobs turn.
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .testTag(VOICE_SCRIM_TAG)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClickLabel = "Close sound",
+                                onClick = closeVoice,
+                            ),
+                    )
+                    VoicePopover(
+                        voiceTrack,
+                        feature.actions,
+                        onClose = closeVoice,
+                        Modifier.align(Alignment.Center).padding(16.dp),
+                    )
+                }
             }
         }
     }
@@ -163,6 +211,7 @@ private fun WideMixer(
     flashes: AgentFlashes,
     width: Dp,
     height: Dp,
+    onVoice: (Int) -> Unit,
 ) {
     // Short windows (a 1280x800 desktop under the dome's clearance) tighten the furniture so the faders keep travel.
     val tight = height < TIGHT_HEIGHT
@@ -232,10 +281,9 @@ private fun WideMixer(
                             underChips = if (beside) scopeToggle else null,
                         )
                         if (state.sectionScope) SectionPanNote()
-                        VoiceNote()
                     }
                 },
-                strips = { Strips(state, meters, actions, flashes, stripWidth, wave, tight) },
+                strips = { Strips(state, meters, actions, flashes, stripWidth, wave, tight, onVoice) },
             )
         }
         if (changesOpen) {
@@ -405,6 +453,7 @@ private fun Strips(
     stripWidth: Dp,
     wave: Dp,
     tight: Boolean,
+    onVoice: (Int) -> Unit,
 ) {
     Row(
         Modifier.fillMaxHeight().horizontalScroll(rememberScrollState()),
@@ -412,7 +461,7 @@ private fun Strips(
     ) {
         for (track in state.tracks) {
             val i = track.index
-            TrackStrip(track, meters, actions, i in state.pins, i in state.agentTouched, flashes.track(i), stripWidth, wave, tight)
+            TrackStrip(track, meters, actions, i in state.pins, i in state.agentTouched, flashes.track(i), stripWidth, wave, tight, onVoice)
         }
         AmbientStrip(meters)
         BusStrip(meters)
@@ -434,6 +483,7 @@ private fun TrackStrip(
     width: Dp,
     wave: Dp,
     tight: Boolean,
+    onVoice: (Int) -> Unit,
 ) {
     val i = track.index
     val color = MixerInk.tracks.getOrElse(i) { MixerInk.accent }
@@ -471,17 +521,12 @@ private fun TrackStrip(
             // A small pin leaves the name room on a narrow strip; its touch target stays PIN_TARGET.
             PinToggle(i, track.name, pinned, { actions.togglePin(i) }, size = 12.dp, anchor = Alignment.TopEnd)
         }
-        SlotHeader(track) { actions.pickSlot(i, it) }
-        VoiceKnobRow(
-            track,
-            onSet = { t, k, v -> actions.setVoiceKnob(t, EngineKnob.entries[k], v) },
-            onHeld = { readout = it },
-            size = ((width - 6.dp) / 3 - 6.dp).coerceIn(18.dp, 30.dp),
-        )
         Box(Modifier.padding(vertical = if (tight) TIGHT_WAVE_PAD else WAVE_PAD).fillMaxWidth().height(wave), contentAlignment = Alignment.Center) {
             MixerWave({ meters.waveOf(i) }, color, Modifier.fillMaxSize())
             readout?.let { KnobReadout(it, Modifier.wrapContentSize(unbounded = true)) }
         }
+        // Under the wave, clear of the pin's touch target, which hangs below the name.
+        VoiceButton(track, { onVoice(i) }, Modifier.padding(bottom = 3.dp).fillMaxWidth())
         // A wide strip fits all three knobs on one row, leaving the fader more height.
         if (!knobsOneRow) panKnob()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -573,15 +618,6 @@ private fun BusStrip(meters: State<MeterSnapshot>) {
 internal fun SectionPanNote() {
     Text(
         "Pan has no per-section value: pan moves still land in the whole vibe.",
-        style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
-    )
-}
-
-@Composable
-internal fun VoiceNote() {
-    Text(
-        "Track sound knobs: dim ones follow MOOD or SPACE, and turning one pins it from what you hear. Double-tap " +
-            "returns it to the file. The switch picks the EDM or SPACE engine; • marks the one playing.",
         style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
     )
 }

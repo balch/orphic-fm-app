@@ -345,6 +345,14 @@ class AiMixerRenderHarness {
 
     @Test fun desktop() = render("desktop", 1280, 800)
 
+    // BASS's sound panel popped out over the strips, beside the Fold's chat and on a phone's expanded row.
+    @Test fun foldVoice() = render("fold_voice_840x1100", 840, 1100, scale = FOLD_SCALE) { tap(voiceButtonTag(3)) }
+
+    @Test fun phoneVoice() = render("phone_voice", 360, 780) {
+        tap(rowTag(3))
+        tap(voiceButtonTag(3))
+    }
+
     // Short windows get the compact list too, with pan, R and D inline in each row.
     @Test fun phoneLandscape() = render("phone_landscape", 800, 360)
 
