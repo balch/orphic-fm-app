@@ -309,6 +309,7 @@ if(BUILD_TESTS)
         test/test_scope.cpp
         test/test_record_ring.cpp
         test/test_engine_slot.cpp
+        test/test_plaits_dx_lfo.cpp
         test/test_control_routing.cpp
         test/test_snapshots.cpp
         test/test_headroom.cpp

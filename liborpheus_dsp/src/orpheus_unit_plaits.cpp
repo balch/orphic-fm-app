@@ -141,6 +141,11 @@ static inline float buf_rms(const float* buf, int n) {
     return (n > 0) ? std::sqrt(sum_sq / n) : 0.0f;
 }
 
+// DX engines (2, 3, 4) read harmonics as a patch selector, so LFO ch2 would hop patches.
+static inline bool lfo_ch2_targets_harmonics(int engine_index) {
+    return engine_index < 2 || engine_index > 4;
+}
+
 void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr,
                          float duo_mod_signal) {
     int idx = u->state.module.index;
@@ -542,7 +547,9 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ? engine->tides_output_buffer[2][num_frames / 2]
                 : engine->lfo_harmonics_buffer[num_frames / 2];
             morph = std::max(0.0f, std::min(1.0f, morph + morph_src * md * 0.5f));
-            harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_src * md * 0.5f));
+            if (lfo_ch2_targets_harmonics(engine_index)) {
+                harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_src * md * 0.5f));
+            }
         }
 
         // Render: Braids range (100..199) → MacroOscillator wrapper.
