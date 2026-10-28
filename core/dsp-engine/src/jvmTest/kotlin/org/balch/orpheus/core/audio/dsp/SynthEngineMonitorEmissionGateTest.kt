@@ -218,6 +218,10 @@ class SynthEngineMonitorEmissionGateTest {
             out.fill(-1)
         }
 
+        override fun nativeGetPulsarActivePatches(out: IntArray) {
+            out.fill(-1)
+        }
+
         override fun nativeGetPulsarArrangement(out: IntArray) {
             out[0] = -1
         }

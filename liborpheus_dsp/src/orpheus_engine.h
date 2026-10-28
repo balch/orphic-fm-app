@@ -835,6 +835,8 @@ struct OrpheusEngine {
     // mix-gated, so readers never see a stale 0; a mid-play write leaves it on the
     // live engine until the track adopts the new id.
     std::atomic<int> pulsar_track_active_engine[8]{};
+    // DX patch (0..31) the track sounds this block, from its final harmonics; -1 off DX.
+    std::atomic<int> pulsar_track_active_patch[8]{-1, -1, -1, -1, -1, -1, -1, -1};
     // 1 while the track plays its SPACE slot. Published beside the engine id because
     // a track with the same engine in both slots still has two sets of params.
     std::atomic<int> pulsar_track_active_space_slot[8]{};

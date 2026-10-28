@@ -24,6 +24,7 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  * @param krakenShift The Kraken shift the engine has in effect (-1 = home), switched on beat lines.
  * @param activeEngines Live per-track engine id the DSP is actually playing
  *   (reflects the random crossfade + section energy overrides). -1 = unset.
+ * @param activePatches Per-track DX patch index (0..31) sounding now, walk included; -1 off DX.
  */
 data class PulsarVizData(
     val stepGates: Array<BooleanArray> = Array(NUM_TRACKS) { BooleanArray(MAX_STEPS) },
@@ -34,6 +35,7 @@ data class PulsarVizData(
     val voidGain: Float = 1f,
     val activeEngines: IntArray = IntArray(NUM_TRACKS) { -1 },
     val krakenShift: Int = -1,
+    val activePatches: IntArray = IntArray(NUM_TRACKS) { -1 },
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -46,6 +48,7 @@ data class PulsarVizData(
         if (voidGain != other.voidGain) return false
         if (!activeEngines.contentEquals(other.activeEngines)) return false
         if (krakenShift != other.krakenShift) return false
+        if (!activePatches.contentEquals(other.activePatches)) return false
         return true
     }
 
@@ -58,6 +61,7 @@ data class PulsarVizData(
         result = 31 * result + voidGain.hashCode()
         result = 31 * result + activeEngines.contentHashCode()
         result = 31 * result + krakenShift
+        result = 31 * result + activePatches.contentHashCode()
         return result
     }
 }

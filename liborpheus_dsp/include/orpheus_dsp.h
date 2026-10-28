@@ -211,6 +211,9 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
 // what is actually heard, not a knob-derived guess). -1 = unset.
 void orpheus_engine_get_pulsar_active_engines(OrpheusEngine* engine, int* out);
 
+// DX patch index (0..31) each track sounds right now into out[8]; -1 = not a DX engine.
+void orpheus_engine_get_pulsar_active_patches(OrpheusEngine* engine, int* out);
+
 // ── Pulsar arrangement state read-back (polled at ~5fps from UI thread) ──
 // Reads the current arrangement state into out[8]:
 //   out[0] = section_index (-1 = inactive)

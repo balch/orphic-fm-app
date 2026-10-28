@@ -368,6 +368,10 @@ void OboeEngine::getPulsarActiveEngines(int* out) {
     bool read = engine_.with(false, [&](OrpheusEngine* e) { orpheus_engine_get_pulsar_active_engines(e, out); return true; });
     if (!read) for (int t = 0; t < 8; t++) out[t] = -1;
 }
+void OboeEngine::getPulsarActivePatches(int* out) {
+    bool read = engine_.with(false, [&](OrpheusEngine* e) { orpheus_engine_get_pulsar_active_patches(e, out); return true; });
+    if (!read) for (int t = 0; t < 8; t++) out[t] = -1;
+}
 void OboeEngine::getPulsarArrangement(int* out) {
     bool read = engine_.with(false, [&](OrpheusEngine* e) { orpheus_engine_get_pulsar_arrangement(e, out); return true; });
     if (!read) out[0] = -1;

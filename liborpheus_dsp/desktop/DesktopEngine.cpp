@@ -245,6 +245,10 @@ void DesktopEngine::getPulsarActiveEngines(int* out) {
     if (dsp_engine_) orpheus_engine_get_pulsar_active_engines(dsp_engine_, out);
     else for (int t = 0; t < 8; t++) out[t] = -1;
 }
+void DesktopEngine::getPulsarActivePatches(int* out) {
+    if (dsp_engine_) orpheus_engine_get_pulsar_active_patches(dsp_engine_, out);
+    else for (int t = 0; t < 8; t++) out[t] = -1;
+}
 void DesktopEngine::getPulsarArrangement(int* out) {
     if (dsp_engine_) orpheus_engine_get_pulsar_arrangement(dsp_engine_, out);
     else out[0] = -1;

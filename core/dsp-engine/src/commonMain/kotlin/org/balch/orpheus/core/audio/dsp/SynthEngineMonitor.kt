@@ -153,6 +153,7 @@ class SynthEngineMonitor(
     private val pulsarPlayheads = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarActiveEngines = IntArray(PULSAR_NUM_TRACKS) { -1 }
+    private val pulsarActivePatches = IntArray(PULSAR_NUM_TRACKS) { -1 }
     private val arrangementBuf = IntArray(8)
 
     // Guards every poll-lifecycle transition below (the five Job refs plus the
@@ -381,6 +382,7 @@ class SynthEngineMonitor(
             val prevPlayheads = IntArray(pulsarPlayheads.size)
             val prevStepCounts = IntArray(pulsarStepCounts.size)
             val prevActiveEngines = IntArray(pulsarActiveEngines.size)
+            val prevActivePatches = IntArray(pulsarActivePatches.size)
             val prevTrackLevels = FloatArray(PULSAR_NUM_TRACKS)
             var prevVoidGain = -1f
             var prevKrakenShift = -1
@@ -390,6 +392,7 @@ class SynthEngineMonitor(
                     pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
                 )
                 nativeBridge.nativeGetPulsarActiveEngines(pulsarActiveEngines)
+                nativeBridge.nativeGetPulsarActivePatches(pulsarActivePatches)
                 val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
                 for (t in 0 until PULSAR_NUM_TRACKS) {
                     val ch = VIZ_PULSAR_TRACK_0 + t
@@ -420,7 +423,8 @@ class SynthEngineMonitor(
                     !pulsarGates.contentEquals(prevGates) ||
                     !pulsarVelocities.contentEquals(prevVelocities) ||
                     !pulsarStepCounts.contentEquals(prevStepCounts) ||
-                    !pulsarActiveEngines.contentEquals(prevActiveEngines)
+                    !pulsarActiveEngines.contentEquals(prevActiveEngines) ||
+                    !pulsarActivePatches.contentEquals(prevActivePatches)
 
                 if (changed) {
                     _pulsarVizFlow.value = PulsarVizData(
@@ -432,12 +436,14 @@ class SynthEngineMonitor(
                         voidGain = lastVoidGain,
                         krakenShift = lastKrakenShift,
                         activeEngines = pulsarActiveEngines.copyOf(),
+                        activePatches = pulsarActivePatches.copyOf(),
                     )
                     pulsarGates.copyInto(prevGates)
                     pulsarVelocities.copyInto(prevVelocities)
                     pulsarPlayheads.copyInto(prevPlayheads)
                     pulsarStepCounts.copyInto(prevStepCounts)
                     pulsarActiveEngines.copyInto(prevActiveEngines)
+                    pulsarActivePatches.copyInto(prevActivePatches)
                     trackLevels.copyInto(prevTrackLevels)
                     prevVoidGain = lastVoidGain
                     prevKrakenShift = lastKrakenShift

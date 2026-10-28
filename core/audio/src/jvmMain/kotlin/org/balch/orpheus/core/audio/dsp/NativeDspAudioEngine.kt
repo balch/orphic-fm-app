@@ -151,6 +151,7 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge, MixBenchTap, StemTapS
         playheadsOut: IntArray, stepCountsOut: IntArray,
     ) = bridge.nativeGetPulsarViz(gatesOut, velocitiesOut, playheadsOut, stepCountsOut)
     override fun nativeGetPulsarActiveEngines(out: IntArray) = bridge.nativeGetPulsarActiveEngines(out)
+    override fun nativeGetPulsarActivePatches(out: IntArray) = bridge.nativeGetPulsarActivePatches(out)
     override fun nativeGetPulsarArrangement(out: IntArray) = bridge.nativeGetPulsarArrangement(out)
 
     // -- MixBenchTap: guarded like nativeGetScope, so a stale dylib reads as an idle bench ---------

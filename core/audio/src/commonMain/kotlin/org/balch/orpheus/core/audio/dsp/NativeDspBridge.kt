@@ -71,6 +71,8 @@ interface NativeDspBridge {
     )
     /** Reads the live per-track active engine ids (what the DSP is playing) into out[8]. */
     fun nativeGetPulsarActiveEngines(out: IntArray)
+    /** Reads each track's sounding DX patch (0..31) into out[8]; -1 when the track is not on a DX engine. */
+    fun nativeGetPulsarActivePatches(out: IntArray)
     /** Reads arrangement + notated-score clock state into out[8] — see PulsarArrangementState. */
     fun nativeGetPulsarArrangement(out: IntArray)
 
