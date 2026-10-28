@@ -339,4 +339,10 @@ class AiMixerStateTest {
         assertEquals("BASS · EDM harmonics pin", vibePathLabel("tracks[3].engineEdm.pinHarmonics", v, names))
         assertEquals("BASS · Space morph", vibePathLabel("tracks[3].engineSpace.morph", v, names))
     }
+
+    @Test
+    fun lockRowReadsPlays() {
+        val names = { t: Int -> BenchMeters.CHANNEL_NAMES[t] }
+        assertEquals("${BenchMeters.CHANNEL_NAMES[4]} · plays", vibePathLabel("tracks[4].slotLock", v, names))
+    }
 }

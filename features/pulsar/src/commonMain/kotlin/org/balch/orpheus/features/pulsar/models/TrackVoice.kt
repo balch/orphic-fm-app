@@ -27,6 +27,7 @@ import kotlinx.serialization.Serializable
  * @param soloBehavior How this track behaves when chosen as soloist (null = never solos).
  * @param duckingProfile How this track ducks during another track's solo (null = defaults).
  * @param evolution Per-track evolution config for rhythmic and pitch evolution.
+ * @param slotLock Holds the track on one engine slot whatever the energy, loop roll or soloist rule would pick.
  */
 @Serializable
 data class TrackVoice(
@@ -42,7 +43,12 @@ data class TrackVoice(
     val soloBehavior: SoloBehavior? = null,
     val duckingProfile: DuckingProfile? = null,
     val evolution: Evolution = Evolution(),
+    val slotLock: SlotLock = SlotLock.AUTO,
 )
+
+/** Which engine slot a track plays. The ordinal is the C++ `track_N_slot_lock` value: 0 Auto, 1 EDM, 2 SPACE. */
+@Serializable
+enum class SlotLock { AUTO, EDM, SPACE }
 
 /** Convenience: [ChordComping] if this track is [TrackRole.Chordal], else null. */
 val TrackVoice.chordComping: ChordComping?

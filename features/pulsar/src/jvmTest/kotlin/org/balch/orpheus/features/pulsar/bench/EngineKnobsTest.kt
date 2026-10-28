@@ -5,9 +5,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.features.pulsar.FmPatchNames
 import org.balch.orpheus.features.pulsar.models.MacroTarget
+import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.vibes.WhalesDreamVibe
 
@@ -54,6 +57,30 @@ class EngineKnobsTest {
     @Test fun anEngineSwitchWithABpmChangeDoesNotRetune() {
         val switched = whale.withEngineId(4, OrpheusEngineId.VOWEL_FOF)
         assertFalse(whale.retunesTo(switched.copy(bpm = whale.bpm + 1f)))
+    }
+
+    private fun Vibe.withLock(track: Int, lock: SlotLock) =
+        copy(tracks = tracks.toMutableList().also { it[track] = it[track].copy(slotLock = lock) })
+
+    @Test fun aSlotLockChangeRetunes() {
+        val locked = whale.withLock(4, SlotLock.SPACE)
+        assertEquals(SlotLock.AUTO, whale.tracks[4].slotLock)
+        assertTrue(whale.retunesTo(locked))
+        assertTrue(locked.retunesTo(whale))
+        assertEquals("tracks[4].slotLock", lockPath(4))
+        assertEquals(listOf(lockPath(4)), diffVibe(whale, locked).map { it.path })
+    }
+
+    @Test fun aSlotLockWithABpmChangeDoesNotRetune() {
+        assertFalse(whale.retunesTo(whale.withLock(4, SlotLock.EDM).copy(bpm = whale.bpm + 1f)))
+    }
+
+    @Test fun aVibeWithoutSlotLockDecodesAsAuto() {
+        val tree = whale.withLock(4, SlotLock.SPACE).toTree()
+        val tracks = tree.getValue("tracks") as JsonArray
+        val bare = JsonObject(tree + ("tracks" to JsonArray(tracks.map { JsonObject((it as JsonObject) - "slotLock") })))
+        assertTrue(bare.getValue("tracks").let { (it as JsonArray)[4] as JsonObject }.keys.none { it == "slotLock" })
+        assertEquals(SlotLock.AUTO, bare.toVibe().tracks[4].slotLock)
     }
 
     @Test fun dxHarmonicsSnapsToTheMiddleOfItsPatch() {

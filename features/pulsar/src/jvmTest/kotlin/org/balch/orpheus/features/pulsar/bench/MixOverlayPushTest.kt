@@ -32,6 +32,7 @@ import org.balch.orpheus.features.pulsar.StubSongEndingPreferences
 import org.balch.orpheus.features.pulsar.StubTransitionPreferences
 import org.balch.orpheus.features.pulsar.StubTransitionRunner
 import org.balch.orpheus.features.pulsar.makeAppCoroutineScope
+import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.models.Vibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
 import kotlinx.serialization.json.Json
@@ -220,6 +221,55 @@ class MixOverlayPushTest {
         assertEquals(track.engineSpace.engineId.id.toFloat(), last["track_4_engine_space"])
         assertTrue(writes.none { it.first.startsWith("track_3_") }, "an unchanged track is not re-pushed")
         assertTrue(writes.none { it.first == "vibe_generation" }, "no reload")
+        scope.cancel()
+    }
+
+    // A lock edit retunes: only the lock port moves (0 Auto, 1 EDM, 2 SPACE), with no load.
+    @Test
+    fun retuneWritesTheSlotLockPort() = runTest(testDispatcher) {
+        writes.clear()
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), lore, scope)
+        vm.actions.setVibe(lore)
+        advanceUntilIdle()
+        val loads = vm.vibeLoadCount.value
+        writes.clear()
+
+        val locked = lore.copy(
+            tracks = lore.tracks.toMutableList().also { it[4] = it[4].copy(slotLock = SlotLock.SPACE) },
+        )
+        assertTrue(vm.retuneVibe(locked))
+        advanceUntilIdle()
+
+        assertEquals(loads, vm.vibeLoadCount.value)
+        assertEquals(locked, vm.vibeFlow.value)
+        assertEquals(2f, writes.last { it.first == "track_4_slot_lock" }.second)
+        assertTrue(writes.none { it.first.startsWith("track_3_") }, "an unchanged track is not re-pushed")
+        assertTrue(writes.none { it.first == "vibe_generation" }, "no reload")
+
+        assertTrue(vm.retuneVibe(lore))
+        advanceUntilIdle()
+        assertEquals(0f, writes.last { it.first == "track_4_slot_lock" }.second, "back to auto writes 0")
+        scope.cancel()
+    }
+
+    // C++ never resets the lock, so every load writes it: EDM as 1, and AUTO as 0.
+    @Test
+    fun applyVibeWritesTheSlotLockPort() = runTest(testDispatcher) {
+        writes.clear()
+        val locked = lore.copy(
+            tracks = lore.tracks.toMutableList().also { it[2] = it[2].copy(slotLock = SlotLock.EDM) },
+        )
+        val scope = FeatureCoroutineScope()
+        val vm = makeViewModel(SongEndingStubSynthEngine(), locked, scope)
+        vm.actions.setVibe(locked)
+        advanceUntilIdle()
+        assertEquals(1f, writes.last { it.first == "track_2_slot_lock" }.second)
+        assertEquals(0f, writes.last { it.first == "track_3_slot_lock" }.second)
+
+        vm.actions.setVibe(lore)
+        advanceUntilIdle()
+        assertEquals(0f, writes.last { it.first == "track_2_slot_lock" }.second, "a vibe with AUTO writes 0")
         scope.cancel()
     }
 

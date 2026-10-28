@@ -66,6 +66,7 @@ class PulsarPlugin : DspPlugin {
     private var _lickOctave = -1  // -1 = auto (midpoint of noteRange)
     private var _trackEdm = intArrayOf(21, 22, 23, 9, 14, 14, 17, 20)
     private var _trackSpace = intArrayOf(20, 17, 23, 19, 6, 14, 17, 19)
+    private var _trackSlotLock = IntArray(8)
     private var _trackVolume = floatArrayOf(0.9f, 0.6f, 0.65f, 0.75f, 0.55f, 0.4f, 0.3f, 0.25f)
     private var _trackPan = floatArrayOf(0f, -0.15f, 0.2f, 0f, -0.25f, -0.35f, 0.3f, 0.4f)
     private val _trackPanGlide = _trackPan.copyOf()
@@ -319,6 +320,9 @@ class PulsarPlugin : DspPlugin {
             }
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ENGINE_SPACE.ordinal + t * 2]) {
                 intType { default = _trackSpace[t]; get { _trackSpace[t] }; set { _trackSpace[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_SLOT_LOCK.ordinal + t]) {
+                intType { default = 0; get { _trackSlotLock[t] }; set { _trackSlotLock[t] = it } }
             }
         }
 

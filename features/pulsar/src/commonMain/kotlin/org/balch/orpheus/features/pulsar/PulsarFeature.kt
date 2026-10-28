@@ -401,8 +401,8 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
 
     /**
      * Plays [vibe] in place of the playing one without a reload, when the two differ only in engine ids, harmonics,
-     * timbre, morph and their pins ([retunesTo]): the song keeps its place and [vibeLoadCount] stays, and a new engine
-     * sounds from its track's next note. False, changing nothing, for any other difference. Previews and fakes return
+     * timbre, morph and their pins, or a track's slot lock ([retunesTo]): the song keeps its place and [vibeLoadCount]
+     * stays, and a new engine sounds from its track's next note. False, changing nothing, for any other difference. Previews and fakes return
      * false, so callers reload instead.
      */
     fun retuneVibe(vibe: Vibe): Boolean = false
@@ -833,6 +833,9 @@ class PulsarViewModel(
     }
     private val trackSpaceIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ENGINE_SPACE.ordinal + i * 2].controlId)
+    }
+    private val trackSlotLockIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_SLOT_LOCK.ordinal + i].controlId)
     }
 
     // Write-only control flows for vibe recipe push
@@ -1814,6 +1817,8 @@ class PulsarViewModel(
             val spa = tv.engineSpace
             trackEdmIds[i].value = IntValue(edm.engineId.id)
             trackSpaceIds[i].value = IntValue(spa.engineId.id)
+            // C++ never resets the lock, so every load writes it, AUTO included.
+            trackSlotLockIds[i].value = IntValue(tv.slotLock.ordinal)
             trackVolumeIds[i].value = FloatValue(edm.volume)
             trackVolumeSpaceIds[i].value = FloatValue(spa.volume)
             val pan = FloatValue(mixOverlay?.pan(i, tv.pan) ?: tv.pan)
@@ -2386,6 +2391,7 @@ class PulsarViewModel(
             if (tv == old.tracks[i]) return@forEachIndexed
             trackEdmIds[i].value = IntValue(tv.engineEdm.engineId.id)
             trackSpaceIds[i].value = IntValue(tv.engineSpace.engineId.id)
+            trackSlotLockIds[i].value = IntValue(tv.slotLock.ordinal)
             pushEngineKnobs(i, tv.engineEdm, tv.engineSpace, overrides?.get(i)?.morph)
         }
         return true

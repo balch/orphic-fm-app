@@ -51,7 +51,7 @@ Notes:
 | `bpm`, `rootNote`, `scaleType`, `levelDb`, other top-level names | that `Vibe(...)` argument |
 | `genre.X` | the `GenreProfile(...)` field |
 | `tracks[i].engineEdm.X` / `tracks[i].engineSpace.X` | that `OrpheusEngine` field on track `i` (`engineId` is `OrpheusEngineId.<new>`) |
-| `tracks[i].X` (`envelopeProfile`, `macroMap.moodTimbre`, `role`, ...) | that `TrackVoice` field; a `role` row whose `type` changed replaces the whole `TrackRole` |
+| `tracks[i].X` (`envelopeProfile`, `macroMap.moodTimbre`, `role`, ...) | that `TrackVoice` field; a `role` row whose `type` changed replaces the whole `TrackRole`; a `slotLock` row becomes `slotLock = SlotLock.EDM` (or `SPACE`; `AUTO` is the default, so drop the argument) |
 | `arrangement.sections[s].X` | that `Section(...)` field |
 | `arrangement.sections[s].trackOverrides.T.X` | `trackOverrides[T]` (`TrackSectionOverride`); add one for track `T` when the section has none |
 | `tension.X`, `effects.X`, `anomalies[k].X` | the `TensionProfile`, `VibeEffects` or anomaly field |

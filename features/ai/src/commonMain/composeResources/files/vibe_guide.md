@@ -1161,8 +1161,8 @@ When pulsar_edit_vibe is available, change the vibe that plays now with it, and 
 pulsar_apply_vibe for a new vibe. Each changed field becomes a History row on top of the vibe's
 file: the user can turn it off, hear and roll back to the points around it, and capture it. The
 vibe keeps its name and its mix rows. Each edit restarts the song from the top, except one that
-changes only an engine, or its harmonics, timbre, morph or pins, which plays on live (a new
-engine from its track's next note). The loop:
+changes only an engine, or its harmonics, timbre, morph or pins, or a track's slotLock, which
+plays on live (a new engine from its track's next note). The loop:
 1. pulsar_get_vibe('current'): the vibe as it plays, earlier edits included.
 2. Listen first when it helps and the mix tools are available: audio_analyze for the track,
    section_jump to the section the user means. When you can't tell which section or track they
@@ -1195,6 +1195,8 @@ What an edit may change (the Mixer's fields go through mix_set, when the mix too
   4's DX patch rule still hold.
 
 Sound words to fields:
+- Holding a track on one engine ("keep the bass on that sound", "stop it flipping"): tracks[i].slotLock is "AUTO" (energy picks), "EDM" or "SPACE".
+  A locked track plays that slot's engine at any energy, and the edit plays on live.
 - A track's timbre ("too bright", "sounds like bagpipes"):
   - engineId on engineEdm and engineSpace, inside the part's family (section 3). Keep the two
     slots a pair (section B).
