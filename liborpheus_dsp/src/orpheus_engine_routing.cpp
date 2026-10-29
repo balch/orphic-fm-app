@@ -926,6 +926,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_evo_rhythmic[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_weight") == 0)
                 engine->pulsar_track_evo_weight[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "chromatic_slide") == 0)
+                engine->pulsar_track_chromatic_slide[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mute") == 0)
                 engine->pulsar_track_mute[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "audition_gain") == 0)

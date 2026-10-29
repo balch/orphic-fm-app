@@ -175,6 +175,7 @@ class PulsarPlugin : DspPlugin {
     private var _tensionEvoAttackPoint = 0.5f
     private var _tensionEvoReleaseSpeed = 0.3f
     private var _trackEvoWeight = floatArrayOf(-1f, -1f, -1f, -1f, -1f, -1f, -1f, -1f)
+    private val _trackChromaticSlide = FloatArray(8) { -1f }
     private val _trackAuditionGain = FloatArray(8) { 1f }
     private val _modLfoRate = FloatArray(8) { 0.2f }
     private val _modLfoDepth = FloatArray(8) { 0f }
@@ -853,6 +854,12 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_WEIGHT.ordinal + t]) {
                 floatType { default = -1f; min = -1f; max = 1f; get { _trackEvoWeight[t] }; set { _trackEvoWeight[t] = it } }
+            }
+        }
+        // Per-track chromatic passing style
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_CHROMATIC_SLIDE.ordinal + t]) {
+                floatType { default = -1f; min = -1f; max = 1f; get { _trackChromaticSlide[t] }; set { _trackChromaticSlide[t] = it } }
             }
         }
 

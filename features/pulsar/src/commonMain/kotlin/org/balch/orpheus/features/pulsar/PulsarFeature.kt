@@ -990,6 +990,9 @@ class PulsarViewModel(
     private val trackEvoWeightIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_WEIGHT.ordinal + i].controlId)
     }
+    private val trackChromaticSlideIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_CHROMATIC_SLIDE.ordinal + i].controlId)
+    }
     private val trackModLfoRateIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_RATE.ordinal + i].controlId)
     }
@@ -2247,6 +2250,7 @@ class PulsarViewModel(
         // Per-track evolution weight
         vibe.tracks.forEachIndexed { i, tv ->
             trackEvoWeightIds[i].value = FloatValue(tv.evolutionWeight)
+            trackChromaticSlideIds[i].value = FloatValue(tv.chromaticStyle.portValue)
         }
 
         // Set macro defaults

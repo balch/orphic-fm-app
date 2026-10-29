@@ -678,12 +678,13 @@ static bool test_random_spurt_fires() {
     return ok;
 }
 
-// A ROOT_ONLY track plays only the chord root, so a chromatic nudge can only land a held
-// wrong root (Rust Belt's bass played C#/D# against a D vamp). Chromatic passing must skip it.
-// The same track on FOLLOW is the control that proves the nudge fires at all.
-struct ChromaticTally { int notes = 0; int out_of_scale = 0; };
+// A plain chromatic nudge holds the wrong note for the whole step (Rust Belt's ROOT_ONLY bass
+// played C#/D# against a D vamp). A slide-in starts a semitone off and glides onto the true
+// note instead. Auto (-1) slides on ROOT_ONLY and nudges elsewhere; FOLLOW with the slide
+// off is the control that proves the nudge fires at all.
+struct ChromaticTally { int notes = 0; int out_of_scale = 0; int slide_blocks = 0; };
 
-static ChromaticTally render_chromatic_track3(int chord_follow) {
+static ChromaticTally render_chromatic_track3(int chord_follow, float chromatic_slide = -1.0f) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit;
     std::memset(&unit, 0, sizeof(unit));
@@ -695,6 +696,9 @@ static ChromaticTally render_chromatic_track3(int chord_follow) {
     engine->pulsar_energy.store(0.8f, std::memory_order_relaxed);
     setup_fixture_baseline(engine);
     engine->pulsar_track_chord_follow[3].store(chord_follow, std::memory_order_relaxed);
+    engine->pulsar_track_chromatic_slide[3].store(chromatic_slide, std::memory_order_relaxed);
+    // No track glide, so any pitch between notes can only come from a slide-in.
+    engine->pulsar_track_glide_rate[3].store(0.0f, std::memory_order_relaxed);
     engine->pulsar_tension_inner_bars.store(4, std::memory_order_relaxed);
     engine->pulsar_tension_outer_bars.store(0, std::memory_order_relaxed);
     engine->pulsar_tension_chromatic_passing.store(1.0f, std::memory_order_relaxed);
@@ -718,24 +722,38 @@ static ChromaticTally render_chromatic_track3(int chord_follow) {
         unit_process_pulsar(&unit, engine, 256, 48000.0f);
         PulsarState* ps = engine->pulsar_state;
         if (!ps) continue;
-        const float n = ps->tracks[3].target_pitch;
-        if (ps->tracks[3].pending_retrig || n != last) {
+        const PulsarTrackState& ts = ps->tracks[3];
+        const float n = ts.target_pitch;
+        if (ts.pending_retrig || n != last) {
             tally.notes++;
             if (!in_scale(static_cast<int>(n))) tally.out_of_scale++;
         }
+        const float off = std::fabs(ts.current_pitch - n);
+        if (off > 0.05f && off <= 1.0f && in_scale(static_cast<int>(n))) tally.slide_blocks++;
         last = n;
     }
     orpheus_engine_destroy(engine);
     return tally;
 }
 
-static bool test_chromatic_passing_skips_root_only() {
-    printf("\n=== Test: chromatic passing skips ROOT_ONLY tracks ===\n");
-    const ChromaticTally root_only = render_chromatic_track3(1);  // ROOT_ONLY
-    const ChromaticTally follow = render_chromatic_track3(0);     // FOLLOW, the control
-    printf("  ROOT_ONLY: %d/%d out of scale; FOLLOW control: %d/%d out of scale\n",
-           root_only.out_of_scale, root_only.notes, follow.out_of_scale, follow.notes);
-    bool pass = root_only.notes > 20 && root_only.out_of_scale == 0 && follow.out_of_scale > 0;
+static bool test_chromatic_passing_slides_in() {
+    printf("\n=== Test: chromatic passing slides in, never holds a wrong note ===\n");
+    const ChromaticTally root_auto = render_chromatic_track3(1);           // ROOT_ONLY, auto
+    const ChromaticTally root_off = render_chromatic_track3(1, 0.0f);      // ROOT_ONLY, off
+    const ChromaticTally follow_auto = render_chromatic_track3(0);         // FOLLOW, auto
+    const ChromaticTally follow_on = render_chromatic_track3(0, 1.0f);     // FOLLOW, on
+    auto show = [](const char* name, const ChromaticTally& c) {
+        printf("  %-12s %d/%d out of scale, %d slide blocks\n",
+               name, c.out_of_scale, c.notes, c.slide_blocks);
+    };
+    show("ROOT auto", root_auto);
+    show("ROOT off", root_off);
+    show("FOLLOW auto", follow_auto);
+    show("FOLLOW on", follow_on);
+    bool pass = root_auto.notes > 20 && root_auto.out_of_scale == 0 && root_auto.slide_blocks > 0
+             && root_off.out_of_scale == 0 && root_off.slide_blocks == 0
+             && follow_auto.out_of_scale > 0 && follow_auto.slide_blocks == 0
+             && follow_on.notes > 20 && follow_on.out_of_scale == 0 && follow_on.slide_blocks > 0;
     printf("  %s\n", pass ? "PASS" : "FAIL");
     return pass;
 }
@@ -1092,7 +1110,7 @@ bool run_pulsar_tension_tests() {
     tally(test_original_lick_immutable());
     tally(test_random_spurt_fires());
     tally(test_tension_evo_release_speed_decays_over_bars());
-    tally(test_chromatic_passing_skips_root_only());
+    tally(test_chromatic_passing_slides_in());
     // conductor tension_drive
     tally(test_tension_drive_raises_intensity_above_baseline());
     tally(test_tension_drive_negative_clamps_and_holds_floor());

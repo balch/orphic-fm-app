@@ -28,6 +28,7 @@ import kotlinx.serialization.Serializable
  * @param duckingProfile How this track ducks during another track's solo (null = defaults).
  * @param evolution Per-track evolution config for rhythmic and pitch evolution.
  * @param slotLock Holds the track on one engine slot whatever the energy, loop roll or soloist rule would pick.
+ * @param chromaticStyle How the tension's chromatic passing tones play on this track.
  */
 @Serializable
 data class TrackVoice(
@@ -44,11 +45,21 @@ data class TrackVoice(
     val duckingProfile: DuckingProfile? = null,
     val evolution: Evolution = Evolution(),
     val slotLock: SlotLock = SlotLock.AUTO,
+    val chromaticStyle: ChromaticStyle = ChromaticStyle.AUTO,
 )
 
 /** Which engine slot a track plays. The ordinal is the C++ `track_N_slot_lock` value: 0 Auto, 1 EDM, 2 SPACE. */
 @Serializable
 enum class SlotLock { AUTO, EDM, SPACE }
+
+/**
+ * How a chromatic passing tone plays. NUDGE holds the note a semitone off for the whole step;
+ * SLIDE starts a semitone off and glides onto the true note, a bassist's slide. AUTO slides on a
+ * ROOT_ONLY track, where a held nudge can only be a wrong root, and nudges everywhere else.
+ * [portValue] is the C++ `track_N_chromatic_slide` value.
+ */
+@Serializable
+enum class ChromaticStyle(val portValue: Float) { AUTO(-1f), NUDGE(0f), SLIDE(1f) }
 
 /** Convenience: [ChordComping] if this track is [TrackRole.Chordal], else null. */
 val TrackVoice.chordComping: ChordComping?

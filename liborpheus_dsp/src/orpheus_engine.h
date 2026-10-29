@@ -1081,6 +1081,11 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_evo_weight[8] = {
         {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}
     };
+    // Chromatic passing as a slide onto the true note (1) or a held semitone nudge (0).
+    // -1 auto: slides on ROOT_ONLY tracks, nudges on the rest.
+    std::atomic<float> pulsar_track_chromatic_slide[8] = {
+        {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}
+    };
 
     // ── Arrangement / Section system ──
     std::atomic<int>   pulsar_arrangement_active{0};

@@ -984,6 +984,15 @@ enum class PulsarSymbol(
     TRACK_5_EVO_WEIGHT("track_5_evo_weight"),
     TRACK_6_EVO_WEIGHT("track_6_evo_weight"),
     TRACK_7_EVO_WEIGHT("track_7_evo_weight"),
+    // Per-track chromatic passing style: -1 auto, 0 nudge, 1 slide
+    TRACK_0_CHROMATIC_SLIDE("track_0_chromatic_slide"),
+    TRACK_1_CHROMATIC_SLIDE("track_1_chromatic_slide"),
+    TRACK_2_CHROMATIC_SLIDE("track_2_chromatic_slide"),
+    TRACK_3_CHROMATIC_SLIDE("track_3_chromatic_slide"),
+    TRACK_4_CHROMATIC_SLIDE("track_4_chromatic_slide"),
+    TRACK_5_CHROMATIC_SLIDE("track_5_chromatic_slide"),
+    TRACK_6_CHROMATIC_SLIDE("track_6_chromatic_slide"),
+    TRACK_7_CHROMATIC_SLIDE("track_7_chromatic_slide"),
 
     // ── Arrangement / Sections ──
     ARRANGEMENT_ACTIVE("arrangement_active"),
