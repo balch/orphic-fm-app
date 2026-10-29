@@ -15,7 +15,7 @@ fun dxLockEngineControl(controlId: String): String? {
         val index = bare.removePrefix(DUO_HARMONICS_PREFIX).toIntOrNull()
         if (index != null && index in 0..5) return VoiceSymbol.duoEngine(index).controlId.key
     }
-    return when (controlId) {
+    return when (bare) {
         "drums_bd_mod" -> DrumSymbol.BD_ENGINE.controlId.key
         "drums_sd_mod" -> DrumSymbol.SD_ENGINE.controlId.key
         "drums_hh_mod" -> DrumSymbol.HH_ENGINE.controlId.key

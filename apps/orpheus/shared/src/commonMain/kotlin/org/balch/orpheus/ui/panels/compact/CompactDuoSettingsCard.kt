@@ -32,12 +32,12 @@ import org.balch.orpheus.features.voice.ui.DuoKnobLabel
 import org.balch.orpheus.features.voice.ui.duoKnobLabel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.DefaultValueFormatter
 import org.balch.orpheus.ui.widgets.KnobValueFormatter
 import org.balch.orpheus.ui.widgets.ModFaderSelector
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.engine.EnginePicker
 import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
-import kotlin.math.roundToInt
 
 /**
  * A self-contained settings card for one duo with engine picker, mod fader, and knobs.
@@ -161,7 +161,6 @@ private fun CompactDuoKnob(
     )
 }
 
-private val DefaultValueFormatter: KnobValueFormatter = { v -> ((v * 100).roundToInt() / 100.0).toString() }
 
 // ═══════════════════════════════════════════════════════════
 // Previews

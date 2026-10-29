@@ -45,11 +45,11 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.ModFaderSelector
 import org.balch.orpheus.ui.widgets.PulseButton
+import org.balch.orpheus.ui.widgets.DefaultValueFormatter
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.engine.EnginePicker
 import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
 import kotlin.math.min
-import kotlin.math.roundToInt
 
 @Composable
 fun DuoVoiceBox(
@@ -332,7 +332,7 @@ internal fun DuoEngineControls(
         valueFormatter = if (harmonicsLabel.locked) {
             { v -> EngineCatalog.patchAt(engineId, v)?.let { "#${it.index + 1}" } ?: "" }
         } else {
-            { v -> ((v * 100).roundToInt() / 100.0).toString() }
+            DefaultValueFormatter
         },
         size = 28.dp,
         progressColor = color,

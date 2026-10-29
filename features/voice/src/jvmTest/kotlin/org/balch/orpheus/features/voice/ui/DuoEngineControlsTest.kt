@@ -24,7 +24,7 @@ class DuoEngineControlsTest {
 
     private class Recorder : VoiceActions by VoicePanelActions.EMPTY.toVoiceActions() {
         val calls = mutableListOf<String>()
-        override fun setDuoEngine(duoIndex: Int, engineOrdinal: Int) { calls += "engine $duoIndex $engineOrdinal" }
+        override fun setDuoEngine(duoIndex: Int, engineId: Int) { calls += "engine $duoIndex $engineId" }
         override fun setDuoHarmonics(duoIndex: Int, value: Float) { calls += "harmonics $duoIndex $value" }
     }
 

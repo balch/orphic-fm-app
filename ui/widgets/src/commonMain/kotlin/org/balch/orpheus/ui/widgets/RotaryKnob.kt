@@ -719,6 +719,9 @@ fun RotaryKnobPreview() {
 
 typealias KnobValueFormatter = (Float) -> String
 
+/** Two decimals, the readout of a knob that has no unit of its own. */
+val DefaultValueFormatter: KnobValueFormatter = { v -> ((v * 100).roundToInt() / 100.0).toString() }
+
 /**
  * A synth-style rotary knob control with vertical layout (knob above, label below).
  * Supports vertical drag interaction for precision.

@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.pulsar.bench
 
-import kotlin.math.floor
 import org.balch.orpheus.core.audio.EngineParam
 import org.balch.orpheus.core.audio.FmPatchNames
 import org.balch.orpheus.core.audio.KnobMeaning
@@ -123,7 +122,6 @@ fun TrackVoice.macroValue(knob: EngineKnob, mood: Float, space: Float): Float {
 
 /** DX patches: the engine floors harmonics x 1.02 x 32 to one of 32, see [FmPatchNames]. */
 private const val DX_PATCHES = 32
-private const val DX_SCALE = 32f * 1.02f
 
 /** How many values [knob] picks between on [engineId], or null for a smooth knob. */
 fun knobSteps(engineId: OrpheusEngineId, knob: EngineKnob): Int? =
@@ -132,8 +130,8 @@ fun knobSteps(engineId: OrpheusEngineId, knob: EngineKnob): Int? =
 /** [value] moved to the middle of its DX patch, so a later hysteresis nudge cannot land on the next one; else as it is. */
 fun EngineKnob.snapped(engineId: OrpheusEngineId, value: Float): Float {
     if (knobSteps(engineId, this) == null) return value
-    val patch = floor(value * DX_SCALE).toInt().coerceIn(0, DX_PATCHES - 1)
-    return (patch + 0.5f) / DX_SCALE
+    val patch = FmPatchNames.patchIndexFor(engineId, value) ?: return value
+    return (patch + 0.5f) / (DX_PATCHES * 1.02f)
 }
 
 /** [knob]'s meaning on [engineId] for a Pulsar track. */

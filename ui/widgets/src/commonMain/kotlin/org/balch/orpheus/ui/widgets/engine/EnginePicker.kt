@@ -221,6 +221,8 @@ private fun EnginePickerOverlay(
     }
     LaunchedEffect(recentKeys) { state.recentKeys = recentKeys }
 
+    // The sheet and the popover are their own windows, so they would not fade with the panel that opened them.
+    KeepPanelsAwake(LocalPanelIdleFade.current)
     if (narrow) {
         OrpheusSlideUpSheet(onDismiss = controller::close, skipPartiallyExpanded = true) {
             EnginePickerPanel(
@@ -234,8 +236,6 @@ private fun EnginePickerOverlay(
             )
         }
     } else {
-        // The popover has its own window, so it would not fade with the panel that opened it.
-        KeepPanelsAwake(LocalPanelIdleFade.current)
         val gap = with(density) { 4.dp.roundToPx() }
         val margin = with(density) { 8.dp.roundToPx() }
         val position = remember(gap, margin) { PillPopoverPosition(gap, margin) }
