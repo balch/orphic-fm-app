@@ -301,7 +301,9 @@ internal fun DuoEngineControls(
     val controller = rememberEnginePickerController()
     val choices = remember(hasNativeEngine) { EngineCatalog.choices(EngineSlotKind.DUO, hasNativeEngine) }
     val harmonicsLabel = duoKnobLabel(engineId, EngineParam.HARMONICS, harmonics)
-    val current = EngineCatalog.choiceFor(engineId, harmonics)
+    // Keyed on the patch, not the float, so a knob drag doesn't rebuild the choice every frame.
+    val patchIndex = EngineCatalog.patchAt(engineId, harmonics)?.index
+    val current = remember(engineId, patchIndex) { EngineCatalog.choiceFor(engineId, harmonics) }
     EnginePicker(
         current = current,
         choices = choices,

@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,18 +24,28 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.audio.EngineCatalog
+import org.balch.orpheus.core.audio.EngineCategory
+import org.balch.orpheus.core.audio.EngineChoice
+import org.balch.orpheus.core.audio.EngineSlotKind
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.proportional
 import org.balch.orpheus.ui.viz.SignalTrace
-import org.balch.orpheus.ui.widgets.DRUM_V2_PICKER_CONFIG
-import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.HorizontalToggle
-import org.balch.orpheus.ui.widgets.PickerConfig
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.drumEngineLabel
+import org.balch.orpheus.ui.widgets.engine.EnginePicker
+import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
+
+/** A drum slot stores the engine ordinal; a DX patch pick also sets MOD to the patch's harmonics. */
+internal fun drumOrdinalFor(choice: EngineChoice): Int = choice.engine.ordinal
+
+/** The slot's current pick. A hidden engine such as FM_DRUM still resolves, so its pill renders. */
+internal fun drumCurrentChoice(engine: Int, mod: Float): EngineChoice =
+    EngineCatalog.choiceFor(OrpheusEngineId.entries.getOrNull(engine) ?: OrpheusEngineId.BD, mod)
 
 @Composable
 fun DrumsPanel(
@@ -90,7 +101,6 @@ fun DrumsPanel(
                 p4 = state.bdP4,
                 engine = state.bdEngine,
                 onEngineChange = actions.setBdEngine,
-                pickerConfig = org.balch.orpheus.ui.widgets.DRUM_BD_PICKER_CONFIG,
                 hasNativeEngine = state.hasNativeEngine,
                 isActive = state.isBdActive,
                 onFrequencyChange = actions.setBdFrequency,
@@ -113,7 +123,6 @@ fun DrumsPanel(
                 p4 = state.sdP4,
                 engine = state.sdEngine,
                 onEngineChange = actions.setSdEngine,
-                pickerConfig = org.balch.orpheus.ui.widgets.DRUM_SD_PICKER_CONFIG,
                 hasNativeEngine = state.hasNativeEngine,
                 isActive = state.isSdActive,
                 onFrequencyChange = actions.setSdFrequency,
@@ -136,7 +145,6 @@ fun DrumsPanel(
                 p4 = state.hhP4,
                 engine = state.hhEngine,
                 onEngineChange = actions.setHhEngine,
-                pickerConfig = org.balch.orpheus.ui.widgets.DRUM_HH_PICKER_CONFIG,
                 hasNativeEngine = state.hasNativeEngine,
                 isActive = state.isHhActive,
                 onFrequencyChange = actions.setHhFrequency,
@@ -189,7 +197,6 @@ private fun DrumRow(
     p4: Float,
     engine: Int,
     onEngineChange: (Int) -> Unit,
-    pickerConfig: PickerConfig,
     hasNativeEngine: Boolean = false,
     glowEnergy: Float = 0f, // TODO: wire to real audio energy from SynthEngine drum levels
     isActive: Boolean,
@@ -203,6 +210,12 @@ private fun DrumRow(
     val learnState = org.balch.orpheus.ui.widgets.LocalLearnModeState.current
     val triggerId = "drums_${tag}_trig"
     val isLearningTrigger = learnState.isLearning(triggerId)
+    val controller = rememberEnginePickerController()
+    val choices = remember(hasNativeEngine) { EngineCatalog.choices(EngineSlotKind.DRUM, hasNativeEngine) }
+    // Keyed on the patch, not the float, so a MOD drag doesn't rebuild the choice every frame.
+    val engineId = OrpheusEngineId.entries.getOrNull(engine) ?: OrpheusEngineId.BD
+    val patch = EngineCatalog.patchAt(engineId, p4)
+    val current = remember(engine, patch?.index) { drumCurrentChoice(engine, p4) }
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -215,18 +228,20 @@ private fun DrumRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            EnginePickerButton(
-                currentEngine = engine,
-                onEngineChange = onEngineChange,
+            EnginePicker(
+                current = current,
+                choices = choices,
+                onPick = { choice ->
+                    onEngineChange(drumOrdinalFor(choice))
+                    if (choice is EngineChoice.Patch) onP4Change(choice.patch.harmonics)
+                },
                 color = color,
-                label = drumEngineLabel(engine),
-                config = pickerConfig,
-                v2Config = if (hasNativeEngine) DRUM_V2_PICKER_CONFIG else null,
-                gestureKey = tag,
+                startCategory = EngineCategory.DRUMS,
+                compact = true,
+                pillHeight = 28.dp,
                 glowEnergy = glowEnergy,
-                size = 36.dp,
-                anchorSize = 34.dp,
-                labelStyle = MaterialTheme.typography.labelMedium,
+                controller = controller,
+                modifier = Modifier.weight(.6f),
             )
 
             KnobGroup(
@@ -255,7 +270,11 @@ private fun DrumRow(
                 onValueChange = onP4Change,
                 color = color,
                 modifier = Modifier.weight(1f),
-                controlId = "drums_${tag}_mod"
+                controlId = "drums_${tag}_mod",
+                bottomLabel = patch?.name,
+                longLabel = patch?.let { EngineCatalog.labelFor(EngineChoice.Patch(it)) },
+                locked = patch != null,
+                onLockedClick = { controller.open(EngineCategory.DX_PATCHES) },
             )
 
             // Trigger Pad aligned as a 5th column
@@ -288,7 +307,10 @@ private fun KnobGroup(
     color: Color,
     modifier: Modifier = Modifier,
     bottomLabel: String? = null,
-    controlId: String? = null
+    controlId: String? = null,
+    longLabel: String? = null,
+    locked: Boolean = false,
+    onLockedClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier,
@@ -300,7 +322,10 @@ private fun KnobGroup(
             size = 34.dp,
             progressColor = color,
             label = bottomLabel,
-            controlId = controlId
+            controlId = controlId,
+            longLabel = longLabel,
+            locked = locked,
+            onLockedClick = onLockedClick,
         )
     }
 }

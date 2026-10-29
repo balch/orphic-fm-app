@@ -773,7 +773,9 @@ fun RotaryKnob(
     val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
     val dragState = rememberKnobDragState(value, range)
     val currentOnLockedClick by rememberUpdatedState(onLockedClick)
-    val lockClickable = locked && enabled && !isLearning && onLockedClick != null
+    // In learn mode a tap selects the knob for MIDI, so the lock's tap must not eat it.
+    val learnMode = controlId != null && learnState.isActive
+    val lockClickable = locked && enabled && !learnMode && onLockedClick != null
     var held by remember { mutableStateOf(false) }
 
     Column(
@@ -798,10 +800,13 @@ fun RotaryKnob(
                     Modifier
                 }
             )
-            .pointerInput(longLabel != null) {
-                if (longLabel == null) return@pointerInput
-                trackHeld { held = it }
-            },
+            .then(
+                if (longLabel != null) {
+                    Modifier.pointerInput(Unit) { trackHeld { held = it } }
+                } else {
+                    Modifier
+                }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (held && longLabel != null) KnobLongLabel(longLabel, progressColor)
@@ -818,7 +823,7 @@ fun RotaryKnob(
             enabled = enabled,
             requireVerticalSlop = requireVerticalSlop,
             locked = locked,
-            onLockedClick = onLockedClick,
+            onLockedClick = if (learnMode) null else onLockedClick,
             previewFocused = previewFocused,
             previewAdjusting = previewAdjusting,
         )

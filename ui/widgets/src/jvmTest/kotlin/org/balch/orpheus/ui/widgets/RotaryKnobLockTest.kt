@@ -1,5 +1,6 @@
 package org.balch.orpheus.ui.widgets
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
@@ -138,5 +139,32 @@ class RotaryKnobLockTest {
         onNodeWithTag("knob").performTouchInput { up() }
         waitForIdle()
         onAllNodesWithText("duo detune, ±25 cents").assertCountEquals(0)
+    }
+
+    @Test
+    fun learnModeTapSelectsTheLockedKnobInsteadOfOpening() = runComposeUiTest {
+        var clicks = 0
+        val selected = mutableListOf<String>()
+        setContent {
+            OrpheusTheme {
+                CompositionLocalProvider(
+                    LocalLearnModeState provides LearnModeState(isActive = true, onSelectControl = { selected += it }),
+                ) {
+                    RotaryKnob(
+                        value = 0.5f,
+                        onValueChange = {},
+                        controlId = "drums_bd_mod",
+                        locked = true,
+                        onLockedClick = { clicks++ },
+                        modifier = Modifier.testTag("knob"),
+                    )
+                }
+            }
+        }
+
+        onNodeWithTag("knob").performClick()
+
+        assertEquals(listOf("drums_bd_mod"), selected, "learn mode selects the knob")
+        assertEquals(0, clicks, "the picker stays closed in learn mode")
     }
 }
