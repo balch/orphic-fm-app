@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import org.balch.orpheus.core.audio.EngineCatalog
+import org.balch.orpheus.core.audio.EngineChoice
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.LocalCanvasScale
@@ -399,6 +401,101 @@ class MixerWidgetsTest {
             assertEquals(true, node(slotLockTag(4, SlotLock.EDM)).config.getOrNull(SemanticsProperties.Selected))
             for (k in 0..2) assertTrue(SemanticsProperties.Disabled !in node(voiceKnobTag(4, k)).config, "knob $k is live once locked")
             assertTrue(texts().none { it.first == "Lock EDM or SPACE to tune its knobs" })
+        }
+    }
+
+    private fun dx2(name: String) = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 && it.name == name }
+
+    /** KEYS on SPACE = DX2 "Bell C", locked to it, with [active] sounding (-1 when the engine reports none). */
+    private fun onDx(active: Int = -1, lock: SlotLock = SlotLock.SPACE): AiMixerUiState {
+        val stored = dx2("Bell C")
+        val id = OrpheusEngineId.DX2
+        return mixState.copy(
+            tracks = mixState.tracks.map { t ->
+                if (t.index != 4) return@map t
+                t.copy(
+                    slotLock = lock,
+                    slot = EngineSlot.SPACE,
+                    edmEngineId = OrpheusEngineId.WTB,
+                    spaceEngineId = id,
+                    edmEngine = "WTB",
+                    spaceEngine = "DX2",
+                    spaceHarmonics = stored.harmonics,
+                    activePatch = active,
+                    voice = EngineKnob.entries.map { k ->
+                        val m = knobMeaning(id, k)
+                        val value = if (k == EngineKnob.HARMONICS) stored.harmonics else 0.5f
+                        MixerVoiceKnob(
+                            k, id, m.short, m.long, value, "0.50", pinned = k == EngineKnob.HARMONICS, changed = false,
+                            source = null, active = m.active, steps = if (k == EngineKnob.HARMONICS) 32 else null,
+                        )
+                    },
+                )
+            },
+        )
+    }
+
+    @Test
+    fun pickPatchSetsEngineAndHarmonics() {
+        val picks = mutableListOf<Triple<Int, EngineSlot, Pair<OrpheusEngineId, Float?>>>()
+        val bells = dx2("Bells")
+        val actions = AiMixerActions.EMPTY.copy(setEngine = { t, s, e, h -> picks += Triple(t, s, e to h) })
+        mixerScene(1280, 1000, 1f, feature(actions, state = onDx())) {
+            tap(voiceButtonTag(4))
+            val tag = enginePickTag(4, EngineSlot.SPACE)
+            tap(tag)
+            repeat(10) { frame() }
+            tap("$tag-tile-${EngineCatalog.key(EngineChoice.Patch(bells))}")
+            val harmonics: Float? = (bells.index + 0.5f) / 32.64f
+            assertEquals(listOf(Triple(4, EngineSlot.SPACE, OrpheusEngineId.DX2 to harmonics)), picks.toList())
+        }
+    }
+
+    @Test
+    fun soundingPatchShownWhenWalking() {
+        val bells = dx2("Bells")
+        val stored = dx2("Bell C")
+        mixerScene(1280, 1000, 1f, feature(state = onDx(active = bells.index))) {
+            tap(voiceButtonTag(4))
+            val pop = bounds(VOICE_POPOVER_TAG)
+            fun inPop() = texts().filter { (_, b) -> pop.contains(b.center) }.map { it.first }
+            assertTrue("Bells" in inPop(), "the knob should name the sounding patch: ${inPop()}")
+            // The pill keeps naming the picked one.
+            assertTrue(inPop().any { it.contains("Bell C") }, "the pill should name the picked patch: ${inPop()}")
+            val knob = bounds(voiceKnobTag(4, 0))
+            touch.pointer(PointerEventType.Press, knob.center)
+            val long = inPop().firstOrNull { it.contains("picked") }
+            touch.pointer(PointerEventType.Release, knob.center)
+            assertNotNull(long, "holding the knob should read the long label: ${inPop()}")
+            assertTrue(long.contains(stored.name) && long.contains(bells.name), long)
+        }
+        mixerScene(1280, 1000, 1f, feature(state = onDx(active = dx2("Bell C").index))) {
+            tap(voiceButtonTag(4))
+            val pop = bounds(VOICE_POPOVER_TAG)
+            val knobLabel = texts().filter { (t, b) -> t == "Bell C" && pop.contains(b.center) }
+            assertTrue(knobLabel.isNotEmpty(), "with nothing walking the knob names the stored patch")
+        }
+    }
+
+    @Test
+    fun harmonicsLockedOnDx() {
+        val turns = mutableListOf<Float?>()
+        val actions = AiMixerActions.EMPTY.copy(setVoiceKnob = { _, _, v -> turns += v })
+        mixerScene(1280, 1000, 1f, feature(actions, state = onDx())) {
+            tap(voiceButtonTag(4))
+            val knob = bounds(voiceKnobTag(4, 0))
+            drag(knob.center, knob.center - Offset(0f, 60f))
+            assertEquals(emptyList(), turns, "a locked knob turned")
+            val tag = enginePickTag(4, EngineSlot.SPACE)
+            assertTrue(nodes().none { it.config.getOrNull(SemanticsProperties.TestTag) == "$tag-chip-DX_PATCHES" })
+            tapAt(knob.center)
+            repeat(10) { frame() }
+            assertEquals(true, node("$tag-chip-DX_PATCHES").config.getOrNull(SemanticsProperties.Selected), "a click opens DX Patches")
+            // The other knobs still turn.
+            key(Key.Escape)
+            val timbre = bounds(voiceKnobTag(4, 1))
+            drag(timbre.center, timbre.center - Offset(0f, 60f))
+            assertTrue(turns.isNotEmpty(), "timbre should still turn")
         }
     }
 

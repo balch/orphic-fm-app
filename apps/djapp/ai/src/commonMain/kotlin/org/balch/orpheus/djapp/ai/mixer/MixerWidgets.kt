@@ -663,6 +663,8 @@ internal fun StripKnob(
     onReset: (() -> Unit)? = null,
     color: Color = MixerInk.accent,
     enabled: Boolean = true,
+    locked: Boolean = false,
+    onLockedClick: (() -> Unit)? = null,
 ) {
     // RotaryKnob keeps its dragged value until its input changes, so a release re-keys it onto the state.
     var generation by remember { mutableIntStateOf(0) }
@@ -703,6 +705,8 @@ internal fun StripKnob(
                 enabled = enabled,
                 valueFormatter = null,
                 requireVerticalSlop = true,
+                locked = locked,
+                onLockedClick = onLockedClick,
             )
         }
     }

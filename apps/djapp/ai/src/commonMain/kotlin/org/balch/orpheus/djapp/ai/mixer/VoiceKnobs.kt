@@ -49,20 +49,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.audio.EngineCatalog
+import org.balch.orpheus.core.audio.EngineCategory
+import org.balch.orpheus.core.audio.EngineChoice
+import org.balch.orpheus.core.audio.EngineSlotKind
+import org.balch.orpheus.core.audio.FmPatchNames
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.legible
-import org.balch.orpheus.features.pulsar.PULSAR_FX_PICKER
-import org.balch.orpheus.features.pulsar.PULSAR_TRACK_PICKERS
-import org.balch.orpheus.features.pulsar.PULSAR_V2_PICKER
-import org.balch.orpheus.features.pulsar.PULSAR_V3_PICKER
-import org.balch.orpheus.features.pulsar.PULSAR_V4_PICKER
 import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.knobValueText
 import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.pulsarEngineLabel
-import org.balch.orpheus.ui.widgets.EnginePickerButton
+import org.balch.orpheus.ui.widgets.engine.EnginePicker
+import org.balch.orpheus.ui.widgets.engine.EnginePickerController
+import org.balch.orpheus.ui.widgets.engine.enginePickerTestTag
+import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
 
 internal fun voiceKnobTag(index: Int, knob: Int) = "mixer-voice-$index-$knob"
 
@@ -140,13 +143,19 @@ private fun LockControl(track: MixerTrack, onLock: (SlotLock) -> Unit) {
 }
 
 /**
- * One slot: its name, its engine picker (press and drag to swap the engine) and a dot while it plays. The held row is
- * lit; the other dims under a lock, but its picker still works. The pill stands at the text's height.
+ * One slot: its name, its engine picker and a dot while it plays. The held row is lit; the other dims under a lock, but
+ * its picker still works. The pill stands at the text's height. A DX patch pick passes its harmonics with the engine.
  */
 @Composable
-private fun EngineRow(track: MixerTrack, slot: EngineSlot, onEngine: (EngineSlot, OrpheusEngineId) -> Unit) {
+private fun EngineRow(
+    track: MixerTrack,
+    slot: EngineSlot,
+    controller: EnginePickerController,
+    onEngine: (EngineSlot, OrpheusEngineId, Float?) -> Unit,
+) {
     val edm = slot == EngineSlot.EDM
     val engine = if (edm) track.edmEngineId else track.spaceEngineId
+    val harmonics = if (edm) track.edmHarmonics else track.spaceHarmonics
     val held = track.knobsLive && track.slot == slot
     val playing = track.slot == slot
     val textSize = legible(LegibleText.SECONDARY)
@@ -155,10 +164,11 @@ private fun EngineRow(track: MixerTrack, slot: EngineSlot, onEngine: (EngineSlot
     val base = LocalTextStyle.current
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val label = pulsarEngineLabel(engine.id)
-    val measured = measurer.measure(label, base.merge(labelStyle), maxLines = 1).size
+    val measured = measurer.measure("Ag", base.merge(labelStyle), maxLines = 1).size
     val pillHeight = with(density) { measured.height.toDp() }
-    val pillWidth = with(density) { measured.width.toDp() + PILL_PAD * 2 }.coerceAtLeast(pillHeight)
+    val choices = remember { EngineCatalog.choices(EngineSlotKind.PULSAR, hasNative = true) }
+    val patchIndex = EngineCatalog.patchAt(engine, harmonics)?.index
+    val current = remember(engine, patchIndex) { EngineCatalog.choiceFor(engine, harmonics) }
     val shape = RoundedCornerShape(6.dp)
     Row(
         Modifier
@@ -177,23 +187,34 @@ private fun EngineRow(track: MixerTrack, slot: EngineSlot, onEngine: (EngineSlot
             maxLines = 1,
             modifier = Modifier.width(56.dp * textScale()),
         )
-        EnginePickerButton(
-            currentEngine = engine.id,
-            onEngineChange = { id -> OrpheusEngineId.fromId(id)?.let { onEngine(slot, it) } },
+        EnginePicker(
+            current = current,
+            choices = choices,
+            onPick = { choice ->
+                val harmonic = (choice as? EngineChoice.Patch)?.patch?.harmonics
+                onEngine(slot, choice.engine, harmonic)
+            },
             color = MixerInk.text,
-            label = label,
-            config = PULSAR_TRACK_PICKERS.getOrElse(track.index) { PULSAR_FX_PICKER },
-            v2Config = PULSAR_V2_PICKER,
-            v3Config = PULSAR_V3_PICKER,
-            v4Config = PULSAR_V4_PICKER,
-            size = pillHeight,
-            width = pillWidth,
-            shape = RoundedCornerShape(50),
+            compact = true,
+            pillHeight = pillHeight,
             labelStyle = labelStyle,
-            modifier = Modifier.testTag(enginePickTag(track.index, slot)),
+            controller = controller,
+            pillLabel = (current as? EngineChoice.Engine)?.let { pulsarEngineLabel(it.engine.id) },
+            modifier = Modifier.enginePickerTestTag(enginePickTag(track.index, slot)),
         )
         if (playing) Text(PLAYING_DOT, style = mixText(textSize, MixerInk.green), maxLines = 1)
     }
+}
+
+/** The harmonics knob on a DX engine: the patch sounding now under it, and the picked one when a walk has moved off it. */
+internal data class DxKnobLabel(val short: String, val long: String)
+
+/** Null off DX. [activePatch] is the engine's sounding patch (-1 when it reports none); [harmonics] is the stored pick. */
+internal fun dxKnobLabel(engine: OrpheusEngineId, harmonics: Float, activePatch: Int): DxKnobLabel? {
+    val picked = EngineCatalog.patchAt(engine, harmonics) ?: return null
+    val sounding = if (activePatch >= 0) FmPatchNames.patchNameAt(engine, activePatch) ?: picked.name else picked.name
+    val long = if (sounding == picked.name) "${engine.name} · $sounding" else "${engine.name} · $sounding (picked ${picked.name})"
+    return DxKnobLabel(sounding, long)
 }
 
 /**
@@ -202,10 +223,18 @@ private fun EngineRow(track: MixerTrack, slot: EngineSlot, onEngine: (EngineSlot
  * Under AUTO they show what plays but are off: faded and disabled.
  */
 @Composable
-internal fun VoiceKnobRow(track: MixerTrack, onSet: (Int, Int, Float?) -> Unit, onHeld: (String?) -> Unit, size: Dp) {
+internal fun VoiceKnobRow(
+    track: MixerTrack,
+    onSet: (Int, Int, Float?) -> Unit,
+    onHeld: (String?) -> Unit,
+    size: Dp,
+    onOpenPatches: () -> Unit = {},
+) {
     val live = track.knobsLive
     Row(Modifier.fillMaxWidth()) {
         track.voice.forEachIndexed { k, v ->
+            // A DX patch selector is picked, not turned: it locks, names the sounding patch, and opens the picker.
+            val dx = if (v.knob == EngineKnob.HARMONICS) dxKnobLabel(v.engineId, v.value, track.activePatch) else null
             val color = when {
                 v.changed -> MixerInk.changed
                 v.pinned -> MixerInk.accent
@@ -222,17 +251,19 @@ internal fun VoiceKnobRow(track: MixerTrack, onSet: (Int, Int, Float?) -> Unit, 
                     value = v.value,
                     range = 0f..1f,
                     onValueChange = { onSet(track.index, k, it) },
-                    onHeld = { held -> onHeld(held?.let { voiceReadout(v, it) }) },
+                    onHeld = { held -> onHeld(held?.let { dx?.long ?: voiceReadout(v, it) }) },
                     size = size,
                     modifier = Modifier
                         .testTag(voiceKnobTag(track.index, k))
                         .then(if (live) Modifier else Modifier.semantics { disabled() }),
-                    onReset = if (turns) ({ onSet(track.index, k, null) }) else null,
+                    onReset = if (turns && dx == null) ({ onSet(track.index, k, null) }) else null,
                     color = color,
                     enabled = turns,
+                    locked = dx != null,
+                    onLockedClick = onOpenPatches,
                 )
                 Text(
-                    v.label,
+                    dx?.short ?: v.label,
                     style = mixText(legible(LegibleText.SECONDARY), if (v.active) color else MixerInk.line),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -317,9 +348,11 @@ internal fun VoicePopover(
         }
         PopoverLabel("PLAYS")
         LockControl(track) { actions.setSlotLock(i, it) }
+        val pickers = EngineSlot.entries.associateWith { rememberEnginePickerController() }
         Column {
-            EngineRow(track, EngineSlot.EDM) { slot, e -> actions.setEngine(i, slot, e) }
-            EngineRow(track, EngineSlot.SPACE) { slot, e -> actions.setEngine(i, slot, e) }
+            for (slot in EngineSlot.entries) {
+                EngineRow(track, slot, pickers.getValue(slot)) { sl, e, h -> actions.setEngine(i, sl, e, h) }
+            }
         }
         // Extra room above, so the knobs do not crowd the engine rows.
         Box(Modifier.padding(top = KNOB_TOP_GAP)) {
@@ -328,6 +361,7 @@ internal fun VoicePopover(
                 onSet = { t, k, v -> actions.setVoiceKnob(t, EngineKnob.entries[k], v) },
                 onHeld = { readout = it },
                 size = POPOVER_KNOB,
+                onOpenPatches = { pickers.getValue(track.slot).open(EngineCategory.DX_PATCHES) },
             )
         }
         // Holds its line while empty, so nothing under it jumps.
