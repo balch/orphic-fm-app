@@ -1,6 +1,7 @@
 // Vibe recorder, second half: replays the port writes VibePortDumpRenderHarness dumped from
 // Kotlin into the DJ graph and writes the mix plus each track soloed as WAVs, with a
-// per-block CSV (section, pitch, harmonics and morph handed to the engine, volume, level) for each solo.
+// per-block CSV (section, pitch, harmonics, morph and timbre handed to the engine, volume, level)
+// for each solo.
 // Manual suite: it writes files, so it runs only when named or VIBE_PORTS is set.
 //
 //   VIBE_PORTS=features/pulsar/build/vibe-recordings/orphic_lore.ports \
@@ -57,7 +58,7 @@ bool record(const PortDump& d, int solo, int seconds, const std::string& wav, co
     FILE* log = nullptr;
     if (solo >= 0) {
         log = fopen(csv.c_str(), "w");
-        if (log) fprintf(log, "seconds,section,bar,note,harmonics,morph,volume,rms\n");
+        if (log) fprintf(log, "seconds,section,bar,note,harmonics,morph,volume,rms,timbre\n");
     }
 
     const int blocks = seconds * kSr / kBlock;
@@ -90,13 +91,14 @@ bool record(const PortDump& d, int solo, int seconds, const std::string& wav, co
             mute();
         }
         if (log) {
-            fprintf(log, "%.4f,%d,%d,%.3f,%.3f,%.3f,%.3f,%.5f\n",
+            fprintf(log, "%.4f,%d,%d,%.3f,%.3f,%.3f,%.3f,%.5f,%.3f\n",
                     static_cast<double>(b) * kBlock / kSr, section, ps ? ps->loop_count : 0,
                     e->pulsar_track_note_debug[solo].load(std::memory_order_relaxed),
                     e->pulsar_track_mod_harmonics_debug[solo].load(std::memory_order_relaxed),
                     e->pulsar_track_mod_morph_debug[solo].load(std::memory_order_relaxed),
                     e->pulsar_track_volume_debug[solo].load(std::memory_order_relaxed),
-                    std::sqrt(sum / (kBlock * 2)));
+                    std::sqrt(sum / (kBlock * 2)),
+                    e->pulsar_track_mod_timbre_debug[solo].load(std::memory_order_relaxed));
         }
     }
     if (log) fclose(log);
