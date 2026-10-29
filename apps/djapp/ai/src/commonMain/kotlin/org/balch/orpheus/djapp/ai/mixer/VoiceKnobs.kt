@@ -61,7 +61,6 @@ import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.knobValueText
 import org.balch.orpheus.features.pulsar.models.SlotLock
-import org.balch.orpheus.features.pulsar.pulsarEngineLabel
 import org.balch.orpheus.ui.widgets.engine.EnginePicker
 import org.balch.orpheus.ui.widgets.engine.EnginePickerController
 import org.balch.orpheus.ui.widgets.engine.enginePickerTestTag
@@ -199,7 +198,6 @@ private fun EngineRow(
             pillHeight = pillHeight,
             labelStyle = labelStyle,
             controller = controller,
-            pillLabel = (current as? EngineChoice.Engine)?.let { pulsarEngineLabel(it.engine.id) },
             modifier = Modifier.enginePickerTestTag(enginePickTag(track.index, slot)),
         )
         if (playing) Text(PLAYING_DOT, style = mixText(textSize, MixerInk.green), maxLines = 1)

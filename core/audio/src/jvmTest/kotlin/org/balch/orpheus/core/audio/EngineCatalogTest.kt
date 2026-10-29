@@ -85,6 +85,23 @@ class EngineCatalogTest {
     }
 
     @Test
+    fun searchMatchesShortCodeAndEnumName() {
+        val all = EngineCatalog.choices(EngineSlotKind.PULSAR, hasNative = true)
+        for (q in listOf("3saw", "triple_saw", "triple saw")) {
+            assertTrue(EngineChoice.Engine(OrpheusEngineId.TRIPLE_SAW) in EngineCatalog.search(all, q), q)
+        }
+        assertTrue(EngineChoice.Engine(OrpheusEngineId.VOWEL_FOF) in EngineCatalog.search(all, "vow"))
+    }
+
+    @Test
+    fun bareEnginesLabelWithShortCodes() {
+        assertEquals("3SAW", EngineCatalog.labelFor(EngineChoice.Engine(OrpheusEngineId.TRIPLE_SAW)))
+        assertEquals("VOW", EngineCatalog.labelFor(EngineChoice.Engine(OrpheusEngineId.VOWEL_FOF)))
+        assertEquals("MST", EngineCatalog.labelFor(EngineChoice.Engine(OrpheusEngineId.MST)))
+        assertEquals("OSC", EngineCatalog.labelFor(EngineChoice.Engine(OrpheusEngineId.OSC)))
+    }
+
+    @Test
     fun labelsAndKeys() {
         val p = EngineCatalog.patches.single { it.engine == DX2 && it.index == 0 }
         assertEquals("DX2 · E piano 1", EngineCatalog.labelFor(EngineChoice.Patch(p)))

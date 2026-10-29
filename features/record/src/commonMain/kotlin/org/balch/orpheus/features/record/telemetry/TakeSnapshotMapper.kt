@@ -1,6 +1,9 @@
 package org.balch.orpheus.features.record.telemetry
 
+import org.balch.orpheus.core.audio.EngineCatalog
+import org.balch.orpheus.core.audio.EngineChoice
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.plugin.PortSymbol
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
@@ -8,7 +11,6 @@ import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.ui.widgets.engineLabel
 
 private const val PAIRS = 6
 private const val QUADS = 3
@@ -59,7 +61,7 @@ fun snapshotOf(preset: SynthPreset): TakeSnapshot {
         PairSnapshot(
             pair = p,
             engineId = engineId,
-            engineName = engineLabel(engineId),
+            engineName = OrpheusEngineId.fromId(engineId)?.let { EngineCatalog.labelFor(EngineChoice.Engine(it)) } ?: "?",
             harmonics = float(VoiceSymbol.duoHarmonics(p), 0f),
             timbre = float(VoiceSymbol.duoSharpness(p), 0f),
             morph = float(VoiceSymbol.duoMorph(p), 0f),

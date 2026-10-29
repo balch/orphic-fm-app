@@ -666,8 +666,6 @@ private fun PulsarSlotPicker(
         color = OrpheusColors.cosmicPurple,
         pillHeight = 30.dp,
         onExpandedChange = onExpandedChange,
-        // The Braids codes read "3SAW", not "TRIPLE_SAW"; a patch keeps the catalog's "DX2 · name".
-        pillLabel = (current as? EngineChoice.Engine)?.let { pulsarEngineLabel(it.engine.id) },
     )
 }
 
