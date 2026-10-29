@@ -15,17 +15,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.balch.orpheus.core.audio.EngineCatalog
+import org.balch.orpheus.core.audio.EngineCategory
+import org.balch.orpheus.core.audio.EngineChoice
+import org.balch.orpheus.core.audio.EngineParam
+import org.balch.orpheus.core.audio.EngineSlotKind
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
@@ -34,14 +43,13 @@ import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.ModFaderSelector
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.VOICE_PICKER_V2_CONFIG
-import org.balch.orpheus.ui.widgets.VOICE_PICKER_V3_CONFIG
-import org.balch.orpheus.ui.widgets.VOICE_PICKER_V4_CONFIG
-import org.balch.orpheus.ui.widgets.engineLabel
+import org.balch.orpheus.ui.widgets.engine.EnginePicker
+import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 @Composable
 fun DuoVoiceBox(
@@ -67,6 +75,10 @@ fun DuoVoiceBox(
     hasNativeEngine: Boolean = false,
     glowEnergy: Float = 0f, // TODO: wire to real audio energy from SynthEngine voice levels
 ) {
+    val engineId = OrpheusEngineId.fromId(duoEngine) ?: OrpheusEngineId.OSC
+    val morphLabel = duoKnobLabel(engineId, EngineParam.MORPH, duoHarmonics)
+    val sharpLabel = duoKnobLabel(engineId, EngineParam.TIMBRE, duoHarmonics)
+
     Column(
         modifier =
             modifier.widthIn(min = 100.dp)
@@ -128,6 +140,7 @@ fun DuoVoiceBox(
                     duoIndex = duoIndex,
                     tune = voiceStateA.tune,
                     duoMorph = duoMorph,
+                    morphLabel = morphLabel,
                     envSpeed = envSpeedA,
                     voiceActions = voiceActions,
                 )
@@ -196,6 +209,7 @@ fun DuoVoiceBox(
                     duoIndex = duoIndex,
                     tune = voiceStateB.tune,
                     sharpness = sharpness,
+                    sharpLabel = sharpLabel,
                     envSpeed = envSpeedB,
                     voiceActions = voiceActions
                 )
@@ -250,36 +264,93 @@ fun DuoVoiceBox(
             }
             } // end Row
 
-            // Engine picker + harmonics knob overlaid between the 4 knobs
-            Column(
-                modifier = Modifier.align(
-                    BiasAlignment(horizontalBias = 0f, verticalBias = -0.35f)
-                ),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                EnginePickerButton(
-                    currentEngine = duoEngine,
-                    onEngineChange = { voiceActions.setDuoEngine(voiceA / 2, it) },
-                    color = color,
-                    label = engineLabel(duoEngine),
-                    v2Config = if (hasNativeEngine) VOICE_PICKER_V2_CONFIG else null,
-                    v3Config = if (hasNativeEngine) VOICE_PICKER_V3_CONFIG else null,
-                    v4Config = if (hasNativeEngine) VOICE_PICKER_V4_CONFIG else null,
-                    gestureKey = voiceA / 2,
-                    glowEnergy = glowEnergy,
-                    showExternalSelection = aiVoiceEngineHighlight,
-                )
-                RotaryKnob(
-                    value = duoHarmonics,
-                    onValueChange = { voiceActions.setDuoHarmonics(voiceA / 2, it) },
-                    label = "\u2261",
-                    size = 28.dp,
-                    progressColor = color
-                )
-            }
+            // Engine pill between the top dials; harmonics knob between the side knob groups.
+            DuoEngineControls(
+                duoIndex = voiceA / 2,
+                engineId = engineId,
+                harmonics = duoHarmonics,
+                color = color,
+                hasNativeEngine = hasNativeEngine,
+                glowEnergy = glowEnergy,
+                showExternalSelection = aiVoiceEngineHighlight,
+                voiceActions = voiceActions,
+                pillModifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
+                knobModifier = Modifier.align(BiasAlignment(horizontalBias = 0f, verticalBias = -0.4f)),
+            )
         } // end Box
     } // end outer Column
+}
+
+/**
+ * The duo's engine pill and harmonics knob. A patch pick sets the DX engine and its harmonics;
+ * on DX the knob locks and a click opens this picker on DX Patches.
+ */
+@Composable
+internal fun DuoEngineControls(
+    duoIndex: Int,
+    engineId: OrpheusEngineId,
+    harmonics: Float,
+    color: Color,
+    hasNativeEngine: Boolean,
+    glowEnergy: Float,
+    showExternalSelection: Boolean,
+    voiceActions: VoiceActions,
+    pillModifier: Modifier = Modifier,
+    knobModifier: Modifier = Modifier,
+) {
+    val controller = rememberEnginePickerController()
+    val choices = remember(hasNativeEngine) { EngineCatalog.choices(EngineSlotKind.DUO, hasNativeEngine) }
+    val harmonicsLabel = duoKnobLabel(engineId, EngineParam.HARMONICS, harmonics)
+    val current = EngineCatalog.choiceFor(engineId, harmonics)
+    EnginePicker(
+        current = current,
+        choices = choices,
+        onPick = { choice ->
+            voiceActions.setDuoEngine(duoIndex, choice.engine.id)
+            if (choice is EngineChoice.Patch) voiceActions.setDuoHarmonics(duoIndex, choice.patch.harmonics)
+        },
+        color = color,
+        compact = true,
+        pillHeight = 22.dp,
+        glowEnergy = glowEnergy,
+        showExternalSelection = showExternalSelection,
+        controller = controller,
+        // The code only: the locked knob below names the patch.
+        pillLabel = (current as? EngineChoice.Patch)?.patch?.engine?.name,
+        modifier = pillModifier.capWidth(),
+    )
+    RotaryKnob(
+        value = harmonics,
+        onValueChange = { voiceActions.setDuoHarmonics(duoIndex, it) },
+        label = harmonicsLabel.short,
+        caption = harmonicsLabel.glyph,
+        longLabel = harmonicsLabel.long,
+        locked = harmonicsLabel.locked,
+        onLockedClick = { controller.open(EngineCategory.DX_PATCHES) },
+        valueFormatter = if (harmonicsLabel.locked) {
+            { v -> EngineCatalog.patchAt(engineId, v)?.let { "#${it.index + 1}" } ?: "" }
+        } else {
+            { v -> ((v * 100).roundToInt() / 100.0).toString() }
+        },
+        size = 28.dp,
+        progressColor = color,
+        labelColor = if (harmonicsLabel.active) color else color.copy(alpha = 0.4f),
+        modifier = knobModifier.capWidth(),
+    )
+}
+
+/**
+ * The centre overlay sits in the gap between the voice columns' knobs, about 30% of the duo's
+ * width, so the pill and knob label truncate there rather than run over the side knobs.
+ */
+private fun Modifier.capWidth(fraction: Float = 0.3f, max: Dp = 84.dp): Modifier = layout { measurable, constraints ->
+    val cap = if (constraints.hasBoundedWidth) {
+        min((constraints.maxWidth * fraction).toInt(), max.roundToPx())
+    } else {
+        max.roundToPx()
+    }
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = cap.coerceAtLeast(0)))
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
 @Preview
@@ -311,6 +382,40 @@ fun DuoVoiceBoxPreview() {
             voiceActions = voiceActions,
             midiActions = midiActions,
             isVoiceBeingLearned = { false },
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+@Preview(name = "Duo on a DX2 patch: harmonics locked")
+@Composable
+fun DuoVoiceBoxDxPreview() {
+    val voiceFeature = VoiceViewModel.previewFeature()
+    val midiFeature = MidiViewModel.previewFeature()
+    val voiceState by voiceFeature.stateFlow.collectAsStateWithLifecycle()
+    val midiState by midiFeature.stateFlow.collectAsStateWithLifecycle()
+    val ePiano = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 && it.index == 0 }
+
+    LiquidPreviewContainerWithGradient {
+        DuoVoiceBox(
+            voiceA = 2,
+            voiceB = 3,
+            color = OrpheusColors.electricBlue,
+            voiceStateA = voiceState.voiceStates[2],
+            voiceStateB = voiceState.voiceStates[3],
+            sharpness = voiceState.duoSharpness[1],
+            envSpeedA = voiceState.voiceEnvelopeSpeeds[2],
+            envSpeedB = voiceState.voiceEnvelopeSpeeds[3],
+            duoModSource = voiceState.duoModSources[1],
+            duoEngine = OrpheusEngineId.DX2.id,
+            duoHarmonics = ePiano.harmonics,
+            duoMorph = voiceState.duoMorphs[1],
+            duoModSourceLevel = voiceState.duoModSourceLevels[1],
+            midiState = midiState,
+            voiceActions = voiceFeature.actions.toVoiceActions(),
+            midiActions = midiFeature.actions.toMidiActions(),
+            isVoiceBeingLearned = { false },
+            hasNativeEngine = true,
             modifier = Modifier.padding(16.dp)
         )
     }

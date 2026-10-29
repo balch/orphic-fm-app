@@ -111,7 +111,8 @@ fun Modifier.enginePickerTestTag(tag: String): Modifier = this then EnginePicker
  * A pill naming [current] that opens a searchable picker over [choices]: a tile popover on wide
  * windows, a list sheet on narrow ones. A pick is recorded in [LocalEngineRecents], passed to
  * [onPick], and closes the picker. [showExternalSelection] (an AI highlight) lights the pill
- * without opening it. [compact] drops the dot and caret for tight spots.
+ * without opening it. [compact] drops the dot and caret for tight spots. [pillLabel] replaces the
+ * pill's text, for a spot that names the patch elsewhere (the Duo panel shows "DX2" over its knob).
  */
 @Composable
 fun EnginePicker(
@@ -128,6 +129,7 @@ fun EnginePicker(
     showExternalSelection: Boolean = false,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     controller: EnginePickerController = rememberEnginePickerController(),
+    pillLabel: String? = null,
 ) {
     val tag = modifier.foldIn<String?>(null) { found, element -> (element as? EnginePickerTag)?.tag ?: found }
         ?: DEFAULT_TAG
@@ -154,6 +156,7 @@ fun EnginePicker(
     Box(modifier = modifier, propagateMinConstraints = true) {
         EnginePill(
             current = current,
+            label = pillLabel ?: EngineCatalog.labelFor(current),
             color = color,
             compact = compact,
             pillHeight = pillHeight,
@@ -284,6 +287,7 @@ private class PillPopoverPosition(private val gap: Int, private val margin: Int)
 @Composable
 private fun EnginePill(
     current: EngineChoice,
+    label: String,
     color: Color,
     compact: Boolean,
     pillHeight: Dp,
@@ -325,7 +329,7 @@ private fun EnginePill(
             )
         }
         Text(
-            text = EngineCatalog.labelFor(current),
+            text = label,
             style = labelStyle ?: TextStyle(fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace),
             color = color,
             maxLines = 1,

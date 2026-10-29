@@ -21,5 +21,10 @@ kotlin {
             implementation(project(":features:midi"))
             implementation(project(":features:drum"))
         }
+        jvmTest.dependencies {
+            // runComposeUiTest for the duo's locked harmonics knob and patch picks.
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
+        }
     }
 }
