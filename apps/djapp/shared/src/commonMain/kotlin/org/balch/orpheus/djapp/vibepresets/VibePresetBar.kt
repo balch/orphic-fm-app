@@ -51,6 +51,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.TimeZone
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalTelevisionHardware
+import org.balch.orpheus.ui.infrastructure.TvGlassEnabled
+import org.balch.orpheus.ui.infrastructure.panelGlassChrome
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
@@ -130,9 +135,15 @@ internal fun VibePresetBar(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
-            .clip(BarShape)
-            .background(OrpheusColors.darkVoid.copy(alpha = 0.92f))
-            .border(1.dp, PresetTeal.copy(alpha = 0.35f), BarShape)
+            // The same glass the docked panels wear, tinted teal; flat on TV hardware like they are.
+            .panelGlassChrome(
+                liquidState = LocalLiquidState.current,
+                effects = LocalLiquidEffects.current,
+                color = PresetTeal,
+                shape = BarShape,
+                accented = true,
+                glassEnabled = !LocalTelevisionHardware.current || TvGlassEnabled,
+            )
             .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {
         // A dot tap that would throw away unsaved changes asks first; a vibe switch or a save drops
