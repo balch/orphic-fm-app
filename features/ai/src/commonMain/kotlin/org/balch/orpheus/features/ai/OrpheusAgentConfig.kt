@@ -159,9 +159,11 @@ class OrpheusAgentConfig(
         - voice_duo_engine_0..3: Synthesis engine selection (integer engine ID = C++ index)
           Standard engines: -1=OSC, 8=VA, 10=FM, 17=Noise, 9=Waveshaping, 12=Additive,
           11=Grain, 19=String, 20=Modal, 18=Particle, 16=Swarm, 14=Chord, 13=Wavetable, 15=Speech
-        - voice_duo_mod_source_0..5: Modulation source (0=FM, 1=OFF, 2=LFO, 3=FLUX)
-        - voice_duo_mod_source_level_0..5: How much mod source affects the duo (0.0=none, 1.0=full)
-        IMPORTANT: Always set BOTH mod_source AND mod_source_level together. Source without level = silent.
+        - duo_patch tool: patch cables per duo (0-5). Sources: LFO_AB, LFO_A, LFO_B, LFO_A90 (LFO A·B/A/B/A 90°),
+          WAVES_1..4, FLUX_X1 X2 X3 Y T1 T2 T3, VOICE_FM. Destinations: HARMONICS, TIMBRE, MORPH, FM (OSC only),
+          PITCH, ENV. Amounts -1..1. Actions: read, connect, disconnect, set_amount, wake, bridge.
+        - voice_duo_mod_source_level_0..5: Master depth for the duo's cables (0.0=none, 1.0=full)
+        IMPORTANT: Cables are silent until voice_duo_mod_source_level_N > 0. HARMONICS cables park when a duo switches to a DX engine (wake brings one back); one connected while already on DX is live and steps through patches.
 
         ### SECRET ENGINES (use sparingly — ~1 in 25 compositions)
         The synth has hidden voices that most users don't know about. These are accessed via
@@ -298,7 +300,7 @@ class OrpheusAgentConfig(
           - For Flux demos: osc (-1) or va (8) to hear pitch changes cleanly
         - **SET MODULATION** before demos: voice_mod_depth, duolfo_freq_a/b, voice_vibrato as needed
         - **PREFER** `synth_control` over `repl_execute` for demos — turning knobs is more visual and interactive
-        - For Flux: set voice_duo_mod_source_0 to 3 (FLUX), voice_duo_mod_source_level_0 to 0.5, AND flux_mix to 0.5, hold voices, then sweep flux_spread and flux_bias so user hears the random melodies
+        - For Flux: duo_patch connect FLUX_X1 to PITCH on duo 0, set voice_duo_mod_source_level_0 to 0.5, AND flux_mix to 0.5, hold voices, then sweep flux_spread and flux_bias so user hears the random melodies
         - **NEVER** just play REPL patterns when explaining — the user wants to see knobs highlighted and turning
 
         ## Creating Pulsar vibes

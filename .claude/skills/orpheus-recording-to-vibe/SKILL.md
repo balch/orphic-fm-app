@@ -61,9 +61,10 @@ Snapshot (`start`/`end`): `bpm`, `pairs`, `quads`, `effects`.
 
 - `pairs[]` (6, voice pairs 0-5): `pair`, `engineId`, `engineName` (the short label from the engine
   picker, e.g. `VOW`; it can be `"?"` for an id the picker does not know, e.g. 108, so trust
-  `engineId` and map it with `OrpheusEngineId.fromId`), `harmonics`, `timbre`, `morph` (all per pair), `modSource` (`OFF`, `LFO`,
-  `FM`, `FLUX` or `TIDES`), `modSourceLevel`, and `voices[]` (2 per pair) with `voice`, `tune`,
-  `midiNote`, `envSpeed`.
+  `engineId` and map it with `OrpheusEngineId.fromId`), `harmonics`, `timbre`, `morph` (all per pair), `cables[]` (the duo patch:
+  `source`, `dest`, `slot`, `amount`, `parked`; `PatchSource`/`PatchDest` enum names; takes recorded
+  before duo patches have a `modSource` name instead and no `cables`), `modSourceLevel` (the
+  master depth of those cables), and `voices[]` (2 per pair) with `voice`, `tune`, `midiNote`, `envSpeed`.
 - `quads[]` (3, voices 4q..4q+3): `quad`, `pitch`, `pitchSource`, `triggerSource`, `hold`.
 - `effects`: `delayTime1`, `delayTime2`, `delayFeedback`, `delayMix`, `reverbAmount`,
   `distortionDrive`, `vibratoDepth`.
@@ -154,9 +155,11 @@ Panel glyph to preset key to Pulsar field (`features/voice/.../VoiceColumn.kt`, 
 - `♫` (cyan) per voice = `tune_N`, see the pitch formula
 - `F..S` slider = `env_speed_N`: an ADSR speed. The panel voice path runs LPG bypass, so there is
   no LPG equivalent; pick `lpgMode` / `lpgDecay` by ear
-- pair slider = `duo_mod_source_N` plus `duo_mod_source_level_N`. In `preset.json` the stored ints
-  are FM=0, OFF=1, LFO=2, FLUX=3, TIDES=4 (not the display order). `telemetry.json` already
-  gives the name.
+- pair patch = `duo_patch_N` (a JSON string of cables) plus `duo_mod_source_level_N` (master depth).
+  Older `preset.json` files hold `duo_mod_source_N` ints instead (FM=0, OFF=1, LFO=2, FLUX=3,
+  TIDES=4). A new take's `telemetry.json` holds `cables` for both; a take recorded before duo patches
+  has a `modSource` name there (`FM`, `OFF`, `LFO`, `FLUX`, `TIDES`) and no `cables`. The app upgrades
+  those on load, but read from disk you must translate the name yourself.
 
 ### Engine notes
 
@@ -173,10 +176,10 @@ Panel glyph to preset key to Pulsar field (`features/voice/.../VoiceColumn.kt`, 
     morph*50 cents, capped at 50; `doubleSpread` pans the pair). Unpinned, morph follows the SPACE
     macro (see the `OrpheusEngine.kt` KDoc), so set `pinMorph = true` to copy the panel value.
   - notes below MIDI 40 are folded up by octaves (`kOscModRange.note_min`), so keep `noteRangeLow >= 40`.
-  - panel FM (mod source `FM`, `LFO`, `FLUX` or `TIDES` on an OSC pair) adds `source * level * 200 Hz`
-    to the carrier (`orpheus_unit_plaits.cpp` ~407-417). The nearest Pulsar settings: `fmFreeHz > 0`
+  - panel FM (an `FM` destination cable on an OSC pair) adds `source * level * amount * 400 Hz`
+    (FM full scale; a converted legacy cable has amount 0.5, so 200 Hz) to the carrier (`orpheus_unit_plaits.cpp` ~407-417). The nearest Pulsar settings: `fmFreeHz > 0`
     is a free-running modulator at that rate with `fmDepth * 200 Hz` deviation, so `fmDepth` = the
-    pair's `modSourceLevel`; `fmRatio` (0..16, integers stay in tune) is the same idea locked to the
+    pair's `modSourceLevel` times twice the FM cable amount; `fmRatio` (0..16, integers stay in tune) is the same idea locked to the
     note as phase modulation at index `fmDepth * 8`. `fmDepth` is used as written; only `morphRise`
     moves it. `fmShape` sets the modulator wave: 0 sine, 0.5
     triangle, 1 square. Pick `fmFreeHz` to copy a panel LFO or free-running source, `fmRatio` to
@@ -197,9 +200,10 @@ time (`orpheus_unit_delay.cpp` 62-63) and have no Pulsar equivalent. The `mod_so
 
 Tell the user what Pulsar cannot reproduce, with the nearest workaround:
 
-- Pair mod source FM, FLUX or TIDES: Pulsar tracks never read the pair mod source or FM depth.
-  OSC is the one exception, approximated with `fmRatio` / `fmFreeHz` (engine notes above). For LFO
-  the nearest is `modLfoDepth`, which only works on tracks 5-7 or a DRONE-profile track (nothing on
+- Pair cables from FM, FLUX or WAVES sources, and any PITCH, ENV or FM cable: Pulsar tracks never
+  read the duo patch or FM depth. OSC is the one exception, approximated with `fmRatio` / `fmFreeHz`
+  (engine notes above). LFO cables to HARMONICS, TIMBRE or MORPH are the one family that maps onto
+  Pulsar's own macros: the nearest is `modLfoDepth`, which only works on tracks 5-7 or a DRONE-profile track (nothing on
   tracks 0-4 unless the track uses the DRONE profile; see `vibe-creator` for track roles) and is scaled by the energy curve except on DRONE
   tracks, but pinning
   timbre blocks it and tension evolution drags an unpinned timbre, so usually pin the static value

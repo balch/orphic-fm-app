@@ -1,5 +1,6 @@
 // Full engine render tests + mod source routing
 #include "test_harness.h"
+#include "patch_test_helpers.h"
 
 static bool test_full_engine_render() {
     printf("\n=== Test: Full engine render (production graph) ===\n");
@@ -101,16 +102,14 @@ static bool test_mod_source_routing() {
 
     struct ModConfig {
         const char* name;
-        int mod_source;
+        int mod_source;  // legacy source, converted with set_legacy_patch
         float mod_depth;
-        float fm_depth;
     };
-    // Kotlin ModSource ordinals: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
     ModConfig configs[] = {
-        {"OFF",  1, 0.0f, 0.0f},
-        {"FM",   0, 0.0f, 0.8f},
-        {"LFO",  2, 0.8f, 0.0f},
-        {"FLUX", 3, 0.8f, 0.0f},
+        {"OFF",  kLegacyOff,     0.0f},
+        {"FM",   kLegacyVoiceFm, 0.8f},
+        {"LFO",  kLegacyLfo,     0.8f},
+        {"FLUX", kLegacyFlux,    0.8f},
     };
 
     static float outputs[4][24000];
@@ -120,9 +119,8 @@ static bool test_mod_source_routing() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         activate_voice(engine, 0, 0, 60.0f, 0.5f, 0.5f, 0.5f, 0.5f);
 
-        engine->mod_source[0].store(configs[c].mod_source);
+        set_legacy_patch(engine, 0, configs[c].mod_source, false);
         engine->mod_depth[0].store(configs[c].mod_depth);
-        engine->fm_depth[0].store(configs[c].fm_depth);
 
         if (configs[c].mod_source == 0) { // VOICE_FM
             activate_voice(engine, 1, 0, 67.0f, 0.5f, 0.5f, 0.5f, 0.5f);

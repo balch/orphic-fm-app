@@ -264,29 +264,29 @@
       "type": "float",
       "value": 0.0
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_0": {
-      "type": "int",
-      "value": 3
+    "org.balch.orpheus.plugins.voice:duo_patch_0": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"FLUX_X1\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"FLUX_X1\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_1": {
-      "type": "int",
-      "value": 0
+    "org.balch.orpheus.plugins.voice:duo_patch_1": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"VOICE_FM\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"VOICE_FM\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_2": {
-      "type": "int",
-      "value": 2
+    "org.balch.orpheus.plugins.voice:duo_patch_2": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"LFO_AB\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"LFO_A\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_B\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_A90\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"LFO_AB\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_3": {
-      "type": "int",
-      "value": 1
+    "org.balch.orpheus.plugins.voice:duo_patch_3": {
+      "type": "string",
+      "value": "{\"cables\":[],\"pitchBridged\":true,\"envBridged\":true}"
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_4": {
-      "type": "int",
-      "value": 1
+    "org.balch.orpheus.plugins.voice:duo_patch_4": {
+      "type": "string",
+      "value": "{\"cables\":[],\"pitchBridged\":true,\"envBridged\":true}"
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_5": {
-      "type": "int",
-      "value": 1
+    "org.balch.orpheus.plugins.voice:duo_patch_5": {
+      "type": "string",
+      "value": "{\"cables\":[],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.duolfo:freq_a": {
       "type": "float",

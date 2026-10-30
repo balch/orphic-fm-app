@@ -9,6 +9,7 @@
 #include "orpheus_graph.h"
 #include "braids_resampler.h"
 #include "source_handoff.h"
+#include "patch_routing.h"
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
 #include "orpheus_voice.h"
@@ -349,7 +350,7 @@ struct OrpheusEngine {
     std::atomic<float> coupling_depth{0.0f};           // 0 = off, scales partner env → pitch
     std::atomic<float> total_feedback{0.0f};           // master output → LFO feedback (0-1)
 
-    // ── Mod Source Routing + FM ─────────────────────────
+    // ── Duo Patch Routing + FM ──────────────────────────
     // Derived, not a separate literal: a duoVoice GraphUnit's moduleIndex*2 must stay
     // inside kNumMainVoices or unit_process_duo_voice silently rejects it.
     static constexpr int kNumDuos = kNumMainVoices / 2;
@@ -358,9 +359,9 @@ struct OrpheusEngine {
     // or kOrpheusOutGain), matching JSyn where voiceA.output connects post-VCA.
     float voice_fm_buffer[kNumVoices][kMaxFrames] = {};
     float marbles_cv_output[2] = {};                   // cached Marbles X1/X2 CV
-    std::atomic<int> mod_source[kNumDuos] = {};        // per-duo: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX (Kotlin ModSource ordinals)
-    std::atomic<float> mod_depth[kNumDuos] = {};       // per-duo timbre mod depth
-    std::atomic<float> fm_depth[kNumDuos] = {};        // per-duo FM depth (0-1, scaled to ±200Hz matching JSyn)
+    std::atomic<float> mod_depth[kNumDuos] = {};       // per-duo master patch depth (0-1)
+    // Panel duo patch cables: amount per [duo][voice A/B][source][dest], 0 when unplugged or parked.
+    std::atomic<float> patch_amount[kNumPanelDuos][2][kPatchSources][kPatchDests] = {};
     std::atomic<int> fm_cross_quad{0};                 // 0=duo pairs, 1=cross-quad circular
 
     // ── Marbles Random Sequencer ─────────────────────
@@ -502,7 +503,6 @@ struct OrpheusEngine {
     float smooth_reverb_damping{0.5f};
     float smooth_reverb_diffusion{0.5f};
     float smooth_mod_depth[kNumDuos] = {};
-    float smooth_fm_depth[kNumDuos] = {};
 
     // ── Vibrato (dedicated sine oscillator → pitch modulation) ──
     std::atomic<float> vibrato_depth{0.0f};    // 0..1 → depth * 20 Hz pitch mod

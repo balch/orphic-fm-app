@@ -5,6 +5,7 @@
 // These tests catch gaps where Kotlin sends port values that C++ ignores
 // (wrong URI, wrong symbol name, or missing handler).
 #include "test_harness.h"
+#include "patch_test_helpers.h"
 
 // ═══════════════════════════════════════════════════════════════════
 // Helper: render with a specific port set, return RMS
@@ -33,61 +34,37 @@ static float render_with_port(
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Test 1: Mod source routing via set_port (Kotlin URI + symbol names)
-// Verifies that C++ handles the VOICE plugin's mod_source symbols
+// Test 1: Patch cable + depth routing via set_port (Kotlin URIs + symbols)
 // ═══════════════════════════════════════════════════════════════════
-static bool test_mod_source_port_routing() {
-    printf("\n=== Test: Mod source port routing via set_port ===\n");
+static bool test_patch_port_routing() {
+    printf("\n=== Test: Patch cable and depth port routing via set_port ===\n");
     bool pass = true;
-
-    float sr = 48000.0f;
-    int total = 24000; // 0.5s
-    // Kotlin sends: URI="org.balch.orpheus.plugins.voice", symbol="duo_mod_source_0"
-    // C++ currently expects: URI="org.balch.orpheus.plugins.modulation", symbol="mod_source_0"
-    // This test verifies which one actually works.
-
-    const char* voice_uri = "org.balch.orpheus.plugins.voice";
-    const char* mod_uri = "org.balch.orpheus.plugins.modulation";
 
     struct TestCase {
         const char* label;
-        const char* uri;
-        const char* src_symbol;
+        const char* depth_uri;
         const char* depth_symbol;
-        const char* fm_symbol;
     } cases[] = {
-        {"Kotlin URI+symbols", voice_uri, "duo_mod_source_0", "duo_mod_source_level_0", "duo_mod_source_level_0"},
-        {"C++ expected URI+symbols", mod_uri, "mod_source_0", "mod_depth_0", "fm_depth_0"},
+        {"voice URI depth", "org.balch.orpheus.plugins.voice", "duo_mod_source_level_0"},
+        {"modulation URI depth", "org.balch.orpheus.plugins.modulation", "mod_depth_0"},
     };
 
     for (auto& tc : cases) {
-        OrpheusEngine* engine = orpheus_engine_create(sr);
-        engine->voice_params[0].active.store(1);
-        engine->voice_params[0].ever_triggered.store(1);
-        engine->voice_params[0].engine_index.store(8);
-        engine->voice_params[0].tune.store(60.0f);
-        engine->voice_params[0].gate.store(1);
-        engine->voice_params[0].harmonics.store(0.5f);
-        engine->voice_params[0].timbre.store(0.5f);
-        engine->voice_params[0].morph.store(0.5f);
-        engine->voice_params[0].decay.store(0.0f);
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        // LFO_AB -> TIMBRE on voice A of duo 0
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.patch", "p0_0_0_1", 1.0f);
+        orpheus_engine_set_port(engine, tc.depth_uri, tc.depth_symbol, 0.8f);
 
-        // Set LFO as mod source (ordinal=2) with high depth
-        orpheus_engine_set_port(engine, tc.uri, tc.src_symbol, 2.0f);  // LFO
-        orpheus_engine_set_port(engine, tc.uri, tc.depth_symbol, 0.8f);
-        engine->lfo_output_value = 0.7f;  // simulate running LFO
-        for (int i = 0; i < kMaxFrames; i++) engine->lfo_output_buffer[i] = 0.7f;
-
-        int actual_src = engine->mod_source[0].load();
+        float amount = engine->patch_amount[0][0][kPatchSrcLfoAB][kPatchDstTimbre].load();
         float actual_depth = engine->mod_depth[0].load();
-        printf("  %s: mod_source=%d (expect 2) mod_depth=%.2f (expect 0.80)\n",
-               tc.label, actual_src, actual_depth);
+        printf("  %s: cable=%.2f (expect 1.00) mod_depth=%.2f (expect 0.80)\n",
+               tc.label, amount, actual_depth);
 
-        if (actual_src != 2) {
-            printf("    FAIL: mod_source not set (URI/symbol mismatch)\n");
+        if (amount != 1.0f) {
+            printf("    FAIL: patch cable not set (URI/symbol mismatch)\n");
             pass = false;
         }
-        if (actual_depth < 0.01f) {
+        if (actual_depth < 0.79f) {
             printf("    FAIL: mod_depth not set\n");
             pass = false;
         }
@@ -95,7 +72,7 @@ static bool test_mod_source_port_routing() {
         orpheus_engine_destroy(engine);
     }
 
-    printf("Mod source port routing test: %s\n", pass ? "PASS" : "FAIL");
+    printf("Patch port routing test: %s\n", pass ? "PASS" : "FAIL");
     return pass;
 }
 
@@ -259,11 +236,11 @@ static bool test_voice_timbre_morph() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Test 5: Mod source + depth integration — LFO mod affects voice output
-// Tests the full pipeline: set mod_source=LFO + mod_depth → voice timbre changes
+// Test 5: Patch cable + depth integration: an LFO cable affects voice output
+// Tests the full pipeline: LFO_AB -> TIMBRE cable + mod_depth -> voice timbre changes
 // ═══════════════════════════════════════════════════════════════════
-static bool test_mod_source_depth_integration() {
-    printf("\n=== Test: Mod source + depth integration ===\n");
+static bool test_patch_depth_integration() {
+    printf("\n=== Test: Patch cable + depth integration ===\n");
     bool pass = true;
 
     float sr = 48000.0f;
@@ -279,8 +256,7 @@ static bool test_mod_source_depth_integration() {
     eng_dry->voice_params[0].harmonics.store(0.5f);
     eng_dry->voice_params[0].timbre.store(0.5f);
     eng_dry->voice_params[0].morph.store(0.5f);
-    eng_dry->voice_params[0].decay.store(0.0f);
-    eng_dry->mod_source[0].store(1); // OFF
+    eng_dry->voice_params[0].decay.store(0.0f);  // no cables: unmodulated
 
     GraphUnit v_dry;
     setup_voice_unit(&v_dry, 0);
@@ -292,8 +268,7 @@ static bool test_mod_source_depth_integration() {
     }
     orpheus_engine_destroy(eng_dry);
 
-    // With mod: set via set_port API (the way Kotlin SHOULD send it)
-    // Using the C++ expected URI since that's what works
+    // With mod: set via set_port API
     OrpheusEngine* eng_mod = orpheus_engine_create(sr);
     eng_mod->voice_params[0].active.store(1);
     eng_mod->voice_params[0].ever_triggered.store(1);
@@ -305,19 +280,19 @@ static bool test_mod_source_depth_integration() {
     eng_mod->voice_params[0].morph.store(0.5f);
     eng_mod->voice_params[0].decay.store(0.0f);
 
-    // Set mod source = LFO (2), depth = 0.8
-    orpheus_engine_set_port(eng_mod, "org.balch.orpheus.plugins.modulation",
-                            "mod_source_0", 2.0f);
+    // LFO_AB -> TIMBRE cable on both voices of duo 0, depth = 0.8
+    orpheus_engine_set_port(eng_mod, "org.balch.orpheus.plugins.patch", "p0_0_0_1", 1.0f);
+    orpheus_engine_set_port(eng_mod, "org.balch.orpheus.plugins.patch", "p0_1_0_1", 1.0f);
     orpheus_engine_set_port(eng_mod, "org.balch.orpheus.plugins.modulation",
                             "mod_depth_0", 0.8f);
     eng_mod->lfo_output_value = 0.7f;
     for (int i = 0; i < kMaxFrames; i++) eng_mod->lfo_output_buffer[i] = 0.7f;
 
     // Verify values were stored
-    int src = eng_mod->mod_source[0].load();
+    float cable = eng_mod->patch_amount[0][0][kPatchSrcLfoAB][kPatchDstTimbre].load();
     float depth = eng_mod->mod_depth[0].load();
-    printf("  After set_port: mod_source=%d mod_depth=%.2f\n", src, depth);
-    if (src != 2 || depth < 0.79f) {
+    printf("  After set_port: cable=%.2f mod_depth=%.2f\n", cable, depth);
+    if (cable != 1.0f || depth < 0.79f) {
         printf("  FAIL: set_port didn't store values correctly\n");
         pass = false;
     }
@@ -341,11 +316,11 @@ static bool test_mod_source_depth_integration() {
     float diff_rms = std::sqrt(diff_sum / total);
     printf("  Dry vs LFO-modulated diff_rms: %.6f\n", diff_rms);
     if (diff_rms < 0.001f) {
-        printf("  FAIL: mod source + depth should change voice output\n");
+        printf("  FAIL: patch cable + depth should change voice output\n");
         pass = false;
     }
 
-    printf("Mod source + depth integration test: %s\n", pass ? "PASS" : "FAIL");
+    printf("Patch cable + depth integration test: %s\n", pass ? "PASS" : "FAIL");
     return pass;
 }
 
@@ -456,17 +431,10 @@ static bool test_kotlin_port_compatibility() {
     check("delay", "mix", 0.5f, "delay_mix",
           engine->delay_mix.load(), 0.5f, true);
 
-    // Mod source via Kotlin URI (voice plugin)
-    engine->mod_source[0].store(0);
-    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.voice", "duo_mod_source_0", 2.0f);
-    check("voice", "duo_mod_source_0", 2.0f, "mod_source[0] (Kotlin URI)",
-          (float)engine->mod_source[0].load(), 2.0f, true);
-
-    // Mod source via C++ URI (modulation plugin)
-    engine->mod_source[0].store(0);
-    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.modulation", "mod_source_0", 2.0f);
-    check("modulation", "mod_source_0", 2.0f, "mod_source[0] (C++ URI)",
-          (float)engine->mod_source[0].load(), 2.0f, true);
+    // Patch cable via the patch URI: p<duo>_<voice>_<src>_<dst>
+    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.patch", "p0_1_15_3", 0.5f);
+    check("patch", "p0_1_15_3", 0.5f, "patch_amount[0][1][15][3]",
+          engine->patch_amount[0][1][15][3].load(), 0.5f, true);
 
     // Mod depth via Kotlin URI (voice plugin)
     engine->mod_depth[0].store(0.0f);
@@ -492,68 +460,28 @@ static bool test_kotlin_port_compatibility() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Test 7: ModSource enum ordinal mapping (Kotlin vs C++)
-// Verify that Kotlin ordinals match C++ expectations
+// Test 7: Patch symbol layout matches Kotlin patchCellSymbol
+// cell = (voice * 16 + src) * 6 + dst, symbol p<duo>_<cell/96>_<cell%96/6>_<cell%6>
 // ═══════════════════════════════════════════════════════════════════
-static bool test_mod_source_enum_mapping() {
-    printf("\n=== Test: ModSource enum ordinal mapping ===\n");
-    bool pass = true;
-
-    // Kotlin ModSource enum: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
-    // C++ mod_source now uses same ordinals as Kotlin
-
-    struct EnumMapping {
-        const char* name;
-        int kotlin_ordinal;
-        int cpp_value;
-        bool matches;
-    } mappings[] = {
-        {"VOICE_FM", 0, 0, true},
-        {"OFF",      1, 1, true},
-        {"LFO",      2, 2, true},
-        {"FLUX",     3, 3, true},
-    };
-
-    for (auto& m : mappings) {
-        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-        engine->mod_source[0].store(m.kotlin_ordinal);
-
-        // Check what C++ interprets
-        int stored = engine->mod_source[0].load();
-        const char* cpp_interp;
-        switch (stored) {
-            case 0: cpp_interp = "VOICE_FM"; break;
-            case 1: cpp_interp = "OFF"; break;
-            case 2: cpp_interp = "LFO"; break;
-            case 3: cpp_interp = "FLUX"; break;
-            default: cpp_interp = "UNKNOWN"; break;
+static bool test_patch_symbol_layout() {
+    printf("\n=== Test: Patch symbol layout ===\n");
+    int wrong = 0;
+    for (int duo = 0; duo < kNumPanelDuos; duo++) {
+        for (int cell = 0; cell < 2 * kPatchSources * kPatchDests; cell++) {
+            OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+            char sym[32];
+            snprintf(sym, sizeof(sym), "p%d_%d_%d_%d", duo, cell / 96, cell % 96 / 6, cell % 6);
+            orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.patch", sym, 0.5f);
+            int v = cell / 96, src = cell % 96 / 6, dst = cell % 6;
+            if (engine->patch_amount[duo][v][src][dst].load() != 0.5f) {
+                if (wrong < 5) printf("  %s did not reach [%d][%d][%d][%d]\n", sym, duo, v, src, dst);
+                wrong++;
+            }
+            orpheus_engine_destroy(engine);
         }
-
-        printf("  Kotlin %s (ordinal %d) → C++ interprets as %s (%d) — %s\n",
-               m.name, m.kotlin_ordinal, cpp_interp, stored,
-               m.matches ? "OK" : "MISMATCH");
-
-        if (!m.matches) {
-            // This documents the known bug — Kotlin sends ordinal, C++ has different mapping
-            printf("    WARNING: Kotlin sends %s but C++ interprets as %s\n", m.name, cpp_interp);
-        }
-
-        orpheus_engine_destroy(engine);
     }
-
-    // Count mismatches — currently 2 are expected (OFF/VOICE_FM swap)
-    int mismatches = 0;
-    for (auto& m : mappings) if (!m.matches) mismatches++;
-    printf("  %d/4 enum values mismatched\n", mismatches);
-
-    // This test DOCUMENTS the bug — it should fail until the enum is fixed
-    if (mismatches > 0) {
-        printf("  FAIL: ModSource enum ordinals don't match between Kotlin and C++\n");
-        pass = false;
-    }
-
-    printf("ModSource enum mapping test: %s\n", pass ? "PASS" : "FAIL");
-    return pass;
+    printf("Patch symbol layout test: %s (%d wrong)\n", wrong == 0 ? "PASS" : "FAIL", wrong);
+    return wrong == 0;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -625,13 +553,13 @@ static bool test_delay_ports() {
 bool run_control_routing_tests() {
     int suite_pass = 0, suite_fail = 0;
     auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
-    tally(test_mod_source_port_routing());
+    tally(test_patch_port_routing());
     tally(test_distortion_mix_port());
     tally(test_master_pan_port());
     tally(test_voice_timbre_morph());
-    tally(test_mod_source_depth_integration());
+    tally(test_patch_depth_integration());
     tally(test_kotlin_port_compatibility());
-    tally(test_mod_source_enum_mapping());
+    tally(test_patch_symbol_layout());
     tally(test_vibrato_port());
     tally(test_delay_ports());
     TEST_SUITE_RETURN(suite_pass, suite_fail);

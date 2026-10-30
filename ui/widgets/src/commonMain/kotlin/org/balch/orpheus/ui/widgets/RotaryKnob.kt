@@ -40,6 +40,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -300,6 +301,17 @@ private fun KnobLongLabel(text: String, color: Color) {
     }
 }
 
+/**
+ * The value arc as (start, sweep) in degrees. Unipolar fills from the dial's start; bipolar runs
+ * from 12 o'clock, the middle of the dial, toward the value, so its sweep is negative below centre.
+ */
+internal fun progressArc(normalized: Float, bipolar: Boolean, startAngle: Float, sweepAngle: Float): Pair<Float, Float> =
+    if (bipolar) {
+        (startAngle + sweepAngle / 2f) to sweepAngle * (normalized - 0.5f)
+    } else {
+        startAngle to sweepAngle * normalized
+    }
+
 @Composable
 internal fun RotaryKnobDial(
     dragState: KnobDragState,
@@ -316,6 +328,7 @@ internal fun RotaryKnobDial(
     requireVerticalSlop: Boolean = false,
     locked: Boolean = false,
     onLockedClick: (() -> Unit)? = null,
+    bipolar: Boolean = false,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // null (the default, used by every real call site) means "use live focus state" below.
     previewFocused: Boolean? = null,
@@ -499,17 +512,21 @@ internal fun RotaryKnobDial(
             val normalizedValue =
                 (dragState.internalValue - range.start) / (range.endInclusive - range.start)
             val currentSweep = sweepAngle * normalizedValue
+            val (arcStart, arcSweep) = progressArc(normalizedValue, bipolar, startAngle, sweepAngle)
+            // A bipolar arc runs either way from 12 o'clock, so it is drawn solid: the sweep gradient fades its start.
+            val glowBrush: Brush = if (bipolar) SolidColor(progressColor.copy(alpha = 0.45f * ring)) else Brush.sweepGradient(
+                colors = listOf(progressColor.copy(alpha = 0.0f), progressColor.copy(alpha = 0.6f * ring)),
+                center = center,
+            )
+            val arcBrush: Brush = if (bipolar) SolidColor(progressColor.copy(alpha = ring)) else Brush.sweepGradient(
+                colors = listOf(progressColor.copy(alpha = 0.5f * ring), progressColor.copy(alpha = ring)),
+                center = center,
+            )
 
             drawArc(
-                brush = Brush.sweepGradient(
-                    colors = listOf(
-                        progressColor.copy(alpha = 0.0f),
-                        progressColor.copy(alpha = 0.6f * ring)
-                    ),
-                    center = center
-                ),
-                startAngle = startAngle,
-                sweepAngle = currentSweep,
+                brush = glowBrush,
+                startAngle = arcStart,
+                sweepAngle = arcSweep,
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcSize,
@@ -517,12 +534,9 @@ internal fun RotaryKnobDial(
             )
 
             drawArc(
-                brush = Brush.sweepGradient(
-                    colors = listOf(progressColor.copy(alpha = 0.5f * ring), progressColor.copy(alpha = ring)),
-                    center = center
-                ),
-                startAngle = startAngle,
-                sweepAngle = currentSweep,
+                brush = arcBrush,
+                startAngle = arcStart,
+                sweepAngle = arcSweep,
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcSize,
@@ -739,6 +753,7 @@ val DefaultValueFormatter: KnobValueFormatter = { v -> ((v * 100).roundToInt() /
  *   notch. A click, or select while focused, fires [onLockedClick] instead.
  * @param caption A small second line under [label], such as the knob's glyph.
  * @param longLabel Shown above the knob while it is pressed, for a [label] too short to explain itself.
+ * @param bipolar Draws the value arc from 12 o'clock toward the value, for a range centred on zero.
  */
 @Composable
 fun RotaryKnob(
@@ -766,6 +781,7 @@ fun RotaryKnob(
     onLockedClick: (() -> Unit)? = null,
     caption: String? = null,
     longLabel: String? = null,
+    bipolar: Boolean = false,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // Every production call site leaves this null and gets live focus behavior.
     previewFocused: Boolean? = null,
@@ -827,6 +843,7 @@ fun RotaryKnob(
             requireVerticalSlop = requireVerticalSlop,
             locked = locked,
             onLockedClick = if (learnMode) null else onLockedClick,
+            bipolar = bipolar,
             previewFocused = previewFocused,
             previewAdjusting = previewAdjusting,
         )

@@ -22,5 +22,8 @@ kotlin {
             // DateTime (TidalRepl uses Clock)
             implementation(libs.kotlinx.datetime)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }

@@ -1,5 +1,6 @@
 // LFO waveform, mode logic, and mod-source integration tests
 #include "test_harness.h"
+#include "patch_test_helpers.h"
 #include "orpheus_units_common.h"
 #include <vector>
 
@@ -367,7 +368,7 @@ static bool test_lfo_timbre_modulation() {
     eng_dry->voice_params[0].timbre.store(0.5f);
     eng_dry->voice_params[0].morph.store(0.5f);
     eng_dry->voice_params[0].decay.store(0.0f);
-    eng_dry->mod_source[0].store(1); // OFF
+    // no patch cables: unmodulated
 
     GraphUnit v_dry;
     setup_voice_unit(&v_dry, 0);
@@ -392,9 +393,8 @@ static bool test_lfo_timbre_modulation() {
     eng_lfo->voice_params[0].timbre.store(0.5f);
     eng_lfo->voice_params[0].morph.store(0.5f);
     eng_lfo->voice_params[0].decay.store(0.0f);
-    eng_lfo->mod_source[0].store(2); // LFO
+    set_patch_cell(eng_lfo, 0, -1, kPatchSrcLfoAB, kPatchDstTimbre, 1.0f);  // timbre only
     eng_lfo->mod_depth[0].store(0.8f);
-    eng_lfo->fm_depth[0].store(0.0f);
     // Fill LFO buffer with constant value (simulates steady LFO for plaits modulation)
     fill_lfo_buffer(eng_lfo, 0.7f);
 
@@ -457,7 +457,7 @@ static bool test_lfo_fm_modulation() {
     eng_dry->voice_params[0].timbre.store(0.0f);
     eng_dry->voice_params[0].morph.store(0.0f);
     eng_dry->voice_params[0].decay.store(0.0f);
-    eng_dry->mod_source[0].store(1); // OFF
+    // no patch cables: unmodulated
 
     GraphUnit v_dry;
     setup_voice_unit(&v_dry, 0);
@@ -481,9 +481,8 @@ static bool test_lfo_fm_modulation() {
     eng_fm->voice_params[0].timbre.store(0.0f);
     eng_fm->voice_params[0].morph.store(0.0f);
     eng_fm->voice_params[0].decay.store(0.0f);
-    eng_fm->mod_source[0].store(2); // LFO
-    eng_fm->mod_depth[0].store(0.0f);
-    eng_fm->fm_depth[0].store(0.8f); // FM depth
+    set_patch_cell(eng_fm, 0, -1, kPatchSrcLfoAB, kPatchDstFm, 0.5f);  // FM only, ±200 Hz at depth 1
+    eng_fm->mod_depth[0].store(0.8f);
     fill_lfo_buffer(eng_fm, 0.5f);
 
     GraphUnit v_fm;
@@ -621,8 +620,8 @@ static bool test_lfo_graph_integration() {
     engine->lfo_shape.store(1.0f);   // triangle
     engine->lfo_mode.store(0);       // AND mode (active output)
 
-    // Set LFO as mod source for duo 0
-    engine->mod_source[0].store(2);  // LFO
+    // LFO -> TIMBRE cable on duo 0
+    set_patch_cell(engine, 0, -1, kPatchSrcLfoAB, kPatchDstTimbre, 1.0f);
     engine->mod_depth[0].store(0.8f);
 
     auto* graph = new OrpheusGraph();
@@ -857,7 +856,7 @@ static bool test_lfo_mod_depth_sweep() {
     eng_base->voice_params[0].timbre.store(0.5f);
     eng_base->voice_params[0].morph.store(0.5f);
     eng_base->voice_params[0].decay.store(0.0f);
-    eng_base->mod_source[0].store(1); // OFF
+    // no patch cables: unmodulated
 
     GraphUnit v_base;
     setup_voice_unit(&v_base, 0);
@@ -880,9 +879,8 @@ static bool test_lfo_mod_depth_sweep() {
         eng->voice_params[0].timbre.store(0.5f);
         eng->voice_params[0].morph.store(0.5f);
         eng->voice_params[0].decay.store(0.0f);
-        eng->mod_source[0].store(2); // LFO
+        set_patch_cell(eng, 0, -1, kPatchSrcLfoAB, kPatchDstTimbre, 1.0f);  // timbre only
         eng->mod_depth[0].store(depths[d]);
-        eng->fm_depth[0].store(0.0f);
         fill_lfo_buffer(eng, 0.7f);
 
         GraphUnit v;

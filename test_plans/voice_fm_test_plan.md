@@ -13,7 +13,7 @@ options.
     - **Quad 5-8:** Voices 5,6,7,8 (mid/high range)
 - **4 Duo Pairs:** 1-2, 3-4, 5-6, 7-8
 - **Per-Voice Controls:** Tune, Envelope Speed, Hold
-- **Per-Duo Controls:** FM Depth (Mod), Sharpness, Mod Source
+- **Per-Duo Controls:** FM Depth (Mod, the master depth for the duo's patch), Sharpness, PATCH bay
 - **Per-Quad Controls:** Pitch offset, Hold level
 - **FM Routing:** Within-pair or Cross-quad
 
@@ -118,7 +118,7 @@ options.
 
 **Setup:**
 
-1. Duo 1-2, set mod source to **FM** (bottom position)
+1. Duo 1-2, open PATCH and drag the VOICE_FM output to the FM and TIMBRE knobs (the fader is the master depth)
 2. Tune voice 1 and 2 close together
 
 **Procedure:**
@@ -167,13 +167,13 @@ options.
 
 ---
 
-### Test 7: Duo Mod Source - OFF
+### Test 7: Patch Bay - No Cables
 
 **Objective:** Verify OFF disables modulation
 
 **Procedure:**
 
-1. Set duo mod source to **OFF** (center)
+1. Open PATCH and remove all cables (no cables = OFF)
 2. Set MOD depth to 100% (should have no effect)
 3. Trigger voices
 
@@ -187,13 +187,13 @@ options.
 
 ---
 
-### Test 8: Duo Mod Source - LFO
+### Test 8: Patch Bay - LFO Cable
 
 **Objective:** Verify LFO modulates FM depth
 
 **Setup:**
 
-1. Set duo mod source to **LFO** (top)
+1. Open PATCH and drag an LFO output to the TIMBRE knob
 2. Set HyperLFO to moderate rate (30%)
 3. Set MOD depth to 50%
 
@@ -273,7 +273,7 @@ options.
 **Setup:**
 
 1. Enable cross-quad toggle (in center panel)
-2. Set duo mod sources to **FM**
+2. On each duo, open PATCH and drag VOICE_FM to the FM knob
 
 **Procedure:**
 
@@ -418,7 +418,7 @@ options.
 
 1. All 8 voices active with holds
 2. Various tunings creating chords
-3. Mix of mod sources (OFF, LFO, FM)
+3. Mix of patches (no cables, LFO cables, VOICE_FM cables)
 4. Cross-quad enabled
 5. Sharpness varied per pair
 6. Different envelope speeds
@@ -447,7 +447,7 @@ options.
 
 - ✓ All voice parameters restored
 - ✓ Tunings correct
-- ✓ Mod sources correct
+- ✓ Patch cables correct
 - ✓ Sounds match preset intent
 
 **Pass/Fail:** ____
@@ -461,9 +461,9 @@ options.
 | Tune           | Per-Voice | 0-100% | Frequency (55-880 Hz, 4 octaves) |
 | Envelope Speed | Per-Voice | 0-100% | Attack/Release time              |
 | Hold           | Per-Voice | Toggle | Latch voice on                   |
-| MOD            | Per-Duo   | 0-100% | FM depth                         |
+| MOD            | Per-Duo   | 0-100% | Patch bay master depth           |
 | Sharpness      | Per-Duo   | 0-100% | Triangle→Square morph            |
-| Mod Source     | Per-Duo   | 3-way  | OFF / LFO / FM                   |
+| Patch Bay      | Per-Duo   | Cables | Any output to any duo knob       |
 | Pitch          | Per-Quad  | 0-100% | Pitch offset (-1 to +1 octave)   |
 | Hold Level     | Per-Quad  | 0-100% | Sustain amplitude                |
 

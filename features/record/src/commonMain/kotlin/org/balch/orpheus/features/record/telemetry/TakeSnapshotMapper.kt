@@ -2,9 +2,12 @@ package org.balch.orpheus.features.record.telemetry
 
 import org.balch.orpheus.core.audio.EngineCatalog
 import org.balch.orpheus.core.audio.EngineChoice
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.patch.duoModSourceLegacyKey
+import org.balch.orpheus.core.audio.patch.duoPatchKey
+import org.balch.orpheus.core.audio.patch.patchFromPreset
 import org.balch.orpheus.core.plugin.PortSymbol
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
@@ -21,12 +24,6 @@ private val VOICE_OFFSET_SEMITONES = floatArrayOf(-12f, -12f, 0f, 0f, 0f, 0f, 12
 /** MIDI note a voice sounds at for its tune and quad pitch, matching the DSP engine. */
 fun soundingMidiNote(voice: Int, tune: Float, quadPitch: Float): Float =
     33f + tune * 48f + VOICE_OFFSET_SEMITONES[voice] + 24f * (quadPitch - 0.5f)
-
-/** Stored mod source (the [ModSource] ordinal) as a readable name. */
-fun modSourceName(stored: Int): String {
-    val source = ModSource.entries.getOrNull(stored) ?: return "UNKNOWN"
-    return if (source == ModSource.VOICE_FM) "FM" else source.name
-}
 
 /** Builds a [TakeSnapshot] from preset port values; missing keys use the plugin port defaults. */
 fun snapshotOf(preset: SynthPreset): TakeSnapshot {
@@ -49,6 +46,12 @@ fun snapshotOf(preset: SynthPreset): TakeSnapshot {
 
     val pairs = (0 until PAIRS).map { p ->
         val engineId = int(VoiceSymbol.duoEngine(p), -1)
+        val patch = patchFromPreset(
+            encoded = (preset.portValues[duoPatchKey(p)] as? PortValue.StringValue)?.value,
+            legacySource = preset.portValues[duoModSourceLegacyKey(p)]?.asFloat(),
+            engine = OrpheusEngineId.fromId(engineId),
+            duoIndex = p,
+        )
         val voices = listOf(2 * p, 2 * p + 1).map { v ->
             val tune = float(VoiceSymbol.tune(v), 0.5f)
             VoiceSnapshot(
@@ -65,7 +68,7 @@ fun snapshotOf(preset: SynthPreset): TakeSnapshot {
             harmonics = float(VoiceSymbol.duoHarmonics(p), 0f),
             timbre = float(VoiceSymbol.duoSharpness(p), 0f),
             morph = float(VoiceSymbol.duoMorph(p), 0f),
-            modSource = modSourceName(int(VoiceSymbol.duoModSource(p), 0)),
+            cables = patch.cables,
             modSourceLevel = float(VoiceSymbol.duoModSourceLevel(p), 0f),
             voices = voices,
         )

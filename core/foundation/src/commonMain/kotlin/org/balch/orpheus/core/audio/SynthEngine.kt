@@ -150,9 +150,6 @@ interface SynthEngine : AudioHostSuspender {
     fun getHyperLfoMode(): Int
     fun getHyperLfoLink(): Boolean
 
-    // Duo Mod Source
-    fun setDuoModSource(duoIndex: Int, source: ModSource)
-
     // Advanced FM
     fun setFmStructure(crossQuad: Boolean) // true = 34>56, 78>12 routing
     fun setTotalFeedback(amount: Float) // 0-1, output→LFO feedback
@@ -327,7 +324,6 @@ interface SynthEngine : AudioHostSuspender {
     fun getVoiceFmDepth(index: Int): Float
     fun getVoiceEnvelopeSpeed(index: Int): Float
     fun getDuoSharpness(duoIndex: Int): Float
-    fun getDuoModSource(duoIndex: Int): ModSource
     fun getFmStructureCrossQuad(): Boolean
     fun getTotalFeedback(): Float
     fun getVibrato(): Float
@@ -389,14 +385,6 @@ interface SynthEngine : AudioHostSuspender {
      * Default no-op for engines without a native bridge.
      */
     fun syncToNative() {}
-}
-
-enum class ModSource {
-    VOICE_FM,
-    OFF,
-    LFO,
-    FLUX,
-    TIDES
 }
 
 @kotlinx.serialization.Serializable

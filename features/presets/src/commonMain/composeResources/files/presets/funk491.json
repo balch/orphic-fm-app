@@ -588,9 +588,9 @@
       "type": "float",
       "value": 0.7899999
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_0": {
-      "type": "int",
-      "value": 4
+    "org.balch.orpheus.plugins.voice:duo_patch_0": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"WAVES_1\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"WAVES_2\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"WAVES_3\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"WAVES_4\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"WAVES_1\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.voice:duo_engine_0": {
       "type": "int",
@@ -620,9 +620,9 @@
       "type": "float",
       "value": 0.5200005
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_1": {
-      "type": "int",
-      "value": 4
+    "org.balch.orpheus.plugins.voice:duo_patch_1": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"WAVES_1\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"WAVES_2\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"WAVES_3\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"WAVES_4\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"WAVES_1\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.voice:duo_engine_1": {
       "type": "int",
@@ -652,9 +652,9 @@
       "type": "float",
       "value": 0.41999996
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_2": {
-      "type": "int",
-      "value": 2
+    "org.balch.orpheus.plugins.voice:duo_patch_2": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"LFO_AB\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"LFO_A\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_B\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_A90\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"LFO_AB\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.voice:duo_engine_2": {
       "type": "int",
@@ -684,9 +684,9 @@
       "type": "float",
       "value": 0.55
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_3": {
-      "type": "int",
-      "value": 2
+    "org.balch.orpheus.plugins.voice:duo_patch_3": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"LFO_AB\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"LFO_A\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_B\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_A90\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"LFO_AB\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.voice:duo_engine_3": {
       "type": "int",
@@ -716,9 +716,9 @@
       "type": "float",
       "value": 0.7600002
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_4": {
-      "type": "int",
-      "value": 2
+    "org.balch.orpheus.plugins.voice:duo_patch_4": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"LFO_AB\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"LFO_A\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_B\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"LFO_A90\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"LFO_AB\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.voice:duo_engine_4": {
       "type": "int",
@@ -748,9 +748,9 @@
       "type": "float",
       "value": 0.8099997
     },
-    "org.balch.orpheus.plugins.voice:duo_mod_source_5": {
-      "type": "int",
-      "value": 4
+    "org.balch.orpheus.plugins.voice:duo_patch_5": {
+      "type": "string",
+      "value": "{\"cables\":[{\"source\":\"WAVES_1\",\"dest\":\"TIMBRE\",\"slot\":\"BOTH\",\"amount\":1.0,\"parked\":false},{\"source\":\"WAVES_2\",\"dest\":\"MORPH\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"WAVES_3\",\"dest\":\"HARMONICS\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false},{\"source\":\"WAVES_4\",\"dest\":\"PITCH\",\"slot\":\"BOTH\",\"amount\":0.041666668,\"parked\":false},{\"source\":\"WAVES_1\",\"dest\":\"FM\",\"slot\":\"BOTH\",\"amount\":0.5,\"parked\":false}],\"pitchBridged\":true,\"envBridged\":true}"
     },
     "org.balch.orpheus.plugins.voice:duo_engine_5": {
       "type": "int",

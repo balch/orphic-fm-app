@@ -64,13 +64,6 @@ enum class VoiceSymbol(
     DUO_SHARPNESS_4("duo_sharpness_4", displayName = "Duo Sharpness 4"),
     DUO_SHARPNESS_5("duo_sharpness_5", displayName = "Duo Sharpness 5"),
 
-    DUO_MOD_SOURCE_0("duo_mod_source_0", displayName = "Duo Mod Source 0"),
-    DUO_MOD_SOURCE_1("duo_mod_source_1", displayName = "Duo Mod Source 1"),
-    DUO_MOD_SOURCE_2("duo_mod_source_2", displayName = "Duo Mod Source 2"),
-    DUO_MOD_SOURCE_3("duo_mod_source_3", displayName = "Duo Mod Source 3"),
-    DUO_MOD_SOURCE_4("duo_mod_source_4", displayName = "Duo Mod Source 4"),
-    DUO_MOD_SOURCE_5("duo_mod_source_5", displayName = "Duo Mod Source 5"),
-
     DUO_ENGINE_0("duo_engine_0", displayName = "Duo Engine 0"),
     DUO_ENGINE_1("duo_engine_1", displayName = "Duo Engine 1"),
     DUO_ENGINE_2("duo_engine_2", displayName = "Duo Engine 2"),
@@ -149,7 +142,6 @@ enum class VoiceSymbol(
         private val modDepths = arrayOf(MOD_DEPTH_0, MOD_DEPTH_1, MOD_DEPTH_2, MOD_DEPTH_3, MOD_DEPTH_4, MOD_DEPTH_5, MOD_DEPTH_6, MOD_DEPTH_7, MOD_DEPTH_8, MOD_DEPTH_9, MOD_DEPTH_10, MOD_DEPTH_11)
         private val envSpeeds = arrayOf(ENV_SPEED_0, ENV_SPEED_1, ENV_SPEED_2, ENV_SPEED_3, ENV_SPEED_4, ENV_SPEED_5, ENV_SPEED_6, ENV_SPEED_7, ENV_SPEED_8, ENV_SPEED_9, ENV_SPEED_10, ENV_SPEED_11)
         private val duoSharpnesses = arrayOf(DUO_SHARPNESS_0, DUO_SHARPNESS_1, DUO_SHARPNESS_2, DUO_SHARPNESS_3, DUO_SHARPNESS_4, DUO_SHARPNESS_5)
-        private val duoModSources = arrayOf(DUO_MOD_SOURCE_0, DUO_MOD_SOURCE_1, DUO_MOD_SOURCE_2, DUO_MOD_SOURCE_3, DUO_MOD_SOURCE_4, DUO_MOD_SOURCE_5)
         private val duoEngines = arrayOf(DUO_ENGINE_0, DUO_ENGINE_1, DUO_ENGINE_2, DUO_ENGINE_3, DUO_ENGINE_4, DUO_ENGINE_5)
         private val duoHarmonics = arrayOf(DUO_HARMONICS_0, DUO_HARMONICS_1, DUO_HARMONICS_2, DUO_HARMONICS_3, DUO_HARMONICS_4, DUO_HARMONICS_5)
         private val duoProsodies = arrayOf(DUO_PROSODY_0, DUO_PROSODY_1, DUO_PROSODY_2, DUO_PROSODY_3, DUO_PROSODY_4, DUO_PROSODY_5)
@@ -167,7 +159,6 @@ enum class VoiceSymbol(
         fun modDepth(index: Int): VoiceSymbol = modDepths[index]
         fun envSpeed(index: Int): VoiceSymbol = envSpeeds[index]
         fun duoSharpness(index: Int): VoiceSymbol = duoSharpnesses[index]
-        fun duoModSource(index: Int): VoiceSymbol = duoModSources[index]
         fun duoEngine(index: Int): VoiceSymbol = duoEngines[index]
         fun duoHarmonics(index: Int): VoiceSymbol = duoHarmonics[index]
         fun duoProsody(index: Int): VoiceSymbol = duoProsodies[index]

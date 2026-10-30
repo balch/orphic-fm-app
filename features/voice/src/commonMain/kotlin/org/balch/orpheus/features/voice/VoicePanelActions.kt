@@ -1,7 +1,7 @@
 package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.patch.DuoPatch
 
 @Immutable
 data class VoicePanelActions(
@@ -15,7 +15,7 @@ data class VoicePanelActions(
     val pulseStart: (Int) -> Unit,
     val pulseEnd: (Int) -> Unit,
     val setHold: (Int, Boolean) -> Unit,
-    val setDuoModSource: (Int, ModSource) -> Unit,
+    val setDuoPatch: (Int, DuoPatch) -> Unit,
     val setQuadPitch: (Int, Float) -> Unit,
     val setQuadHold: (Int, Float) -> Unit,
     val setFmStructure: (Boolean) -> Unit,
@@ -47,7 +47,7 @@ data class VoicePanelActions(
             setVoiceTune = {_, _ -> }, setVoiceModDepth = {_, _ -> },
             setDuoModDepth = {_, _ -> }, setDuoSharpness = {_, _ -> },
             setVoiceEnvelopeSpeed = {_, _ -> }, pulseStart = {}, pulseEnd = {},
-            setHold = {_, _ -> }, setDuoModSource = {_, _ -> },
+            setHold = {_, _ -> }, setDuoPatch = {_, _ -> },
             setQuadPitch = {_, _ -> }, setQuadHold = {_, _ -> },
             setFmStructure = {}, setTotalFeedback = {},
             setVoiceCoupling = {}, wobblePulseStart = {_, _, _ -> },

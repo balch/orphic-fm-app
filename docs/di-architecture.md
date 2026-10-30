@@ -293,6 +293,7 @@ qualifier can ride the `binding<...>` type argument; Kotlin's default target set
 | `AndroidAppLifecycleManager` (Orpheus, Android only) | `MixerViewModel` |
 | `DjAppLifecycleManager` (Orphic DJ, Android only) | `PulsarViewModel` |
 | `InAppReviewManager` (Orphic DJ, Android only) | |
+| `DuoPatchPresetSync` (Orpheus) | |
 
 `DistortionViewModel` restores engine ports in `onRestore` too, but is deliberately left
 `startup = false`: it writes `DistortionSymbol.DRIVE` and `MIX`, the same two ports

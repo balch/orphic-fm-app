@@ -227,7 +227,7 @@ private fun DuoLfoControls(
             RotaryKnob(
                 value = uiState.lfoA,
                 onValueChange = actions.setLfoA,
-                label = "RATE 1",
+                label = "RATE A",
                 controlId = DuoLfoSymbol.FREQ_A.controlId.key,
                 size = 56.dp,
                 progressColor = activeColor
@@ -245,7 +245,7 @@ private fun DuoLfoControls(
             RotaryKnob(
                 value = uiState.lfoB,
                 onValueChange = actions.setLfoB,
-                label = "RATE 2",
+                label = "RATE B",
                 controlId = DuoLfoSymbol.FREQ_B.controlId.key,
                 size = 56.dp,
                 progressColor = activeColor

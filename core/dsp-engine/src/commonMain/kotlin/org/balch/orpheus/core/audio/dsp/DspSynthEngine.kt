@@ -16,7 +16,6 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.AudioHostRepair
 import org.balch.orpheus.core.audio.AudioRouteMonitor
 import org.balch.orpheus.core.audio.FadeCurve
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
@@ -193,7 +192,7 @@ class DspSynthEngine(
         )
 
         setupListeners()
-        syncNativeBridgeState()
+        syncFreshNative()
 
         // Initial defaults
         setDelayMix(0f)
@@ -203,7 +202,13 @@ class DspSynthEngine(
         routing.setDrumTriggerSource(2, 0) // HiHat -> Internal (manual only)
     }
 
-    override fun syncToNative() = syncNativeBridgeState()
+    override fun syncToNative() = syncFreshNative()
+
+    /** A new native engine starts with zero patch cells, so it gets every cell on top of the port sync. */
+    private fun syncFreshNative() {
+        syncNativeBridgeState()
+        pluginProvider.voicePlugin.resyncPatches()
+    }
 
     /** Push current voice state to C++ engine so it matches Kotlin on startup. */
     private fun syncNativeBridgeState() {
@@ -239,12 +244,10 @@ class DspSynthEngine(
             // Sync tune with correct MIDI note conversion
             nativeBridge.nativeSetVoiceTune(voiceA, tuneToMidiNote(voiceA, voiceManager.getVoiceTune(voiceA)))
             nativeBridge.nativeSetVoiceTune(voiceA + 1, tuneToMidiNote(voiceA + 1, voiceManager.getVoiceTune(voiceA + 1)))
-            // Sync mod source and depth
-            val modSrc = voiceManager.getDuoModSource(duo)
+            // Sync master mod depth; the patch cells follow the loop
             val modLvl = voiceManager.getDuoModSourceLevel(duo)
-            pluginProvider.voicePlugin.setDuoModSource(duo, modSrc.ordinal)
             pluginProvider.voicePlugin.setDuoModSourceLevel(duo, modLvl)
-            log.debug { "syncNative: duo=$duo engineId=$engineId active=true modSrc=$modSrc modLvl=$modLvl" }
+            log.debug { "syncNative: duo=$duo engineId=$engineId active=true modLvl=$modLvl" }
         }
         // Sync per-quad volume
         for (quad in 0..2) {
@@ -348,11 +351,6 @@ class DspSynthEngine(
                         val voiceA = index * 2
                         nativeBridge.nativeSetVoiceTimbre(voiceA, value)
                         nativeBridge.nativeSetVoiceTimbre(voiceA + 1, value)
-                    }
-                    "duo_mod_source" -> {
-                        val modSourceOrdinal = value as Int
-                        voiceManager.setDuoModSource(index, ModSource.entries[modSourceOrdinal])
-                        pluginProvider.voicePlugin.setDuoModSource(index, modSourceOrdinal)
                     }
                     "duo_engine" -> {
                         val engineId = value as Int
@@ -522,7 +520,7 @@ class DspSynthEngine(
             log.info { "nativeLoadGraph result: $result" }
         }
         // Re-sync port map values after graph load (graph load resets node defaults)
-        syncNativeBridgeState()
+        syncFreshNative()
     }
 
     override fun setVizEnabled(enabled: Boolean) {
@@ -822,7 +820,6 @@ class DspSynthEngine(
         nativeBridge.nativeSetVoiceHold(index, amount)
     }
     override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) = voiceManager.setVoiceWobble(index, wobbleOffset, range)
-    override fun setDuoModSource(duoIndex: Int, source: ModSource) = voiceManager.setDuoModSource(duoIndex, source)
     override fun setFmStructure(crossQuad: Boolean) {
         voiceManager.setFmStructure(crossQuad)
         pluginProvider.voicePlugin.setFmCrossQuad(crossQuad)
@@ -936,7 +933,6 @@ class DspSynthEngine(
     override fun getVoiceFmDepth(index: Int) = voiceManager.getVoiceFmDepth(index)
     override fun getVoiceEnvelopeSpeed(index: Int) = voiceManager.getVoiceEnvelopeSpeed(index)
     override fun getDuoSharpness(duoIndex: Int) = voiceManager.getDuoSharpness(duoIndex)
-    override fun getDuoModSource(duoIndex: Int) = voiceManager.getDuoModSource(duoIndex)
     override fun getQuadPitch(quadIndex: Int) = voiceManager.getQuadPitch(quadIndex)
     override fun getQuadHold(quadIndex: Int) = voiceManager.getQuadHold(quadIndex)
     override fun getQuadVolume(quadIndex: Int) = voiceManager.getQuadVolume(quadIndex)

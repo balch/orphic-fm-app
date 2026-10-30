@@ -3,6 +3,31 @@
 #include <cmath>
 #include <cstring>
 
+// One unsigned decimal field of a patch symbol, terminated by `end`. -1 when malformed.
+static int parse_patch_field(const char** s, char end) {
+    const char* p = *s;
+    int v = 0, digits = 0;
+    while (*p >= '0' && *p <= '9') {
+        if (++digits > 3) return -1;
+        v = v * 10 + (*p - '0');
+        p++;
+    }
+    if (digits == 0 || *p != end) return -1;
+    *s = (end == '\0') ? p : p + 1;
+    return v;
+}
+
+// "p<duo>_<voice>_<src>_<dst>" into cell indices, bounds-checked. No allocation, no sscanf.
+static bool parse_patch_symbol(const char* symbol, int cell[4]) {
+    if (symbol[0] != 'p') return false;
+    const char* s = symbol + 1;
+    for (int f = 0; f < 4; f++) {
+        cell[f] = parse_patch_field(&s, f < 3 ? '_' : '\0');
+        if (cell[f] < 0) return false;
+    }
+    return cell[0] < kNumPanelDuos && cell[1] < 2 && cell[2] < kPatchSources && cell[3] < kPatchDests;
+}
+
 // Hash function matching Kotlin's hash16() and orpheus_graph.cpp's hash16()
 static uint16_t engine_hash16(const char* str) {
     uint16_t h = 0;
@@ -19,6 +44,19 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                              const char* plugin_uri,
                              const char* symbol,
                              float value) {
+    // Duo patch cables: engine atomics only, no graph port
+    if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.patch") == 0) {
+        int cell[4];
+        if (parse_patch_symbol(symbol, cell)) {
+            // NaN/inf would poison the sums. Checked on the bits: -ffast-math folds std::isfinite.
+            uint32_t bits;
+            std::memcpy(&bits, &value, sizeof(bits));
+            float amount = ((bits >> 23) & 0xFFu) != 0xFFu ? value : 0.0f;
+            engine->patch_amount[cell[0]][cell[1]][cell[2]][cell[3]].store(amount, std::memory_order_relaxed);
+        }
+        return;
+    }
+
     // Route through graph if available (raw value — scaled overrides below)
     OrpheusGraph* g = engine->graph.load(std::memory_order_relaxed);
     if (g) {
@@ -27,7 +65,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         orpheus_graph_set_port(g, uh, sh, value);
     }
 
-    // Voice plugin parameters (coupling, mod source/depth, vibrato)
+    // Voice plugin parameters (coupling, mod depth, vibrato)
     {
         static uint16_t h_voice = engine_hash16("org.balch.orpheus.plugins.voice");
         static uint16_t h_coupling = engine_hash16("coupling_depth");
@@ -48,18 +86,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->vibrato_depth.store(value, std::memory_order_relaxed);
                 return;
             }
-            // Per-duo mod source/depth: duo_mod_source_N, duo_mod_source_level_N
-            static uint16_t src_hashes[] = {
-                engine_hash16("duo_mod_source_0"), engine_hash16("duo_mod_source_1"),
-                engine_hash16("duo_mod_source_2"), engine_hash16("duo_mod_source_3"),
-                engine_hash16("duo_mod_source_4"), engine_hash16("duo_mod_source_5")};
+            // Per-duo master patch depth: duo_mod_source_level_N
             static uint16_t lvl_hashes[] = {
                 engine_hash16("duo_mod_source_level_0"), engine_hash16("duo_mod_source_level_1"),
                 engine_hash16("duo_mod_source_level_2"), engine_hash16("duo_mod_source_level_3"),
                 engine_hash16("duo_mod_source_level_4"), engine_hash16("duo_mod_source_level_5")};
             for (int i = 0; i < 6; i++) {
-                if (symbol_hash == src_hashes[i]) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
-                if (symbol_hash == lvl_hashes[i]) { engine->mod_depth[i].store(value, std::memory_order_relaxed); engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == lvl_hashes[i]) { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
             }
 
             // Per-duo voice parameters: engine, sharpness→timbre, harmonics, morph.
@@ -159,23 +192,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->fm_cross_quad.store(static_cast<int>(value), std::memory_order_relaxed);
                 return;
             }
-            // Per-duo parameters: mod_source_N, mod_depth_N, fm_depth_N
-            static uint16_t mod_src_hashes[] = {
-                engine_hash16("mod_source_0"), engine_hash16("mod_source_1"),
-                engine_hash16("mod_source_2"), engine_hash16("mod_source_3"),
-                engine_hash16("mod_source_4"), engine_hash16("mod_source_5")};
+            // Per-duo master patch depth: mod_depth_N
             static uint16_t mod_depth_hashes[] = {
                 engine_hash16("mod_depth_0"), engine_hash16("mod_depth_1"),
                 engine_hash16("mod_depth_2"), engine_hash16("mod_depth_3"),
                 engine_hash16("mod_depth_4"), engine_hash16("mod_depth_5")};
-            static uint16_t fm_depth_hashes[] = {
-                engine_hash16("fm_depth_0"), engine_hash16("fm_depth_1"),
-                engine_hash16("fm_depth_2"), engine_hash16("fm_depth_3"),
-                engine_hash16("fm_depth_4"), engine_hash16("fm_depth_5")};
             for (int i = 0; i < 6; i++) {
-                if (symbol_hash == mod_src_hashes[i]) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
                 if (symbol_hash == mod_depth_hashes[i])  { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
-                if (symbol_hash == fm_depth_hashes[i])  { engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
             }
         }
     }

@@ -25,8 +25,11 @@ import org.balch.orpheus.core.audio.EngineCategory
 import org.balch.orpheus.core.audio.EngineChoice
 import org.balch.orpheus.core.audio.EngineParam
 import org.balch.orpheus.core.audio.EngineSlotKind
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.patch.DuoPatch
+import org.balch.orpheus.core.audio.patch.PatchDest
+import org.balch.orpheus.core.audio.patch.PatchSource
+import org.balch.orpheus.core.audio.patch.VoiceSlot
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.ui.DuoKnobLabel
 import org.balch.orpheus.features.voice.ui.duoKnobLabel
@@ -34,13 +37,14 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.DefaultValueFormatter
 import org.balch.orpheus.ui.widgets.KnobValueFormatter
-import org.balch.orpheus.ui.widgets.ModFaderSelector
+import org.balch.orpheus.ui.widgets.ModDepthFader
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.engine.EnginePicker
 import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
+import org.balch.orpheus.ui.widgets.patch.PatchBayButton
 
 /**
- * A self-contained settings card for one duo with engine picker, mod fader, and knobs.
+ * A self-contained settings card for one duo with engine picker, mod depth fader, PATCH button, and knobs.
  * All contents show/hide together via [showModRow] using AnimatedVisibility.
  * [engine] is the C++ engine id. On DX the harmonics knob locks and opens the picker on DX Patches.
  */
@@ -50,13 +54,13 @@ fun CompactDuoSettingsCard(
     color: Color,
     engine: Int,
     hasNativeEngine: Boolean,
-    modSource: ModSource,
+    patch: DuoPatch,
     modSourceLevel: Float,
     morph: Float,
     harmonics: Float,
     sharpness: Float,
     onEngineChange: (Int) -> Unit,
-    onModSourceChange: (ModSource) -> Unit,
+    onPatchChange: (DuoPatch) -> Unit,
     onModSourceLevelChange: (Float) -> Unit,
     onMorphChange: (Float) -> Unit,
     onHarmonicsChange: (Float) -> Unit,
@@ -64,7 +68,7 @@ fun CompactDuoSettingsCard(
     showModRow: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val modFaderControlId = VoiceSymbol.duoModSource(duoIndex).controlId.key
+    val modFaderControlId = VoiceSymbol.duoModSourceLevel(duoIndex).controlId.key
     val engineId = OrpheusEngineId.fromId(engine) ?: OrpheusEngineId.OSC
     val controller = rememberEnginePickerController()
     val choices = remember(hasNativeEngine) { EngineCatalog.choices(EngineSlotKind.DUO, hasNativeEngine) }
@@ -76,7 +80,7 @@ fun CompactDuoSettingsCard(
         exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
     ) {
         Column {
-            // Row 1: Mod fader + Engine picker
+            // Row 1: Mod depth fader + PATCH + Engine picker
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -84,13 +88,19 @@ fun CompactDuoSettingsCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ModFaderSelector(
+                ModDepthFader(
                     depth = modSourceLevel,
                     onDepthChange = onModSourceLevelChange,
-                    activeSource = modSource,
-                    onSourceChange = onModSourceChange,
                     color = color,
                     controlId = modFaderControlId,
+                )
+                PatchBayButton(
+                    duoIndex = duoIndex,
+                    patch = patch,
+                    engine = engineId,
+                    onPatchChange = onPatchChange,
+                    color = color,
+                    compact = true,
                 )
                 // Keyed on the patch, not the float, so a knob drag doesn't rebuild the choice every frame.
                 val patchIndex = EngineCatalog.patchAt(engineId, harmonics)?.index
@@ -175,13 +185,15 @@ private fun CompactDuoSettingsCardExpandedPreview() {
             color = OrpheusColors.neonMagenta,
             engine = OrpheusEngineId.VA.id,
             hasNativeEngine = true,
-            modSource = ModSource.LFO,
+            patch = DuoPatch()
+                .connect(PatchSource.LFO_A, PatchDest.MORPH, VoiceSlot.BOTH, 0.5f)
+                .connect(PatchSource.WAVES_1, PatchDest.PITCH, VoiceSlot.BOTH, 0.3f),
             modSourceLevel = 0.6f,
             morph = 0.5f,
             harmonics = 0.3f,
             sharpness = 0.7f,
             onEngineChange = {},
-            onModSourceChange = {},
+            onPatchChange = {},
             onModSourceLevelChange = {},
             onMorphChange = {},
             onHarmonicsChange = {},
@@ -201,13 +213,13 @@ private fun CompactDuoSettingsCardDxPreview() {
             color = OrpheusColors.warmGlow,
             engine = OrpheusEngineId.DX2.id,
             hasNativeEngine = true,
-            modSource = ModSource.OFF,
+            patch = DuoPatch(),
             modSourceLevel = 0.0f,
             morph = 0.5f,
             harmonics = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 }.harmonics,
             sharpness = 0.5f,
             onEngineChange = {},
-            onModSourceChange = {},
+            onPatchChange = {},
             onModSourceLevelChange = {},
             onMorphChange = {},
             onHarmonicsChange = {},
@@ -227,13 +239,13 @@ private fun CompactDuoSettingsCardCollapsedPreview() {
             color = OrpheusColors.electricBlue,
             engine = OrpheusEngineId.TRN.id,
             hasNativeEngine = true,
-            modSource = ModSource.OFF,
+            patch = DuoPatch(),
             modSourceLevel = 0.0f,
             morph = 0.5f,
             harmonics = 0.5f,
             sharpness = 0.5f,
             onEngineChange = {},
-            onModSourceChange = {},
+            onPatchChange = {},
             onModSourceLevelChange = {},
             onMorphChange = {},
             onHarmonicsChange = {},

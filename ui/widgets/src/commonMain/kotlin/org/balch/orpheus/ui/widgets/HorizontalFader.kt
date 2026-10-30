@@ -39,7 +39,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.math.roundToInt
 
 /**
- * Generic horizontal fader with the metallic mixer-thumb style from [ModFaderSelector].
+ * Generic horizontal fader with the metallic mixer-thumb style from [ModDepthFader].
  *
  * - **Drag** horizontally to adjust [value] in 0.0–1.0.
  * - Optional [thumbLabel] text is rendered inside the metallic thumb.

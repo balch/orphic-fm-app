@@ -33,9 +33,14 @@ import org.balch.orpheus.core.audio.EngineCategory
 import org.balch.orpheus.core.audio.EngineChoice
 import org.balch.orpheus.core.audio.EngineParam
 import org.balch.orpheus.core.audio.EngineSlotKind
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.VoiceState
+import org.balch.orpheus.core.audio.patch.DuoPatch
+import org.balch.orpheus.core.audio.patch.PatchDest
+import org.balch.orpheus.core.audio.patch.PatchSource
+import org.balch.orpheus.core.audio.patch.VoiceSlot
+import org.balch.orpheus.core.audio.patch.modulatedDests
+import org.balch.orpheus.core.audio.patch.modulatedVoiceDests
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.midi.MidiUiState
@@ -43,12 +48,14 @@ import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.widgets.ModFaderSelector
+import org.balch.orpheus.ui.widgets.ModDepthFader
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.DefaultValueFormatter
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.engine.EnginePicker
 import org.balch.orpheus.ui.widgets.engine.rememberEnginePickerController
+import org.balch.orpheus.ui.widgets.patch.ModDotBox
+import org.balch.orpheus.ui.widgets.patch.PatchBayButton
 import kotlin.math.min
 
 @Composable
@@ -62,7 +69,7 @@ fun DuoVoiceBox(
     sharpness: Float,
     envSpeedA: Float,
     envSpeedB: Float,
-    duoModSource: ModSource,
+    duoPatch: DuoPatch,
     duoEngine: Int,
     duoHarmonics: Float,
     duoMorph: Float,
@@ -78,6 +85,13 @@ fun DuoVoiceBox(
     val engineId = OrpheusEngineId.fromId(duoEngine) ?: OrpheusEngineId.OSC
     val morphLabel = duoKnobLabel(engineId, EngineParam.MORPH, duoHarmonics)
     val sharpLabel = duoKnobLabel(engineId, EngineParam.TIMBRE, duoHarmonics)
+    val modulated = remember(duoPatch, engineId) { duoPatch.modulatedDests(engineId) }
+    val modulatedA = remember(duoPatch, engineId) {
+        modulated.filterTo(mutableSetOf()) { !it.perVoice } + duoPatch.modulatedVoiceDests(engineId, VoiceSlot.A)
+    }
+    val modulatedB = remember(duoPatch, engineId) {
+        modulated.filterTo(mutableSetOf()) { !it.perVoice } + duoPatch.modulatedVoiceDests(engineId, VoiceSlot.B)
+    }
 
     Column(
         modifier =
@@ -108,13 +122,19 @@ fun DuoVoiceBox(
 
             val duoIndex = voiceA / 2
 
-            ModFaderSelector(
+            ModDepthFader(
                 depth = duoModSourceLevel,
                 onDepthChange = { voiceActions.setDuoModSourceLevel(duoIndex, it) },
-                activeSource = duoModSource,
-                onSourceChange = { voiceActions.setDuoModSource(duoIndex, it) },
                 color = color,
-                controlId = VoiceSymbol.duoModSource(duoIndex).controlId.key
+                controlId = VoiceSymbol.duoModSourceLevel(duoIndex).controlId.key
+            )
+
+            PatchBayButton(
+                duoIndex = duoIndex,
+                patch = duoPatch,
+                engine = engineId,
+                onPatchChange = { voiceActions.setDuoPatch(duoIndex, it) },
+                color = color,
             )
         }
 
@@ -141,6 +161,7 @@ fun DuoVoiceBox(
                     tune = voiceStateA.tune,
                     duoMorph = duoMorph,
                     morphLabel = morphLabel,
+                    modulated = modulatedA,
                     envSpeed = envSpeedA,
                     voiceActions = voiceActions,
                 )
@@ -210,6 +231,7 @@ fun DuoVoiceBox(
                     tune = voiceStateB.tune,
                     sharpness = sharpness,
                     sharpLabel = sharpLabel,
+                    modulated = modulatedB,
                     envSpeed = envSpeedB,
                     voiceActions = voiceActions
                 )
@@ -273,6 +295,7 @@ fun DuoVoiceBox(
                 hasNativeEngine = hasNativeEngine,
                 glowEnergy = glowEnergy,
                 showExternalSelection = aiVoiceEngineHighlight,
+                harmonicsModulated = PatchDest.HARMONICS in modulated,
                 voiceActions = voiceActions,
                 pillModifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp),
                 knobModifier = Modifier.align(BiasAlignment(horizontalBias = 0f, verticalBias = -0.4f)),
@@ -295,6 +318,7 @@ internal fun DuoEngineControls(
     glowEnergy: Float,
     showExternalSelection: Boolean,
     voiceActions: VoiceActions,
+    harmonicsModulated: Boolean = false,
     pillModifier: Modifier = Modifier,
     knobModifier: Modifier = Modifier,
 ) {
@@ -321,24 +345,25 @@ internal fun DuoEngineControls(
         pillLabel = (current as? EngineChoice.Patch)?.patch?.engine?.name,
         modifier = pillModifier.capWidth(),
     )
-    RotaryKnob(
-        value = harmonics,
-        onValueChange = { voiceActions.setDuoHarmonics(duoIndex, it) },
-        label = harmonicsLabel.short,
-        caption = harmonicsLabel.glyph,
-        longLabel = harmonicsLabel.long,
-        locked = harmonicsLabel.locked,
-        onLockedClick = { controller.open(EngineCategory.DX_PATCHES) },
-        valueFormatter = if (harmonicsLabel.locked) {
-            { v -> EngineCatalog.patchAt(engineId, v)?.let { "#${it.index + 1}" } ?: "" }
-        } else {
-            DefaultValueFormatter
-        },
-        size = 28.dp,
-        progressColor = color,
-        labelColor = if (harmonicsLabel.active) color else color.copy(alpha = 0.4f),
-        modifier = knobModifier.capWidth(),
-    )
+    ModDotBox(PatchDest.HARMONICS, harmonicsModulated, color, knobModifier.capWidth()) {
+        RotaryKnob(
+            value = harmonics,
+            onValueChange = { voiceActions.setDuoHarmonics(duoIndex, it) },
+            label = harmonicsLabel.short,
+            caption = harmonicsLabel.glyph,
+            longLabel = harmonicsLabel.long,
+            locked = harmonicsLabel.locked,
+            onLockedClick = { controller.open(EngineCategory.DX_PATCHES) },
+            valueFormatter = if (harmonicsLabel.locked) {
+                { v -> EngineCatalog.patchAt(engineId, v)?.let { "#${it.index + 1}" } ?: "" }
+            } else {
+                DefaultValueFormatter
+            },
+            size = 28.dp,
+            progressColor = color,
+            labelColor = if (harmonicsLabel.active) color else color.copy(alpha = 0.4f),
+        )
+    }
 }
 
 /**
@@ -375,7 +400,9 @@ fun DuoVoiceBoxPreview() {
             sharpness = voiceState.duoSharpness[0],
             envSpeedA = voiceState.voiceEnvelopeSpeeds[0],
             envSpeedB = voiceState.voiceEnvelopeSpeeds[1],
-            duoModSource = voiceState.duoModSources[0],
+            duoPatch = DuoPatch()
+                .connect(PatchSource.LFO_A, PatchDest.MORPH, VoiceSlot.BOTH, 0.5f)
+                .connect(PatchSource.WAVES_1, PatchDest.PITCH, VoiceSlot.BOTH, 0.3f),
             duoEngine = voiceState.duoEngines[0],
             duoHarmonics = voiceState.duoHarmonics[0],
             duoMorph = voiceState.duoMorphs[0],
@@ -408,7 +435,7 @@ fun DuoVoiceBoxDxPreview() {
             sharpness = voiceState.duoSharpness[1],
             envSpeedA = voiceState.voiceEnvelopeSpeeds[2],
             envSpeedB = voiceState.voiceEnvelopeSpeeds[3],
-            duoModSource = voiceState.duoModSources[1],
+            duoPatch = DuoPatch().connect(PatchSource.FLUX_X1, PatchDest.ENV, VoiceSlot.BOTH, 0.4f),
             duoEngine = OrpheusEngineId.DX2.id,
             duoHarmonics = ePiano.harmonics,
             duoMorph = voiceState.duoMorphs[1],

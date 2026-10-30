@@ -1,6 +1,7 @@
 // MI module unit tests: Clock, Grids, Marbles, Looper, Bender, Per-String Bender,
 // Voice Coupling, FM Modulation
 #include "test_harness.h"
+#include "patch_test_helpers.h"
 
 static bool test_clock() {
     printf("\n=== Test: Clock pulse accuracy ===\n");
@@ -328,8 +329,8 @@ static bool test_fm_modulation() {
     engine->voice_params[1].ever_triggered.store(1);
     engine->voice_params[1].engine_index.store(-1);
 
-    engine->mod_source[0].store(0); // VOICE_FM
-    engine->fm_depth[0].store(0.5f);
+    set_legacy_patch(engine, 0, kLegacyVoiceFm, false);
+    engine->mod_depth[0].store(0.5f);
 
     GraphUnit v0 = {}, v1 = {};
     v0.type = UNIT_PLAITS; v0.enabled = true;
@@ -451,8 +452,8 @@ static bool test_duo_voice_fm() {
     engine->voice_params[1].decay.store(0.0f);
 
     // Enable VOICE_FM cross-modulation for duo 0
-    engine->mod_source[0].store(0);  // VOICE_FM
-    engine->fm_depth[0].store(0.5f);
+    set_legacy_patch(engine, 0, kLegacyVoiceFm, false);
+    engine->mod_depth[0].store(0.5f);
 
     GraphUnit duo_unit = {};
     duo_unit.type = UNIT_DUO_VOICE;

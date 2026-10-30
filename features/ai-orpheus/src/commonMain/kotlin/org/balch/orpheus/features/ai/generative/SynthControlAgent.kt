@@ -264,7 +264,7 @@ class SynthControlAgent(
         if (voiceMatch != null) return voiceMatch.groupValues[1].toInt() / 4
 
         // Duo controls (0-indexed) → quad N/2
-        val duoMatch = Regex("voice_(?:duo_mod_source|duo_sharpness|duo_engine|duo_harmonics|duo_morph|duo_mod_source_level)_(\\d+)").find(id)
+        val duoMatch = Regex("voice_(?:duo_sharpness|duo_engine|duo_harmonics|duo_morph|duo_mod_source_level)_(\\d+)").find(id)
         if (duoMatch != null) return duoMatch.groupValues[1].toInt() / 2
 
         // Global/effect controls (voice_vibrato, distortion_*, delay_*, resonator_*, warps_*, etc.)

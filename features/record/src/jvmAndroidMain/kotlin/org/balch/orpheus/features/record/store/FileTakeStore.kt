@@ -6,6 +6,7 @@ import org.balch.orpheus.core.presets.PresetJson
 import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.features.record.telemetry.TakeTelemetry
 import org.balch.orpheus.features.record.telemetry.TelemetryJson
+import org.balch.orpheus.features.record.telemetry.decodeTelemetry
 import java.io.File
 
 /** Takes live in `<root>/<take-id>/{audio.wav,preset.json,telemetry.json}`. */
@@ -39,7 +40,7 @@ class FileTakeStore(private val root: File) : TakeStore {
     }
 
     private fun telemetryDuration(dir: File): Float? = runCatching {
-        TelemetryJson.decodeFromString<TakeTelemetry>(File(dir, TELEMETRY_FILE).readText()).durationSec
+        decodeTelemetry(File(dir, TELEMETRY_FILE).readText()).durationSec
     }.getOrNull()
 
     private fun wavDuration(wav: File): Float? =

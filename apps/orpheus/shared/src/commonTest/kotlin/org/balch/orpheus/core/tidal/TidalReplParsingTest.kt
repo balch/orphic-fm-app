@@ -38,6 +38,7 @@ class TidalReplParsingTest {
             dispatcherProvider,
             globalTempo,
             scope,
+            NoOpDuoPatchBay(),
         )
         repl = TidalRepl(scheduler, dispatcherProvider, scope)
     }

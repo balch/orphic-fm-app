@@ -21,7 +21,7 @@ structure, total feedback, vibrato, and voice coupling.
 **Setup:**
 
 1. Cross-quad toggle OFF (default)
-2. Set duo pairs to FM mod source
+2. On each duo pair, open PATCH and drag VOICE_FM to the FM knob
 3. Set FM depth to 50%
 
 **Procedure:**
@@ -51,7 +51,7 @@ structure, total feedback, vibrato, and voice coupling.
 **Setup:**
 
 1. Enable cross-quad toggle (34→56, 78→12)
-2. All duo pairs set to FM mod source
+2. On each duo pair, open PATCH and drag VOICE_FM to the FM knob
 3. FM depth 50%
 
 **Procedure:**

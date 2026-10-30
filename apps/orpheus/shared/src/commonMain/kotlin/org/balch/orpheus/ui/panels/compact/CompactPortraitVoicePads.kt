@@ -23,8 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.patch.DuoPatch
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoicePanelActions
@@ -189,13 +189,13 @@ private fun DuoVoiceColumn(
                     color = config.color,
                     engine = voiceState.duoEngines.getOrElse(config.duoIndex) { OrpheusEngineId.OSC.id },
                     hasNativeEngine = voiceState.hasNativeEngine,
-                    modSource = voiceState.duoModSources.getOrElse(config.duoIndex) { ModSource.OFF },
+                    patch = voiceState.duoPatches.getOrElse(config.duoIndex) { DuoPatch() },
                     modSourceLevel = voiceState.duoModSourceLevels.getOrElse(config.duoIndex) { 0f },
                     morph = voiceState.duoMorphs.getOrElse(config.duoIndex) { 0f },
                     harmonics = voiceState.duoHarmonics.getOrElse(config.duoIndex) { 0.5f },
                     sharpness = voiceState.duoSharpness.getOrElse(config.duoIndex) { 0f },
                     onEngineChange = { actions.setDuoEngine(config.duoIndex, it) },
-                    onModSourceChange = { actions.setDuoModSource(config.duoIndex, it) },
+                    onPatchChange = { actions.setDuoPatch(config.duoIndex, it) },
                     onModSourceLevelChange = { actions.setDuoModSourceLevel(config.duoIndex, it) },
                     onMorphChange = { actions.setDuoMorph(config.duoIndex, it) },
                     onHarmonicsChange = { actions.setDuoHarmonics(config.duoIndex, it) },

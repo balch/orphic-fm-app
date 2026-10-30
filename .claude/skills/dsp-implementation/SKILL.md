@@ -328,6 +328,6 @@ task yourself and commit the result.
 | No parameter smoothing on mix | Click/pop when toggling module | Use `smooth_coeff()` per-sample ramp |
 | Normalization too loose (e.g., [-5,+5]) | Destroys downstream pitch/timbre | Calibrate to [-1.1, +1.1] post-norm |
 | Reading atomics inside sample loop | Unnecessary overhead | Read once per block into local vars |
-| Unconditional modulation routing | Module affects others without user consent | Gate by explicit mod source selector |
+| Unconditional modulation routing | Module affects others without user consent | Gate by a patch cell: route the source through the duo patch matrix (amount 0 = off), never on a mix level alone |
 | Hash string mismatch with Kotlin symbol | `set_port` silently drops parameter | Match `engine_hash16("symbol")` to `PortSymbol.symbol` exactly |
 | Forgot to re-export ODWG after wiring change | `jvmTest` fails with an ODWG drift error | Run `./gradlew :core:dsp-engine:exportOdwg` and commit the result |
