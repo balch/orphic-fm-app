@@ -416,7 +416,8 @@ class DspSynthEngine(
 
             override fun onGlobalParamChange(param: String, value: Any) {
                 when (param) {
-                    "fm_structure" -> voiceManager.setFmStructure(value as Boolean)
+                    // Through setFmStructure so C++ fm_cross_quad follows the toggle live.
+                    "fm_structure" -> setFmStructure(value as Boolean)
                     "total_feedback" -> setTotalFeedback(value as Float)
                     "vibrato" -> setVibrato(value as Float)
                     "coupling" -> voiceManager.setVoiceCoupling(value as Float)
