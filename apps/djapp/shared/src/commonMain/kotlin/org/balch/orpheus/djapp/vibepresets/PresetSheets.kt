@@ -243,7 +243,7 @@ internal fun ManagePresetsSheet(
             }
             ManageRow(highlighted = target == null, onClick = { highlight(null) }) {
                 Spacer(Modifier.size(12.dp))
-                RowName(ORIGINAL_LABEL, color = PresetMuted)
+                RowName(originalLabel(state.vibeName), color = PresetMuted)
             }
             SheetButtons {
                 val editing = renaming

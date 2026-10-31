@@ -74,12 +74,14 @@ internal const val MANAGE_DESCRIPTION = "Manage presets"
 internal const val PRESETS_TOGGLE_LABEL = "SAVES"
 internal const val PRESET_DOT_PREFIX = "Preset "
 internal const val NOW_DOT_DESCRIPTION = "Unsaved changes"
-internal const val ORIGINAL_LABEL = "Vibe's original"
 internal const val DISCARD_PROMPT = "Discard changes?"
 internal const val DISCARD_LABEL = "DISCARD"
 internal const val CANCEL_LABEL = "CANCEL"
 internal const val SHOW_SAVES_DESCRIPTION = "Show saves"
 internal const val HIDE_SAVES_DESCRIPTION = "Hide saves"
+
+/** The vibe's original, e.g. "Bell Tolls - OG". */
+internal fun originalLabel(vibeName: String): String = "$vibeName - OG"
 
 private val DotSize = 14.dp
 // Wider than the dot, so a thumb hits it; the joining line runs through the gap.
@@ -159,7 +161,7 @@ internal fun VibePresetBar(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             PresetDot(
-                description = ORIGINAL_LABEL,
+                description = originalLabel(state.vibeName),
                 color = PresetPurple,
                 selected = selected == null,
                 joinStart = false,
@@ -208,7 +210,7 @@ internal fun VibePresetBar(
                 }
             } else {
                 Text(
-                    text = selected?.name ?: ORIGINAL_LABEL,
+                    text = selected?.name ?: originalLabel(state.vibeName),
                     color = if (selected != null) PresetTeal else PresetPurple,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
