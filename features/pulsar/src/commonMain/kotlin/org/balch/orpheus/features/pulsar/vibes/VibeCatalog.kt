@@ -94,10 +94,9 @@ object VibeCatalog {
 
     /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
     private val entryList: List<Pair<VibeName, CatalogEntry>> = listOf(
-        VibeNames.WHALES_DREAM to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient", "psych")),
         VibeNames.ORPHIC_LORE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "wah", "psych")),
-        VibeNames.BELL_TOLLS to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         VibeNames.DOG_HOUSE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),
+        VibeNames.BELL_TOLLS to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         VibeNames.FILTER_FUNK to CatalogEntry(VibeStatus.LIVE, tags = listOf("funk")),
         VibeNames.FIRE_SKY to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff")),
         VibeNames.SPACE_AND_DRUMS to CatalogEntry(VibeStatus.LIVE, tags = listOf("space")),
@@ -109,6 +108,7 @@ object VibeCatalog {
         VibeNames.STAY_ASLEEP to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff", "blues", "minimal", "cinematic")),
 
 // -----------------------------
+        VibeNames.WHALES_DREAM to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient", "psych")),
         VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         VibeNames.FIRE_SKY_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         VibeNames.RUST_BELT_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
