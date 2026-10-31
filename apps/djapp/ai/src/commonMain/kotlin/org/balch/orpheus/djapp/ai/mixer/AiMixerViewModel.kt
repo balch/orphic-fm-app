@@ -43,6 +43,8 @@ import org.balch.orpheus.djapp.ai.tools.MixCaptureTool
 import org.balch.orpheus.djapp.ai.tools.VIBE_LOADING
 import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.SectionReadout
+import org.balch.orpheus.features.pulsar.sectionReadout
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.EngineKnob
@@ -169,6 +171,18 @@ class AiMixerViewModel(
     }.flowOn(dispatchers.default)
 
     override val agentEdits: Flow<MixControl> = collab.agentEdits
+
+    override val sectionReadout: Flow<SectionReadout?> = pulsarFeature.actions.let { a ->
+        // RANDOM is pre-rolled here, so the final-section suffix names the style that will fire.
+        val pending = combine(a.songEndingEnabled, a.resolvedTransitionStyle) { on, style -> if (on) style else null }
+        combine(pulsarFeature.arrangementStateFlow, pulsarFeature.vibeFlow, a.activeTransition, a.finalSectionIndex, pending) {
+            arr, vibe, active, final, pend ->
+            sectionReadout(vibe.arrangement?.sections?.getOrNull(arr.sectionIndex)?.name, arr, active, final, pend)
+        }
+            // The arrangement emits on every score tick; the line changes once a bar.
+            .distinctUntilChanged()
+            .flowOn(dispatchers.default)
+    }
 
     override val actions = AiMixerActions(
         setLevelDb = { t, db -> edit(MixControl.Level(t), onDone = ::refuse) { setHeardLevelDb(t, db.coerceIn(MIN_DB, MAX_DB)) } },
@@ -338,12 +352,14 @@ class AiMixerViewModel(
             state: AiMixerUiState = AiMixerUiState(),
             meters: MeterSnapshot,
             agentEdits: Flow<MixControl> = emptyFlow(),
+            sectionReadout: SectionReadout? = null,
         ): AiMixerFeature =
             object : AiMixerFeature {
                 override val stateFlow: StateFlow<AiMixerUiState> = MutableStateFlow(state)
                 override val actions: AiMixerActions = AiMixerActions.EMPTY
                 override val meters: Flow<MeterSnapshot> = MutableStateFlow(meters)
                 override val agentEdits: Flow<MixControl> = agentEdits
+                override val sectionReadout: Flow<SectionReadout?> = MutableStateFlow(sectionReadout)
             }
 
         @Composable
