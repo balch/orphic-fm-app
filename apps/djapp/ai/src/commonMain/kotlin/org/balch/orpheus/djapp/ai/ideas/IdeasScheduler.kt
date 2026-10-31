@@ -17,12 +17,14 @@ import kotlinx.coroutines.launch
  * When the ideas strip refreshes: as each agent turn ends, and once [pauseMs] pass after the user's last mixer
  * move. Never while a turn runs, and one call at a time: triggers that land during a call run once after it,
  * with the latest input. [clock] reads milliseconds on the same timeline as [scope]'s delays.
+ * Nothing is called while inactive: the strip is folded, so ideas are on demand ([setActive]).
  */
 class IdeasScheduler(
     private val scope: CoroutineScope,
     private val generator: IdeasGenerator,
     private val clock: () -> Long,
     private val pauseMs: Long = 4_000,
+    private var active: Boolean = false,
 ) {
     private val log = logging("IdeasScheduler")
     private val lock = SynchronizedObject()
@@ -35,7 +37,26 @@ class IdeasScheduler(
     private var pauseInput: (() -> IdeasInput)? = null
     private var pauseJob: Job? = null
     private var calling = false
+    private var callJob: Job? = null
     private var followUp: (() -> IdeasInput)? = null
+
+    /**
+     * Opening asks for a fresh set now, or at the running turn's end. Closing drops every pending refresh and
+     * cancels the call in flight; the last ideas stay for the next open.
+     */
+    fun setActive(on: Boolean, input: () -> IdeasInput) = synchronized(lock) {
+        if (on == active) return@synchronized
+        active = on
+        if (on) {
+            if (!turnRunning) request(input)
+        } else {
+            dropPause()
+            followUp = null
+            callJob?.cancel()
+            callJob = null
+            calling = false
+        }
+    }
 
     /** Drops a pending pause refresh; a call already in flight still publishes. */
     fun onTurnStarted() = synchronized(lock) {
@@ -50,12 +71,12 @@ class IdeasScheduler(
     fun onTurnEnded(input: () -> IdeasInput) = synchronized(lock) {
         turnRunning = false
         dropPause()
-        request(input)
+        if (active) request(input)
     }
 
     /** A user move restarts the pause; [input] is read when the refresh runs. Moves during a turn wait for its end. */
     fun onUserMove(input: () -> IdeasInput) = synchronized(lock) {
-        if (turnRunning) return@synchronized
+        if (turnRunning || !active) return@synchronized
         lastMoveAtMs = clock()
         pauseInput = input
         if (pauseJob?.isActive != true) pauseJob = scope.launch { awaitPause() }
@@ -80,7 +101,7 @@ class IdeasScheduler(
             val input = pauseInput
             pauseInput = null
             pauseJob = null
-            if (input != null && !turnRunning) request(input)
+            if (input != null && !turnRunning && active) request(input)
         }
     }
 
@@ -91,26 +112,35 @@ class IdeasScheduler(
             return
         }
         calling = true
-        scope.launch { runCalls(input) }
+        callJob = scope.launch { runCalls(input) }
     }
 
     private suspend fun runCalls(first: () -> IdeasInput) {
+        val self = currentCoroutineContext()[Job]
         var input = first
         try {
             while (true) {
                 val fresh = generate(input)
-                if (fresh.isNotEmpty()) _ideas.value = fresh
                 input = synchronized(lock) {
+                    // A close cancelled this call; a reopen may already have started another.
+                    if (callJob !== self) return
+                    if (fresh.isNotEmpty()) _ideas.value = fresh
                     val next = followUp
                     followUp = null
-                    if (next == null) calling = false
+                    if (next == null) {
+                        calling = false
+                        callJob = null
+                    }
                     next
                 } ?: return
             }
         } catch (e: CancellationException) {
             synchronized(lock) {
-                calling = false
-                followUp = null
+                if (callJob === self) {
+                    calling = false
+                    callJob = null
+                    followUp = null
+                }
             }
             throw e
         }

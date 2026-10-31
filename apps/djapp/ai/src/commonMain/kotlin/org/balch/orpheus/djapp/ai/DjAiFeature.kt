@@ -139,6 +139,7 @@ data class SongPasteRef(val id: String, val lines: Int, val title: String?)
  * @property sheetMode Chat alone or the Mixer beside it.
  * @property queued Messages sent while a turn runs; they go as one prompt when it ends.
  * @property ideas The ideas strip's cards.
+ * @property ideasOpen Whether the ideas strip is unfolded; the AI makes ideas only while it is.
  * @property mixerVisible Whether the Mixer is on screen, so the agent may change the mix.
  * @property pins Track indices the user pinned.
  * @property recapNext The next prompt opens with a recap: a cancel or an error took the agent's history.
@@ -163,6 +164,7 @@ data class DjAiUiState(
     val sheetMode: AiSheetMode = AiSheetMode.CHAT,
     val queued: List<String> = emptyList(),
     val ideas: List<Idea> = emptyList(),
+    val ideasOpen: Boolean = false,
     val mixerVisible: Boolean = false,
     val pins: Set<Int> = emptySet(),
     /** Estimated USD the AI has spent since the app started, by model id; a model that spent nothing is absent. */
@@ -207,6 +209,8 @@ data class DjAiPanelActions(
     val setSheetOpen: (Boolean) -> Unit,
     /** Send an idea's prompt as the next message. */
     val tryIdea: (Idea) -> Unit,
+    /** Unfold or fold the ideas strip; folded, the AI makes no ideas. */
+    val setIdeasOpen: (Boolean) -> Unit,
 ) {
     companion object {
         val EMPTY = DjAiPanelActions(
@@ -226,6 +230,7 @@ data class DjAiPanelActions(
             setMixerVisible = {},
             setSheetOpen = {},
             tryIdea = {},
+            setIdeasOpen = {},
         )
     }
 }

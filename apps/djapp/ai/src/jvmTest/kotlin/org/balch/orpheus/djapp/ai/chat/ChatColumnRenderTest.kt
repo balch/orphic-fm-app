@@ -54,6 +54,7 @@ class ChatColumnRenderTest {
             Idea("Push the hats wider", "Push the hats wider", mix = true),
             Idea("Add a breakdown before the drop", "Add a breakdown before the drop", mix = false),
         ),
+        ideasOpen = true,
     )
 
     @Test

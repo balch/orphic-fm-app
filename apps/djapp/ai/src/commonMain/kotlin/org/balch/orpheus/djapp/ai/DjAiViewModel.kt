@@ -213,8 +213,9 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
 }
 
 /**
- * A mixer move joins the chat; a USER move starts the ideas pause only while the AI sheet is open. Moves from the
- * small Mix panel, the Pulsar knobs or MIDI with the sheet closed cost no ideas call.
+ * A mixer move joins the chat; a USER move starts the ideas pause only while the AI sheet is open (and the scheduler
+ * drops it while the strip is folded). Moves from the small Mix panel, the Pulsar knobs or MIDI with the sheet closed
+ * cost no ideas call.
  */
 internal fun onMixMove(move: MixMove, sheetOpen: Boolean, chat: DjAiChat, ideas: IdeasScheduler, input: () -> IdeasInput) {
     chat.onMove(move)
@@ -440,6 +441,11 @@ class DjAiViewModel(
 
     private fun tryIdea(idea: Idea) = chat.send(idea.prompt, _uiState.value.reference, label = idea.text)
 
+    private fun setIdeasOpen(open: Boolean) {
+        _uiState.update { it.copy(ideasOpen = open) }
+        ideas.setActive(open, ::ideasInput)
+    }
+
     private fun attachReference(text: String) = references.attach(text)
 
     private fun detachReference() = references.detach()
@@ -506,6 +512,7 @@ class DjAiViewModel(
         setMixerVisible = collab::setMixerVisible,
         setSheetOpen = { sheetOpen.value = it },
         tryIdea = ::tryIdea,
+        setIdeasOpen = ::setIdeasOpen,
     )
 
     companion object {
