@@ -829,7 +829,6 @@ internal fun SectionChips(
     onLoop: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     flashes: AgentFlashes? = null,
-    trailing: (@Composable () -> Unit)? = null,
     underLastChip: (@Composable () -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
@@ -866,7 +865,6 @@ internal fun SectionChips(
                     )
                 }
             }
-            trailing?.invoke()
         }
         if (underLastChip != null) {
             // Read at measure time, so a scroll or a new bar moves only this line.

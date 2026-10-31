@@ -281,8 +281,7 @@ private fun WideMixer(
                             knobSize = knobSize,
                             knobWidth = knobWidth,
                             flashes = flashes,
-                            chipsTrailing = if (beside) null else scopeToggle,
-                            underChips = if (beside) scopeToggle else null,
+                            aboveChips = scopeToggle,
                             underLastChip = { SectionReadoutLine(readout) },
                         )
                         if (state.sectionScope) SectionPanNote()
@@ -369,8 +368,7 @@ private fun WideHeader(
 
 /**
  * The macro knobs and the section chips: one row when [beside], else knobs (scrolling if cramped) over chips.
- * [chipsTrailing] ends the chips' row; [underChips] goes right under it either way; [underLastChip] sits below the
- * chips, right-aligned to the last one.
+ * [aboveChips] goes right over the chips' row either way; [underLastChip] sits below it, right-aligned to the last chip.
  */
 @Composable
 internal fun KnobsAndChips(
@@ -380,8 +378,7 @@ internal fun KnobsAndChips(
     knobSize: Dp,
     knobWidth: Dp = 88.dp,
     flashes: AgentFlashes? = null,
-    chipsTrailing: (@Composable () -> Unit)? = null,
-    underChips: (@Composable () -> Unit)? = null,
+    aboveChips: (@Composable () -> Unit)? = null,
     underLastChip: (@Composable () -> Unit)? = null,
 ) {
     @Composable
@@ -393,15 +390,14 @@ internal fun KnobsAndChips(
         actions.setLoop,
         Modifier.fillMaxWidth(),
         flashes = flashes,
-        trailing = chipsTrailing,
         underLastChip = underLastChip,
     )
     if (beside) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KNOBS_CHIPS_GAP)) {
             MixerMacroKnobs(state.macros, actions.setMacro, knobSize = knobSize, knobWidth = knobWidth, flashes = flashes)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                aboveChips?.invoke()
                 chips()
-                underChips?.invoke()
             }
         }
     } else {
@@ -414,8 +410,8 @@ internal fun KnobsAndChips(
                 knobWidth = knobWidth,
                 flashes = flashes,
             )
+            aboveChips?.invoke()
             chips()
-            underChips?.invoke()
         }
     }
 }
