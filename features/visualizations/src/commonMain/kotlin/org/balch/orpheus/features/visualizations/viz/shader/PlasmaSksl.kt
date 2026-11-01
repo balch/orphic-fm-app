@@ -3,8 +3,8 @@ package org.balch.orpheus.features.visualizations.viz.shader
 /**
  * The Orphogram and Orphograph shaders: loud regions melt into glossy plasma (metaball-style
  * dome shading, rim glow, a halo outside the surface) over a dark void with faint drifting
- * nebula and stars. Colour follows pitch: bass orange and magenta, mids violet and pink, highs
- * electric blue and cyan. Valid as SkSL and AGSL.
+ * nebula and stars. Colour follows pitch: bass indigo and violet, mids hot pink, highs electric
+ * blue and cyan, with a cyan rim light. Valid as SkSL and AGSL.
  */
 object PlasmaSksl {
 
@@ -36,14 +36,14 @@ float fbm(float2 p) {
     return s;
 }
 
-// 0 = lowest pitch, 1 = highest
+// 0 = lowest pitch, 1 = highest: indigo bass through violet and hot pink to electric blue and cyan highs.
 float3 pitchHue(float t) {
     float s = clamp(t, 0.0, 1.0) * 5.0;
-    if (s < 1.0) return mix(float3(1.0, 0.38, 0.19), float3(1.0, 0.0, 1.0), s);
-    if (s < 2.0) return mix(float3(1.0, 0.0, 1.0), float3(0.67, 0.25, 1.0), s - 1.0);
-    if (s < 3.0) return mix(float3(0.67, 0.25, 1.0), float3(1.0, 0.41, 0.71), s - 2.0);
-    if (s < 4.0) return mix(float3(1.0, 0.41, 0.71), float3(0.0, 0.5, 1.0), s - 3.0);
-    return mix(float3(0.0, 0.5, 1.0), float3(0.0, 0.96, 1.0), s - 4.0);
+    if (s < 1.0) return mix(float3(0.15, 0.0, 0.6), float3(0.5, 0.1, 1.0), s);
+    if (s < 2.0) return mix(float3(0.5, 0.1, 1.0), float3(0.8, 0.2, 1.0), s - 1.0);
+    if (s < 3.0) return mix(float3(0.8, 0.2, 1.0), float3(1.0, 0.2, 0.8), s - 2.0);
+    if (s < 4.0) return mix(float3(1.0, 0.2, 0.8), float3(0.2, 0.6, 1.0), s - 3.0);
+    return mix(float3(0.2, 0.6, 1.0), float3(0.0, 1.0, 1.0), s - 4.0);
 }
 
 // The void: near-black violet, slow nebula drift, a sparse twinkle of stars.
@@ -68,7 +68,8 @@ float3 plasma(float3 hue, float gx, float gy, float depth) {
     float bounce = pow(max(dot(r, normalize(float3(0.6, -0.5, 0.6))), 0.0), 6.0) * 0.25;
     float rim = (1.0 - n.z) * (1.0 - n.z);
     float3 white = mix(float3(1.0), hue, 0.5);
-    return hue * (0.25 + 0.8 * diff) + hue * (rim * 1.2 + bounce) + white * sheen + white * pow(dome, 4.0) * 0.3;
+    // The rim light leans cyan, so every tube carries a blue edge like a plasma globe's.
+    return hue * (0.25 + 0.8 * diff) + mix(hue, float3(0.2, 0.9, 1.0), 0.6) * rim * 1.2 + hue * bounce + white * sheen + white * pow(dome, 4.0) * 0.3;
 }
 """
 
