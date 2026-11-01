@@ -6,7 +6,8 @@ Helper scripts for the `r8-analyzer` skill (Path A, quantitative).
 
 ```bash
 ./scripts/r8/analyze.sh                                # orpheus android
-./scripts/r8/analyze.sh :apps:djapp:androidApp:assembleRelease   # dj android
+./scripts/r8/analyze.sh :apps:djapp:androidApp:assembleOgRelease -Porphic.liveVibesOnly=true   # dj android (OG)
+./scripts/r8/analyze.sh :apps:djapp:androidApp:assembleAiRelease  # dj android (AI)
 ```
 
 Requires Python 3 with `protobuf` (`pip3 install protobuf`).

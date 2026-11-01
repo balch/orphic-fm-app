@@ -63,8 +63,18 @@ Tag-message structure mirrors what ends up in the GitHub release body. Keep bull
 `assembleRelease` tasks build *every* release variant, so name the flavor explicitly:
 
 ```bash
-./gradlew :apps:djapp:androidApp:bundleOgRelease
+./gradlew :apps:djapp:androidApp:bundleOgRelease -Porphic.liveVibesOnly=true
 ```
+
+**OG ships only LIVE vibes, so every OG release build passes `-Porphic.liveVibesOnly=true`.** It drops the
+non-LIVE vibe sources from `features:pulsar`. `preOgReleaseBuild` fails without it, and
+`bundleOgRelease` / `assembleOgRelease` run `verifyOgReleaseHasOnlyLiveVibes`, which checks the R8
+mapping for leftover non-LIVE vibe classes. The AI edition is the opposite (it ships every vibe and
+fails with the switch), so build OG and AI in **separate Gradle runs**, never one invocation.
+For the same reason a whole-module `build` or `assemble` of `:apps:djapp:androidApp` (or a root
+`build`/`assemble` that covers both `:apps:djapp:shared` and `:apps:djapp:ai`) can't pass in one
+run; use the per-edition tasks. `jvmTest`, `compileKotlinJvm`, `allTests` and `:apps:djapp:androidApp:lint`
+don't touch the release guards.
 
 Output: `apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-v1.X.Y-og-release.aab`
 
@@ -76,7 +86,7 @@ This is the file you upload to Play Console. Signed with the release keystore if
 ### 4. Build the APK (sideload distribution)
 
 ```bash
-./gradlew :apps:djapp:androidApp:assembleOgRelease
+./gradlew :apps:djapp:androidApp:assembleOgRelease -Porphic.liveVibesOnly=true
 ```
 
 Output: `apps/djapp/androidApp/build/outputs/apk/og/release/djapp-v1.X.Y-og-release.apk`
@@ -88,7 +98,7 @@ freshly-built file is faster than guessing.
 This is a **single universal APK** containing both `arm64-v8a` and `x86_64` ABIs (the convention plugin sets `abiFilters` but no `splits.abi` block, so they go in one file). Friendlier than per-ABI APKs for testers who don't know their architecture. Typically ~8–9 MB.
 
 The two builds reuse most intermediates, so running them back-to-back works:
-`./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease`.
+`./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease -Porphic.liveVibesOnly=true`.
 
 ### 5. Push the tag
 
@@ -118,7 +128,7 @@ go to the **`internal`** and **`production`** tracks. Upload to internal, then p
 versionCode to production so both tracks carry identical bytes:
 
 ```bash
-./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal
+./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal -Porphic.liveVibesOnly=true
 ./gradlew --no-configuration-cache :apps:djapp:androidApp:promoteOgReleaseArtifact \
   --from-track internal --promote-track production --version-code <N> --release-status completed
 ```
@@ -187,7 +197,7 @@ recreating).
 xcodegen generate --spec apps/djapp/iosApp/project.yml --project apps/djapp/iosApp
 
 # 2. Build the shared KMP framework for device, Release configuration.
-./gradlew --no-configuration-cache :apps:djapp:shared:linkReleaseFrameworkIosArm64
+./gradlew --no-configuration-cache :apps:djapp:shared:linkReleaseFrameworkIosArm64 -Porphic.liveVibesOnly=true
 
 # 3. Compute versions from git — same source of truth as Android, see the "iOS mirrors
 #    Android versioning" note below.
@@ -409,7 +419,7 @@ EOF
 git push origin v1.X.Y --force
 
 # 3. Rebuild artifacts at the new SHA and re-publish them to Google Play / TestFlight.
-./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease
+./gradlew :apps:djapp:androidApp:bundleOgRelease :apps:djapp:androidApp:assembleOgRelease -Porphic.liveVibesOnly=true
 
 # 4. Edit the release notes on GitHub to mention the new change.
 gh release edit v1.X.Y --notes "$(cat <<'EOF'
@@ -475,12 +485,12 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | List recent tags | `git tag --sort=-creatordate \| head -10` |
 | Show tag annotation | `git for-each-ref refs/tags/vX.Y.Z --format="%(contents)"` |
 | Commits since last tag | `git log vX.Y.Z..HEAD --oneline` |
-| Build AAB (shipping flavor) | `./gradlew :apps:djapp:androidApp:bundleOgRelease` |
-| Build universal APK | `./gradlew :apps:djapp:androidApp:assembleOgRelease` |
+| Build AAB (shipping flavor) | `./gradlew :apps:djapp:androidApp:bundleOgRelease -Porphic.liveVibesOnly=true` |
+| Build universal APK | `./gradlew :apps:djapp:androidApp:assembleOgRelease -Porphic.liveVibesOnly=true` |
 | AAB output path | `apps/djapp/androidApp/build/outputs/bundle/ogRelease/djapp-vX.Y.Z-og-release.aab` |
 | APK output path | `apps/djapp/androidApp/build/outputs/apk/og/release/djapp-vX.Y.Z-og-release.apk` |
-| Publish to a Play track | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal` |
-| Publish store listing + graphics | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseListing` |
+| Publish to a Play track | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseBundle -PplayTrack=internal -Porphic.liveVibesOnly=true` |
+| Publish store listing + graphics (no build, no switch) | `./gradlew --no-configuration-cache :apps:djapp:androidApp:publishOgReleaseListing` |
 | List real task names | `./gradlew :apps:djapp:androidApp:tasks --all \| grep -iE "^bundle\|^publish"` |
 | Push a tag | `git push origin vX.Y.Z` |
 | Force-update a published tag | `git push origin vX.Y.Z --force` |
@@ -490,7 +500,7 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 | Edit notes | `gh release edit vX.Y.Z --notes "..."` |
 | Mark a release latest | `gh release edit vX.Y.Z --latest` |
 | Regenerate iOS Xcode project | `xcodegen generate --spec apps/djapp/iosApp/project.yml --project apps/djapp/iosApp` |
-| Build iOS release framework | `./gradlew :apps:djapp:shared:linkReleaseFrameworkIosArm64` |
+| Build iOS release framework | `./gradlew :apps:djapp:shared:linkReleaseFrameworkIosArm64 -Porphic.liveVibesOnly=true` |
 | Upload IPA to App Store Connect | `xcrun altool --upload-app -f <ipa> --type ios --apiKey <KEYID> --apiIssuer <ISSUER_ID>` |
 | List TestFlight beta groups | `GET /v1/betaGroups?filter[app]=<APP_ID>` (see step 9) |
 | Wait for a build to process | `GET /v1/builds?filter[app]=<APP_ID>&filter[version]=<N>` until `processingState=VALID` |
@@ -503,10 +513,16 @@ If `versionName` doesn't match the tag, HEAD wasn't actually at the tag when you
 - **You are not sure the artifact was built on the tag**: the filename cannot tell you — `versionTag` strips the `-N-gSHA` suffix, so an off-tag build is named after the *previous* tag and looks legitimate. Dump the manifest (see "Verifying versions match expectations") and check `versionCode` against `git rev-list --count HEAD` at the tag. A stale artifact from the previous release may also be sitting in the same output directory; check mtimes before uploading.
 - **Filename says `-dirty`**: working tree has uncommitted changes. Commit them first — the current flow is to tweak on a feature branch, then land it on `main` as logical, separately revertable commits. Reach for `git stash` only if the change genuinely should not ship, and check first that the dirty files are yours: the tree often carries the user's WIP or a sibling agent's edits.
 - **`gh release create` fails with "release already exists"**: use `gh release edit` to update the notes. Binaries are never attached to the release.
-- **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease`.
+- **Build picks up the wrong `versionCode`**: configuration cache. Try `./gradlew --no-configuration-cache :apps:djapp:androidApp:bundleOgRelease -Porphic.liveVibesOnly=true`.
 - **Built artifact isn't where you expected**: the flavor segment moves between the bundle and APK trees (`bundle/ogRelease/` vs `apk/og/release/`). `find apps/djapp/androidApp/build/outputs -name "*-v1.X.Y-*"` beats guessing.
 - **You built the `ai` flavor by mistake**: it carries appId `org.balch.djapp.ai` and the INTERNET permission. Play will treat it as a different app. Rebuild with the `Og` task.
 - **AAB is unsigned**: `keystore.properties` is missing at the repo root. The convention plugin silently falls back to the debug signing config in that case. Play Console will reject the upload.
 - **A commit landed after the tag and you want the tag to include it**: see "add one more commit to a published release" above.
 - **iOS `xcodebuild archive`/`-exportArchive` fails with a login or provisioning-profile error**: the yearly Development cert or the Xcode account session has gone stale — see `reference_apple_dev_team` memory. Not a project misconfiguration.
 - **iOS build succeeds but you don't have the Issuer ID**: check the `reference_apple_dev_team` / `project_ios_appstore_publishing` memories first. Never store it (or the `.p8` key) in a committed file.
+- **`OG release needs -Porphic.liveVibesOnly=true`** (`preOgReleaseBuild`): the OG bundle/APK build ran without the switch. Add `-Porphic.liveVibesOnly=true`.
+- **`AI release ships every vibe; drop -Porphic.liveVibesOnly=true`** (`preAiReleaseBuild`): the switch was on for an AI build. Drop it, and build AI in its own Gradle run.
+- **`OG release keeps non-LIVE vibe classes (build with -Porphic.liveVibesOnly=true)`** (`verifyOgReleaseHasOnlyLiveVibes`, the R8 mapping check): the build kept non-LIVE vibe classes. Rebuild with the switch.
+- **`OG release framework needs -Porphic.liveVibesOnly=true`** (`:apps:djapp:shared:linkReleaseFrameworkIos*`): add the switch to the link command.
+- **`AI release framework ships every vibe; drop -Porphic.liveVibesOnly=true`** (`:apps:djapp:ai:linkReleaseFrameworkIos*`): drop the switch.
+- **`OG <target> framework links non-LIVE vibe classes (build with -Porphic.liveVibesOnly=true)`** (`verifyOgFrameworkHasOnlyLiveVibes<Target>`, the nm check, finalizes each shared release link when the switch is on): relink with the switch.
