@@ -82,10 +82,16 @@ import org.balch.orpheus.djapp.variant.mergeTabContributions
 import org.balch.orpheus.djapp.variant.stageChromeOverhang
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
+import org.balch.orpheus.djapp.vibepresets.VibePresetBar
+import org.balch.orpheus.djapp.vibepresets.VibePresetSheets
+import org.balch.orpheus.djapp.vibepresets.VibePresetsViewModel
+import org.balch.orpheus.djapp.vibepresets.collectChrome
+import org.balch.orpheus.djapp.vibepresets.rememberPresetsTransportLead
 import org.balch.orpheus.features.dj.DjPanel
 import org.balch.orpheus.features.dj.DjUiState
 import org.balch.orpheus.features.dj.DjViewModel
 import org.balch.orpheus.features.horn.HornDisplayHeight
+import org.balch.orpheus.features.horn.HornFeature
 import org.balch.orpheus.features.horn.HornPanel
 import org.balch.orpheus.features.horn.HornViewModel
 import org.balch.orpheus.features.pulsar.EndsPanel
@@ -94,6 +100,7 @@ import org.balch.orpheus.features.pulsar.PulsarGridHeight
 import org.balch.orpheus.features.pulsar.PulsarPanel
 import org.balch.orpheus.features.pulsar.PulsarSelectors
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.mixer.MixerFeature
 import org.balch.orpheus.features.pulsar.mixer.MixerViewModel
 import org.balch.orpheus.features.timer.TimerFeature
 import org.balch.orpheus.features.timer.TimerPanel
@@ -144,6 +151,11 @@ fun DjAppScreen(
     val pulsarFeature = PulsarViewModel.feature()
     val timerFeature = TimerViewModel.feature()
     val mixerFeature = MixerViewModel.feature()
+    val presetsFeature = VibePresetsViewModel.feature()
+    val presetChrome by presetsFeature.collectChrome()
+    val presetsLead = rememberPresetsTransportLead(presetsFeature)
+    // The bar's ≡ opens it; local, as no other screen opens the manage sheet.
+    var presetManageOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Mapped before collecting: DjUiState changes on every platter tick, and only this flips the fade.
@@ -266,7 +278,7 @@ fun DjAppScreen(
             val fadeEnabled = fadesPanelsWhenIdle(
                 layout,
                 hidesPanelsWhenIdle,
-                sheetOpen = activeSheet != null,
+                sheetOpen = activeSheet != null || presetChrome.draftOpen || presetManageOpen,
                 turntableUp = turntableUp,
             )
             PanelIdleFadeWatcher(fade = panelFade, enabled = fadeEnabled)
@@ -299,6 +311,7 @@ fun DjAppScreen(
                                 // The dock's top bar carries the one Vibe picker (and the anomaly
                                 // long-press), so the docked panel has no selector row at all.
                                 selectors = if (docked) PulsarSelectors.None else djVibeSelectors(),
+                                transportLead = presetsLead,
                             )
                             DjTab -> DjPanel(
                                 feature = djFeature,
@@ -319,42 +332,20 @@ fun DjAppScreen(
                                 showExpandedTitle = showTitle,
                                 fillHeight = fill,
                             )
-                            MixTab -> Column(modifier = panelModifier) {
-                                DjMixPanel(
-                                    feature = mixerFeature,
-                                    trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                                    masterOutVizFlow = synthEngine.masterOutVizFlow,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    showExpandedTitle = showTitle,
-                                    fillHeight = fill,
-                                )
-                            }
-                            HornTab -> {
-                                // Over the phone bar the dome's name pill rises onto Horn's knob labels:
-                                // the panel sits that much higher, its display giving up the height.
-                                val overBar = !docked && !layout.usesLandscapeChrome()
-                                val lift = if (overBar) HornPillClearance else 0.dp
-                                // Only a filled slot is read back: its height comes from the layout,
-                                // not the content. A docked panel wraps its content and keeps 160dp.
-                                var slotPx by remember { mutableIntStateOf(0) }
-                                val density = LocalDensity.current
-                                val displayHeight = if (!fill || slotPx == 0) HornDisplayHeight else {
-                                    hornDisplayHeightFor(with(density) { slotPx.toDp() }, HornDisplayHeight)
-                                }
-                                HornPanel(
-                                    inVizFlow = synthEngine.hornInVizFlow,
-                                    outVizFlow = synthEngine.hornOutVizFlow,
-                                    hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
-                                    wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
-                                    modifier = panelModifier.padding(bottom = lift).onSizeChanged { slotPx = it.height },
-                                    isExpanded = true,
-                                    onExpandedChange = {},
-                                    showCollapsedHeader = false,
-                                    showExpandedTitle = showTitle,
-                                    fillHeight = fill,
-                                    displayHeight = displayHeight,
-                                )
-                            }
+                            MixTab -> MixRoutePanel(
+                                feature = mixerFeature,
+                                synthEngine = synthEngine,
+                                modifier = panelModifier,
+                                showTitle = showTitle,
+                                fill = fill,
+                            )
+                            HornTab -> HornRoutePanel(
+                                synthEngine = synthEngine,
+                                modifier = panelModifier,
+                                showTitle = showTitle,
+                                fill = fill,
+                                lift = hornPillLift(layout, docked, barShown = presetChrome.available && presetChrome.barShown),
+                            )
                             VibeInfoTab -> VibeInfoPanel(
                                 pulsar = pulsarFeature,
                                 vizFlow = synthEngine.pulsarVizFlow,
@@ -416,6 +407,16 @@ fun DjAppScreen(
                         },
                         routePanel = routePanel,
                         navContent = navContent,
+                        pulsarTransportLead = presetsLead,
+                        presetBar = { barModifier ->
+                            if (presetChrome.available && presetChrome.barShown) {
+                                VibePresetBar(
+                                    feature = presetsFeature,
+                                    onManage = { presetManageOpen = true },
+                                    modifier = barModifier,
+                                )
+                            }
+                        },
                     )
 
                     DjAppOverlaySheets(
@@ -425,6 +426,13 @@ fun DjAppScreen(
                         synthEngine = synthEngine,
                         tabContributions = tabContributions,
                         onDismiss = { activeSheet = null },
+                    )
+
+                    VibePresetSheets(
+                        feature = presetsFeature,
+                        isLandscape = layout.usesLandscapeChrome(),
+                        manageOpen = presetManageOpen,
+                        onManageDismiss = { presetManageOpen = false },
                     )
                 }
             }
@@ -565,11 +573,17 @@ internal fun DjAppMainContent(
     onShowVibeInfo: () -> Unit,
     routePanel: @Composable (DjRoute, Modifier, Boolean) -> Unit,
     navContent: @Composable (Modifier) -> Unit,
+    // PulsarPanel's transportLead for the Pulsar panels placed here (the PRESETS toggle).
+    pulsarTransportLead: (@Composable () -> Unit)? = null,
+    // One bar under the panels in every layout, inside the stage so it fades with them.
+    presetBar: @Composable (Modifier) -> Unit = {},
 ) {
     // The container holding the content panels is both what the picture is sized against and
     // what the idle fade applies to; the header and the nav are outside it in every layout.
     val stage = LocalVizStage.current
     val fade = LocalPanelIdleFade.current
+    // The bar's foot clears the dome and its name pill, which rise over the stage's bottom edge.
+    val barClearance = stageChromeOverhang(layout)
 
     // Below header and Pulsar: the pair when the layout has room, else the nav-selected panel.
     val lowerPanels: @Composable (Modifier) -> Unit = { mod ->
@@ -584,14 +598,21 @@ internal fun DjAppMainContent(
             // TV: the visualization owns the screen and panels dock around its edges.
             // Nothing fills the centre, so the VizBackground sibling reads through. The dock
             // already fills exactly the band between the top and bottom bars, so it IS the stage.
-            DjPanelDock(
-                panels = dockedPanels,
+            // The preset bar sits at its foot, above the bottom bar, inside the dock's overscan margin.
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .vizStage(stage)
                     .panelIdleFade(fade),
-            ) { route, panelModifier ->
-                routePanel(route, panelModifier, true)
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                DjPanelDock(
+                    panels = dockedPanels,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                ) { route, panelModifier ->
+                    routePanel(route, panelModifier, true)
+                }
+                presetBar(Modifier.fillMaxWidth(1f - 2f * OverscanFraction).padding(bottom = barClearance))
             }
         }
         DjLayout.Landscape -> {
@@ -607,40 +628,49 @@ internal fun DjAppMainContent(
                     // Top clears flex mode's status bar; the rail already covers the start side.
                     insetSides = WindowInsetsSides.Top + WindowInsetsSides.End,
                 )
-                // The panels' own container, as in portrait. The fade goes on each panel.
-                Row(
+                // The panels' own container, as in portrait, with the preset bar under both panels.
+                // The fade goes on each panel and on the bar.
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .vizStage(stage),
                 ) {
-                    // A short screen (the Fold 8's 360dp cover) takes its shortfall off the grid, as
-                    // portrait does. The slot's height comes from the row, so reading it back is safe.
-                    var pulsarSlotPx by remember { mutableIntStateOf(0) }
-                    val density = LocalDensity.current
-                    val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
-                        pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
-                    }
-                    PulsarPanel(
+                    Row(
                         modifier = Modifier
-                            .weight(.5f)
-                            .fillMaxHeight()
-                            .onSizeChanged { pulsarSlotPx = it.height }
-                            .panelIdleFade(fade),
-                        pulsar = pulsarFeature,
-                        trackEditing = LocalShowTrackEdit.current,
-                        vizFlow = synthEngine.pulsarVizFlow,
-                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                        isExpanded = true,
-                        onExpandedChange = {},
-                        showCollapsedHeader = false,
-                        showExpandedTitle = false,
-                        // Top-anchored: centred, a short wide window left ~140dp dead above the selectors.
-                        centerContent = false,
-                        gridHeight = gridHeight,
-                        selectors = djVibeSelectors(),
-                    )
-                    navContent(Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade))
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    ) {
+                        // A short screen (the Fold 8's 360dp cover) takes its shortfall off the grid, as
+                        // portrait does. The slot's height comes from the row, so reading it back is safe.
+                        var pulsarSlotPx by remember { mutableIntStateOf(0) }
+                        val density = LocalDensity.current
+                        val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
+                            pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
+                        }
+                        PulsarPanel(
+                            modifier = Modifier
+                                .weight(.5f)
+                                .fillMaxHeight()
+                                .onSizeChanged { pulsarSlotPx = it.height }
+                                .panelIdleFade(fade),
+                            pulsar = pulsarFeature,
+                            trackEditing = LocalShowTrackEdit.current,
+                            vizFlow = synthEngine.pulsarVizFlow,
+                            trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                            isExpanded = true,
+                            onExpandedChange = {},
+                            showCollapsedHeader = false,
+                            showExpandedTitle = false,
+                            // Top-anchored: centred, a short wide window left ~140dp dead above the selectors.
+                            centerContent = false,
+                            gridHeight = gridHeight,
+                            selectors = djVibeSelectors(),
+                            transportLead = pulsarTransportLead,
+                        )
+                        navContent(Modifier.weight(.5f).fillMaxHeight().panelIdleFade(fade))
+                    }
+                    presetBar(Modifier.fillMaxWidth().padding(bottom = barClearance).panelIdleFade(fade))
                 }
             }
         }
@@ -689,8 +719,10 @@ internal fun DjAppMainContent(
                         showExpandedTitle = false,
                         gridHeight = gridHeight,
                         selectors = djVibeSelectors(),
+                        transportLead = pulsarTransportLead,
                     )
                     lowerPanels(Modifier.weight(.4f).fillMaxWidth())
+                    presetBar(Modifier.fillMaxWidth().padding(bottom = barClearance))
                 }
             }
         }
@@ -707,37 +739,42 @@ internal fun DjAppMainContent(
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     insetSides = WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
                 )
-                DjTabletopLayout(
-                    hinge = layout.hinge,
-                    // The whole folded region is the stage: the hinge splits the panels, not the
-                    // picture, and the set is happier spanning it than squeezed into one half.
-                    modifier = Modifier.weight(1f).vizStage(stage),
-                    top = { mod ->
-                        // Sharing the half with the header leaves Pulsar short of a full grid on
-                        // a low crease, so it flexes as portrait does.
-                        var pulsarSlotPx by remember { mutableIntStateOf(0) }
-                        val density = LocalDensity.current
-                        val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
-                            pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
-                        }
-                        PulsarPanel(
-                            pulsar = pulsarFeature,
-                            trackEditing = LocalShowTrackEdit.current,
-                            vizFlow = synthEngine.pulsarVizFlow,
-                            trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                            modifier = mod
-                                .onSizeChanged { pulsarSlotPx = it.height }
-                                .panelIdleFade(fade),
-                            isExpanded = true,
-                            onExpandedChange = {},
-                            showCollapsedHeader = false,
-                            showExpandedTitle = false,
-                            gridHeight = gridHeight,
-                            selectors = djVibeSelectors(),
-                        )
-                    },
-                    bottom = { mod -> lowerPanels(mod.panelIdleFade(fade)) },
-                )
+                // The whole folded region is the stage: the hinge splits the panels, not the
+                // picture, and the set is happier spanning it than squeezed into one half. The
+                // preset bar runs under both halves, at the foot of the flat one.
+                Column(modifier = Modifier.weight(1f).fillMaxWidth().vizStage(stage)) {
+                    DjTabletopLayout(
+                        hinge = layout.hinge,
+                        modifier = Modifier.weight(1f),
+                        top = { mod ->
+                            // Sharing the half with the header leaves Pulsar short of a full grid on
+                            // a low crease, so it flexes as portrait does.
+                            var pulsarSlotPx by remember { mutableIntStateOf(0) }
+                            val density = LocalDensity.current
+                            val gridHeight = if (pulsarSlotPx == 0) PulsarGridHeight else {
+                                pulsarGridHeightFor(with(density) { pulsarSlotPx.toDp() }, PulsarGridHeight)
+                            }
+                            PulsarPanel(
+                                pulsar = pulsarFeature,
+                                trackEditing = LocalShowTrackEdit.current,
+                                vizFlow = synthEngine.pulsarVizFlow,
+                                trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                                modifier = mod
+                                    .onSizeChanged { pulsarSlotPx = it.height }
+                                    .panelIdleFade(fade),
+                                isExpanded = true,
+                                onExpandedChange = {},
+                                showCollapsedHeader = false,
+                                showExpandedTitle = false,
+                                gridHeight = gridHeight,
+                                selectors = djVibeSelectors(),
+                                transportLead = pulsarTransportLead,
+                            )
+                        },
+                        bottom = { mod -> lowerPanels(mod.panelIdleFade(fade)) },
+                    )
+                    presetBar(Modifier.fillMaxWidth().padding(bottom = barClearance).panelIdleFade(fade))
+                }
             }
         }
     }
@@ -1373,3 +1410,64 @@ private fun HornTabLandscapePreview() {
 
 /** How far the Horn panel sits up off the phone bar, so the dome's name pill clears its knob labels. */
 internal val HornPillClearance = 16.dp
+
+/**
+ * Horn's lift off the phone bar. Over the bar the dome's name pill rises onto Horn's knob labels;
+ * with the preset bar shown, the bar's own overhang padding already clears the pill.
+ */
+internal fun hornPillLift(layout: DjLayout, docked: Boolean, barShown: Boolean): Dp =
+    if (!docked && !barShown && !layout.usesLandscapeChrome()) HornPillClearance else 0.dp
+
+/** The Mix tab as a nav destination or docked panel; internal so the phone fit test renders the real one. */
+@Composable
+internal fun MixRoutePanel(
+    feature: MixerFeature,
+    synthEngine: SynthEngine,
+    modifier: Modifier,
+    showTitle: Boolean,
+    fill: Boolean,
+) {
+    Column(modifier = modifier) {
+        DjMixPanel(
+            feature = feature,
+            trackVizFlows = synthEngine.pulsarTrackVizFlows,
+            masterOutVizFlow = synthEngine.masterOutVizFlow,
+            modifier = Modifier.fillMaxWidth(),
+            showExpandedTitle = showTitle,
+            fillHeight = fill,
+        )
+    }
+}
+
+/** The Horn tab, sitting [lift] up off the bottom of its slot, its display giving up that height. */
+@Composable
+internal fun HornRoutePanel(
+    synthEngine: SynthEngine,
+    modifier: Modifier,
+    showTitle: Boolean,
+    fill: Boolean,
+    lift: Dp,
+    feature: HornFeature = HornViewModel.feature(),
+) {
+    // Only a filled slot is read back: its height comes from the layout, not the content.
+    // A docked panel wraps its content and keeps 160dp.
+    var slotPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val displayHeight = if (!fill || slotPx == 0) HornDisplayHeight else {
+        hornDisplayHeightFor(with(density) { slotPx.toDp() }, HornDisplayHeight)
+    }
+    HornPanel(
+        feature = feature,
+        inVizFlow = synthEngine.hornInVizFlow,
+        outVizFlow = synthEngine.hornOutVizFlow,
+        hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
+        wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
+        modifier = modifier.padding(bottom = lift).onSizeChanged { slotPx = it.height },
+        isExpanded = true,
+        onExpandedChange = {},
+        showCollapsedHeader = false,
+        showExpandedTitle = showTitle,
+        fillHeight = fill,
+        displayHeight = displayHeight,
+    )
+}

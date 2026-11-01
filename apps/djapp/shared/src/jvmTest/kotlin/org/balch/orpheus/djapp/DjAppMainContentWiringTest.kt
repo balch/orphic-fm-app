@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -17,8 +19,11 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -97,6 +102,32 @@ class DjAppMainContentWiringTest {
             )
 
             case.assertHeader(shot, stage)
+        }
+    }
+
+    /**
+     * One bar under every layout's panels, never one per pane. Inside the stage, so the fade and
+     * the wake overlay reach it as they reach the panels.
+     */
+    @Test
+    fun presetBarIsPlacedInEveryLayout() {
+        Case.All.forEach { case ->
+            val shot = render(case) { mod ->
+                Box(mod.fillMaxWidth().height(PresetBarHeight.dp).background(PanelColour).testTag(PresetBarTag))
+            }
+            assertEquals(1, shot.presetBars.size, "${case.name}: the preset bar was composed ${shot.presetBars.size} times")
+            val bar = shot.presetBars.single()
+            val stage = assertNotNull(shot.stage, "${case.name}: no stage was reported")
+            assertTrue(bar.height >= PresetBarHeight - 1f, "${case.name}: the bar was squeezed to $bar")
+            assertTrue(stage.contains(bar, slack = 1f), "${case.name}: the bar $bar is outside the stage $stage")
+            // The ring and its name pill rise over the stage's foot; the bar sits clear above them.
+            shot.transport?.let { transport ->
+                assertTrue(!bar.overlaps(transport), "${case.name}: the bar $bar is under the transport $transport")
+            }
+            assertTrue(
+                shot.paintedIn(bar.deflate(EdgeSlack)) == 0,
+                "${case.name}: the bar did not fade with the panels",
+            )
         }
     }
 
@@ -287,6 +318,8 @@ class DjAppMainContentWiringTest {
         /** The vibe transport's bounds, ring and name: the phone bar's ring rises into the stage. */
         val transport: Rect?,
         val content: Rect,
+        /** Bounds of every node tagged as the preset bar. */
+        val presetBars: List<Rect>,
         val width: Int,
         val height: Int,
         private val painted: (Int, Int) -> Boolean,
@@ -374,7 +407,7 @@ class DjAppMainContentWiringTest {
         }
     }
 
-    private fun render(case: Case): Shot {
+    private fun render(case: Case, presetBar: @Composable (Modifier) -> Unit = {}): Shot {
         val stage = VizStage()
         val fade = PanelIdleFade { 0L }
         // Straight to gone, without the watcher: this test is about what the fade reaches, not
@@ -395,7 +428,7 @@ class DjAppMainContentWiringTest {
                                     .fillMaxSize()
                                     .onGloballyPositioned { content = it.boundsInRoot() },
                             ) {
-                                MainContent(case.layout)
+                                MainContent(case.layout, presetBar = presetBar)
                             }
                         }
                     }
@@ -412,6 +445,8 @@ class DjAppMainContentWiringTest {
                 stage = stage.bounds,
                 transport = scene.semanticsOwners.firstNotNullOfOrNull { it.rootSemanticsNode.findTransport() }?.boundsInRoot,
                 content = content,
+                presetBars = scene.semanticsOwners.flatMap { it.rootSemanticsNode.tagged(PresetBarTag) }
+                    .map { it.boundsInRoot },
                 width = case.width,
                 height = case.height,
                 painted = { x, y -> px[x, y] != VoidColour },
@@ -462,6 +497,7 @@ class DjAppMainContentWiringTest {
         dockedPanels: List<DjRoute> = listOf(PulsarTab, DjTab),
         onPanelClick: () -> Unit = {},
         onPanelBounds: (Rect) -> Unit = {},
+        presetBar: @Composable (Modifier) -> Unit = {},
     ) {
         DjAppMainContent(
             layout = layout,
@@ -471,6 +507,7 @@ class DjAppMainContentWiringTest {
             synthEngine = RenderProbeSynthEngine(),
             vizFeature = VizViewModel.previewFeature(),
             onShowVibeInfo = {},
+            presetBar = presetBar,
             // Stand-ins for the real panels: this test is about which region they land in,
             // whether the fade reaches them and whether a click gets through, not about what any
             // one of them draws.
@@ -505,6 +542,13 @@ class DjAppMainContentWiringTest {
          * a panel that failed to fade would paint the whole region, not its first few rows.
          */
         const val EdgeSlack = 6f
+
+        const val PresetBarTag = "presetBar"
+        const val PresetBarHeight = 40
+
+        fun SemanticsNode.tagged(tag: String): List<SemanticsNode> =
+            (if (config.getOrNull(SemanticsProperties.TestTag) == tag) listOf(this) else emptyList()) +
+                children.flatMap { it.tagged(tag) }
 
         /** One frame at 60Hz, the step the virtual clocks advance by. */
         const val FrameMs = 16L

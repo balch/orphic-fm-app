@@ -20,6 +20,7 @@ import org.balch.orpheus.core.playback.OverlaySubtitleProducer
 import org.balch.orpheus.core.playback.PlayFromMediaIdHandler
 import org.balch.orpheus.core.playback.SkipHandler
 import org.balch.orpheus.djapp.variant.DjTabContribution
+import org.balch.orpheus.djapp.vibepresets.VibePresetsAvailability
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.playback.PulsarMetadataProducer
 import org.balch.orpheus.features.pulsar.playback.PulsarVibePicker
@@ -70,6 +71,11 @@ interface DjAppModule {
         @Provides
         fun provideHornPanelAvailability(contributions: Set<DjTabContribution>): HornPanelAvailability =
             HornPanelAvailability { contributions.none { it.replaces == HornTab } }
+
+        /** Vibe presets are an OG-edition feature: the same edition test as the horn panel. */
+        @Provides
+        fun provideVibePresetsAvailability(contributions: Set<DjTabContribution>): VibePresetsAvailability =
+            VibePresetsAvailability { contributions.none { it.replaces == HornTab } }
 
         @Provides
         fun providePulsarPlaybackMode(): PulsarPlaybackMode = PulsarPlaybackMode.EXPLICIT
