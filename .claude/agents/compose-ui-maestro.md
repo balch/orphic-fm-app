@@ -87,6 +87,7 @@ Your domain is the Orpheus-FM synthesizer — a 12-oscillator organismic synth w
 3. **Implement**: Make changes following existing Kotlin conventions (Kotlin and Compose Multiplatform versions are in `gradle/libs.versions.toml`).
 4. **Verify**: After changes, run `./gradlew compileKotlinJvm` and `./gradlew :features:<name>:build` for the touched module (see CLAUDE.md Build) to catch compilation issues.
 5. **Preview**: Ensure all modified composables have working previews.
+6. **Surface type**: Check that a new panel, sheet or pop-out follows the rules in `docs/ui-surfaces.md`.
 
 ## Platform Awareness
 - This is Kotlin Multiplatform — do NOT use platform-specific APIs in common source sets without expect/actual declarations.

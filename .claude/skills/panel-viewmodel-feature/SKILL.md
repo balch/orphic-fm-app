@@ -214,6 +214,8 @@ class TidesViewModel(
 
 **Location**: `features/<name>/src/commonMain/kotlin/.../*Panel.kt`
 
+Not sure whether the feature is a panel, a sheet or a pop-out? See `docs/ui-surfaces.md`.
+
 ```kotlin
 @Composable
 fun TidesPanel(
