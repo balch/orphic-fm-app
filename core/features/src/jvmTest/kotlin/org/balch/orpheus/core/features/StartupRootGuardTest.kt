@@ -28,6 +28,7 @@ class StartupRootGuardTest {
             "InAppReviewManager",
             "IosAppLifecycle",
             "OrphicMcpServer",
+            "DuoPatchPresetSync",
         )
 
         /**

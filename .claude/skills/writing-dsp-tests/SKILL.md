@@ -107,21 +107,20 @@ float dc_offset = sum / total_samples;
 ```
 
 ### 6. Cross-Source Level Matching
-When a module can be selected as a mod source alongside others (LFO, Flux, etc.), verify that switching between sources at the same depth produces **comparable** modulation amounts. A 10x level difference between LFO and Tides as pitch mod sources is a bug.
+When a module can be patched as a mod source alongside others (LFO, Flux, etc.), verify that cables from different sources at the same amount produce **comparable** modulation. A 10x level difference between LFO and Tides on a PITCH cable is a bug. Cables scale by the destination's full-scale value (`kPatchFullScale` in `liborpheus_dsp/src/patch_routing.h`), so patch each source into the same cell at the same amount (`set_patch_cell` in `patch_test_helpers.h`) and compare the destination's swing.
 
 ### 7. Unconditional Routing Audit
 Check for modulation paths that activate **without user selection**. Pattern to flag:
 
 ```cpp
-// BAD: activates whenever tides_mix > 0, regardless of mod source setting
+// BAD: activates whenever tides_mix > 0, regardless of the patch
 if (tides_mix > 0.001f && lfo_depth > 0.001f) {
     mod_pitch += tides_output_buffer[3][mid] * lfo_depth * 0.5f;
 }
 
-// GOOD: only activates when user selects Tides as mod source
-if (fm_mod_source == 4) {
-    // ... use tides buffers
-}
+// GOOD: only activates when the user patches a Tides cable (a cell in the duo patch matrix)
+// Test: set_patch_cell(e, duo, voice, src, dst, amount) or set_legacy_patch(e, duo, legacy_source, on_dx)
+// from test/patch_test_helpers.h. A cable at amount 0 is the OFF case: the output must match no cable.
 ```
 
 ## Test Template
@@ -211,7 +210,7 @@ static bool test_MODULE_peak_levels() {
 - [ ] Peak levels checked with TIGHT bounds for ALL setting combos
 - [ ] Modulation destination impact computed and printed
 - [ ] DC offset flagged for pitch-routed channels
-- [ ] Level-matched against other mod sources (LFO, Flux)
-- [ ] No unconditional modulation routing without user selection
+- [ ] Level-matched against other mod sources (LFO, Flux) through the same patch cell and amount
+- [ ] No unconditional modulation routing without a patch cable
 - [ ] Enough blocks processed to capture full cycle at lowest frequency
 - [ ] All continuous params tested at multiple positions (not just default)

@@ -3,7 +3,6 @@ package org.balch.orpheus.core.audio.dsp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.core.audio.ModSource
 import kotlin.math.pow
 
 /**
@@ -20,7 +19,6 @@ class DspVoiceManager(
     private val _voiceFmDepth = FloatArray(12)
     private val _voiceEnvelopeSpeed = FloatArray(12)
     private val _duoSharpness = FloatArray(6)
-    private val _duoModSource = Array(6) { ModSource.OFF }
     private val _quadPitch = FloatArray(3) { 0.5f }
     private val _quadHold = FloatArray(3)
     private val _quadVolume = FloatArray(3) { 1.0f }
@@ -154,11 +152,6 @@ class DspVoiceManager(
         // No-op: Kotlin DSP wobble removed. C++ handles wobble directly if needed.
     }
 
-    fun setDuoModSource(duoIndex: Int, source: ModSource) {
-        _duoModSource[duoIndex] = source
-        pluginProvider.voicePlugin.setDuoModSource(duoIndex, source.ordinal)
-    }
-
     fun setFmStructure(crossQuad: Boolean) {
         _fmStructureCrossQuad = crossQuad
         pluginProvider.voicePlugin.setFmStructure(crossQuad)
@@ -255,7 +248,6 @@ class DspVoiceManager(
     fun getVoiceFmDepth(index: Int) = _voiceFmDepth[index]
     fun getVoiceEnvelopeSpeed(index: Int) = _voiceEnvelopeSpeed[index]
     fun getDuoSharpness(duoIndex: Int) = _duoSharpness[duoIndex]
-    fun getDuoModSource(duoIndex: Int) = _duoModSource[duoIndex]
     fun getQuadPitch(quadIndex: Int) = _quadPitch[quadIndex]
     fun getQuadHold(quadIndex: Int) = _quadHold[quadIndex]
     fun getQuadVolume(quadIndex: Int) = _quadVolume[quadIndex]

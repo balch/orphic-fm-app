@@ -1,4 +1,5 @@
 #include "test_harness.h"
+#include "patch_test_helpers.h"
 #include "orpheus_units.h"
 #include "orpheus_engine.h"
 #include <cmath>
@@ -108,10 +109,9 @@ static std::vector<float> render_fm_scenario(const FmScenario& s) {
     engine->voice_params[1].harmonics.store(s.harmonics);
     engine->voice_params[1].decay.store(ENV_SPEED);
 
-    // Mod source and FM depth (per-duo, duo 0)
-    engine->mod_source[0].store(s.mod_source);
-    engine->fm_depth[0].store(s.fm_depth);
-    engine->mod_depth[0].store(s.fm_depth);  // Plaits cross-mod uses mod_depth for RMS-based timbre modulation
+    // Legacy mod source as a patch, and the duo's master depth (duo 0)
+    set_legacy_patch(engine, 0, s.mod_source, false);
+    engine->mod_depth[0].store(s.fm_depth);
     engine->fm_cross_quad.store(0);  // standard duo pairs
 
     // Coupling

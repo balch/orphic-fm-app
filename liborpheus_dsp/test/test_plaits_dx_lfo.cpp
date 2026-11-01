@@ -1,15 +1,16 @@
-// Duo LFO/Tides ch2 (harmonics) must not move DX patch selection.
-// Only ch2 carries signal here, so fm_depth 0 vs 1 isolates the harmonics route.
+// Legacy LFO/Tides patches park the HARMONICS cable on DX, so ch2 must not move DX patch selection.
+// Only ch2 carries signal here, so depth 0 vs 1 isolates the harmonics route.
 #include "test_harness.h"
+#include "patch_test_helpers.h"
+#include "dx_engine_range.h"
 
 static constexpr int kFrames = 12000;
 
-static std::vector<float> render_ch2_only(int engine_idx, int mod_source, float fm_depth) {
+static std::vector<float> render_ch2_only(int engine_idx, int mod_source, float depth) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     activate_voice(engine, 0, engine_idx, 60.0f, 0.5f, 0.5f, 0.5f, 0.5f);
-    engine->mod_source[0].store(mod_source);
-    engine->mod_depth[0].store(0.0f);
-    engine->fm_depth[0].store(fm_depth);
+    set_legacy_patch(engine, 0, mod_source, is_dx_engine_index(engine_idx));
+    engine->mod_depth[0].store(depth);
     for (int i = 0; i < kMaxFrames; i++) {
         engine->lfo_output_buffer[i] = 0.0f;
         engine->lfo_morph_buffer[i] = 0.0f;
@@ -41,8 +42,8 @@ static float peak(const std::vector<float>& a) {
     return p;
 }
 
-static bool test_dx_ch2_ignored() {
-    printf("\n=== Test: DX ignores LFO/Tides ch2 ===\n");
+static bool test_dx_parked_harmonics_holds() {
+    printf("\n=== Test: a parked (amount 0) HARMONICS cell leaves DX unchanged ===\n");
     bool pass = true;
     for (int eng : {2, 3, 4}) {
         for (int src : {2, 4}) {
@@ -74,7 +75,7 @@ static bool test_va_ch2_still_moves() {
 bool run_plaits_dx_lfo_tests() {
     int p = 0, f = 0;
     auto tally = [&](bool ok) { if (ok) ++p; else ++f; };
-    tally(test_dx_ch2_ignored());
+    tally(test_dx_parked_harmonics_holds());
     tally(test_va_ch2_still_moves());
     TEST_SUITE_RETURN(p, f);
 }

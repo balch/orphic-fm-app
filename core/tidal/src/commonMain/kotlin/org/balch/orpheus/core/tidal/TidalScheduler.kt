@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.patch.DuoPatchBay
+import org.balch.orpheus.core.audio.patch.LegacyModSource
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.ControlStateSnapshot
 import org.balch.orpheus.core.controller.SynthController
@@ -31,6 +33,13 @@ import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.tempo.GlobalTempo
 import kotlin.math.pow
+
+/** Tidal's `duomod` source name as a legacy mod source: "fm", "lfo", anything else is off. */
+fun tidalDuoModSource(name: String): LegacyModSource = when (name.lowercase()) {
+    "fm" -> LegacyModSource.VOICE_FM
+    "lfo" -> LegacyModSource.LFO
+    else -> LegacyModSource.OFF
+}
 
 /**
  * State of the Tidal scheduler.
@@ -60,6 +69,7 @@ class TidalScheduler(
     private val dispatchProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
     private val scope: AppCoroutineScope,
+    private val duoPatchBay: DuoPatchBay,
 ) {
     private val log = logging("TidalScheduler")
     
@@ -623,15 +633,7 @@ class TidalScheduler(
             }
 
             is TidalEvent.DuoMod -> {
-                val modSource = when (event.source.lowercase()) {
-                    "fm" -> org.balch.orpheus.core.audio.ModSource.VOICE_FM
-                    "lfo" -> org.balch.orpheus.core.audio.ModSource.LFO
-                    else -> org.balch.orpheus.core.audio.ModSource.OFF
-                }
-                tidalSetPluginControl(
-                    VoiceSymbol.duoModSource(event.duoIndex).controlId,
-                    PortValue.IntValue(modSource.ordinal),
-                )
+                duoPatchBay.applyLegacySource(event.duoIndex, tidalDuoModSource(event.source))
             }
 
             is TidalEvent.DuoSharp -> {

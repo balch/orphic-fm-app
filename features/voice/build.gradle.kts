@@ -25,6 +25,10 @@ kotlin {
             // runComposeUiTest for the duo's locked harmonics knob and patch picks.
             implementation(libs.compose.ui.test)
             implementation(compose.desktop.currentOs)
+            implementation(libs.kotlinx.coroutines.test)
+            // DuoPatchPresetSyncTest drives the real VoicePlugin and DspSynthEngine through PresetLoader.
+            implementation(project(":core:plugins:voice"))
+            implementation(project(":core:dsp-engine"))
         }
     }
 }

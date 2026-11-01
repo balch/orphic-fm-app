@@ -1,11 +1,5 @@
 package org.balch.orpheus.ui.widgets
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -18,7 +12,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -33,33 +26,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Combined horizontal fader + mode selector for duo mod controls.
- *
- * - **Drag** horizontally → adjusts mod depth 0.0–1.0
- * - **Tap** (release with minimal movement) → cycles mode OFF→LFO→FM→FLUX→OFF
- *
- * The thumb displays the current mode label with an animated slide transition.
+ * Horizontal fader for a duo's mod depth (0.0-1.0). Drag to set; the patch bay owns the sources.
  * Mixer-fader style: the thumb is taller than the track and extends above/below it.
  */
 @Composable
-fun ModFaderSelector(
+fun ModDepthFader(
     depth: Float,
     onDepthChange: (Float) -> Unit,
-    activeSource: ModSource,
-    onSourceChange: (ModSource) -> Unit,
     modifier: Modifier = Modifier,
     color: Color = OrpheusColors.warmGlow,
     controlId: String? = null
@@ -82,13 +64,8 @@ fun ModFaderSelector(
         modifier
     }
 
-    // rememberUpdatedState so the long-lived pointerInput coroutine always sees current values
-    val currentSource by rememberUpdatedState(activeSource)
-    val currentOnSourceChange by rememberUpdatedState(onSourceChange)
     val currentOnDepthChange by rememberUpdatedState(onDepthChange)
-
-    val isOff = activeSource == ModSource.OFF
-    val activeAlpha = if (isOff) 0.35f else 1f
+    val activeAlpha = if (depth <= 0f) 0.35f else 1f
 
     // Outer box sized to thumb height (taller than track)
     Box(
@@ -160,18 +137,6 @@ fun ModFaderSelector(
                         }
                         change.consume()
                     } while (change.pressed)
-
-                    // Released — if no drag happened, it's a tap → cycle mode
-                    if (!isDragging && cumulativeAbsX < touchSlop) {
-                        val next = when (currentSource) {
-                            ModSource.OFF -> ModSource.LFO
-                            ModSource.LFO -> ModSource.VOICE_FM
-                            ModSource.VOICE_FM -> ModSource.FLUX
-                            ModSource.FLUX -> ModSource.TIDES
-                            ModSource.TIDES -> ModSource.OFF
-                        }
-                        currentOnSourceChange(next)
-                    }
                 }
             },
         contentAlignment = Alignment.CenterStart
@@ -201,64 +166,23 @@ fun ModFaderSelector(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            AnimatedContent(
-                targetState = activeSource,
-                transitionSpec = {
-                    (slideInVertically { height -> height } + fadeIn()).togetherWith(
-                        slideOutVertically { height -> -height } + fadeOut()
-                    )
-                },
-                label = "ModFaderLabel"
-            ) { source ->
-                val label = when (source) {
-                    ModSource.OFF -> "OFF"
-                    ModSource.LFO -> "LFO"
-                    ModSource.VOICE_FM -> "FM"
-                    ModSource.FLUX -> "FLUX"
-                    ModSource.TIDES -> "WAVES"
-                }
-                Text(
-                    text = label,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (source == ModSource.OFF) color.copy(alpha = 0.5f) else color,
-                    textAlign = TextAlign.Center
-                )
-            }
+            Box(Modifier.width(2.dp).height(14.dp).background(color.copy(alpha = 0.6f * activeAlpha)))
         }
     }
 }
 
 @Preview
 @Composable
-fun ModFaderSelectorPreview() {
+fun ModDepthFaderPreview() {
     OrpheusTheme {
         Row(
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ModFaderSelector(
-                depth = 0.0f,
-                onDepthChange = {},
-                activeSource = ModSource.OFF,
-                onSourceChange = {},
-                color = OrpheusColors.neonMagenta
-            )
-            ModFaderSelector(
-                depth = 0.5f,
-                onDepthChange = {},
-                activeSource = ModSource.LFO,
-                onSourceChange = {},
-                color = OrpheusColors.neonCyan
-            )
-            ModFaderSelector(
-                depth = 0.8f,
-                onDepthChange = {},
-                activeSource = ModSource.VOICE_FM,
-                onSourceChange = {},
-                color = OrpheusColors.warmGlow
-            )
+            ModDepthFader(depth = 0.0f, onDepthChange = {}, color = OrpheusColors.neonMagenta)
+            ModDepthFader(depth = 0.5f, onDepthChange = {}, color = OrpheusColors.neonCyan)
+            ModDepthFader(depth = 0.8f, onDepthChange = {}, color = OrpheusColors.warmGlow)
         }
     }
 }

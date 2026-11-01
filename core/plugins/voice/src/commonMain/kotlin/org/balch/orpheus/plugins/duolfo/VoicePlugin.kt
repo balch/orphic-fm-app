@@ -2,12 +2,27 @@ package org.balch.orpheus.plugins.duolfo
 
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.patch.DuoPatch
+import org.balch.orpheus.core.audio.patch.DuoPatchBay
+import org.balch.orpheus.core.audio.patch.LegacyModSource
+import org.balch.orpheus.core.audio.patch.PATCH_CELLS
+import org.balch.orpheus.core.audio.patch.PATCH_URI
+import org.balch.orpheus.core.audio.patch.cellAmounts
+import org.balch.orpheus.core.audio.patch.legacyDuoPatch
+import org.balch.orpheus.core.audio.patch.patchCellSymbol
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
@@ -19,9 +34,10 @@ import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
+@ContributesBinding(AppScope::class, binding = binding<DuoPatchBay>())
 class VoicePlugin(
     private val audioEngine: AudioEngine
-) : DspPlugin {
+) : DspPlugin, DuoPatchBay {
 
     override val info = PluginInfo(
         uri = URI,
@@ -54,7 +70,6 @@ class VoicePlugin(
     private val _modDepth = FloatArray(12)
     private val _envSpeed = FloatArray(12)
     private val _duoSharpness = FloatArray(6)
-    private val _duoModSource = IntArray(6)
     
     private var _fmStructureCrossQuad = false
     private var _totalFeedback = 0f
@@ -73,6 +88,14 @@ class VoicePlugin(
     private val _duoSpeed = FloatArray(6) { 0.0f }
     private val _duoMorph = FloatArray(6) { 0.0f }
     private val _duoModSourceLevel = FloatArray(6) { 0.0f }
+
+    // Missing data converts as VOICE_FM, so that is the app default too.
+    private val _patches = MutableStateFlow(List(6) { legacyDuoPatch(LegacyModSource.VOICE_FM, false, it) })
+    override val patches: StateFlow<List<DuoPatch>> = _patches.asStateFlow()
+
+    // Cell amounts C++ last received per duo; C++ starts all zero.
+    private val lastSent = Array(6) { FloatArray(PATCH_CELLS) }
+    private val patchLock = SynchronizedObject()
 
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-11)
@@ -127,15 +150,6 @@ class VoicePlugin(
                     }
                 }
             }
-            controlPort(VoiceSymbol.duoModSource(i)) {
-                intType {
-                    get { _duoModSource[i] }
-                    set {
-                        _duoModSource[i] = it
-                        listener?.onVoiceParamChange(i, "duo_mod_source", it)
-                    }
-                }
-            }
             controlPort(VoiceSymbol.duoEngine(i)) {
                 intType {
                     default = -1
@@ -145,7 +159,7 @@ class VoicePlugin(
                     min = -1; max = 108
                     get { _duoEngine[i] }
                     set {
-                        _duoEngine[i] = it
+                        updateEngine(i, it)
                         log.info { "VoicePlugin.duoEngine[$i] = $it (listener=${listener != null})" }
                         listener?.onVoiceParamChange(i, "duo_engine", it)
                     }
@@ -336,7 +350,7 @@ class VoicePlugin(
     fun setModDepth(i: Int, v: Float) { _modDepth[i] = v }
     fun setEnvSpeed(i: Int, v: Float) { _envSpeed[i] = v }
     fun setDuoSharpness(i: Int, v: Float) { _duoSharpness[i] = v }
-    fun setDuoEngine(i: Int, v: Int) { _duoEngine[i] = v }
+    fun setDuoEngine(i: Int, v: Int) = updateEngine(i, v)
     fun setDuoHarmonics(i: Int, v: Float) { _duoHarmonics[i] = v }
     fun setDuoProsody(i: Int, v: Float) { _duoProsody[i] = v }
     fun setDuoSpeed(i: Int, v: Float) { _duoSpeed[i] = v }
@@ -352,10 +366,46 @@ class VoicePlugin(
     fun setQuadPitchSource(i: Int, v: Int) { _quadPitchSource[i] = v }
     fun setQuadEnvTriggerMode(i: Int, v: Boolean) { _quadEnvTriggerMode[i] = v }
 
-    // Forward to C++ engine via audio engine port
-    fun setDuoModSource(duoIndex: Int, modSourceOrdinal: Int) {
-        _duoModSource[duoIndex] = modSourceOrdinal
-        audioEngine.setPort(URI, "duo_mod_source_$duoIndex", modSourceOrdinal.toFloat())
+    /** Every engine write lands here so DX arrivals park HARMONICS cables and departures wake them. */
+    private fun updateEngine(duo: Int, id: Int) = synchronized(patchLock) {
+        val old = _duoEngine[duo]
+        _duoEngine[duo] = id
+        if (old != id) {
+            val patch = _patches.value[duo]
+            val moved = patch.onEngineChange(OrpheusEngineId.fromId(old), OrpheusEngineId.fromId(id))
+            if (moved != patch) setPatch(duo, moved)
+        }
+    }
+
+    override fun engineOf(duo: Int): OrpheusEngineId? = OrpheusEngineId.fromId(_duoEngine[duo])
+
+    override fun setPatch(duo: Int, patch: DuoPatch) = synchronized(patchLock) {
+        _patches.value = _patches.value.toMutableList().also { it[duo] = patch }
+        val cells = patch.cellAmounts()
+        val sent = lastSent[duo]
+        for (c in 0 until PATCH_CELLS) {
+            if (cells[c] != sent[c]) {
+                sent[c] = cells[c]
+                audioEngine.setPort(PATCH_URI, patchCellSymbol(duo, c), cells[c])
+            }
+        }
+    }
+
+    override fun update(duo: Int, transform: (DuoPatch) -> DuoPatch) = synchronized(patchLock) {
+        setPatch(duo, transform(_patches.value[duo]))
+    }
+
+    override fun applyLegacySource(duo: Int, source: LegacyModSource) = synchronized(patchLock) {
+        setPatch(duo, legacyDuoPatch(source, engineOf(duo)?.forcePinHarmonics == true, duo))
+    }
+
+    /** Sends every cell of every duo. Only for a fresh native engine; preset syncs rely on the diff. */
+    fun resyncPatches() = synchronized(patchLock) {
+        _patches.value.forEachIndexed { duo, patch ->
+            val cells = patch.cellAmounts()
+            cells.copyInto(lastSent[duo])
+            for (c in 0 until PATCH_CELLS) audioEngine.setPort(PATCH_URI, patchCellSymbol(duo, c), cells[c])
+        }
     }
 
     fun setDuoModSourceLevel(duoIndex: Int, level: Float) {

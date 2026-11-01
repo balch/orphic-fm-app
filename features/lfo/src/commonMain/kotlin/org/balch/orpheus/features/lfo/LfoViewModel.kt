@@ -120,8 +120,8 @@ interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
         - **CHAOS**: Lorenz attractor — chaotic, non-repeating modulation.
 
         ## Dual LFO Controls (&&/OFF/||)
-        - **RATE 1**: Frequency of LFO oscillator A (exponential: 0=off, 1=10Hz).
-        - **RATE 2**: Frequency of LFO oscillator B (exponential: 0=off, 1=10Hz).
+        - **RATE A**: Frequency of LFO oscillator A (exponential: 0=off, 1=10Hz).
+        - **RATE B**: Frequency of LFO oscillator B (exponential: 0=off, 1=10Hz).
         - **LINK**: Links both LFO frequencies together.
         - **SHAPE**: Blends between square (0) and triangle (1) waveforms.
 

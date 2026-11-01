@@ -170,6 +170,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_looper.cpp"
     "src/orpheus_unit_marbles.cpp"
     "src/orpheus_unit_plaits.cpp"
+    "src/patch_routing.cpp"
     "src/orpheus_unit_reverb.cpp"
     "src/orpheus_unit_rings.cpp"
     "src/orpheus_unit_warps.cpp"
@@ -310,6 +311,7 @@ if(BUILD_TESTS)
         test/test_record_ring.cpp
         test/test_engine_slot.cpp
         test/test_plaits_dx_lfo.cpp
+        test/test_patch_routing.cpp
         test/test_control_routing.cpp
         test/test_snapshots.cpp
         test/test_headroom.cpp

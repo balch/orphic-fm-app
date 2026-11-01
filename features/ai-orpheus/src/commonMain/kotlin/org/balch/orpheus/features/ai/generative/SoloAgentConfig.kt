@@ -51,14 +51,15 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         2. **SET DUO SHARPNESS** (voice_duo_sharpness_0..3) — Waveform character:
            - 0.0=soft/sine, 0.5=medium, 1.0=sharp/bright. Match to mood energy level.
 
-        3. **SET DUO MOD SOURCE** — Each duo has a modulation source. Defaults are source=FM, level=0 (silent!).
-           You MUST set level > 0 for any mod source to be audible:
-           - voice_duo_mod_source_0..5: Select source (0=FM, 1=OFF, 2=LFO, 3=FLUX)
-           - voice_duo_mod_source_level_0..5: Amount (0.0=none, 1.0=full). SET THIS > 0!
-             * FM (0): Metallic, bell-like timbres. Level 0.3-0.5 for subtle, 0.7+ for aggressive.
-             * OFF (1): Clean, unmodulated sound. Level doesn't matter.
-             * LFO (2): Rhythmic tremolo/vibrato. Level 0.2-0.4 for gentle, 0.6+ for dramatic.
-             * FLUX (3): Generative random melodies. Level 0.3-0.7. Also set flux_mix > 0 for pitch effect.
+        3. **SET DUO PATCH** — Each duo has patch cables from sources to destinations (duo_patch tool).
+           Cables are silent until the master depth is above 0:
+           - voice_duo_mod_source_level_0..5: Master depth (0.0=none, 1.0=full). SET THIS > 0!
+           - Sources: LFO_AB/LFO_A/LFO_B/LFO_A90, WAVES_1..4, FLUX_X1..X3/Y/T1..T3, VOICE_FM.
+           - Destinations: HARMONICS, TIMBRE, MORPH, FM (OSC only), PITCH, ENV. Amounts -1..1.
+             * HARMONICS cables park when a duo switches to a DX engine (wake revives one); one connected while on DX is live and steps patches.
+             * VOICE_FM to TIMBRE/FM: Metallic, bell-like timbres. Depth 0.3-0.5 subtle, 0.7+ aggressive.
+             * LFO cables: Rhythmic movement. Depth 0.2-0.4 gentle, 0.6+ dramatic.
+             * FLUX cables: Generative random melodies. Depth 0.3-0.7. Also set flux_mix > 0 for pitch effect.
 
         4. **SET VOICE MODULATION** — Per-voice FM depth and LFO:
            - voice_mod_depth_0..7: FM depth per voice (0=clean, 0.3=warm, 0.7=bright harmonics)

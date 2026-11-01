@@ -1,11 +1,11 @@
 package org.balch.orpheus.features.voice.ui
 
-import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.patch.DuoPatch
 import org.balch.orpheus.features.midi.MidiPanelActions
 import org.balch.orpheus.features.voice.VoicePanelActions
 
 interface VoiceActions {
-    fun setDuoModSource(duoIndex: Int, source: ModSource)
+    fun setDuoPatch(duoIndex: Int, patch: DuoPatch)
     fun setVoiceTune(index: Int, value: Float)
     fun setDuoModDepth(duoIndex: Int, value: Float)
     fun setVoiceEnvelopeSpeed(index: Int, value: Float)
@@ -44,7 +44,7 @@ interface MidiActions {
  * This provides a single source of truth for mapping between the two interfaces.
  */
 fun VoicePanelActions.toVoiceActions(): VoiceActions = object : VoiceActions {
-    override fun setDuoModSource(duoIndex: Int, source: ModSource) = this@toVoiceActions.setDuoModSource(duoIndex, source)
+    override fun setDuoPatch(duoIndex: Int, patch: DuoPatch) = this@toVoiceActions.setDuoPatch(duoIndex, patch)
     override fun setVoiceTune(index: Int, value: Float) = this@toVoiceActions.setVoiceTune(index, value)
     override fun setDuoModDepth(duoIndex: Int, value: Float) = this@toVoiceActions.setDuoModDepth(duoIndex, value)
     override fun setVoiceEnvelopeSpeed(index: Int, value: Float) = this@toVoiceActions.setVoiceEnvelopeSpeed(index, value)

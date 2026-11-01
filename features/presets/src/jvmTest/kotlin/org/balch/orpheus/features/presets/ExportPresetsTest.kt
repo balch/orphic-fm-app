@@ -1,6 +1,10 @@
 package org.balch.orpheus.features.presets
 
 import kotlinx.coroutines.test.runTest
+import org.balch.orpheus.core.audio.patch.DuoPatch
+import org.balch.orpheus.core.audio.patch.PATCH_URI
+import org.balch.orpheus.core.audio.patch.cellAmounts
+import org.balch.orpheus.core.audio.patch.patchCellSymbol
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.features.presets.patches.CleanPatch
@@ -61,6 +65,10 @@ class ExportPresetsTest {
         preset.portValues.entries
             .sortedBy { it.key }
             .forEach { (key, value) ->
+                if (value is PortValue.StringValue && key.substringAfter(":").startsWith("duo_patch_")) {
+                    appendPatchCells(sb, key.substringAfterLast("_").toInt(), value.value)
+                    return@forEach
+                }
                 // key format: "org.balch.orpheus.plugins.voice:tune_0"
                 val parts = key.split(":", limit = 2)
                 if (parts.size == 2) {
@@ -83,6 +91,16 @@ class ExportPresetsTest {
         sb.appendLine()
         sb.appendLine("static const float preset_${id}_bpm = ${preset.bpm}f;")
         return sb.toString()
+    }
+
+    /** One entry per non-zero cell of the encoded duo patch. */
+    private fun appendPatchCells(sb: StringBuilder, duo: Int, encoded: String) {
+        val patch = requireNotNull(DuoPatch.decode(encoded)) { "duo_patch_$duo does not decode" }
+        patch.cellAmounts().forEachIndexed { cell, amount ->
+            if (amount != 0f) {
+                sb.appendLine("    {\"$PATCH_URI\", \"${patchCellSymbol(duo, cell)}\", ${amount}f, false},")
+            }
+        }
     }
 
     private companion object {

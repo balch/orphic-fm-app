@@ -191,7 +191,7 @@ parameters, effects, and modulation routing. Presets are stored as JSON files wi
 - Voice mod depths (8)
 - Voice envelope speeds (8)
 - Pair sharpness (4)
-- Duo mod sources (4)
+- Duo patch cables and master depth (4 duos)
 - HyperLFO A & B rates
 - HyperLFO mode
 - HyperLFO link state

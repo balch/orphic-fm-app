@@ -1,5 +1,6 @@
 // Voice engine behavior: polyphonic, lifecycle, gate retrigger, hold, idle detection
 #include "test_harness.h"
+#include "patch_test_helpers.h"
 #include "stmlib/utils/random.h"
 
 static bool test_single_voice_engine0() {
@@ -446,9 +447,8 @@ static bool test_duo_depth_smoothing_time_constant() {
             vp.tune.store(v % 2 ? 67.0f : 60.0f);
             vp.gate.store(1);
         }
-        engine->mod_source[0].store(0);  // VOICE_FM
+        set_legacy_patch(engine, 0, kLegacyVoiceFm, false);
         engine->mod_depth[0].store(kTarget);
-        engine->fm_depth[0].store(kTarget);
         engine->coupling_depth.store(kTarget);
 
         auto* graph = engine->graph.load(std::memory_order_acquire);
@@ -456,14 +456,11 @@ static bool test_duo_depth_smoothing_time_constant() {
         for (int f = 0; f < kSettleFrames; f += c.block)
             orpheus_graph_process(graph, engine, buf.data(), c.block);
 
-        float fd = engine->smooth_fm_depth[0];
         float md = engine->smooth_mod_depth[0];
         float cp = engine->smooth_coupling_depth;
-        // Engine 0 never reads mod depth, so only Plaits duos smooth it.
-        bool ok = std::fabs(fd - ideal) < kTol && std::fabs(cp - ideal) < kTol &&
-                  (c.engine_index < 0 || std::fabs(md - ideal) < kTol);
-        printf("  engine %2d block %3d duos %d: fm %.4f mod %.4f coupling %.4f (ideal %.4f) %s\n",
-               c.engine_index, c.block, c.duos, fd, md, cp, ideal, ok ? "PASS" : "FAIL");
+        bool ok = std::fabs(md - ideal) < kTol && std::fabs(cp - ideal) < kTol;
+        printf("  engine %2d block %3d duos %d: depth %.4f coupling %.4f (ideal %.4f) %s\n",
+               c.engine_index, c.block, c.duos, md, cp, ideal, ok ? "PASS" : "FAIL");
         all_pass &= ok;
         orpheus_engine_destroy(engine);
     }

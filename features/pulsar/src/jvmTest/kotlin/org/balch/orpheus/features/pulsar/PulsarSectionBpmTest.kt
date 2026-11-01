@@ -11,7 +11,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.balch.orpheus.core.audio.FadeCurve
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
@@ -497,7 +496,6 @@ private class ArrangementStubEngine(
     override fun getHyperLfoFreq(index: Int): Float = 0f
     override fun getHyperLfoMode(): Int = 0
     override fun getHyperLfoLink(): Boolean = false
-    override fun setDuoModSource(duoIndex: Int, source: ModSource) = Unit
     override fun setFmStructure(crossQuad: Boolean) = Unit
     override fun setTotalFeedback(amount: Float) = Unit
     override fun setVibrato(amount: Float) = Unit
@@ -528,7 +526,6 @@ private class ArrangementStubEngine(
     override fun getVoiceFmDepth(index: Int): Float = 0f
     override fun getVoiceEnvelopeSpeed(index: Int): Float = 0f
     override fun getDuoSharpness(duoIndex: Int): Float = 0f
-    override fun getDuoModSource(duoIndex: Int): ModSource = ModSource.OFF
     override fun getFmStructureCrossQuad(): Boolean = false
     override fun getTotalFeedback(): Float = 0f
     override fun getVibrato(): Float = 0f

@@ -6,8 +6,10 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.update
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DRUM_URI
@@ -40,11 +42,12 @@ class PresetLoader(
         )
     val presetFlow: SharedFlow<SynthPreset> = _presetFlow.asSharedFlow()
 
-    // Non-plugin feature state (e.g. text input, voice selection)
-    private val _featureState = mutableMapOf<String, PortValue>()
+    // Non-plugin feature state (e.g. text input, voice selection). Immutable snapshots, so
+    // writers on any thread never race a capture.
+    private val _featureState = MutableStateFlow<Map<String, PortValue>>(emptyMap())
 
     fun setFeatureValue(key: String, value: PortValue) {
-        _featureState[key] = value
+        _featureState.update { it + (key to value) }
     }
 
     /**
@@ -99,7 +102,7 @@ class PresetLoader(
         return SynthPreset(
             name = name,
             bpm = globalTempo.getBpm().toFloat(),
-            portValues = portRegistry.captureState() + _featureState
+            portValues = portRegistry.captureState() + _featureState.value
         )
     }
 }

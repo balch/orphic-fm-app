@@ -398,7 +398,7 @@ and square waveforms. It serves as a modulation source for delays and voice FM.
 
 **Procedure:**
 
-1. Set a Duo pair mod source to **LFO** (top position)
+1. On a Duo pair, open PATCH and drag an LFO output to the TIMBRE knob
 2. Set voices with FM depth
 3. Modulate LFO rates and observe voice timbre changes
 

@@ -12,7 +12,6 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
-import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import kotlin.math.roundToInt
 
 /**
@@ -150,8 +149,7 @@ class MidiInputHandler(
     }
 
     private fun isCycleControl(controlId: String): Boolean {
-        return controlId == DuoLfoSymbol.MODE.controlId.key ||
-                (controlId.startsWith("$VOICE_URI:") && controlId.contains("duo_mod_source"))
+        return controlId == DuoLfoSymbol.MODE.controlId.key
     }
 
     private fun dispatchControlChange(controlId: String, value: Float) {

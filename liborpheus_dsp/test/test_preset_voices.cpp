@@ -31,11 +31,9 @@ static void dump_render(const char* preset_name, const char* name, const std::ve
     std::fclose(f);
 }
 
-// Apply a preset's port values to the engine via set_port
+// Apply a preset's port values to the engine via set_port.
 static void apply_preset(OrpheusEngine* engine, const std::vector<PresetPort>& ports) {
-    for (auto& p : ports) {
-        orpheus_engine_set_port(engine, p.uri, p.symbol, p.value);
-    }
+    for (auto& p : ports) orpheus_engine_set_port(engine, p.uri, p.symbol, p.value);
 }
 
 // Render a preset with specific voice pair gated, through the production graph.
@@ -110,11 +108,10 @@ static bool test_preset_duo_pair(const char* preset_name,
     float vl_b = engine->voice_levels[v_b].load(std::memory_order_relaxed);
     int eng_a = engine->voice_params[v_a].engine_index.load(std::memory_order_relaxed);
     int eng_b = engine->voice_params[v_b].engine_index.load(std::memory_order_relaxed);
-    int mod_src = engine->mod_source[duo_index].load(std::memory_order_relaxed);
     float mod_d = engine->mod_depth[duo_index].load(std::memory_order_relaxed);
 
-    printf("  Engine: v%d=%d v%d=%d  ModSrc=%d ModDepth=%.3f\n",
-           v_a, eng_a, v_b, eng_b, mod_src, mod_d);
+    printf("  Engine: v%d=%d v%d=%d  ModDepth=%.3f\n",
+           v_a, eng_a, v_b, eng_b, mod_d);
     printf("  VoiceLevels: v%d=%.4f v%d=%.4f\n", v_a, vl_a, v_b, vl_b);
     printf("  Mix: RMS_L=%.4f RMS_R=%.4f Peak=%.4f\n", rms_l, rms_r, peak);
 

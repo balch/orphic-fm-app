@@ -133,14 +133,13 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
         - **DV MODE**: Déjà vu target section — T+X (both rhythm and pitch repeat), T (rhythm only), X (pitch only).
 
         ## Activating Flux on Voice Pairs
-        Flux must be assigned as the duo modulation source on a voice duo to take effect.
-        Always set ALL THREE controls together:
-        1. Set `voice_duo_mod_source_N` to **3** (FLUX) for the desired pair(s) (0-5).
-        2. Set `voice_duo_mod_source_level_N` to **0.3-0.7** to control how much Flux modulates the duo.
+        Flux must be patched into a voice duo to take effect. Always set ALL THREE together:
+        1. Use the `duo_patch` tool to connect a Flux output (FLUX_X1, X2, X3, Y, T1, T2, T3) to a destination
+           (e.g. PITCH, TIMBRE, MORPH) on the desired pair(s) (0-5).
+        2. Set `voice_duo_mod_source_level_N` to **0.3-0.7** (master depth for the duo's cables).
         3. Set Flux **MIX** above 0 to hear the pitch modulation.
-        Flux gates and triggers are routed automatically when FLUX is the active mod source.
 
-        To disable: set `voice_duo_mod_source_N` back to **1** (OFF), or set MIX to 0.
+        To disable: disconnect the Flux cables with `duo_patch`, or set MIX to 0.
 
         ## Tips
         - Start with MIX at 0 and slowly increase to hear how random melodies blend with your existing tuning.
@@ -148,7 +147,7 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
         - Low SPREAD + high DEJA VU creates subtle, repetitive motifs.
         - High SPREAD + Chromatic scale = experimental, atonal sequences.
         - Pair with Delay and Reverb for ambient generative music.
-        - Assign FLUX to only 1-2 pairs and keep others on OFF or LFO for contrast.
+        - Assign FLUX to only 1-2 pairs and keep other pairs on LFO cables or unpatched for contrast.
     """.trimIndent()
 
             override val portControlKeys = mapOf(

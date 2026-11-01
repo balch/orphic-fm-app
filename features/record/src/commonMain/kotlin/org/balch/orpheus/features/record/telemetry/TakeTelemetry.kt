@@ -3,6 +3,9 @@ package org.balch.orpheus.features.record.telemetry
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.patch.LegacyModSource
+import org.balch.orpheus.core.audio.patch.legacyDuoPatch
 
 /** Contents of `telemetry.json` for one recorded take. */
 @Serializable
@@ -43,6 +46,25 @@ data class MidiNoteOn(override val t: Float, val note: Int, val velocity: Int, v
 @Serializable
 @SerialName("midiNoteOff")
 data class MidiNoteOff(override val t: Float, val note: Int, val voice: Int?) : TakeEvent
+
+/** Fills cables from the old `modSource` name on takes recorded before duo patches. */
+fun TakeTelemetry.upgraded(): TakeTelemetry = copy(start = start.upgraded(), end = end.upgraded())
+
+private fun TakeSnapshot.upgraded(): TakeSnapshot = copy(pairs = pairs.map { it.upgraded() })
+
+private fun PairSnapshot.upgraded(): PairSnapshot {
+    if (cables.isNotEmpty() || modSource == null) return this
+    val legacy = when (modSource) {
+        "FM" -> LegacyModSource.VOICE_FM
+        else -> LegacyModSource.entries.firstOrNull { it.name == modSource && it != LegacyModSource.VOICE_FM }
+    } ?: return copy(modSource = null)
+    val onDx = OrpheusEngineId.fromId(engineId)?.forcePinHarmonics == true
+    return copy(cables = legacyDuoPatch(legacy, onDx, pair).cables, modSource = null)
+}
+
+/** Decodes a take's telemetry.json, upgrading old takes. */
+fun decodeTelemetry(text: String): TakeTelemetry =
+    TelemetryJson.decodeFromString(TakeTelemetry.serializer(), text).upgraded()
 
 val TelemetryJson: Json = Json {
     classDiscriminator = "type"

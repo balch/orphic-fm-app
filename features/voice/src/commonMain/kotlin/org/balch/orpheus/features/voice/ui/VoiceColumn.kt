@@ -18,12 +18,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.balch.orpheus.core.audio.EngineParam
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.patch.PatchDest
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.HorizontalEnvelopeSlider
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.patch.ModDotBox
 
 @Composable
 fun VoiceColumnMod(
@@ -35,6 +37,7 @@ fun VoiceColumnMod(
     morphLabel: DuoKnobLabel,
     envSpeed: Float,
     voiceActions: VoiceActions,
+    modulated: Set<PatchDest> = emptySet(),
 ) {
     Column(
         modifier =
@@ -45,28 +48,35 @@ fun VoiceColumnMod(
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
         DuoEngineKnob(
+            dest = PatchDest.MORPH,
+            modulated = PatchDest.MORPH in modulated,
             value = duoMorph,
             onValueChange = { voiceActions.setDuoMorph(duoIndex, it) },
             label = morphLabel,
             controlId = VoiceSymbol.duoMorph(duoIndex).controlId.key,
             color = OrpheusColors.neonMagenta,
         )
-        RotaryKnob(
-            value = tune,
-            onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
-            label = "\u266B", // eighth notes
-            labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
-            size = 28.dp,
-            progressColor = OrpheusColors.neonCyan
-        )
+        val slot = if (voiceIndex % 2 == 0) "-A" else "-B"
+        ModDotBox(PatchDest.PITCH, PatchDest.PITCH in modulated, OrpheusColors.neonCyan, tagSuffix = slot) {
+            RotaryKnob(
+                value = tune,
+                onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
+                label = "\u266B", // eighth notes
+                labelStyle = MaterialTheme.typography.labelLarge,
+                controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
+                size = 28.dp,
+                progressColor = OrpheusColors.neonCyan
+            )
+        }
         // Envelope Speed Slider
-        HorizontalEnvelopeSlider(
-            value = envSpeed,
-            onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
-            color = OrpheusColors.neonCyan,
-            controlId = VoiceSymbol.envSpeed(voiceIndex).controlId.key
-        )
+        ModDotBox(PatchDest.ENV, PatchDest.ENV in modulated, OrpheusColors.neonCyan, tagSuffix = slot) {
+            HorizontalEnvelopeSlider(
+                value = envSpeed,
+                onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
+                color = OrpheusColors.neonCyan,
+                controlId = VoiceSymbol.envSpeed(voiceIndex).controlId.key
+            )
+        }
     }
 }
 
@@ -80,6 +90,7 @@ fun VoiceColumnSharp(
     sharpLabel: DuoKnobLabel,
     envSpeed: Float,
     voiceActions: VoiceActions,
+    modulated: Set<PatchDest> = emptySet(),
 ) {
     Column(
         modifier =
@@ -90,52 +101,63 @@ fun VoiceColumnSharp(
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
         DuoEngineKnob(
+            dest = PatchDest.TIMBRE,
+            modulated = PatchDest.TIMBRE in modulated,
             value = sharpness,
             onValueChange = { voiceActions.setDuoSharpness(duoIndex, it) },
             label = sharpLabel,
             controlId = VoiceSymbol.duoSharpness(duoIndex).controlId.key,
             color = OrpheusColors.synthGreen,
         )
-        RotaryKnob(
-            value = tune,
-            onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
-            label = "\u266B", // eighth notes
-            labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
-            size = 28.dp,
-            progressColor = OrpheusColors.neonCyan
-        )
+        val slot = if (voiceIndex % 2 == 0) "-A" else "-B"
+        ModDotBox(PatchDest.PITCH, PatchDest.PITCH in modulated, OrpheusColors.neonCyan, tagSuffix = slot) {
+            RotaryKnob(
+                value = tune,
+                onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
+                label = "\u266B", // eighth notes
+                labelStyle = MaterialTheme.typography.labelLarge,
+                controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
+                size = 28.dp,
+                progressColor = OrpheusColors.neonCyan
+            )
+        }
         // Envelope Speed Slider
-        HorizontalEnvelopeSlider(
-            value = envSpeed,
-            onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
-            color = OrpheusColors.neonCyan,
-            controlId = VoiceSymbol.envSpeed(voiceIndex).controlId.key
-        )
+        ModDotBox(PatchDest.ENV, PatchDest.ENV in modulated, OrpheusColors.neonCyan, tagSuffix = slot) {
+            HorizontalEnvelopeSlider(
+                value = envSpeed,
+                onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
+                color = OrpheusColors.neonCyan,
+                controlId = VoiceSymbol.envSpeed(voiceIndex).controlId.key
+            )
+        }
     }
 }
 
 /** A duo knob that names its job on the current engine; an inactive one shows "-" and dims. */
 @Composable
 private fun DuoEngineKnob(
+    dest: PatchDest,
+    modulated: Boolean,
     value: Float,
     onValueChange: (Float) -> Unit,
     label: DuoKnobLabel,
     controlId: String,
     color: Color,
 ) {
-    RotaryKnob(
-        value = value,
-        onValueChange = onValueChange,
-        label = label.short,
-        caption = label.glyph,
-        longLabel = label.long,
-        controlId = controlId,
-        size = 28.dp,
-        progressColor = color,
-        labelColor = if (label.active) color else color.copy(alpha = 0.4f),
-        modifier = Modifier.alpha(if (label.active) 1f else 0.5f),
-    )
+    ModDotBox(dest, modulated, color) {
+        RotaryKnob(
+            value = value,
+            onValueChange = onValueChange,
+            label = label.short,
+            caption = label.glyph,
+            longLabel = label.long,
+            controlId = controlId,
+            size = 28.dp,
+            progressColor = color,
+            labelColor = if (label.active) color else color.copy(alpha = 0.4f),
+            modifier = Modifier.alpha(if (label.active) 1f else 0.5f),
+        )
+    }
 }
 
 @Preview

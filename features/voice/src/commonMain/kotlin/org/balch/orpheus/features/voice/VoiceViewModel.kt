@@ -19,8 +19,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.patch.DuoPatchBay
 import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
@@ -56,11 +56,11 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
             override val title = "Voices"
 
             override val markdown = """
-                Voice configuration panel for the 12-voice FM synthesizer. Controls tuning, engine selection, harmonics, envelope speed, modulation depth, duo modulation source, and coupling for individual voices, duos, and quads.
+                Voice configuration panel for the 12-voice FM synthesizer. Controls tuning, engine selection, harmonics, envelope speed, modulation depth, duo patch, and coupling for individual voices, duos, and quads.
 
                 ## Hierarchy
                 - **Voices (x12)**: Individual voice tuning, modulation depth, and envelope speed.
-                - **Duos (x6)**: Each duo shares an engine, harmonics, morph, sharpness, duo mod depth, and duo modulation source.
+                - **Duos (x6)**: Each duo shares an engine, harmonics, morph, sharpness, duo mod depth, and a patch of modulation cables.
                 - **Quads (x3)**: Each quad controls pitch offset, hold level, and volume for four voices.
 
                 ## Global Controls
@@ -68,26 +68,25 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
                 - **COUPLING**: Voice coupling strength — how much neighboring voices influence each other.
                 - **TOTAL_FEEDBACK**: Global FM feedback amount across all voices.
 
-                ## Duo Modulation Source
-                Each voice duo has TWO controls that work together:
-                - **DUO_MOD_SOURCE** selects WHICH effect: 0=FM, 1=OFF, 2=LFO, 3=FLUX.
-                - **DUO_MOD_SOURCE_LEVEL** controls HOW MUCH of that effect is applied (0.0=none, 1.0=full).
+                ## Duo Patch
+                Each voice duo has a patch of cables (use the `duo_patch` tool) plus a master depth:
+                - **Sources**: LFO_AB, LFO_A, LFO_B, LFO_A90 (LFO A·B / A / B / A 90°), WAVES_1..4,
+                  FLUX_X1, X2, X3, Y, T1, T2, T3, and VOICE_FM (the duo's own FM).
+                - **Destinations**: HARMONICS, TIMBRE, MORPH, FM (OSC only), PITCH, ENV. Amounts are -1..1.
+                - **DUO_MOD_SOURCE_LEVEL** is the master depth for all of the duo's cables (0.0=none, 1.0=full).
 
-                Always set BOTH when activating a mod source. Setting the source without depth means no audible effect.
-
-                Mod source types:
-                - **0 = FM**: Voice FM synthesis modulation between the two voices in the duo.
-                - **1 = OFF**: No modulation effect applied.
-                - **2 = LFO**: Low-frequency oscillator modulation for rhythmic movement.
-                - **3 = FLUX**: Flux random sequencer — generates evolving pitch sequences and gates. Also requires Flux MIX > 0 to hear pitch effect.
+                Cables are silent until the master depth is above 0. HARMONICS cables park (kept, but inactive)
+                when a duo switches to a DX engine, and `wake` brings one back. A HARMONICS cable connected
+                while the duo is already on DX is live and steps through patches.
+                Flux sources also need Flux MIX > 0 to hear the pitch effect.
 
                 ## Tips
                 - Use per-duo ENGINE selection to mix different synthesis models across the keyboard.
                 - HARMONICS and MORPH shape the tonal character within each engine.
                 - Adjust ENVELOPE SPEED per-voice for varied articulation across the keyboard.
                 - COUPLING creates organic, chorus-like detuning between voices.
-                - To activate FLUX: set DUO_MOD_SOURCE to 3, set DUO_MOD_SOURCE_LEVEL to 0.3-0.7, and set Flux MIX > 0.
-                - Use LFO (2) for rhythmic tremolo/vibrato, FM (0) for metallic timbres, OFF (1) for clean sound.
+                - To activate FLUX: connect a FLUX_* source with `duo_patch`, set DUO_MOD_SOURCE_LEVEL to 0.3-0.7, and set Flux MIX > 0.
+                - LFO cables give rhythmic movement, VOICE_FM cables give metallic timbres, no cables is clean sound.
 
                 ## Hidden Engines
                 There are additional synthesis engines beyond the standard set. These are rare,
@@ -127,10 +126,6 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
                 // Per-duo mod source level (x6)
                 for (i in 0 until 6) {
                     put(VoiceSymbol.duoModSourceLevel(i).controlId.key, "Mod source level for duo $i")
-                }
-                // Per-duo mod source (x6): 0=FM, 1=OFF, 2=LFO, 3=FLUX
-                for (i in 0 until 6) {
-                    put(VoiceSymbol.duoModSource(i).controlId.key, "Duo modulation source for duo $i (0=FM, 1=OFF, 2=LFO, 3=FLUX)")
                 }
                 // Per-voice mod depth (x12)
                 for (i in 0 until 12) {
@@ -173,6 +168,7 @@ class VoiceViewModel(
     private val synthController: SynthController,
     private val wobbleController: VoiceWobbleController,
     private val globalTempo: GlobalTempo,
+    private val patchBay: DuoPatchBay,
     dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope
 ) : VoicesFeature {
@@ -188,7 +184,6 @@ class VoiceViewModel(
 
     // Per-duo (×6)
     private val duoSharpnessFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoSharpness(i).controlId) }
-    private val duoModSourceFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoModSource(i).controlId) }
     private val duoEngineFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoEngine(i).controlId) }
     private val duoHarmonicsFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoHarmonics(i).controlId) }
     private val duoMorphFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoMorph(i).controlId) }
@@ -225,11 +220,6 @@ class VoiceViewModel(
         }
         for (i in 0 until 6) {
             add(duoSharpnessFlows[i].map { VoiceIntent.DuoSharpness(i, it.asFloat()) })
-            add(duoModSourceFlows[i].map {
-                val sources = ModSource.entries
-                val srcIndex = it.asInt().coerceIn(0, sources.size - 1)
-                VoiceIntent.DuoModSource(i, sources[srcIndex])
-            })
             add(duoEngineFlows[i].map { VoiceIntent.DuoEngine(i, it.asInt()) })
             add(duoHarmonicsFlows[i].map { VoiceIntent.DuoHarmonics(i, it.asFloat()) })
             add(duoMorphFlows[i].map { VoiceIntent.DuoMorph(i, it.asFloat()) })
@@ -248,6 +238,7 @@ class VoiceViewModel(
         add(vibratoFlow.map { VoiceIntent.Vibrato(it.asFloat()) })
         add(couplingFlow.map { VoiceIntent.VoiceCoupling(it.asFloat()) })
         add(masterVolFlow.map { VoiceIntent.MasterVolume(it.asFloat()) })
+        add(patchBay.patches.map { VoiceIntent.DuoPatches(it) })
         add(flowOf(VoiceIntent.HasNativeEngine(engine.hasNativeEngine)))
     }.merge()
 
@@ -262,7 +253,7 @@ class VoiceViewModel(
         pulseStart = ::pulseStart,
         pulseEnd = ::pulseEnd,
         setHold = ::setHold,
-        setDuoModSource = ::setDuoModSource,
+        setDuoPatch = patchBay::setPatch,
         setQuadPitch = ::setQuadPitch,
         setQuadHold = ::setQuadHold,
         setFmStructure = fmStructureFlow.boolSetter(),
@@ -418,14 +409,6 @@ class VoiceViewModel(
                 }
             }
 
-            is VoiceIntent.FmStructure -> {
-                // Re-apply duoModSources with VOICE_FM routing (depends on structure flag)
-                state.duoModSources.forEachIndexed { index, source ->
-                    if (source == ModSource.VOICE_FM)
-                        engine.setDuoModSource(index, source)
-                }
-            }
-
             else -> { /* Port-based side effects handled by controlFlows */ }
         }
     }
@@ -466,10 +449,6 @@ class VoiceViewModel(
 
     fun setHold(index: Int, holding: Boolean) {
         synthController.emitHoldChange(index, holding, ControlEventOrigin.UI)
-    }
-
-    fun setDuoModSource(index: Int, source: ModSource) {
-        duoModSourceFlows[index].value = IntValue(source.ordinal)
     }
 
     fun setDuoEngine(duoIndex: Int, engineId: Int) {

@@ -28,8 +28,10 @@ import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.audio.HyperLfoMode
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.patch.LegacyModSource
+import org.balch.orpheus.core.audio.patch.duoPatchKey
+import org.balch.orpheus.core.audio.patch.legacyDuoPatch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.di.FeatureScope
@@ -566,8 +568,8 @@ class AiOptionsViewModel(
                  sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_sharpness_$i", PortValue.FloatValue(v)) }
 
                  // Mostly FM for metallic/bell/lead tones
-                 val modSources = List(6) { if (r.nextFloat() > 0.8) ModSource.LFO else ModSource.VOICE_FM }
-                 modSources.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_mod_source_$i", PortValue.IntValue(v.ordinal)) }
+                 val modSources = List(6) { if (r.nextFloat() > 0.8) LegacyModSource.LFO else LegacyModSource.VOICE_FM }
+                 modSources.forEachIndexed { i, v -> put(duoPatchKey(i), PortValue.StringValue(legacyDuoPatch(v, onDx = false, duoIndex = i).encode())) }
                  
                  // Ping-pong delay style
                  val delayUri = DelayPlugin.URI

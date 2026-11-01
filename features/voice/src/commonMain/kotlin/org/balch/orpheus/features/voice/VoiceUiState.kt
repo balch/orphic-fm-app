@@ -1,8 +1,10 @@
 package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.VoiceState
+import org.balch.orpheus.core.audio.patch.DuoPatch
+import org.balch.orpheus.core.audio.patch.LegacyModSource
+import org.balch.orpheus.core.audio.patch.legacyDuoPatch
 
 @Immutable
 data class VoiceUiState(
@@ -11,7 +13,7 @@ data class VoiceUiState(
     val voiceModDepths: List<Float> = List(12) { 0.0f },
     val duoSharpness: List<Float> = List(6) { 0.0f },
     val voiceEnvelopeSpeeds: List<Float> = List(12) { 0.0f },
-    val duoModSources: List<ModSource> = List(6) { ModSource.OFF },
+    val duoPatches: List<DuoPatch> = List(6) { legacyDuoPatch(LegacyModSource.VOICE_FM, false, it) },
     val quadGroupPitches: List<Float> = List(3) { 0.5f },
     val quadGroupHolds: List<Float> = List(3) { 0.0f },
     val quadGroupVolumes: List<Float> = List(3) { 1.0f },
@@ -52,7 +54,7 @@ internal sealed interface VoiceIntent {
 
     // Duo-level intents
     data class DuoSharpness(val duoIndex: Int, val value: Float) : VoiceIntent
-    data class DuoModSource(val duoIndex: Int, val source: ModSource) : VoiceIntent
+    data class DuoPatches(val patches: List<DuoPatch>) : VoiceIntent
     data class DuoEngine(val duoIndex: Int, val engineOrdinal: Int) : VoiceIntent
     data class DuoHarmonics(val duoIndex: Int, val value: Float) : VoiceIntent
     data class DuoMorph(val duoIndex: Int, val value: Float) : VoiceIntent

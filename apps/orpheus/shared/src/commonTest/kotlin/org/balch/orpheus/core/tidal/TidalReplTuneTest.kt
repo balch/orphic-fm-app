@@ -49,6 +49,7 @@ class TidalReplTuneTest {
             dispatcherProvider,
             globalTempo,
             scope,
+            NoOpDuoPatchBay(),
         )
         repl = TidalRepl(scheduler, dispatcherProvider, scope)
     }

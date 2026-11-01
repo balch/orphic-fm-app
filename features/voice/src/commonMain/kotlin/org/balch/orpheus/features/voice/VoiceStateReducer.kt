@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.voice
 
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.VoiceState
 
 internal fun reduceVoiceState(state: VoiceUiState, intent: VoiceIntent): VoiceUiState =
@@ -24,8 +23,8 @@ internal fun reduceVoiceState(state: VoiceUiState, intent: VoiceIntent): VoiceUi
         is VoiceIntent.DuoSharpness ->
             state.withDuoSharpness(intent.duoIndex, intent.value)
 
-        is VoiceIntent.DuoModSource ->
-            state.withDuoModSource(intent.duoIndex, intent.source)
+        is VoiceIntent.DuoPatches ->
+            state.copy(duoPatches = intent.patches)
 
         is VoiceIntent.DuoEngine ->
             state.withDuoEngine(intent.duoIndex, intent.engineOrdinal)
@@ -111,9 +110,6 @@ internal fun VoiceUiState.withEnvelopeSpeed(index: Int, value: Float) =
 
 internal fun VoiceUiState.withDuoSharpness(duoIndex: Int, value: Float) =
     copy(duoSharpness = duoSharpness.mapIndexed { i, s -> if (i == duoIndex) value else s })
-
-internal fun VoiceUiState.withDuoModSource(duoIndex: Int, source: ModSource) =
-    copy(duoModSources = duoModSources.mapIndexed { i, s -> if (i == duoIndex) source else s })
 
 internal fun VoiceUiState.withDuoEngine(duoIndex: Int, engineOrdinal: Int) =
     copy(duoEngines = duoEngines.mapIndexed { i, e -> if (i == duoIndex) engineOrdinal else e })

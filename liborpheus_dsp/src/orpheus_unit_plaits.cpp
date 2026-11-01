@@ -1,6 +1,5 @@
 #include "orpheus_units.h"
 #include "orpheus_units_common.h"
-#include "dx_engine_range.h"
 #include "orpheus_engine.h"
 #include "orpheus_unit_chaos.h"
 #include <cmath>
@@ -134,21 +133,33 @@ static float compute_scaled_hold(float hold, float speed) {
     return std::min(1.0f, eased_hold * scale_factor);
 }
 
-// Block-level RMS of a float buffer — used for computing cross-mod energy
-// between duo voices when one or both use Plaits (block-rate) engines.
-static inline float buf_rms(const float* buf, int n) {
-    float sum_sq = 0.0f;
-    for (int i = 0; i < n; i++) sum_sq += buf[i] * buf[i];
-    return (n > 0) ? std::sqrt(sum_sq / n) : 0.0f;
+static inline float clamp01(float x) { return std::max(0.0f, std::min(1.0f, x)); }
+
+// A destination's cables added onto base one term at a time as base + value * gain, the shape
+// the release build fused for the old mod sources, so legacy patches render bit-identically.
+static inline float add_terms(float base, const PatchVoiceTerms& t, int dst) {
+    for (int j = 0; j < t.count[dst]; j++) base += t.term[dst][j].value * t.term[dst][j].gain;
+    return base;
 }
 
-// DX engines (2, 3, 4) read harmonics as a patch selector, so LFO ch2 would hop patches.
-static inline bool lfo_ch2_targets_harmonics(int engine_index) {
-    return !is_dx_engine_index(engine_index);
+// add_terms clamped to [0, 1]. With nothing plugged in the base is left untouched.
+static inline float add_terms01(float base, const PatchVoiceTerms& t, int dst) {
+    return (t.count[dst] > 0) ? clamp01(add_terms(base, t, dst)) : base;
 }
 
-void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr,
-                         float duo_mod_signal) {
+// ENV cables move envSpeed (stored in decay) before the envelope and hold read it.
+static inline float env_speed_with(float decay, const PatchVoiceTerms& t, const PatchVoiceMods& m) {
+    return (t.count[kPatchDstEnv] > 0) ? clamp01(decay + m.env) : decay;
+}
+
+// FM cables at sample i: buffer sources fuse as freq + v * gain, block constants add their Hz.
+static inline float apply_fm(float freq, const PatchFmPlan& p, int i, float partner) {
+    for (int j = 0; j < p.count; j++) freq += (p.buf[j] ? p.buf[j][i] : partner) * p.gain[j];
+    if (p.has_block) freq += p.block_hz;
+    return freq;
+}
+
+void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
     int idx = u->state.module.index;
     if (idx < 0 || idx >= kNumVoices) {
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
@@ -195,10 +206,24 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         return;
     }
 
+    // ── Patch matrix: smoothed master depth and this voice's block-rate offsets ──
+    float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
+    int duo = idx / 2;
+    float depth = 0.0f;
+    if (duo < OrpheusEngine::kNumDuos) {
+        float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
+        engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
+        depth = engine->smooth_mod_depth[duo];
+    }
+    PatchVoiceTerms terms;
+    patch_voice_terms(*engine, duo, idx % 2, idx, num_frames, depth, &terms);
+    PatchVoiceMods mods = patch_term_sums(terms);
+
     float* out = u->output_buffers[OPORT_OUT];
     int engine_index = vp.engine_index.load(std::memory_order_relaxed);
     int actual_gate = vp.gate.load(std::memory_order_relaxed);
-    float env_speed = vp.decay.load(std::memory_order_relaxed); // envSpeed stored in decay
+    // envSpeed stored in decay; an ENV cable moves it before envelope and hold read it
+    float env_speed = env_speed_with(vp.decay.load(std::memory_order_relaxed), terms, mods);
     float raw_hold = engine->voice_hold_level[idx].load(std::memory_order_relaxed);
     float scaled_hold = compute_scaled_hold(raw_hold, env_speed);
 
@@ -229,9 +254,6 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
-    // ── Smoothing coefficient for this block ──────────────────
-    float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
-
     // ── Vibrato modulation ───────────────────────────────────
     // Block-midpoint from dedicated vibrato buffer (Hz domain, matches JSyn)
     float vibrato_hz_mid = engine->vibrato_output_buffer[num_frames / 2];
@@ -251,65 +273,8 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
-    // ── Mod source routing: FM + timbre modulation ──────
-    // JSyn architecture:
-    //   Engine 0: modInput → fmDepthControl → fmFreqMixer = linear FM in Hz (±200Hz).
-    //             ALL mod sources (VOICE_FM, LFO, FLUX) go through this path.
-    //   Plaits:   modInput → timbreModDepth = timbre modulation only (no pitch FM).
-    //             ALL mod sources go through timbre mod, not frequency.
-    //
-    // For Engine 0, VOICE_FM uses per-sample audio-rate FM from the partner's
-    // output buffer. LFO uses per-sample from lfo_output_buffer. FLUX uses
-    // block-rate from marbles CV.
-    float timbre_mod_offset = 0.0f;
-    int fm_mod_source = -1;      // 0=VOICE_FM, 2=LFO, 3=FLUX (-1=OFF)
-    int fm_voice_idx = -1;       // partner voice index (only for VOICE_FM)
-    float fm_depth_smoothed = 0.0f;
-    float fm_flux_signal = 0.0f; // block-rate FLUX signal for Engine 0 FM
-    {
-        int duo = idx / 2;
-        if (duo < OrpheusEngine::kNumDuos) {
-            // Kotlin ModSource enum: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
-            int src = engine->mod_source[duo].load(std::memory_order_relaxed);
-            float mod_signal = 0.0f;  // block-level signal for Plaits timbre mod
-            if (src == 0) { // VOICE_FM
-                int fm_source;
-                if (!engine->fm_cross_quad.load(std::memory_order_relaxed)) {
-                    fm_source = (idx % 2 == 0) ? idx + 1 : idx - 1;
-                } else {
-                    fm_source = (idx - 2 + 8) % 8;
-                }
-                if (fm_source >= 0 && fm_source < kNumVoices) {
-                    fm_mod_source = 0;
-                    fm_voice_idx = fm_source;
-                    // For Plaits timbre mod: use duo override (RMS) if provided,
-                    // otherwise fall back to mid-point sample (standalone rendering)
-                    mod_signal = (duo_mod_signal >= 0.0f)
-                        ? duo_mod_signal
-                        : engine->voice_fm_buffer[fm_source][num_frames / 2];
-                }
-            } else if (src == 2) { // LFO
-                fm_mod_source = 2;
-                mod_signal = engine->lfo_output_buffer[num_frames / 2];
-            } else if (src == 3) { // FLUX (Marbles CV)
-                fm_mod_source = 3;
-                fm_flux_signal = engine->marbles_cv_output[duo % 2];
-                mod_signal = fm_flux_signal;
-            } else if (src == 4) { // TIDES (Waves envelope/LFO)
-                // Reads tides_output_buffer directly (no graph wire). May read
-                // previous frame's data if tides hasn't run yet — inaudible at LFO rates.
-                fm_mod_source = 4;
-                mod_signal = engine->tides_output_buffer[0][num_frames / 2];
-            }
-            // src == 1 (OFF) leaves fm_mod_source = -1
-            float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
-            float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
-            engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
-            engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
-            timbre_mod_offset = mod_signal * engine->smooth_mod_depth[duo];
-            fm_depth_smoothed = engine->smooth_fm_depth[duo];
-        }
-    }
+    // VOICE_FM partner for per-sample FM (Engine 0 only; Plaits engines take no FM)
+    int fm_voice_idx = patch_fm_partner(*engine, idx);
 
     // ── Bender pitch offset (Hz domain, matches JSyn benderDepth=100Hz) ──
     float bend_hz = 0.0f;
@@ -347,21 +312,9 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float feedback_amount = vp.harmonics.load(std::memory_order_relaxed);
         float morph_val = vp.morph.load(std::memory_order_relaxed);
 
-        // Multi-channel modulation: LFO ch1-2 or Tides ch1-2 (scaled by mod_depth)
-        // Only applies when mod source is LFO (2) or Tides (4) — other sources
-        // (OFF, VOICE_FM, FLUX) must not read the LFO buffers, which may contain
-        // DuoLFO per-oscillator data that would corrupt morph (e.g. Speech voice).
-        if (fm_mod_source == 2 || fm_mod_source == 4) {
-            float md = fm_depth_smoothed;
-            float morph_src = (fm_mod_source == 4)
-                ? engine->tides_output_buffer[1][num_frames / 2]
-                : engine->lfo_morph_buffer[num_frames / 2];
-            float harm_src = (fm_mod_source == 4)
-                ? engine->tides_output_buffer[2][num_frames / 2]
-                : engine->lfo_harmonics_buffer[num_frames / 2];
-            morph_val = std::max(0.0f, std::min(1.0f, morph_val + morph_src * md * 0.5f));
-            feedback_amount = std::max(0.0f, std::min(1.0f, feedback_amount + harm_src * md * 0.5f));
-        }
+        // Patch cables: MORPH and HARMONICS (feedback); TIMBRE is unused here
+        morph_val = add_terms01(morph_val, terms, kPatchDstMorph);
+        feedback_amount = add_terms01(feedback_amount, terms, kPatchDstHarmonics);
 
         // Detune: ±morph × 25 cents (matching JSyn: MAX_DETUNE=50 cents, split ±half)
         // Voice A (even idx) gets positive detune, Voice B (odd) gets negative
@@ -369,14 +322,14 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float detune_semitones = detune_sign * morph_val * (25.0f / 100.0f);
 
         float base_note = vp.tune.load(std::memory_order_relaxed) + detune_semitones;
-        // Ch3 pitch wander: LFO or Tides (±0.5 semitone max)
-        if (fm_mod_source == 2 || fm_mod_source == 4) {
-            float pitch_src = (fm_mod_source == 4)
-                ? engine->tides_output_buffer[3][num_frames / 2]
-                : engine->lfo_pitch_buffer[num_frames / 2];
-            base_note += pitch_src * fm_depth_smoothed * 0.5f;
-        }
+        base_note = add_terms(base_note, terms, kPatchDstPitch);
         base_note = std::max(20.0f, std::min(127.0f, base_note));
+
+        PatchFmTaps fm_taps;
+        patch_fm_taps(*engine, duo, idx % 2, &fm_taps);
+        PatchFmPlan fm_plan;
+        patch_fm_plan(*engine, fm_taps, depth, &fm_plan);
+        bool has_fm = fm_plan.count > 0 || fm_plan.has_block;
 
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
@@ -405,22 +358,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 freq *= (1.0f + pitch_cv_buffer[i]);
             }
 
-            // Linear FM in Hz — matches JSyn: fmFreqMixer = (fmSignal * fmDepth * 200Hz) + baseFreq
-            // All mod sources modulate Engine 0 frequency through the same path.
-            if (fm_mod_source == 0 && fm_voice_idx >= 0) {
-                // VOICE_FM: per-sample from partner's previous output buffer
-                float fm_sample = engine->voice_fm_buffer[fm_voice_idx][i];
-                freq += fm_sample * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 2) {
-                // LFO: per-sample from lfo_output_buffer (audio-rate)
-                float lfo_fm = engine->lfo_output_buffer[i];
-                freq += lfo_fm * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 3) {
-                // FLUX: block-rate from marbles CV
-                freq += fm_flux_signal * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 4) {
-                // TIDES: per-sample from tides_output_buffer[0]
-                freq += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
+            // Linear FM in Hz from the FM cables (VOICE_FM reads the partner's previous block)
+            if (has_fm) {
+                float partner = (fm_voice_idx >= 0) ? engine->voice_fm_buffer[fm_voice_idx][i] : 0.0f;
+                freq = apply_fm(freq, fm_plan, i, partner);
             }
 
             float audio = osc.core.Next(freq, sr, sharpness, feedback_amount);
@@ -524,34 +465,14 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         } else {
             note = note_raw;
         }
-        // Ch3 pitch wander: LFO or Tides (±0.5 semitone max, scaled by mod_depth)
-        if (fm_mod_source == 2 || fm_mod_source == 4) {
-            float ps = (fm_mod_source == 4)
-                ? engine->tides_output_buffer[3][num_frames / 2]
-                : engine->lfo_pitch_buffer[num_frames / 2];
-            note += ps * fm_depth_smoothed * 0.5f;
-        }
+        note = add_terms(note, terms, kPatchDstPitch);
         note = std::max(20.0f, std::min(127.0f, note));  // clamp to safe MIDI range
-        float harmonics = vp.harmonics.load(std::memory_order_relaxed);
+        // Patch cables. A parked DX HARMONICS cable arrives as amount 0, so DX patches hold.
+        float harmonics = add_terms01(vp.harmonics.load(std::memory_order_relaxed), terms, kPatchDstHarmonics);
         float timbre = std::max(0.0f, std::min(1.0f,
-            vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
-        float morph = vp.morph.load(std::memory_order_relaxed);
+            vp.timbre.load(std::memory_order_relaxed) + mods.timbre));
+        float morph = add_terms01(vp.morph.load(std::memory_order_relaxed), terms, kPatchDstMorph);
         float accent = vp.accent.load(std::memory_order_relaxed);
-
-        // Multi-channel modulation: LFO ch1-2 or Tides ch1-2 (scaled by mod_depth)
-        if (fm_mod_source == 2 || fm_mod_source == 4) {
-            float md = fm_depth_smoothed;
-            float morph_src = (fm_mod_source == 4)
-                ? engine->tides_output_buffer[1][num_frames / 2]
-                : engine->lfo_morph_buffer[num_frames / 2];
-            float harm_src = (fm_mod_source == 4)
-                ? engine->tides_output_buffer[2][num_frames / 2]
-                : engine->lfo_harmonics_buffer[num_frames / 2];
-            morph = std::max(0.0f, std::min(1.0f, morph + morph_src * md * 0.5f));
-            if (lfo_ch2_targets_harmonics(engine_index)) {
-                harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_src * md * 0.5f));
-            }
-        }
 
         // Render: Braids range (100..199) → MacroOscillator wrapper.
         // Otherwise → OrpheusVoice (handles Plaits engine selection, outGain, soft_limit).
@@ -815,93 +736,45 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
         return;
     }
 
-    // ── Plaits rendering: delegate to unit_process_plaits with cross-mod ──
-    // Instead of bailing out entirely, we compute RMS-based cross-modulation
-    // signals so Plaits voices get meaningful timbre modulation from their
-    // partner, restoring JSyn-quality FM interaction.
+    // ── Plaits rendering: delegate to unit_process_plaits per voice ──
+    // A VOICE_FM cable's block-rate value is the partner's RMS: A reads B's previous
+    // block, B reads A's block just rendered.
     int engineA = vpA.engine_index.load(std::memory_order_relaxed);
     int engineB = vpB.engine_index.load(std::memory_order_relaxed);
     if (engineA >= 0 || engineB >= 0) {
-        // Pre-smooth FM/mod once per block, then save+restore around
+        // Pre-smooth the depth once per block, then save+restore around
         // the two unit_process_plaits calls to prevent double-smoothing.
         float sc = block_smooth_coeff(sr, num_frames, kDuoDepthSmoothSeconds);
-        float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
-        engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
         float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
         engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
 
-        float saved_fm = engine->smooth_fm_depth[duo];
         float saved_mod = engine->smooth_mod_depth[duo];
 
         auto& tmp = engine->plaits_fallback_unit;
 
-        int src = engine->mod_source[duo].load(std::memory_order_relaxed);
-        bool is_voice_fm = (src == 0);  // VOICE_FM
-
-        if (engineA >= 0 && engineB >= 0) {
-            // ── Both Plaits: RMS cross-mod ──
-            // A gets timbre mod from RMS of B's previous block
-            // B gets timbre mod from RMS of A's current block (just rendered)
-            float mod_for_A = is_voice_fm ? buf_rms(engine->voice_fm_buffer[idxB], num_frames) : -1.0f;
-
-            std::memset(&tmp, 0, sizeof(tmp));
-            tmp.type = UNIT_PLAITS;
-            tmp.enabled = true;
-            tmp.state.module.index = idxA;
-            unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_A);
-            std::memcpy(outA, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
-
-            engine->smooth_fm_depth[duo] = saved_fm;
-            engine->smooth_mod_depth[duo] = saved_mod;
-
-            // B reads A's current output (just rendered, now in voice_fm_buffer[idxA])
-            float mod_for_B = is_voice_fm ? buf_rms(engine->voice_fm_buffer[idxA], num_frames) : -1.0f;
-
-            tmp.state.module.index = idxB;
-            std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
-            unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_B);
-            std::memcpy(outB, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
-
-            engine->smooth_fm_depth[duo] = saved_fm;
-            engine->smooth_mod_depth[duo] = saved_mod;
-
-        } else {
-            // ── Mixed duo: Engine 0 + Plaits ──
-            // Render Engine 0 first (gets per-sample FM from partner's prev buffer).
-            // Then render Plaits with RMS of Engine 0's current output.
-            int e0_idx, pl_idx;
-            float *e0_out, *pl_out;
-            if (engineA < 0) {
-                e0_idx = idxA; e0_out = outA;
-                pl_idx = idxB; pl_out = outB;
-            } else {
-                e0_idx = idxB; e0_out = outB;
-                pl_idx = idxA; pl_out = outA;
-            }
-
-            // Engine 0 voice renders first — unit_process_plaits handles
-            // per-sample FM from voice_fm_buffer internally for engine_index < 0
-            std::memset(&tmp, 0, sizeof(tmp));
-            tmp.type = UNIT_PLAITS;
-            tmp.enabled = true;
-            tmp.state.module.index = e0_idx;
-            unit_process_plaits(&tmp, engine, num_frames, sr);
-            std::memcpy(e0_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
-
-            engine->smooth_fm_depth[duo] = saved_fm;
-            engine->smooth_mod_depth[duo] = saved_mod;
-
-            // Plaits voice gets RMS of Engine 0's current output as timbre mod
-            float mod_for_plaits = is_voice_fm ? buf_rms(engine->voice_fm_buffer[e0_idx], num_frames) : -1.0f;
-
-            tmp.state.module.index = pl_idx;
-            std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
-            unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_plaits);
-            std::memcpy(pl_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
-
-            engine->smooth_fm_depth[duo] = saved_fm;
-            engine->smooth_mod_depth[duo] = saved_mod;
+        // Engine 0 renders first in a mixed duo, so the Plaits voice reads its current block.
+        int first = idxA, second = idxB;
+        float *first_out = outA, *second_out = outB;
+        if (engineA >= 0 && engineB < 0) {
+            first = idxB; first_out = outB;
+            second = idxA; second_out = outA;
         }
+
+        std::memset(&tmp, 0, sizeof(tmp));
+        tmp.type = UNIT_PLAITS;
+        tmp.enabled = true;
+        tmp.state.module.index = first;
+        unit_process_plaits(&tmp, engine, num_frames, sr);
+        std::memcpy(first_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+        engine->smooth_mod_depth[duo] = saved_mod;
+
+        tmp.state.module.index = second;
+        std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
+        unit_process_plaits(&tmp, engine, num_frames, sr);
+        std::memcpy(second_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+        engine->smooth_mod_depth[duo] = saved_mod;
 
         return;
     }
@@ -915,69 +788,41 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     // Coupling depth (shared, smoothed in orpheus_graph_process)
     float coupling = engine->smooth_coupling_depth;
 
-    // FM mod source + depth (per-duo, smoothed)
-    int src = engine->mod_source[duo].load(std::memory_order_relaxed);
-    float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
-    engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
-    float fm_depth_smoothed = engine->smooth_fm_depth[duo];
+    // Master patch depth (per-duo, smoothed) and each voice's cables
+    float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
+    engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
+    float depth = engine->smooth_mod_depth[duo];
+    PatchVoiceTerms termsA, termsB;
+    patch_voice_terms(*engine, duo, 0, idxA, num_frames, depth, &termsA);
+    patch_voice_terms(*engine, duo, 1, idxB, num_frames, depth, &termsB);
+    PatchVoiceMods modsA = patch_term_sums(termsA);
+    PatchVoiceMods modsB = patch_term_sums(termsB);
+    PatchFmTaps tapsA, tapsB;
+    patch_fm_taps(*engine, duo, 0, &tapsA);
+    patch_fm_taps(*engine, duo, 1, &tapsB);
+    PatchFmPlan planA, planB;
+    patch_fm_plan(*engine, tapsA, depth, &planA);
+    patch_fm_plan(*engine, tapsB, depth, &planB);
+    bool has_fmA = planA.count > 0 || planA.has_block;
+    bool has_fmB = planB.count > 0 || planB.has_block;
 
-    // FM source routing
-    // Kotlin ModSource: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX, 4=TIDES
-    int fm_mod_source = -1;
-    float fm_flux_signal = 0.0f;
-    // For VOICE_FM in duo mode, A reads from B and B reads from A (default)
-    // With cross-quad: A reads from A's cross-quad source, B reads from B's cross-quad source
-    int fm_source_for_A = -1;
-    int fm_source_for_B = -1;
-    if (src == 0) { // VOICE_FM
-        fm_mod_source = 0;
-        if (!engine->fm_cross_quad.load(std::memory_order_relaxed)) {
-            // Standard duo pairs: A reads B, B reads A
-            fm_source_for_A = idxB;
-            fm_source_for_B = idxA;
-        } else {
-            // Cross-quad circular: each voice reads from (idx-2+8)%8
-            fm_source_for_A = (idxA - 2 + 8) % 8;
-            fm_source_for_B = (idxB - 2 + 8) % 8;
-        }
-    } else if (src == 2) { // LFO
-        fm_mod_source = 2;
-    } else if (src == 3) { // FLUX
-        fm_mod_source = 3;
-        fm_flux_signal = engine->marbles_cv_output[duo % 2];
-    } else if (src == 4) { // TIDES (Waves envelope/LFO)
-        fm_mod_source = 4;
-    }
+    // VOICE_FM partners: A reads B and B reads A, or each its cross-quad source
+    int fm_source_for_A = patch_fm_partner(*engine, idxA);
+    int fm_source_for_B = patch_fm_partner(*engine, idxB);
 
     // ── Per-voice parameters ──────────────────────────────────────
     // Voice A
     int gateA = vpA.gate.load(std::memory_order_relaxed);
-    float env_speedA = vpA.decay.load(std::memory_order_relaxed);
+    float env_speedA = env_speed_with(vpA.decay.load(std::memory_order_relaxed), termsA, modsA);
     float raw_holdA = engine->voice_hold_level[idxA].load(std::memory_order_relaxed);
     float scaled_holdA = compute_scaled_hold(raw_holdA, env_speedA);
     float feedbackA = vpA.harmonics.load(std::memory_order_relaxed);
-    float morph_valA = vpA.morph.load(std::memory_order_relaxed);
-    // Multi-channel modulation for duo voice A (LFO or Tides ch1-3)
-    if (fm_mod_source == 2 || fm_mod_source == 4) {
-        float md = engine->smooth_fm_depth[duo];
-        float morph_src = (fm_mod_source == 4)
-            ? engine->tides_output_buffer[1][num_frames / 2]
-            : engine->lfo_morph_buffer[num_frames / 2];
-        float harm_src = (fm_mod_source == 4)
-            ? engine->tides_output_buffer[2][num_frames / 2]
-            : engine->lfo_harmonics_buffer[num_frames / 2];
-        morph_valA = std::max(0.0f, std::min(1.0f, morph_valA + morph_src * md * 0.5f));
-        feedbackA = std::max(0.0f, std::min(1.0f, feedbackA + harm_src * md * 0.5f));
-    }
+    float morph_valA = add_terms01(vpA.morph.load(std::memory_order_relaxed), termsA, kPatchDstMorph);
+    feedbackA = add_terms01(feedbackA, termsA, kPatchDstHarmonics);
     // Voice A: positive detune (+morph × 25 cents, matching JSyn ±split)
     float detune_semiA = morph_valA * (25.0f / 100.0f);
     float base_noteA = vpA.tune.load(std::memory_order_relaxed) + detune_semiA;
-    if (fm_mod_source == 2 || fm_mod_source == 4) {
-        float pitch_srcA = (fm_mod_source == 4)
-            ? engine->tides_output_buffer[3][num_frames / 2]
-            : engine->lfo_pitch_buffer[num_frames / 2];
-        base_noteA += pitch_srcA * engine->smooth_fm_depth[duo] * 0.5f;
-    }
+    base_noteA = add_terms(base_noteA, termsA, kPatchDstPitch);
     base_noteA = std::max(20.0f, std::min(127.0f, base_noteA));
     float sharpnessA = vpA.timbre.load(std::memory_order_relaxed);
     float bend_hzA = engine->voice_bend_cv[idxA];
@@ -989,32 +834,16 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 
     // Voice B
     int gateB = vpB.gate.load(std::memory_order_relaxed);
-    float env_speedB = vpB.decay.load(std::memory_order_relaxed);
+    float env_speedB = env_speed_with(vpB.decay.load(std::memory_order_relaxed), termsB, modsB);
     float raw_holdB = engine->voice_hold_level[idxB].load(std::memory_order_relaxed);
     float scaled_holdB = compute_scaled_hold(raw_holdB, env_speedB);
     float feedbackB = vpB.harmonics.load(std::memory_order_relaxed);
-    float morph_valB = vpB.morph.load(std::memory_order_relaxed);
-    // Multi-channel modulation for duo voice B (LFO or Tides ch1-3)
-    if (fm_mod_source == 2 || fm_mod_source == 4) {
-        float md = engine->smooth_fm_depth[duo];
-        float morph_src = (fm_mod_source == 4)
-            ? engine->tides_output_buffer[1][num_frames / 2]
-            : engine->lfo_morph_buffer[num_frames / 2];
-        float harm_src = (fm_mod_source == 4)
-            ? engine->tides_output_buffer[2][num_frames / 2]
-            : engine->lfo_harmonics_buffer[num_frames / 2];
-        morph_valB = std::max(0.0f, std::min(1.0f, morph_valB + morph_src * md * 0.5f));
-        feedbackB = std::max(0.0f, std::min(1.0f, feedbackB + harm_src * md * 0.5f));
-    }
+    float morph_valB = add_terms01(vpB.morph.load(std::memory_order_relaxed), termsB, kPatchDstMorph);
+    feedbackB = add_terms01(feedbackB, termsB, kPatchDstHarmonics);
     // Voice B: negative detune (-morph × 25 cents, matching JSyn ±split)
     float detune_semiB = -morph_valB * (25.0f / 100.0f);
     float base_noteB = vpB.tune.load(std::memory_order_relaxed) + detune_semiB;
-    if (fm_mod_source == 2 || fm_mod_source == 4) {
-        float pitch_srcB = (fm_mod_source == 4)
-            ? engine->tides_output_buffer[3][num_frames / 2]
-            : engine->lfo_pitch_buffer[num_frames / 2];
-        base_noteB += pitch_srcB * engine->smooth_fm_depth[duo] * 0.5f;
-    }
+    base_noteB = add_terms(base_noteB, termsB, kPatchDstPitch);
     base_noteB = std::max(20.0f, std::min(127.0f, base_noteB));
     float sharpnessB = vpB.timbre.load(std::memory_order_relaxed);
     float bend_hzB = engine->voice_bend_cv[idxB];
@@ -1094,23 +923,11 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 freqA += envB * coupling * 30.0f;
             }
 
-            // FM modulation
-            if (fm_mod_source == 0 && fm_source_for_A >= 0) {
-                // VOICE_FM: per-sample from B's previous output (1-sample delay)
-                // In standard duo mode, fm_source_for_A == idxB, so we use prev_outB
-                // In cross-quad mode, fm_source_for_A may be a different voice — use buffer
-                if (fm_source_for_A == idxB) {
-                    freqA += prev_outB * fm_depth_smoothed * 200.0f;
-                } else {
-                    freqA += engine->voice_fm_buffer[fm_source_for_A][i] * fm_depth_smoothed * 200.0f;
-                }
-            } else if (fm_mod_source == 2) {
-                freqA += engine->lfo_output_buffer[i] * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 3) {
-                freqA += fm_flux_signal * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 4) {
-                // TIDES: per-sample from tides_output_buffer[0]
-                freqA += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
+            // FM cables. VOICE_FM: B's previous sample (1-sample delay), or the cross-quad buffer
+            if (has_fmA) {
+                float partner = (fm_source_for_A == idxB) ? prev_outB
+                    : (fm_source_for_A >= 0) ? engine->voice_fm_buffer[fm_source_for_A][i] : 0.0f;
+                freqA = apply_fm(freqA, planA, i, partner);
             }
 
             float audioA = oscA.core.Next(freqA, sr, sharpnessA, feedbackA);
@@ -1183,23 +1000,11 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 freqB += envA * coupling * 30.0f;
             }
 
-            // FM modulation
-            if (fm_mod_source == 0 && fm_source_for_B >= 0) {
-                // VOICE_FM: per-sample from A's CURRENT output (zero delay!)
-                // In standard duo mode, fm_source_for_B == idxA, so we use sampleA directly
-                // In cross-quad mode, fm_source_for_B may be a different voice — use buffer
-                if (fm_source_for_B == idxA) {
-                    freqB += sampleA * fm_depth_smoothed * 200.0f;
-                } else {
-                    freqB += engine->voice_fm_buffer[fm_source_for_B][i] * fm_depth_smoothed * 200.0f;
-                }
-            } else if (fm_mod_source == 2) {
-                freqB += engine->lfo_output_buffer[i] * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 3) {
-                freqB += fm_flux_signal * fm_depth_smoothed * 200.0f;
-            } else if (fm_mod_source == 4) {
-                // TIDES: per-sample from tides_output_buffer[0]
-                freqB += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
+            // FM cables. VOICE_FM: A's current sample (zero delay), or the cross-quad buffer
+            if (has_fmB) {
+                float partner = (fm_source_for_B == idxA) ? sampleA
+                    : (fm_source_for_B >= 0) ? engine->voice_fm_buffer[fm_source_for_B][i] : 0.0f;
+                freqB = apply_fm(freqB, planB, i, partner);
             }
 
             float audioB = oscB.core.Next(freqB, sr, sharpnessB, feedbackB);

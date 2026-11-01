@@ -1,6 +1,9 @@
 package org.balch.orpheus.features.record.telemetry
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.audio.patch.PatchCable
 
 /** Synth state at one instant (take start or end), flattened for the skill to read. */
 @Serializable
@@ -11,6 +14,7 @@ data class TakeSnapshot(
     val effects: EffectsSnapshot,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class PairSnapshot(
     val pair: Int,
@@ -19,7 +23,10 @@ data class PairSnapshot(
     val harmonics: Float,
     val timbre: Float,
     val morph: Float,
-    val modSource: String,
+    val cables: List<PatchCable> = emptyList(),
+    /** Read-only: the mod source name old takes wrote; [upgraded] turns it into [cables]. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val modSource: String? = null,
     val modSourceLevel: Float,
     val voices: List<VoiceSnapshot>,
 )

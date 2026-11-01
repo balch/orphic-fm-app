@@ -40,9 +40,10 @@ data object DroneAgentConfig : SynthControlAgentConfig {
 
         PER-DUO CONTROLS (Quad 2 = Duos 4-5):
         - voice_duo_sharpness_4, voice_duo_sharpness_5: Waveform sharpness (0=soft/sine, 1=sharp/saw).
-        - voice_duo_mod_source_4, voice_duo_mod_source_5: Modulation source (0=FM, 1=OFF, 2=LFO, 3=FLUX).
-        - voice_duo_mod_source_level_4, voice_duo_mod_source_level_5: Mod source amount (0.0=none, 1.0=full).
-        IMPORTANT: Always set BOTH mod_source AND mod_source_level together. Source without level = silent.
+        - duo_patch tool (duo 4 or 5): connect a source (LFO_A, WAVES_1, FLUX_X1, VOICE_FM, ...) to a destination
+          (HARMONICS, TIMBRE, MORPH, FM, PITCH, ENV) with an amount -1..1.
+        - voice_duo_mod_source_level_4, voice_duo_mod_source_level_5: Master depth (0.0=none, 1.0=full).
+        IMPORTANT: Cables are silent until the master depth is above 0.
         
         BENDER CONTROL (SPECIAL: uses -1.0 to +1.0 range!):
         - BENDER: Pitch bend with spring-loaded feel (-1.0=down, 0.0=center, +1.0=up)
