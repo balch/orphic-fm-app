@@ -615,6 +615,7 @@ bool run_pulsar_texture_line_tests();
 bool run_pulsar_pan_glide_tests();
 bool run_pulsar_pad_restrike_tests();
 bool run_pulsar_engine_swap_tests();
+bool run_pulsar_slot_lock_tests();
 bool run_pulsar_audition_gain_tests();
 bool run_pulsar_grain_fx_tests();
 bool run_pulsar_lick_growth_tests();

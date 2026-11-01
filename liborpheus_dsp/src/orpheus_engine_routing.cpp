@@ -770,6 +770,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             }
             else if (std::strcmp(param, "engine_space") == 0)
                 engine->pulsar_track_engine_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "slot_lock") == 0)
+                engine->pulsar_track_slot_lock[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "volume") == 0)
                 engine->pulsar_track_volume[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "volume_space") == 0)

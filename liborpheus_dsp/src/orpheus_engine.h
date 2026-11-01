@@ -826,6 +826,8 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend
     std::atomic<int> pulsar_track_engine_edm[8]{};
     std::atomic<int> pulsar_track_engine_space[8]{};
+    // 0 lets energy pick the slot, 1 holds EDM, 2 holds SPACE (after the loop roll draws).
+    std::atomic<int> pulsar_track_slot_lock[8]{};
     // Mirrors PulsarTrackState::engine_index — written unconditionally by
     // unit_process_pulsar each block (after the energy-driven slot decision,
     // even when edm == spa or the crossfade zone keeps the prior choice).

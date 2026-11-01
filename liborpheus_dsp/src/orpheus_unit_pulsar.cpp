@@ -3744,6 +3744,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ts.space_slot = true;
             }
             // In crossfade zone (0.4-0.6): keep current — probabilistic pick at loop boundary.
+            // A slot lock (1 EDM, 2 SPACE) overrides whatever energy picked.
+            const int lock = engine->pulsar_track_slot_lock[t].load(std::memory_order_relaxed);
+            if (lock != 0) ts.space_slot = lock == 2;
             // The slot, not the engine id, picks the params: edm == spa still has two slots.
             ts.engine_index = ts.space_slot ? spa : edm;
             // Publish active slot unconditionally (even when edm == spa or the
@@ -5107,6 +5110,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         float roll = rand01(state->mutation_seed);
                         vts.space_slot = !(roll < p_edm);
                     }
+                    // A lock overrides the pick after the roll has drawn, so other tracks keep theirs.
+                    const int lock = engine->pulsar_track_slot_lock[vt].load(std::memory_order_relaxed);
+                    if (lock != 0) vts.space_slot = lock == 2;
                     vts.engine_index = vts.space_slot ? spa : edm;
                 }
 
