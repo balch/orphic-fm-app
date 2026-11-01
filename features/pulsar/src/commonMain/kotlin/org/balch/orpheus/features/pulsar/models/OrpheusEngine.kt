@@ -154,8 +154,9 @@ data class OrpheusEngine(
     /** Seconds the swell takes to reach the full [harmonicsRise]. */
     val harmonicsRiseTime: Float = 2f,
     /**
-     * Amount added to morph over each note, -1..1, then held. 0 is off. On SPK and VOWEL_FOF
-     * morph picks the vowel, so this sweeps it within each note. A note-on glides back over 80 ms.
+     * Amount added to morph over each note, -1..1, then held. 0 is off. On SPK morph picks the
+     * vowel, so this sweeps it within each note; on VOWEL_FOF harmonics is the vowel and morph the
+     * voice type. A note-on glides back over 80 ms.
      */
     val morphRise: Float = 0f,
     /** Seconds the sweep takes to reach the full [morphRise]. */

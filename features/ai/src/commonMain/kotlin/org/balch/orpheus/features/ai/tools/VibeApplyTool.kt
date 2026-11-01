@@ -17,6 +17,7 @@ import kotlinx.serialization.modules.SerializersModule
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.ai.AiVibeArchive
+import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
 import org.balch.orpheus.features.pulsar.anonmalies.Anomaly
@@ -72,14 +73,14 @@ private object InertVoidAnomalyDeserializer : DeserializationStrategy<VoidAnomal
         VoidAnomaly.serializer().deserialize(decoder).copy(probability = 0f)
 }
 
-@LLMDescription("Arguments for applying a Pulsar vibe (built by editing a pulsar_get_vibe template) to the live engine.")
+@LLMDescription("Arguments for applying a Pulsar vibe (composed on a pulsar_cast_vibe skeleton) to the live engine.")
 @Serializable
 data class VibeApplyArgs(
-    @property:LLMDescription("A complete Pulsar vibe as JSON. Get a template from pulsar_get_vibe, edit it, and pass the whole edited JSON here. Use an evocative ORIGINAL name — never a real artist/band/song/album name.")
+    @property:LLMDescription("A complete Pulsar vibe as JSON: the pulsar_cast_vibe skeleton composed on, or pulsar_get_vibe('current') tweaked. Use an evocative ORIGINAL name, never a real artist/band/song/album name.")
     val vibeJson: String,
 )
 
-@LLMDescription("Result of applying a vibe. On failure, message explains what to fix; correct the JSON and call pulsar_apply_vibe again.")
+@LLMDescription("Result of applying a vibe. On failure, message explains what to fix; correct the JSON and call pulsar_apply_vibe again, unless budgetSpent is true: then reply to the user now.")
 @Serializable
 data class VibeApplyResult(
     @property:LLMDescription("True if the vibe was valid and is now playing.")
@@ -88,6 +89,8 @@ data class VibeApplyResult(
     val message: String,
     @property:LLMDescription("The name of the vibe that was applied, or null on failure.")
     val appliedName: String? = null,
+    @property:LLMDescription("True when this turn's applies are used up: do not retry, reply to the user now.")
+    val budgetSpent: Boolean = false,
 )
 
 /**
@@ -144,6 +147,7 @@ class VibeApplyTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
     private val eventBus: VibeCreateEventBus,
     private val aiVibeArchive: AiVibeArchive,
+    private val turnBudget: TurnBudget,
 ) : ToolProvider {
 
     private val json = vibeApplyJson
@@ -155,28 +159,36 @@ class VibeApplyTool(
             name = "pulsar_apply_vibe",
             description = """
                 Apply a Pulsar vibe to the live beat machine and start it playing.
-                Workflow: call pulsar_get_vibe to get a template, edit the JSON to match the
-                requested feel (bpm, rootNote, scaleType, genre.customProgression, per-track engines,
-                arrangement), then pass the complete edited JSON here.
+                Workflow: a new vibe starts from the pulsar_cast_vibe skeleton (never a shipped vibe);
+                compose on it (bpm, rootNote, scaleType, genre.customProgression, melodies,
+                arrangement), then pass the complete JSON here. To tweak what plays, start from
+                pulsar_get_vibe('current'). At most ${TurnBudget.MAX_APPLIES} applies per turn: once spent, reply to the user.
                 Rules: exactly 8 tracks; progression degrees 0..6; name must be an evocative ORIGINAL
                 name (never a real artist/band/song/album); any section that sets soloMode also
                 needs the top-level 'band' field — without it the solo never starts (pulsar_vibe_guide
                 section 7 has one to copy).
-                Instruments — keep each track's engine in its role family when you change it:
-                  drums BD/SD/HH/NSE/PAR · bass WSH/VCF/PD/VA/DX · keys DX2 · lead DX3/WSH/FM/WTB ·
-                  pad ENS/STR/CHD/GRN/ADD · texture MOD/PAR/SPK/SWM/NES/TRN.
+                Instruments: keep each track's engines in their part family when you change one
+                (pulsar_vibe_guide section 3 lists the families).
                 DX FAMILY (DX/DX2/DX3): 'harmonics' is NOT a tone knob — it is a 32-patch selector
                 (quantized, auto-pinned). Set it deliberately to pick a patch; to land on patch index N
                 use harmonics = (N + 0.5) / (32 * 1.02). The + 0.5 is required: it aims at the middle
                 of patch N's zone, and dropping it lands on the zone's edge and loads patch N-1.
                 Never leave a DX engine's harmonics arbitrary or it loads a random patch and sounds
-                wrong. Set harmonics/timbre/morph explicitly on any engine you swap in.
-                If this returns success=false, read the message, fix the JSON, and call again.
+                wrong. On any other engine you swap in, set the tone by moving the track's macroMap
+                window (moodHarmonics, moodTimbre, spaceDecay) or by pinning the knob: an unpinned
+                knob ignores its JSON value (pulsar_vibe_guide section A).
+                If this returns success=false, read the message, fix the JSON, and call again, unless
+                budgetSpent is true: then reply to the user now.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeApplyArgs): VibeApplyResult {
+                val decoded = decodeVibe(json, args.vibeJson)
+                // Only a vibe that decodes spends the budget, so fixing a rejected one stays possible.
+                if (decoded.isSuccess && !turnBudget.allowApply()) {
+                    return VibeApplyResult(false, TurnBudget.SPENT, budgetSpent = true)
+                }
                 eventBus.emitGenerating()
-                return decodeVibe(json, args.vibeJson).fold(
+                return decoded.fold(
                     onSuccess = { vibe ->
                         // Persist the AI's creation immediately (best-effort, never throws) so it is
                         // retrievable later even if the song auto-advances past it, the app closes, or

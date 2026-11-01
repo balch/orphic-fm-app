@@ -34,6 +34,12 @@ class ValueCodeBlockTest {
     }
 
     @Test
+    fun `long renders with an L suffix`() {
+        assertEquals("1234L", valueToCodeBlock(1234L).toString())
+        assertEquals("-7L", valueToCodeBlock(-7L).toString())
+    }
+
+    @Test
     fun `string renders quoted`() {
         assertEquals("\"Lost in Space\"", valueToCodeBlock("Lost in Space").toString())
     }

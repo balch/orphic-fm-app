@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.Macro
@@ -134,6 +135,8 @@ data class MixSetResult(
     val macroKnob: Float? = null,
     @property:LLMDescription("The value heard in the playing section when a section edit holds this macro (engine only), else null.")
     val macroHeard: Float? = null,
+    @property:LLMDescription("True when this turn's mix edits are used up: do not retry, reply to the user now.")
+    val budgetSpent: Boolean = false,
 )
 
 @LLMDescription("A track index.")
@@ -150,6 +153,8 @@ data class MixToggleResult(
     val message: String,
     val muted: List<Int> = emptyList(),
     val soloed: List<Int> = emptyList(),
+    @property:LLMDescription("True when this turn's mix edits are used up: do not retry, reply to the user now.")
+    val budgetSpent: Boolean = false,
 )
 
 @LLMDescription("No arguments.")
@@ -311,6 +316,7 @@ class MixReadTool(
 class MixSetTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
     private val controllerProvider: () -> MixBenchController,
+    private val turnBudget: TurnBudget,
 ) : ToolProvider {
     override val tool: Tool<MixSetArgs, MixSetResult> by lazy {
         object : Tool<MixSetArgs, MixSetResult>(
@@ -323,6 +329,7 @@ class MixSetTool(
                 field=pan: -1 to 1, whole vibe only. field=reverb or delay: send heard in the playing section, 0-1.
                 field=macro: energy, complexity, mood or space knob, 0-1.
                 scope=vibe edits every section; scope=section edits only the playing one. Omit scope to keep the last one.
+                mix_set, mix_mute and mix_solo share a budget of ${TurnBudget.MAX_MIX_EDITS} edits per turn.
             """.trimIndent(),
         ) {
             override suspend fun execute(args: MixSetArgs): MixSetResult = guarded({ MixSetResult(false, it) }) {
@@ -333,7 +340,9 @@ class MixSetTool(
                 if (field !in FIELDS) badArg("field must be one of ${FIELDS.joinToString()}, not \"${args.field}\"")
                 val track = if (field == "macro") null else requireTrack(args.track)
                 val macro = if (field == "macro") parseMacro(args.macro) else null
-                args.scope?.let { c.setScope(parseScope(it)) }
+                val newScope = args.scope?.let(::parseScope)
+                if (!turnBudget.allowMixEdit()) return@guarded MixSetResult(false, TurnBudget.SPENT, budgetSpent = true)
+                newScope?.let { c.setScope(it) }
                 val scope = c.scope.value
                 val notes = mutableListOf<String>()
                 if (scope == Scope.SECTION && !pulsar.vibeFlow.value.sectionScopeAvailable()) {
@@ -386,24 +395,32 @@ class MixSetTool(
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject
-class MixMuteTool(private val controllerProvider: () -> MixBenchController) : ToolProvider {
+class MixMuteTool(
+    private val controllerProvider: () -> MixBenchController,
+    private val turnBudget: TurnBudget,
+) : ToolProvider {
     override val tool: Tool<MixTrackArgs, MixToggleResult> by lazy {
         toggleTool(
             "mix_mute",
             "Toggle mute on one track (0-7). Mutes stay through mix_reset; a vibe load clears them.",
             controllerProvider,
+            turnBudget,
         ) { toggleMute(it) }
     }
 }
 
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 @Inject
-class MixSoloTool(private val controllerProvider: () -> MixBenchController) : ToolProvider {
+class MixSoloTool(
+    private val controllerProvider: () -> MixBenchController,
+    private val turnBudget: TurnBudget,
+) : ToolProvider {
     override val tool: Tool<MixTrackArgs, MixToggleResult> by lazy {
         toggleTool(
             "mix_solo",
             "Toggle solo on one track (0-7); any solo silences the unsoloed tracks. Solos stay through mix_reset; a vibe load clears them.",
             controllerProvider,
+            turnBudget,
         ) { toggleSolo(it) }
     }
 }
@@ -412,6 +429,7 @@ private fun toggleTool(
     name: String,
     description: String,
     controllerProvider: () -> MixBenchController,
+    turnBudget: TurnBudget,
     toggle: suspend MixBenchController.(Int) -> Boolean,
 ): Tool<MixTrackArgs, MixToggleResult> = object : Tool<MixTrackArgs, MixToggleResult>(
     argsType = typeToken<MixTrackArgs>(),
@@ -420,8 +438,10 @@ private fun toggleTool(
     description = description,
 ) {
     override suspend fun execute(args: MixTrackArgs): MixToggleResult = guarded({ MixToggleResult(false, it) }) {
+        val track = requireTrack(args.track)
+        if (!turnBudget.allowMixEdit()) return@guarded MixToggleResult(false, TurnBudget.SPENT, budgetSpent = true)
         val c = controllerProvider()
-        if (!c.toggle(requireTrack(args.track))) badArg(VIBE_LOADING)
+        if (!c.toggle(track)) badArg(VIBE_LOADING)
         MixToggleResult(true, "ok", c.muted.value.sorted(), c.soloed.value.sorted())
     }
 }

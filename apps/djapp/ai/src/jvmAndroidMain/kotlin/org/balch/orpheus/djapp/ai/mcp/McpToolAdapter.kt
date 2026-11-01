@@ -27,6 +27,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.djapp.ai.tools.ToolProgress
+import org.balch.orpheus.features.ai.TurnBudget
 
 /**
  * Adapts koog tools to MCP: the schema comes from the koog [ToolDescriptor] and a call runs the
@@ -78,10 +79,13 @@ internal object McpToolAdapter {
         )
     }
 
-    /** Runs [tool]; a throw, bad arguments or an `ok: false` result comes back as `isError`. */
+    /**
+     * Runs [tool]; a throw, bad arguments or an `ok: false` result comes back as `isError`.
+     * MCP has no agent turns to reset a [TurnBudget], so its calls run [TurnBudget.Exempt].
+     */
     suspend fun call(tool: ToolBase<*, *>, arguments: JsonObject?): CallToolResult {
         val text = try {
-            tool.run(arguments ?: JsonObject(emptyMap()))
+            withContext(TurnBudget.Exempt) { tool.run(arguments ?: JsonObject(emptyMap())) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

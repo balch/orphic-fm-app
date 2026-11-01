@@ -141,6 +141,8 @@ enum class ScaleType(val scaleIndex: Int) {
  *   [VoidAnomaly] drop-to-silence or a [LickAnomaly] original-riff swap. Empty = none; the vibe
  *   then ignores the manual anomaly trigger. At most one anomaly of each concrete type.
  * @param speech Phrases the vibe can speak. Required as soon as any [Section] declares [Section.speech].
+ * @param cast How the AI's cast rolled this vibe, so an archived vibe can be cast again. The engine
+ *   ignores it; null for a hand-written vibe.
  */
 @Serializable
 data class Vibe(
@@ -177,6 +179,7 @@ data class Vibe(
     val lickWah: WahParams? = null,
     val anomalies: List<Anomaly> = emptyList(),
     val speech: VibeSpeech? = null,
+    val cast: CastProvenance? = null,
 ) {
     init {
         require(tracks.size == 8) {

@@ -1,6 +1,17 @@
 package org.balch.orpheus.features.ai.tools
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
+import org.balch.orpheus.features.ai.NoOpAiVibeArchive
+import org.balch.orpheus.features.ai.TurnBudget
+import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarPanelActions
+import org.balch.orpheus.features.pulsar.PulsarUiState
+import org.balch.orpheus.features.pulsar.VibeCreateEventBus
+import org.balch.orpheus.features.pulsar.models.Vibe
+import org.balch.orpheus.features.pulsar.models.CastProvenance
 import org.balch.orpheus.features.pulsar.models.Album
 import org.balch.orpheus.features.pulsar.models.ChordComping
 import org.balch.orpheus.features.pulsar.models.CompingStyle
@@ -15,6 +26,7 @@ import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.TremoloTideVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VibeApplyToolTest {
@@ -174,5 +186,59 @@ class VibeApplyToolTest {
         val result = decodeVibe(vibeApplyJson, doubled)
         assertTrue(result.isSuccess, "decode failed: ${result.exceptionOrNull()?.message}")
         assertEquals(dh, result.getOrNull())
+    }
+
+    @Test
+    fun applyBudgetRefusesFourth() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget()).tool
+        val names = listOf("Ember One", "Ember Two", "Ember Three", "Ember Four")
+        val results = names.map { n ->
+            tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe.copy(name = n))))
+        }
+        assertEquals(listOf(true, true, true, false), results.map { it.success })
+        assertEquals(listOf(false, false, false, true), results.map { it.budgetSpent })
+        assertEquals(TurnBudget.SPENT, results.last().message)
+        assertEquals(names.take(3), pulsar.applied.map { it.name }, "the refused apply never reaches the engine")
+    }
+
+    @Test
+    fun aRejectedVibeDoesNotSpendTheApplyBudget() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget()).tool
+        repeat(5) {
+            val rejected = tool.execute(VibeApplyArgs("{ not a vibe }"))
+            assertFalse(rejected.success)
+            assertFalse(rejected.budgetSpent, "a rejected vibe is fixable, not a spent budget")
+        }
+        assertTrue(tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe))).success)
+    }
+
+    @Test
+    fun aCastBlockSurvivesTheApplyAndOldJsonWithoutOneStillLoads() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget()).tool
+        val cast = castVibe(VibeCastArgs(mode = "ALL_ROLLED", seed = 77L, styleTags = listOf("funk")), savedMode = null)
+        val composed = vibeApplyJson.decodeFromString<Vibe>(cast.vibeJson).copy(name = "Porch Light")
+        val result = tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(composed)))
+        assertTrue(result.success, result.message)
+        assertEquals(CastProvenance(77L, "ALL_ROLLED", listOf("funk")), pulsar.applied.single().cast)
+
+        val old = vibeApplyJson.encodeToString(DogHouseVibe().vibe).replace(",\"cast\":null", "")
+        assertTrue("\"cast\"" !in old, "precondition: the JSON predates the cast block")
+        assertEquals(DogHouseVibe().vibe, decodeVibe(vibeApplyJson, old).getOrThrow())
+    }
+
+    /** Records applies; the rest of Pulsar stays at its stub defaults. */
+    private class ApplyOnlyPulsar(first: Vibe) : PulsarFeature {
+        val applied = mutableListOf<Vibe>()
+        override val vibeFlow = MutableStateFlow(first)
+        override val arrangementStateFlow = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
+        override val stateFlow = MutableStateFlow(PulsarUiState(vibe = first))
+        override val actions = PulsarPanelActions()
+        override fun applyVibe(vibe: Vibe) {
+            applied += vibe
+            vibeFlow.value = vibe
+        }
     }
 }

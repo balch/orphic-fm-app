@@ -1,11 +1,13 @@
 ---
 name: orphic-mcp
-description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like, on the desktop app or on an Android phone (adb forward). Covers launching the app, connecting over MCP, the tools, the mixing workflow, raw audio and troubleshooting.
+description: Use when the user wants Claude to mix a vibe live in the running Orphic DJ app (AI edition), or mentions the orphic MCP server, mix_read, mix_set, mix_capture, audio_analyze, audio_capture, stems, or connecting Claude Code to the DJ app, or wants to measure or record what the mix sounds like, on the desktop app or on an Android phone (adb forward), or wants Claude to make a new vibe in the running app (pulsar_vibe_guide, pulsar_cast_vibe, pulsar_apply_vibe). Covers launching the app, connecting over MCP, the tools, making a vibe, the mixing workflow, raw audio and troubleshooting.
 ---
 
 # Orphic MCP
 
 The AI edition of the desktop DJ app runs a loopback MCP server. It serves the same tools the in-app agent uses, so Claude Code can read and change the live mix while the user listens.
+
+Every vibe workflow starts with `pulsar_vibe_guide` (the shared composition guide, the same text the in-app agent reads) and, for a new vibe, `pulsar_cast_vibe`. See "Making a vibe".
 
 ## Launch
 
@@ -37,7 +39,9 @@ disown
 - `mix_capture`: save the mix edits as a capture file (see below).
 - `ports_list`, `port_get`, `port_set`: raw engine control ports, keyed `uri:symbol`.
 - `vibe_list`, `vibe_load`, `transport`: pick a vibe, and play, pause or read state.
-- `pulsar_*`, `start_composition`: the vibe-authoring tools.
+- `pulsar_vibe_guide`: the composition guide, plus a catalog of shipped vibes for ideas only.
+- `pulsar_cast_vibe`: rolls an 8-track skeleton. Args `mode` (BED_FIXED or ALL_ROLLED; omit for the user's saved mode), `seed` (omit for a random roll), `styleTags` (rock, electro, ambient, reggae, psych, funk) and `pins` (`{track, role, engine}`). Returns `seed`, `summary` (one line per track) and `vibeJson`.
+- `pulsar_apply_vibe`, `pulsar_get_vibe`, `pulsar_vibe_schema`, the other `pulsar_*` tools, `start_composition`: the rest of the vibe-authoring tools.
 - `audio_analyze`: record the next 0.5-15 s (default 5) and measure each stem: level, third-octave spectrum, envelope, onsets, low end and stereo. `stems` and `kinds` narrow it.
 - `audio_capture`: record the next 0.5-30 s (default 10) to one WAV per stem plus `stems.json`, for offline analysis. `stems` narrows it.
 - The 13 stems:
@@ -74,6 +78,21 @@ The `aiDebug` build of Orphic DJ on a phone or emulator runs the same server. Th
 - The script uses `adb exec-out`, not `shell`, because `shell` rewrites bytes and would corrupt WAVs.
 - A 401 reply names where the token file lives.
 
+## Making a vibe
+
+The same loop the in-app agent follows (its "Creating Pulsar vibes" prompt in `OrpheusAgentConfig.kt`), driven over MCP:
+
+1. **New vibe:** `pulsar_vibe_guide`, then `pulsar_cast_vibe`. Pass `styleTags` from the request and `pins` for anything the user named (a part or an engine on a track). Never copy a shipped vibe: `pulsar_get_vibe` with a shipped name is for borrowing an idea only.
+2. **Tweak of the vibe playing now** ("slower", "swap the lead to a bell"): `pulsar_get_vibe` with `'current'`, change only what was asked, and go to step 4. Do not cast.
+3. **Compose on the skeleton** per the guide: the frame (`name`, `bpm`, `rootNote`, `scaleType`), the groove, the progression (`genre.customProgression`), the melodies, the arrangement's sections and the effects. Keep the guide's section B rules and the skeleton's `cast` block (it records the roll, so the archived vibe can be cast again). Invent an original name (no real artist, band, song or album).
+4. **`pulsar_apply_vibe`** with the complete JSON. It applies and plays at once. On `success: false`, fix the JSON per the message and apply again.
+5. **One or two listening passes, no more:** `transport` play, `mix_read` once to start the meters, `audio_analyze` (it records for the seconds you ask, which is the wait), then `mix_read` again for the levels, then small fixes with `mix_set`. A re-apply clears the live mix edits, so call `mix_capture` before any re-apply (for example a `levelDb` change). The guide's section 11 has the targets and the pass in full.
+6. **Hand over:** tell the user the vibe's name, the seed and the cast summary (so a vibe they like can be remade), and a sentence on its sound. Invite them to open the Mixer tab, tweak, and say when they are back; then `mix_read`, say what changed and suggest the next move. `mix_capture` keeps the mix, archives the vibe in `~/.config/orpheus-dj/ai-vibes/` and restarts the song.
+
+The in-app agent is capped per turn (3 applies and 12 mix edits; `TurnBudget`). MCP calls are exempt, since no agent turn ever resets them, so the cap is yours to keep: stick to one or two passes and let the user judge.
+
+To turn the result into a shipped `*Vibe.kt`, hand the archived JSON to `.claude/skills/grab-ai-vibes/scripts/import_vibe.sh` and follow the `vibe-creator` skill.
+
 ## Mixing workflow
 
 1. `transport` play, then `mix_read`. Note the vibe, the sections and the loudness.
@@ -86,7 +105,7 @@ The `aiDebug` build of Orphic DJ on a phone or emulator runs the same server. Th
 ## Gotchas
 
 - `port_set` is never captured. Use `mix_set` for level, pan, sends and the four macros. A vibe load can overwrite port writes.
-- Meters idle off after about 10 s. The first `mix_read` after that starts them and shows silence. Read again after about 3 s.
+- Meters idle off after about 10 s. The first `mix_read` after that starts them and shows silence. Do your other checks (`audio_analyze` takes its N seconds), then read again.
 - The TRACKS view in the app shares this mix. Faders the user moves show up in `mix_read`.
 - Capture on a catalog vibe writes a file only. The live mix stays as it is.
 - Capture on an AI vibe also writes the rows into the vibe, archives it in `~/.config/orpheus-dj/ai-vibes/`, and restarts the song. Mutes, solos and the loop clear.

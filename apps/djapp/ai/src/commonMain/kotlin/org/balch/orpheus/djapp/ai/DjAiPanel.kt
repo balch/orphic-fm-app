@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -58,6 +60,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -67,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.ai.AiModel
+import org.balch.orpheus.features.ai.composer.CastMode
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
@@ -110,6 +114,7 @@ fun DjAiPanel(
             onSaveKey = actions.saveKey,
             onClearKey = actions.clearKey,
         )
+        CastModeRow(mode = uiState.castMode, onSelect = actions.selectCastMode)
         uiState.mcpEndpoint?.takeIf { mcpExpanded }?.let { McpEndpointRow(it) }
 
         // The prompt row is the input box when idle, and a one-line status strip while the
@@ -224,6 +229,39 @@ private fun ConfigStrip(
             )
         } else {
             ApiKeyEntryCompact(onSubmit = onSaveKey)
+        }
+    }
+}
+
+/** "Cast: bed fixed | everything rolled", the two ways a new vibe is cast. */
+@Composable
+private fun CastModeRow(mode: CastMode, onSelect: (CastMode) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "Cast:",
+            style = MaterialTheme.typography.labelSmall,
+            color = OrpheusColors.sterlingSilver,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        )
+        listOf(CastMode.BED_FIXED to "bed fixed", CastMode.ALL_ROLLED to "everything rolled").forEach { (m, label) ->
+            // A 40dp tap target around the small pill.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .heightIn(min = 40.dp)
+                    .widthIn(min = 40.dp)
+                    .selectable(selected = m == mode, onClick = { onSelect(m) }, role = Role.RadioButton),
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (m == mode) OrpheusColors.pureWhite else OrpheusColors.sterlingSilver.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(OrpheusColors.metallicBlue.copy(alpha = if (m == mode) 0.35f else 0f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
         }
     }
 }

@@ -6,6 +6,18 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
+// EngineMirrorParityTest regex-parses these C++ files. Declared as inputs so a C++-only edit
+// reruns the guard instead of leaving jvmTest up to date.
+tasks.named<Test>("jvmTest") {
+    inputs.files(
+        file("../../liborpheus_dsp/src/pulsar_mod_ranges.h"),
+        file("../../liborpheus_dsp/src/orpheus_unit_pulsar.cpp"),
+    )
+        .withPropertyName("cppEngineMirrorSources")
+        .withPathSensitivity(PathSensitivity.NAME_ONLY)
+        .optional()
+}
+
 kotlin {
     android {
         namespace = "org.balch.orpheus.features.ai"

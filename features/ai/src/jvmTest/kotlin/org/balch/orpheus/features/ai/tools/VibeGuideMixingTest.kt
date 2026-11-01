@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai.tools
 
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -9,8 +10,10 @@ import kotlin.test.assertTrue
  */
 class VibeGuideMixingTest {
 
-    private val recipes = STATIC_GUIDE.substringAfter("### Mix (").substringBefore("## 11. Mixing")
-    private val mixing = STATIC_GUIDE.substringAfter("## 11. Mixing").substringBefore("## 12.")
+    private val guide = runBlocking { loadStaticGuide() }
+
+    private val recipes = guide.substringAfter("### Mix (").substringBefore("## 11. Mixing")
+    private val mixing = guide.substringAfter("## 11. Mixing").substringBefore("## 12.")
 
     // Mix tool result fields, not vibe fields; the DJ app's GuideToolNamesTest checks them against the tools.
     private val toolFields = setOf("lufsShort", "lufsIntegrated", "pastKneePct", "relLu", "subPct", "lowPct", "trackLabels")
@@ -29,12 +32,12 @@ class VibeGuideMixingTest {
 
     @Test
     fun `Mixing is section 11, after the recipes and before the invariants`() {
-        val recipesAt = STATIC_GUIDE.indexOf("## 10. Translation recipes")
-        val mixingAt = STATIC_GUIDE.indexOf("## 11. Mixing")
-        val invariantsAt = STATIC_GUIDE.indexOf("## 12. Invariants")
+        val recipesAt = guide.indexOf("## 10. Translation recipes")
+        val mixingAt = guide.indexOf("## 11. Mixing")
+        val invariantsAt = guide.indexOf("## 12. Invariants")
         assertTrue(recipesAt in 0 until mixingAt, "Mixing should follow the recipes")
         assertTrue(mixingAt < invariantsAt, "Invariants should follow Mixing as section 12")
-        assertTrue(STATIC_GUIDE.contains("### Mix ("), "section 10 lost its Mix recipes")
+        assertTrue(guide.contains("### Mix ("), "section 10 lost its Mix recipes")
     }
 
     @Test
@@ -60,7 +63,7 @@ class VibeGuideMixingTest {
 
     @Test
     fun `section 7 and the trackOverrides note list pan, and the note lists morph`() {
-        assertTrue(STATIC_GUIDE.contains("pan (glides there at 0.15 pan units per second)"), "section 7 list lost pan")
+        assertTrue(guide.contains("pan (glides there at 0.15 pan units per second)"), "section 7 list lost pan")
         assertTrue(Regex("""\bpan \(-1\.\.1; the track glides""").containsMatchIn(TRACK_OVERRIDES_NOTE), "note lost pan")
         assertTrue(Regex("""\bmorph,""").containsMatchIn(TRACK_OVERRIDES_NOTE), "note lost morph")
     }

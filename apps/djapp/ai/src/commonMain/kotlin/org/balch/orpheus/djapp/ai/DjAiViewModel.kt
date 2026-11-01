@@ -25,12 +25,14 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.playback.PlaybackController
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.AgentActivityEventBus
 import org.balch.orpheus.features.ai.OrpheusAgent
 import org.balch.orpheus.features.ai.PromptIntent
+import org.balch.orpheus.features.ai.composer.CastMode
 import org.balch.orpheus.features.pulsar.VibeCreateEvent
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
 
@@ -215,6 +217,16 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
 internal fun withMcpEndpoint(s: DjAiUiState, endpoint: McpEndpoint?): DjAiUiState =
     s.copy(mcpEndpoint = endpoint)
 
+/** The saved casting mode, falling back to [CastMode.BED_FIXED] for a missing or unknown value. */
+internal fun castModeFromPref(saved: String?): CastMode =
+    CastMode.entries.firstOrNull { it.name == saved } ?: CastMode.BED_FIXED
+
+internal fun withCastMode(s: DjAiUiState, mode: CastMode): DjAiUiState = s.copy(castMode = mode)
+
+/** The loaded preference, only while the UI still shows the default: a tap that beat the load wins. */
+internal fun withSavedCastMode(s: DjAiUiState, saved: CastMode): DjAiUiState =
+    if (s.castMode == DjAiUiState().castMode) s.copy(castMode = saved) else s
+
 /**
  * Reduce a [VibeCreateEvent] into a new [DjAiUiState].
  */
@@ -249,6 +261,7 @@ class DjAiViewModel(
     private val playbackController: PlaybackController,
     private val scope: FeatureCoroutineScope,
     private val mcpEndpointState: McpEndpointState,
+    private val preferences: AppPreferencesRepository,
 ) : DjAiFeature {
 
     private val log = logging("DjAiViewModel")
@@ -293,6 +306,11 @@ class DjAiViewModel(
             mcpEndpointState.endpoint.collect { endpoint ->
                 _uiState.update { withMcpEndpoint(it, endpoint) }
             }
+        }
+
+        scope.launch(dispatcherProvider.io) {
+            val saved = castModeFromPref(preferences.load().vibeCastMode)
+            _uiState.update { withSavedCastMode(it, saved) }
         }
 
         // Track selected model
@@ -370,6 +388,13 @@ class DjAiViewModel(
         }
     }
 
+    private fun selectCastMode(mode: CastMode) {
+        _uiState.update { withCastMode(it, mode) }
+        scope.launch(dispatcherProvider.io) {
+            preferences.update { it.copy(vibeCastMode = mode.name) }
+        }
+    }
+
     /**
      * Cancel an in-flight generation (or clear a stale result/error) and return to IDLE.
      *
@@ -393,6 +418,7 @@ class DjAiViewModel(
         saveKey = ::saveKey,
         clearKey = ::clearKey,
         selectModel = ::selectModel,
+        selectCastMode = ::selectCastMode,
         reset = ::reset,
         dismissError = ::dismissError,
     )

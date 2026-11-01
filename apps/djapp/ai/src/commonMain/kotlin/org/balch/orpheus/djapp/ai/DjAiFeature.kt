@@ -5,6 +5,7 @@ import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
+import org.balch.orpheus.features.ai.composer.CastMode
 
 /** Lifecycle phase of the DJ AI vibe-creation flow. */
 enum class DjAiPhase {
@@ -85,6 +86,7 @@ sealed interface DjAiFeedItem {
  * @property selectedModel Currently selected AI model.
  * @property availableModels All models the user may choose from.
  * @property isKeySet Whether an API key is configured for the current model's provider.
+ * @property castMode How a new vibe is cast: bed fixed or everything rolled. Saved across launches.
  * @property mcpEndpoint The loopback MCP server's url and token; null until it listens (and on iOS).
  */
 @Immutable
@@ -99,6 +101,7 @@ data class DjAiUiState(
     val availableModels: List<AiModel> = emptyList(),
     val isKeySet: Boolean = false,
     val mcpEndpoint: McpEndpoint? = null,
+    val castMode: CastMode = CastMode.BED_FIXED,
 )
 
 /**
@@ -115,6 +118,8 @@ data class DjAiPanelActions(
     val clearKey: (AiProvider) -> Unit,
     /** Switch the active AI model. */
     val selectModel: (AiModel) -> Unit,
+    /** Choose how a new vibe is cast; saved. */
+    val selectCastMode: (CastMode) -> Unit,
     /** Reset to IDLE, clearing the feed and error. */
     val reset: () -> Unit,
     /** Dismiss the error banner without touching the feed's failure context. */
@@ -127,6 +132,7 @@ data class DjAiPanelActions(
             saveKey = { _, _ -> },
             clearKey = {},
             selectModel = {},
+            selectCastMode = {},
             reset = {},
             dismissError = {},
         )
