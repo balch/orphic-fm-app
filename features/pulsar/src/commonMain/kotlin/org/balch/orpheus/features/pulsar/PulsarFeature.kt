@@ -468,6 +468,12 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     fun setMixOverlay(overlay: MixOverlay?) {}
 
     /**
+     * Play [track] at the vibe's own volume, past any section volume override, re-pushing at once;
+     * null puts every track back under its sections. Lick Lab's boost. A no-op default for stubs.
+     */
+    fun bypassSectionVolume(track: Int?) {}
+
+    /**
      * The macro knob value the app plays and saves, which the Mix Bench treats as its baseline.
      * Previews and fakes read it from [stateFlow].
      */
@@ -1231,6 +1237,9 @@ class PulsarViewModel(
 
     /** Section whose sends were last pushed; -1 before one is known. */
     @Volatile private var pushedSection = -1
+
+    /** The track [bypassSectionVolume] plays at its vibe volume; null in every normal run. */
+    @Volatile private var volumeBypassTrack: Int? = null
 
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
@@ -2370,9 +2379,7 @@ class PulsarViewModel(
             // synchronously at the section boundary and regenerates from. Writing the
             // effective value into the genre atomic from this 5Hz collector would race that
             // and leave the base density wrong for the next section.
-            // Both slots: C++ picks per render block by the live engine_index.
-            trackVolumeIds[i].value = FloatValue(o?.volume ?: edm.volume)
-            trackVolumeSpaceIds[i].value = FloatValue(o?.volume ?: spa.volume)
+            pushTrackVolume(i, tv, o?.volume)
             // The glide port drifts a section pan in and back out; at load the pan port snaps there too.
             val pan = FloatValue(effectivePan(i, o?.pan ?: tv.pan))
             if (!applyPatternInputs) trackPanIds[i].value = pan
@@ -2399,6 +2406,25 @@ class PulsarViewModel(
         sendBases = next
         pushedSection = sectionIndex
         pushEffectiveSends(deepId.value.asFloat())
+    }
+
+    // Both slots: C++ picks per render block by the live engine_index.
+    private fun pushTrackVolume(i: Int, tv: TrackVoice, sectionVolume: Float?) {
+        val v = sectionVolume.takeIf { i != volumeBypassTrack }
+        trackVolumeIds[i].value = FloatValue(v ?: tv.engineEdm.volume)
+        trackVolumeSpaceIds[i].value = FloatValue(v ?: tv.engineSpace.volume)
+    }
+
+    override fun bypassSectionVolume(track: Int?) {
+        val old = volumeBypassTrack
+        if (track == old) return
+        volumeBypassTrack = track
+        val vibe = vibeFlow.value
+        val overrides = vibe.arrangement?.sections?.getOrNull(pushedSection)?.trackOverrides
+        for (i in setOfNotNull(old, track)) {
+            val tv = vibe.tracks.getOrNull(i) ?: continue
+            pushTrackVolume(i, tv, overrides?.get(i)?.volume)
+        }
     }
 
     override fun setMixOverlay(overlay: MixOverlay?) {

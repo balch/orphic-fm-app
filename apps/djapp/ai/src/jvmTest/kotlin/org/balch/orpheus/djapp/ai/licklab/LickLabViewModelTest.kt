@@ -485,9 +485,11 @@ class LickLabViewModelTest {
         r.vm.actions.toggleBoost()
         assertEquals(listOf("track_4_live_boost" to 1.585f), writes)
         assertEquals(true, r.vm.stateFlow.value.boost)
+        assertEquals(4, r.pulsar.volumeBypass)
         r.vm.actions.toggleBoost()
         assertEquals("track_4_live_boost" to 1f, writes.last())
         assertEquals(false, r.vm.stateFlow.value.boost)
+        assertEquals(null, r.pulsar.volumeBypass)
     }
 
     private fun TestScope.boosted(): Rig = shownAndArmed().also {
@@ -498,6 +500,7 @@ class LickLabViewModelTest {
     private fun assertBoostDropped(r: Rig, track: Int = 4) {
         assertEquals(false, r.vm.stateFlow.value.boost)
         assertEquals(1f, value("track_${track}_live_boost"))
+        assertEquals(null, r.pulsar.volumeBypass)
     }
 
     @Test
@@ -521,6 +524,7 @@ class LickLabViewModelTest {
         assertEquals(1f, value("track_4_live_boost"))
         assertEquals(1.585f, value("track_5_live_boost"))
         assertEquals(true, r.vm.stateFlow.value.boost)
+        assertEquals(5, r.pulsar.volumeBypass)
         writes.clear()
         r.pulsar.applyVibe(r.pulsar.vibeList[1])
         runCurrent()

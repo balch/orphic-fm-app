@@ -127,6 +127,7 @@ class LickLabViewModel internal constructor(
         }
         scope.onCleared {
             _state.value.armedTrack?.let(live::disarm)
+            pulsarFeature.bypassSectionVolume(null)
             pulseHold?.dispose()
         }
     }
@@ -167,7 +168,7 @@ class LickLabViewModel internal constructor(
         disarm()
         live.arm(track)
         // Boost moves with the player onto the new track.
-        if (s.boost) live.boost(track, BOOST_GAIN)
+        if (s.boost) boost(track, on = true)
         armedVibe = vibe.name
         // The armed track cannot also be its own caller.
         if (s.callerTrack == track) setCaller(null)
@@ -207,8 +208,14 @@ class LickLabViewModel internal constructor(
     override fun toggleBoost() {
         val s = _state.value
         val track = s.armedTrack ?: return
-        live.boost(track, if (s.boost) 1f else BOOST_GAIN)
+        boost(track, on = !s.boost)
         _state.update { it.copy(boost = !s.boost) }
+    }
+
+    /** Boost lifts the track and plays it past its sections' volume overrides. */
+    private fun boost(track: Int, on: Boolean) {
+        live.boost(track, if (on) BOOST_GAIN else 1f)
+        pulsarFeature.bypassSectionVolume(if (on) track else null)
     }
 
     override fun toggleRecording() {
@@ -402,6 +409,7 @@ class LickLabViewModel internal constructor(
         held.clear()
         val track = _state.value.armedTrack ?: return
         live.disarm(track)
+        pulsarFeature.bypassSectionVolume(null)
         if (_state.value.recording) flushTake()
         if (hadNotes) closeAnswer(beat())
         _state.update {

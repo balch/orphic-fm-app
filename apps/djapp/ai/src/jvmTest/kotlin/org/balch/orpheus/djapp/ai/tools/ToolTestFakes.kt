@@ -70,6 +70,14 @@ internal class FakePulsar(override val vibeList: List<Vibe>) : PulsarFeature {
         vibeLoadCount.value++
     }
 
+    /** The track [bypassSectionVolume] last named. */
+    var volumeBypass: Int? = null
+        private set
+
+    override fun bypassSectionVolume(track: Int?) {
+        volumeBypass = track
+    }
+
     /** Off by default, so a knob-only change reloads as it did before live retunes; on, it retunes as the app does. */
     var retunes = false
     var retuneCount = 0

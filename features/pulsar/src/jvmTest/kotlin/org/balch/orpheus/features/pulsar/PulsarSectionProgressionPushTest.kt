@@ -664,6 +664,45 @@ class PulsarSectionProgressionPushTest {
             )
         }
 
+    @Test
+    fun `a bypassed track plays its base volume through section overrides until released`() =
+        runTest(testDispatcher) {
+            val vibe = pushTestVibe(
+                sections = listOf(
+                    Section(
+                        name = "intro", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(4 to TrackSectionOverride(volume = 0.1f)),
+                    ),
+                    Section(
+                        name = "groove", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(4 to TrackSectionOverride(volume = 0.2f)),
+                    ),
+                ),
+            )
+            val base = vibe.tracks[4].engineEdm.volume
+            val vm = makeViewModel(vibe)
+            vm.actions.setVibe(vibe)
+            advanceUntilIdle()
+            fun enter(section: Int) {
+                arrangementFlow.value = PulsarArrangementState(
+                    sectionIndex = section, barsElapsed = 0, barsTotal = 4,
+                    soloActive = false, soloTrack = -1, soloMode = 0,
+                )
+            }
+            enter(0)
+            advanceUntilIdle()
+            assertEquals(0.1f, floatPort("track_4_volume"))
+
+            vm.bypassSectionVolume(4)
+            assertEquals(base, floatPort("track_4_volume"), "the bypass re-pushes at once")
+            enter(1)
+            advanceUntilIdle()
+            assertEquals(base, floatPort("track_4_volume"), "a later section's override stays bypassed")
+
+            vm.bypassSectionVolume(null)
+            assertEquals(0.2f, floatPort("track_4_volume"), "released, the playing section's override returns")
+        }
+
     /**
      * The vibe-load push deliberately skips the pattern-generation inputs. `density` and the hold
      * parameters reach the engine only through `load_vibe` and the déjà-vu regeneration, so the
