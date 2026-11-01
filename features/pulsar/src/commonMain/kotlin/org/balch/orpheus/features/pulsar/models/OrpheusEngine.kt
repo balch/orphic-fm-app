@@ -161,6 +161,13 @@ data class OrpheusEngine(
     val morphRise: Float = 0f,
     /** Seconds the sweep takes to reach the full [morphRise]. */
     val morphRiseTime: Float = 2f,
+    /**
+     * Renders the voice twice, this many cents apart (0..50). 0 is off. 8-15 thickens a lead or
+     * singer, 20+ is a wide chorus. Costs a second engine on the track. Ignored on MST.
+     */
+    val doubleDetune: Float = 0f,
+    /** How far apart the two doubled voices pan, 0..1. Only matters while [doubleDetune] is above 0. */
+    val doubleSpread: Float = 0f,
 ) {
     init {
         require(fmRatio in 0f..16f) { "fmRatio must be 0..16, was $fmRatio" }
@@ -179,5 +186,7 @@ data class OrpheusEngine(
         require(harmonicsRiseTime in 0.1f..8f) { "harmonicsRiseTime must be 0.1..8 s, was $harmonicsRiseTime" }
         require(morphRise in -1f..1f) { "morphRise must be -1..1, was $morphRise" }
         require(morphRiseTime in 0.1f..8f) { "morphRiseTime must be 0.1..8 s, was $morphRiseTime" }
+        require(doubleDetune in 0f..50f) { "doubleDetune must be 0..50 cents, was $doubleDetune" }
+        require(doubleSpread in 0f..1f) { "doubleSpread must be 0..1, was $doubleSpread" }
     }
 }

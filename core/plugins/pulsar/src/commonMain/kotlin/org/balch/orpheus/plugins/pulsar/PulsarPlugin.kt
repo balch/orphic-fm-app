@@ -117,6 +117,10 @@ class PulsarPlugin : DspPlugin {
     private val _trackMorphRiseSpace = FloatArray(8) { 0f }
     private val _trackMorphRiseTime = FloatArray(8) { 2f }
     private val _trackMorphRiseTimeSpace = FloatArray(8) { 2f }
+    private val _trackDoubleDetune = FloatArray(8) { 0f }
+    private val _trackDoubleDetuneSpace = FloatArray(8) { 0f }
+    private val _trackDoubleSpread = FloatArray(8) { 0f }
+    private val _trackDoubleSpreadSpace = FloatArray(8) { 0f }
     private val _trackHarmonicsModulation = FloatArray(8) { 0f }
     // Default source = 4 (MOOD) so an opt-in user only has to set the range.
     private val _trackHarmonicsMacroSource = IntArray(8) { 4 }
@@ -583,6 +587,30 @@ class PulsarPlugin : DspPlugin {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MORPH_RISE_TIME_SPACE.ordinal + t]) {
                 floatType { default = 2f; min = 0.1f; max = 8f
                     get { _trackMorphRiseTimeSpace[t] }; set { _trackMorphRiseTimeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_DETUNE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 50f
+                    get { _trackDoubleDetune[t] }; set { _trackDoubleDetune[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_DETUNE_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 50f
+                    get { _trackDoubleDetuneSpace[t] }; set { _trackDoubleDetuneSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_SPREAD.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackDoubleSpread[t] }; set { _trackDoubleSpread[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DOUBLE_SPREAD_SPACE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f
+                    get { _trackDoubleSpreadSpace[t] }; set { _trackDoubleSpreadSpace[t] = it } }
             }
         }
         // Per-track pin flags (EDM slot). Space-slot equivalents flow through

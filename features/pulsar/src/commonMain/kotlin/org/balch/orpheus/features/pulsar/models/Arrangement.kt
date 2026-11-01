@@ -84,6 +84,11 @@ data class SectionTransition(
  *   The track's base morph and pin state are restored on exit.
  * @param morphRise Override [OrpheusEngine.morphRise] (-1..1) on both engine slots, so one
  *   section's SPK vowel glides further than another's. The track's own rise returns on exit.
+ * @param doubleDetune Override [OrpheusEngine.doubleDetune] (0..50 cents) on both engine slots.
+ *   The C++ glides changes over 50 ms, but turning the double off (0) is instant, so vary the
+ *   amount rather than toggle it. The track's own value returns on exit.
+ * @param doubleSpread Override [OrpheusEngine.doubleSpread] (0..1) on both engine slots. The
+ *   track's own value returns on exit.
  * @param reverbSend Override per-track reverb send (0..1).
  * @param delaySend Override per-track delay send (0..1).
  * @param envelopeProfile Override envelope profile for this section. Switch e.g.
@@ -122,6 +127,8 @@ data class TrackSectionOverride(
     val pan: Float? = null,
     val morph: Float? = null,
     val morphRise: Float? = null,
+    val doubleDetune: Float? = null,
+    val doubleSpread: Float? = null,
     val reverbSend: Float? = null,
     val delaySend: Float? = null,
     val envelopeProfile: EnvelopeProfile? = null,
@@ -138,6 +145,12 @@ data class TrackSectionOverride(
     init {
         require(breatheBars >= 0) { "TrackSectionOverride.breatheBars must be >= 0, got $breatheBars" }
         require(pan == null || pan in -1f..1f) { "TrackSectionOverride.pan must be -1..1, got $pan" }
+        require(doubleDetune == null || doubleDetune in 0f..50f) {
+            "TrackSectionOverride.doubleDetune must be 0..50 cents, got $doubleDetune"
+        }
+        require(doubleSpread == null || doubleSpread in 0f..1f) {
+            "TrackSectionOverride.doubleSpread must be 0..1, got $doubleSpread"
+        }
         require(breatheFloor in 0f..1f) {
             "TrackSectionOverride.breatheFloor must be 0..1, got $breatheFloor"
         }

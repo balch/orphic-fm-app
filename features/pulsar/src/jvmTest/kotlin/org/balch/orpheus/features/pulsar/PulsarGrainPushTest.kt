@@ -290,6 +290,25 @@ class PulsarGrainPushTest {
     }
 
     @Test
+    fun `double fields reach both engine slots of their track`() = runTest(testDispatcher) {
+        val edm = OrpheusEngine(engineId = OrpheusEngineId.SPK, doubleDetune = 12f, doubleSpread = 0.4f)
+        val space = OrpheusEngine(engineId = OrpheusEngineId.SPK, doubleDetune = 0f, doubleSpread = 0.9f)
+        val vibe = grainTestVibe(edm, space)
+
+        makeViewModel(vibe).actions.setVibe(vibe)
+        advanceUntilIdle()
+
+        assertEquals(12f, float("track_4_double_detune"))
+        assertEquals(0f, float("track_4_double_detune_space"))
+        assertEquals(0.4f, float("track_4_double_spread"))
+        assertEquals(0.9f, float("track_4_double_spread_space"))
+        assertEquals(0f, float("track_0_double_detune"), "a track without one pushes 0")
+        assertEquals(0f, float("track_0_double_detune_space"))
+        assertEquals(0f, float("track_0_double_spread"))
+        assertEquals(0f, float("track_0_double_spread_space"))
+    }
+
+    @Test
     fun `a track with no harmonics rise pushes 0 at the default time`() = runTest(testDispatcher) {
         val va = OrpheusEngine(engineId = OrpheusEngineId.VA)
         val vibe = grainTestVibe(va, va)

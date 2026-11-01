@@ -872,6 +872,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_morph_rise_time[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "morph_rise_time_space") == 0)
                 engine->pulsar_track_morph_rise_time_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "double_detune") == 0)
+                engine->pulsar_track_double_detune[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "double_detune_space") == 0)
+                engine->pulsar_track_double_detune_space[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "double_spread") == 0)
+                engine->pulsar_track_double_spread[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "double_spread_space") == 0)
+                engine->pulsar_track_double_spread_space[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics") == 0)
                 engine->pulsar_track_pin_harmonics[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "pin_harmonics_space") == 0)

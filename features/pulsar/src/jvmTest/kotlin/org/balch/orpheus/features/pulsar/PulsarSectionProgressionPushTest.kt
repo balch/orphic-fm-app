@@ -76,6 +76,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
@@ -725,6 +726,60 @@ class PulsarSectionProgressionPushTest {
             assertEquals(0.375f, floatPort("track_5_morph_rise"))
             assertEquals(0.375f, floatPort("track_5_morph_rise_space"))
         }
+
+    @Test
+    fun `section double override reaches both slots and the track's own values return`() =
+        runTest(testDispatcher) {
+            val base = pushTestVibe(
+                sections = listOf(
+                    Section(
+                        name = "intro", barsMin = 4, barsMax = 4,
+                        trackOverrides = mapOf(
+                            5 to TrackSectionOverride(doubleDetune = 14f, doubleSpread = 0.7f),
+                        ),
+                    ),
+                    Section(name = "groove", barsMin = 4, barsMax = 4),
+                ),
+            )
+            val own = OrpheusEngine(engineId = OrpheusEngineId.VA, doubleDetune = 8f, doubleSpread = 0.3f)
+            val vibe = base.copy(
+                tracks = base.tracks.mapIndexed { i, t ->
+                    if (i == 5) t.copy(engineEdm = own, engineSpace = own) else t
+                },
+            )
+
+            makeViewModel(vibe).actions.setVibe(vibe)
+            advanceUntilIdle()
+            arrangementFlow.value = PulsarArrangementState(
+                sectionIndex = 0, barsElapsed = 0, barsTotal = 4,
+                soloActive = false, soloTrack = -1, soloMode = 0,
+            )
+            advanceUntilIdle()
+
+            assertEquals(14f, floatPort("track_5_double_detune"))
+            assertEquals(14f, floatPort("track_5_double_detune_space"))
+            assertEquals(0.7f, floatPort("track_5_double_spread"))
+            assertEquals(0.7f, floatPort("track_5_double_spread_space"))
+
+            arrangementFlow.value = PulsarArrangementState(
+                sectionIndex = 1, barsElapsed = 0, barsTotal = 4,
+                soloActive = false, soloTrack = -1, soloMode = 0,
+            )
+            advanceUntilIdle()
+
+            assertEquals(8f, floatPort("track_5_double_detune"))
+            assertEquals(8f, floatPort("track_5_double_detune_space"))
+            assertEquals(0.3f, floatPort("track_5_double_spread"))
+            assertEquals(0.3f, floatPort("track_5_double_spread_space"))
+        }
+
+    @Test
+    fun `section double override outside its range is rejected`() {
+        assertFailsWith<IllegalArgumentException> { TrackSectionOverride(doubleDetune = 51f) }
+        assertFailsWith<IllegalArgumentException> { TrackSectionOverride(doubleDetune = -1f) }
+        assertFailsWith<IllegalArgumentException> { TrackSectionOverride(doubleSpread = -0.1f) }
+        assertFailsWith<IllegalArgumentException> { TrackSectionOverride(doubleSpread = 1.1f) }
+    }
 
     /**
      * A section's lpgMode rides the per-track bank as the enum id. An unauthored slot must

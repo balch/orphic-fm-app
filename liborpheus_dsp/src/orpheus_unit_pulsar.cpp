@@ -20,6 +20,7 @@
 #include "pulsar_lick_growth.h"
 #include "pulsar_lick_calm.h"
 #include "pulsar_kraken.h"
+#include "orpheus_units_common.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -2887,6 +2888,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->loop_count = 0;
         state->loops_since_reset = 0;
         std::memset(state->voice_alloc_buffers, 0, sizeof(state->voice_alloc_buffers));
+        std::memset(state->double_alloc_buffers, 0, sizeof(state->double_alloc_buffers));
         std::memset(state->drunk_offsets, 0, sizeof(state->drunk_offsets));
         std::memset(state->drunk_targets, 0, sizeof(state->drunk_targets));
         state->tempo_drift = 0.0f;
@@ -2929,6 +2931,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             state->tracks[t].voice.Init(&allocator);
             state->tracks[t].osc_lpg.Init();
             state->tracks[t].braids_voice.Init();
+            stmlib::BufferAllocator double_allocator(
+                state->double_alloc_buffers[t], kVoiceAllocBytes_Pulsar);
+            state->dbl[t].voice.Init(&double_allocator);
+            state->dbl[t].osc_lpg.Init();
+            state->dbl[t].braids_voice.Init();
             state->tracks[t].tides_env.Init();
             state->tracks[t].mod_poly_lfo.Init();
             state->tracks[t].mod_slope.Init();
@@ -3532,10 +3539,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Per-track: advance sequencer + render voice ──
     float track_buffer[kMaxFrames];
     // The grain layer (Mist or grain FX) for the track being rendered. mid joins track_buffer
-    // after the envelope; side joins at the stereo mix. Both are only read when grain_track
-    // is set, so they are left uninitialised.
+    // after the envelope. track_side is the grains' unpanned side, joining at the stereo mix
+    // (the double's side has its own buffer). Read only when set, so left uninitialised.
     float mist_mid[kMaxFrames];
-    float mist_side[kMaxFrames];
+    float track_side[kMaxFrames];
 #ifdef ORPHEUS_TESTING
     const float mist_width_debug = engine->pulsar_mist_width_debug.load(std::memory_order_relaxed);
     const float mist_width = mist_width_debug < 0.0f ? mist::kWidth : mist_width_debug;
@@ -3643,6 +3650,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.harmonics_rise_time = PULSAR_PICK(harmonics_rise_time);
             ts.morph_rise          = PULSAR_PICK(morph_rise);
             ts.morph_rise_time     = PULSAR_PICK(morph_rise_time);
+            // A non-finite port write (MCP port_set) turns the double off or flattens its spread.
+            const float double_detune = PULSAR_PICK(double_detune);
+            const float double_spread = PULSAR_PICK(double_spread);
+            ts.double_detune = scope_is_finite(double_detune)
+                ? std::clamp(double_detune, 0.0f, kDoubleDetuneMaxCents) : 0.0f;
+            ts.double_spread = scope_is_finite(double_spread)
+                ? std::clamp(double_spread, 0.0f, 1.0f) : 0.0f;
         }
 
         // ── Apply macro modulation ──
@@ -5931,49 +5945,157 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         engine->pulsar_track_note_debug[t].store(note_for_render, std::memory_order_relaxed);
 #endif
 
-        if (ts.engine_index >= 100 && ts.engine_index < 200) {
-            unit_process_braids(ts.braids_voice, ts.braids_resampler,
-                                ts.engine_index,
-                                note_for_render,
-                                clamp01(mod_harmonics),
-                                clamp01(mod_timbre),
-                                clamp01(mod_morph),
-                                sample_rate, track_buffer, num_frames);
-        } else if (ts.engine_index >= kChaosEngineMin && ts.engine_index <= kChaosEngineMax) {
-            // Chaos engines (200..204): per-track ChaosVoiceState driven by the
-            // shared chaos kernel. Without this branch the engine_index would
-            // fall through to plaits::Voice::Render which clamps unknown ids to
-            // its last engine (HiHat). Split at the intra-block step boundary
-            // like the OrpheusVoice path below, so the kernel sees the gate
-            // edge (note-on re-seed) on the true boundary sample.
-            const int trig_off =
-                (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
-                    ? ts.trigger_offset : 0;
-            if (trig_off > 0) {
+        // Renders the engine (every family but Mist) at `note` into `out` on one voice set:
+        // the track's own, or the detuned double's second set in state->dbl. Scalars are
+        // copied so no local's address escapes; that keeps the wah loops' codegen unchanged.
+        // `note_on` is the set's note-on: ts.pending_retrig, plus the double's activation edge.
+        auto render_engine = [&ts, mod_harmonics, mod_timbre, mod_morph, sample_rate, num_frames,
+                              gate_for_render, active_lpg_mode, is_self_env, accent_for_render](
+                                 auto& vs, float note, float* out, bool note_on) {
+            if (ts.engine_index >= 100 && ts.engine_index < 200) {
+                unit_process_braids(vs.braids_voice, vs.braids_resampler,
+                                    ts.engine_index,
+                                    note,
+                                    clamp01(mod_harmonics),
+                                    clamp01(mod_timbre),
+                                    clamp01(mod_morph),
+                                    sample_rate, out, num_frames);
+            } else if (ts.engine_index >= kChaosEngineMin && ts.engine_index <= kChaosEngineMax) {
+                // Chaos engines (200..204): per-track ChaosVoiceState driven by the
+                // shared chaos kernel. Without this branch the engine_index would
+                // fall through to plaits::Voice::Render which clamps unknown ids to
+                // its last engine (HiHat). Split at the intra-block step boundary
+                // like the OrpheusVoice path below, so the kernel sees the gate
+                // edge (note-on re-seed) on the true boundary sample.
+                const int trig_off =
+                    (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
+                        ? ts.trigger_offset : 0;
+                if (trig_off > 0) {
+                    chaos::process_chaos_block(
+                        vs.chaos_state,
+                        ts.engine_index,
+                        clamp01(mod_harmonics),
+                        clamp01(mod_timbre),
+                        clamp01(mod_morph),
+                        note,
+                        ts.gate_pre_boundary ? 1 : 0,
+                        sample_rate,
+                        out,
+                        trig_off);
+                }
                 chaos::process_chaos_block(
-                    ts.chaos_state,
+                    vs.chaos_state,
                     ts.engine_index,
                     clamp01(mod_harmonics),
                     clamp01(mod_timbre),
                     clamp01(mod_morph),
-                    note_for_render,
-                    ts.gate_pre_boundary ? 1 : 0,
+                    note,
+                    gate_for_render,
                     sample_rate,
-                    track_buffer,
-                    trig_off);
+                    out + trig_off,
+                    num_frames - trig_off);
+            } else if (ts.engine_index < 0) {
+                // OSC: split at the intra-block step boundary like the chaos and
+                // OrpheusVoice paths, so the onset lands on the true boundary
+                // sample instead of a full block early.
+                const int trig_off =
+                    (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
+                        ? ts.trigger_offset : 0;
+                // OSC has no row in kOrpheusLpgDefault (that table cannot be
+                // indexed by -1), so ENGINE_DEFAULT resolves to BYPASS here and
+                // the LPG stays strictly opt-in per vibe.
+                LpgMode osc_lpg_mode = static_cast<LpgMode>(active_lpg_mode);
+                if (osc_lpg_mode == LPG_ENGINE_DEFAULT) osc_lpg_mode = LPG_BYPASS;
+
+                // The vactrol blooms on a note ONSET, not on any rising gate edge.
+                // gate_timer is decremented at block rate, so a held note whose step
+                // boundary falls inside a block drops voice_active for that block and
+                // the hold continuation raises it again; treating those as note-ons
+                // re-blooms the LPG several times per note. pending_retrig is set by the
+                // trigger path and by a PLUCK_REPEAT re-pick, and is still intact here —
+                // the Tides envelope below is what consumes it.
+                const bool osc_note_on = note_on;
+
+                if (trig_off > 0) {
+                    const int g_pre = ts.gate_pre_boundary ? 1 : 0;
+                    osc::process_osc_block(
+                        vs.osc_state, note,
+                        clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
+                        ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
+                        g_pre,
+                        sample_rate, out, trig_off);
+                    // The onset lands at trig_off, so the pre-boundary segment is
+                    // always the previous note's tail: never a bloom.
+                    vs.osc_lpg.Process(osc_lpg_mode, note,
+                                       ts.lpg_decay, ts.lpg_colour,
+                                       false, g_pre, out, trig_off);
+                }
+                osc::process_osc_block(
+                    vs.osc_state, note,
+                    clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
+                    ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
+                    gate_for_render,
+                    sample_rate, out + trig_off, num_frames - trig_off);
+                vs.osc_lpg.Process(osc_lpg_mode, note,
+                                   ts.lpg_decay, ts.lpg_colour,
+                                   osc_note_on, gate_for_render,
+                                   out + trig_off, num_frames - trig_off);
+            } else {
+                // Sub-block trigger accuracy: split the render at the intra-block
+                // step-boundary offset so the voice's gate edge — and with it the
+                // drum onset — lands on the true boundary sample instead of
+                // snapping up to a full block (10.7ms at 512/48k) early. The
+                // pre-boundary segment renders the previous note's tail with its
+                // old gate state. OrpheusVoice buffers sub-24-sample remainders
+                // internally, so arbitrary segment lengths are safe.
+                const int trig_off =
+                    (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
+                        ? ts.trigger_offset : 0;
+                if (trig_off > 0) {
+                    int gate_pre = ts.gate_pre_boundary ? 1 : 0;
+                    if (is_self_env && ts.in_hold) gate_pre = gate_for_render;
+                    vs.voice.Render(
+                        ts.engine_index,
+                        gate_pre,
+                        note,
+                        clamp01(mod_harmonics),
+                        clamp01(mod_timbre),
+                        clamp01(mod_morph),
+                        accent_for_render,
+                        out,
+                        trig_off,
+                        static_cast<LpgMode>(active_lpg_mode),
+                        ts.lpg_decay,
+                        ts.lpg_colour
+                    );
+                }
+                // The onset segment carries the note-on itself: the voice's gate edge
+                // cannot see it when lick notes run back to back and the gate never
+                // falls, and PLUCK only blooms on an edge. Same contract as osc_note_on
+                // above; a hold blooms only when a PLUCK_REPEAT grid re-picks it.
+                vs.voice.Render(
+                    ts.engine_index,
+                    gate_for_render,
+                    note,
+                    clamp01(mod_harmonics),
+                    clamp01(mod_timbre),
+                    clamp01(mod_morph),
+                    accent_for_render,
+                    out + trig_off,
+                    num_frames - trig_off,
+                    static_cast<LpgMode>(active_lpg_mode),
+                    ts.lpg_decay,
+                    ts.lpg_colour,
+                    note_on
+                );
             }
-            chaos::process_chaos_block(
-                ts.chaos_state,
-                ts.engine_index,
-                clamp01(mod_harmonics),
-                clamp01(mod_timbre),
-                clamp01(mod_morph),
-                note_for_render,
-                gate_for_render,
-                sample_rate,
-                track_buffer + trig_off,
-                num_frames - trig_off);
-        } else if (ts.engine_index == kMistEngineId) {
+        };
+
+        // Detuned double: voice A at note - d/2, voice B at note + d/2, as an equal-power mid in
+        // track_buffer and a side in double_side, which is only read while the double is active.
+        const bool double_active = ts.double_detune > 0.0f && ts.engine_index != kMistEngineId;
+        float double_side[kMaxFrames];
+        if (ts.engine_index == kMistEngineId) {
             // Mist: one call per block. The kernel builds its own per-sample gate from
             // the split offset, so the onset still lands on the boundary sample.
             PulsarMistState& ms = state->mist[t];
@@ -5996,104 +6118,38 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             mp.shape = ts.grain_shape;
             mp.blend = ts.grain_blend;
             mist::process_mist_block(ms, mp, grain_gate, mist_pitch_context(engine, state, ts, t),
-                                     sample_rate, track_buffer, mist_mid, mist_side, num_frames);
+                                     sample_rate, track_buffer, mist_mid, track_side, num_frames);
             grain_track = true;
-        } else if (ts.engine_index < 0) {
-            // OSC: split at the intra-block step boundary like the chaos and
-            // OrpheusVoice paths, so the onset lands on the true boundary
-            // sample instead of a full block early.
-            const int trig_off =
-                (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
-                    ? ts.trigger_offset : 0;
-            // OSC has no row in kOrpheusLpgDefault (that table cannot be
-            // indexed by -1), so ENGINE_DEFAULT resolves to BYPASS here and
-            // the LPG stays strictly opt-in per vibe.
-            LpgMode osc_lpg_mode = static_cast<LpgMode>(active_lpg_mode);
-            if (osc_lpg_mode == LPG_ENGINE_DEFAULT) osc_lpg_mode = LPG_BYPASS;
-
-            // The vactrol blooms on a note ONSET, not on any rising gate edge.
-            // gate_timer is decremented at block rate, so a held note whose step
-            // boundary falls inside a block drops voice_active for that block and
-            // the hold continuation raises it again; treating those as note-ons
-            // re-blooms the LPG several times per note. pending_retrig is set by the
-            // trigger path and by a PLUCK_REPEAT re-pick, and is still intact here —
-            // the Tides envelope below is what consumes it.
-            const bool osc_note_on = ts.pending_retrig;
-
-            if (trig_off > 0) {
-                const int g_pre = ts.gate_pre_boundary ? 1 : 0;
-                osc::process_osc_block(
-                    ts.osc_state, note_for_render,
-                    clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
-                    ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
-                    g_pre,
-                    sample_rate, track_buffer, trig_off);
-                // The onset lands at trig_off, so the pre-boundary segment is
-                // always the previous note's tail: never a bloom.
-                ts.osc_lpg.Process(osc_lpg_mode, note_for_render,
-                                   ts.lpg_decay, ts.lpg_colour,
-                                   false, g_pre, track_buffer, trig_off);
+        } else if (double_active) {
+            // Live changes glide at block rate; turning on snaps to the targets.
+            if (!ts.double_prev_active) {
+                ts.double_detune_smooth = ts.double_detune;
+                ts.double_spread_smooth = ts.double_spread;
+            } else {
+                const float c = block_smooth_coeff(sample_rate, num_frames, kDoubleGlideSeconds);
+                ts.double_detune_smooth += c * (ts.double_detune - ts.double_detune_smooth);
+                ts.double_spread_smooth += c * (ts.double_spread - ts.double_spread_smooth);
             }
-            osc::process_osc_block(
-                ts.osc_state, note_for_render,
-                clamp01(mod_harmonics), clamp01(mod_timbre), clamp01(mod_morph),
-                ts.fm_ratio, ts.fm_shape, ts.fm_free_hz,
-                gate_for_render,
-                sample_rate, track_buffer + trig_off, num_frames - trig_off);
-            ts.osc_lpg.Process(osc_lpg_mode, note_for_render,
-                               ts.lpg_decay, ts.lpg_colour,
-                               osc_note_on, gate_for_render,
-                               track_buffer + trig_off, num_frames - trig_off);
+            const float half = ts.double_detune_smooth * 0.005f;   // half the cents, in semitones
+            render_engine(ts, note_for_render - half, track_buffer, ts.pending_retrig);
+            // Turning on mid-note strikes voice B, whose own gate edge may be long gone. Only
+            // while the gate is up, so a vibe load with no note sounding does not bloom a PLUCK.
+            const bool double_onset = !ts.double_prev_active && gate_for_render != 0;
+            render_engine(state->dbl[t], note_for_render + half, double_side,
+                          ts.pending_retrig || double_onset);
+            float mid_gain, side_gain;
+            double_gains(ts.double_spread_smooth, mid_gain, side_gain);
+            for (int i = 0; i < num_frames; i++) {
+                const float va = track_buffer[i];
+                const float vb = double_side[i];
+                track_buffer[i] = mid_gain * (va + vb);
+                double_side[i] = side_gain * (va - vb);
+            }
         } else {
-            // Sub-block trigger accuracy: split the render at the intra-block
-            // step-boundary offset so the voice's gate edge — and with it the
-            // drum onset — lands on the true boundary sample instead of
-            // snapping up to a full block (10.7ms at 512/48k) early. The
-            // pre-boundary segment renders the previous note's tail with its
-            // old gate state. OrpheusVoice buffers sub-24-sample remainders
-            // internally, so arbitrary segment lengths are safe.
-            const int trig_off =
-                (ts.trigger_offset > 0 && ts.trigger_offset < num_frames)
-                    ? ts.trigger_offset : 0;
-            if (trig_off > 0) {
-                int gate_pre = ts.gate_pre_boundary ? 1 : 0;
-                if (is_self_env && ts.in_hold) gate_pre = gate_for_render;
-                ts.voice.Render(
-                    ts.engine_index,
-                    gate_pre,
-                    note_for_render,
-                    clamp01(mod_harmonics),
-                    clamp01(mod_timbre),
-                    clamp01(mod_morph),
-                    accent_for_render,
-                    track_buffer,
-                    trig_off,
-                    static_cast<LpgMode>(active_lpg_mode),
-                    ts.lpg_decay,
-                    ts.lpg_colour
-                );
-            }
-            // The onset segment carries the note-on itself: the voice's gate edge
-            // cannot see it when lick notes run back to back and the gate never
-            // falls, and PLUCK only blooms on an edge. Same contract as osc_note_on
-            // above; a hold blooms only when a PLUCK_REPEAT grid re-picks it.
-            ts.voice.Render(
-                ts.engine_index,
-                gate_for_render,
-                note_for_render,
-                clamp01(mod_harmonics),
-                clamp01(mod_timbre),
-                clamp01(mod_morph),
-                accent_for_render,
-                track_buffer + trig_off,
-                num_frames - trig_off,
-                static_cast<LpgMode>(active_lpg_mode),
-                ts.lpg_decay,
-                ts.lpg_colour,
-                ts.pending_retrig
-            );
+            render_engine(ts, note_for_render, track_buffer, ts.pending_retrig);
         }
         ts.mist_prev_active = (ts.engine_index == kMistEngineId);
+        ts.double_prev_active = double_active;
 
         // ── Apply Tides envelope ──
         // Self-enveloped engines bypass: 19-23 (String, Modal, BD, SD, HH), 2-4 (SixOp).
@@ -6101,6 +6157,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // swell by ~30 dB). Hardware Plaits and the synth voice path leave them unenveloped too.
         bool self_enveloped = (ts.engine_index >= 19 && ts.engine_index <= 23)
                            || (ts.engine_index >= 2 && ts.engine_index <= 4);
+        // The double's side takes the same envelope as the mid.
+        float* dbl = double_active ? double_side : nullptr;
 
         if (!self_enveloped) {
             // DRONE profile: slow attack/sustain/release envelope (bypasses broken Tides)
@@ -6133,6 +6191,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (ts.tides_env_level < 0.001f) ts.tides_env_level = 0.0f;
                     }
                     track_buffer[i] *= ts.tides_env_level;
+                    if (dbl) dbl[i] *= ts.tides_env_level;
                 }
             } else {
                 int envelope_mode = engine->pulsar_envelope_mode.load(std::memory_order_relaxed);
@@ -6194,6 +6253,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (env > 1.0f) env = 1.0f;
                         ts.tides_env_level = env;
                         track_buffer[i] *= env;
+                        if (dbl) dbl[i] *= env;
                     }
                 } else {
                     // === SIMPLE AD ENVELOPE ===
@@ -6216,6 +6276,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             if (ts.tides_env_level < 0.001f) ts.tides_env_level = 0.0f;
                         }
                         track_buffer[i] *= ts.tides_env_level;
+                        if (dbl) dbl[i] *= ts.tides_env_level;
                     }
                 }
             }
@@ -6243,10 +6304,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             gp.blend = ts.grain_blend;
             gp.size = ts.grain_size;
             grainfx::process_block(gs, gp, grain_gate, mist_pitch_context(engine, state, ts, t),
-                                   sample_rate, track_buffer, mist_mid, mist_side, num_frames);
+                                   sample_rate, track_buffer, mist_mid, track_side, num_frames);
             grain_track = true;
         }
         ts.grain_fx_prev_active = grain_fx_active;
+
+        // The grains' side at the Mist width. A width-1 grain track skips the scale, so it
+        // is unchanged. The double's side stays apart: it follows the pan, the grains' does not.
+        if (grain_track && mist_width != 1.0f) {
+            for (int i = 0; i < num_frames; i++) track_side[i] *= mist_width;
+        }
 
         // Grains carry their own envelopes, so they join after Pulsar's. The voice
         // already in track_buffer took the envelope above.
@@ -6318,20 +6385,22 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 const float breathe = orpheus::breathe_gain(env, floor_gain);
                 track_buffer[i] *= breathe;
                 // The spread sinks with the centre.
-                if (grain_track) mist_side[i] *= breathe;
+                if (grain_track) track_side[i] *= breathe;
+                if (double_active) double_side[i] *= breathe;
             }
             state->breathe_env[t] = env;
         }
 
         // ── Audition gain ramp ──
         // Only while the gain moves: a linear ramp across the block on the rendered buffer,
-        // so the dry mix, sends and Mist side term all follow without a seam.
+        // so the dry mix, sends and side term all follow without a seam.
         if (aud_end != aud_start) {
             const float step = (aud_end - aud_start) / static_cast<float>(num_frames);
             for (int i = 0; i < num_frames; i++) {
                 const float g = aud_start + step * static_cast<float>(i + 1);
                 track_buffer[i] *= g;
-                if (grain_track) mist_side[i] *= g;
+                if (grain_track) track_side[i] *= g;
+                if (double_active) double_side[i] *= g;
             }
         }
 
@@ -6386,19 +6455,41 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // unchanged, so a mono fold-down is the sound without it.
         if (grain_track) {
             for (int i = 0; i < num_frames; i++) {
-                const float sd = mist_side[i] * vol * void_gain_buf[i] * mist_width;
+                const float sd = track_side[i] * vol * void_gain_buf[i];
                 out_l[i] += sd;
                 out_r[i] -= sd;
                 bus_l[i] += sd;
                 bus_r[i] -= sd;
             }
         }
-        if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
+        // The double's side through a balance control, so the pair pans as one stereo source.
+        float dbl_w_l = 0.0f, dbl_w_r = 0.0f;
+        if (double_active) {
+            double_side_weights(pan_l, pan_r, dbl_w_l, dbl_w_r);
             for (int i = 0; i < num_frames; i++) {
-                const float s = track_buffer[i] * vol * void_gain_buf[i];
-                const float sd = grain_track ? mist_side[i] * vol * void_gain_buf[i] * mist_width : 0.0f;
-                taps->track_l[t][i] = s * pan_l + sd;
-                taps->track_r[t][i] = s * pan_r - sd;
+                const float ds = double_side[i] * vol * void_gain_buf[i];
+                out_l[i] += ds * dbl_w_l;
+                out_r[i] -= ds * dbl_w_r;
+                bus_l[i] += ds * dbl_w_l;
+                bus_r[i] -= ds * dbl_w_r;
+            }
+        }
+        if (OrpheusEngine::PulsarMeasureTaps* taps = measure_taps) {
+            if (double_active) {
+                for (int i = 0; i < num_frames; i++) {
+                    const float s = track_buffer[i] * vol * void_gain_buf[i];
+                    const float sd = grain_track ? track_side[i] * vol * void_gain_buf[i] : 0.0f;
+                    const float ds = double_side[i] * vol * void_gain_buf[i];
+                    taps->track_l[t][i] = s * pan_l + sd + ds * dbl_w_l;
+                    taps->track_r[t][i] = s * pan_r - sd - ds * dbl_w_r;
+                }
+            } else {
+                for (int i = 0; i < num_frames; i++) {
+                    const float s = track_buffer[i] * vol * void_gain_buf[i];
+                    const float sd = grain_track ? track_side[i] * vol * void_gain_buf[i] : 0.0f;
+                    taps->track_l[t][i] = s * pan_l + sd;
+                    taps->track_r[t][i] = s * pan_r - sd;
+                }
             }
         }
 
@@ -6413,13 +6504,34 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (reverb_brightness <= 0.001f) reverb_brightness = 0.5f;  // default if unset
         float rb_lp_coeff = 0.1f + reverb_brightness * 0.9f;  // 0=dark(0.1), 1=bright/bypass(1.0)
 
-        if ((delay_send_amt > 0.001f || reverb_send_amt > 0.001f) && grain_track) {
+        if ((delay_send_amt > 0.001f || reverb_send_amt > 0.001f) && double_active) {
+            // The grain sends loop below plus the double's balance-panned side. Keep in step.
+            for (int i = 0; i < num_frames; i++) {
+                float s = track_buffer[i] * vol * void_gain_buf[i];
+                const float sd = grain_track ? track_side[i] * vol * void_gain_buf[i] : 0.0f;
+                const float ds = double_side[i] * vol * void_gain_buf[i];
+                const float wet_l = s * pan_l + sd + ds * dbl_w_l;
+                const float wet_r = s * pan_r - sd - ds * dbl_w_r;
+                if (delay_send_amt > 0.001f) {
+                    engine->pulsar_delay_send_l[i] += wet_l * delay_send_amt;
+                    engine->pulsar_delay_send_r[i] += wet_r * delay_send_amt;
+                }
+                if (reverb_send_amt > 0.001f) {
+                    float dry_l = wet_l * reverb_send_amt;
+                    float dry_r = wet_r * reverb_send_amt;
+                    ts.reverb_send_filter_state_l += rb_lp_coeff * (dry_l - ts.reverb_send_filter_state_l);
+                    ts.reverb_send_filter_state_r += rb_lp_coeff * (dry_r - ts.reverb_send_filter_state_r);
+                    engine->pulsar_reverb_send_l[i] += ts.reverb_send_filter_state_l;
+                    engine->pulsar_reverb_send_r[i] += ts.reverb_send_filter_state_r;
+                }
+            }
+        } else if ((delay_send_amt > 0.001f || reverb_send_amt > 0.001f) && grain_track) {
             // Separate from the loop below because fast-math can reassociate a zero side
             // term, and other engines' sends must stay bit-identical. Keep in step with
             // it: the two differ only by the side, which enters ahead of the reverb filter.
             for (int i = 0; i < num_frames; i++) {
                 float s = track_buffer[i] * vol * void_gain_buf[i];
-                const float sd = mist_side[i] * vol * void_gain_buf[i] * mist_width;
+                const float sd = track_side[i] * vol * void_gain_buf[i];
                 if (delay_send_amt > 0.001f) {
                     engine->pulsar_delay_send_l[i] += (s * pan_l + sd) * delay_send_amt;
                     engine->pulsar_delay_send_r[i] += (s * pan_r - sd) * delay_send_amt;

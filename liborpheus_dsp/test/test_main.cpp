@@ -151,6 +151,8 @@ static TestSuite suites[] = {
     {"pulsar_pitch_rise", run_pulsar_pitch_rise_tests, true},
     {"pulsar_harmonics_rise", run_pulsar_harmonics_rise_tests, true},
     {"pulsar_morph_rise", run_pulsar_morph_rise_tests, true},
+    {"pulsar_double",   run_pulsar_double_tests,   true},
+    {"pulsar_double_bench", run_pulsar_double_bench,   false},  // manual: CPU and memory bench
     {"pulsar_slot",     run_pulsar_slot_tests,     true},
     {"pulsar_section_ramp", run_pulsar_section_ramp_tests, true},
     {"pulsar_texture_line", run_pulsar_texture_line_tests, true},

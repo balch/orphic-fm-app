@@ -447,6 +447,8 @@ class OrphicLoreVibe : VibeProvider {
                     pitchRise = 25f, pitchRiseTime = 2f,
                     // A singer's waver on top, fading in 0.3 s after each note starts.
                     vibratoDepth = 25f, vibratoRate = 5.5f,
+                    // Two singers 18 cents apart, spread wide around the track's pan.
+                    doubleDetune = 18f, doubleSpread = 0.8f,
                     // The choir: grains of the voice itself landing on chord tones within about a
                     // third either side, clustered on the sung note, so the Sirens sing in harmony.
                     // Long slow-attack grains carry across the note changes, so the harmony stays

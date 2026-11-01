@@ -8,6 +8,7 @@
 #include "pulsar_osc.h"
 #include "pulsar_mist.h"
 #include "pulsar_grain_fx.h"
+#include "pulsar_double.h"
 #include "pulsar_void.h"
 #include "pulsar_storm.h"
 #include "pulsar_street.h"
@@ -328,6 +329,15 @@ struct PulsarTrackState {
     float morph_rise_offset = 0.0f;
     float morph_rise_return_from = 0.0f;
     float morph_rise_return_progress = 1.0f;
+    // Detuned double: cents between the two voices (0 = off) and their spread, resolved
+    // per block from the active slot. The second voice set lives in PulsarState::dbl.
+    float double_detune = 0.0f;
+    float double_spread = 0.0f;
+    // Whether the double rendered last block, so turning it on mid-note can strike voice B.
+    bool  double_prev_active = false;
+    // The detune and spread the double renders with, gliding toward the two above.
+    float double_detune_smooth = 0.0f;
+    float double_spread_smooth = 0.0f;
     // Melodic lick line that keeps the texture-curve fade and escapes track 7's FX note
     // gate. Resolved per block from the track-level atomic.
     bool  texture_line = false;
@@ -1227,6 +1237,9 @@ struct PulsarState {
 
     // Per-voice allocation buffers for OrpheusVoice::Init
     uint8_t voice_alloc_buffers[kNumPulsarTracks][kVoiceAllocBytes_Pulsar];
+    // Each track's second voice set for the detuned double, and its allocator.
+    PulsarTrackDouble dbl[kNumPulsarTracks];
+    uint8_t double_alloc_buffers[kNumPulsarTracks][kVoiceAllocBytes_Pulsar];
 
     // Mutation state — patterns evolve over time
     uint32_t seed_counter;      // incremented each scene load for varied seeds
