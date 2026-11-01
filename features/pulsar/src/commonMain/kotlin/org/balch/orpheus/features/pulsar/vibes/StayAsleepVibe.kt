@@ -464,9 +464,10 @@ class StayAsleepVibe : VibeProvider {
                 // full level for the entire gate, which on its own reads as an organ.
                 // lpgMode PLUCK is what makes this a struck string instead.
                 //
-                // harmonics/timbre/morph are deliberately NOT authored. On OSC all three are
-                // macro- and evolution-driven on this track, so a static would be a value the
-                // gate never lets through. The ranges below are where they really live.
+                // harmonics/timbre are deliberately NOT authored. On OSC both are macro- and
+                // evolution-driven on this track, so a static would be a value the gate never
+                // lets through. The ranges below are where they really live. Morph is the
+                // exception: it is the FM index, pinned so it can be shaped per note.
                 OrpheusEngine(
                     engineId = OrpheusEngineId.OSC,
                     volume = 0.90f,
@@ -479,7 +480,15 @@ class StayAsleepVibe : VibeProvider {
                     // Modulator an octave DOWN: a sub-octave ratio rounds the tone rather than
                     // adding bite. 1f is fatter and buzzier, 1.5f goes clangy.
                     fmRatio = .5f,
-                    fmShape = 0.42f,          // between sine and triangle: a few sidebands, still soft
+                    fmShape = 0.20f,          // mostly sine: the index envelope below carries the bite
+                    // FM that moves: each note hits at index 0.30 * 8 = 2.4 rad, then falls to
+                    // 0.06 (about 0.5 rad, nearly pure) over 150 ms. Bite on the attack, a
+                    // round ring under the slide. Pinned, so Space and the tension sweep can't
+                    // hold the index steady over the note. EAR-TUNE(user owns after ear test)
+                    morph = 0.30f,
+                    pinMorph = true,
+                    morphRise = -0.24f,
+                    morphRiseTime = 0.15f,
                     // E2. Also OSC's playability floor (kOscModRange.note_min = 40) — below it
                     // the render clamp folds notes UP an octave, so a stray mutated note would
                     // jump register. The auto lick octave still centers on E2, so the two
@@ -507,9 +516,9 @@ class StayAsleepVibe : VibeProvider {
                             energyDensity = MacroTarget(0.92f, 1.0f),
                             // Harmonics is self-feedback grit on OSC and the render clamps it
                             // at kOscModRange.harmonics_max = 0.35. MELODIC's stock 0.3-0.7
-                            // would sit pinned at max feedback with most of the Mood knob dead;
-                            // this keeps the default around 0.15 and gives the knob real travel.
-                            moodHarmonics = MacroTarget(0.05f, 0.30f),
+                            // would sit pinned at max feedback with most of the Mood knob dead.
+                            // Self-feedback is FM too, so this keeps the default near 0.10.
+                            moodHarmonics = MacroTarget(0.04f, 0.20f),
                             // Complexity is the growth knob: 0 plays the written figure, 1 ghosts
                             // ~8% of empty steps and drifts ~10% of notes per loop-cycle.
                             complexityVariation = MacroTarget(0f, 1f),
@@ -678,7 +687,7 @@ class StayAsleepVibe : VibeProvider {
             // both phases share one p, so outerDepth becomes a linear-to-quadratic knob.
             // 0.60 hangs the walk-up back and rushes the last bar, paid for in peak height.
             // The kick's morph is pinned per section, so the evolution sweep lands on the
-            // bass alone: the tone opens as the climb goes up.
+            // bass alone: its timbre opens as the climb goes up.
             tension = TensionProfile(
                 innerBars = 4,       // one staircase per visit
                 outerBars = 4,       // == innerBars: curves the walk-up, see above
@@ -691,7 +700,7 @@ class StayAsleepVibe : VibeProvider {
                     // top of every climb. On the OSC bass timbre is the triangle-to-square blend:
                     // capped at 0.45 it opens a little under tension instead of squaring off (0.80 did).
                     timbreLow = 0.20f, timbreHigh = 0.45f, timbreProbability = 0.95f,
-                    // Morph is the FM index, morph * 8 radians: 0.10-0.38 stays short of clangy.
+                    // Morph reaches the keys only: the bass pins its FM index and shapes it per note.
                     morphLow = 0.10f, morphHigh = 0.38f, morphProbability = 0.90f,
                     // A knee on the tone: evolution is (intensity - attackPoint) / (1 - attackPoint),
                     // so the timbre barely stirs early and opens late.
