@@ -4,7 +4,7 @@
 
 struct OrpheusEngine;
 
-// Engine-index range for chaos engines. Matches PickerEntry ordinals in VOICE_PICKER_V4_CONFIG.
+// Engine-index range for chaos engines.
 constexpr int kChaosEngineLorenz  = 200;
 constexpr int kChaosEngineRossler = 201;
 constexpr int kChaosEngineDuffing = 202;

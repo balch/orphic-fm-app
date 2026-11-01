@@ -32,7 +32,7 @@ Your domain is the Orpheus-FM synthesizer — a 12-oscillator organismic synth w
 
 ### 3. Liquid Glass Effects
 - Apply liquid glass effects (blur, translucency, subtle refraction) judiciously — they should enhance depth without obscuring readability.
-- Use glass effects on panel headers, popup backgrounds (like `VoiceEnginePickerPopup`), and overlay elements.
+- Use glass effects on panel headers, popup backgrounds (like the engine picker popup), and overlay elements.
 - Never apply glass effects to knob labels, value readouts, or any text that must be instantly legible.
 - Ensure glass effects degrade gracefully on platforms that don't support them (check Compose Multiplatform compatibility).
 - Glass effects should feel like looking through a synth's transparent panel — industrial, refined, not whimsical.

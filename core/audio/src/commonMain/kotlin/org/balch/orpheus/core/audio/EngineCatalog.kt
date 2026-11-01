@@ -104,12 +104,13 @@ object EngineCatalog {
         return bare + dx
     }
 
-    /** Case-insensitive substring match over code, display name, category, patch name and family. */
+    /** Case-insensitive substring match over short code, enum name, display name, category, patch name and family. */
     fun search(choices: List<EngineChoice>, query: String): List<EngineChoice> {
         val q = query.trim()
         if (q.isEmpty()) return choices
         return choices.filter { c ->
             val fields = buildList {
+                add(codeFor(c.engine))
                 add(c.engine.name)
                 add(c.engine.displayName)
                 category(c.engine)?.let { add(it.label) }
@@ -122,9 +123,25 @@ object EngineCatalog {
         }
     }
 
+    /** The short pill code for a bare engine (the Braids codes read "3SAW", not "TRIPLE_SAW"). */
+    fun codeFor(id: OrpheusEngineId): String = when (id) {
+        OSC -> "OSC"
+        VCF -> "VCF"; PD -> "PD"; DX -> "DX"; DX2 -> "DX2"; DX3 -> "DX3"
+        TRN -> "TRN"; ENS -> "ENS"; NES -> "NES"
+        VA -> "VA"; WSH -> "WSH"; FM, FM_DRUM -> "FM"; GRN -> "GRN"; ADD -> "ADD"
+        WTB -> "WTB"; CHD -> "CHD"; SPK -> "SPK"; SWM -> "SWM"; NSE -> "NSE"
+        PAR -> "PAR"; STR -> "STR"; MOD -> "MOD"
+        BD -> "BD"; SD -> "SD"; HH -> "HH"
+        TRIPLE_SAW -> "3SAW"; TRIPLE_SQUARE -> "3SQR"; TRIPLE_TRIANGLE -> "3TRI"
+        TRIPLE_SINE -> "3SIN"; TRIPLE_RING_MOD -> "3RM"
+        CSAW -> "CSAW"; TOY -> "TOY"; VOWEL_FOF -> "VOW"; QUESTION_MARK -> "?"
+        LRZ -> "LRZ"; ROS -> "ROS"; DUF -> "DUF"; HEN -> "HEN"; CHU -> "CHU"
+        MST -> "MST"
+    }
+
     fun labelFor(choice: EngineChoice): String = when (choice) {
-        is EngineChoice.Engine -> if (choice.engine == FM_DRUM) "FM" else choice.engine.name
-        is EngineChoice.Patch -> "${choice.patch.engine.name} · ${choice.patch.name}"
+        is EngineChoice.Engine -> codeFor(choice.engine)
+        is EngineChoice.Patch -> "${codeFor(choice.patch.engine)} · ${choice.patch.name}"
     }
 
     fun key(choice: EngineChoice): String = when (choice) {
