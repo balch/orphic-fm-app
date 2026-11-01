@@ -38,8 +38,9 @@ class FeatureStartupGuardTest {
          * Distortion writes DRIVE and MIX, the same ports MixerViewModel's DIST fader owns and
          * restores from a different key. Building both at startup is last-writer-wins, and the
          * UiState defaults are 0.0f, so a saved DIST value can be silently zeroed.
+         * Cowbell: the DJ AI edition builds it through CowbellStartup; startup = true would build it in OG too.
          */
-        val DELIBERATELY_LAZY_RESTORERS = setOf("DistortionFeature.kt")
+        val DELIBERATELY_LAZY_RESTORERS = setOf("DistortionFeature.kt", "CowbellFeature.kt")
     }
 
     @Test

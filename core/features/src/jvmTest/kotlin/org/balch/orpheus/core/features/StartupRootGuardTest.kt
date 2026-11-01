@@ -29,6 +29,7 @@ class StartupRootGuardTest {
             "IosAppLifecycle",
             "OrphicMcpServer",
             "DuoPatchPresetSync",
+            "CowbellStartup",
         )
 
         /**
