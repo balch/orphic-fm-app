@@ -328,6 +328,36 @@ static bool test_boost_scales_armed_track_only() {
     return ok;
 }
 
+static bool test_paused_armed_track_still_plays() {
+    printf("\n=== Test: paused, the armed track plays, the rest is silent and the clock holds ===\n");
+    Rig r(true);
+    r.run(kSettle);
+    r.e->pulsar_playing.store(0, std::memory_order_relaxed);
+    r.run(4);
+    const int playhead = r.e->pulsar_state->tracks[0].playhead;
+    const double acc = r.e->pulsar_state->clock_accumulator;
+    r.strike(71.0f, 1);
+    float live = 0.0f, other = 0.0f;
+    for (int b = 0; b < kBarBlocks; b++) {
+        live = std::max(live, r.block());
+        for (int i = 0; i < kFrames; i++) other = std::max(other, std::fabs(r.taps->track_l[kOther][i]));
+    }
+    const bool held = r.e->pulsar_state->tracks[0].playhead == playhead
+                   && r.e->pulsar_state->clock_accumulator == acc;
+    // Disarmed while paused, the whole unit goes quiet again.
+    r.e->pulsar_track_live_active[kTrack].store(0, std::memory_order_relaxed);
+    float quiet = 0.0f;
+    for (int b = 0; b < 4; b++) {
+        unit_process_pulsar(&r.unit, r.e, kFrames, 48000.0f);
+        for (int i = 0; i < kFrames; i++) quiet = std::max(quiet, std::fabs(r.unit.output_buffers[0][i]));
+    }
+    const bool ok = live > 0.01f && other < 1e-4f && held && quiet == 0.0f;
+    printf("  live peak %.4f, track %d peak %.6f, clock held %d, disarmed peak %.6f\n",
+           live, kOther, other, held, quiet);
+    printf("Paused noodle: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 static bool test_density_out_mutes_only_unarmed_tracks() {
     printf("\n=== Test: a section's density 0 mutes the sequencer, never the live player ===\n");
     Rig r(true);
@@ -504,6 +534,7 @@ bool run_pulsar_live_input_tests() {
     tally(test_engine_swap_waits_for_live_strike());
     tally(test_disarm_returns_to_sequencer());
     tally(test_boost_scales_armed_track_only());
+    tally(test_paused_armed_track_still_plays());
     tally(test_density_out_mutes_only_unarmed_tracks());
     tally(test_handoff_skips_armed_track());
     tally(test_track_note_readback_follows_live_note());

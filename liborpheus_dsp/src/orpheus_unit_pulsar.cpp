@@ -3309,7 +3309,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Check playing state ──
     bool playing = engine->pulsar_playing.load(std::memory_order_relaxed) != 0;
     float mix = engine->pulsar_mix.load(std::memory_order_relaxed);
-    if (!playing || mix <= 0.001f) {
+    // A Lick Lab track plays on through a pause: the timeline holds and every other voice is silent.
+    sync_live_arm(state, engine);
+    const bool live_noodle = !playing && any_track_live_armed(state);
+    engine->pulsar_live_noodle.store(live_noodle && mix > 0.001f ? 1 : 0, std::memory_order_relaxed);
+    if ((!playing && !live_noodle) || mix <= 0.001f) {
         std::memset(out_l, 0, num_frames * sizeof(float));
         std::memset(out_r, 0, num_frames * sizeof(float));
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
@@ -3406,7 +3410,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // one that changed with the host block size (desktop 512 vs Android vs WASM).
     // Everything downstream inherited that lag: the energy volume curves, the
     // energy > 0.6f EDM/Space engine swap, swing amount and the fire gate.
-    float smooth_coeff = 1.0f - std::exp(-static_cast<float>(num_frames)
+    // A paused noodle holds the macros where the pause left them.
+    float smooth_coeff = live_noodle ? 0.0f : 1.0f - std::exp(-static_cast<float>(num_frames)
                                          / (0.01f * sample_rate));
 
     float target_energy     = engine->pulsar_energy.load(std::memory_order_relaxed);
@@ -3670,19 +3675,22 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // 5% reads as gentle rubato instead of sloppy timekeeping.)
     float max_drift = (1.0f - energy) * 0.05f;
 
-    state->tempo_drift_countdown -= num_frames;
-    if (state->tempo_drift_countdown <= 0) {
-        state->tempo_drift_target = (rand01(state->mutation_seed) - 0.5f) * 2.0f * max_drift;
-        int bars = 4 + static_cast<int>(rand01(state->mutation_seed) * 4.0f);
-        state->tempo_drift_countdown = static_cast<int>(samples_per_step * 16.0 * bars);
-    }
+    // A paused noodle holds the walk: its draws share mutation_seed with the chord mutation.
+    if (!live_noodle) {
+        state->tempo_drift_countdown -= num_frames;
+        if (state->tempo_drift_countdown <= 0) {
+            state->tempo_drift_target = (rand01(state->mutation_seed) - 0.5f) * 2.0f * max_drift;
+            int bars = 4 + static_cast<int>(rand01(state->mutation_seed) * 4.0f);
+            state->tempo_drift_countdown = static_cast<int>(samples_per_step * 16.0 * bars);
+        }
 
-    // Slew toward the target over ~32 steps. This runs once per BLOCK, so the
-    // exponent must scale with the frames advanced this call — the previous
-    // per-sample constant applied per block slewed ~512x slower than intended.
-    float drift_coeff = 1.0f - std::exp(-static_cast<float>(num_frames)
-        / std::max(static_cast<float>(samples_per_step * 32.0), 1.0f));
-    state->tempo_drift += drift_coeff * (state->tempo_drift_target - state->tempo_drift);
+        // Slew toward the target over ~32 steps. This runs once per BLOCK, so the
+        // exponent must scale with the frames advanced this call — the previous
+        // per-sample constant applied per block slewed ~512x slower than intended.
+        float drift_coeff = 1.0f - std::exp(-static_cast<float>(num_frames)
+            / std::max(static_cast<float>(samples_per_step * 32.0), 1.0f));
+        state->tempo_drift += drift_coeff * (state->tempo_drift_target - state->tempo_drift);
+    }
     state->tempo_drift = std::max(-max_drift, std::min(max_drift, state->tempo_drift));
 
     samples_per_step *= (1.0 + static_cast<double>(state->tempo_drift));
@@ -3690,7 +3698,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // Void cursor: fractional steps elapsed in the current section. Advances at the
     // sequencer rate so the end-aligned arc stays locked to the section boundary.
     double void_cursor_start = state->void_state.cursor;
-    state->void_state.cursor += static_cast<double>(num_frames) / samples_per_step;
+    if (!live_noodle) state->void_state.cursor += static_cast<double>(num_frames) / samples_per_step;
 
     // Audition gain smoothing: 5 ms time constant whatever the block size.
     const float audition_coeff = 1.0f - std::exp(-static_cast<float>(num_frames) / (0.005f * sample_rate));
@@ -3769,8 +3777,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->start_hold_samples = 0;
     }
 
-    // Either hold freezes the timeline: no accumulator advance, no boundaries.
-    const bool timeline_hold = scratch_hold || start_hold;
+    // Any hold freezes the timeline: no accumulator advance, no boundaries.
+    const bool timeline_hold = scratch_hold || start_hold || live_noodle;
 
     // Vibe-load boundary: fire step 0 at sample 0 of the first playing block
     // so every track resyncs onto the fresh window immediately. Parity stays
@@ -3908,9 +3916,18 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         ? engine->pulsar_track_##field[t].load(std::memory_order_relaxed) \
         : engine->pulsar_track_##field##_space[t].load(std::memory_order_relaxed))
 
-    sync_live_arm(state, engine);
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
+        // A paused noodle renders only the armed track; the rest hold where the pause left them,
+        // so no voice draws on a shared RNG and the song resumes as it would have.
+        if (live_noodle && !ts.live_armed) {
+            engine->viz_rings[VIZ_PULSAR_TRACK_0 + t].write(0.0f);
+            if (measure_taps) {
+                std::memset(measure_taps->track_l[t], 0, num_frames * sizeof(float));
+                std::memset(measure_taps->track_r[t], 0, num_frames * sizeof(float));
+            }
+            continue;
+        }
         const PulsarTrackMacroMap& mm = ts.macro_map;
         bool grain_track = false;
 
@@ -5947,7 +5964,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         //     the window would simply never advance.
         // The trapezoid (15% in, sustain, 15% out) matches the master-bus wah this path
         // replaces, so the sweep shape is unchanged by the reroute.
-        if (t == 0) {
+        // A paused noodle freezes the window, as the pause's early return does.
+        if (t == 0 && !live_noodle) {
             int left = state->anomaly_wah_samples_left;
             const int total = state->anomaly_wah_samples_total;
             if (left > 0 && total > 0) {
@@ -7097,7 +7115,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     //
     // set_bed runs every block even when the values did not change: it is also what
     // re-asserts the bed's distance after a strike temporarily darkened it.
-    {
+    // A paused noodle leaves out the storm, street, fog and speech, as it skips the other tracks.
+    if (!live_noodle) {
         storm::StormVoice& storm = state->storm_voice;
         float bed_rain = 0.0f, bed_rain_level = 0.0f, bed_rumble = 0.0f, bed_distance = 0.0f;
         if (state->arrangement.active) {
@@ -7171,7 +7190,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Street voice: footsteps and train (pulsar_street.h) ─────────────────────
     // The weather's bed model: the active section's street lerps toward the staged destination
     // on the macro pre-roll. Footsteps ride track 0's boundaries recorded in the track loop.
-    {
+    if (!live_noodle) {
         street::StreetVoice& street = state->street_voice;
         float foot = 0.0f, echo = 0.0f, train = 0.0f, train_progress = 0.0f;
         bool run = false;
@@ -7237,7 +7256,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // Phrases are started at bar boundaries (the section's fog bed, or the FogHornAnomaly);
     // here it only renders. Straight into the stereo mix like the storm, under the Void duck
     // and the vibe trim, with fixed generous sends: the reverb scales with distance.
-    if (state->fog_voice.active()) {
+    if (!live_noodle && state->fog_voice.active()) {
         float fog_l[kMaxFrames], fog_r[kMaxFrames];
         std::memset(fog_l, 0, num_frames * sizeof(float));
         std::memset(fog_r, 0, num_frames * sizeof(float));
@@ -7265,7 +7284,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Vibe speech ─────────────────────────────────────────────────────
     // After the street block, into the stereo mix ahead of the output HPF, under the
     // Void duck, with fixed sends so a phrase sits in the vibe's room.
-    if (state->speech_player.active()) {
+    if (!live_noodle && state->speech_player.active()) {
         float speech_buf[kMaxFrames];
         std::memset(speech_buf, 0, num_frames * sizeof(float));
         state->speech_player.Render(speech_buf, num_frames);

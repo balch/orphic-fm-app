@@ -340,7 +340,9 @@ static RenderTrace render_ramped(void (*configure)(OrpheusEngine*), int bars) {
     float prev_left = 1e9f;
     for (int b = 0; b < bars * kBarBlocks; b++) {
         const float left = r.beats_left();
-        if (left > prev_left + 0.5f) changes++;
+        // Played blocks only: the load block publishes a countdown when armed (a paused noodle)
+        // and 0 when not, which must not count as a change in one render and not the other.
+        if (b > 1 && left > prev_left + 0.5f) changes++;
         prev_left = left;
         r.e->pulsar_complexity.store(changes % 3 == 0 ? 1.0f : 0.0f, std::memory_order_relaxed);
         r.block();

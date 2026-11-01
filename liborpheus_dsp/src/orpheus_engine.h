@@ -1303,6 +1303,9 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_live_glide[8] = {};
     // Gain on the whole armed track (dry and sends), 1..4. Live only; defaults to 1.0.
     std::atomic<float> pulsar_track_live_boost[8] = {};
+    // Pulsar sets this while it plays an armed track through a pause; the master out then lets
+    // it past the app mute, which the pause sets. Written by the Pulsar unit every block.
+    std::atomic<int>   pulsar_live_noodle{0};
 
     // Mix measurement taps (vibe_measure suite, mix bench). Null unless one of them sets it; when
     // set, Pulsar copies each block's per-track dry contribution and its bus on both sides of the

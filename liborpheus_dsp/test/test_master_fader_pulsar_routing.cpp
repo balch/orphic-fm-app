@@ -229,6 +229,38 @@ bool test_fade_out_then_in_restores_pulsar() {
     return c.ok;
 }
 
+// Test 4: a pause stops Pulsar and sets the app mute, but an armed Lick Lab track still
+// reaches the soundcard; disarmed, the pause is silent again.
+bool test_paused_noodle_plays_through_mute() {
+    Checker c;
+    OrpheusEngine* engine = make_pulsar_engine();
+    CHK(c, engine != nullptr);
+    if (!engine) return false;
+    constexpr int kTrack = 4;
+    engine->pulsar_playing.store(0, std::memory_order_relaxed);
+    engine->global_muted.store(1, std::memory_order_relaxed);
+    const PeakResult paused = render_blocks(engine, 256, 200);
+
+    engine->pulsar_track_live_active[kTrack].store(1, std::memory_order_relaxed);
+    engine->pulsar_track_live_velocity[kTrack].store(0.9f, std::memory_order_relaxed);
+    engine->pulsar_track_live_note[kTrack].store(64.0f, std::memory_order_relaxed);
+    engine->pulsar_track_live_strike[kTrack].store(1, std::memory_order_relaxed);
+    engine->pulsar_track_live_gate[kTrack].store(1, std::memory_order_relaxed);
+    const PeakResult noodle = render_blocks(engine, 256, 40);
+
+    engine->pulsar_track_live_gate[kTrack].store(0, std::memory_order_relaxed);
+    engine->pulsar_track_live_active[kTrack].store(0, std::memory_order_relaxed);
+    const PeakResult after = render_blocks(engine, 256, 100);
+
+    CHK(c, paused.peak_last_block == 0.0f);
+    CHK(c, noodle.peak_overall > 0.01f);
+    CHK(c, after.peak_last_block == 0.0f);
+    printf("  master_fader_pulsar.paused_noodle_plays_through_mute paused=%.4f noodle=%.4f after=%.4f %s\n",
+           paused.peak_last_block, noodle.peak_overall, after.peak_last_block, c.ok ? "OK" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return c.ok;
+}
+
 }  // namespace
 
 bool run_master_fader_pulsar_routing_tests() {
@@ -241,6 +273,7 @@ bool run_master_fader_pulsar_routing_tests() {
     tally(test_fade_to_zero_silences_pulsar());
     tally(test_fade_ramp_is_monotonic_at_master());
     tally(test_fade_out_then_in_restores_pulsar());
+    tally(test_paused_noodle_plays_through_mute());
     stmlib::Random::Seed(saved_rng);
     TEST_SUITE_RETURN(pass, fail);
 }

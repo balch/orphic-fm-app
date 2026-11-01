@@ -32,6 +32,18 @@ class LickClockTest {
     }
 
     @Test
+    fun `a paused playhead's frozen phase does not hold the clock back`() {
+        clock.beat(500.0, Any(), 1.0)
+        // Paused: fresh pulses every 33 ms, all at the held step's end.
+        var last = 0.0
+        for (i in 1..30) {
+            now = i * 33L
+            last = clock.beat(500.0, Any(), 1.0)
+        }
+        assertEquals(30 * 33 / 500.0, last, 1e-9)
+    }
+
+    @Test
     fun `without a beat phase it counts time alone`() {
         clock.beat(400.0, null, null)
         now = 1000
