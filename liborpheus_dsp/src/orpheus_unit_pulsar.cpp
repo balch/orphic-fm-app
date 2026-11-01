@@ -1690,6 +1690,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             {m.space_decay_min.load(std::memory_order_relaxed), m.space_decay_max.load(std::memory_order_relaxed)},
             {m.mood_harm_min.load(std::memory_order_relaxed), m.mood_harm_max.load(std::memory_order_relaxed)},
             {m.mood_timbre_min.load(std::memory_order_relaxed), m.mood_timbre_max.load(std::memory_order_relaxed)},
+            {m.mood_pitch_min.load(std::memory_order_relaxed), m.mood_pitch_max.load(std::memory_order_relaxed)},
         };
 
         // Generate pattern
@@ -5965,6 +5966,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             note_for_render += ts.pitch_rise * 0.01f * ts.pitch_rise_progress;
             ts.pitch_rise_progress = std::min(1.0f, ts.pitch_rise_progress
                 + static_cast<float>(num_frames) / (sample_rate * ts.pitch_rise_time));
+        }
+
+        // ── Mood pitch ──
+        // Mood bends the pitch handed to every engine by a per-track number of semitones,
+        // lerped across the macro. Block rate, after vibrato and rise. (0, 0) skips it.
+        if (mm.mood_pitch.min_value != 0.0f || mm.mood_pitch.max_value != 0.0f) {
+            const float bend = lerp_macro(mood, mm.mood_pitch);
+            if (scope_is_finite(bend)) note_for_render += std::clamp(bend, -24.0f, 24.0f);
         }
 
         // ── Harmonics rise ──

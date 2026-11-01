@@ -2193,7 +2193,7 @@ class PulsarViewModel(
     }
 
     /**
-     * Push the 16 macro map floats for a single track.
+     * Push the macro map floats (16) for a single track.
      */
     private fun pushMacroMap(trackIndex: Int, map: TrackMacroMap) {
         val ids = trackMacroIds[trackIndex]
@@ -2211,6 +2211,8 @@ class PulsarViewModel(
         ids[11].value = FloatValue(map.moodHarmonics.max)
         ids[12].value = FloatValue(map.moodTimbre.min)
         ids[13].value = FloatValue(map.moodTimbre.max)
+        ids[14].value = FloatValue(map.moodPitch.min)
+        ids[15].value = FloatValue(map.moodPitch.max)
     }
 
     /**

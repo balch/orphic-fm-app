@@ -131,7 +131,9 @@ class PulsarPlugin : DspPlugin {
     private val _trackBarStrategy = IntArray(8) { 0 }
     private var _stepCount = 16
     private var _openingNoteFloor = 0
-    private val _trackMacro = FloatArray(8 * PulsarSymbol.TRACK_MACRO_STRIDE) { 0.5f }
+    private val _trackMacro = FloatArray(8 * PulsarSymbol.TRACK_MACRO_STRIDE) {
+        if (it % PulsarSymbol.TRACK_MACRO_STRIDE >= PulsarSymbol.TRACK_MACRO_MOOD_PITCH_OFFSET) 0f else 0.5f
+    }
     private var _genreDensity = floatArrayOf(0.5f, 0.35f, 0.8f, 0.4f, 0.3f, 0.2f, 0.15f, 0.08f)
     private var _genreSwing = 0.02f
     private var _genreGhostProb = 0.3f
@@ -682,14 +684,20 @@ class PulsarPlugin : DspPlugin {
             intType { default = _openingNoteFloor; get { _openingNoteFloor }; set { _openingNoteFloor = it } }
         }
 
-        // Per-track macro maps (TRACK_MACRO_STRIDE entries per track: 7 targets × min/max)
+        // Per-track macro maps (TRACK_MACRO_STRIDE entries per track: 8 targets × min/max; mood pitch is semitones)
         for (t in 0..7) {
             val macroBase =
                 PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal + t * PulsarSymbol.TRACK_MACRO_STRIDE
             for (m in 0 until PulsarSymbol.TRACK_MACRO_STRIDE) {
                 val idx = t * PulsarSymbol.TRACK_MACRO_STRIDE + m
+                val semitones = m >= PulsarSymbol.TRACK_MACRO_MOOD_PITCH_OFFSET
                 controlPort(PulsarSymbol.entries[macroBase + m]) {
-                    floatType { default = 0.5f; min = 0f; max = 1f; get { _trackMacro[idx] }; set { _trackMacro[idx] = it } }
+                    floatType {
+                        default = if (semitones) 0f else 0.5f
+                        min = if (semitones) -24f else 0f
+                        max = if (semitones) 24f else 1f
+                        get { _trackMacro[idx] }; set { _trackMacro[idx] = it }
+                    }
                 }
             }
         }
