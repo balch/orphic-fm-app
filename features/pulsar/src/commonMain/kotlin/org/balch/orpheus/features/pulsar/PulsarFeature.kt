@@ -2633,8 +2633,8 @@ class PulsarViewModel(
                     PluginControlId(PULSAR_URI, "section_track_density_$baseIdx"),
                     FloatValue(o?.density ?: -1f)
                 )
-                // Breathe (volume/timbre swell), trailing 3 slots on this per-track family.
-                // 0 is the natural "off" value for all three, so absent overrides don't need
+                // Breathe (volume/timbre swell), trailing 4 slots on this per-track family.
+                // 0 is the natural "off" value for all four, so absent overrides don't need
                 // a separate sentinel the way density does.
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_track_breathe_bars_$baseIdx"),
@@ -2647,6 +2647,10 @@ class PulsarViewModel(
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_track_breathe_timbre_span_$baseIdx"),
                     FloatValue(o?.breatheTimbreSpan ?: 0f)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_breathe_smooth_$baseIdx"),
+                    FloatValue(if (o?.breatheSmooth == true) 1f else 0f)
                 )
                 // Pinned hits: a 64-bit step mask as four 16-bit words (a float is exact only
                 // to 2^24). Word w holds steps 16w..16w+15; all zero = no pin.

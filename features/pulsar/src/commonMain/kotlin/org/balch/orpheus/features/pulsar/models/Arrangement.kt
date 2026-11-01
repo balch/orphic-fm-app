@@ -116,6 +116,8 @@ data class SectionTransition(
  * @param breatheFloor Gain at the bottom of the breathe cycle, 0-1.
  * @param breatheTimbreSpan How much timbre (morph) closes as the breath sinks, 0-1. 0 = gain
  *   only, no timbre movement.
+ * @param breatheSmooth False steps the cycle once per loop-unit, so 1 holds still. True glides
+ *   it through each loop-unit, so 1 rises and falls once per loop-unit: a wave, not a step.
  */
 @Serializable
 data class TrackSectionOverride(
@@ -141,6 +143,7 @@ data class TrackSectionOverride(
     val breatheBars: Int = 0,
     val breatheFloor: Float = 0f,
     val breatheTimbreSpan: Float = 0f,
+    val breatheSmooth: Boolean = false,
 ) {
     init {
         require(breatheBars >= 0) { "TrackSectionOverride.breatheBars must be >= 0, got $breatheBars" }

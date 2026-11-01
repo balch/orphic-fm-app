@@ -46,6 +46,7 @@ struct BreatheSpec {
     int   bars        = 0;
     float floor_gain  = 0.0f;
     float timbre_span = 0.0f;
+    bool  smooth      = false;
 };
 
 struct BreatheCase {
@@ -115,6 +116,7 @@ static void push_breathe_arrangement(OrpheusEngine* engine, int bars_per_section
         engine->pulsar_section_track_breathe_bars[i].store(0.0f, std::memory_order_relaxed);
         engine->pulsar_section_track_breathe_floor[i].store(0.0f, std::memory_order_relaxed);
         engine->pulsar_section_track_breathe_timbre_span[i].store(0.0f, std::memory_order_relaxed);
+        engine->pulsar_section_track_breathe_smooth[i].store(0.0f, std::memory_order_relaxed);
     }
     const BreatheSpec* spec[2] = { &s0, &s1 };
     for (int s = 0; s < 2; s++) {
@@ -125,6 +127,8 @@ static void push_breathe_arrangement(OrpheusEngine* engine, int bars_per_section
             .store(spec[s]->floor_gain, std::memory_order_relaxed);
         engine->pulsar_section_track_breathe_timbre_span[slot]
             .store(spec[s]->timbre_span, std::memory_order_relaxed);
+        engine->pulsar_section_track_breathe_smooth[slot]
+            .store(spec[s]->smooth ? 1.0f : 0.0f, std::memory_order_relaxed);
     }
 
     for (int s = 0; s < kMaxSections; s++) {
@@ -290,6 +294,46 @@ static bool test_breathe_gain_cycles_per_bar() {
     return ok;
 }
 
+// (b2) The smooth cycle. bars = 1 with smooth set rises and falls inside every bar:
+// the top at each bar line, the floor mid-bar. Stepped, bars = 1 never moves.
+static bool test_smooth_breathe_swells_within_each_bar() {
+    printf("\n=== Test: a smooth 1-bar breathe sinks mid-bar and rises at the bar line ===\n");
+    BreatheCase dry;
+    dry.bars_per_section = 8;
+    BreatheCase wet = dry;
+    wet.s0 = {1, 0.1f, 0.0f, true};
+    const BreatheTrace a = run_case(dry);
+    const BreatheTrace b = run_case(wet);
+
+    // Bucket each block by where it sits in its bar; skip the entry bar.
+    double edge_sq_a = 0, edge_sq_b = 0, mid_sq_a = 0, mid_sq_b = 0;
+    int bar_start = 0;
+    for (size_t i = 0; i < a.rms.size(); i++) {
+        if (i > 0 && a.bar[i] != a.bar[i - 1]) bar_start = static_cast<int>(i);
+        if (a.bar[i] < 1 || a.section[i] != 0) continue;
+        const float pos = static_cast<float>(static_cast<int>(i) - bar_start) / 93.75f;
+        const double ra = static_cast<double>(a.rms[i]) * a.rms[i];
+        const double rb = static_cast<double>(b.rms[i]) * b.rms[i];
+        if (pos < 0.15f || pos > 0.9f)       { edge_sq_a += ra; edge_sq_b += rb; }
+        else if (pos > 0.4f && pos < 0.65f) { mid_sq_a += ra; mid_sq_b += rb; }
+    }
+
+    bool ok = true;
+    if (edge_sq_a < 1e-8 || mid_sq_a < 1e-8) {
+        printf("  FAIL: the dry render has no notes at the bar edges or mid-bar\n");
+        return false;
+    }
+    const float edge = static_cast<float>(std::sqrt(edge_sq_b / edge_sq_a));
+    const float mid  = static_cast<float>(std::sqrt(mid_sq_b / mid_sq_a));
+    // A 1 s bar is fast for the 0.2 s one-pole, which takes about a third off the swing
+    // here; at a playable tempo (a 4 s+ bar) the full depth comes through.
+    printf("  bar-line ratio %.3f, mid-bar ratio %.3f\n", edge, mid);
+    if (edge < 0.70f) { printf("  FAIL: bar-line level sank\n"); ok = false; }
+    if (mid > 0.50f)  { printf("  FAIL: mid-bar level did not sink\n"); ok = false; }
+    if (ok) printf("  PASS\n");
+    return ok;
+}
+
 // (c) The timbre half. Pinned timbre keeps every other writer off mod_timbre, so the
 // debug peek is the base value plus the breathe bias and nothing else.
 static bool test_breathe_biases_timbre_by_span() {
@@ -420,6 +464,7 @@ static bool test_breathe_bank_routing() {
     orpheus_engine_set_port(engine, uri, "section_track_breathe_bars_11", 2.0f);
     orpheus_engine_set_port(engine, uri, "section_track_breathe_floor_11", 0.25f);
     orpheus_engine_set_port(engine, uri, "section_track_breathe_timbre_span_11", 0.4f);
+    orpheus_engine_set_port(engine, uri, "section_track_breathe_smooth_11", 1.0f);
     orpheus_engine_set_port(engine, uri, "section_track_breathe_bars_9999", 7.0f);   // dropped
 
     bool ok = true;
@@ -432,15 +477,18 @@ static bool test_breathe_bank_routing() {
     if (engine->pulsar_section_track_breathe_timbre_span[11].load(std::memory_order_relaxed) != 0.4f) {
         printf("  FAIL: timbre_span slot did not route\n"); ok = false;
     }
-    // The three families share the "section_track_breathe_" prefix; a too-short
-    // strncmp would land floor/timbre_span writes in the bars bank.
+    if (engine->pulsar_section_track_breathe_smooth[11].load(std::memory_order_relaxed) != 1.0f) {
+        printf("  FAIL: smooth slot did not route\n"); ok = false;
+    }
+    // The four families share the "section_track_breathe_" prefix; a too-short
+    // strncmp would land the other writes in the bars bank.
     for (int i = 0; i < kBank; i++) {
         if (i == 11) continue;
         if (engine->pulsar_section_track_breathe_bars[i].load(std::memory_order_relaxed) != 0.0f) {
             printf("  FAIL: bars slot %d was written by a sibling family\n", i); ok = false; break;
         }
     }
-    if (ok) printf("  PASS: 3 x %d-slot bank routed, out-of-range write dropped\n", kBank);
+    if (ok) printf("  PASS: 4 x %d-slot bank routed, out-of-range write dropped\n", kBank);
     orpheus_engine_destroy(engine);
     return ok;
 }
@@ -480,8 +528,19 @@ static bool test_breathe_curve_shape() {
                orpheus::breathe_timbre_bias(bot, span), span); ok = false;
     }
     // bars 0 is off, and off has to be unity at every phase the caller could ask for.
-    if (orpheus::breathe_phase(7, 0) != 0.0f) {
+    if (orpheus::breathe_phase(7, 0) != 0.0f || orpheus::breathe_phase_smooth(7, 0.5f, 0) != 0.0f) {
         printf("  FAIL: bars 0 must read as phase 0\n"); ok = false;
+    }
+    // The smooth phase adds the position inside the bar.
+    struct { int bar; float frac; int bars; float phase; } smooth[] = {
+        {0, 0.5f, 1, 0.5f}, {5, 0.25f, 1, 0.25f}, {1, 0.5f, 2, 0.75f}, {3, 0.25f, 4, 0.8125f},
+    };
+    for (const auto& e : smooth) {
+        const float ph = orpheus::breathe_phase_smooth(e.bar, e.frac, e.bars);
+        if (std::fabs(ph - e.phase) > 1e-6f) {
+            printf("  FAIL: smooth phase(%d, %.2f, %d) = %.5f (expected %.5f)\n",
+                   e.bar, e.frac, e.bars, ph, e.phase); ok = false;
+        }
     }
     if (ok) printf("  PASS: raised cosine, top at entry, floor and -span at the bottom\n");
     return ok;
@@ -499,6 +558,7 @@ bool run_pulsar_breathe_tests() {
         uint32_t saved = stmlib::Random::state();
         tally(test_breathe_off_is_bit_identical());
         tally(test_breathe_gain_cycles_per_bar());
+        tally(test_smooth_breathe_swells_within_each_bar());
         tally(test_breathe_biases_timbre_by_span());
         tally(test_flip_into_a_breathe_less_section_is_clean());
         tally(test_breathe_handoff_snaps_to_the_incoming_top());

@@ -921,6 +921,7 @@ struct SectionParam {
     int   track_breathe_bars[kNumPulsarTracks] = {};
     float track_breathe_floor[kNumPulsarTracks] = {};
     float track_breathe_timbre_span[kNumPulsarTracks] = {};
+    bool  track_breathe_smooth[kNumPulsarTracks] = {};
     // Per-section chord progression override (0 = no override; see pulsar_chord_progression.h for kMaxProgressionLength = 8)
     int custom_progression_length = 0;
     int8_t custom_progression[kMaxProgressionLength] = {};

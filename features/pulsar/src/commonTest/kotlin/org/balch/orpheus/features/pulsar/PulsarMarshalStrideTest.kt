@@ -158,11 +158,11 @@ class PulsarMarshalStrideTest {
         assertEquals(0.1f, d.reverbBoost)
     }
 
-    // --- breathe: 3 trailing slots on the section_track_* per-track override family ---
+    // --- breathe: 4 trailing slots on the section_track_* per-track override family ---
 
     @Test
     fun trackSectionOverrideTrailingFieldsAreBreathe() {
-        // breatheBars/breatheFloor/breatheTimbreSpan must be the LAST three declared
+        // breatheBars/breatheFloor/breatheTimbreSpan/breatheSmooth must be the LAST four declared
         // fields, in this order — the marshal writes them as trailing slots and any
         // future field inserted before them (rather than appended after) would still
         // pass a plain "contains" check but silently reorder nothing here since the
@@ -171,9 +171,9 @@ class PulsarMarshalStrideTest {
         val descriptor = TrackSectionOverride.serializer().descriptor
         val names = (0 until descriptor.elementsCount).map { descriptor.getElementName(it) }
         assertEquals(
-            listOf("breatheBars", "breatheFloor", "breatheTimbreSpan"),
-            names.takeLast(3),
-            "breathe fields must be the trailing three on TrackSectionOverride, matching " +
+            listOf("breatheBars", "breatheFloor", "breatheTimbreSpan", "breatheSmooth"),
+            names.takeLast(4),
+            "breathe fields must be the trailing four on TrackSectionOverride, matching " +
                 "the doc comment's \"trailing slots\" contract",
         )
     }
