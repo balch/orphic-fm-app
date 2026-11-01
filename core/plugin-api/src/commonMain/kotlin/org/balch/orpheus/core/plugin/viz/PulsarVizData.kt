@@ -25,7 +25,7 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  * @param activeEngines Live per-track engine id the DSP is actually playing
  *   (reflects the random crossfade + section energy overrides). -1 = unset.
  * @param activePatches Per-track DX patch index (0..31) sounding now, walk included; -1 off DX.
- * @param trackNotes Per-track sounding MIDI pitch, glide included; -1 while the gate is low.
+ * @param trackNotes Per-track sounding MIDI pitch, glide included, rounded to the semitone; -1 while the gate is low.
  * @param chordRootDegree Scale degree (0..6) of the current chord's root; -1 when none.
  */
 data class PulsarVizData(

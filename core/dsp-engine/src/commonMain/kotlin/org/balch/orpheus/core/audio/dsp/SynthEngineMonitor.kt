@@ -406,6 +406,11 @@ class SynthEngineMonitor(
                 nativeBridge.nativeGetPulsarActiveEngines(pulsarActiveEngines)
                 nativeBridge.nativeGetPulsarActivePatches(pulsarActivePatches)
                 nativeBridge.nativeGetPulsarTrackNotes(pulsarTrackNotes)
+                // Whole semitones only, so a glide does not re-emit on every poll.
+                for (t in pulsarTrackNotes.indices) {
+                    val n = pulsarTrackNotes[t]
+                    pulsarTrackNotes[t] = if (n < 0f) -1f else n.roundToInt().toFloat()
+                }
                 val chordRoot = nativeBridge.nativeGetPulsarChordRootDegree()
                 val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
                 for (t in 0 until PULSAR_NUM_TRACKS) {

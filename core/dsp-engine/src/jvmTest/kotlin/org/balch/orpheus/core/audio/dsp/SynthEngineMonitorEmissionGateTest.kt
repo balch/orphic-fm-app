@@ -109,6 +109,17 @@ class SynthEngineMonitorEmissionGateTest {
 
             tick()
             assertEquals(settled + 2, emissions.size, "unchanged notes and chord must not re-emit")
+
+            // A glide inside one semitone must not re-emit at poll rate.
+            bridge.trackNote4 = 74.3f
+            tick()
+            bridge.trackNote4 = 73.8f
+            tick()
+            assertEquals(settled + 2, emissions.size, "a glide that still rounds to 74 must not re-emit")
+            bridge.trackNote4 = 74.6f
+            tick()
+            assertEquals(settled + 3, emissions.size, "a glide reaching the next semitone emits")
+            assertEquals(75f, emissions.last().trackNotes[4])
         } finally {
             scope.cancel()
             runCurrent()
