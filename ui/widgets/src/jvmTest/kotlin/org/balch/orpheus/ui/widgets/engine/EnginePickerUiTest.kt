@@ -291,6 +291,29 @@ class EnginePickerUiTest {
         }
     }
 
+    /** A printable key pressed while a tile has focus moves focus to the search and lands there as text. */
+    @OptIn(InternalComposeUiApi::class, ExperimentalComposeUiApi::class)
+    @Test
+    fun typingOnAFocusedTileGoesToTheSearch() {
+        val scene = ImageComposeScene(1024, 768, Density(1f)) {
+            Host(current = EngineChoice.Engine(OrpheusEngineId.VA), onPick = {})
+        }
+        try {
+            scene.render()
+            scene.render()
+            scene.tap(scene.node("p"))
+            scene.render()
+            scene.key(Key.DirectionDown)
+            assertEquals("p-tile-VA", scene.focusedTag())
+            scene.type('d')
+            assertEquals("p-search", scene.focusedTag(), "focus moves to the search")
+            val text = scene.node("p-search").config.getOrNull(SemanticsProperties.EditableText)?.text
+            assertEquals("d", text)
+        } finally {
+            scene.close()
+        }
+    }
+
     private fun hasTestTagPrefix(prefix: String) =
         androidx.compose.ui.test.SemanticsMatcher("tag starts with $prefix") {
             it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true

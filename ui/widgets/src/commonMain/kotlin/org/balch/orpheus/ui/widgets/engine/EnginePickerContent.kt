@@ -56,6 +56,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -244,7 +248,18 @@ internal fun EnginePickerPanel(
                     Key.DirectionRight -> FocusDirection.Right
                     Key.DirectionUp -> FocusDirection.Up
                     Key.DirectionDown -> FocusDirection.Down
-                    else -> return@onKeyEvent false
+                    else -> {
+                        // A printable key on a tile or chip lands in the search as typed text.
+                        val code = event.utf16CodePoint
+                        if (searchFocused || event.isCtrlPressed || event.isMetaPressed || event.isAltPressed ||
+                            code <= 0x20 || code == 0x7f
+                        ) {
+                            return@onKeyEvent false
+                        }
+                        state.query += code.toChar().toString()
+                        runCatching { searchFocus.requestFocus() }
+                        return@onKeyEvent true
+                    }
                 }
                 // Consumed even at an edge: an unused arrow would reach window hooks (the DJ app skips vibes).
                 focusManager.moveFocus(direction)

@@ -472,8 +472,8 @@ class VoiceViewModel(
         duoModSourceFlows[index].value = IntValue(source.ordinal)
     }
 
-    fun setDuoEngine(duoIndex: Int, engineOrdinal: Int) {
-        duoEngineFlows[duoIndex].value = IntValue(engineOrdinal)
+    fun setDuoEngine(duoIndex: Int, engineId: Int) {
+        duoEngineFlows[duoIndex].value = IntValue(engineId)
     }
 
     fun setDuoHarmonics(duoIndex: Int, value: Float) {
