@@ -1,20 +1,29 @@
 package org.balch.orpheus.features.ai.tools
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.features.ai.TurnBudget
 import org.balch.orpheus.features.ai.composer.CastMode
 import org.balch.orpheus.features.ai.composer.DRONE_BEDS
 import org.balch.orpheus.features.ai.composer.EngineMirror
+import org.balch.orpheus.features.ai.composer.LOOP_STYLES
 import org.balch.orpheus.features.ai.composer.Part
 import org.balch.orpheus.features.ai.composer.STYLE_TAGS
 import org.balch.orpheus.features.ai.composer.VOICE_PALETTE
+import org.balch.orpheus.features.ai.composer.shippedVibeProviders
+import org.balch.orpheus.features.ai.composer.shippedVibes
+import org.balch.orpheus.features.pulsar.models.Band
+import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.Section
 import kotlin.math.roundToInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /** The guide teaches the cast-first workflow, names only real engines and fields, and never sends the agent to a template. */
 class VibeGuideContentTest {
@@ -204,12 +213,99 @@ class VibeGuideContentTest {
     fun everyFieldTheNewSectionsNameIsReal() {
         val newSections = section("## A. Casting", "## 1. The frame")
         // Cast tool arguments and result fields, not vibe fields.
-        val toolFields = setOf("styleTags", "vibeJson", "pasteId", "sameAs", "phraseSlots")
+        val toolFields = setOf("styleTags", "vibeJson", "pasteId", "sameAs", "phraseSlots", "leadLine")
+        // A worked lick's label names its Kotlin val; sectionELicksAreShipped reads that val from the vibe.
+        val lickVals = melodyJsonBlocks.mapNotNull { lickLabel.find(it.label)?.groupValues?.get(2) }.toSet()
         val named = (Regex("`([A-Za-z]+)`").findAll(newSections) + Regex("""\b[a-z]+[A-Z][A-Za-z0-9]*\b""").findAll(newSections))
             .map { it.groupValues.last() }.toSet()
         val unknown = named.filterNot {
-            it == "dB" || schema.contains("\"$it\":") || it in toolFields || Regex("""\b$it\b""").containsMatchIn(TRACK_OVERRIDES_NOTE)
+            it == "dB" || schema.contains("\"$it\":") || it in toolFields || it in lickVals ||
+                Regex("""\b$it\b""").containsMatchIn(TRACK_OVERRIDES_NOTE)
         }
-        assertTrue(unknown.isEmpty(), "sections A-D name fields the schema lacks: $unknown")
+        assertTrue(unknown.isEmpty(), "sections A-E name fields the schema lacks: $unknown")
+    }
+
+    // ── Section E: melody lines and singers ──
+
+    private val melody by lazy { section("## E. Melody lines", "## 1. The frame") }
+
+    /** A fenced json block in section E and the line above its fence, which labels it. */
+    private class JsonBlock(val label: String, val body: String)
+
+    private val melodyJsonBlocks: List<JsonBlock> by lazy {
+        Regex("""```json\n(.*?)\n```""", RegexOption.DOT_MATCHES_ALL).findAll(melody).map { m ->
+            val label = melody.substring(0, m.range.first).trimEnd().substringAfterLast('\n')
+            JsonBlock(label, m.groupValues[1])
+        }.toList()
+    }
+
+    /** "Orphic Lore, val sirensDescent: ..." names the shipped vibe and the val the lick is read from. */
+    private val lickLabel = Regex("""^(.+?), val (\w+)\b""")
+
+    // The apply-path decoder, made strict: an unknown key or a bad enum fails instead of being dropped.
+    private val strictJson = Json(vibeApplyJson) { ignoreUnknownKeys = false; coerceInputValues = false }
+
+    private fun decodeLicks(): List<Pair<JsonBlock, Lick>> = melodyJsonBlocks
+        .filter { "steps" in Json.parseToJsonElement(it.body).jsonObject }
+        .map { it to strictJson.decodeFromString(Lick.serializer(), it.body) }
+
+    @Test
+    fun guideTeachesFourMelodyKinds() {
+        listOf("### Lyric line", "### Lead line", "### Riff", "### Jam").forEach {
+            assertTrue(melody.contains(it), "section E lacks $it")
+        }
+        listOf(
+            "lickIndex", "bassLineIndex", "lickMutationMode", "CHORD_TONES", "leadLine", "doubleDetune",
+            "doubleSpread", "handoffMatrix", "pullInMatrix", "LickBuilder", "LongFill",
+        ).forEach { assertTrue(Regex("""\b$it\b""").containsMatchIn(melody), "section E never names $it") }
+    }
+
+    @Test
+    fun everySectionEJsonBlockDecodes() {
+        assertTrue(melodyJsonBlocks.isNotEmpty(), "section E has no json blocks")
+        var licks = 0
+        melodyJsonBlocks.forEach { b ->
+            val top = Json.parseToJsonElement(b.body).jsonObject
+            when {
+                "steps" in top -> { strictJson.decodeFromString(Lick.serializer(), b.body); licks++ }
+                "barsMin" in top -> strictJson.decodeFromString(Section.serializer(), b.body)
+                "members" in top -> strictJson.decodeFromString(Band.serializer(), b.body)
+                else -> fail("section E json block is not a Lick, Section or Band (after \"${b.label}\"):\n${b.body}")
+            }
+        }
+        assertTrue(licks >= 4, "section E has $licks worked licks, wants at least 4")
+    }
+
+    @Test
+    fun sectionELicksAreShipped() {
+        val licks = decodeLicks()
+        assertTrue(licks.isNotEmpty(), "precondition: section E has worked licks")
+        val shipped = shippedVibes().flatMap { v -> listOfNotNull(v.lick, v.bassLine) + v.lickRotation?.pool.orEmpty() }.toSet()
+        val providers = shippedVibeProviders()
+        licks.forEach { (block, lick) ->
+            assertTrue(lick in shipped, "a section E lick is no shipped vibe's lick, bassLine or pool slot (after \"${block.label}\")")
+            val (vibeName, valName) = lickLabel.find(block.label)?.destructured
+                ?: fail("a worked lick's label must read \"<vibe>, val <name>\": \"${block.label}\"")
+            val provider = providers.singleOrNull { it.vibe.name == vibeName } ?: fail("no shipped vibe is named \"$vibeName\"")
+            val field = runCatching { provider.javaClass.getDeclaredField(valName) }.getOrNull()
+                ?: fail("${provider.javaClass.simpleName} has no val $valName")
+            field.isAccessible = true
+            assertEquals(field.get(provider), lick, "the lick labelled $vibeName, val $valName is not that val")
+        }
+        listOf("sirensDescent", "funkSketch").forEach { v ->
+            assertTrue(licks.any { Regex("""^Orphic Lore, val $v\b""").containsMatchIn(it.first.label) }, "section E lacks Orphic Lore's $v")
+        }
+        listOf("Stay Asleep", "Symphony No. 5 in C Minor").forEach { name ->
+            assertTrue(licks.any { it.first.label.startsWith("$name, val ") }, "section E lacks a worked lick from $name")
+        }
+    }
+
+    @Test
+    fun stepCountMathsIsStated() {
+        val flat = melody.replace(Regex("""\s+"""), " ")
+        listOf("stepCount / 4 beats", "At 32", "At 64", "chordsPerBar 4").forEach {
+            assertTrue(it in flat, "section E lost \"$it\"")
+        }
+        LOOP_STYLES.forEach { assertTrue(Regex("""\b$it\b""").containsMatchIn(flat), "section E never names loop style $it") }
     }
 }
