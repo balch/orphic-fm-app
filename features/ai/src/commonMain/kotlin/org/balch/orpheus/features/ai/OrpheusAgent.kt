@@ -145,6 +145,7 @@ class OrpheusAgent(
     private val dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
     private val greetingMode: AgentGreetingMode,
+    private val errorLog: AgentErrorLog,
 ) {
     private val logger = logging("OrpheusAgent")
 
@@ -298,6 +299,7 @@ class OrpheusAgent(
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow" }
                     agentActivityEventBus.emitError(throwable.message ?: "An error occurred")
+                    errorLog.record(AgentErrorSource.AGENT, throwable.toString())
                     _agentState.value = errorMessageAsState(throwable, throwable.message ?: "An error occurred")
                 }
                 .collect { state ->
@@ -357,6 +359,7 @@ class OrpheusAgent(
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow after restart" }
                     agentActivityEventBus.emitError(throwable.message ?: "An error occurred")
+                    errorLog.record(AgentErrorSource.AGENT, throwable.toString())
                     _agentState.value = errorMessageAsState(throwable, throwable.message ?: "An error occurred")
                 }
                 .collect { state ->
@@ -409,9 +412,17 @@ class OrpheusAgent(
                         logger.error(ctx.error) { "Error running agent" }
                         send(errorMessageAsState(ctx.error, "Something went wrong..."))
                         agentActivityEventBus.emitError(ctx.error.message ?: "Something went wrong")
+                        errorLog.record(AgentErrorSource.AGENT, ctx.error.toString())
                     }
                 }
-                onToolCallFailed { context -> logger.e { "Tool call failed: ${context.toolName} : ${context.message}" } }
+                onToolCallFailed { context ->
+                    logger.e { "Tool call failed: ${context.toolName} : ${context.message}" }
+                    errorLog.record(AgentErrorSource.TOOL, context.message, context.toolName)
+                }
+                onToolValidationFailed { context ->
+                    logger.e { "Tool args invalid: ${context.toolName} : ${context.message}" }
+                    errorLog.record(AgentErrorSource.TOOL, context.message, context.toolName)
+                }
             }
             // Usage tracking handler
             handleEvents {
@@ -423,6 +434,7 @@ class OrpheusAgent(
     }.catch { throwable ->
         logger.error(throwable) { "Unhandled exception in agent flow" }
         agentActivityEventBus.emitError(throwable.message ?: "An error occurred")
+                    errorLog.record(AgentErrorSource.AGENT, throwable.toString())
         emit(errorMessageAsState(throwable, throwable.message ?: "An error occurred"))
     }
 

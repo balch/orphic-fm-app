@@ -82,6 +82,7 @@ class OrpheusAgentGreetingTest {
             dispatcherProvider = dispatcherProvider,
             scope = featureScope,
             greetingMode = mode,
+            errorLog = AgentErrorLog(),
         )
         return agent to {
             featureScope.cancel()

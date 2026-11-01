@@ -45,6 +45,7 @@ import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.djapp.ai.OrphicFiles
+import org.balch.orpheus.features.ai.AgentErrorLog
 
 /**
  * Merged into the FeatureScope graph so the AppScope server can read the same tool set the
@@ -53,10 +54,11 @@ import org.balch.orpheus.djapp.ai.OrphicFiles
 @ContributesTo(FeatureScope::class)
 interface McpToolAccess {
     val mcpToolProviders: Set<ToolProvider>
+    val agentErrorLog: AgentErrorLog
 }
 
 /**
- * The AI edition's loopback MCP server: every koog [ToolProvider] in FeatureScope, served at
+ * The AI edition's loopback MCP server: every koog [ToolProvider] in FeatureScope plus [AgentErrorsTool], served at
  * `http://127.0.0.1:<port>/mcp` with a bearer token, `mcp.json` under [OrphicFiles.root].
  * Starts with the app, stops on process exit; [McpEndpointState] carries the endpoint once it listens.
  */
@@ -83,7 +85,7 @@ class OrphicMcpServer(
     ) {
         val access = holder.featureGraph as? McpToolAccess
             ?: error("FeatureGraph does not merge McpToolAccess; is :apps:djapp:ai on the graph's classpath?")
-        access.mcpToolProviders
+        access.mcpToolProviders + AgentErrorsTool(access.agentErrorLog)
     }
 
     init {
