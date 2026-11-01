@@ -143,6 +143,8 @@ class DesktopDspBridge {
     )
     external fun nativeGetPulsarActiveEngines(out: IntArray)
     external fun nativeGetPulsarActivePatches(out: IntArray)
+    external fun nativeGetPulsarTrackNotes(out: FloatArray)
+    external fun nativeGetPulsarChordRootDegree(): Int
     external fun nativeGetPulsarArrangement(out: IntArray)
 
     // miniaudio audio device control

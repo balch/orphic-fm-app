@@ -377,6 +377,13 @@ void OboeEngine::getPulsarActivePatches(int* out) {
     bool read = engine_.with(false, [&](OrpheusEngine* e) { orpheus_engine_get_pulsar_active_patches(e, out); return true; });
     if (!read) for (int t = 0; t < 8; t++) out[t] = -1;
 }
+void OboeEngine::getPulsarTrackNotes(float* out) {
+    bool read = engine_.with(false, [&](OrpheusEngine* e) { orpheus_engine_get_pulsar_track_notes(e, out); return true; });
+    if (!read) for (int t = 0; t < 8; t++) out[t] = -1.0f;
+}
+int OboeEngine::getPulsarChordRootDegree() {
+    return engine_.with(-1, [&](OrpheusEngine* e) { return orpheus_engine_get_pulsar_chord_root_degree(e); });
+}
 void OboeEngine::getPulsarArrangement(int* out) {
     bool read = engine_.with(false, [&](OrpheusEngine* e) { orpheus_engine_get_pulsar_arrangement(e, out); return true; });
     if (!read) out[0] = -1;

@@ -326,6 +326,17 @@ void orpheus_engine_get_pulsar_active_patches(OrpheusEngine* engine, int* out) {
         out[t] = engine->pulsar_track_active_patch[t].load(std::memory_order_relaxed);
 }
 
+void orpheus_engine_get_pulsar_track_notes(OrpheusEngine* engine, float* out) {
+    if (!engine || !out) return;
+    for (int t = 0; t < kNumPulsarTracks; t++)
+        out[t] = engine->pulsar_track_sounding_note[t].load(std::memory_order_relaxed);
+}
+
+int orpheus_engine_get_pulsar_chord_root_degree(OrpheusEngine* engine) {
+    if (!engine) return -1;
+    return engine->pulsar_chord_root_degree.load(std::memory_order_relaxed);
+}
+
 void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
     if (!engine || !out) { if (out) out[0] = -1; return; }
     // The notated-score clock lives directly on engine, not on PulsarState, and advances

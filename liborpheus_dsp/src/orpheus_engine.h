@@ -837,6 +837,10 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_track_active_engine[8]{};
     // DX patch (0..31) the track sounds this block, from its final harmonics; -1 off DX.
     std::atomic<int> pulsar_track_active_patch[8]{-1, -1, -1, -1, -1, -1, -1, -1};
+    // MIDI pitch each track sounds this block, glide and note_min fold included; -1 while its gate is low.
+    std::atomic<float> pulsar_track_sounding_note[8]{-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    // Scale degree (0..6) of the current chord's root; -1 with no progression or while stopped.
+    std::atomic<int> pulsar_chord_root_degree{-1};
     // 1 while the track plays its SPACE slot. Published beside the engine id because
     // a track with the same engine in both slots still has two sets of params.
     std::atomic<int> pulsar_track_active_space_slot[8]{};
@@ -955,6 +959,8 @@ struct OrpheusEngine {
     // Same peek for the post-playability-floor note, so a test can see the
     // octave fold an engine's note_min applies.
     std::atomic<float> pulsar_track_note_debug[8]{};
+    // Note-ons (pending_retrig) each track's render has seen, counted per block.
+    std::atomic<int>   pulsar_track_note_on_debug[8]{};
     // Final per-track volume after the texture curve, band gains and mute.
     std::atomic<float> pulsar_track_volume_debug[8]{};
     // Test-only override of mist::kWidth, so a test can render the same block with
@@ -1286,6 +1292,15 @@ struct OrpheusEngine {
     // Debug audition gain (DJ app TRACKS view), multiplies the final track volume. Default 1.0
     // is set in orpheus_engine_create; mute and solo arrive here as 0.
     std::atomic<float> pulsar_track_audition_gain[8] = {};
+    // Live note input (Lick Lab). While live_active is set the track ignores its pattern and
+    // plays these: note is MIDI (fractional bends), each change of live_strike is a new strike,
+    // glide is 0..1 like glideRate. Defaults set in orpheus_engine_create.
+    std::atomic<int>   pulsar_track_live_active[8] = {};
+    std::atomic<float> pulsar_track_live_note[8] = {};
+    std::atomic<int>   pulsar_track_live_gate[8] = {};
+    std::atomic<int>   pulsar_track_live_strike[8] = {};
+    std::atomic<float> pulsar_track_live_velocity[8] = {};
+    std::atomic<float> pulsar_track_live_glide[8] = {};
 
     // Mix measurement taps (vibe_measure suite, mix bench). Null unless one of them sets it; when
     // set, Pulsar copies each block's per-track dry contribution and its bus on both sides of the

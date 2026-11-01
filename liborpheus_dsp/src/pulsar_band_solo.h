@@ -78,6 +78,31 @@ inline const bool* build_solo_eligibility(const BandSoloConfigParam& config,
     return (eligible > 0) ? out : nullptr;
 }
 
+// True if any of member m's tracks is armed for live input (Lick Lab).
+inline bool member_has_live_track(const BandSoloConfigParam& config, int m,
+                                  const PulsarTrackState* tracks, int num_tracks) {
+    if (m < 0 || m >= config.member_count) return false;
+    const BandMemberParam& mem = config.members[m];
+    for (int ti = 0; ti < mem.track_count; ti++) {
+        const int rt = mem.tracks[ti];
+        if (rt >= 0 && rt < num_tracks && tracks[rt].live_armed) return true;
+    }
+    return false;
+}
+
+// A member playing an armed track never takes the lead: narrows `elig` (nullptr = all) into
+// out. With nothing armed it returns `elig` untouched, so unarmed selection stays bit-identical.
+inline const bool* exclude_live_members(const BandSoloConfigParam& config,
+                                        const PulsarTrackState* tracks, int num_tracks,
+                                        const bool* elig, bool* out) {
+    bool any = false;
+    for (int t = 0; t < num_tracks; t++) any |= tracks[t].live_armed;
+    if (!any) return elig;
+    for (int m = 0; m < config.member_count; m++)
+        out[m] = (!elig || elig[m]) && !member_has_live_track(config, m, tracks, num_tracks);
+    return out;
+}
+
 inline int select_initial_lead(
     const BandSoloConfigParam& config,
     uint32_t& seed,
@@ -357,6 +382,8 @@ inline void start_band_solo(
     const bool* elig = (section.solo_mode == SoloModeId::JAM ||
                         section.solo_mode == SoloModeId::LICK_BUILDER)
         ? build_solo_eligibility(config, tracks, num_tracks, line_elig) : nullptr;
+    bool live_elig[kMaxBandMembers];
+    elig = exclude_live_members(config, tracks, num_tracks, elig, live_elig);
     state.lead_member = select_initial_lead(config, seed, elig);
 
     // LongFill uses section bars, LickBuilder/Jam uses band's barsPerLead
@@ -469,6 +496,8 @@ inline void advance_band_solo(
     const bool* elig = (section.solo_mode == SoloModeId::JAM ||
                         section.solo_mode == SoloModeId::LICK_BUILDER)
         ? build_solo_eligibility(config, tracks, num_tracks, line_elig) : nullptr;
+    bool live_elig[kMaxBandMembers];
+    elig = exclude_live_members(config, tracks, num_tracks, elig, live_elig);
 
     // Drop expired pull-ins
     for (int m = 0; m < config.member_count; m++) {
@@ -522,12 +551,21 @@ inline void advance_band_solo(
             end_drum_lead(state, config, tracks, num_tracks);
         }
 
-        int next = (state.pending_lead >= 0) ? state.pending_lead
-                                             : select_next_lead(config, state, seed, elig);
+        // A pending lead armed since it was picked is replaced by a fresh pick.
+        const bool pending_ok = state.pending_lead >= 0
+            && !member_has_live_track(config, state.pending_lead, tracks, num_tracks);
+        int next = pending_ok ? state.pending_lead
+                              : select_next_lead(config, state, seed, elig);
 
         // Drum-lead gate: override `next` with the always_active drummer
         // when conditions are met. Inserted AFTER next is computed, BEFORE roles.
         bool drum_lead = should_drum_lead(section.solo_mode, state.last_handoff_was_drum, seed);
+        for (int m = 0; drum_lead && m < config.member_count; m++) {
+            if (config.members[m].always_active) {
+                if (member_has_live_track(config, m, tracks, num_tracks)) drum_lead = false;
+                break;
+            }
+        }
         if (drum_lead) {
             // pick the always_active drummer as the lead for this span
             for (int m = 0; m < config.member_count; m++) {

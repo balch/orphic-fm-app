@@ -2949,6 +2949,74 @@ static inline void schedule_triplet_repick(PulsarTrackState& ts, int seg_start, 
     }
 }
 
+// Arming or disarming live input releases whatever the track was sounding and clears the
+// sequencer's note chains, so neither source inherits the other's note.
+static void sync_live_arm(PulsarState* state, const OrpheusEngine* engine) {
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        PulsarTrackState& ts = state->tracks[t];
+        const bool armed = engine->pulsar_track_live_active[t].load(std::memory_order_acquire) != 0;
+        if (armed == ts.live_armed) continue;
+        ts.live_armed = armed;
+        ts.live_gate_prev = false;
+        ts.live_tapped = false;
+        // A count left from before this arm is not a new strike.
+        ts.live_strike_seen = engine->pulsar_track_live_strike[t].load(std::memory_order_acquire);
+        ts.voice_active = false;
+        ts.gate_timer = 0.0f;
+        ts.in_hold = false;
+        ts.suppress_hold_tail = false;
+        ts.prev_step_gated = false;
+        ts.repick_live = false;
+        ts.arp_note_count = 0;
+        ts.kraken_base_valid = false;  // a Kraken shift never re-pitches a live note
+        ts.glide_rate = 0.0f;
+        ts.current_pitch = ts.target_pitch;
+    }
+}
+
+// An armed track's note for this block: the gate holds the voice, a rising gate or a new
+// strike count is a note-on, and a note change without one is legato at live_glide.
+// A new count sounds for this block even if the gate already fell (a sub-block tap).
+static void apply_live_input(PulsarTrackState& ts, const OrpheusEngine* engine, int t) {
+    // Acquire pairs with the release stores in routing: velocity and glide land before the
+    // note, and the note before the strike and gate.
+    const bool gate = engine->pulsar_track_live_gate[t].load(std::memory_order_acquire) != 0;
+    const int strike = engine->pulsar_track_live_strike[t].load(std::memory_order_acquire);
+    float note = engine->pulsar_track_live_note[t].load(std::memory_order_acquire);
+    if (!std::isfinite(note)) note = ts.target_pitch;
+    note = std::clamp(note, 0.0f, 127.0f);
+    const bool held = ts.live_gate_prev;
+    ts.live_gate_prev = gate;
+    const bool new_count = strike != ts.live_strike_seen;
+    // A count seen a block before its gate was that gate's note-on: the rise is not a second one.
+    const bool same_tap = ts.live_tapped && !new_count;
+    const bool struck = new_count || (gate && !held && !same_tap);
+    ts.live_tapped = new_count && !gate;
+    ts.live_strike_seen = strike;
+    ts.gate_timer = 0.0f;
+    if (!gate && !struck) {
+        ts.voice_active = false;
+        return;
+    }
+    ts.voice_active = true;
+    if (struck) {
+        ts.pending_retrig = true;
+        ts.trigger_offset = 0;
+        ts.current_velocity = clamp01(engine->pulsar_track_live_velocity[t].load(std::memory_order_relaxed));
+    } else if (note == ts.target_pitch) {
+        return;
+    }
+    ts.target_pitch = note;
+    // Same glide mapping as a sequenced step; only a held note glides into the next.
+    const float g = clamp01(engine->pulsar_track_live_glide[t].load(std::memory_order_relaxed));
+    if (held && g > 0.001f) {
+        ts.glide_rate = 0.001f * std::pow(0.02f, g);
+    } else {
+        ts.glide_rate = 0.0f;
+        ts.current_pitch = note;
+    }
+}
+
 // Copies the tracks' steps and playheads to pulsar_viz for the step grid. Audio thread only.
 static void publish_pulsar_viz(const PulsarState* state, OrpheusEngine* engine) {
     auto& viz = engine->pulsar_viz;
@@ -3138,8 +3206,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         kraken_clear(state, engine);
         engine->viz_rings[VIZ_PULSAR_KRAKEN].write(static_cast<float>(kKrakenHome));
         // Nothing sounds while paused or muted, so the mixer falls back to the picked patch.
-        for (int t = 0; t < kNumPulsarTracks; t++)
+        for (int t = 0; t < kNumPulsarTracks; t++) {
             engine->pulsar_track_active_patch[t].store(-1, std::memory_order_relaxed);
+            engine->pulsar_track_sounding_note[t].store(-1.0f, std::memory_order_relaxed);
+        }
+        engine->pulsar_chord_root_degree.store(-1, std::memory_order_relaxed);
         // Report the void glow as idle while paused/muted: this return sits above the
         // void-gain pre-pass and its viz write, so without these two lines a pause
         // mid-duck freezes the Kotlin VIBE-dropdown tint at the ring's last (ducked)
@@ -3719,6 +3790,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         ? engine->pulsar_track_##field[t].load(std::memory_order_relaxed) \
         : engine->pulsar_track_##field##_space[t].load(std::memory_order_relaxed))
 
+    sync_live_arm(state, engine);
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
         const PulsarTrackMacroMap& mm = ts.macro_map;
@@ -5266,6 +5338,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ts.in_hold = false;   // don't let a stale hold-chain force gate_for_render high
                 continue;
             }
+            // Live input owns an armed track's notes (apply_live_input below); the playhead
+            // keeps time so a disarm hands the track back on its next step.
+            if (ts.live_armed) continue;
 
             if (ts.playhead >= kMaxPulsarSteps) ts.playhead = 0;
             PulsarStep pinned_scratch = {};
@@ -5770,6 +5845,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             resolve_breathe_block(state, sample_rate);
         }
 
+        if (ts.live_armed) apply_live_input(ts, engine, t);
+
         // Decrement gate timer by num_frames (block-rate approximation).
         if (ts.gate_timer > 0.0f) {
             ts.gate_timer -= static_cast<float>(num_frames);
@@ -5836,7 +5913,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         // A pending engine id lands on this block's note-on, or once armed on the bar line with a
         // strike there so self-enveloped engines sound. Every engine_index reader below sees it.
-        if (ts.engine_swap_wait >= 0 && (ts.pending_retrig || swap_bar_at >= 0)) {
+        // A held live note keeps its envelope instead: the next real strike lands the swap.
+        const bool live_held = ts.live_armed && ts.voice_active;
+        if (ts.engine_swap_wait >= 0 && (ts.pending_retrig || (swap_bar_at >= 0 && !live_held))) {
             if (!ts.pending_retrig && ts.voice_active) {
                 ts.pending_retrig = true;
                 ts.trigger_offset = swap_bar_at;
@@ -5860,7 +5939,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Determine note and accent from current step
         float note_for_render = ts.current_pitch;
         float accent_for_render = 0.8f;
-        if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
+        if (ts.live_armed) {
+            accent_for_render = ts.current_velocity;
+        } else if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
             PulsarStep pinned_scratch = {};
             const PulsarStep& step = effective_step(ts, t, ts.playhead, pinned_scratch);
             if (step.gate) {
@@ -6112,6 +6193,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
+        // The pitch the track sounds for the readback: floor fold in, vibrato/rise/bend out.
+        const float sounding_note = note_for_render;
+
         // ── Vibrato ──
         // Opt-in sine wobble on the pitch handed to every engine. Block rate, like glide
         // and the note itself. Depth 0 skips all of it, state included.
@@ -6196,6 +6280,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         engine->pulsar_track_mod_timbre_debug[t].store(clamp01(mod_timbre), std::memory_order_relaxed);
         engine->pulsar_track_mod_morph_debug[t].store(clamp01(mod_morph), std::memory_order_relaxed);
         engine->pulsar_track_note_debug[t].store(note_for_render, std::memory_order_relaxed);
+        if (ts.pending_retrig) engine->pulsar_track_note_on_debug[t].fetch_add(1, std::memory_order_relaxed);
 #endif
         // Mirrors FmPatchNames: floor(h * 32.64) clamped to 0..31, the DX patch picker.
         engine->pulsar_track_active_patch[t].store(
@@ -6203,6 +6288,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 ? std::clamp(static_cast<int>(std::floor(clamp01(mod_harmonics) * 32.64f)), 0, 31)
                 : -1,
             std::memory_order_relaxed);
+        engine->pulsar_track_sounding_note[t].store(
+            gate_for_render != 0 ? sounding_note : -1.0f, std::memory_order_relaxed);
 
         // Renders the engine (every family but Mist) at `note` into `out` on one voice set:
         // the track's own, or the detuned double's second set in state->dbl. Scalars are
@@ -6827,6 +6914,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 }
             }
         }
+    }
+
+    {
+        const PulsarChordState& cs = state->chord_state;
+        const bool has_chord = cs.progression_length > 0
+            && cs.chord_index >= 0 && cs.chord_index < cs.progression_length;
+        engine->pulsar_chord_root_degree.store(
+            has_chord ? cs.progression[cs.chord_index] : -1, std::memory_order_relaxed);
     }
 
     // The vibe's level trim, read once for the storm, street and speech blocks below. The

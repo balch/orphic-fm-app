@@ -506,6 +506,20 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarActivePatch
 }
 
 JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarTrackNotes(
+        JNIEnv *env, jobject thiz, jfloatArray out) {
+    float buf[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    sEngine.getPulsarTrackNotes(buf);
+    env->SetFloatArrayRegion(out, 0, 8, buf);
+}
+
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarChordRootDegree(
+        JNIEnv *env, jobject thiz) {
+    return sEngine.getPulsarChordRootDegree();
+}
+
+JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarArrangement(
         JNIEnv *env, jobject thiz, jintArray out) {
     int data[8] = {-1, 0, 0, 0, -1, 0, 0, 0};

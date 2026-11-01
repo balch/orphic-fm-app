@@ -160,6 +160,7 @@ class SynthEngineMonitor(
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarActiveEngines = IntArray(PULSAR_NUM_TRACKS) { -1 }
     private val pulsarActivePatches = IntArray(PULSAR_NUM_TRACKS) { -1 }
+    private val pulsarTrackNotes = FloatArray(PULSAR_NUM_TRACKS) { -1f }
     private val arrangementBuf = IntArray(8)
 
     // Guards every poll-lifecycle transition below (the five Job refs plus the
@@ -392,6 +393,8 @@ class SynthEngineMonitor(
             val prevStepCounts = IntArray(pulsarStepCounts.size)
             val prevActiveEngines = IntArray(pulsarActiveEngines.size)
             val prevActivePatches = IntArray(pulsarActivePatches.size)
+            val prevTrackNotes = FloatArray(pulsarTrackNotes.size)
+            var prevChordRoot = -1
             val prevTrackLevels = FloatArray(PULSAR_NUM_TRACKS)
             var prevVoidGain = -1f
             var prevKrakenShift = -1
@@ -402,6 +405,8 @@ class SynthEngineMonitor(
                 )
                 nativeBridge.nativeGetPulsarActiveEngines(pulsarActiveEngines)
                 nativeBridge.nativeGetPulsarActivePatches(pulsarActivePatches)
+                nativeBridge.nativeGetPulsarTrackNotes(pulsarTrackNotes)
+                val chordRoot = nativeBridge.nativeGetPulsarChordRootDegree()
                 val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
                 for (t in 0 until PULSAR_NUM_TRACKS) {
                     val ch = VIZ_PULSAR_TRACK_0 + t
@@ -433,7 +438,9 @@ class SynthEngineMonitor(
                     !pulsarVelocities.contentEquals(prevVelocities) ||
                     !pulsarStepCounts.contentEquals(prevStepCounts) ||
                     !pulsarActiveEngines.contentEquals(prevActiveEngines) ||
-                    !pulsarActivePatches.contentEquals(prevActivePatches)
+                    !pulsarActivePatches.contentEquals(prevActivePatches) ||
+                    !pulsarTrackNotes.contentEquals(prevTrackNotes) ||
+                    chordRoot != prevChordRoot
 
                 if (changed) {
                     _pulsarVizFlow.value = PulsarVizData(
@@ -446,6 +453,8 @@ class SynthEngineMonitor(
                         krakenShift = lastKrakenShift,
                         activeEngines = pulsarActiveEngines.copyOf(),
                         activePatches = pulsarActivePatches.copyOf(),
+                        trackNotes = pulsarTrackNotes.copyOf(),
+                        chordRootDegree = chordRoot,
                     )
                     pulsarGates.copyInto(prevGates)
                     pulsarVelocities.copyInto(prevVelocities)
@@ -453,6 +462,8 @@ class SynthEngineMonitor(
                     pulsarStepCounts.copyInto(prevStepCounts)
                     pulsarActiveEngines.copyInto(prevActiveEngines)
                     pulsarActivePatches.copyInto(prevActivePatches)
+                    pulsarTrackNotes.copyInto(prevTrackNotes)
+                    prevChordRoot = chordRoot
                     trackLevels.copyInto(prevTrackLevels)
                     prevVoidGain = lastVoidGain
                     prevKrakenShift = lastKrakenShift

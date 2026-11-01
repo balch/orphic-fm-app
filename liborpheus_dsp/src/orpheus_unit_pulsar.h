@@ -503,6 +503,13 @@ struct PulsarTrackState {
     // roll leaves it alone, since the voice is still on the note that did fire.
     float current_velocity = 0.8f;
 
+    // Live input (pulsar_track_live_*): armed at block start, so band solos see it too.
+    // The gate and strike last seen tell a new strike from a held note.
+    bool live_armed = false;
+    bool live_gate_prev = false;
+    bool live_tapped = false;  // last block saw a new count with the gate down
+    int  live_strike_seen = 0;
+
     // Reverb send brightness filter (one-pole LP per channel)
     float reverb_send_filter_state_l = 0.0f;
     float reverb_send_filter_state_r = 0.0f;

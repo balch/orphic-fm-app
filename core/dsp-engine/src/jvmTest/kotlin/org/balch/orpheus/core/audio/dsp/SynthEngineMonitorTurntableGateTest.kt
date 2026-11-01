@@ -134,6 +134,8 @@ class SynthEngineMonitorTurntableGateTest {
         ) {}
         override fun nativeGetPulsarActiveEngines(out: IntArray) { for (i in out.indices) out[i] = -1 }
         override fun nativeGetPulsarActivePatches(out: IntArray) { out.fill(-1) }
+        override fun nativeGetPulsarTrackNotes(out: FloatArray) { out.fill(-1f) }
+        override fun nativeGetPulsarChordRootDegree(): Int = -1
         override fun nativeGetPulsarArrangement(out: IntArray) { out[0] = -1 }
 
         // Unused control surface.

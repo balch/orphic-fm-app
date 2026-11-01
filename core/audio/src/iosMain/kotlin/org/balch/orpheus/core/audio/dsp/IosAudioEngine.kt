@@ -1505,6 +1505,12 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         for (i in out.indices) out[i] = -1
     }
 
+    override fun nativeGetPulsarTrackNotes(out: FloatArray) {
+        for (i in out.indices) out[i] = -1f
+    }
+
+    override fun nativeGetPulsarChordRootDegree(): Int = -1
+
     companion object {
         private val log = logging("IosAudioEngine")
 

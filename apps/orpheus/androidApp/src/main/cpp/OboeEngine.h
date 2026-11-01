@@ -64,6 +64,8 @@ public:
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void getPulsarActiveEngines(int* out);
     void getPulsarActivePatches(int* out);
+    void getPulsarTrackNotes(float* out);
+    int  getPulsarChordRootDegree();
     void getPulsarArrangement(int* out);
     void getTurntableViz(int deck, float* outBuf);
     void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);

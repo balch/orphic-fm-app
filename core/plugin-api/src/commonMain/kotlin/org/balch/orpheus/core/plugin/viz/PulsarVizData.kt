@@ -25,6 +25,8 @@ private const val MAX_STEPS = PULSAR_MAX_STEPS
  * @param activeEngines Live per-track engine id the DSP is actually playing
  *   (reflects the random crossfade + section energy overrides). -1 = unset.
  * @param activePatches Per-track DX patch index (0..31) sounding now, walk included; -1 off DX.
+ * @param trackNotes Per-track sounding MIDI pitch, glide included; -1 while the gate is low.
+ * @param chordRootDegree Scale degree (0..6) of the current chord's root; -1 when none.
  */
 data class PulsarVizData(
     val stepGates: Array<BooleanArray> = Array(NUM_TRACKS) { BooleanArray(MAX_STEPS) },
@@ -36,6 +38,8 @@ data class PulsarVizData(
     val activeEngines: IntArray = IntArray(NUM_TRACKS) { -1 },
     val krakenShift: Int = -1,
     val activePatches: IntArray = IntArray(NUM_TRACKS) { -1 },
+    val trackNotes: FloatArray = FloatArray(NUM_TRACKS) { -1f },
+    val chordRootDegree: Int = -1,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -49,6 +53,8 @@ data class PulsarVizData(
         if (!activeEngines.contentEquals(other.activeEngines)) return false
         if (krakenShift != other.krakenShift) return false
         if (!activePatches.contentEquals(other.activePatches)) return false
+        if (!trackNotes.contentEquals(other.trackNotes)) return false
+        if (chordRootDegree != other.chordRootDegree) return false
         return true
     }
 
@@ -62,6 +68,8 @@ data class PulsarVizData(
         result = 31 * result + activeEngines.contentHashCode()
         result = 31 * result + krakenShift
         result = 31 * result + activePatches.contentHashCode()
+        result = 31 * result + trackNotes.contentHashCode()
+        result = 31 * result + chordRootDegree
         return result
     }
 }

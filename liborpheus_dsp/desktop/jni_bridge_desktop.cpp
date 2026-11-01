@@ -473,6 +473,18 @@ JNI_FN(nativeGetPulsarActivePatches)(JNIEnv *env, jobject thiz, jintArray out) {
 }
 
 JNIEXPORT void JNICALL
+JNI_FN(nativeGetPulsarTrackNotes)(JNIEnv *env, jobject thiz, jfloatArray out) {
+    float buf[8] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    sEngine.getPulsarTrackNotes(buf);
+    env->SetFloatArrayRegion(out, 0, 8, buf);
+}
+
+JNIEXPORT jint JNICALL
+JNI_FN(nativeGetPulsarChordRootDegree)(JNIEnv *env, jobject thiz) {
+    return sEngine.getPulsarChordRootDegree();
+}
+
+JNIEXPORT void JNICALL
 JNI_FN(nativeGetPulsarArrangement)(JNIEnv *env, jobject thiz, jintArray out) {
     int data[8] = {-1, 0, 0, 0, -1, 0, 0, 0};
     sEngine.getPulsarArrangement(data);

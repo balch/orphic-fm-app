@@ -189,6 +189,8 @@ class DrumVoiceIndexRegressionTest {
         ) {}
         override fun nativeGetPulsarActiveEngines(out: IntArray) {}
         override fun nativeGetPulsarActivePatches(out: IntArray) {}
+        override fun nativeGetPulsarTrackNotes(out: FloatArray) {}
+        override fun nativeGetPulsarChordRootDegree(): Int = -1
         override fun nativeGetPulsarArrangement(out: IntArray) {}
     }
 }

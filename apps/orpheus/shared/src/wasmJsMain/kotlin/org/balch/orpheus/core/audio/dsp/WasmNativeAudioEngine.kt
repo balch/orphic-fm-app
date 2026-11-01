@@ -200,6 +200,8 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
     ) { /* WASM: not yet implemented */ }
     override fun nativeGetPulsarActiveEngines(out: IntArray) { for (i in out.indices) out[i] = -1 }
     override fun nativeGetPulsarActivePatches(out: IntArray) { for (i in out.indices) out[i] = -1 }
+    override fun nativeGetPulsarTrackNotes(out: FloatArray) { for (i in out.indices) out[i] = -1f }
+    override fun nativeGetPulsarChordRootDegree(): Int = -1
     override fun nativeGetPulsarArrangement(out: IntArray) { /* WASM: not yet implemented */ }
 
     companion object {

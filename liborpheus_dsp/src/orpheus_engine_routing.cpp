@@ -955,6 +955,21 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_mute[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "audition_gain") == 0)
                 engine->pulsar_track_audition_gain[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "live_active") == 0)
+                engine->pulsar_track_live_active[t].store(static_cast<int>(value), std::memory_order_release);
+            // Release: velocity and glide (relaxed, written first) are visible with the note,
+            // so a legato never lands with the previous glide.
+            else if (std::strcmp(param, "live_note") == 0)
+                engine->pulsar_track_live_note[t].store(value, std::memory_order_release);
+            // Release: note, velocity and glide (written first) are visible with the strike.
+            else if (std::strcmp(param, "live_gate") == 0)
+                engine->pulsar_track_live_gate[t].store(static_cast<int>(value), std::memory_order_release);
+            else if (std::strcmp(param, "live_strike") == 0)
+                engine->pulsar_track_live_strike[t].store(static_cast<int>(value), std::memory_order_release);
+            else if (std::strcmp(param, "live_velocity") == 0)
+                engine->pulsar_track_live_velocity[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "live_glide") == 0)
+                engine->pulsar_track_live_glide[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_rate") == 0)
                 engine->pulsar_track_mod_lfo_rate[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mod_lfo_rate_space") == 0)

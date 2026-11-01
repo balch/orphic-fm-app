@@ -177,6 +177,12 @@ class PulsarPlugin : DspPlugin {
     private var _trackEvoWeight = floatArrayOf(-1f, -1f, -1f, -1f, -1f, -1f, -1f, -1f)
     private val _trackChromaticSlide = FloatArray(8) { -1f }
     private val _trackAuditionGain = FloatArray(8) { 1f }
+    private val _liveActive = IntArray(8)
+    private val _liveNote = FloatArray(8) { 60f }
+    private val _liveGate = IntArray(8)
+    private val _liveStrike = IntArray(8)
+    private val _liveVelocity = FloatArray(8) { 0.8f }
+    private val _liveGlide = FloatArray(8)
     private val _modLfoRate = FloatArray(8) { 0.2f }
     private val _modLfoDepth = FloatArray(8) { 0f }
     private val _modLfoShape = FloatArray(8) { 0.3f }
@@ -870,6 +876,28 @@ class PulsarPlugin : DspPlugin {
                     default = 1f; min = 0f; max = 1.5f; excludeFromPresets = true
                     get { _trackAuditionGain[t] }; set { _trackAuditionGain[t] = it }
                 }
+            }
+        }
+
+        // Lick Lab live input. Session state: never saved in a preset. Strike is a counter.
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_ACTIVE.ordinal + t]) {
+                intType { default = 0; min = 0; max = 1; excludeFromPresets = true; get { _liveActive[t] }; set { _liveActive[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_NOTE.ordinal + t]) {
+                floatType { default = 60f; min = 0f; max = 127f; excludeFromPresets = true; get { _liveNote[t] }; set { _liveNote[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_GATE.ordinal + t]) {
+                intType { default = 0; min = 0; max = 1; excludeFromPresets = true; get { _liveGate[t] }; set { _liveGate[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_STRIKE.ordinal + t]) {
+                intType { default = 0; min = 0; max = 16_777_216; excludeFromPresets = true; get { _liveStrike[t] }; set { _liveStrike[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_VELOCITY.ordinal + t]) {
+                floatType { default = 0.8f; min = 0f; max = 1f; excludeFromPresets = true; get { _liveVelocity[t] }; set { _liveVelocity[t] = it } }
+            }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LIVE_GLIDE.ordinal + t]) {
+                floatType { default = 0f; min = 0f; max = 1f; excludeFromPresets = true; get { _liveGlide[t] }; set { _liveGlide[t] = it } }
             }
         }
 

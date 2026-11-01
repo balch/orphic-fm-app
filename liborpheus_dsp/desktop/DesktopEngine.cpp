@@ -252,6 +252,13 @@ void DesktopEngine::getPulsarActivePatches(int* out) {
     if (dsp_engine_) orpheus_engine_get_pulsar_active_patches(dsp_engine_, out);
     else for (int t = 0; t < 8; t++) out[t] = -1;
 }
+void DesktopEngine::getPulsarTrackNotes(float* out) {
+    if (dsp_engine_) orpheus_engine_get_pulsar_track_notes(dsp_engine_, out);
+    else for (int t = 0; t < 8; t++) out[t] = -1.0f;
+}
+int DesktopEngine::getPulsarChordRootDegree() {
+    return dsp_engine_ ? orpheus_engine_get_pulsar_chord_root_degree(dsp_engine_) : -1;
+}
 void DesktopEngine::getPulsarArrangement(int* out) {
     if (dsp_engine_) orpheus_engine_get_pulsar_arrangement(dsp_engine_, out);
     else out[0] = -1;

@@ -82,6 +82,40 @@ class SynthEngineMonitorEmissionGateTest {
     }
 
     @Test
+    fun `pulsar viz emits on a sounding note or chord root change`() = runTest {
+        val provider = TestDispatcherProvider(StandardTestDispatcher(testScheduler))
+        val scope = AppCoroutineScope(provider)
+        val bridge = ScriptedBridge()
+        val monitor = SynthEngineMonitor(bridge, provider, scope)
+        try {
+            val emissions = mutableListOf<PulsarVizData>()
+            backgroundScope.launch { monitor.pulsarVizFlow.collect { emissions.add(it) } }
+            monitor.startMonitoring()
+            runCurrent()
+            tick()
+            val settled = emissions.size
+            assertEquals(-1f, emissions.last().trackNotes[4], "a silent track reads -1")
+            assertEquals(-1, emissions.last().chordRootDegree, "no chord reads -1")
+
+            bridge.trackNote4 = 74f
+            tick()
+            assertEquals(settled + 1, emissions.size, "a sounding note change must emit")
+            assertEquals(74f, emissions.last().trackNotes[4])
+
+            bridge.chordRoot = 3
+            tick()
+            assertEquals(settled + 2, emissions.size, "a chord root change must emit")
+            assertEquals(3, emissions.last().chordRootDegree)
+
+            tick()
+            assertEquals(settled + 2, emissions.size, "unchanged notes and chord must not re-emit")
+        } finally {
+            scope.cancel()
+            runCurrent()
+        }
+    }
+
+    @Test
     fun `turntable viz seeds sized silent buffer once and gates steady silence`() = runTest {
         val provider = TestDispatcherProvider(StandardTestDispatcher(testScheduler))
         val scope = AppCoroutineScope(provider)
@@ -191,6 +225,10 @@ class SynthEngineMonitorEmissionGateTest {
         /** Track 0 playhead reported by [nativeGetPulsarViz]. */
         var playhead0 = 0
 
+        /** Track 4's sounding note and the chord root degree; -1 = silent / none. */
+        var trackNote4 = -1f
+        var chordRoot = -1
+
         /** Size of the buffer the monitor polls turntable viz into (129). */
         var turntableBufSize = 0
             private set
@@ -221,6 +259,13 @@ class SynthEngineMonitorEmissionGateTest {
         override fun nativeGetPulsarActivePatches(out: IntArray) {
             out.fill(-1)
         }
+
+        override fun nativeGetPulsarTrackNotes(out: FloatArray) {
+            out.fill(-1f)
+            out[4] = trackNote4
+        }
+
+        override fun nativeGetPulsarChordRootDegree(): Int = chordRoot
 
         override fun nativeGetPulsarArrangement(out: IntArray) {
             out[0] = -1
