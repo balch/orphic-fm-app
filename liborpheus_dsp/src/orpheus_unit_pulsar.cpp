@@ -90,6 +90,13 @@ static inline int engine_note_floor(int engine_index) {
     return 0;
 }
 
+// DX, DX2, DX3: harmonics picks a patch, so these engines always pin it.
+static constexpr int kDxEngineMin = 2;
+static constexpr int kDxEngineMax = 4;
+static inline bool is_dx_engine(int engine_index) {
+    return engine_index >= kDxEngineMin && engine_index <= kDxEngineMax;
+}
+
 // Storm send taps. Fixed rather than authored: the weather voice has no per-engine
 // send atomics behind it, and a wide reverb wash is what turns a dry rain bed into
 // weather — the pulsar reverb is the only diffusion the storm gets. The reverb tap is
@@ -3712,6 +3719,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         ts.trigger_offset = 0;
         ts.pending_retrig = false;
         ts.gate_pre_boundary = ts.voice_active;
+        int swap_bar_at = -1;   // this block's bar-line boundary for an armed engine swap
 
         // Per-block refresh of fields that section transitions can override.
         // Atomic-cheap; lets Kotlin push per-section overrides without a vibe reload.
@@ -3750,6 +3758,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // While ts.space_slot is clear we use the *_edm atomics; otherwise
         // we fall through to *_space, even when both slots hold the same engine.
         // This mirrors the lpg_mode/lpg_mode_space selection at render time below.
+        bool pin_harmonics_port = false;
         {
             const bool use_edm = !ts.space_slot;
             ts.volume     = PULSAR_PICK(volume);
@@ -3758,7 +3767,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             ts.morph      = PULSAR_PICK(morph);
             ts.lpg_decay  = PULSAR_PICK(lpg_decay);
             ts.lpg_colour = PULSAR_PICK(lpg_colour);
-            ts.pin_harmonics = PULSAR_PICK(pin_harmonics) != 0;
+            // The DX force follows the sounding engine, so a pending swap moves it on adoption.
+            pin_harmonics_port = PULSAR_PICK(pin_harmonics) != 0;
+            ts.pin_harmonics = pin_harmonics_port || is_dx_engine(ts.engine_index);
             ts.pin_timbre    = PULSAR_PICK(pin_timbre) != 0;
             ts.pin_morph     = PULSAR_PICK(pin_morph) != 0;
             ts.harmonics_modulation   = PULSAR_PICK(harmonics_modulation);
@@ -3974,6 +3985,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 && section_jump_pending(engine, state->arrangement)) {
                 pulsar_restart_loop(ts, state->tension.half_lick);
                 for (int rt = 1; rt < kNumPulsarTracks; rt++) state->tracks[rt].resync_pending = true;
+            }
+            // A swap pending 16 steps is armed and lands on the track's next bar line.
+            if (!is_load_boundary && swap_bar_at < 0 && ts.engine_swap_wait >= 16.0 * samples_per_step
+                && (ts.playhead - ts.wrap_start) % kJumpBarSteps == 0) {
+                swap_bar_at = step_boundary_samples[b];
             }
             // The opening section's first cycle has no wrap to plan from, so it is
             // planned here, at the vibe-load boundary itself.
@@ -5783,16 +5799,23 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
-        // A pending engine id lands on this block's note-on, or after 16 steps with a forced
-        // strike so self-enveloped engines sound. Every engine_index reader below sees it.
-        if (ts.engine_swap_wait >= 0
-            && (ts.pending_retrig || ts.engine_swap_wait >= 16.0 * samples_per_step)) {
-            if (ts.voice_active) ts.pending_retrig = true;
+        // A pending engine id lands on this block's note-on, or once armed on the bar line with a
+        // strike there so self-enveloped engines sound. Every engine_index reader below sees it.
+        if (ts.engine_swap_wait >= 0 && (ts.pending_retrig || swap_bar_at >= 0)) {
+            if (!ts.pending_retrig && ts.voice_active) {
+                ts.pending_retrig = true;
+                ts.trigger_offset = swap_bar_at;
+            }
             ts.live_engine_edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
             ts.live_engine_space = engine->pulsar_track_engine_space[t].load(std::memory_order_relaxed);
             ts.engine_swap_wait = -1;
             ts.engine_index = ts.space_slot ? ts.live_engine_space : ts.live_engine_edm;
             engine->pulsar_track_active_engine[t].store(ts.engine_index, std::memory_order_relaxed);
+            const bool pin = pin_harmonics_port || is_dx_engine(ts.engine_index);
+            if (pin != ts.pin_harmonics) {
+                ts.pin_harmonics = pin;
+                mod_harmonics = pin ? ts.harmonics : lerp_macro(mood, mm.mood_harmonics);
+            }
         }
 
         // Score firing moved out of this per-track loop: with a flat voice pool a chord's
@@ -5984,7 +6007,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // the quantizer is what makes small knob tweaks land on discrete
         // "voices" instead of smoothly interpolating.
         if (ts.pin_harmonics
-            && ts.engine_index >= 2 && ts.engine_index <= 4
+            && is_dx_engine(ts.engine_index)
             && ts.harmonics_macro_range > 0.001f) {
             // 0=NONE, 1=ENERGY, 2=COMPLEXITY, 3=SPACE, 4=MOOD (matches MacroSource.kt ordinals)
             float macro_val = 0.5f;
@@ -6020,7 +6043,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Engines with internal VCAs keep their gate high during holds: BD(21), SD(22), HH(23),
         // DX(2-4). STR(19) and MOD(20) strike once on the note-on and ignore a held gate.
         bool is_self_env = (ts.engine_index >= 21 && ts.engine_index <= 23)
-                        || (ts.engine_index >= 2 && ts.engine_index <= 4);
+                        || is_dx_engine(ts.engine_index);
         int gate_for_render = ts.voice_active ? 1 : 0;
         if (is_self_env && ts.in_hold) gate_for_render = 1;
 
@@ -6357,7 +6380,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // STR and MOD are struck: a note is all onset, so any attack here eats it (the DRONE
         // swell by ~30 dB). Hardware Plaits and the synth voice path leave them unenveloped too.
         bool self_enveloped = (ts.engine_index >= 19 && ts.engine_index <= 23)
-                           || (ts.engine_index >= 2 && ts.engine_index <= 4);
+                           || is_dx_engine(ts.engine_index);
         // The double's side takes the same envelope as the mid.
         float* dbl = double_active ? double_side : nullptr;
 

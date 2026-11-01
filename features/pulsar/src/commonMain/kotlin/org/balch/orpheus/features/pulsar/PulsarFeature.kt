@@ -2399,8 +2399,9 @@ class PulsarViewModel(
         trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
         trackMorphIds[i].value = FloatValue(sectionMorph ?: edm.morph)
         trackMorphSpaceIds[i].value = FloatValue(sectionMorph ?: spa.morph)
-        trackPinHarmonicsIds[i].value = IntValue(if (edm.pinHarmonics || edm.engineId.forcePinHarmonics) 1 else 0)
-        trackPinHarmonicsSpaceIds[i].value = IntValue(if (spa.pinHarmonics || spa.engineId.forcePinHarmonics) 1 else 0)
+        // The raw pin: C++ forces the DX pin when the swapped engine sounds, not when the port moves.
+        trackPinHarmonicsIds[i].value = IntValue(if (edm.pinHarmonics) 1 else 0)
+        trackPinHarmonicsSpaceIds[i].value = IntValue(if (spa.pinHarmonics) 1 else 0)
         trackPinTimbreIds[i].value = IntValue(if (edm.pinTimbre) 1 else 0)
         trackPinTimbreSpaceIds[i].value = IntValue(if (spa.pinTimbre) 1 else 0)
         trackPinMorphIds[i].value = IntValue(if (sectionMorph != null || edm.pinMorph) 1 else 0)
