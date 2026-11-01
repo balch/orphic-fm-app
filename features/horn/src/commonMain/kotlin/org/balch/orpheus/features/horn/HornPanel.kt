@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
+import org.balch.orpheus.ui.infrastructure.vizLabelColor
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -639,7 +640,7 @@ private fun BrakeToggle(
         Text(
             text = "BRAKE",
             style = MaterialTheme.typography.labelSmall.proportional(),
-            color = CrimsonHorn.copy(alpha = 0.7f),
+            color = vizLabelColor(CrimsonHorn).copy(alpha = 0.7f),
             fontSize = 9.sp,
             fontWeight = FontWeight.Medium,
         )

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.orpheus.ui.infrastructure.vizLabelColor
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
@@ -115,7 +116,7 @@ fun LabeledDropdown(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.proportional(),
-            color = labelColor,
+            color = vizLabelColor(labelColor),
             fontSize = if (hero) DropdownHeroLabelFontSize else DropdownLabelFontSize,
             fontWeight = FontWeight.Medium,
             maxLines = 1,

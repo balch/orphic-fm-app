@@ -3,6 +3,7 @@ package org.balch.orpheus.ui.infrastructure
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,9 @@ data class CenterPanelStyle(
  * @param bars The glass for the nav bars (a phone's bottom bar and rail, the dock's top and
  * bottom bars), which span the screen and hold only icons and labels, so they can take a
  * different fill from the panels; null gives them the panels' glass.
+ * @param labelTone How panel labels read over this visualization; see [vizLabelColor].
+ * @param tintColor Fills the panels' glass in place of each panel's own colour, such as a dark
+ *   fill where frost over a bright visualization turns pale; null keeps the panel's colour.
  */
 data class VisualizationLiquidEffects(
     val frostSmall: Float = 4f,
@@ -74,6 +78,8 @@ data class VisualizationLiquidEffects(
     val title: CenterPanelStyle = CenterPanelStyle(),
     val docked: VisualizationLiquidEffects? = null,
     val bars: VisualizationLiquidEffects? = null,
+    val labelTone: LabelTone = LabelTone.Panel,
+    val tintColor: Color? = null,
 ) {
     companion object {
         val Default = VisualizationLiquidEffects()
@@ -91,6 +97,17 @@ data class VisualizationLiquidEffects(
             )
         )
     }
+}
+
+/** Panel label colour over a visualization: the panel's own, or forced light or dark where the viz drowns it. */
+enum class LabelTone { Panel, Light, Dark }
+
+/** [panelColor] as the current visualization's [LabelTone] wants it. */
+@Composable
+fun vizLabelColor(panelColor: Color): Color = when (LocalLiquidEffects.current.labelTone) {
+    LabelTone.Panel -> panelColor
+    LabelTone.Light -> Color(0xFFEDE8FF)
+    LabelTone.Dark -> OrpheusColors.darkVoid
 }
 
 /**
@@ -194,7 +211,7 @@ fun Modifier.panelGlassChrome(
                 liquidState = liquidState,
                 scope = scope,
                 frostAmount = effects.frostSmall.dp,
-                color = color,
+                color = effects.tintColor ?: color,
                 tintAlpha = effects.tintAlpha,
                 shape = shape,
             )

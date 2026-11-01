@@ -80,6 +80,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
+import org.balch.orpheus.ui.infrastructure.vizLabelColor
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
@@ -859,12 +860,14 @@ fun RotaryKnob(
             previewAdjusting = previewAdjusting,
         )
 
+        // The visualization behind the panel can ask for light or dark labels to stay readable.
+        val shownLabelColor = vizLabelColor(labelColor)
         if (label != null) {
             Spacer(modifier = Modifier.height(2.dp))
             KnobLabel(
                 text = label,
                 style = labelStyle,
-                color = labelColor,
+                color = shownLabelColor,
                 pulseColor = indicatorColor,
                 pulse = pulseLabel,
                 onLongPress = if (enabled && !isLearning) onLongPress else null,
@@ -875,7 +878,7 @@ fun RotaryKnob(
             Text(
                 text = caption,
                 style = labelStyle.copy(fontSize = 9.sp).proportional(),
-                color = labelColor.copy(alpha = 0.6f),
+                color = shownLabelColor.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

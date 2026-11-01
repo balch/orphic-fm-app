@@ -15,6 +15,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.orpheus.ui.infrastructure.vizLabelColor
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import kotlin.math.roundToInt
@@ -75,7 +76,7 @@ fun HorizontalRotaryKnob(
                 Text(
                     text = label,
                     style = labelStyle,
-                    color = labelColor,
+                    color = vizLabelColor(labelColor),
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = textAlign,
