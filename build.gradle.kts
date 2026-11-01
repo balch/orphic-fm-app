@@ -98,6 +98,8 @@ allprojects {
 val runRenderHarnesses = providers.gradleProperty("renderHarness").isPresent
 allprojects {
     tasks.withType<Test>().configureEach {
+        // Scenes draw off screen; headless keeps the worker JVM out of the macOS Dock and focus.
+        systemProperty("java.awt.headless", "true")
         if (!runRenderHarnesses) filter { excludeTestsMatching("*RenderHarness") }
     }
 }
