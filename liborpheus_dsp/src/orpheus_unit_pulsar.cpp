@@ -1193,6 +1193,40 @@ static bool resolve_bar_lick(PulsarState* state, OrpheusEngine* engine, bool sec
     return false;
 }
 
+// Section.bassLineIndex: point the bass channel at the section's pool slot, or hand it
+// back to the authored bass line when the section pins none. Mutation and octave stay the
+// bass line's own. Only BASS-source lick tracks re-render.
+static void resolve_section_bass_line(PulsarState* state, OrpheusEngine* engine,
+                                      const SectionParam& sec, bool carry_ghosts) {
+    const int want = sec.bass_line_index;
+    const PulsarLickStep* src;
+    int len, loop;
+    if (want >= 0 && want < state->lick_pool_count && want != state->bass_line_slot) {
+        src = state->lick_pool[want];
+        len = state->lick_pool_len[want];
+        loop = (state->lick_pool_loop[want] > 0) ? state->lick_pool_loop[want] : len;
+    } else if (want == -1 && state->bass_line_slot != -1) {
+        src = state->authored_bass_line;
+        len = state->authored_bass_line_length;
+        loop = state->authored_bass_line_loop_length;
+    } else {
+        return;
+    }
+    if (len > kMaxLickSteps) len = kMaxLickSteps;
+    state->bass_line_length = len;
+    state->bass_line_loop_length = loop;
+    std::memcpy(state->bass_line, src, sizeof(PulsarLickStep) * len);
+    std::memcpy(state->original_bass_line, src, sizeof(PulsarLickStep) * len);
+    state->bass_line_slot = want;
+
+    const LickRenderCtx ctx = lick_render_ctx(engine);
+    const uint32_t seed = state->seed_counter * 2654435761u;
+    for (int rt = 0; rt < kNumPulsarTracks; rt++) {
+        if (engine->pulsar_track_lick_source[rt].load(std::memory_order_relaxed) != 1) continue;
+        render_track_lick(state, engine, ctx, rt, seed, carry_ghosts);
+    }
+}
+
 // ── Vibe loading (reads recipe from engine atomics) ─────────────────
 
 // Start a section's band solo, and for LICK_BUILDER seed the live lick from the
@@ -1579,6 +1613,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->bass_line_mutation = engine->pulsar_bass_line_mutation.load(std::memory_order_relaxed);
     state->bass_line_octave   = engine->pulsar_bass_line_octave.load(std::memory_order_relaxed);
     std::memcpy(state->original_bass_line, state->bass_line, sizeof(PulsarLickStep) * bass_len);
+    state->authored_bass_line_length = bass_len;
+    state->authored_bass_line_loop_length = state->bass_line_loop_length;
+    std::memcpy(state->authored_bass_line, state->bass_line, sizeof(PulsarLickStep) * bass_len);
+    state->bass_line_slot = -1;
 
     int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
     int scale_idx = engine->pulsar_scale_index.load(std::memory_order_relaxed);
@@ -2004,6 +2042,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             int lick_slot = static_cast<int>(engine->pulsar_section_data[base + 26].load(std::memory_order_relaxed));
             sec.lick_index = (lick_slot > 0) ? (lick_slot - 1) : -1;
 
+            // Slot 17: the bass-channel pin, a pool slot + 1 like slot 26.
+            int bass_slot = static_cast<int>(engine->pulsar_section_data[base + 17].load(std::memory_order_relaxed));
+            sec.bass_line_index = (bass_slot > 0) ? (bass_slot - 1) : -1;
+
             // Slot 16: jamCarry — continue an in-flight band solo across this
             // section's entry seam (see SectionParam::jam_carry).
             sec.jam_carry =
@@ -2280,6 +2322,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     apply_pool_lick(state, sec.lick_index);
                     regenerate_lick_tracks(state, engine, state->seed_counter * 2654435761u, false);
                 }
+                // Same reason for the bass channel's pin: it sings from bar one.
+                resolve_section_bass_line(state, engine, sec, false);
 
                 // Apply per-track section overrides for the initial section so
                 // chordal patterns generated above match the active section's
@@ -4232,9 +4276,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                                                 entry_interval - kDejavuSeamGuard - 1);
                         }
 
-                        // The section's lick slot goes in before its solo starts, so a
-                        // LickBuilder seeds from the incoming figure, not the outgoing one.
+                        // The section's lick slot and bass pin go in before its solo starts,
+                        // so a LickBuilder seeds from the incoming figure, not the outgoing one.
                         lick_swapped = resolve_bar_lick(state, engine, true);
+                        resolve_section_bass_line(state, engine, sec, state->lick_carry_growth);
                         const int seam_lead = state->band_solo_state.active
                             ? state->band_solo_state.lead_member : -1;
 

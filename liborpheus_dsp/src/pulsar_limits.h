@@ -36,9 +36,9 @@ static constexpr int kMaxSectionTransitions = 8;
 
 // Per-section wire strides (floats/ints per section in each array). Governs allocation
 // size for BOTH arrays below, but only pulsar_section_data's own indexing uses the full
-// width (slots 21-25 are SectionWeather, slot 26 is the pinned lick, slots 27-30 are
-// SectionStreet, slot 31 the section volume, slots 32-36 the rampTo macros, slot 37 the
-// volume envelope's point count and 38.. its (bar, level) pairs) —
+// width (slot 17 the bass-channel pin, slots 21-25 are SectionWeather, slot 26 is the
+// pinned lick, slots 27-30 are SectionStreet, slot 31 the section volume, slots 32-36 the
+// rampTo macros, slot 37 the volume envelope's point count and 38.. its (bar, level) pairs) —
 // pulsar_section_tension_data is indexed by its own kSectionTensionFields stride.
 static constexpr int kMaxSectionVolumePoints = 6;
 static constexpr int kSectionDataFields = 50;   // pulsar_section_data, pulsar_section_tension_data

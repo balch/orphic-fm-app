@@ -62,4 +62,37 @@ class BassLineTest {
         assertEquals(0.25f, decoded.bassLineMutation)
         assertEquals(2, decoded.bassLineOctave)
     }
+
+    private fun pinnedArrangement(bassLineIndex: Int) = Arrangement(
+        sections = listOf(Section(name = "verse", barsMin = 4, barsMax = 4, bassLineIndex = bassLineIndex)),
+    )
+
+    private fun pool(size: Int) = LickRotation(pool = List(size) { smallLick })
+
+    @Test
+    fun `bassLineIndex needs a pool and a bass line`() {
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(tracks = bassTracks(), bassLine = smallLick, arrangement = pinnedArrangement(0))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(lickRotation = pool(2), arrangement = pinnedArrangement(0))
+        }
+    }
+
+    @Test
+    fun `bassLineIndex must be inside the pool`() {
+        assertFailsWith<IllegalArgumentException> {
+            base.copy(tracks = bassTracks(), bassLine = smallLick, lickRotation = pool(2), arrangement = pinnedArrangement(2))
+        }
+        val v = base.copy(tracks = bassTracks(), bassLine = smallLick, lickRotation = pool(2), arrangement = pinnedArrangement(1))
+        assertEquals(1, v.arrangement!!.sections[0].bassLineIndex)
+    }
+
+    @Test
+    fun `bassLineIndex survives a JSON round trip`() {
+        val json = Json { encodeDefaults = true }
+        val v = base.copy(tracks = bassTracks(), bassLine = smallLick, lickRotation = pool(3), arrangement = pinnedArrangement(2))
+        val decoded = json.decodeFromString<Vibe>(json.encodeToString(Vibe.serializer(), v))
+        assertEquals(2, decoded.arrangement!!.sections[0].bassLineIndex)
+    }
 }

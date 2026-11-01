@@ -307,6 +307,9 @@ data class Section(
     /** Pin this section's lick to a [LickRotation.pool] slot. Null = rotate as usual.
      *  Scores use this to give each section its own theme. */
     val lickIndex: Int? = null,
+    /** Pin the bass channel (what [LickSource.BASS] tracks sing) to a [LickRotation.pool]
+     *  slot for this section. Null keeps [Vibe.bassLine]. */
+    val bassLineIndex: Int? = null,
     /** Phrases this section speaks inside its loop-cycles; they need [Vibe.speech]. */
     val speech: List<SpeechCue> = emptyList(),
     /** Footsteps and train under this section (slots 27-30). Null = no street. */
@@ -347,6 +350,11 @@ data class Section(
         lickIndex?.let {
             require(it in 0 until LickRotation.MAX_LICK_POOL) {
                 "Section.lickIndex must be 0..${LickRotation.MAX_LICK_POOL - 1}, got $it"
+            }
+        }
+        bassLineIndex?.let {
+            require(it in 0 until LickRotation.MAX_LICK_POOL) {
+                "Section.bassLineIndex must be 0..${LickRotation.MAX_LICK_POOL - 1}, got $it"
             }
         }
         require(exitEffects.size <= TransitionEffect.MAX_PER_FLIP) {
@@ -504,8 +512,9 @@ data class Arrangement(
         const val MAX_SECTION_TRANSITIONS = 8
 
         /**
-         * Floats per section in the `section_data_$i` bank (slots 0-20 existing fields,
-         * 21-25 [SectionWeather], 26 [Section.lickIndex], 27-30 SectionStreet). MUST equal
+         * Floats per section in the `section_data_$i` bank (slots 0-20 existing fields, slot 17
+         * the bass-channel pin [Section.bassLineIndex], 21-25 [SectionWeather],
+         * 26 [Section.lickIndex], 27-30 SectionStreet). MUST equal
          * `kSectionDataFields` in `pulsar_limits.h`.
          * `PulsarSectionLimitsTest` parses the header and fails if these drift apart.
          *

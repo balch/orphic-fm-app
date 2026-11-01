@@ -2326,7 +2326,8 @@ class PulsarViewModel(
      *   5=macro_energy, 6=macro_complexity, 7=macro_space, 8=macro_mood,
      *   9=solo_mode_id (0=no solo), 10=solo_probability, 11=solo_mutation_rate (LickBuilder),
      *   12=solo_lick_influence (Jam), 13=solo_bars_min (LongFill), 14=solo_bars_max (LongFill),
-     *   15=reserved (retired: was exitScratchMs, see the zeroing comment below), 16=jamCarry, 17=reserved,
+     *   15=reserved (retired: was exitScratchMs, see the zeroing comment below), 16=jamCarry,
+     *   17=bass_line_index+1 (the bass-channel pin, 0=no override),
      *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override,
      *   21=weather_rain, 22=weather_rumble, 23=weather_strike_chance, 24=weather_distance,
      *   25=weather_rain_level (SectionWeather; all-zero when [Section.weather] is null),
@@ -2434,7 +2435,8 @@ class PulsarViewModel(
             // [0]=bars_min, [1]=bars_max, [2]=bar_step (1 = any value in
             //   [bars_min, bars_max]; 2 = odd-or-even-only stride), [3]=recency_decay,
             // [4]=transition_count, [5]=energy, [6]=complexity, [7]=space, [8]=mood,
-            // [9..17]=solo data (format depends on new vs legacy system),
+            // [9..16]=solo data (format depends on new vs legacy system),
+            // [17]=bass_line_index+1, the bass-channel pin (0 = no override),
             // [18]=comping_style_override, [19]=comping_inversion_override,
             // [20]=chord_follow_override, [21..25]=weather, [26]=lick_index+1 (0 = no
             // override), [27..30]=street, [31]=volume+1, [32..36]=rampTo+1 (0 = unset),
@@ -2469,7 +2471,7 @@ class PulsarViewModel(
                 setSection(14, (sectionSolo as? SoloMode.LongFill)?.barsMax?.toFloat() ?: 4f)
                 setSection(15, 0f) // slot 15 retired, never repurpose
                 setSection(16, 0f) // slot 16 written below (jamCarry)
-                setSection(17, 0f) // reserved
+                setSection(17, 0f) // slot 17 written below (bassLineIndex)
             } else {
                 // No solo in this section
                 setSection(9, 0f)
@@ -2483,6 +2485,8 @@ class PulsarViewModel(
             // section's entry (see Section.jamCarry). Written after the solo
             // block so it wins over the reserved-0 writes in both branches.
             setSection(16, if (section.jamCarry) 1f else 0f)
+            // Slot 17: the bass-channel pin, pool slot + 1 (0 = keep Vibe.bassLine), like slot 26.
+            setSection(17, ((section.bassLineIndex ?: -1) + 1).toFloat())
 
             // Section-level comping overrides (slots 18-20); -1.0 = no override
             setSection(18, compingStyleOrSentinel(section.compingStyle))

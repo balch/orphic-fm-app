@@ -4,6 +4,7 @@
 #include "test_harness.h"
 #include "test_pulsar_helpers.h"
 #include "../src/orpheus_unit_pulsar.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -427,6 +428,286 @@ static bool test_generative_call_response_uses_track_channel() {
     return ok;
 }
 
+// ── Section.bassLineIndex: a section pins a lick-pool slot for the bass channel ──
+//
+// Pool slot s is a constant-degree line (kPinPoolDegree[s]). Section 0 lasts one bar and
+// pins the lead to slot 0 (slot 26) and, optionally, the bass channel to slot 2 (slot 17);
+// section 1 pins the lead to slot 1 and the bass to nothing, and self-loops for 32 bars.
+static constexpr int kBassPinSlot = 2;
+static constexpr float kPinPoolDegree[3] = {1.0f, 3.0f, 6.0f};
+
+static void push_bass_pin_pool(OrpheusEngine* engine) {
+    const int F = OrpheusEngine::kLickFieldsPerStep, S = OrpheusEngine::kMaxLickSteps;
+    for (int s = 0; s < 3; s++) {
+        for (int i = 0; i < 4; i++) {
+            int b = s * (S * F) + i * F;
+            engine->pulsar_lick_pool_data[b + 0] = kPinPoolDegree[s];
+            engine->pulsar_lick_pool_data[b + 1] = 1.0f;   // quarter notes, as push_two_channels
+            engine->pulsar_lick_pool_data[b + 2] = 0.8f;
+            engine->pulsar_lick_pool_data[b + 3] = -1.0f;
+            engine->pulsar_lick_pool_hit_prob[s * S + i] = 1.0f;
+        }
+        engine->pulsar_lick_pool_len[s] = 4;
+        engine->pulsar_lick_pool_loop[s] = 4;
+    }
+    engine->pulsar_lick_anomaly_index = -1;
+    engine->pulsar_lick_anomaly_chance = 0.0f;
+    engine->pulsar_lick_pool_count.store(3, std::memory_order_release);
+}
+
+// s0_bass_pin = -1 writes slot 17 as 0 (no pin).
+static void push_bass_pin_arrangement(OrpheusEngine* engine, int s0_bass_pin) {
+    engine->pulsar_arrangement_active.store(1, std::memory_order_relaxed);
+    engine->pulsar_arrangement_section_count.store(2, std::memory_order_relaxed);
+    engine->pulsar_arrangement_intro_index.store(0, std::memory_order_relaxed);
+    engine->pulsar_arrangement_outro_index.store(-1, std::memory_order_relaxed);
+
+    constexpr int kSectionStride = kSectionDataFields;
+    float section_data[2 * kSectionStride] = {};
+    for (int s = 0; s < 2; s++) {
+        float* d = section_data + s * kSectionStride;
+        d[2] = 1; d[3] = 0.8f; d[4] = 1;               // bar_step, recency_decay, one edge
+        d[5] = -1; d[6] = -1; d[7] = -1; d[8] = -1;    // no macro overrides
+        d[18] = -1; d[19] = -1; d[20] = -1;            // no comping overrides
+    }
+    section_data[0] = 1;  section_data[1] = 1;         // section 0: one bar
+    section_data[26] = 1;                              // lead pinned to slot 0
+    section_data[17] = static_cast<float>(s0_bass_pin + 1);
+    section_data[kSectionStride + 0] = 32;  section_data[kSectionStride + 1] = 32;
+    section_data[kSectionStride + 26] = 2;             // lead pinned to slot 1
+    for (int i = 0; i < 2 * kSectionStride; i++) {
+        engine->pulsar_section_data[i].store(section_data[i], std::memory_order_relaxed);
+    }
+
+    // s0 -> s1 and s1 -> s1, both hard cuts.
+    float trans[8 * 8 * 3] = {};
+    trans[0] = 1;  trans[1] = 1.0f;
+    trans[24] = 1; trans[25] = 1.0f;
+    for (int i = 0; i < 8 * 8 * 3; i++)
+        engine->pulsar_section_transitions[i].store(trans[i], std::memory_order_relaxed);
+    engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
+}
+
+static GenStepsResult snap_track(PulsarState* ps, int t) {
+    GenStepsResult r;
+    r.step_count = std::min(ps->tracks[t].step_count, kMaxPulsarSteps);
+    for (int i = 0; i < r.step_count; i++) {
+        r.note[i] = ps->tracks[t].steps[i].note;
+        r.gate[i] = ps->tracks[t].steps[i].gate;
+        if (r.first_note < 0 && r.gate[i]) r.first_note = r.note[i];
+    }
+    return r;
+}
+
+struct BassPinRun {
+    bool reached_s1 = false;
+    GenStepsResult s0_bass, s0_lead, s1_bass, s1_lead;
+    int s0_lick = -1, s1_lick = -1;
+    int s0_lead_degree = -99, s1_lead_degree = -99;
+};
+
+// bass_degree is the authored bassLine's constant degree; s0_bass_pin = -1 pins nothing.
+static BassPinRun run_bass_pin_case(float bass_degree, int s0_bass_pin) {
+    BassPinRun r;
+    stmlib::Random::Seed(0xBA55u);
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_seed.store(424242, std::memory_order_relaxed);
+    push_two_channels(engine);
+    for (int i = 0; i < 4; i++) {
+        char sym[36];
+        snprintf(sym, sizeof(sym), "bass_line_data_%d", i * OrpheusEngine::kLickFieldsPerStep);
+        orpheus_engine_set_port(engine, PULSAR_URI, sym, bass_degree);
+    }
+    setup_two_lick_tracks(engine);
+    // REPEAT on both lick tracks: with mutation 0 the render then ignores its seed.
+    engine->pulsar_track_bar_strategy[3].store(0, std::memory_order_relaxed);
+    engine->pulsar_track_bar_strategy[4].store(0, std::memory_order_relaxed);
+    push_bass_pin_pool(engine);
+    push_bass_pin_arrangement(engine, s0_bass_pin);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    PulsarState* ps = engine->pulsar_state;
+    if (ps && ps->section_state.current_section == 0) {
+        r.s0_bass = snap_track(ps, 3);
+        r.s0_lead = snap_track(ps, 4);
+        r.s0_lick = ps->current_lick_index;
+        r.s0_lead_degree = ps->lick[0].scale_degree;
+        for (int i = 0; i < 400 && !r.reached_s1; i++) {
+            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            if (ps->section_state.current_section == 1) {
+                r.reached_s1 = true;
+                r.s1_bass = snap_track(ps, 3);
+                r.s1_lead = snap_track(ps, 4);
+                r.s1_lick = ps->current_lick_index;
+                r.s1_lead_degree = ps->lick[0].scale_degree;
+            }
+        }
+    }
+    orpheus_engine_destroy(engine);
+    return r;
+}
+
+static bool test_bass_line_index_sings_the_pool_slot() {
+    printf("\n=== Test: a section's bass_line_index renders that pool slot on the BASS track ===\n");
+    BassPinRun pinned = run_bass_pin_case(0.0f, kBassPinSlot);
+    // Reference: the same vibe whose authored bassLine IS slot 2's line, nothing pinned.
+    BassPinRun reference = run_bass_pin_case(kPinPoolDegree[kBassPinSlot], -1);
+    BassPinRun authored = run_bass_pin_case(0.0f, -1);
+    bool rendered = pinned.s0_bass.first_note >= 0 && reference.s0_bass.first_note >= 0;
+    bool sings_slot = steps_identical(pinned.s0_bass, reference.s0_bass);
+    bool moved = !steps_identical(pinned.s0_bass, authored.s0_bass);
+    printf("  section 0 bass first note: pinned=%d slot-2 reference=%d authored=%d\n",
+           pinned.s0_bass.first_note, reference.s0_bass.first_note, authored.s0_bass.first_note);
+    printf("  rendered=%s sings_slot_2=%s differs_from_authored=%s\n",
+           rendered ? "OK" : "FAIL", sings_slot ? "OK" : "FAIL", moved ? "OK" : "FAIL");
+    bool ok = rendered && sings_slot && moved;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_bass_line_index_restores_authored_line() {
+    printf("\n=== Test: a section without bass_line_index restores the authored bassLine ===\n");
+    BassPinRun pinned = run_bass_pin_case(0.0f, kBassPinSlot);
+    BassPinRun authored = run_bass_pin_case(0.0f, -1);
+    bool reached = pinned.reached_s1 && authored.reached_s1;
+    bool rendered = pinned.s1_bass.first_note >= 0;
+    // Non-vacuity: section 0 really sang the pin, so section 1 had something to undo.
+    bool was_pinned = !steps_identical(pinned.s0_bass, authored.s0_bass);
+    bool restored = reached && steps_identical(pinned.s1_bass, authored.s1_bass);
+    printf("  section 1 bass first note: pinned run=%d authored run=%d (section 0 pinned=%d)\n",
+           pinned.s1_bass.first_note, authored.s1_bass.first_note, pinned.s0_bass.first_note);
+    printf("  reached=%s rendered=%s section_0_pinned=%s restored=%s\n",
+           reached ? "OK" : "FAIL", rendered ? "OK" : "FAIL", was_pinned ? "OK" : "FAIL",
+           restored ? "OK" : "FAIL");
+    bool ok = reached && rendered && was_pinned && restored;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+static bool test_bass_line_index_leaves_lead_alone() {
+    printf("\n=== Test: bass_line_index never moves the LEAD track off its lick_index ===\n");
+    BassPinRun pinned = run_bass_pin_case(0.0f, kBassPinSlot);
+    BassPinRun authored = run_bass_pin_case(0.0f, -1);
+    bool reached = pinned.reached_s1 && authored.reached_s1;
+    bool slots = pinned.s0_lick == 0 && pinned.s1_lick == 1
+              && pinned.s0_lead_degree == static_cast<int>(kPinPoolDegree[0])
+              && pinned.s1_lead_degree == static_cast<int>(kPinPoolDegree[1]);
+    bool rendered = pinned.s0_lead.first_note >= 0 && pinned.s1_lead.first_note >= 0;
+    // Non-vacuity: the bass pin did take effect in section 0 of this same run.
+    bool bass_pinned = !steps_identical(pinned.s0_bass, authored.s0_bass);
+    bool same_lead = reached && steps_identical(pinned.s0_lead, authored.s0_lead)
+                  && steps_identical(pinned.s1_lead, authored.s1_lead);
+    printf("  lead slot s0=%d s1=%d, lead degree s0=%d s1=%d\n",
+           pinned.s0_lick, pinned.s1_lick, pinned.s0_lead_degree, pinned.s1_lead_degree);
+    printf("  reached=%s slots=%s rendered=%s bass_pinned=%s lead_unchanged_by_bass_pin=%s\n",
+           reached ? "OK" : "FAIL", slots ? "OK" : "FAIL", rendered ? "OK" : "FAIL",
+           bass_pinned ? "OK" : "FAIL", same_lead ? "OK" : "FAIL");
+    bool ok = reached && slots && rendered && bass_pinned && same_lead;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+struct BassSeamRun {
+    bool reached_s1 = false;
+    int slot_after = -2;
+    GenStepsResult before, after;   // track 3 on the last block of section 0, the first of section 1
+};
+
+// The bass channel at mutation 0.8, so a re-render on a fresh seed moves the steps. No lead
+// pins and no pool, so nothing else re-renders a lick track at the seam. s1_pins_authored
+// gives section 1 a one-slot pool holding the authored bass line and pins it there.
+static BassSeamRun run_bass_seam_case(bool s1_pins_authored) {
+    BassSeamRun r;
+    stmlib::Random::Seed(0xBA55u);
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    GraphUnit unit;
+    std::memset(&unit, 0, sizeof(unit));
+    unit.type = UNIT_PULSAR;
+    unit.enabled = true;
+    engine->pulsar_playing.store(1, std::memory_order_relaxed);
+    engine->pulsar_mix.store(1.0f, std::memory_order_relaxed);
+    setup_fixture_baseline(engine);
+    engine->pulsar_seed.store(424242, std::memory_order_relaxed);
+    push_two_channels(engine);
+    orpheus_engine_set_port(engine, PULSAR_URI, "bass_line_mutation", 0.8f);
+    engine->pulsar_complexity.store(0.6f, std::memory_order_relaxed);  // past the steady zone
+    setup_two_lick_tracks(engine);
+    engine->pulsar_track_bar_strategy[3].store(0, std::memory_order_relaxed);
+    engine->pulsar_track_bar_strategy[4].store(0, std::memory_order_relaxed);
+    if (s1_pins_authored) {
+        const int F = OrpheusEngine::kLickFieldsPerStep;
+        for (int i = 0; i < 4; i++) {
+            engine->pulsar_lick_pool_data[i * F + 0] = 4.0f;   // push_two_channels' bass line
+            engine->pulsar_lick_pool_data[i * F + 1] = 1.0f;
+            engine->pulsar_lick_pool_data[i * F + 2] = 0.8f;
+            engine->pulsar_lick_pool_data[i * F + 3] = -1.0f;
+            engine->pulsar_lick_pool_hit_prob[i] = 1.0f;
+        }
+        engine->pulsar_lick_pool_len[0] = 4;
+        engine->pulsar_lick_pool_loop[0] = 4;
+        engine->pulsar_lick_anomaly_index = -1;
+        engine->pulsar_lick_anomaly_chance = 0.0f;
+        engine->pulsar_lick_pool_count.store(1, std::memory_order_release);
+    }
+    push_bass_pin_arrangement(engine, -1);
+    engine->pulsar_section_data[26].store(0.0f, std::memory_order_relaxed);
+    engine->pulsar_section_data[kSectionDataFields + 26].store(0.0f, std::memory_order_relaxed);
+    if (s1_pins_authored)
+        engine->pulsar_section_data[kSectionDataFields + 17].store(1.0f, std::memory_order_relaxed);
+    engine->pulsar_arrangement_generation.store(1, std::memory_order_release);
+    trigger_vibe_load(engine);
+    engine->clock_bpm.store(240.0f, std::memory_order_relaxed);
+
+    unit_process_pulsar(&unit, engine, 512, 48000.0f);
+    PulsarState* ps = engine->pulsar_state;
+    if (ps && ps->section_state.current_section == 0) {
+        // A re-render seeds from seed_counter, which only a load sets, so it would repeat the
+        // load's render exactly. A new value makes any seam re-render show in the steps.
+        ps->seed_counter += 1;
+        for (int i = 0; i < 400 && !r.reached_s1; i++) {
+            r.before = snap_track(ps, 3);
+            unit_process_pulsar(&unit, engine, 512, 48000.0f);
+            if (ps->section_state.current_section == 1) {
+                r.reached_s1 = true;
+                r.after = snap_track(ps, 3);
+                r.slot_after = ps->bass_line_slot;
+            }
+        }
+    }
+    orpheus_engine_destroy(engine);
+    return r;
+}
+
+// A vibe with an arrangement and no bass pin does no bass-channel work at a section seam:
+// the BASS track keeps the exact steps it had. The control re-renders the same line at the
+// seam (a pin to a slot holding it), proving the comparison sees a seam re-render.
+static bool test_bass_line_index_absent_is_inert() {
+    printf("\n=== Test: no bass_line_index leaves the BASS track untouched at a seam ===\n");
+    BassSeamRun unpinned = run_bass_seam_case(false);
+    BassSeamRun control = run_bass_seam_case(true);
+    bool reached = unpinned.reached_s1 && control.reached_s1;
+    bool rendered = unpinned.before.first_note >= 0 && control.before.first_note >= 0;
+    bool slot_kept = unpinned.slot_after == -1;
+    bool untouched = steps_identical(unpinned.before, unpinned.after);
+    bool control_moved = control.slot_after == 0 && !steps_identical(control.before, control.after);
+    printf("  bass slot after seam: unpinned=%d control=%d\n", unpinned.slot_after, control.slot_after);
+    printf("  reached=%s rendered=%s slot_kept=%s untouched=%s control_rerender_moves=%s\n",
+           reached ? "OK" : "FAIL", rendered ? "OK" : "FAIL", slot_kept ? "OK" : "FAIL",
+           untouched ? "OK" : "FAIL", control_moved ? "OK" : "FAIL");
+    bool ok = reached && rendered && slot_kept && untouched && control_moved;
+    printf("  Overall -- %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_bass_line_tests() {
     printf("\n========== PULSAR BASS LINE TESTS ==========\n");
     int suite_pass = 0, suite_fail = 0;
@@ -435,6 +716,10 @@ bool run_pulsar_bass_line_tests() {
     tally(test_bass_only_vibe_renders());
     tally(test_lick_builder_seeds_from_bass_channel());
     tally(test_generative_call_response_uses_track_channel());
+    tally(test_bass_line_index_sings_the_pool_slot());
+    tally(test_bass_line_index_restores_authored_line());
+    tally(test_bass_line_index_leaves_lead_alone());
+    tally(test_bass_line_index_absent_is_inert());
     printf("\nPulsar bass line tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
