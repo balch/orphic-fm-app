@@ -1,7 +1,9 @@
 package org.balch.orpheus.djapp.ai.mixer
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
@@ -21,6 +23,8 @@ data class AiMixerActions(
     val reset: () -> Unit,
     val capture: () -> Unit,
     val dismissNotice: () -> Unit,
+    val togglePin: (Int) -> Unit,
+    val dismissCapture: () -> Unit = {},
 ) {
     companion object {
         val EMPTY = AiMixerActions(
@@ -37,6 +41,8 @@ data class AiMixerActions(
             reset = {},
             capture = {},
             dismissNotice = {},
+            togglePin = {},
+            dismissCapture = {},
         )
     }
 }
@@ -45,6 +51,9 @@ data class AiMixerActions(
 interface AiMixerFeature : SynthFeature<AiMixerUiState, AiMixerActions> {
     /** Cold: polls the controller's meters at 20 Hz while collected, so metering idles off when nobody collects. */
     val meters: Flow<MeterSnapshot>
+
+    /** Each control the agent or MCP just changed, for the panel to flash. */
+    val agentEdits: Flow<MixControl> get() = emptyFlow()
 
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty

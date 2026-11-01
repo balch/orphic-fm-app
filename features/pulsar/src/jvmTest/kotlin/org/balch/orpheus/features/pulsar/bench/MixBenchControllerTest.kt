@@ -28,6 +28,7 @@ import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -228,6 +229,31 @@ class MixBenchControllerTest {
         gainWrites.clear()
         section(2); runCurrent()
         assertEquals(setOf("track_5_audition_gain"), gainWrites.map { it.first }.toSet())
+    }
+
+    @Test
+    fun resetKeepsTheTracksItIsTold() = runTest {
+        section(1)
+        val c = started()
+        c.setLevelDb(2, -6f)
+        c.setLevelDb(4, -6f)
+        c.setPan(4, 0.5f)
+        c.setScope(Scope.SECTION)
+        c.setReverb(4, 0.3f)
+        c.setReverb(2, 0.3f)
+        c.setMacro(Macro.MOOD, 0.2f)
+        c.resetToFile(keep = setOf(4))
+        val l = c.layers.value
+        assertEquals(0f, l.vibe.levelDb[2])
+        assertEquals(-6f, l.vibe.levelDb[4])
+        assertEquals(0.5f, l.vibe.pan[4])
+        assertEquals(listOf<Float?>(null, null, null, null, 0.3f, null, null, null), l.sections.getValue(1).reverbSend)
+        assertTrue(l.sections.getValue(1).macrosHeard.isEmpty())
+        assertEquals(1f, gain(2))
+        assertEquals(10f.pow(-6f / 20f), gain(4), 1e-5f)
+        // The kept track's pan and send still play through the overlay.
+        assertNotNull(feature.overlay)
+        assertTrue(feature.benchMacros.isEmpty())
     }
 
     @Test

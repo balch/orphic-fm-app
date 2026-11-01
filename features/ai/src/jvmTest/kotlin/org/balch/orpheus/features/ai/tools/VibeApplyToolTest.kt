@@ -27,6 +27,7 @@ import org.balch.orpheus.features.pulsar.vibes.TremoloTideVibe
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VibeApplyToolTest {
@@ -191,7 +192,7 @@ class VibeApplyToolTest {
     @Test
     fun applyBudgetRefusesFourth() = runBlocking {
         val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
-        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget()).tool
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), emptySet()).tool
         val names = listOf("Ember One", "Ember Two", "Ember Three", "Ember Four")
         val results = names.map { n ->
             tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe.copy(name = n))))
@@ -205,7 +206,7 @@ class VibeApplyToolTest {
     @Test
     fun aRejectedVibeDoesNotSpendTheApplyBudget() = runBlocking {
         val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
-        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget()).tool
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), emptySet()).tool
         repeat(5) {
             val rejected = tool.execute(VibeApplyArgs("{ not a vibe }"))
             assertFalse(rejected.success)
@@ -217,7 +218,7 @@ class VibeApplyToolTest {
     @Test
     fun aCastBlockSurvivesTheApplyAndOldJsonWithoutOneStillLoads() = runBlocking {
         val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
-        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget()).tool
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), emptySet()).tool
         val cast = castVibe(VibeCastArgs(mode = "ALL_ROLLED", seed = 77L, styleTags = listOf("funk")), savedMode = null)
         val composed = vibeApplyJson.decodeFromString<Vibe>(cast.vibeJson).copy(name = "Porch Light")
         val result = tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(composed)))
@@ -227,6 +228,41 @@ class VibeApplyToolTest {
         val old = vibeApplyJson.encodeToString(DogHouseVibe().vibe).replace(",\"cast\":null", "")
         assertTrue("\"cast\"" !in old, "precondition: the JSON predates the cast block")
         assertEquals(DogHouseVibe().vibe, decodeVibe(vibeApplyJson, old).getOrThrow())
+    }
+
+    @Test
+    fun emptyGuardSetApplies() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), emptySet()).tool
+        val result = tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe.copy(name = "Open Road"))))
+        assertTrue(result.success, result.message)
+        assertNull(result.refusal)
+        assertEquals(listOf("Open Road"), pulsar.applied.map { it.name })
+    }
+
+    @Test
+    fun aGuardRefusalStopsTheApply() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        val guards = setOf(VibeApplyGuard { null }, VibeApplyGuard { "Ask the user first." })
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), guards).tool
+        val result = tool.execute(VibeApplyArgs(vibeApplyJson.encodeToString(DogHouseVibe().vibe)))
+        assertFalse(result.success)
+        assertEquals("Ask the user first.", result.message)
+        assertEquals(VibeApplyGuard.REFUSAL, result.refusal)
+        assertTrue(pulsar.applied.isEmpty())
+    }
+
+    @Test
+    fun guardRefusalsDoNotSpendTheApplyBudget() = runBlocking {
+        val pulsar = ApplyOnlyPulsar(DogHouseVibe().vibe)
+        var asked = 0
+        val guard = VibeApplyGuard { if (++asked <= TurnBudget.MAX_APPLIES) "Ask the user first." else null }
+        val tool = VibeApplyTool({ pulsar }, VibeCreateEventBus(), NoOpAiVibeArchive(), TurnBudget(), setOf(guard)).tool
+        val json = vibeApplyJson.encodeToString(DogHouseVibe().vibe)
+        repeat(TurnBudget.MAX_APPLIES) { assertEquals(VibeApplyGuard.REFUSAL, tool.execute(VibeApplyArgs(json)).refusal) }
+        val applied = tool.execute(VibeApplyArgs(json))
+        assertTrue(applied.success, applied.message)
+        assertEquals(1, pulsar.applied.size)
     }
 
     /** Records applies; the rest of Pulsar stays at its stub defaults. */

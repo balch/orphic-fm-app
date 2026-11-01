@@ -313,13 +313,19 @@ class OrpheusAgentConfig(
         5. When the mix tools are available (transport, mix_read, mix_set, audio_analyze, mix_capture),
            take one or two short listening passes, no more: transport play, mix_read once to start
            the meters, audio_analyze (it records for the seconds you ask, so it is the wait), then
-           mix_read again for the levels, then small fixes with mix_set (or one re-apply that
-           changes the vibe's levelDb). A re-apply clears the live mix edits, so call mix_capture
+           mix_read again for the levels, then, when the Mixer is open, small fixes with mix_set (or
+           one re-apply that changes the vibe's levelDb). A re-apply clears the live mix edits, so call mix_capture
            before any re-apply.
         6. Reply with the vibe's name, the seed (for a new vibe) and a sentence or two on its sound.
-           Then, when the mix tools are available, invite the user: open the Mixer tab, tweak, and tell me when you're back.
-        When the user says they are back, read the mix with mix_read (when it is available), say what
-        changed and suggest the next move.
+        When the mix tools are available, you mix together with the user:
+           - Each user message starts with bracketed lines: whether the Mixer is open, the pinned
+             strips, and the user's moves since your last turn. Read them and build on them.
+           - Change the mix only while the Mixer is open. When it is closed, ask the user to open it;
+             the app shows them a button.
+           - A refusal of PINNED or USER_MOVED means leave that control alone; mention it briefly.
+           - Never re-apply over the user's live edits without their confirmation; the app shows
+             them a button.
+           - Keep replies short while mixing.
         A plain-text reply ends your turn and waits for the user, so send none until step 6; your text
         reply is what ends the turn. The tools enforce a budget per turn: ${TurnBudget.MAX_APPLIES} applies, and
         ${TurnBudget.MAX_MIX_EDITS} mix edits when those tools are available. A result with budgetSpent=true

@@ -297,16 +297,17 @@ class MixBenchController(
     /**
      * Drops every layer edit and hands their tracks, the overlay and held section macros back to the app.
      * Mutes and solos stay, with the tracks they need. Whole-vibe macro moves stay on the app's knobs,
-     * and in the vibe layer, so a capture still writes what the knob plays.
+     * and in the vibe layer, so a capture still writes what the knob plays. Tracks in [keep] keep their
+     * levels, pans and sends (a pinned strip); section macros are not a track's, so they go.
      */
-    suspend fun resetToFile() = lock.withLock {
-        _layers.value = BenchLayers(vibe = VibeLayer(macros = _layers.value.vibe.macros))
-        val keep = if (_soloed.value.isNotEmpty()) owned.toSet() else owned intersect _muted.value
-        val released = owned - keep
-        owned.retainAll(keep)
+    suspend fun resetToFile(keep: Set<Int> = emptySet()) = lock.withLock {
+        _layers.value = _layers.value.onlyTracks(keep)
+        val stay = (if (_soloed.value.isNotEmpty()) owned.toSet() else owned intersect _muted.value) + (owned intersect keep)
+        val released = owned - stay
+        owned.retainAll(stay)
         if (running) for (t in released) synthController.setPluginControl(gainIds[t], FloatValue(1f))
         pushGains()
-        releaseOverlay()
+        if (keep.isEmpty()) releaseOverlay() else if (overlayOwned) pushOverlay()
         restoreHeldMacros()
     }
 
@@ -536,5 +537,17 @@ class MixBenchController(
 
         fun BenchLayers.withSection(s: Int, edit: (SectionLayer) -> SectionLayer) =
             copy(sections = sections + (s to edit(sections[s] ?: SectionLayer())))
+
+        /** The track edits of [keep] and the whole-vibe macros; every other value back to the vibe as written. */
+        fun BenchLayers.onlyTracks(keep: Set<Int>): BenchLayers {
+            fun <T> List<T>.only(unset: T) = mapIndexed { t, v -> if (t in keep) v else unset }
+            val v = vibe
+            return BenchLayers(
+                vibe = VibeLayer(v.levelDb.only(0f), v.pan.only(null), v.reverbRatio.only(1f), v.delayRatio.only(1f), v.macros),
+                sections = sections
+                    .mapValues { (_, s) -> SectionLayer(s.levelDb.only(0f), s.reverbSend.only(null), s.delaySend.only(null)) }
+                    .filterValues { it != SectionLayer() },
+            )
+        }
     }
 }

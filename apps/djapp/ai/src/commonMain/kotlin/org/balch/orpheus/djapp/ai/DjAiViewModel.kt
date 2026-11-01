@@ -26,23 +26,35 @@ import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.djapp.ai.collab.CollabEvents
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.MixCollab
+import org.balch.orpheus.djapp.ai.collab.MixMove
+import org.balch.orpheus.djapp.ai.ideas.Idea
+import org.balch.orpheus.djapp.ai.ideas.IdeasGenerator
+import org.balch.orpheus.djapp.ai.ideas.IdeasInput
+import org.balch.orpheus.djapp.ai.ideas.IdeasScheduler
+import org.balch.orpheus.djapp.ai.ideas.mixSnapshot
+import org.balch.orpheus.djapp.ai.ideas.recentChat
+import org.balch.orpheus.djapp.ai.ideas.recentMoves
+import org.balch.orpheus.djapp.ai.ideas.vibeSummary
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
 import org.balch.orpheus.djapp.ai.songref.SongPasteStore
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.AgentActivityEventBus
 import org.balch.orpheus.features.ai.OrpheusAgent
-import org.balch.orpheus.features.ai.PromptIntent
 import org.balch.orpheus.features.ai.composer.CastMode
+import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.VibeCreateEvent
 import org.balch.orpheus.features.pulsar.VibeCreateEventBus
+import org.balch.orpheus.features.pulsar.bench.Macro
+import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import kotlin.time.TimeSource
 
 // ─────────────────────────────────────────────────────────────────────────
 // Pure reducers (internal so tests can call them directly without DI)
 // ─────────────────────────────────────────────────────────────────────────
-
-/** Tool-name set that indicates a Pulsar vibe operation is under way. */
-private val VIBE_TOOLS = setOf("pulsar_apply_vibe", "pulsar_vibe_schema", "pulsar_get_vibe")
 
 private val HEADLINE_RE = Regex("""\*\*(.+?)\*\*""")
 
@@ -94,23 +106,9 @@ internal fun appendReasoning(
     return out to id
 }
 
-/** Shared clear applied on submit() and reset(): a fresh run starts with an empty feed. */
+/** The clear for a new conversation: an empty feed and no error. */
 internal fun clearRunOutput(s: DjAiUiState): DjAiUiState =
     s.copy(feed = emptyList(), nextId = 0, error = null)
-
-/**
- * Start a fresh run from [draft]: clear the previous run's output, seed the feed with the
- * [DjAiFeedItem.Request] row (always id 0, always the top row), remember [draft] as
- * [DjAiUiState.lastPrompt] for the model-switch prefill, and blank the input.
- */
-internal fun startRun(s: DjAiUiState, draft: String, shown: String = draft): DjAiUiState =
-    clearRunOutput(s).copy(
-        phase = DjAiPhase.GENERATING,
-        promptDraft = "",
-        lastPrompt = draft,
-        feed = listOf(DjAiFeedItem.Request(id = 0, text = shown)),
-        nextId = 1,
-    )
 
 /**
  * State transition for a model switch. Always returns to [DjAiPhase.IDLE]: the agent
@@ -148,29 +146,26 @@ private fun friendly(tool: String): String = when (tool) {
  * - [AgentActivityEvent.Error] -> back to [DjAiPhase.IDLE] with [DjAiUiState.error] set;
  *   the feed keeps its failure context. Without this, an LLM/API failure (e.g. a 400)
  *   left the panel spinning in GENERATING forever with the error only in the log.
- * - When a vibe tool starts from [DjAiPhase.IDLE], phase advances to [DjAiPhase.GENERATING].
+ * - Events while [DjAiPhase.IDLE] are strays from a stopped run and are dropped: only [DjAiChat] starts a turn.
  */
 internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiState {
-    val startsVibeRun = e is AgentActivityEvent.ToolStarted && e.tool in VIBE_TOOLS
     // Process events in both GENERATING and RESULT: VibeApplyTool emits VibeCreateEvent.Generated
     // (flipping GENERATING -> RESULT) BEFORE Koog fires the trailing ToolCompleted + Assistant, so
-    // gating on GENERATING alone would drop those closing events. Only stray events while IDLE are
-    // ignored, unless a vibe tool is just starting (which itself advances IDLE -> GENERATING).
-    if (s.phase == DjAiPhase.IDLE && !startsVibeRun) return s
+    // gating on GENERATING alone would drop those closing events.
+    if (s.phase == DjAiPhase.IDLE) return s
     return when (e) {
         is AgentActivityEvent.Reasoning -> {
             val (newFeed, newNextId) = appendReasoning(s.feed, s.nextId, e.text)
             s.copy(feed = newFeed, nextId = newNextId)
         }
         is AgentActivityEvent.ToolStarted -> {
-            val newPhase = if (s.phase == DjAiPhase.IDLE && e.tool in VIBE_TOOLS) {
-                DjAiPhase.GENERATING
-            } else {
-                s.phase
-            }
             s.copy(
-                phase = newPhase,
-                feed = s.feed + DjAiFeedItem.Tool(id = s.nextId, name = friendly(e.tool), running = true),
+                feed = s.feed + DjAiFeedItem.Tool(
+                    id = s.nextId,
+                    name = friendly(e.tool),
+                    running = true,
+                    summary = toolSummary(e.tool, e.args),
+                ),
                 nextId = s.nextId + 1,
             )
         }
@@ -215,6 +210,15 @@ internal fun reduceActivityEvent(e: AgentActivityEvent, s: DjAiUiState): DjAiUiS
     }
 }
 
+/**
+ * A mixer move joins the chat; a USER move starts the ideas pause only while the AI sheet is open. Moves from the
+ * small Mix panel, the Pulsar knobs or MIDI with the sheet closed cost no ideas call.
+ */
+internal fun onMixMove(move: MixMove, sheetOpen: Boolean, chat: DjAiChat, ideas: IdeasScheduler, input: () -> IdeasInput) {
+    chat.onMove(move)
+    if (move.origin == EditOrigin.USER && sheetOpen) ideas.onUserMove(input)
+}
+
 /** Carry the MCP server's current endpoint (null while it is not listening) into the UI state. */
 internal fun withMcpEndpoint(s: DjAiUiState, endpoint: McpEndpoint?): DjAiUiState =
     s.copy(mcpEndpoint = endpoint)
@@ -230,12 +234,14 @@ internal fun withSavedCastMode(s: DjAiUiState, saved: CastMode): DjAiUiState =
     if (s.castMode == DjAiUiState().castMode) s.copy(castMode = saved) else s
 
 /**
- * Reduce a [VibeCreateEvent] into a new [DjAiUiState].
+ * Reduce a [VibeCreateEvent] into a new [DjAiUiState]. Only an in-app turn's events count: an apply made while
+ * IDLE (an MCP call) leaves the chat alone.
  */
-internal fun reduceVibeEvent(e: VibeCreateEvent, s: DjAiUiState): DjAiUiState = when (e) {
+internal fun reduceVibeEvent(e: VibeCreateEvent, s: DjAiUiState): DjAiUiState = if (s.phase == DjAiPhase.IDLE) s else when (e) {
     is VibeCreateEvent.Generating -> s.copy(phase = DjAiPhase.GENERATING, error = null)
     is VibeCreateEvent.Generated -> s.copy(phase = DjAiPhase.RESULT, error = null)
-    is VibeCreateEvent.Failed -> s.copy(phase = DjAiPhase.IDLE, error = e.error)
+    // The agent fixes the JSON and retries in the same turn, so a failed apply does not end it.
+    is VibeCreateEvent.Failed -> s.copy(error = e.error)
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -243,10 +249,10 @@ internal fun reduceVibeEvent(e: VibeCreateEvent, s: DjAiUiState): DjAiUiState = 
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
- * ViewModel for the DJ AI vibe-creation panel.
+ * ViewModel for the DJ AI chat.
  *
- * Wires [AgentActivityEventBus] and [VibeCreateEventBus] into [DjAiUiState] via
- * pure reducers, and delegates key / model management to the shared repositories.
+ * Wires [AgentActivityEventBus], [VibeCreateEventBus], the mixer's moves and the tools' questions into
+ * [DjAiUiState] through [DjAiChat] and pure reducers, and delegates key / model management to the shared repositories.
  */
 @Inject
 @SingleIn(FeatureScope::class)
@@ -265,6 +271,12 @@ class DjAiViewModel(
     private val mcpEndpointState: McpEndpointState,
     private val preferences: AppPreferencesRepository,
     private val songPasteStore: SongPasteStore,
+    private val collab: MixCollab,
+    private val collabEvents: CollabEvents,
+    ideasGenerator: IdeasGenerator,
+    // Lazy providers, as in MixReadTool: the feature and the AppScope controller would close a DI cycle.
+    private val pulsarFeatureProvider: () -> PulsarFeature,
+    private val mixBenchProvider: () -> MixBenchController,
 ) : DjAiFeature {
 
     private val log = logging("DjAiViewModel")
@@ -278,28 +290,60 @@ class DjAiViewModel(
 
     override val stateFlow: StateFlow<DjAiUiState> = _uiState.asStateFlow()
 
+    private val clockStart = TimeSource.Monotonic.markNow()
+
+    private val ideas = IdeasScheduler(scope, ideasGenerator, clock = { clockStart.elapsedNow().inWholeMilliseconds })
+
+    /** Whether the AI sheet is composed, in either mode. */
+    private val sheetOpen = MutableStateFlow(false)
+
+    private val chat = DjAiChat(
+        _uiState,
+        collab,
+        scope,
+        sendPrompt = { agent.sendPrompt(it) },
+        restartAgent = agent::restart,
+        onTurnStarted = ideas::onTurnStarted,
+        onTurnEnded = { ideas.onTurnEnded(::ideasInput) },
+    )
+
     init {
-        // Collect agent activity events -> reduceActivityEvent
         scope.launch(dispatcherProvider.default) {
-            activityEventBus.events.collect { event ->
-                _uiState.update { s -> reduceActivityEvent(event, s) }
+            activityEventBus.events.collect { chat.onActivity(it) }
+        }
+
+        scope.launch(dispatcherProvider.default) {
+            collab.moves.collect { onMixMove(it, sheetOpen.value, chat, ideas, ::ideasInput) }
+        }
+
+        // Mix ideas show only while the Mixer is open.
+        scope.launch(dispatcherProvider.default) {
+            combine(ideas.ideas, collab.mixerVisible) { list, open -> if (open) list else list.filterNot { it.mix } }
+                .collect { list -> _uiState.update { it.copy(ideas = list) } }
+        }
+
+        // CollabEvents has no replay, so it is collected here for the feature's life, never from a composable.
+        scope.launch(dispatcherProvider.default) {
+            collabEvents.events.collect { chat.onCollabEvent(it) }
+        }
+
+        scope.launch(dispatcherProvider.default) {
+            combine(collab.mixerVisible, collab.pins) { v, p -> v to p }.collect { (visible, pins) ->
+                _uiState.update { it.copy(mixerVisible = visible, pins = pins) }
             }
         }
 
         // Collect vibe-create events -> reduceVibeEvent
         scope.launch(dispatcherProvider.default) {
             vibeEventBus.events.collect { event ->
-                // Capture activity BEFORE reducing: a dismiss/reset drops phase back to IDLE, and a
-                // late Generated must NOT auto-start audio from silence in that case.
-                val wasActive = _uiState.value.phase != DjAiPhase.IDLE
-                _uiState.update { s -> reduceVibeEvent(event, s) }
+                val play = chat.onVibeEvent(event)
                 // A generated vibe is applied to the engine, but in the DJ app the transport is
                 // EXPLICIT — playback is gated by PlaybackController (unlike the Orpheus app where
                 // Pulsar always runs), so a vibe applied while stopped loads silently. Start the
                 // transport so "play X" actually produces sound. play() is idempotent (no-op if
                 // already Playing) and must run on main (media session / audio focus), matching the
                 // manual transport toggle in MainActivity/main.kt.
-                if (event is VibeCreateEvent.Generated && wasActive) {
+                if (play) {
                     withContext(dispatcherProvider.main) { playbackController.play() }
                 }
             }
@@ -315,6 +359,8 @@ class DjAiViewModel(
             val saved = castModeFromPref(preferences.load().vibeCastMode)
             _uiState.update { withSavedCastMode(it, saved) }
         }
+
+        SheetModeMemory(_uiState, preferences, scope, dispatcherProvider.io)
 
         // Track selected model
         scope.launch(dispatcherProvider.default) {
@@ -339,6 +385,30 @@ class DjAiViewModel(
         }
     }
 
+    /** What the next ideas call sees, read now. */
+    private fun ideasInput(): IdeasInput {
+        val feed = _uiState.value.feed
+        val pulsar = pulsarFeatureProvider()
+        val bench = mixBenchProvider()
+        val vibe = pulsar.vibeFlow.value
+        val section = pulsar.arrangementStateFlow.value.sectionIndex
+        return IdeasInput(
+            mixerOpen = collab.mixerVisible.value,
+            vibeSummary = vibeSummary(vibe, section),
+            mixSnapshot = mixSnapshot(
+                vibe = vibe,
+                section = section,
+                layers = bench.layers.value,
+                energy = pulsar.macroKnob(Macro.ENERGY),
+                muted = bench.muted.value,
+                soloed = bench.soloed.value,
+                macros = Macro.entries.associate { it.name.lowercase() to pulsar.macroKnob(it) },
+            ),
+            recentMoves = recentMoves(feed),
+            recentChat = recentChat(feed),
+        )
+    }
+
     // ─────────────────────────────────────────────────
     // Actions
     // ─────────────────────────────────────────────────
@@ -348,27 +418,12 @@ class DjAiViewModel(
     }
 
     private fun submit() {
-        val current = _uiState.value
-        if (current.phase == DjAiPhase.GENERATING) return
-        val draft = current.promptDraft.trim()
+        val draft = _uiState.value.promptDraft.trim()
         // An Enter right after a big paste waits for its chip, so the prompt carries the pasteId.
-        references.whenAttached { send(draft) }
+        references.whenAttached { chat.send(draft, _uiState.value.reference, clearDraft = true) }
     }
 
-    private fun send(draft: String) {
-        val current = _uiState.value
-        if (current.phase == DjAiPhase.GENERATING) return
-        val reference = current.reference
-        if (draft.isBlank() && reference == null) return
-
-        val shown = draft.ifBlank { "♪ song reference" }
-        log.debug { "Submitting prompt: $shown" }
-        _uiState.update { startRun(it, draft, shown) }
-        agent.sendPrompt(PromptIntent(
-            prompt = agentPrompt(draft, reference),
-            displayText = shown,
-        ))
-    }
+    private fun tryIdea(idea: Idea) = chat.send(idea.prompt, _uiState.value.reference)
 
     private val references = ReferenceAttacher(songPasteStore, scope, dispatcherProvider.default, _uiState)
 
@@ -400,8 +455,7 @@ class DjAiViewModel(
             // The agent pins its model at run() creation, so a live selection would otherwise not
             // take effect. restart() is SILENT for the DJ app (cancel + re-arm, no greeting), which
             // re-reads config.model on the next submit with zero LLM traffic.
-            agent.restart()
-            _uiState.update { applyModelSwitch(it) }
+            chat.switchModel(model.displayName)
             log.debug { "Model selected: ${model.displayName}" }
         }
     }
@@ -413,16 +467,8 @@ class DjAiViewModel(
         }
     }
 
-    /**
-     * Cancel an in-flight generation (or clear a stale result/error) and return to IDLE.
-     *
-     * Calls [OrpheusAgent.restart] to abort the current Koog run before clearing UI state. For the
-     * DJ app, restart() is a SILENT cancel + re-arm (no greeting), so this aborts the in-flight run
-     * on an explicit user-initiated cancel / panel dismiss with zero LLM traffic.
-     */
-    private fun reset() {
-        agent.restart()
-        _uiState.update { clearRunOutput(it).copy(phase = DjAiPhase.IDLE) }
+    private fun setSheetMode(mode: AiSheetMode) {
+        _uiState.update { it.copy(sheetMode = mode) }
     }
 
     /** Clear just the error banner — the feed keeps its failure context. */
@@ -437,10 +483,16 @@ class DjAiViewModel(
         clearKey = ::clearKey,
         selectModel = ::selectModel,
         selectCastMode = ::selectCastMode,
-        reset = ::reset,
+        cancel = chat::cancel,
+        newConversation = chat::newConversation,
         dismissError = ::dismissError,
         attachReference = ::attachReference,
         detachReference = ::detachReference,
+        onAction = chat::onAction,
+        setSheetMode = ::setSheetMode,
+        setMixerVisible = collab::setMixerVisible,
+        setSheetOpen = { sheetOpen.value = it },
+        tryIdea = ::tryIdea,
     )
 
     companion object {

@@ -1,6 +1,8 @@
 package org.balch.orpheus.djapp.ai.tools
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.descriptors.SerialDescriptor
 import org.balch.orpheus.core.controller.SynthController
@@ -28,12 +30,15 @@ class GuideToolNamesTest {
         val synth = SynthController()
         val registry = PortRegistry(emptySet())
         val d = OneDispatcher(Dispatchers.Unconfined)
+        // A cancelled scope: the mixer's knob follower never starts.
+        val r = CollabRig(FakePulsar(listOf(vibe("Night Drive"))), { error("unused") }, CoroutineScope(Job().apply { cancel() }))
         listOf(
-            MixReadTool({ error("unused") }, { error("unused") }), MixSetTool({ error("unused") }, { error("unused") }, TurnBudget()),
-            MixMuteTool({ error("unused") }, TurnBudget()), MixSoloTool({ error("unused") }, TurnBudget()), MixResetTool { error("unused") },
-            SectionJumpTool({ error("unused") }, { error("unused") }), SectionLoopTool { error("unused") },
-            PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth),
-            VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d), TransportTool({ error("unused") }, d),
+            MixReadTool({ error("unused") }, { error("unused") }), MixSetTool({ error("unused") }, { error("unused") }, TurnBudget(), r.mixer, r.events),
+            MixMuteTool({ error("unused") }, TurnBudget(), r.mixer, r.events), MixSoloTool({ error("unused") }, TurnBudget(), r.mixer, r.events),
+            MixResetTool(r.mixer, r.events, r.guard, r.collab),
+            SectionJumpTool({ error("unused") }, r.mixer, r.events), SectionLoopTool(r.mixer, r.events),
+            PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth, r.mixer, r.events),
+            VibeListTool { error("unused") }, VibeLoadTool({ error("unused") }, d, r.guard), TransportTool({ error("unused") }, d),
             AudioAnalyzeTool { error("unused") }, AudioCaptureTool(UnavailableStemCaptureService()),
             MixCaptureTool(UnavailableMixCaptureService()),
         ).map { it.tool.descriptor.name }.toSet()

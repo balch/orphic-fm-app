@@ -1,17 +1,21 @@
 package org.balch.orpheus.djapp.ai.tools
 
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -25,6 +29,10 @@ import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
 import org.balch.orpheus.core.ports.PortRegistry
+import org.balch.orpheus.djapp.ai.collab.CollabEvent
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.ai.mcp.McpToolAdapter
 import org.balch.orpheus.djapp.di.MixBenchExit
 import org.balch.orpheus.features.ai.TurnBudget
@@ -67,6 +75,7 @@ class MixToolsTest {
                     port(2, "track_3_harmonics"),
                     port(3, "track_4_reverb_send_space"),
                     port(4, "track_3_pan_glide"),
+                    port(5, "track_3_audition_gain"),
                 ),
             ),
             FakePlugin("org.balch.orpheus.plugins.reverb", listOf(port(0, "mode", 0f, 3f, PortType.INT))),
@@ -80,11 +89,35 @@ class MixToolsTest {
         runCurrent()
     }
 
+    /** Every tool over one controller and one collaboration layer, as the app wires them; the Mixer starts on screen. */
+    private inner class Tools(c: () -> MixBenchController, scope: CoroutineScope, dispatcher: CoroutineDispatcher = Dispatchers.Unconfined) {
+        val rig = CollabRig(pulsar, c, scope)
+        val collab = rig.collab
+        val read = MixReadTool({ pulsar }, c)
+        val set = MixSetTool({ pulsar }, c, budget, rig.mixer, rig.events)
+        val mute = MixMuteTool(c, budget, rig.mixer, rig.events)
+        val solo = MixSoloTool(c, budget, rig.mixer, rig.events)
+        val reset = MixResetTool(rig.mixer, rig.events, rig.guard, rig.collab)
+        val jump = SectionJumpTool({ pulsar }, rig.mixer, rig.events)
+        val loop = SectionLoopTool(rig.mixer, rig.events)
+        val portSet = PortSetTool(registry, synth, rig.mixer, rig.events)
+        val load = VibeLoadTool({ pulsar }, OneDispatcher(dispatcher), rig.guard)
+    }
+
+    private fun TestScope.tools(c: MixBenchController) = Tools({ c }, backgroundScope, StandardTestDispatcher(testScheduler))
+
+    /** What the tools told the UI, collected from now on. */
+    private fun TestScope.events(t: Tools): List<CollabEvent> {
+        val seen = mutableListOf<CollabEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { t.rig.events.events.collect { seen += it } }
+        return seen
+    }
+
     @Test
     fun mixSetLevelRoutesToController() = runTest {
         pulsar.section(1)
         val c = controller()
-        val r = MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "level_db", value = -6.0206f, track = 2))
+        val r = tools(c).set.tool.execute(MixSetArgs(field = "level_db", value = -6.0206f, track = 2))
         assertTrue(r.ok, r.message)
         assertTrue(r.captured)
         assertEquals("VIBE", r.scope)
@@ -99,7 +132,7 @@ class MixToolsTest {
     fun mixSetSectionScopeEditsThePlayingSection() = runTest {
         pulsar.section(1)
         val c = controller()
-        val r = MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "level_db", value = -3f, track = 5, scope = "section"))
+        val r = tools(c).set.tool.execute(MixSetArgs(field = "level_db", value = -3f, track = 5, scope = "section"))
         assertTrue(r.ok, r.message)
         assertEquals("SECTION", r.scope)
         assertEquals(-3f, c.layers.value.sections.getValue(1).levelDb[5], 1e-5f)
@@ -110,7 +143,7 @@ class MixToolsTest {
     fun mixSetSectionSendClampsAndSaysSo() = runTest {
         pulsar.section(1)
         val c = controller()
-        val set = MixSetTool({ pulsar }, { c }, budget).tool
+        val set = tools(c).set.tool
         val high = set.execute(MixSetArgs(field = "reverb", value = 1.4f, track = 2, scope = "section"))
         assertTrue(high.ok, high.message)
         assertTrue("clamped" in high.message, high.message)
@@ -126,7 +159,7 @@ class MixToolsTest {
     @Test
     fun mixSetMacroMovesKnob() = runTest {
         val c = controller()
-        val r = MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "macro", value = 0.7f, macro = "Energy"))
+        val r = tools(c).set.tool.execute(MixSetArgs(field = "macro", value = 0.7f, macro = "Energy"))
         assertTrue(r.ok, r.message)
         assertTrue(r.captured)
         assertEquals("energy" to 0.7f, pulsar.macroWrites.last())
@@ -137,8 +170,9 @@ class MixToolsTest {
     @Test
     fun editsDuringAnUnfollowedVibeLoadAskForAMixRead() = runTest {
         val c = controller()
+        val t = tools(c)
         pulsar.applyVibe(pulsar.vibeFlow.value)
-        val set = MixSetTool({ pulsar }, { c }, budget).tool
+        val set = t.set.tool
         for (args in listOf(
             MixSetArgs(field = "level_db", value = -6f, track = 2),
             MixSetArgs(field = "pan", value = 0.5f, track = 2),
@@ -149,7 +183,7 @@ class MixToolsTest {
             assertFalse(r.ok, args.field)
             assertEquals(VIBE_LOADING, r.message)
         }
-        val mute = MixMuteTool({ c }, budget).tool.execute(MixTrackArgs(1))
+        val mute = t.mute.tool.execute(MixTrackArgs(1))
         assertFalse(mute.ok)
         assertEquals(VIBE_LOADING, mute.message)
         assertEquals(BenchLayers(), c.layers.value)
@@ -162,7 +196,7 @@ class MixToolsTest {
         pulsar.section(2)
         val c = controller()
         c.toggleMute(1)
-        val r = MixReadTool({ pulsar }, { c }).tool.execute(MixReadArgs(meters = true))
+        val r = tools(c).read.tool.execute(MixReadArgs(meters = true))
         assertTrue(r.ok, r.message)
         assertEquals("Night Drive", r.vibe)
         assertEquals(MixSectionRef(2, "chorus"), r.section)
@@ -179,7 +213,7 @@ class MixToolsTest {
     @Test
     fun portSetGoesThroughSynthControllerWithAiOrigin() = runTest {
         val key = "$PULSAR_URI:track_3_harmonics"
-        val r = PortSetTool(registry, synth).tool.execute(PortSetArgs(key, 0.4f))
+        val r = Tools({ error("an ungated port never reaches the mixer") }, backgroundScope).portSet.tool.execute(PortSetArgs(key, 0.4f))
         assertTrue(r.ok, r.message)
         assertFalse(r.captured)
         assertNull(r.hint)
@@ -191,7 +225,7 @@ class MixToolsTest {
 
     @Test
     fun portSetClampsToRange() = runTest {
-        val tool = PortSetTool(registry, synth).tool
+        val tool = Tools({ error("an ungated port never reaches the mixer") }, backgroundScope).portSet.tool
         val high = tool.execute(PortSetArgs("$PULSAR_URI:track_3_harmonics", 5f))
         assertTrue(high.ok)
         assertTrue(high.clamped)
@@ -204,7 +238,7 @@ class MixToolsTest {
 
     @Test
     fun portSetOnTrackVolumeHintsMixSet() = runTest {
-        val tool = PortSetTool(registry, synth).tool
+        val tool = tools(controller()).portSet.tool
         val volume = tool.execute(PortSetArgs("$PULSAR_URI:track_3_volume", 0.5f))
         assertTrue(volume.ok)
         assertFalse(volume.captured)
@@ -221,30 +255,31 @@ class MixToolsTest {
         val r = tool.execute(PortsListArgs(filter = "*pulsar:track_3_*"))
         assertTrue(r.ok)
         assertEquals(
-            listOf("track_3_harmonics", "track_3_pan_glide", "track_3_volume").map { "$PULSAR_URI:$it" },
+            listOf("track_3_audition_gain", "track_3_harmonics", "track_3_pan_glide", "track_3_volume").map { "$PULSAR_URI:$it" },
             r.ports.map { it.key },
         )
         assertEquals(0.8f, r.ports.last().value)
         val limited = tool.execute(PortsListArgs(filter = "TRACK_3", limit = 1))
-        assertEquals(3, limited.matched)
+        assertEquals(4, limited.matched)
         assertEquals(1, limited.ports.size)
-        assertEquals(6, tool.execute(PortsListArgs()).matched)
+        assertEquals(7, tool.execute(PortsListArgs()).matched)
     }
 
     @Test
     fun badArgsReturnErrors() = runTest {
         val c = controller()
-        val set = MixSetTool({ pulsar }, { c }, budget).tool
+        val t = tools(c)
+        val set = t.set.tool
         val results = listOf(
             set.execute(MixSetArgs(field = "level_db", value = -3f, track = 9)).let { it.ok to it.message },
             set.execute(MixSetArgs(field = "volume", value = -3f, track = 1)).let { it.ok to it.message },
             set.execute(MixSetArgs(field = "macro", value = 0.5f, macro = "tempo")).let { it.ok to it.message },
             set.execute(MixSetArgs(field = "pan", value = 0f, track = 1, scope = "song")).let { it.ok to it.message },
-            MixMuteTool({ c }, budget).tool.execute(MixTrackArgs(9)).let { it.ok to it.message },
+            t.mute.tool.execute(MixTrackArgs(9)).let { it.ok to it.message },
             PortGetTool(registry, synth).tool.execute(PortGetArgs("$PULSAR_URI:nope")).let { it.ok to it.message },
-            PortSetTool(registry, synth).tool.execute(PortSetArgs("nope", 1f)).let { it.ok to it.message },
-            VibeLoadTool({ pulsar }, OneDispatcher(Dispatchers.Unconfined)).tool.execute(VibeLoadArgs("Nope")).let { it.ok to it.message },
-            SectionJumpTool({ pulsar }, { c }).tool.execute(SectionJumpArgs(section = 7)).let { it.ok to it.message },
+            t.portSet.tool.execute(PortSetArgs("nope", 1f)).let { it.ok to it.message },
+            t.load.tool.execute(VibeLoadArgs("Nope")).let { it.ok to it.message },
+            t.jump.tool.execute(SectionJumpArgs(section = 7)).let { it.ok to it.message },
             TransportTool({ error("unused") }, OneDispatcher(Dispatchers.Unconfined)).tool.execute(TransportArgs("rewind")).let { it.ok to it.message },
         )
         for ((ok, message) in results) {
@@ -256,7 +291,7 @@ class MixToolsTest {
 
     @Test
     fun vibeLoadUnknownFails() = runTest {
-        val tool = VibeLoadTool({ pulsar }, OneDispatcher(StandardTestDispatcher(testScheduler))).tool
+        val tool = tools(controller()).load.tool
         val bad = tool.execute(VibeLoadArgs("Nope"))
         assertFalse(bad.ok)
         assertTrue(bad.message.contains("vibe_list"))
@@ -269,7 +304,7 @@ class MixToolsTest {
     @Test
     fun sectionJumpByName() = runTest {
         val c = controller()
-        val r = SectionJumpTool({ pulsar }, { c }).tool.execute(SectionJumpArgs(name = "Chorus"))
+        val r = tools(c).jump.tool.execute(SectionJumpArgs(name = "Chorus"))
         assertTrue(r.ok, r.message)
         assertEquals(MixSectionRef(2, "chorus"), r.section)
     }
@@ -280,11 +315,11 @@ class MixToolsTest {
         try {
             val c = MixBenchController(pulsar, synth, NoMeterTap, scope)
             val d = OneDispatcher(Dispatchers.Unconfined)
+            val t = Tools({ c }, scope)
             val tools = listOf(
-                MixReadTool({ pulsar }, { c }), MixSetTool({ pulsar }, { c }, budget), MixMuteTool({ c }, budget), MixSoloTool({ c }, budget),
-                MixResetTool { c }, SectionJumpTool({ pulsar }, { c }), SectionLoopTool { c },
-                PortsListTool(registry, synth), PortGetTool(registry, synth), PortSetTool(registry, synth),
-                VibeListTool { pulsar }, VibeLoadTool({ pulsar }, d), TransportTool({ error("unused") }, d),
+                t.read, t.set, t.mute, t.solo, t.reset, t.jump, t.loop,
+                PortsListTool(registry, synth), PortGetTool(registry, synth), t.portSet,
+                VibeListTool { pulsar }, t.load, TransportTool({ error("unused") }, d),
             ).map { it.tool }
             assertEquals(
                 listOf(
@@ -306,9 +341,10 @@ class MixToolsTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             val c = MixBenchController(pulsar, synth, NoMeterTap, scope)
+            val t = Tools({ c }, scope)
             val r = runBlocking {
                 c.start()
-                MixSetTool({ pulsar }, { c }, budget).tool.execute(MixSetArgs(field = "macro", value = 0.1f, macro = "space", scope = "section"))
+                t.set.tool.execute(MixSetArgs(field = "macro", value = 0.1f, macro = "space", scope = "section"))
             }
             assertTrue(r.ok, r.message)
             assertEquals(0.65f, r.macroKnob)
@@ -317,7 +353,7 @@ class MixToolsTest {
             assertEquals(mapOf(Macro.SPACE to 0.1f), pulsar.benchMacros)
             assertEquals(0.65f, pulsar.macroKnob(Macro.SPACE))
             assertTrue(pulsar.macroWrites.isEmpty())
-            val read = runBlocking { MixReadTool({ pulsar }, { c }).tool.execute(MixReadArgs(meters = false)) }
+            val read = runBlocking { t.read.tool.execute(MixReadArgs(meters = false)) }
             assertEquals(0.65f, read.macros["space"])
             assertEquals(mapOf("space" to 0.1f), read.sectionMacros)
             // What the desktop window close runs; it closes the recorder first.
@@ -342,13 +378,14 @@ class MixToolsTest {
     @Test
     fun mixEditBudgetRefusesThirteenth() = runTest {
         val c = controller()
-        val set = MixSetTool({ pulsar }, { c }, budget).tool
-        val mute = MixMuteTool({ c }, budget).tool
-        val solo = MixSoloTool({ c }, budget).tool
-        repeat(4) { t ->
-            assertTrue(set.execute(MixSetArgs(field = "level_db", value = -1f - t, track = t)).ok)
-            assertTrue(mute.execute(MixTrackArgs(t)).ok)
-            assertTrue(solo.execute(MixTrackArgs(t)).ok)
+        val t = tools(c)
+        val set = t.set.tool
+        val mute = t.mute.tool
+        val solo = t.solo.tool
+        repeat(4) { i ->
+            assertTrue(set.execute(MixSetArgs(field = "level_db", value = -1f - i, track = i)).ok)
+            assertTrue(mute.execute(MixTrackArgs(i)).ok)
+            assertTrue(solo.execute(MixTrackArgs(i)).ok)
         }
         val layers = c.layers.value
         val refused = listOf(
@@ -367,8 +404,7 @@ class MixToolsTest {
 
     @Test
     fun mcpCallsAreNotBudgeted() = runTest {
-        val c = controller()
-        val mute = MixMuteTool({ c }, budget).tool
+        val mute = tools(controller()).mute.tool
         repeat(12) { budget.tryMixEdit() }
         assertFalse(mute.execute(MixTrackArgs(1)).ok, "an agent call is over budget")
         // Over MCP there are no agent turns, so the budget would never reset: those calls skip it.
@@ -377,5 +413,170 @@ class MixToolsTest {
             assertNotEquals(true, r.isError, r.content.toString())
         }
         assertFalse(mute.execute(MixTrackArgs(1)).ok, "MCP calls leave the agent's budget as it was")
+    }
+
+    @Test
+    fun mixSetRefusesWhenMixerClosed() = runTest {
+        val c = controller()
+        val t = tools(c)
+        val seen = events(t)
+        t.collab.setMixerVisible(false)
+        val r = t.set.tool.execute(MixSetArgs(field = "level_db", value = -6f, track = 2))
+        assertFalse(r.ok)
+        assertEquals("MIXER_CLOSED", r.refusal)
+        assertEquals(CollabMixer.MIXER_CLOSED, r.message)
+        assertEquals(BenchLayers(), c.layers.value)
+        assertEquals(listOf<CollabEvent>(CollabEvent.OpenMixerRequested(CollabMixer.MIXER_CLOSED)), seen)
+    }
+
+    @Test
+    fun everyMixChangingToolRefusesWhenMixerClosed() = runTest {
+        val c = controller()
+        val t = tools(c)
+        t.collab.setMixerVisible(false)
+        val refusals = listOf(
+            t.mute.tool.execute(MixTrackArgs(1)).refusal,
+            t.solo.tool.execute(MixTrackArgs(1)).refusal,
+            t.reset.tool.execute(NoArgs()).refusal,
+            t.jump.tool.execute(SectionJumpArgs(section = 2)).refusal,
+            t.loop.tool.execute(SectionLoopArgs(on = true)).refusal,
+            t.set.tool.execute(MixSetArgs(field = "macro", value = 0.9f, macro = "energy")).refusal,
+        )
+        assertEquals(List(6) { "MIXER_CLOSED" }, refusals)
+        assertTrue(c.muted.value.isEmpty() && c.soloed.value.isEmpty())
+        assertNull(c.loopSection.value)
+        assertTrue(pulsar.macroWrites.isEmpty())
+    }
+
+    @Test
+    fun mixSetRefusesPinnedStrip() = runTest {
+        val c = controller()
+        val t = tools(c)
+        t.collab.togglePin(2)
+        val pinned = t.set.tool.execute(MixSetArgs(field = "level_db", value = -6f, track = 2))
+        assertFalse(pinned.ok)
+        assertEquals("PINNED", pinned.refusal)
+        assertEquals(CollabMixer.PINNED, pinned.message)
+        assertEquals("PINNED", t.mute.tool.execute(MixTrackArgs(2)).refusal)
+        assertEquals(0f, c.layers.value.vibe.levelDb[2])
+        assertFalse(2 in c.muted.value)
+        val other = t.set.tool.execute(MixSetArgs(field = "level_db", value = -6f, track = 3))
+        assertTrue(other.ok, other.message)
+        assertNull(other.refusal)
+    }
+
+    @Test
+    fun mixSetSkipsUserMovedControl() = runTest {
+        val c = controller()
+        val t = tools(c)
+        val seen = events(t)
+        t.collab.beginTurn()
+        t.rig.mixer.edit(EditOrigin.USER, MixControl.Level(2)) { setHeardLevelDb(2, -4f) }
+        val r = t.set.tool.execute(MixSetArgs(field = "level_db", value = -9f, track = 2))
+        assertFalse(r.ok)
+        assertEquals("USER_MOVED", r.refusal)
+        assertEquals(-4f, c.layers.value.vibe.levelDb[2])
+        assertEquals(listOf<CollabEvent>(CollabEvent.AgentSkipped(MixControl.Level(2), "-4.0 dB")), seen)
+        // Another control on the same strip is still the agent's to change.
+        assertTrue(t.set.tool.execute(MixSetArgs(field = "pan", value = 0.4f, track = 2)).ok)
+    }
+
+    @Test
+    fun sectionJumpSkipNamesTheUsersTarget() = runTest {
+        pulsar.section(0)
+        val c = controller()
+        val t = tools(c)
+        val seen = events(t)
+        t.collab.beginTurn()
+        // The user's jump lands at the next bar line, so "intro" is still playing.
+        t.rig.mixer.edit(EditOrigin.USER, MixControl.Section, shown = "chorus") { jumpTo(2) }
+        val r = t.jump.tool.execute(SectionJumpArgs(section = 1))
+        assertEquals("USER_MOVED", r.refusal)
+        assertEquals(listOf<CollabEvent>(CollabEvent.AgentSkipped(MixControl.Section, "chorus")), seen)
+    }
+
+    @Test
+    fun mcpMixSetWorksWithMixerClosed() = runTest {
+        val c = controller()
+        val t = tools(c)
+        val seen = events(t)
+        t.collab.setMixerVisible(false)
+        val r = withContext(TurnBudget.Exempt) { t.set.tool.execute(MixSetArgs(field = "level_db", value = -6f, track = 2)) }
+        assertTrue(r.ok, r.message)
+        assertNull(r.refusal)
+        assertEquals(-6f, c.layers.value.vibe.levelDb[2])
+        assertTrue(seen.isEmpty())
+    }
+
+    @Test
+    fun mcpMixSetRespectsPins() = runTest {
+        val c = controller()
+        val t = tools(c)
+        t.collab.togglePin(2)
+        val r = withContext(TurnBudget.Exempt) { t.set.tool.execute(MixSetArgs(field = "level_db", value = -6f, track = 2)) }
+        assertFalse(r.ok)
+        assertEquals("PINNED", r.refusal)
+        assertEquals(0f, c.layers.value.vibe.levelDb[2])
+    }
+
+    @Test
+    fun resetSkipsPinnedStrips() = runTest {
+        pulsar.section(1)
+        val c = controller()
+        val t = tools(c)
+        val seen = events(t)
+        val set = t.set.tool
+        t.rig.mixer.edit(EditOrigin.USER, MixControl.Level(2)) { setHeardLevelDb(2, -6.0206f) }
+        set.execute(MixSetArgs(field = "level_db", value = -6f, track = 1))
+        set.execute(MixSetArgs(field = "pan", value = 0.5f, track = 2))
+        set.execute(MixSetArgs(field = "reverb", value = 0.4f, track = 2, scope = "section"))
+        t.collab.togglePin(2)
+        // The user's only change is on the strip they pinned, which the reset keeps, so nothing needs confirming.
+        val r = t.reset.tool.execute(NoArgs())
+        assertTrue(r.ok, r.message)
+        assertTrue(seen.isEmpty())
+        val layers = c.layers.value
+        assertEquals(0f, layers.vibe.levelDb[1])
+        assertEquals(-6.0206f, layers.vibe.levelDb[2], 1e-4f)
+        assertEquals(0.5f, layers.vibe.pan[2])
+        assertEquals(0.4f, layers.sections.getValue(1).reverbSend[2])
+        assertEquals(1f, gain(1), 1e-5f)
+        assertEquals(0.5f, gain(2), 1e-4f)
+    }
+
+    @Test
+    fun portSetGatesMixPortsOnly() = runTest {
+        val c = controller()
+        val t = tools(c)
+        val tool = t.portSet.tool
+        t.collab.setMixerVisible(false)
+        val mixPorts = listOf("track_3_volume", "track_4_reverb_send_space", "energy").map { "$PULSAR_URI:$it" }
+        for (key in mixPorts) {
+            val r = tool.execute(PortSetArgs(key, 0.2f))
+            assertFalse(r.ok, key)
+            assertEquals("MIXER_CLOSED", r.refusal, key)
+            assertNull(ports[key], key)
+        }
+        for (key in listOf("track_3_pan_glide", "track_3_audition_gain").map { "$PULSAR_URI:$it" }) {
+            val r = tool.execute(PortSetArgs(key, 0.2f))
+            assertEquals("MIXER_CLOSED", r.refusal, key)
+            assertNull(ports[key], key)
+        }
+        for (key in listOf("track_3_harmonics").map { "$PULSAR_URI:$it" }) {
+            val r = tool.execute(PortSetArgs(key, 0.2f))
+            assertTrue(r.ok, key)
+            assertNull(r.refusal)
+        }
+        assertTrue(tool.execute(PortSetArgs("org.balch.orpheus.plugins.reverb:mode", 1f)).ok)
+
+        t.collab.setMixerVisible(true)
+        t.collab.togglePin(3)
+        for (port in listOf("track_3_volume", "track_3_pan_glide", "track_3_audition_gain")) {
+            assertEquals("PINNED", tool.execute(PortSetArgs("$PULSAR_URI:$port", 0.2f)).refusal, port)
+        }
+        t.collab.togglePin(3)
+        val written = tool.execute(PortSetArgs("$PULSAR_URI:track_3_volume", 0.2f))
+        assertTrue(written.ok, written.message)
+        assertEquals(PortValue.FloatValue(0.2f), ports["$PULSAR_URI:track_3_volume"])
     }
 }

@@ -46,7 +46,8 @@ import org.balch.orpheus.ui.widgets.OrpheusSlideUpSheet
  * - Landscape: a right-edge side sheet sliding in over a tap-to-dismiss scrim,
  *   leaving the nav rail and the panel behind it visible.
  *
- * The same [content] is used in both — only the container differs.
+ * The same [content] is used in both — only the container differs. The side sheet is min(60%, 440dp) wide, room
+ * for the AI chat's column.
  */
 @Composable
 fun AdaptiveSheet(
@@ -56,7 +57,7 @@ fun AdaptiveSheet(
     content: @Composable () -> Unit,
 ) {
     if (isLandscape) {
-        SideSheet(onDismiss = onDismiss, content = content)
+        SideSheet(onDismiss = onDismiss, widthCap = 440.dp, content = content)
     } else {
         OrpheusSlideUpSheet(
             onDismiss = onDismiss,
@@ -76,7 +77,7 @@ fun AdaptiveSheet(
 /** The stage's own sheet, shown while [open]: [SideSheet] with the rail and the dock, else [StagePanel]. */
 @Composable
 internal fun StageSheet(isLandscape: Boolean, open: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    if (isLandscape) SideSheet(onDismiss, open, content) else StagePanel(onDismiss, open, content)
+    if (isLandscape) SideSheet(onDismiss, open, content = content) else StagePanel(onDismiss, open, content)
 }
 
 /**
@@ -98,6 +99,7 @@ private fun rememberSheetVisibility(open: Boolean): MutableTransitionState<Boole
 internal fun SideSheet(
     onDismiss: () -> Unit,
     open: Boolean = true,
+    widthCap: Dp = 400.dp,
     content: @Composable () -> Unit,
 ) {
     val visible = rememberSheetVisibility(open) ?: return
@@ -105,10 +107,10 @@ internal fun SideSheet(
     NavigationBackHandler(rememberNavigationEventState(NavigationEventInfo.None), isBackEnabled = open, onBackCompleted = onDismiss)
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Width = min(60% of the window, 400dp): generous on phones, capped so the panel
+        // Width = min(60% of the window, widthCap): generous on phones, capped so the panel
         // doesn't sprawl on tablets/foldables. (Computed here because chaining
         // fillMaxWidth(fraction) + widthIn does not honor the cap — fillMaxWidth wins.)
-        val panelWidth = minOf(maxWidth * 0.6f, 400.dp)
+        val panelWidth = minOf(maxWidth * 0.6f, widthCap)
         AnimatedVisibility(visibleState = visible, enter = fadeIn(), exit = fadeOut()) {
             Box(
                 Modifier

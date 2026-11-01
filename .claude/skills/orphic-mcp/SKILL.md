@@ -34,7 +34,7 @@ disown
 - `mix_read`: vibe, playing section, per-track level/pan/sends/mute/solo, macros, and loudness meters.
 - `mix_set`: `field` is level_db (heard dB in the playing section, -30 to 3.5), pan, reverb, delay or macro. `scope` is vibe or section.
 - `mix_mute`, `mix_solo`: toggle one track (0-7).
-- `mix_reset`: levels, pans, sends and section layers back to the vibe. Keeps mutes, solos and whole-vibe macro moves, and a capture still writes those macros.
+- `mix_reset`: levels, pans, sends and section layers back to the vibe. Keeps mutes, solos, pinned strips and whole-vibe macro moves, and a capture still writes those macros.
 - `section_jump`, `section_loop`: move to a section at the next bar line, or hold the current one.
 - `mix_capture`: save the mix edits as a capture file (see below).
 - `ports_list`, `port_get`, `port_set`: raw engine control ports, keyed `uri:symbol`.
@@ -87,11 +87,21 @@ The same loop the in-app agent follows (its "Creating Pulsar vibes" prompt in `O
 3. **Compose on the skeleton** per the guide: the frame (`name`, `bpm`, `rootNote`, `scaleType`), the groove, the progression (`genre.customProgression`), the melodies, the arrangement's sections and the effects. Keep the guide's section B rules and the skeleton's `cast` block (it records the roll, so the archived vibe can be cast again). Invent an original name (no real artist, band, song or album).
 4. **`pulsar_apply_vibe`** with the complete JSON. It applies and plays at once. On `success: false`, fix the JSON per the message and apply again.
 5. **One or two listening passes, no more:** `transport` play, `mix_read` once to start the meters, `audio_analyze` (it records for the seconds you ask, which is the wait), then `mix_read` again for the levels, then small fixes with `mix_set`. A re-apply clears the live mix edits, so call `mix_capture` before any re-apply (for example a `levelDb` change). The guide's section 11 has the targets and the pass in full.
-6. **Hand over:** tell the user the vibe's name, the seed and the cast summary (so a vibe they like can be remade), and a sentence on its sound. Invite them to open the Mixer tab, tweak, and say when they are back; then `mix_read`, say what changed and suggest the next move. `mix_capture` keeps the mix, archives the vibe in `~/.config/orpheus-dj/ai-vibes/` and restarts the song.
+6. **Hand over:** tell the user the vibe's name, the seed and the cast summary (so a vibe they like can be remade), and a sentence on its sound. The user may be mixing at the same time, so see the next section for the rules your edits follow. `mix_capture` keeps the mix, archives the vibe in `~/.config/orpheus-dj/ai-vibes/` and restarts the song.
 
 The in-app agent is capped per turn (3 applies and 12 mix edits; `TurnBudget`). MCP calls are exempt, since no agent turn ever resets them, so the cap is yours to keep: stick to one or two passes and let the user judge.
 
 To turn the result into a shipped `*Vibe.kt`, hand the archived JSON to `.claude/skills/grab-ai-vibes/scripts/import_vibe.sh` and follow the `vibe-creator` skill.
+
+## Mixing together
+
+The user can mix in the app while you drive it, and the in-app agent sees their moves each turn. Over MCP you do not get that turn context, so call `mix_read` to see where the controls are now.
+
+- **Pins:** the user can pin a strip in the Mixer. Edits to a pinned strip are refused with `PINNED`, over MCP too, and the message says the user pinned it. Do not retry: ask the user. `mix_reset` skips pinned strips. Pins last until the user unpins or another vibe loads.
+- **Moves made mid-turn:** the in-app agent skips a control the user just moved (`USER_MOVED`). MCP has no turn, so this does not apply: your edit lands and overwrites the user's value. Read before you set, and leave a control alone if the user is on it.
+- **The Mixer need not be open** for MCP edits (`MIXER_CLOSED` is for the in-app agent), but the user sees nothing move unless it is. Say what you changed.
+- **Wipes:** a re-apply or `vibe_load` clears the live mix edits and pins, and MCP is not asked to confirm. Call `mix_capture` first when the user has moved things, and say so before you load.
+- Your edits flash on the strips like the in-app agent's, and the in-app agent sees them marked (Claude Code).
 
 ## Mixing workflow
 

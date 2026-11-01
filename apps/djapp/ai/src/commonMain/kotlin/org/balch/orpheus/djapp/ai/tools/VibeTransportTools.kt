@@ -13,6 +13,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.playback.PlaybackState
+import org.balch.orpheus.djapp.ai.collab.DjVibeApplyGuard
 import org.balch.orpheus.features.pulsar.PulsarFeature
 
 @LLMDescription("The vibe catalog.")
@@ -38,6 +39,8 @@ data class VibeLoadResult(
     val ok: Boolean,
     val message: String,
     val vibe: String? = null,
+    @property:LLMDescription("WIPE_UNCONFIRMED when the load would clear the user's live mix: ask them, they confirm with a button.")
+    val refusal: String? = null,
 )
 
 @LLMDescription("Arguments for transport.")
@@ -79,18 +82,23 @@ class VibeListTool(private val pulsarFeatureProvider: () -> PulsarFeature) : Too
 class VibeLoadTool(
     private val pulsarFeatureProvider: () -> PulsarFeature,
     private val dispatchers: DispatcherProvider,
+    private val wipeGuard: DjVibeApplyGuard,
 ) : ToolProvider {
     override val tool: Tool<VibeLoadArgs, VibeLoadResult> by lazy {
         object : Tool<VibeLoadArgs, VibeLoadResult>(
             argsType = typeToken<VibeLoadArgs>(),
             resultType = typeToken<VibeLoadResult>(),
             name = "vibe_load",
-            description = "Load a vibe by name (see vibe_list) at once, with no transition. Clears mix edits, mutes and solos.",
+            description = """
+                Load a vibe by name (see vibe_list) at once, with no transition. Clears mix edits, mutes, solos and pins,
+                so when the user has changed the mix it is refused (WIPE_UNCONFIRMED) until they confirm.
+            """.trimIndent(),
         ) {
             override suspend fun execute(args: VibeLoadArgs): VibeLoadResult = guarded({ VibeLoadResult(false, it) }) {
                 val pulsar = pulsarFeatureProvider()
                 val name = pulsar.vibeNames.firstOrNull { it.equals(args.name.trim(), ignoreCase = true) }
                     ?: badArg("no vibe named \"${args.name}\"; see vibe_list")
+                wipeGuard.wipeRefusal()?.let { return@guarded VibeLoadResult(false, it.reason, refusal = it.refusal.name) }
                 val loaded = withContext(dispatchers.main) { pulsar.applyVibeByName(name) }
                 if (!loaded) badArg("vibe \"$name\" did not load")
                 VibeLoadResult(true, "Loaded \"$name\".", name)

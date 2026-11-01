@@ -132,10 +132,17 @@ class TurnBudgetTest {
         assertTrue("${TurnBudget.MAX_APPLIES} applies" in prompt)
         assertTrue("${TurnBudget.MAX_MIX_EDITS} mix edits when" in prompt)
         assertTrue("unless budgetSpent is true" in prompt)
-        // The synth app has no mix tools: every line naming the Mixer tab is conditional.
-        val mixerLines = prompt.lines().filter { "Mixer tab" in it }
-        assertTrue(mixerLines.isNotEmpty())
-        mixerLines.forEach { assertTrue("when the mix tools are available" in it, it) }
+        // The synth app has no mix tools: every Mixer rule sits under the mix-tools conditional.
+        val head = "When the mix tools are available, you mix together with the user:"
+        assertTrue(head in prompt, "the mixing rules lost their conditional")
+        val mixing = prompt.substringAfter(head).substringBefore("A plain-text reply ends your turn")
+        listOf("moves since your last turn", "only while the Mixer is open", "PINNED", "USER_MOVED", "confirmation", "short")
+            .forEach { assertTrue(it in mixing, "the mixing rules lost \"$it\":\n$mixing") }
+        // The listening pass (step 5) is conditional as a whole, and fixes the mix only with the Mixer open.
+        val pass = prompt.substringAfter("5. When the mix tools are available").substringBefore("\n6. ")
+        assertTrue("when the Mixer is open, small fixes with mix_set" in pass.replace(Regex("\\s+"), " "), pass)
+        assertTrue(prompt.replace(mixing, "").replace(pass, "").lines().none { "Mixer" in it }, "a Mixer rule outside the conditional")
+        assertFalse("when you're back" in prompt || "they are back" in prompt, "the back-and-forth rule is still there")
     }
 
     @Test

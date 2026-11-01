@@ -2,12 +2,14 @@ package org.balch.orpheus.djapp.ai.mixer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,31 +20,51 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.max
+import androidx.compose.ui.unit.min
+import org.balch.orpheus.djapp.LegibleText
+import org.balch.orpheus.djapp.ai.chat.rememberOverlayFocus
+import org.balch.orpheus.djapp.legible
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 
@@ -55,36 +77,45 @@ private val WIDE_MIN_HEIGHT = 400.dp
 /** Under this height the strips tighten their padding, gaps, waves and knobs. */
 private val TIGHT_HEIGHT = 480.dp
 
-/** The height the header, knobs and strip furniture take, normal and tight; the faders get the rest. */
-private val FURNITURE = 360.dp
-private val TIGHT_FURNITURE = 316.dp
-
-/** The fader's least height: 72dp of travel inside its 6dp padding. */
-private val MIN_FADER = 84.dp
-
 private val TIGHT_WAVE_HEIGHT = 20.dp
 
-/** At or above this width the changes column sits beside the strips; below it, under them. */
-private val SIDE_BESIDE_MIN = 1100.dp
-
-private val SIDE_WIDTH = 260.dp
-
-/** At or above this width the macro knobs share a row with the section chips. */
+/** At or above this width the macro knobs share a row with the section chips (compact list). */
 internal val KNOBS_BESIDE_CHIPS_MIN = 760.dp
 
-private val SOURCE_STRIP_WIDTH = 64.dp
+/** The least room the section chips need beside the knobs in the wide layout. */
+private val CHIPS_MIN = 380.dp
+
+/** At or above this width the bus readout shares the title's row. */
+private val HEADER_ONE_ROW_MIN = 1200.dp
+
+internal val AMBIENT_WIDTH = 64.dp
 private val STRIP_GAP = 6.dp
 private val BUS_STRIP_WIDTH = 76.dp
 private val WAVE_HEIGHT = 28.dp
 private val WAVE_PAD = 5.dp
+private val TIGHT_WAVE_PAD = 3.dp
+
+/** The gap between the macro knobs and the section chips beside them. */
+private val KNOBS_CHIPS_GAP = 16.dp
 
 internal const val DRY = 11
 internal const val OUT = 12
 internal val SOURCES = listOf(Triple(8, "STORM", "weather"), Triple(9, "STREET", "street"), Triple(10, "SPEECH", "speech"))
 
+/** The AMBIENT strip's three meters: weather, street and speech. */
+private val AMBIENT = listOf(8 to "S", 9 to "St", 10 to "Sp")
+
+internal fun stripTag(index: Int) = "mixer-strip-$index"
+
+internal const val AMBIENT_TAG = "mixer-ambient"
+internal const val BUS_TAG = "mixer-bus"
+internal const val CHANGES_TAG = "mixer-changes"
+internal const val CHANGES_SCRIM_TAG = "mixer-changes-scrim"
+
 /**
  * The AI edition's mixer: the desktop Mix Bench rebuilt natively. Meters are collected here once, while shown, and
- * handed down as a [State] that only draw lambdas and the LU and bus text leafs read.
+ * handed down as a [State] that only draw lambdas and the LU and bus text leafs read. The agent's and MCP's edits
+ * flash the control they changed.
  *
  * [bottomOverhang] is how far the bar's chrome reaches up over the panel's bottom edge: the strips' surface stops
  * above it, and the compact list scrolls its last rows clear of it.
@@ -98,6 +129,13 @@ fun AiMixerPanel(
 ) {
     val state by feature.stateFlow.collectAsState()
     val meters = feature.meters.collectAsState(EMPTY_METERS)
+    val flashes = remember { AgentFlashes() }
+    val latest by rememberUpdatedState(state)
+    LaunchedEffect(feature) {
+        feature.agentEdits.collect { control ->
+            flashes.flash(control, latest.tracks.map { it.index }.filter { it !in latest.pins })
+        }
+    }
     BoxWithConstraints(modifier) {
         val wideHeight = maxHeight - bottomOverhang
         val wide = maxWidth >= WIDE_MIN && wideHeight >= WIDE_MIN_HEIGHT
@@ -108,9 +146,9 @@ fun AiMixerPanel(
             contentColor = MixerInk.text,
         ) {
             if (wide) {
-                WideMixer(state, meters, feature.actions, maxWidth, wideHeight)
+                WideMixer(state, meters, feature.actions, flashes, maxWidth, wideHeight)
             } else {
-                CompactMixer(state, meters, feature.actions, maxWidth, bottomOverhang = bottomOverhang)
+                CompactMixer(state, meters, feature.actions, flashes, maxWidth, bottomOverhang = bottomOverhang)
             }
         }
     }
@@ -121,63 +159,198 @@ private fun WideMixer(
     state: AiMixerUiState,
     meters: State<MeterSnapshot>,
     actions: AiMixerActions,
+    flashes: AgentFlashes,
     width: Dp,
     height: Dp,
 ) {
     // Short windows (a 1280x800 desktop under the dome's clearance) tighten the furniture so the faders keep travel.
     val tight = height < TIGHT_HEIGHT
     val pad = if (tight) 8.dp else 12.dp
-    val gap = if (tight) 6.dp else 10.dp
+    val gap = if (tight) 4.dp else 10.dp
     val wave = if (tight) TIGHT_WAVE_HEIGHT else WAVE_HEIGHT
-    val sideBeside = width >= SIDE_BESIDE_MIN
-    val stripsWidth = width - pad * 2 - if (sideBeside) SIDE_WIDTH + pad else 0.dp
-    // The eight tracks share what the sources and the bus leave, within readable limits.
-    val stripWidth = ((stripsWidth - BUS_STRIP_WIDTH - SOURCE_STRIP_WIDTH * 3 - STRIP_GAP * 11 - 2.dp) / 8)
-        .coerceIn(72.dp, 132.dp)
-    // What is left of the height after the header rows and the strip furniture goes to the faders.
-    val faderHeight = (height - if (tight) TIGHT_FURNITURE else FURNITURE).coerceIn(MIN_FADER, 360.dp)
+    val stripsWidth = width - pad * 2
+    // The eight tracks share what the ambient and bus strips leave, within readable limits.
+    val stripWidth = ((stripsWidth - BUS_STRIP_WIDTH - AMBIENT_WIDTH - STRIP_GAP * 9) / 8).coerceIn(72.dp, 132.dp)
     val knobSize = when {
         tight -> 32.dp
         height < 500.dp -> 38.dp
         else -> 46.dp
     }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(pad),
-        verticalArrangement = Arrangement.spacedBy(gap),
+    // Legible labels widen the knobs, so whether they fit beside the chips depends on the canvas scale too.
+    val textScale = textScale()
+    val knobWidth = max(88.dp, 76.dp * textScale)
+    val beside = stripsWidth >= knobWidth * 4 + MACRO_KNOB_GAP * 3 + KNOBS_CHIPS_GAP + CHIPS_MIN
+    var changesOpen by rememberSaveable { mutableStateOf(false) }
+    var headerRowHeight by remember { mutableIntStateOf(0) }
+    val overlay = rememberOverlayFocus()
+    val closeChanges = {
+        changesOpen = false
+        overlay.onClose()
+    }
+    val scopeToggle: @Composable () -> Unit = {
+        ScopeToggle(state, actions.setScope, flashKey = flashes.count(FlashTarget.EditScope))
+    }
+    // Esc closes the popover; every other key goes on as before.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { overlay.onPreviewKey(it, changesOpen) { changesOpen = false } }
+            .focusRequester(overlay.host)
+            .focusable(),
     ) {
-        Header(state.vibeName, meters, stacked = false)
-        KnobsAndChips(state, actions, beside = width >= KNOBS_BESIDE_CHIPS_MIN, knobSize = knobSize)
-        if (sideBeside) {
-            StripsBeside(
-                strips = { Strips(state, meters, actions, stripWidth, faderHeight, wave) },
-                side = { SideColumn(state, actions, Modifier.fillMaxSize(), fitHeight = true) },
-                gap = pad,
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(pad)) {
+            TopThenStrips(
+                viewport = height - pad * 2,
+                gap = gap,
+                top = {
+                    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                        WideHeader(
+                            state,
+                            meters,
+                            actions,
+                            oneRow = width >= HEADER_ONE_ROW_MIN,
+                            tight = tight,
+                            onChanges = {
+                                if (changesOpen) {
+                                    closeChanges()
+                                } else {
+                                    overlay.onOpen()
+                                    changesOpen = true
+                                }
+                            },
+                            onRowHeight = { headerRowHeight = it },
+                        )
+                        KnobsAndChips(
+                            state,
+                            actions,
+                            beside = beside,
+                            knobSize = knobSize,
+                            knobWidth = knobWidth,
+                            flashes = flashes,
+                            chipsTrailing = if (beside) null else scopeToggle,
+                            underChips = if (beside) scopeToggle else null,
+                        )
+                        if (state.sectionScope) SectionPanNote()
+                    }
+                },
+                strips = { Strips(state, meters, actions, flashes, stripWidth, wave, tight) },
             )
-        } else {
-            Strips(state, meters, actions, stripWidth, faderHeight, wave, Modifier.fillMaxWidth())
-            SideColumn(state, actions, Modifier.fillMaxWidth())
+        }
+        if (changesOpen) {
+            val top = pad + with(LocalDensity.current) { headerRowHeight.toDp() } + 6.dp
+            // Taps outside the popover close it.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .testTag(CHANGES_SCRIM_TAG)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = "Close changes",
+                        onClick = closeChanges,
+                    ),
+            )
+            ChangesPopover(
+                state,
+                onClose = closeChanges,
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = top, end = pad)
+                    .width(min(stripsWidth, 320.dp * textScale))
+                    .heightIn(max = (height - top - pad).coerceAtLeast(160.dp)),
+            )
         }
     }
 }
 
-/** The strips, then the changes column at [SIDE_WIDTH] and exactly the strips' height, so it never makes the page taller. */
+/** [top] at its own height, then [strips] stretched over the rest of [viewport], never under their least height (the column scrolls instead). */
 @Composable
-private fun StripsBeside(strips: @Composable () -> Unit, side: @Composable () -> Unit, gap: Dp) {
-    Layout(content = { strips(); side() }) { measurables, constraints ->
-        val sideWidth = SIDE_WIDTH.roundToPx()
-        val stripsWidth = (constraints.maxWidth - sideWidth - gap.roundToPx()).coerceAtLeast(0)
-        val s = measurables[0].measure(Constraints(maxWidth = stripsWidth, maxHeight = constraints.maxHeight))
-        val c = measurables[1].measure(Constraints.fixed(sideWidth, s.height))
-        layout(constraints.maxWidth, s.height) {
-            s.place(0, 0)
-            c.place(constraints.maxWidth - sideWidth, 0)
+private fun TopThenStrips(viewport: Dp, gap: Dp, top: @Composable () -> Unit, strips: @Composable () -> Unit) {
+    Layout(content = { top(); strips() }) { measurables, constraints ->
+        val t = measurables[0].measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+        val g = gap.roundToPx()
+        val least = measurables[1].minIntrinsicHeight(constraints.maxWidth)
+        val h = (viewport.roundToPx() - t.height - g).coerceAtLeast(least)
+        val s = measurables[1].measure(Constraints(maxWidth = constraints.maxWidth, minHeight = h, maxHeight = h))
+        layout(constraints.maxWidth, t.height + g + h) {
+            t.place(0, 0)
+            s.place(0, t.height + g)
         }
+    }
+}
+
+/** Title, the changes button, Capture and Reset; the bus readout beside them when [oneRow], else under. */
+@Composable
+private fun WideHeader(
+    state: AiMixerUiState,
+    meters: State<MeterSnapshot>,
+    actions: AiMixerActions,
+    oneRow: Boolean,
+    tight: Boolean,
+    onChanges: () -> Unit,
+    onRowHeight: (Int) -> Unit,
+) {
+    // No close button: Back/Esc, the scrim and the tab bar all close the sheet.
+    Column(verticalArrangement = Arrangement.spacedBy(if (tight) 3.dp else 6.dp)) {
+        Row(
+            Modifier.onSizeChanged { onRowHeight(it.height) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Title(state.vibeName, Modifier.weight(1f))
+            if (oneRow) BusReadout(meters)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MixerButton(changesLabel(state.changeCount), onChanges, Modifier.testTag(CHANGES_TAG))
+                MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
+                MixerButton("Reset to file", actions.reset)
+            }
+        }
+        if (!oneRow) BusReadout(meters, textAlign = TextAlign.Start)
+        state.capture?.let { CaptureResult(it, actions.dismissCapture, Modifier.fillMaxWidth()) }
+        state.notice?.let { NoticeLine(it, actions.dismissNotice, Modifier.fillMaxWidth(), compact = tight) }
+    }
+}
+
+/** The pending changes over the strips, opened from the header's changes button. */
+@Composable
+private fun ChangesPopover(state: AiMixerUiState, onClose: () -> Unit, modifier: Modifier) {
+    val lines = remember(state.changes) { changeLines(state.changes) }
+    val shape = RoundedCornerShape(8.dp)
+    // Focus comes here on open, so the panel's Esc handler sees the keys.
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    Column(
+        modifier
+            .shadow(8.dp, shape)
+            .clip(shape)
+            .background(MixerInk.card)
+            .border(1.dp, MixerInk.line, shape)
+            // A pointer handler makes the card the hit target, so its taps never reach the close-on-tap scrim.
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
+            .focusRequester(focus)
+            .focusable()
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ChangesTitle(Modifier.weight(1f))
+            Text(
+                "Close",
+                style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.text, FontWeight.SemiBold),
+                maxLines = 1,
+                modifier = Modifier.clickable(role = Role.Button, onClick = onClose).padding(4.dp),
+            )
+        }
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+            ChangesList(lines, Modifier.fillMaxWidth())
+        }
+        FaderNote()
     }
 }
 
 /**
  * The macro knobs and the section chips: one row when [beside], else knobs (scrolling if cramped) over chips.
- * [underChips] goes right under the chips either way.
+ * [chipsTrailing] ends the chips' row; [underChips] goes right under it either way.
  */
 @Composable
 internal fun KnobsAndChips(
@@ -186,13 +359,26 @@ internal fun KnobsAndChips(
     beside: Boolean,
     knobSize: Dp,
     knobWidth: Dp = 88.dp,
+    flashes: AgentFlashes? = null,
+    chipsTrailing: (@Composable () -> Unit)? = null,
     underChips: (@Composable () -> Unit)? = null,
 ) {
+    @Composable
+    fun chips() = SectionChips(
+        state.sections,
+        state.section,
+        state.loopSection,
+        actions.jumpTo,
+        actions.setLoop,
+        Modifier.fillMaxWidth(),
+        flashes = flashes,
+        trailing = chipsTrailing,
+    )
     if (beside) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            MixerMacroKnobs(state.macros, actions.setMacro, knobSize = knobSize, knobWidth = knobWidth)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KNOBS_CHIPS_GAP)) {
+            MixerMacroKnobs(state.macros, actions.setMacro, knobSize = knobSize, knobWidth = knobWidth, flashes = flashes)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionChips(state.sections, state.section, state.loopSection, actions.jumpTo, actions.setLoop, Modifier.fillMaxWidth())
+                chips()
                 underChips?.invoke()
             }
         }
@@ -204,8 +390,9 @@ internal fun KnobsAndChips(
                 Modifier.horizontalScroll(rememberScrollState()),
                 knobSize = knobSize,
                 knobWidth = knobWidth,
+                flashes = flashes,
             )
-            SectionChips(state.sections, state.section, state.loopSection, actions.jumpTo, actions.setLoop, Modifier.fillMaxWidth())
+            chips()
             underChips?.invoke()
         }
     }
@@ -218,7 +405,7 @@ internal fun Header(vibeName: String, meters: State<MeterSnapshot>, stacked: Boo
     if (stacked) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Title(vibeName, Modifier.fillMaxWidth())
-            BusReadout(meters, textAlign = TextAlign.Start, size = 12.5.sp)
+            BusReadout(meters, textAlign = TextAlign.Start, nativeSize = 12f)
         }
         return
     }
@@ -231,13 +418,13 @@ internal fun Header(vibeName: String, meters: State<MeterSnapshot>, stacked: Boo
 @Composable
 internal fun Title(vibeName: String, modifier: Modifier) {
     Column(modifier) {
-        Text("MIXER", style = mixText(10.sp, MixerInk.dim, FontWeight.SemiBold), maxLines = 1)
+        Text("MIXER", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim, FontWeight.SemiBold), maxLines = 1)
         Text(
             vibeName.ifEmpty { "No vibe" },
-            style = mixText(17.sp, MixerInk.text, FontWeight.Bold),
+            style = mixText(legible(LegibleText.TITLE), MixerInk.text, FontWeight.Bold),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 320.dp),
+            modifier = Modifier.widthIn(max = 320.dp * textScale()),
         )
     }
 }
@@ -247,63 +434,101 @@ private fun Strips(
     state: AiMixerUiState,
     meters: State<MeterSnapshot>,
     actions: AiMixerActions,
+    flashes: AgentFlashes,
     stripWidth: Dp,
-    faderHeight: Dp,
     wave: Dp,
-    modifier: Modifier = Modifier,
+    tight: Boolean,
 ) {
     Row(
-        modifier.horizontalScroll(rememberScrollState()).height(IntrinsicSize.Min),
+        Modifier.fillMaxHeight().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(STRIP_GAP),
     ) {
         for (track in state.tracks) {
-            TrackStrip(track, meters, actions, stripWidth, faderHeight, wave)
+            val i = track.index
+            TrackStrip(track, meters, actions, i in state.pins, i in state.agentTouched, flashes.track(i), stripWidth, wave, tight)
         }
-        for ((ch, name, what) in SOURCES) {
-            SourceStrip(ch, name, what, meters, SOURCE_STRIP_WIDTH, faderHeight, wave)
-        }
-        BusStrip(meters, faderHeight, wave)
+        AmbientStrip(meters)
+        BusStrip(meters)
     }
 }
 
-/** The height of the pan, R and D rows, so the source and bus meters line up with the track faders. */
-private val SLIDERS_HEIGHT = SLIDER_HEIGHT * 3
-
+/**
+ * One track: name, pin and engine, wave, pan and send knobs, the fader (which takes the height left), loudness and
+ * mute/solo. A pinned strip is outlined; the agent's marks lie over it.
+ */
 @Composable
 private fun TrackStrip(
     track: MixerTrack,
     meters: State<MeterSnapshot>,
     actions: AiMixerActions,
+    pinned: Boolean,
+    agentTouched: Boolean,
+    flashKey: Int,
     width: Dp,
-    faderHeight: Dp,
     wave: Dp,
+    tight: Boolean,
 ) {
     val i = track.index
     val color = MixerInk.tracks.getOrElse(i) { MixerInk.accent }
-    Column(
-        Modifier
-            .width(width)
-            .fillMaxHeight()
-            .graphicsLayer { alpha = if (track.silenced) 0.5f else 1f }
-            .clip(RoundedCornerShape(8.dp))
-            .background(MixerInk.card)
-            .padding(horizontal = 5.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        StripTitle(track.name, track.engine, color)
-        MixerWave({ meters.waveOf(i) }, color, Modifier.padding(vertical = WAVE_PAD).fillMaxWidth().height(wave))
-        MixerSlider(
-            "pan", track.pan, -1f..1f, { actions.setPan(i, it) }, ::panText, i,
+    val shape = RoundedCornerShape(8.dp)
+    var readout by remember { mutableStateOf<String?>(null) }
+    val knob = ((width - 16.dp) / 2).coerceIn(24.dp, 34.dp)
+    val knobsOneRow = width - 8.dp >= knob * 3 + 12.dp
+    val panKnob: @Composable () -> Unit = {
+        StripKnob(
+            "pan", track.pan, -1f..1f, { actions.setPan(i, it) }, { v -> readout = v?.let(::panText) }, knob,
             onReset = { actions.setPan(i, track.filePan) },
         )
-        MixerSlider("R", track.reverb, 0f..1f, { actions.setReverb(i, it) }, ::f2, i)
-        MixerSlider("D", track.delay, 0f..1f, { actions.setDelay(i, it) }, ::f2, i)
+    }
+    Column(
+        Modifier
+            .testTag(stripTag(i))
+            .width(width)
+            .fillMaxHeight()
+            .then(agentMark(flashKey, agentTouched, corner = 8.dp))
+            .graphicsLayer { alpha = if (track.silenced) 0.5f else 1f }
+            .clip(shape)
+            .background(MixerInk.card)
+            .then(if (pinned) Modifier.border(1.5.dp, MixerInk.pin, shape) else Modifier)
+            .padding(horizontal = 3.dp, vertical = if (tight) 4.dp else 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                track.name,
+                style = mixText(legible(LegibleText.MIXER_MIN), color, FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            // A small pin leaves the name room on a narrow strip; its touch target stays PIN_TARGET.
+            PinToggle(i, track.name, pinned, { actions.togglePin(i) }, size = 12.dp, anchor = Alignment.TopEnd)
+        }
+        Text(
+            track.engine,
+            style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.padding(vertical = if (tight) TIGHT_WAVE_PAD else WAVE_PAD).fillMaxWidth().height(wave), contentAlignment = Alignment.Center) {
+            MixerWave({ meters.waveOf(i) }, color, Modifier.fillMaxSize())
+            readout?.let { KnobReadout(it, Modifier.wrapContentSize(unbounded = true)) }
+        }
+        // A wide strip fits all three knobs on one row, leaving the fader more height.
+        if (!knobsOneRow) panKnob()
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            if (knobsOneRow) panKnob()
+            StripKnob("R", track.reverb, 0f..1f, { actions.setReverb(i, it) }, { v -> readout = v?.let(::f2) }, knob)
+            StripKnob("D", track.delay, 0f..1f, { actions.setDelay(i, it) }, { v -> readout = v?.let(::f2) }, knob)
+        }
         DbFader(
             db = track.levelDb,
             onDbChange = { actions.setLevelDb(i, it) },
             onReset = { actions.setLevelDb(i, 0f) },
             index = i,
-            height = faderHeight,
+            modifier = Modifier.weight(1f),
+            height = null,
             meter = { MixerMeter({ meters.fillOf(i) }, Modifier.width(8.dp).fillMaxHeight()) },
         )
         LuText(meters, i)
@@ -312,107 +537,93 @@ private fun TrackStrip(
     }
 }
 
+/** Storm, street and speech, read-only: one thin meter each. */
 @Composable
-private fun StripTitle(name: String, sub: String, color: Color) {
-    Text(name, style = mixText(11.sp, color, FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    Text(sub, style = mixText(9.sp, MixerInk.dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-/** A read-only source: its wave, meter and loudness, nothing to move. */
-@Composable
-private fun SourceStrip(ch: Int, name: String, what: String, meters: State<MeterSnapshot>, width: Dp, faderHeight: Dp, wave: Dp) {
+private fun AmbientStrip(meters: State<MeterSnapshot>) {
+    val shape = RoundedCornerShape(8.dp)
     Column(
         Modifier
-            .width(width)
+            .testTag(AMBIENT_TAG)
+            .width(AMBIENT_WIDTH)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(shape)
             .background(MixerInk.sourceCard)
-            .border(1.dp, MixerInk.line, RoundedCornerShape(8.dp))
-            .padding(horizontal = 5.dp, vertical = 6.dp),
+            .border(1.dp, MixerInk.line, shape)
+            .padding(horizontal = 3.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        StripTitle(name, what, MixerInk.dim)
-        MixerWave({ meters.waveOf(ch) }, MixerInk.dim, Modifier.padding(vertical = WAVE_PAD).fillMaxWidth().height(wave))
-        Spacer(Modifier.height(SLIDERS_HEIGHT))
-        Box(Modifier.height(faderHeight).padding(vertical = 6.dp)) {
-            MixerMeter({ meters.fillOf(ch) }, Modifier.width(8.dp).fillMaxHeight())
+        val style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim, FontWeight.Bold)
+        val measurer = rememberTextMeasurer()
+        val room = with(LocalDensity.current) { (AMBIENT_WIDTH - 6.dp).roundToPx() }
+        // The word outgrows the strip on a shrunk canvas, so it shortens rather than ellipsizes.
+        val title = remember(style, room) {
+            if (measurer.measure("AMBIENT", style, maxLines = 1).size.width <= room) "AMBIENT" else "AMB"
         }
-        Text("meter only", style = mixText(9.sp, MixerInk.dim), maxLines = 1)
-        LuText(meters, ch)
+        Text(title, style = style, maxLines = 1)
+        Row(
+            Modifier.weight(1f).padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
+        ) {
+            for ((ch, label) in AMBIENT) {
+                Column(Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    MixerMeter({ meters.fillOf(ch) }, Modifier.weight(1f).padding(vertical = 6.dp).width(6.dp))
+                    Text(label, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1)
+                }
+            }
+        }
     }
 }
 
-/** The dry mix and the output, side by side, with their peaks. */
+/** The dry mix and the output, side by side, with their peaks under them. */
 @Composable
-private fun BusStrip(meters: State<MeterSnapshot>, faderHeight: Dp, wave: Dp) {
+private fun BusStrip(meters: State<MeterSnapshot>) {
+    val shape = RoundedCornerShape(8.dp)
     Column(
         Modifier
+            .testTag(BUS_TAG)
             .width(BUS_STRIP_WIDTH)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(shape)
             .background(MixerInk.sourceCard)
-            .border(1.dp, MixerInk.line, RoundedCornerShape(8.dp))
-            .padding(horizontal = 5.dp, vertical = 6.dp),
+            .border(1.dp, MixerInk.line, shape)
+            .padding(horizontal = 3.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        StripTitle("BUS", "peak dB", MixerInk.text)
-        Spacer(Modifier.height(wave + WAVE_PAD * 2 + SLIDERS_HEIGHT))
-        Row(Modifier.height(faderHeight).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("BUS", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.text, FontWeight.Bold), maxLines = 1)
+        Text("peak", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1)
+        Row(Modifier.weight(1f).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             MixerMeter({ meters.fillOf(DRY) }, Modifier.width(8.dp).fillMaxHeight())
             MixerMeter({ meters.fillOf(OUT) }, Modifier.width(8.dp).fillMaxHeight())
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(BenchMeters.CHANNEL_NAMES[DRY], style = mixText(10.sp), maxLines = 1)
-                PeakText(meters, DRY)
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(BenchMeters.CHANNEL_NAMES[OUT], style = mixText(10.sp), maxLines = 1)
-                PeakText(meters, OUT)
-            }
-        }
-    }
-}
-
-/** With [fitHeight] the list and footer scroll inside the height it is given; otherwise the list caps at 360dp. */
-@Composable
-private fun SideColumn(state: AiMixerUiState, actions: AiMixerActions, modifier: Modifier = Modifier, fitHeight: Boolean = false) {
-    val lines = remember(state.changes) { changeLines(state.changes) }
-    Column(
-        modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MixerInk.card)
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        ChangesTitle()
-        ScopeToggle(state, actions.setScope)
-        if (state.sectionScope) SectionPanNote()
-        if (fitHeight) {
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ChangesList(lines, Modifier.fillMaxWidth())
-                ChangesFooter(state, actions)
-            }
-        } else {
-            Box(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                ChangesList(lines, Modifier.fillMaxWidth())
-            }
-            ChangesFooter(state, actions)
+        for (ch in listOf(DRY, OUT)) {
+            Text(BenchMeters.CHANNEL_NAMES[ch], style = mixText(legible(LegibleText.MIXER_MIN)), maxLines = 1)
+            PeakText(meters, ch)
         }
     }
 }
 
 @Composable
-internal fun ChangesTitle() {
-    Text("Changes", style = mixText(13.sp, MixerInk.text, FontWeight.SemiBold))
+internal fun ChangesTitle(modifier: Modifier = Modifier) {
+    Text("Changes", style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text, FontWeight.SemiBold), modifier = modifier)
 }
 
 @Composable
 internal fun SectionPanNote() {
-    Text("Pan has no per-section value: pan moves still land in the whole vibe.", style = mixText(11.sp, MixerInk.dim))
+    Text(
+        "Pan has no per-section value: pan moves still land in the whole vibe.",
+        style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+    )
 }
 
-/** Capture and Reset, the capture result, the notice and the fader note, under the changes list. */
+@Composable
+private fun FaderNote() {
+    Text(
+        "Faders show the dB offset from the file (0 = as written). Pan and sends show the value heard in the playing section.",
+        style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim),
+    )
+}
+
+/** Capture and Reset, the capture result, the notice and the fader note, under the compact list's changes. */
 @Composable
 internal fun ChangesFooter(state: AiMixerUiState, actions: AiMixerActions) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -420,11 +631,8 @@ internal fun ChangesFooter(state: AiMixerUiState, actions: AiMixerActions) {
             MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
             MixerButton("Reset to file", actions.reset)
         }
-        state.capture?.let { CaptureResult(it) }
+        state.capture?.let { CaptureResult(it, actions.dismissCapture, Modifier.fillMaxWidth()) }
         state.notice?.let { NoticeLine(it, actions.dismissNotice, Modifier.fillMaxWidth()) }
-        Text(
-            "Faders show the dB offset from the file (0 dB = as written). Pan and sends show the value heard in the playing section.",
-            style = mixText(10.sp, MixerInk.dim),
-        )
+        FaderNote()
     }
 }

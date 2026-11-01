@@ -11,25 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import org.balch.orpheus.djapp.DjAppNavScaffold
-import org.balch.orpheus.djapp.DjLayout
-import org.balch.orpheus.djapp.DjTab
-import org.balch.orpheus.djapp.DjTvBottomBar
-import org.balch.orpheus.djapp.HornTab
-import org.balch.orpheus.djapp.MixTab
-import org.balch.orpheus.djapp.MixerTab
-import org.balch.orpheus.djapp.PulsarTab
-import org.balch.orpheus.djapp.djTabs
-import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
-import org.balch.orpheus.djapp.variant.stageChromeOverhang
-import org.balch.orpheus.features.pulsar.PulsarFeature
-import org.balch.orpheus.features.pulsar.PulsarUiState
-import org.balch.orpheus.features.pulsar.PulsarViewModel
-import org.balch.orpheus.features.pulsar.VibeNavState
-import org.balch.orpheus.features.timer.TimerViewModel
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -38,12 +19,31 @@ import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import java.io.File
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.test.Test
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.djapp.AiTab
+import org.balch.orpheus.djapp.DjAppNavScaffold
+import org.balch.orpheus.djapp.DjLayout
+import org.balch.orpheus.djapp.DjTab
+import org.balch.orpheus.djapp.DjTvBottomBar
+import org.balch.orpheus.djapp.HornTab
+import org.balch.orpheus.djapp.LocalCanvasScale
+import org.balch.orpheus.djapp.MixTab
+import org.balch.orpheus.djapp.PulsarTab
+import org.balch.orpheus.djapp.djTabs
+import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
+import org.balch.orpheus.djapp.variant.stageChromeOverhang
+import org.balch.orpheus.features.pulsar.PulsarFeature
+import org.balch.orpheus.features.pulsar.PulsarUiState
+import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.VibeNavState
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
@@ -51,10 +51,15 @@ import org.balch.orpheus.features.pulsar.bench.ChannelMeter
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
+import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.ui.theme.OrpheusTheme
 
 /** ./gradlew :apps:djapp:ai:jvmTest --tests '*AiMixerRenderHarness*' -PrenderHarness --rerun */
 class AiMixerRenderHarness {
+    private companion object {
+        const val FOLD_SCALE = 0.652f
+    }
+
     private val engines = listOf("BD/BD", "SD/HH", "HH/HH", "VA/FM", "CHD/WT", "STR/MOD", "GRN/NOI", "SPK/MST")
 
     private val tracks = BenchMeters.CHANNEL_NAMES.take(8).mapIndexed { t, name ->
@@ -102,6 +107,8 @@ class AiMixerRenderHarness {
             appliedToAiVibe = false,
         ),
         notice = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope.",
+        pins = setOf(3),
+        agentTouched = setOf(5, 6),
     )
 
     // A different sine envelope per channel, with a little carrier wobble so the bins read as audio.
@@ -151,13 +158,13 @@ class AiMixerRenderHarness {
             frame()
         }
 
-        /** Taps the node tagged [tag] 20 dp in from its left edge, where a mixer row shows its name. */
+        /** Taps the node tagged [tag] 20 dp in from its left edge (where a mixer row shows its name), or its centre if narrower. */
         fun tap(tag: String) {
             val out = mutableListOf<SemanticsNode>()
             fun walk(n: SemanticsNode) { out += n; n.children.forEach(::walk) }
             walk(scene.semanticsOwners.first().rootSemanticsNode)
             val b = out.first { it.config.getOrNull(SemanticsProperties.TestTag) == tag }.boundsInRoot
-            val at = Offset(b.left + 40f, b.center.y)
+            val at = Offset(minOf(b.left + 40f, b.center.x), b.center.y)
             pointer(PointerEventType.Press, at)
             pointer(PointerEventType.Release, at)
             repeat(20) { frame() }
@@ -174,8 +181,8 @@ class AiMixerRenderHarness {
         }
     }
 
-    private fun render(name: String, w: Int, h: Int, interact: Touch.() -> Unit = {}) =
-        renderScene(name, w, h, interact) { feature -> AiMixerPanel(feature, Modifier.fillMaxSize()) }
+    private fun render(name: String, w: Int, h: Int, scale: Float = 1f, interact: Touch.() -> Unit = {}) =
+        renderScene(name, w, h, interact, scale) { feature -> AiMixerPanel(feature, Modifier.fillMaxSize()) }
 
     private val pulsar: PulsarFeature = run {
         val base = PulsarViewModel.previewFeature()
@@ -203,8 +210,8 @@ class AiMixerRenderHarness {
             Spacer(Modifier.height(108.dp))
             Box(Modifier.weight(1f).fillMaxWidth()) { Stage(feature, DjLayout.LargeScreen) }
             DjTvBottomBar(
-                panels = listOf(DjTab, MixTab, PulsarTab, HornTab, MixerTab),
-                isDocked = { it == MixerTab },
+                panels = listOf(DjTab, MixTab, PulsarTab, AiTab),
+                isDocked = { it == AiTab },
                 onToggle = {},
                 pulsarFeature = pulsar,
                 onTogglePlayback = {},
@@ -217,21 +224,31 @@ class AiMixerRenderHarness {
     /** The sheet in the real phone scaffold, its bar's ring rising over the stage's bottom edge. */
     private fun renderPhone(name: String, interact: Touch.() -> Unit = {}) = renderScene(name, 360, 780, interact) { feature ->
         DjAppNavScaffold(
-            isSelected = { it == MixerTab },
+            isSelected = { it == AiTab },
             onItemClick = {},
             layout = DjLayout.Portrait,
             pulsarFeature = pulsar,
             timerFeature = TimerViewModel.previewFeature(),
             onTogglePlayback = {},
-            tabs = djTabs + MixerTab,
+            tabs = djTabs.map { if (it == HornTab) AiTab else it },
             modifier = Modifier.fillMaxSize().background(MixerInk.sourceCard),
         ) { Stage(feature, DjLayout.Portrait) }
     }
 
-    private fun renderScene(name: String, w: Int, h: Int, interact: Touch.() -> Unit = {}, content: @Composable (AiMixerFeature) -> Unit) {
+    /** [scale] is the canvas shrink the legible text undoes: 0.652 on the Fold, 1 at native density. */
+    private fun renderScene(
+        name: String,
+        w: Int,
+        h: Int,
+        interact: Touch.() -> Unit = {},
+        scale: Float = 1f,
+        content: @Composable (AiMixerFeature) -> Unit,
+    ) {
         val feature = AiMixerViewModel.previewFeature(state, meters)
         val scene = ImageComposeScene(w * 2, h * 2, Density(2f)) {
-            OrpheusTheme { content(feature) }
+            CompositionLocalProvider(LocalCanvasScale provides scale) {
+                OrpheusTheme { content(feature) }
+            }
         }
         try {
             val touch = Touch(scene)
@@ -250,6 +267,14 @@ class AiMixerRenderHarness {
     }
 
     @Test fun tablet() = render("tablet", 834, 1194)
+
+    // The Fold's canvas beside the 440dp chat, and the Fold's whole canvas with the chat collapsed.
+    @Test fun foldBesideChat() = render("fold_beside_chat_840x1100", 840, 1100, scale = FOLD_SCALE)
+
+    @Test fun foldFull() = render("fold_full_1280x1153", 1280, 1153, scale = FOLD_SCALE)
+
+    // The changes popover open from the header.
+    @Test fun foldChanges() = render("fold_changes_840x1100", 840, 1100, scale = FOLD_SCALE) { tap(CHANGES_TAG) }
 
     @Test fun desktop() = render("desktop", 1280, 800)
 

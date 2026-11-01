@@ -67,4 +67,27 @@ class VibeGuideMixingTest {
         assertTrue(Regex("""\bpan \(-1\.\.1; the track glides""").containsMatchIn(TRACK_OVERRIDES_NOTE), "note lost pan")
         assertTrue(Regex("""\bmorph,""").containsMatchIn(TRACK_OVERRIDES_NOTE), "note lost morph")
     }
+
+    private val handover = guide.substringAfter("6. Hand the mix over:").substringBefore("### Gotchas")
+
+    @Test
+    fun `guide says to mix only with the Mixer open`() {
+        listOf("only while that line says open", "MIXER_CLOSED", "Open Mixer", "mix_reset", "section_jump").forEach {
+            assertTrue(Regex(it.split(" ").joinToString("""\s+""") { w -> Regex.escape(w) }).containsMatchIn(handover), "hand-over lost \"$it\"")
+        }
+        assertTrue(Regex("""when the mix tools are\s+available""", RegexOption.IGNORE_CASE).containsMatchIn(handover), "hand-over is not conditional")
+    }
+
+    @Test
+    fun `guide mentions pins and skips and the wipe confirmation`() {
+        listOf("PINNED", "USER_MOVED", "WIPE_UNCONFIRMED", "Clear and apply", "Keep my mix", "never ask them to keep their hands off")
+            .forEach { assertTrue(Regex(it.split(" ").joinToString("""\s+""") { w -> Regex.escape(w) }).containsMatchIn(handover), "hand-over lost \"$it\"") }
+    }
+
+    @Test
+    fun `guide no longer says tell me when you are back`() {
+        listOf("Mixer tab", "when they are back", "tell you when", "when the user says they are back").forEach {
+            assertTrue(!guide.contains(it, ignoreCase = true), "the guide still says \"$it\"")
+        }
+    }
 }

@@ -33,10 +33,10 @@ class PromptPasteTest {
 
     @Test fun promptNamesThePasteId() {
         val p = agentPrompt("dubby please", SongPasteRef("paste-2", 120, "Kettle Morning"))
-        assertTrue(p.startsWith("Make a Pulsar vibe: dubby please"))
+        assertTrue(p.startsWith("dubby please\n\nThe user attached a song reference"), p)
         assertTrue("pasteId=\"paste-2\"" in p)
         assertTrue("song_reference" in p)
-        assertEquals("Make a Pulsar vibe: dubby please", agentPrompt("dubby please", null))
+        assertEquals("dubby please", agentPrompt("dubby please", null))
         assertTrue(agentPrompt("", SongPasteRef("paste-1", 3, null)).startsWith("Make a Pulsar vibe inspired by the attached song reference"))
     }
 
@@ -100,6 +100,13 @@ class PromptPasteTest {
 
     @Test fun enterInTheMiddleSubmitsAndDropsTheNewline() =
         assertEquals(DraftEdit.Text("ab", true), classifyDraftEdit("ab", "a\nb"))
+
+    // Lines the user added with Shift+Enter stay when Enter submits or a short paste joins.
+    @Test fun enterKeepsEarlierLines() =
+        assertEquals(DraftEdit.Text("one\ntwo", true), classifyDraftEdit("one\ntwo", "one\ntwo\n"))
+
+    @Test fun shortPasteJoinsOnlyItself() =
+        assertEquals(DraftEdit.Text("one\nab cd", false), classifyDraftEdit("one\n", "one\nab\ncd"))
 
     @Test fun shortTrailingNewlinePasteWithMoreNewlinesJoins() =
         assertEquals(DraftEdit.Text("x a b ", false), classifyDraftEdit("x ", "x a\nb\n"))

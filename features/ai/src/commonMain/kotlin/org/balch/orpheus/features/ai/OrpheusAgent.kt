@@ -26,6 +26,7 @@ import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.params.LLMParams
+import ai.koog.serialization.kotlinx.toKotlinxJsonObject
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -78,6 +79,9 @@ private const val ANTHROPIC_THINKING_BUDGET = 4096   // ≥1024, counts toward m
 // be greater than thinking.budget_tokens"). Always set it explicitly. Thinking (budgeted OR
 // adaptive) counts toward max_tokens, so leave generous room for the visible reply too.
 private const val ANTHROPIC_MAX_TOKENS = 16_000
+
+/** How much of a tool call's arguments [AgentActivityEvent.ToolStarted] carries; a feed needs the first few fields. */
+private const val MAX_TOOL_ARGS_CHARS = 4_096
 
 /**
  * Anthropic thinking config, shaped per model generation.
@@ -387,7 +391,9 @@ class OrpheusAgent(
                 onAgentCompleted { _ -> logger.d { "Agent completed" } }
                 onToolCallStarting { context ->
                     logger.d { "Tool call starting: ${context.toolName}" }
-                    agentActivityEventBus.emitToolStarted(context.toolName)
+                    // The arguments let a feed summarise the call; Orpheus ignores them. A vibe's JSON is cut short.
+                    val args = runCatching { context.toolArgs.toKotlinxJsonObject().toString().take(MAX_TOOL_ARGS_CHARS) }.getOrNull()
+                    agentActivityEventBus.emitToolStarted(context.toolName, args)
                 }
                 onToolCallCompleted { context ->
                     logger.d { "Tool call completed: ${context.toolName}" }

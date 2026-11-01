@@ -1,16 +1,24 @@
 package org.balch.orpheus.djapp.ai.tools
 
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
+import org.balch.orpheus.djapp.ai.collab.CollabEvents
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.DjVibeApplyGuard
+import org.balch.orpheus.djapp.ai.collab.MixCollab
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarPanelActions
 import org.balch.orpheus.features.pulsar.PulsarUiState
+import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.Macro
+import org.balch.orpheus.features.pulsar.bench.MixCaptureService
+import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -76,4 +84,29 @@ internal class OneDispatcher(d: CoroutineDispatcher) : DispatcherProvider {
     override val io = d
     override val default = d
     override val unconfined = d
+}
+
+/** Counts captures; [fail] makes each one throw, which must never block the wipe it precedes. */
+internal class CountingCapture(var fail: Boolean = false) : MixCaptureService {
+    var calls = 0
+        private set
+
+    override suspend fun capture(): CaptureOutcome {
+        calls++
+        if (fail) error("disk full")
+        return CaptureOutcome(true, "ok", "/tmp/capture.json", emptyList(), null, aiVibe = false, appliedToAiVibe = false)
+    }
+}
+
+/** The collaboration layer as the app wires it over [controller], with the Mixer on screen. */
+internal class CollabRig(
+    pulsar: PulsarFeature,
+    controller: () -> MixBenchController,
+    scope: CoroutineScope,
+    val capture: CountingCapture = CountingCapture(),
+) {
+    val collab = MixCollab().apply { setMixerVisible(true) }
+    val events = CollabEvents()
+    val mixer = CollabMixer(controller, { pulsar }, collab, scope)
+    val guard = DjVibeApplyGuard(collab, mixer, events, capture)
 }

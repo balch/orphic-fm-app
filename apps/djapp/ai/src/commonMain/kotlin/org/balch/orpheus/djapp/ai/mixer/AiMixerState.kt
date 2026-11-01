@@ -66,8 +66,22 @@ data class AiMixerUiState(
     val capture: MixerCapture? = null,
     val capturing: Boolean = false,
     val notice: String? = null,
+    /** Tracks the user pinned; the agent may not change them. */
+    val pins: Set<Int> = emptySet(),
+    /** Tracks the agent changed this turn. */
+    val agentTouched: Set<Int> = emptySet(),
 ) {
     val sectionScope: Boolean get() = scope == Scope.SECTION && sectionScopeAvailable && section >= 0
+
+    /** One per captured row, so one per "+" line of [changeLines]. */
+    val changeCount: Int get() = changes.size
+}
+
+/** The header's changes button text. */
+fun changesLabel(count: Int): String = when (count) {
+    0 -> "No changes"
+    1 -> "1 change"
+    else -> "$count changes"
 }
 
 /** The bench page's state view, for the panel. [knobs] are the app's macro knobs. */

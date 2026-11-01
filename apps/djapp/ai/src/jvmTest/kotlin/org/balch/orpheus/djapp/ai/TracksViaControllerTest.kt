@@ -40,6 +40,11 @@ import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.preferences.AppPreferences
 import org.balch.orpheus.core.preferences.BaseAppPreferencesRepository
+import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.collab.EditOrigin
+import org.balch.orpheus.djapp.ai.collab.MixCollab
+import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.djapp.ai.collab.MixMove
 import org.balch.orpheus.djapp.ai.tools.FakePulsar
 import org.balch.orpheus.djapp.ai.tools.OneDispatcher
 import org.balch.orpheus.djapp.ai.tools.vibe
@@ -109,9 +114,12 @@ class TracksViaControllerTest {
             playbackMode = PulsarPlaybackMode.EXPLICIT,
             dispatcherProvider = dispatchers,
             scope = scope,
-            trackGainSink = MixBenchTrackGainSink({ c }, pulsar, scope),
+            trackGainSink = MixBenchTrackGainSink(collabMixer(c, backgroundScope), { c }, pulsar, scope),
         ).also { vm -> backgroundScope.launch { vm.stateFlow.collect {} } }
     }
+
+    private fun collabMixer(c: MixBenchController, scope: CoroutineScope, resolve: () -> MixBenchController = { c }) =
+        CollabMixer(resolve, { pulsar }, MixCollab(), scope)
 
     private fun db(gain: Float) = 20f * log10(gain)
 
@@ -138,7 +146,8 @@ class TracksViaControllerTest {
     fun constructionNeverResolvesTheController() = runTest(testDispatcher) {
         val c = controller()
         var resolved = 0
-        val sink = MixBenchTrackGainSink({ resolved++; c }, pulsar, backgroundScope)
+        val provider = { resolved++; c }
+        val sink = MixBenchTrackGainSink(collabMixer(c, backgroundScope, provider), provider, pulsar, backgroundScope)
         // MixerViewModel builds under Metro's lock, so the AppScope controller waits for a coroutine.
         assertEquals(0, resolved)
         sink.toggleMute(0)
@@ -155,7 +164,7 @@ class TracksViaControllerTest {
         // FeatureCoroutineScope is a SupervisorJob, so a dead consumer would drop later taps silently.
         val scope = CoroutineScope(SupervisorJob() + testDispatcher + CoroutineExceptionHandler { _, e -> failures += e })
         try {
-            val sink = MixBenchTrackGainSink({ c }, pulsar, scope)
+            val sink = MixBenchTrackGainSink(collabMixer(c, scope), { c }, pulsar, scope)
             sink.toggleMute(TrackTuning.TRACK_COUNT)
             sink.toggleMute(0)
             runCurrent()
@@ -175,7 +184,7 @@ class TracksViaControllerTest {
         }
         val scope = FeatureCoroutineScope()
         try {
-            val sink = AiTrackGainSink({ c }, pulsar, scope, dispatchers)
+            val sink = AiTrackGainSink(collabMixer(c, scope), { c }, pulsar, scope, dispatchers)
             // The app's exit blocks Main on the controller's stop, so an edit bound to Main could stall it.
             sink.setLevel(1, 0.5f)
             // Coroutine debug mode appends " @coroutine#N" to the thread name.
@@ -307,5 +316,23 @@ class TracksViaControllerTest {
         pulsar.section(2)
         runCurrent()
         assertEquals(emptyList(), gainWrites.toList())
+    }
+
+    @Test
+    fun tracksResetIsARecordedUserMove() = runTest(testDispatcher) {
+        val c = controller()
+        val collab = MixCollab()
+        val moves = mutableListOf<MixMove>()
+        backgroundScope.launch { collab.moves.collect { moves += it } }
+        val sink = MixBenchTrackGainSink(CollabMixer({ c }, { pulsar }, collab, backgroundScope), { c }, pulsar, backgroundScope)
+        sink.setLevel(2, 0.5f)
+        runCurrent()
+        sink.reset()
+        runCurrent()
+        assertEquals(0f, c.layers.value.vibe.levelDb[2])
+        val move = moves.last()
+        assertEquals(EditOrigin.USER, move.origin)
+        assertEquals(MixControl.ResetToFile, move.control)
+        assertEquals("edited" to "file", move.before to move.after)
     }
 }

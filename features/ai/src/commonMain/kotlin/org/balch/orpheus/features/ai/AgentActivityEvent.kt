@@ -10,7 +10,8 @@ import org.balch.orpheus.core.di.FeatureScope
 
 /** A live agent activity event for the VIBE panel feed. */
 sealed interface AgentActivityEvent {
-    data class ToolStarted(val tool: String) : AgentActivityEvent
+    /** [args] is the call's arguments as JSON, when known. */
+    data class ToolStarted(val tool: String, val args: String? = null) : AgentActivityEvent
     data class ToolCompleted(val tool: String) : AgentActivityEvent
     data class Assistant(val text: String) : AgentActivityEvent
     data class Reasoning(val text: String) : AgentActivityEvent
@@ -29,7 +30,7 @@ class AgentActivityEventBus {
     private val _events = MutableSharedFlow<AgentActivityEvent>(replay = 0, extraBufferCapacity = 64)
     val events: SharedFlow<AgentActivityEvent> = _events.asSharedFlow()
 
-    fun emitToolStarted(tool: String) { _events.tryEmit(AgentActivityEvent.ToolStarted(tool)) }
+    fun emitToolStarted(tool: String, args: String? = null) { _events.tryEmit(AgentActivityEvent.ToolStarted(tool, args)) }
     fun emitToolCompleted(tool: String) { _events.tryEmit(AgentActivityEvent.ToolCompleted(tool)) }
     fun emitAssistant(text: String) { _events.tryEmit(AgentActivityEvent.Assistant(text)) }
     fun emitReasoning(text: String) { _events.tryEmit(AgentActivityEvent.Reasoning(text)) }
