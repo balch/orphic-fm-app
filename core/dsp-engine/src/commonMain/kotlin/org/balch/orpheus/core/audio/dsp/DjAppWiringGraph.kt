@@ -45,6 +45,11 @@ fun buildDjAppWiringGraph(): ByteArray = wiringGraph {
     val pulsarDelayUnit = pulsarDelay("pulsarDelay")
     val pulsarReverbUnit = pulsarReverb("pulsarReverb")
 
+    // Cowbell ignores its inputs; Pulsar -> inputB only orders it after Pulsar so GRID sees this
+    // block's export. At most one per graph (engine-wide state).
+    val cowbellUnit = cowbell("cowbell")
+    pulsarUnit.out to cowbellUnit.inputB
+
     // ── Sum all sources into pre-limiter bus (ADD accumulates, then scale) ──
     // Left bus: horn L + turntable + delay L + reverb L + pulsarDelay L + pulsarReverb L
     val busL = add("busL")
@@ -64,15 +69,19 @@ fun buildDjAppWiringGraph(): ByteArray = wiringGraph {
     pulsarDelayUnit.outRight to busR.inputA
     pulsarReverbUnit.outRight to busR.inputA
 
-    // Attenuate summed bus to prevent clipping (6 sources → -8dB ≈ 0.4)
-    val busAttenL = multiply("busAttenL") { inputB = 0.4f }
-    val busAttenR = multiply("busAttenR") { inputB = 0.4f }
+    // Attenuate summed bus to prevent clipping (6 sources, gain kept at 0.4)
+    // duckSource 4 = DUCK_COWBELL: the cowbell's MORE ducks the vibe here, ahead of the cowbell's own join.
+    val busAttenL = multiply("busAttenL") { inputB = 0.4f; duckSource = 4f }
+    val busAttenR = multiply("busAttenR") { inputB = 0.4f; duckSource = 4f }
     busL.out to busAttenL.inputA
     busR.out to busAttenR.inputA
 
     // ── Attenuated bus → Limiter → Master ──
     busAttenL.out to driveL.input
     busAttenR.out to driveR.input
+    // The cowbell skips the bus attenuation so it reaches the limiter at unity, as in Orpheus.
+    cowbellUnit.out to driveL.input
+    cowbellUnit.outRight to driveR.input
     driveL.out to master.inputA
     driveR.out to master.inputB
 

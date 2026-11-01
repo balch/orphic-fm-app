@@ -1,0 +1,256 @@
+diff --git a/rings/dsp/dsp.cc b/rings/dsp/dsp.cc
+new file mode 100644
+index 0000000..989294e
+--- /dev/null
++++ b/rings/dsp/dsp.cc
+@@ -0,0 +1,39 @@
++// Copyright 2015 Emilie Gillet.
++//
++// Author: Emilie Gillet (emilie.o.gillet@gmail.com)
++//
++// Permission is hereby granted, free of charge, to any person obtaining a copy
++// of this software and associated documentation files (the "Software"), to deal
++// in the Software without restriction, including without limitation the rights
++// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++// copies of the Software, and to permit persons to whom the Software is
++// furnished to do so, subject to the following conditions:
++// 
++// The above copyright notice and this permission notice shall be included in
++// all copies or substantial portions of the Software.
++// 
++// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++// THE SOFTWARE.
++// 
++// See http://creativecommons.org/licenses/MIT/ for more information.
++//
++// -----------------------------------------------------------------------------
++//
++// Runtime sample rate (Orpheus patch).
++
++#include "rings/dsp/dsp.h"
++
++namespace rings {
++
++static float sample_rate_ = 48000.0f;
++
++void SetSampleRate(float sample_rate) { sample_rate_ = sample_rate; }
++
++float SampleRate() { return sample_rate_; }
++
++}  // namespace rings
+diff --git a/rings/dsp/dsp.h b/rings/dsp/dsp.h
+index 822e533..68db1d8 100644
+--- a/rings/dsp/dsp.h
++++ b/rings/dsp/dsp.h
+@@ -36,8 +36,10 @@
+ 
+ namespace rings {
+   
+-static const float kSampleRate = 48000.0f;
+-const float a3 = 440.0f / kSampleRate;
++// Process-wide sample rate (default 48 kHz). Call SetSampleRate() before Part::Init.
++void SetSampleRate(float sample_rate);
++float SampleRate();
++inline float A3() { return 440.0f / SampleRate(); }
+ const size_t kMaxBlockSize = 24;
+ 
+ }  // namespace rings
+diff --git a/rings/dsp/fm_voice.cc b/rings/dsp/fm_voice.cc
+index 99ec483..94214fc 100644
+--- a/rings/dsp/fm_voice.cc
++++ b/rings/dsp/fm_voice.cc
+@@ -41,7 +41,7 @@ namespace rings {
+ using namespace stmlib;
+ 
+ void FMVoice::Init() {
+-  set_frequency(220.0f / kSampleRate);
++  set_frequency(220.0f / SampleRate());
+   set_ratio(0.5f);
+   set_brightness(0.5f);
+   set_damping(0.5f);
+@@ -63,19 +63,19 @@ void FMVoice::Init() {
+   fm_amount_ = 0.0f;
+   
+   follower_.Init(
+-      8.0f / kSampleRate,
+-      160.0f / kSampleRate,
+-      1600.0f / kSampleRate);
++      8.0f / SampleRate(),
++      160.0f / SampleRate(),
++      1600.0f / SampleRate());
+ }
+ 
+ void FMVoice::Process(const float* in, float* out, float* aux, size_t size) {
+   // Interpolate between the "oscillator" behaviour and the "FMLPGed thing"
+   // behaviour.
+   float envelope_amount = damping_ < 0.9f ? 1.0f : (1.0f - damping_) * 10.0f;
+-  float amplitude_rt60 = 0.1f * SemitonesToRatio(damping_ * 96.0f) * kSampleRate;
++  float amplitude_rt60 = 0.1f * SemitonesToRatio(damping_ * 96.0f) * SampleRate();
+   float amplitude_decay = 1.0f - powf(0.001f, 1.0f / amplitude_rt60);
+ 
+-  float brightness_rt60 = 0.1f * SemitonesToRatio(damping_ * 84.0f) * kSampleRate;
++  float brightness_rt60 = 0.1f * SemitonesToRatio(damping_ * 84.0f) * SampleRate();
+   float brightness_decay = 1.0f - powf(0.001f, 1.0f / brightness_rt60);
+   
+   float ratio = Interpolate(lut_fm_frequency_quantizer, ratio_, 128.0f);
+diff --git a/rings/dsp/part.cc b/rings/dsp/part.cc
+index 60b1c4d..5bb66bb 100644
+--- a/rings/dsp/part.cc
++++ b/rings/dsp/part.cc
+@@ -50,14 +50,14 @@ void Part::Init(uint16_t* reverb_buffer) {
+   for (int32_t i = 0; i < kMaxPolyphony; ++i) {
+     excitation_filter_[i].Init();
+     plucker_[i].Init();
+-    dc_blocker_[i].Init(1.0f - 10.0f / kSampleRate);
++    dc_blocker_[i].Init(1.0f - 10.0f / SampleRate());
+   }
+   
+   reverb_.Init(reverb_buffer);
+   limiter_.Init();
+ 
+   note_filter_.Init(
+-      kSampleRate / kMaxBlockSize,
++      SampleRate() / kMaxBlockSize,
+       0.001f,  // Lag time with a sharp edge on the V/Oct input or trigger.
+       0.010f,  // Lag time after the trigger has been received.
+       0.050f,  // Time to transition from reactive to filtered.
+@@ -93,7 +93,7 @@ void Part::ConfigureResonators() {
+               model_ == RESONATOR_MODEL_STRING_AND_REVERB;
+           string_[i].Init(has_dispersion);
+ 
+-          float f_lfo = float(kMaxBlockSize) / float(kSampleRate);
++          float f_lfo = float(kMaxBlockSize) / float(SampleRate());
+           f_lfo *= lfo_frequencies[i];
+           lfo_[i].Init<COSINE_OSCILLATOR_APPROXIMATE>(f_lfo);
+         }
+@@ -371,7 +371,7 @@ void Part::RenderStringVoice(
+         frequencies,
+         num_strings);
+     for (int32_t i = 0; i < num_strings; ++i) {
+-      frequencies[i] = SemitonesToRatio(frequencies[i] - 69.0f) * a3;
++      frequencies[i] = SemitonesToRatio(frequencies[i] - 69.0f) * A3();
+     }
+   } else {
+     frequencies[0] = frequency;
+@@ -500,13 +500,13 @@ void Part::Process(
+     // filter.
+     float cutoff = patch.brightness * (2.0f - patch.brightness);
+     float note = note_[voice] + performance_state.tonic + performance_state.fm;
+-    float frequency = SemitonesToRatio(note - 69.0f) * a3;
++    float frequency = SemitonesToRatio(note - 69.0f) * A3();
+     float filter_cutoff_range = performance_state.internal_exciter
+       ? frequency * SemitonesToRatio((cutoff - 0.5f) * 96.0f)
+       : 0.4f * SemitonesToRatio((cutoff - 1.0f) * 108.0f);
+     float filter_cutoff = min(voice == active_voice_
+       ? filter_cutoff_range
+-      : (10.0f / kSampleRate), 0.499f);
++      : (10.0f / SampleRate()), 0.499f);
+     float filter_q = performance_state.internal_exciter ? 1.5f : 0.8f;
+ 
+     // Process input with excitation filter. Inactive voices receive silence.
+diff --git a/rings/dsp/resonator.cc b/rings/dsp/resonator.cc
+index c01f375..7915374 100644
+--- a/rings/dsp/resonator.cc
++++ b/rings/dsp/resonator.cc
+@@ -44,7 +44,7 @@ void Resonator::Init() {
+     f_[i].Init();
+   }
+ 
+-  set_frequency(220.0f / kSampleRate);
++  set_frequency(220.0f / SampleRate());
+   set_structure(0.25f);
+   set_brightness(0.5f);
+   set_damping(0.3f);
+diff --git a/rings/dsp/string.cc b/rings/dsp/string.cc
+index 662b1e6..d7734fb 100644
+--- a/rings/dsp/string.cc
++++ b/rings/dsp/string.cc
+@@ -50,7 +50,7 @@ void String::Init(bool enable_dispersion) {
+   fir_damping_filter_.Init();
+   iir_damping_filter_.Init();
+   
+-  set_frequency(220.0f / kSampleRate);
++  set_frequency(220.0f / SampleRate());
+   set_dispersion(0.25f);
+   set_brightness(0.5f);
+   set_damping(0.3f);
+@@ -66,7 +66,7 @@ void String::Init(bool enable_dispersion) {
+   out_sample_[0] = out_sample_[1] = 0.0f;
+   aux_sample_[0] = aux_sample_[1] = 0.0f;
+   
+-  dc_blocker_.Init(1.0f - 20.0f / kSampleRate);
++  dc_blocker_.Init(1.0f - 20.0f / SampleRate());
+ }
+ 
+ template<bool enable_dispersion>
+@@ -101,7 +101,7 @@ void String::ProcessInternal(
+   
+   // For damping/absorption, the interpolation is done in the filter code.
+   float lf_damping = damping_ * (2.0f - damping_);
+-  float rt60 = 0.07f * SemitonesToRatio(lf_damping * 96.0f) * kSampleRate;
++  float rt60 = 0.07f * SemitonesToRatio(lf_damping * 96.0f) * SampleRate();
+   float rt60_base_2_12 = max(-120.0f * delay / src_ratio / rt60, -127.0f);
+   float damping_coefficient = SemitonesToRatio(rt60_base_2_12);
+   float brightness = brightness_ * brightness_;
+diff --git a/rings/dsp/string_synth_part.cc b/rings/dsp/string_synth_part.cc
+index 8bcb83a..4985b2a 100644
+--- a/rings/dsp/string_synth_part.cc
++++ b/rings/dsp/string_synth_part.cc
+@@ -62,7 +62,7 @@ void StringSynthPart::Init(uint16_t* reverb_buffer) {
+   ensemble_.Init(reverb_buffer);
+   
+   note_filter_.Init(
+-      kSampleRate / kMaxBlockSize,
++      SampleRate() / kMaxBlockSize,
+       0.001f,  // Lag time with a sharp edge on the V/Oct input or trigger.
+       0.005f,  // Lag time after the trigger has been received.
+       0.050f,  // Time to transition from reactive to filtered.
+@@ -239,7 +239,7 @@ void StringSynthPart::ProcessEnvelopes(
+   }
+   
+   // Convert the arbitrary values to actual units.
+-  float period = kSampleRate / kMaxBlockSize;
++  float period = SampleRate() / kMaxBlockSize;
+   float attack_time = SemitonesToRatio(attack * 96.0f) * 0.005f * period;
+   // float decay_time = SemitonesToRatio(decay * 96.0f) * 0.125f * period;
+   float decay_time = SemitonesToRatio(decay * 84.0f) * 0.180f * period;
+@@ -286,7 +286,7 @@ void StringSynthPart::ProcessFormantFilter(
+     float b = formants[vowel_integral + 1][i];
+     float f = a + (b - a) * vowel_fractional;
+     f *= shift;
+-    formant_filter_[i].set_f_q<FREQUENCY_DIRTY>(f / kSampleRate, resonance);
++    formant_filter_[i].set_f_q<FREQUENCY_DIRTY>(f / SampleRate(), resonance);
+     formant_filter_[i].Process<FILTER_MODE_BAND_PASS>(
+         filter_in_buffer_,
+         filter_out_buffer_,
+@@ -376,7 +376,7 @@ void StringSynthPart::Process(
+         amplitudes[2 * (num_harmonics - 1) + 1] += amplitudes[2 * i + 1];
+       }
+ 
+-      float frequency = SemitonesToRatio(note - 69.0f) * a3;
++      float frequency = SemitonesToRatio(note - 69.0f) * A3();
+       voice_[group * chord_size + chord_note].Render(
+           frequency,
+           amplitudes,
+diff --git a/rings/dsp/strummer.h b/rings/dsp/strummer.h
+index 2de3f9a..1c9b971 100644
+--- a/rings/dsp/strummer.h
++++ b/rings/dsp/strummer.h
+@@ -43,9 +43,9 @@ class Strummer {
+   
+   void Init(float ioi, float sr) {
+     onset_detector_.Init(
+-        8.0f / kSampleRate,
+-        160.0f / kSampleRate,
+-        1600.0f / kSampleRate,
++        8.0f / SampleRate(),
++        160.0f / SampleRate(),
++        1600.0f / SampleRate(),
+         sr,
+         ioi);
+     inhibit_timer_ = static_cast<int32_t>(ioi * sr);

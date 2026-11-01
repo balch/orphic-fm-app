@@ -27,6 +27,14 @@ git clone https://github.com/pichenettes/eurorack.git
 
 The CMake build expects `eurorack/` at `../../../eurorack` relative to `liborpheus_dsp/`, or set `EURORACK_DIR` explicitly.
 
+The Rings resonator sources are built from a patched copy, never from `eurorack/` itself.
+`liborpheus_dsp/patches/rings-runtime-sample-rate.patch` turns `kSampleRate` and `a3` into a runtime
+value (`rings::SetSampleRate`). `cmake/patched_rings.cmake` copies `rings/dsp` and `rings/resources.*`
+into `<build-dir>/patched_rings/` and applies the patch there; configure fails naming the patch if it
+no longer applies. To regenerate it, copy `eurorack/rings/dsp` to `a/rings/dsp` and `b/rings/dsp` in a
+scratch dir, edit `b`, then run `git diff --no-index a b` and fix the paths to `a/rings/...` and
+`b/rings/...`. Do not apply it to the eurorack checkout.
+
 ### Emscripten (WASM only)
 
 ```bash

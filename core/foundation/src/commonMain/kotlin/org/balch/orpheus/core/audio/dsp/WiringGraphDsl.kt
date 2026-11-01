@@ -40,6 +40,7 @@ const val UNIT_TIDES = 34
 const val UNIT_PULSAR = 35
 const val UNIT_PULSAR_DELAY = 36
 const val UNIT_PULSAR_REVERB = 37
+const val UNIT_COWBELL = 38
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ const val PARAM_INPUT_A = 10
 const val PARAM_INPUT_B = 11
 const val PARAM_INPUT_C = 12
 const val PARAM_MODULE_INDEX = 13
-const val PARAM_DUCK_SOURCE = 14   // DuckSource enum: 0=none, 1=synth, 2=drums, 3=bass
+const val PARAM_DUCK_SOURCE = 14   // DuckSource enum: 0=none, 1=synth, 2=drums, 3=bass, 4=cowbell (MORE's duck)
 
 // ── DSL types ───────────────────────────────────────────────────────────────
 
@@ -360,6 +361,9 @@ class WiringGraphBuilder {
 
     fun pulsarReverb(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_PULSAR_REVERB, name, init)
+
+    fun cowbell(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_COWBELL, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

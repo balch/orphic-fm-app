@@ -53,6 +53,20 @@ void unit_process_tides(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_pulsar_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
 void unit_process_pulsar_reverb(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
+void unit_process_cowbell(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
+// Lock-free from any thread: fills an empty strike slot, or replaces the quietest when all 8 are full.
+void cowbell_push_strike(OrpheusEngine* engine, uint32_t packed);
+// The same, reporting how it ended; on a replace, *overwritten is the word it replaced.
+enum CowbellPushResult { COWBELL_PUSH_PLACED, COWBELL_PUSH_REPLACED, COWBELL_PUSH_DROPPED };
+CowbellPushResult cowbell_push_strike_result(OrpheusEngine* engine, uint32_t packed, uint32_t* overwritten);
+// The root-relative scale-degree offset nearest `semitones`, never above `max_semitones`.
+struct PulsarScale;
+float snap_to_scale(float semitones, const PulsarScale& scale, float max_semitones);
+// Audio thread, in the graph's duck pass: ramps a DUCK_COWBELL unit's outputs by the gain the
+// bell keyed from its own output (MORE). Unity, and untouched, while MORE is 0.
+void cowbell_apply_duck(GraphUnit* u, OrpheusEngine* engine, int num_frames);
+// Audio thread, on a graph swap: drops strikes queued while no cowbell unit was running.
+void cowbell_on_graph_swap(OrpheusEngine* engine, uint32_t graph_generation);
 
 // Render a Braids voice into out_buffer.
 // `osc` is the per-voice/per-track MacroOscillator instance (caller owns it).

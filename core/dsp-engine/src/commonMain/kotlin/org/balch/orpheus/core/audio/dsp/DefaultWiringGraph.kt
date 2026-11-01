@@ -386,6 +386,13 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     drumDirectResoDryGainR.out to drumDirectResoSumR.inputA
     drumDirectResoWetGainR.out to drumDirectResoSumR.inputB
 
+    // Cowbell joins the drum sum. Its inputs are ignored; Pulsar -> inputB only orders it after
+    // Pulsar so the unit sees this block's GRID export. At most one per graph (engine-wide state).
+    val cowbellUnit = cowbell("cowbell")
+    pulsarUnit.out to cowbellUnit.inputB
+    cowbellUnit.out to drumDirectResoSumL.inputA
+    cowbellUnit.outRight to drumDirectResoSumR.inputA
+
     // Limiter (drive=1.0)
     val drumDirectLimiterL = limiter("drumDirectLimiterL") { driveAmount = 1.0f; duckSource = 2f } // DUCK_DRUMS
     val drumDirectLimiterR = limiter("drumDirectLimiterR") { driveAmount = 1.0f; duckSource = 2f } // DUCK_DRUMS

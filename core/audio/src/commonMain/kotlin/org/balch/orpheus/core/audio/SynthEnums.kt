@@ -17,7 +17,7 @@ enum class WarpsSource(val displayName: String) {
     DRUMS("Drums"),       // 1
     REPL("REPL"),         // 2
     LFO("LFO"),           // 3
-    RESONATOR("Cowbell"), // 4
+    RESONATOR("Rezo"), // 4
     WARPS("Feedback"),    // 5
     FLUX("Warbles"),      // 6
     BENDER("Bender"),     // 7

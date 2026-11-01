@@ -1,5 +1,9 @@
 #include "orpheus_engine.h"
 #include "orpheus_graph.h"
+#include "orpheus_units.h"
+#include "cowbell_macros.h"
+#include "kotlin_engine_ordinal.h"
+#include "orpheus_float_checks.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -49,10 +53,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
     if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.patch") == 0) {
         int cell[4];
         if (parse_patch_symbol(symbol, cell)) {
-            // NaN/inf would poison the sums. Checked on the bits: -ffast-math folds std::isfinite.
-            uint32_t bits;
-            std::memcpy(&bits, &value, sizeof(bits));
-            float amount = ((bits >> 23) & 0xFFu) != 0xFFu ? value : 0.0f;
+            // NaN/inf would poison the sums.
+            float amount = orpheus_is_finite(value) ? value : 0.0f;
             engine->patch_amount[cell[0]][cell[1]][cell[2]][cell[3]].store(amount, std::memory_order_relaxed);
         }
         return;
@@ -320,6 +322,51 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->rings_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.cowbell") == 0) {
+        // Non-finite values are dropped, so the atomics stay finite (strike's decoder checks its
+        // own). `mode` and `fill` are Kotlin-only.
+        auto clamp = [](float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); };
+        if (std::strcmp(symbol, "strike") == 0) {
+            const uint32_t packed = cowbell_strike_from_port(value);
+            if (packed) cowbell_push_strike(engine, packed);
+        }
+        else if (!orpheus_is_finite(value)) {
+            // dropped
+        }
+        else if (std::strcmp(symbol, "gate") == 0)
+            engine->cowbell_gate.store(value > 0.5f, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "grid") == 0)
+            engine->cowbell_grid.store(value > 0.5f, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bend_scale") == 0)
+            engine->cowbell_bend_scale.store(value > 0.5f, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "live") == 0)
+            engine->cowbell_live.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "level") == 0)
+            engine->cowbell_level.store(clamp(value, 0.0f, 1.0f), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "more") == 0)
+            engine->cowbell_more.store(clamp(value, 0.0f, 1.0f), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "metal") == 0)
+            engine->cowbell_metal.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "ring") == 0)
+            engine->cowbell_ring.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "intensity") == 0)
+            engine->cowbell_intensity.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "structure_offset") == 0)
+            engine->cowbell_structure_offset.store(clamp(value, -0.4f, 0.4f), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "position_offset") == 0)
+            engine->cowbell_position_offset.store(clamp(value, -0.45f, 0.45f), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bend") == 0)
+            engine->cowbell_bend.store(clamp(value, -1.0f, 1.0f), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "grid_strength") == 0)
+            engine->cowbell_grid_strength.store(clamp(value, 0.0f, 1.0f), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "engine") == 0) {
+            if (value >= -1.0f && value <= 24.0f)
+                engine->cowbell_engine.store(static_cast<int>(std::lround(value)), std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "octave") == 0)
+            engine->cowbell_octave.store(static_cast<int>(std::lround(clamp(value, -2.0f, 2.0f))),
+                                         std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.warps") == 0) {
         if (std::strcmp(symbol, "algorithm") == 0)
             engine->warps_algorithm.store(value, std::memory_order_relaxed);
@@ -471,31 +518,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             } else if (std::strcmp(sym, "p5") == 0) {
                 vp.lpg_colour.store(value, std::memory_order_relaxed);
             } else if (std::strcmp(sym, "engine") == 0) {
-                // Map Kotlin PlaitsEngineId ordinal to C++ Plaits engine index
-                // Kotlin: 0=BD, 1=SD, 2=HH, 3=FMDrum, 4=FM, 5=Noise, 6=Waveshaping,
-                //         7=VA, 8=Additive, 9=Grain, 10=String, 11=Modal, 12=Particle,
-                //         13=Swarm, 14=Chord, 15=Wavetable, 16=Speech,
-                //         17=VA_VCF, 18=PhaseDistortion, 19=SixOpFM, 20=WaveTerrain,
-                //         21=StringMachine, 22=Chiptune,
-                //         23=SixOpFM_2 (bank 2), 24=SixOpFM_3 (bank 3)
-                // C++: see kOrpheusOutGain[] in orpheus_voice.h for index meanings
-                static const int kKotlinToEngine[] = {
-                    21, 22, 23, 10, // BD, SD, HH, FMDrum→FM(10) (no C++ FmDrum; Kotlin has custom impl)
-                    10, 17,  9,  8, // FM, Noise, Waveshaping, VA
-                    12, 11, 19, 20, // Additive, Grain, String, Modal
-                    18, 16, 14, 13, // Particle, Swarm, Chord, Wavetable
-                    15,             // Speech
-                    // V1.2 engines (ordinals 17-22)
-                     0,  1,  2,  5, // VA_VCF, PhaseDistortion, SixOpFM, WaveTerrain
-                     6,  7,         // StringMachine, Chiptune
-                    // SixOp additional banks (ordinals 23-24)
-                     3,  4          // SixOpFM_2 (bank 2), SixOpFM_3 (bank 3)
-                };
-                int ordinal = static_cast<int>(value);
-                if (ordinal >= 0 && ordinal < static_cast<int>(sizeof(kKotlinToEngine)/sizeof(kKotlinToEngine[0]))) {
+                // Kotlin PlaitsEngineId ordinal to C++ Plaits engine index.
+                const int want_engine = kotlin_engine_ordinal_to_plaits(static_cast<int>(value));
+                if (want_engine >= 0) {
                     // Boot sync re-sends this port at its current value, so flag a
                     // retrigger only on a real change.
-                    const int want_engine = kKotlinToEngine[ordinal];
                     if (vp.engine_index.exchange(want_engine, std::memory_order_relaxed) != want_engine)
                         vp.engine_changed.store(1, std::memory_order_relaxed);
                 }

@@ -154,6 +154,10 @@ set(BRAIDS_SRC
     "${EURORACK_DIR}/braids/resources.cc"
 )
 
+# ── Rings resonator sources (patched copy, runtime sample rate) ──
+# Its headers collide with Plaits' resource macros: only the cowbell resonator TUs include them.
+include(cmake/patched_rings.cmake)
+
 # ── Orpheus engine sources ────────────────────────
 set(ORPHEUS_SRC
     "src/orpheus_engine.cpp"
@@ -186,8 +190,10 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_pulsar.cpp"
     "src/orpheus_unit_pulsar_delay.cpp"
     "src/orpheus_unit_pulsar_reverb.cpp"
+    "src/orpheus_unit_cowbell.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
+    "src/orpheus_cowbell_resonator.cpp"
     "src/orpheus_spectrum.cc"
     "src/orpheus_scope.cc"
     "src/orpheus_unit_chaos.cpp"
@@ -227,6 +233,7 @@ add_library(orpheus_dsp STATIC
     ${FRAMES_SRC}
     ${TIDES2_SRC}
     ${BRAIDS_SRC}
+    ${PATCHED_RINGS_SRC}
 )
 
 # ── Build stamp ───────────────────────────────────
@@ -256,6 +263,7 @@ target_include_directories(orpheus_dsp PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
 target_include_directories(orpheus_dsp PRIVATE
+    "${PATCHED_RINGS_INCLUDE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${COMPAT_DIR}"
     "${EURORACK_DIR}"
@@ -326,6 +334,9 @@ if(BUILD_TESTS)
         test/test_bass_voice.cpp
         test/test_horn.cpp
         test/test_turntable.cpp
+        test/test_cowbell_resonator.cpp
+        test/test_cowbell_unit.cpp
+        test/test_cowbell_spike.cpp
         test/test_tides.cpp
         test/test_pulsar.cpp
         test/test_pulsar_bus.cpp
@@ -447,6 +458,7 @@ if(BUILD_TESTS)
     endif()
 
     target_include_directories(orpheus_dsp_test PRIVATE
+        "${PATCHED_RINGS_INCLUDE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/test"
         "${NOOP_TEST_DIR}"

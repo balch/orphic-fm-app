@@ -71,6 +71,10 @@ static TestSuite suites[] = {
     {"bass",            run_bass_voice_tests,      true},
     {"horn",            run_horn_tests,            true},
     {"turntable",       run_turntable_tests,       true},
+    {"cowbell_reso",    run_cowbell_reso_tests,    true},
+    {"cowbell_unit",    run_cowbell_unit_tests,    true},
+    {"cowbell_spike",   run_cowbell_spike,         false},  // manual: writes WAV files
+    {"cowbell_bench",   run_cowbell_bench,         false},  // manual: prints a CPU table
     {"tides",           run_tides_tests,           true},
     {"preset-voices",   run_preset_voice_tests,    true},
     {"benchmark",       run_benchmark_tests,       true},

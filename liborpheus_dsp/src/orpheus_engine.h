@@ -22,6 +22,7 @@
 
 // Orpheus resonator (modal + Karplus-Strong, ported from Kotlin)
 #include "orpheus_resonator.h"
+#include "orpheus_cowbell_resonator.h"
 #include "orpheus_horn.h"
 
 // Include MI Warps modulator
@@ -111,6 +112,89 @@ static constexpr int kNumDrumVoices = 3;
 static constexpr int kDrumVoiceStart = kNumMainVoices;  // 24
 static constexpr int kNumVoices = kNumMainVoices + kNumDrumVoices;  // 27
 static constexpr int kVoiceAllocBytes = 32768;  // 32KB per voice (generous)
+
+// A strike held back for a GRID line: its packed word, the 16th it lands on, frames to go.
+struct CowbellPendingStrike {
+    uint32_t packed;
+    int64_t slot;
+    int remaining;
+};
+
+// A fill's noise burst: band-passed noise (one TPT state-variable filter) under a cubic decay,
+// added to the resonator's input, with a dry share straight to the output. Pool is fixed-size.
+static constexpr int kCowbellMaxBursts = 16;
+struct CowbellBurst {
+    int frames_left = 0;   // 0 = free
+    int total_frames = 0;
+    int delay = 0;         // frames into the block it was born in; 0 once that block is done
+    float velocity = 0.0f; // the strike's, for replacing the quietest
+    float amp = 0.0f;      // peak noise amplitude
+    float dry = 0.0f;
+    float g = 0.0f, k = 0.0f, a1 = 0.0f, a2 = 0.0f, a3 = 0.0f;  // band-pass coefficients
+    float ic1 = 0.0f, ic2 = 0.0f;
+};
+
+// UNIT_COWBELL's audio-thread state. On the engine, not the unit, so it survives graph swaps.
+struct CowbellUnitState {
+    bool idle = false;
+    int quiet_blocks = 0;  // consecutive silent blocks with no strike, gate or bend
+    bool level_started = false;  // the level smoother snaps to its first target
+    float level = 0.0f;
+    float more = 0.0f;           // MORE (boost past max), ramped across the block like level
+    // MORE's duck of the DJ bus: the bell's output envelope and the gain it keys. The bus units
+    // tagged DUCK_COWBELL ramp from duck_from to duck_gain across their block.
+    float duck_env = 0.0f;
+    float duck_from = 1.0f;
+    float duck_gain = 1.0f;
+    float last_pre_ceiling_peak = 0.0f;  // the last block's peak before the soft ceiling (tests read this)
+    // Strikes drained from the slots in the last block: count, quietest and words (tests read these).
+    int last_drain_count = 0;
+    float last_drain_min_velocity = 0.0f;
+    uint32_t last_drained_words[OrpheusCowbellResonator::kMaxStrikes] = {};
+    // graph_generation as of the last block; a change means a graph swap.
+    uint32_t graph_generation = 0;
+    // GRID snapping: strikes waiting for a 16th, and the last 16th that fired.
+    CowbellPendingStrike pending[OrpheusCowbellResonator::kMaxStrikes] = {};
+    int pending_count = 0;
+    int64_t last_fired_slot = -1;
+    // Exciter: the Plaits engine sounding (-1 = impulse only), adopted at a strike.
+    int exciter_engine = -1;
+    bool gate_prev = false;      // cowbell_gate last block, for its rising edge
+    int tap_gate_frames = 0;     // frames left on the last TAP strike's 5 ms gate
+    float tap_level = 0.0f;      // that strike's velocity
+    float accent = 0.0f;         // the last trigger's velocity
+    float exciter_env = 0.0f;    // VCA (no envelope) or SYNTH level scale (six-op)
+    float hold_target = 1.0f;    // six-op scale: 1 for TAP, the VCA level under SYNTH, 0 after it
+    bool exciter_tail_quiet = false;  // an enveloped engine's tail fell below the floor
+    float exciter_gain = 0.0f;   // strike gain, ramped across the block
+    float noise_env = 0.0f;      // SYNTH noise level for engines whose hit decays under a held gate
+    float noise_lp = 0.0f;       // its one-pole low-pass state
+    uint32_t noise_seed = 1u;
+    CowbellBurst bursts[kCowbellMaxBursts] = {};
+    uint32_t burst_seed = 1u;    // per-hit random burst centres
+    int exciter_trigger_count = 0;  // exciter hits sent to the engine, ever (tests read it)
+    float bend = 0.0f;           // bend amount, smoothed at block rate
+    float exciter_bend = 0.0f;   // semitones, slewed like the resonator's own glide
+    float scale_bend = 0.0f;     // BEND TO SCALE: the snapped target's own glide, in semitones
+    bool scale_active = false;   // BEND TO SCALE applied last block
+    float exciter_note = 0.0f;   // the note last rendered (tests read it)
+    float width = 1.0f;          // stereo width now applied (1 at polyphony 1)
+    int last_fire_count = 0;     // strikes that sounded in the last block (tests read it)
+};
+
+// Pulsar's 16th grid for the block just rendered, for cowbell GRID snapping. Audio thread
+// only: the engine clears `running` before each graph pass, and a playing Pulsar sets it.
+static constexpr int kPulsarGridMaxBoundaries = 16;
+struct PulsarGridExport {
+    bool running = false;
+    float samples_per_step = 0.0f;
+    int boundary_count = 0;
+    int boundary_samples[kPulsarGridMaxBoundaries] = {};
+    int64_t boundary_steps[kPulsarGridMaxBoundaries] = {};  // a monotonic 16th count, one per boundary
+    int64_t next_step = 0;            // the step of the first boundary after this block
+    float samples_to_next = 0.0f;     // measured from the block's end, swing-aware
+    float samples_since_last = 0.0f;  // the last line before this block to its start (0 after a vibe load)
+};
 
 struct OrpheusEngine {
     float sample_rate;
@@ -229,6 +313,40 @@ struct OrpheusEngine {
     // Orpheus resonator (drum direct path, moduleIndex=1)
     OrpheusResonator drum_resonator;
     std::atomic<int>   rings_drum_bypass{0};   // enabled by default (drum MAIN path)
+
+    // Cowbell (UNIT_COWBELL). Strikes arrive through cowbell_push_strike into these slots
+    // (0 = empty); the unit drains them each block. Knob atomics are written by routing.
+    OrpheusCowbellResonator cowbell_reso;
+    OrpheusVoice cowbell_exciter;  // the picked engine, rendered into the resonator's input
+    uint8_t cowbell_exciter_alloc[kVoiceAllocBytes];
+    float cowbell_exciter_buf[kMaxFrames] = {};
+    float cowbell_burst_dry_buf[kMaxFrames] = {};  // the fill bursts' dry share
+    std::atomic<uint32_t> cowbell_strike_slots[OrpheusCowbellResonator::kMaxStrikes] = {};
+    std::atomic<float> cowbell_level{0.7f};
+    std::atomic<float> cowbell_more{0.0f};  // 0..1: a boost past max, and the DJ bus duck
+    std::atomic<float> cowbell_metal{0.84f};
+    std::atomic<float> cowbell_ring{0.0f};
+    std::atomic<float> cowbell_intensity{0.7f};
+    std::atomic<float> cowbell_structure_offset{0.0f};  // -0.4..0.4
+    std::atomic<float> cowbell_position_offset{0.0f};   // -0.45..0.45
+    std::atomic<float> cowbell_bend{0.0f};              // -1..1
+    std::atomic<float> cowbell_grid_strength{0.7f};
+    std::atomic<int>   cowbell_engine{-1};               // exciter engine, -1 = impulse only
+    std::atomic<int>   cowbell_octave{0};               // -2..2
+    std::atomic<bool>  cowbell_gate{false};
+    std::atomic<bool>  cowbell_grid{true};
+    std::atomic<bool>  cowbell_bend_scale{false};  // snap the bend to Pulsar's scale while it plays
+    CowbellUnitState   cowbell_state;
+    PulsarGridExport   pulsar_grid;
+#ifdef ORPHEUS_TESTING
+    // How each cowbell_push_strike call ended: into an empty slot, over a quieter strike, or dropped.
+    std::atomic<uint32_t> cowbell_push_placed{0};
+    std::atomic<uint32_t> cowbell_push_replaced{0};
+    std::atomic<uint32_t> cowbell_push_dropped{0};
+#endif
+
+    // Bumped by every graph load, before the swap; the audio thread compares it per block.
+    std::atomic<uint32_t> graph_generation{0};
 
     // Warps modulator
     warps::Modulator warps_modulator;
@@ -1306,6 +1424,9 @@ struct OrpheusEngine {
     // Pulsar sets this while it plays an armed track through a pause; the master out then lets
     // it past the app mute, which the pause sets. Written by the Pulsar unit every block.
     std::atomic<int>   pulsar_live_noodle{0};
+    // The DJ cowbell tab sets this while it is open, so a strike sounds through the pause's mute.
+    // Held for the whole tab, not per strike: the 5 ms mute ramp would eat a strike's attack.
+    std::atomic<int>   cowbell_live{0};
 
     // Mix measurement taps (vibe_measure suite, mix bench). Null unless one of them sets it; when
     // set, Pulsar copies each block's per-track dry contribution and its bus on both sides of the

@@ -121,6 +121,8 @@ class SynthEngineMonitor(
     val djOutVizFlow: StateFlow<FloatArray> = _djOutVizFlow.asStateFlow()
     private val _beatPhaseFlow = MutableStateFlow(0f)
     val beatPhaseFlow: StateFlow<Float> = _beatPhaseFlow.asStateFlow()
+    private val _cowbellOutVizFlow = MutableStateFlow(0f)
+    val cowbellOutVizFlow: StateFlow<Float> = _cowbellOutVizFlow.asStateFlow()
     private val _masterOutVizFlow = MutableStateFlow(FloatArray(0))
     val masterOutVizFlow: StateFlow<FloatArray> = _masterOutVizFlow.asStateFlow()
     private val _hornInVizFlow = MutableStateFlow(FloatArray(0))
@@ -173,6 +175,7 @@ class SynthEngineMonitor(
     private var monitoringJob: Job? = null
     private var vizJob: Job? = null
     private var turntableVizJob: Job? = null
+    private var cowbellVizJob: Job? = null
     private var pulsarVizJob: Job? = null
     private var arrangementPollJob: Job? = null
     private var spectrumJob: Job? = null
@@ -201,6 +204,9 @@ class SynthEngineMonitor(
     /** Turntable viz was requested by UI (survives a background pause/resume). */
     private var turntableVizRequested = false
 
+    /** The cowbell panel's rim glow was requested by UI (survives a background pause/resume). */
+    private var cowbellVizRequested = false
+
     /** Scope was requested by UI (survives a background pause/resume and an engine restart). */
     private var scopeRequested = false
 
@@ -217,6 +223,24 @@ class SynthEngineMonitor(
         if (count > 0) {
             flow.value = appendToVizRing(flow.value, vizBuf, count)
             history?.write(channel, vizBuf, count, posBuf[0])
+        }
+    }
+
+    /**
+     * The cowbell's block peaks are one live scalar: publish the loudest since the last poll, so a
+     * hit between polls still lights the rim. NaN samples are skipped; the result is 0..1.
+     */
+    internal fun pollCowbellOut(readPositions: IntArray, vizBuf: FloatArray, posBuf: IntArray) {
+        posBuf[0] = readPositions[VIZ_COWBELL_OUT]
+        val count = nativeBridge.nativeGetViz(VIZ_COWBELL_OUT, vizBuf, posBuf)
+        readPositions[VIZ_COWBELL_OUT] = posBuf[0]
+        if (count > 0) {
+            var peak = 0f
+            for (i in 0 until count) {
+                val v = vizBuf[i]
+                if (!v.isNaN() && v > peak) peak = v
+            }
+            _cowbellOutVizFlow.value = peak.coerceAtMost(1f)
         }
     }
 
@@ -284,6 +308,7 @@ class SynthEngineMonitor(
             // setVizEnabled alone can't launch the poll until monitoring is active.
             if (vizRequested) launchVizPoll()
             if (turntableVizRequested) launchTurntableVizPoll()
+            if (cowbellVizRequested) launchCowbellVizPoll()
             if (spectrumRequested || spectrogramRequested) launchSpectrumPoll()
             if (scopeRequested) launchScopePoll()
         }
@@ -315,6 +340,7 @@ class SynthEngineMonitor(
                 // it while the engine is actually monitoring, otherwise a resume
                 // after stopMonitoring() would poll a stopped engine.
                 if (turntableVizRequested) launchTurntableVizPoll()
+                if (cowbellVizRequested) launchCowbellVizPoll()
                 if (spectrumRequested || spectrogramRequested) launchSpectrumPoll()
                 if (scopeRequested) launchScopePoll()
             }
@@ -328,6 +354,8 @@ class SynthEngineMonitor(
             vizJob = null
             turntableVizJob?.cancel()
             turntableVizJob = null
+            cowbellVizJob?.cancel()
+            cowbellVizJob = null
             spectrumJob?.cancel()
             spectrumJob = null
             scopeJob?.cancel()
@@ -572,6 +600,35 @@ class SynthEngineMonitor(
         _djVizFlowB.value = FloatArray(0)
     }
 
+    /** Start the cowbell rim-glow poll: one scalar channel at the turntable poll's rate. */
+    fun startCowbellViz(): Unit = synchronized(pollLock) {
+        cowbellVizRequested = true
+        // As the turntable: the request survives a pause or stop, so a later start relaunches it.
+        if (!uiVisible || !monitoringActive) return@synchronized
+        launchCowbellVizPoll()
+    }
+
+    private fun launchCowbellVizPoll() {
+        if (cowbellVizJob != null) return
+        cowbellVizJob = monitoringScope.launch(dispatcherProvider.io) {
+            val vizBuf = FloatArray(VIZ_BUF_SIZE)
+            val readPositions = IntArray(VIZ_CHANNEL_COUNT)
+            val posBuf = IntArray(1)
+            while (isActive) {
+                pollCowbellOut(readPositions, vizBuf, posBuf)
+                delay(VIZ_POLL_INTERVAL)
+            }
+        }
+    }
+
+    /** Stop the cowbell rim-glow poll. */
+    fun stopCowbellViz(): Unit = synchronized(pollLock) {
+        cowbellVizRequested = false
+        cowbellVizJob?.cancel()
+        cowbellVizJob = null
+        _cowbellOutVizFlow.value = 0f
+    }
+
     /** Cancel all polling jobs. */
     fun stopMonitoring(): Unit = synchronized(pollLock) {
         monitoringActive = false
@@ -579,6 +636,8 @@ class SynthEngineMonitor(
         vizJob = null
         turntableVizJob?.cancel()
         turntableVizJob = null
+        cowbellVizJob?.cancel()
+        cowbellVizJob = null
         pulsarVizJob?.cancel()
         pulsarVizJob = null
         arrangementPollJob?.cancel()
@@ -795,7 +854,8 @@ class SynthEngineMonitor(
         private const val VIZ_PULSAR_KRAKEN = 39  // Kraken shift in effect (-1 = home)
         private const val VIZ_PULSAR_NEXT_CHORD = 40  // Next chord's root degree (-1 = none)
         private const val VIZ_PULSAR_CHORD_BEATS_LEFT = 41  // Beats until that chord starts
-        private const val VIZ_CHANNEL_COUNT = 42  // 29 + 8 pulsar tracks + beat, void, kraken, next chord, beats left
+        private const val VIZ_COWBELL_OUT = 42  // cowbell output peak per block
+        private const val VIZ_CHANNEL_COUNT = 43  // 29 + 8 pulsar tracks + beat, void, kraken, next chord, beats left, cowbell
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

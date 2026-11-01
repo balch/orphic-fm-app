@@ -1,6 +1,7 @@
 #include "orpheus_engine.h"
 #include "orpheus_graph.h"
 #include "mix_bench.h"
+#include "orpheus_units.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -88,6 +89,10 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         stmlib::BufferAllocator bass_allocator(engine->bass_voice_alloc_buffer, kVoiceAllocBytes);
         engine->bass_voice.Init(&bass_allocator);
     }
+    {
+        stmlib::BufferAllocator exciter_allocator(engine->cowbell_exciter_alloc, kVoiceAllocBytes);
+        engine->cowbell_exciter.Init(&exciter_allocator);
+    }
     engine->bass_seq_state.initialized = false;
 
     // Initialize Clouds granular processor
@@ -102,6 +107,7 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // Initialize Orpheus resonators (modal + Karplus-Strong)
     engine->resonator.init(engine->sample_rate);
     engine->drum_resonator.init(engine->sample_rate);
+    engine->cowbell_reso.init(engine->sample_rate);
 
     // Initialize Warps modulator
     engine->warps_modulator.Init(engine->sample_rate);
@@ -294,6 +300,7 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
     orpheus_graph_dump_exec_order(new_graph);
 
     // Atomic swap: audio thread sees the new graph at its next block.
+    engine->graph_generation.fetch_add(1, std::memory_order_release);
     auto* old = engine->graph.exchange(new_graph, std::memory_order_acq_rel);
     if (old) orpheus_graph_retire(engine, old);
     return 0;
@@ -557,6 +564,10 @@ void orpheus_engine_process(OrpheusEngine* engine,
     std::memset(output_buffer, 0, num_frames * 2 * sizeof(float));
 
     OrpheusGraph* graph = engine->graph.load(std::memory_order_acquire);
+    const uint32_t graph_generation = engine->graph_generation.load(std::memory_order_acquire);
+    if (graph_generation != engine->cowbell_state.graph_generation) {
+        cowbell_on_graph_swap(engine, graph_generation);
+    }
     // One null check per block while the bench is off.
     MixBench* bench = engine->mix_bench.load(std::memory_order_acquire);
     if (graph) {
@@ -567,6 +578,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
         while (frames_done < num_frames) {
             int chunk = num_frames - frames_done;
             if (chunk > kMaxFrames) chunk = kMaxFrames;
+            // A disabled or missing Pulsar must not leave a stale grid running.
+            engine->pulsar_grid.running = false;
             orpheus_graph_process(graph, engine, output_buffer + frames_done * 2, chunk);
             // Per chunk, while the taps still hold this chunk. OUT is the graph's output, before TTS.
             if (bench) bench->on_block(engine, output_buffer + frames_done * 2, chunk);

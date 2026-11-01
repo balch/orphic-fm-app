@@ -3342,6 +3342,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // (`state` is always non-null here: the lazy-init block above allocated it.)
         state->void_state.gain_smoothed = 1.0f;
         engine->viz_rings[VIZ_PULSAR_VOID_GAIN].write(1.0f);
+        engine->pulsar_grid.running = false;  // no transport: the cowbell plays free
         // Silence on every track ring, as the other units write 0 when bypassed: the
         // Orphoscope lanes and grid traces scroll off instead of freezing until resume.
         for (int t = 0; t < kNumPulsarTracks; t++)
@@ -3812,6 +3813,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // under it (tempo drift or a swing change both move it), so leaving the
     // comparison live let boundaries fire during the freeze — and keep firing
     // until the accumulator drained. Freezing means no advance AND no boundary.
+    const double accumulator_at_start = state->clock_accumulator;
     for (int i = 0; i < num_frames && !timeline_hold; i++) {
         state->clock_accumulator += 1.0;
 
@@ -3833,6 +3835,31 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 step_boundary_samples[num_boundaries++] = i;
             }
         }
+    }
+
+    // The grid for cowbell GRID snapping: this block's lines, then the next one, which lands
+    // on the first frame j of the next block where the accumulator plus j + 1 reaches it.
+    {
+        PulsarGridExport& grid = engine->pulsar_grid;
+        grid.running = !timeline_hold;
+        grid.samples_per_step = static_cast<float>(samples_per_step);
+        grid.boundary_count = std::min(num_boundaries, kPulsarGridMaxBoundaries);
+        for (int b = 0; b < num_boundaries; b++) {
+            const int64_t step = state->grid_step++;
+            if (b < kPulsarGridMaxBoundaries) {
+                grid.boundary_samples[b] = step_boundary_samples[b];
+                grid.boundary_steps[b] = step;
+            }
+        }
+        grid.next_step = state->grid_step;
+        const double next_threshold = step_is_odd ? (samples_per_step - swing_shift)
+                                                  : (samples_per_step + swing_shift);
+        grid.samples_to_next = static_cast<float>(
+            std::max(0.0, std::ceil(next_threshold - state->clock_accumulator) - 1.0));
+        // A line leaves the accumulator under 1, then it gains 1 a frame. A vibe load's line has
+        // no line before it.
+        grid.samples_since_last = load_boundary_index >= 0
+            ? 0.0f : static_cast<float>(std::floor(accumulator_at_start) + 1.0);
     }
 
     // Precompute the per-sample void gain for this block (all tracks share it),

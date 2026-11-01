@@ -43,6 +43,7 @@ enum OrpheusUnitType : uint16_t {
     UNIT_PULSAR = 35,
     UNIT_PULSAR_DELAY = 36,
     UNIT_PULSAR_REVERB = 37,
+    UNIT_COWBELL = 38,
     UNIT_TYPE_COUNT
 };
 
@@ -170,6 +171,7 @@ enum DuckSource : uint8_t {
     DUCK_SYNTH = 1,
     DUCK_DRUMS = 2,
     DUCK_BASS  = 3,
+    DUCK_COWBELL = 4,  // the cowbell's MORE duck, keyed by the bell's own output
 };
 
 struct GraphUnit {

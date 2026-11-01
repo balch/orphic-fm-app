@@ -19,6 +19,7 @@ private val emptyVizHistory: StateFlow<VizHistory?> = MutableStateFlow(null)
 private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(PulsarVizData())
 private val emptyPulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> = MutableStateFlow(null)
 private val emptyBeatPhaseFlow: StateFlow<Float> = MutableStateFlow(0f)
+private val emptyCowbellOutFlow: StateFlow<Float> = MutableStateFlow(0f)
 private val emptyEngineRecreatedFlow: SharedFlow<Unit> = MutableSharedFlow<Unit>().asSharedFlow()
 private val completedGraphReady: Deferred<Unit> = CompletableDeferred(Unit)
 
@@ -240,6 +241,8 @@ interface SynthEngine : AudioHostSuspender {
     val djVizFlowB: StateFlow<FloatArray> get() = emptyVizFlow
     val djOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val beatPhaseFlow: StateFlow<Float> get() = emptyBeatPhaseFlow
+    /** Cowbell output peak, 0..1. */
+    val cowbellOutVizFlow: StateFlow<Float> get() = emptyCowbellOutFlow
     val masterOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
@@ -288,6 +291,9 @@ interface SynthEngine : AudioHostSuspender {
 
     /** Enable/disable turntable viz polling (DJ platter waveforms). */
     fun setTurntableVizEnabled(enabled: Boolean) {}
+
+    /** Enable/disable the poll behind [cowbellOutVizFlow]. The cowbell panel holds it on while composed. */
+    fun setCowbellVizEnabled(enabled: Boolean) {}
 
     /**
      * Inform the engine whether the app UI is visible. When false (app

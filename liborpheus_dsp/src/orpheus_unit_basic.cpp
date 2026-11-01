@@ -215,8 +215,10 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
 
     // Global mute: smooth toward 0 (muted) or 1 (unmuted) for click-free transitions
     // A paused Lick Lab noodle plays through the pause's mute; Pulsar renders only that track then.
+    // The DJ cowbell tab arms cowbell_live while open, not per strike, so the ramp keeps the attack.
     const bool muted = engine->global_muted.load(std::memory_order_relaxed) != 0
-        && engine->pulsar_live_noodle.load(std::memory_order_relaxed) == 0;
+        && engine->pulsar_live_noodle.load(std::memory_order_relaxed) == 0
+        && engine->cowbell_live.load(std::memory_order_relaxed) == 0;
     float mute_target = muted ? 0.0f : 1.0f;
 
     // Fast early-out: if fully muted and target is still muted, zero output.

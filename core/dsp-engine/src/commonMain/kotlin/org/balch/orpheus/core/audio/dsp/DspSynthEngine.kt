@@ -140,6 +140,7 @@ class DspSynthEngine(
     override val djVizFlowB: StateFlow<FloatArray> get() = monitor.djVizFlowB
     override val djOutVizFlow: StateFlow<FloatArray> get() = monitor.djOutVizFlow
     override val beatPhaseFlow: StateFlow<Float> get() = monitor.beatPhaseFlow
+    override val cowbellOutVizFlow: StateFlow<Float> get() = monitor.cowbellOutVizFlow
     override val masterOutVizFlow: StateFlow<FloatArray> get() = monitor.masterOutVizFlow
     override val hornInVizFlow: StateFlow<FloatArray> get() = monitor.hornInVizFlow
     override val hornOutVizFlow: StateFlow<FloatArray> get() = monitor.hornOutVizFlow
@@ -543,6 +544,10 @@ class DspSynthEngine(
 
     override fun setTurntableVizEnabled(enabled: Boolean) {
         if (enabled) monitor.startTurntableViz() else monitor.stopTurntableViz()
+    }
+
+    override fun setCowbellVizEnabled(enabled: Boolean) {
+        if (enabled) monitor.startCowbellViz() else monitor.stopCowbellViz()
     }
 
     override fun setUiVisible(visible: Boolean) {

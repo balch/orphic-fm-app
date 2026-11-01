@@ -64,5 +64,6 @@ enum VizChannel {
     VIZ_PULSAR_KRAKEN = 39,     // Kraken shift in effect: target index, -1 = home
     VIZ_PULSAR_NEXT_CHORD = 40,        // degree of the next chord change, -1 = none or unknown
     VIZ_PULSAR_CHORD_BEATS_LEFT = 41,  // beats until that change lands
+    VIZ_COWBELL_OUT = 42,              // cowbell output peak per block
     VIZ_CHANNEL_COUNT
 };

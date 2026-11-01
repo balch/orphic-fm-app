@@ -334,7 +334,7 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
         "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO",
         "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN", "TURNTABLE", "TIDES",
-        "PULSAR", "PULSAR_DELAY", "PULSAR_REVERB"
+        "PULSAR", "PULSAR_DELAY", "PULSAR_REVERB", "COWBELL"
     };
     static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
                   "type_names[] out of sync with UnitType enum");
@@ -529,6 +529,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_pulsar_delay(u, engine, num_frames, sr); break;
             case UNIT_PULSAR_REVERB:
                 unit_process_pulsar_reverb(u, engine, num_frames, sr); break;
+            case UNIT_COWBELL:
+                unit_process_cowbell(u, engine, num_frames, sr); break;
             default: break;
         }
 
@@ -539,6 +541,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 case DUCK_SYNTH: duck = engine->turntable_duck_synth; break;
                 case DUCK_DRUMS: duck = engine->turntable_duck_drums; break;
                 case DUCK_BASS:  duck = engine->turntable_duck_bass;  break;
+                case DUCK_COWBELL: cowbell_apply_duck(u, engine, num_frames); break;
                 default: break;
             }
             if (duck < 0.999f) {

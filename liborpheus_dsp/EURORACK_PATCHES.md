@@ -7,6 +7,9 @@ These must be reapplied if the upstream source is ever re-cloned or updated.
 > `git submodule update --init stmlib` or the CMake configure fails on
 > `stmlib/dsp/atan.cc`.
 
+> `patches/rings-runtime-sample-rate.patch` is not one of these. It is applied by CMake to a
+> build-dir copy of `rings/`; do not apply it to the eurorack checkout (see `docs/BUILD.md`).
+
 **To apply all patches:**
 ```bash
 cd /path/to/eurorack

@@ -766,6 +766,64 @@ static bool test_production_graphs_keep_every_connection() {
     return pass;
 }
 
+// Straight from the file's bytes: no input port lists more than kMaxSourcesPerPort connections,
+// there is exactly one UNIT_COWBELL (its state is engine-wide, so a second would share it), and
+// Pulsar feeds its inputB.
+static bool check_graph_file_limits(const char* relative) {
+    std::vector<uint8_t> d = read_test_data(relative);
+    if (d.size() < 12) {
+        printf("  FAIL: cannot read %s\n", relative);
+        return false;
+    }
+    auto u16 = [&](size_t p) { return (uint16_t)(d[p] | (d[p + 1] << 8)); };
+    int unit_count = u16(6), conn_count = u16(8);
+    size_t pos = 12;
+    int cowbells = 0;
+    std::vector<int> type(unit_count);
+    for (int i = 0; i < unit_count; i++) {
+        type[i] = u16(pos);
+        if (type[i] == UNIT_COWBELL) cowbells++;
+        pos += 6 + 6 * (size_t)u16(pos + 4);
+    }
+    std::vector<int> count((size_t)unit_count * kMaxInputPorts, 0);
+    bool pulsar_to_cowbell = false;
+    for (int c = 0; c < conn_count; c++, pos += 8) {
+        const int src = u16(pos), dst = u16(pos + 4);
+        count[(size_t)dst * kMaxInputPorts + u16(pos + 6)]++;
+        if (type[src] == UNIT_PULSAR && type[dst] == UNIT_COWBELL && u16(pos + 6) == IPORT_INPUT_B)
+            pulsar_to_cowbell = true;
+    }
+    bool pass = true;
+    for (int u = 0; u < unit_count; u++) {
+        for (int p = 0; p < kMaxInputPorts; p++) {
+            int n = count[(size_t)u * kMaxInputPorts + p];
+            if (n > kMaxSourcesPerPort) {
+                printf("  FAIL: %s unit %d port %d lists %d sources (max %d)\n", relative, u, p, n,
+                       kMaxSourcesPerPort);
+                pass = false;
+            }
+        }
+    }
+    // The edge orders the cowbell after Pulsar; sort order alone can drift with declaration order.
+    if (!pulsar_to_cowbell) {
+        printf("  FAIL: %s has no Pulsar -> cowbell inputB connection\n", relative);
+        pass = false;
+    }
+    if (cowbells != 1) {
+        printf("  FAIL: %s has %d UNIT_COWBELL, want exactly 1\n", relative, cowbells);
+        pass = false;
+    }
+    return pass;
+}
+
+static bool test_production_graph_files_within_limits() {
+    printf("\n=== Test: Graph — checked-in graphs: no port over 8 sources, one cowbell ===\n");
+    bool pass = check_graph_file_limits("/default_graph.odwg");
+    pass = check_graph_file_limits("/dj_graph.odwg") && pass;
+    printf("Graph file limits test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // A port fed by more sources than it can hold must reject the graph, not drop the extras.
 static bool test_graph_load_rejects_port_overflow() {
     printf("\n=== Test: Graph — loader rejects too many sources on one port ===\n");
@@ -801,5 +859,6 @@ bool run_graph_tests() {
     tally(test_engine0_release_timing());
     tally(test_production_graphs_keep_every_connection());
     tally(test_graph_load_rejects_port_overflow());
+    tally(test_production_graph_files_within_limits());
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

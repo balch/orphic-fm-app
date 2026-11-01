@@ -1266,6 +1266,7 @@ struct PulsarState {
     // Grain FX recordings, one per track, beside mist[] for the same reason.
     PulsarGrainFxState grainfx[kNumPulsarTracks];
     double clock_accumulator;   // fractional sample counter for step grid
+    int64_t grid_step = 0;      // every step boundary since creation (the cowbell's GRID slots)
     // Armed by load_vibe: the next AUDIBLE playing block fires a step boundary
     // at sample 0 so the new vibe's downbeat sounds at the load instant.
     bool boundary_on_load = false;
