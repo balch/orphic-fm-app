@@ -72,6 +72,11 @@ data class MixerTrack(
     val spaceEngineId: OrpheusEngineId = OrpheusEngineId.VA,
     /** Harmonics, timbre and morph of [slot]'s engine, in that order. */
     val voice: List<MixerVoiceKnob> = emptyList(),
+    /** Each slot's stored harmonics, which names the DX patch its picker shows. */
+    val edmHarmonics: Float = 0.5f,
+    val spaceHarmonics: Float = 0.5f,
+    /** The DX patch (0..31) sounding on [slot] now, walks included; -1 when the engine reports none. */
+    val activePatch: Int = -1,
 ) {
     /** The knobs tune [slot] only while the track is locked to it. */
     val knobsLive: Boolean get() = slotLock != SlotLock.AUTO
@@ -336,6 +341,10 @@ fun changesLabel(count: Int): String = when (count) {
 data class VoiceView(
     val heard: EngineSlot = EngineSlot.EDM,
     val edited: Set<String> = emptySet(),
+    /** Per track, the DX patch sounding now or -1 off DX, from the engine's viz. */
+    val activePatches: List<Int> = emptyList(),
+    /** Per track, the engine id the DSP is playing now; a patch counts only when it is the shown slot's engine. */
+    val activeEngines: List<Int> = emptyList(),
 )
 
 /** The bench page's state view, for the panel. [knobs] are the app's macro knobs. */
@@ -411,6 +420,10 @@ fun mixerState(
             edmEngineId = track.engineEdm.engineId,
             spaceEngineId = track.engineSpace.engineId,
             voice = voiceKnobs,
+            edmHarmonics = track.engineEdm.harmonics,
+            spaceHarmonics = track.engineSpace.harmonics,
+            // Under AUTO the shown slot is an estimate; the patch is the shown slot's only if that engine is the one playing.
+            activePatch = voice.activePatches.getOrElse(t) { -1 }.takeIf { voice.activeEngines.getOrElse(t) { -1 } == engine.engineId.id } ?: -1,
         )
     }
     val macros = Macro.entries.map { m ->

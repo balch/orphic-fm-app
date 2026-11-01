@@ -181,6 +181,9 @@ data class PulsarUiState(
     val selectedTrack: Int? = null,
     val trackEnginesEdm: List<Int> = listOf(21, 22, 23, 9, 14, 14, 17, 20),
     val trackEnginesSpace: List<Int> = listOf(20, 17, 23, 19, 6, 14, 17, 19),
+    /** Each track's stored harmonics per slot, which names the DX patch a picker shows. */
+    val trackHarmonicsEdm: List<Float> = List(8) { 0.5f },
+    val trackHarmonicsSpace: List<Float> = List(8) { 0.5f },
     val trackMuted: List<Boolean> = List(8) { false },
 )
 
@@ -208,6 +211,9 @@ data class PulsarPanelActions(
     val selectTrack: (Int?) -> Unit = {},
     val setTrackEngineEdm: (Int, Int) -> Unit = { _, _ -> },
     val setTrackEngineSpace: (Int, Int) -> Unit = { _, _ -> },
+    /** A DX patch pick sets its harmonics beside the engine; the slot's stored harmonics port. */
+    val setTrackHarmonicsEdm: (track: Int, value: Float) -> Unit = { _, _ -> },
+    val setTrackHarmonicsSpace: (track: Int, value: Float) -> Unit = { _, _ -> },
     val toggleTrackMute: (Int) -> Unit = {},
     val songEndingEnabled: StateFlow<Boolean> = MutableStateFlow(false),
     val onSetSongEndingEnabled: (Boolean) -> Unit = {},
@@ -306,6 +312,8 @@ private sealed interface PulsarIntent {
     data class SelectedTrack(val value: Int?) : PulsarIntent
     data class TrackEngineEdm(val track: Int, val engine: Int) : PulsarIntent
     data class TrackEngineSpace(val track: Int, val engine: Int) : PulsarIntent
+    data class TrackHarmonicsEdm(val track: Int, val value: Float) : PulsarIntent
+    data class TrackHarmonicsSpace(val track: Int, val value: Float) : PulsarIntent
     data class TrackMuteList(val muteList: List<Boolean>) : PulsarIntent
 }
 
@@ -1348,6 +1356,8 @@ class PulsarViewModel(
         setTrackEngineSpace = { track, engine ->
             trackSpaceIds[track].value = IntValue(engine)
         },
+        setTrackHarmonicsEdm = { track, value -> trackHarmonicsIds[track].value = FloatValue(value) },
+        setTrackHarmonicsSpace = { track, value -> trackHarmonicsSpaceIds[track].value = FloatValue(value) },
         toggleTrackMute = { track ->
             val currentMuted = _trackMutedFlow.value[track]
             val newMuted = !currentMuted
@@ -1451,6 +1461,12 @@ class PulsarViewModel(
         *trackSpaceIds.mapIndexed { i, flow ->
             flow.map { PulsarIntent.TrackEngineSpace(i, it.asInt()) }
         }.toTypedArray(),
+        *trackHarmonicsIds.mapIndexed { i, flow ->
+            flow.map { PulsarIntent.TrackHarmonicsEdm(i, it.asFloat()) }
+        }.toTypedArray(),
+        *trackHarmonicsSpaceIds.mapIndexed { i, flow ->
+            flow.map { PulsarIntent.TrackHarmonicsSpace(i, it.asFloat()) }
+        }.toTypedArray(),
     )
 
     private val _state = MutableStateFlow(PulsarUiState(
@@ -1502,6 +1518,16 @@ class PulsarViewModel(
                         is PulsarIntent.TrackEngineSpace -> state.copy(
                             trackEnginesSpace = state.trackEnginesSpace.toMutableList().also {
                                 it[intent.track] = intent.engine
+                            }
+                        )
+                        is PulsarIntent.TrackHarmonicsEdm -> state.copy(
+                            trackHarmonicsEdm = state.trackHarmonicsEdm.toMutableList().also {
+                                it[intent.track] = intent.value
+                            }
+                        )
+                        is PulsarIntent.TrackHarmonicsSpace -> state.copy(
+                            trackHarmonicsSpace = state.trackHarmonicsSpace.toMutableList().also {
+                                it[intent.track] = intent.value
                             }
                         )
                         is PulsarIntent.TrackMuteList -> state.copy(trackMuted = intent.muteList)

@@ -51,6 +51,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import org.balch.orpheus.core.audio.EngineCatalog
+import org.balch.orpheus.core.audio.EngineChoice
+import org.balch.orpheus.core.audio.EngineSlotKind
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.TransitionSpec
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
@@ -66,7 +70,7 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.widgets.DropdownCycleMinWidth
 import org.balch.orpheus.ui.widgets.DropdownValueText
-import org.balch.orpheus.ui.widgets.EnginePickerButton
+import org.balch.orpheus.ui.widgets.engine.EnginePicker
 import org.balch.orpheus.ui.widgets.EnumDropdown
 import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
@@ -568,7 +572,7 @@ private fun PulsarStepGridSection(
  * engine picker pair. Shown only while [selected] is non-null in the caller's `AnimatedVisibility`.
  */
 @Composable
-private fun PulsarVoiceDetailStrip(
+internal fun PulsarVoiceDetailStrip(
     selected: Int,
     state: PulsarUiState,
     actions: PulsarPanelActions,
@@ -580,6 +584,7 @@ private fun PulsarVoiceDetailStrip(
     val isMuted = state.trackMuted[selected]
     val edmEngine = state.trackEnginesEdm[selected]
     val spaceEngine = state.trackEnginesSpace[selected]
+    val choices = remember { EngineCatalog.choices(EngineSlotKind.PULSAR, hasNative = true) }
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -612,16 +617,12 @@ private fun PulsarVoiceDetailStrip(
             color = OrpheusColors.cosmicPurple.copy(alpha = 0.5f),
             fontSize = 9.sp,
         )
-        EnginePickerButton(
-            currentEngine = edmEngine,
-            onEngineChange = { actions.setTrackEngineEdm(selected, it) },
-            color = OrpheusColors.cosmicPurple,
-            label = pulsarEngineLabel(edmEngine),
-            config = PULSAR_TRACK_PICKERS[selected],
-            v2Config = PULSAR_V2_PICKER,
-            v3Config = PULSAR_V3_PICKER,
-            v4Config = PULSAR_V4_PICKER,
-            size = 36.dp,
+        PulsarSlotPicker(
+            engineId = edmEngine,
+            harmonics = state.trackHarmonicsEdm[selected],
+            choices = choices,
+            onEngine = { actions.setTrackEngineEdm(selected, it) },
+            onHarmonics = { actions.setTrackHarmonicsEdm(selected, it) },
             onExpandedChange = onPickerExpandedChange,
         )
 
@@ -630,19 +631,44 @@ private fun PulsarVoiceDetailStrip(
             color = OrpheusColors.cosmicPurple.copy(alpha = 0.5f),
             fontSize = 9.sp,
         )
-        EnginePickerButton(
-            currentEngine = spaceEngine,
-            onEngineChange = { actions.setTrackEngineSpace(selected, it) },
-            color = OrpheusColors.cosmicPurple,
-            label = pulsarEngineLabel(spaceEngine),
-            config = PULSAR_TRACK_PICKERS[selected],
-            v2Config = PULSAR_V2_PICKER,
-            v3Config = PULSAR_V3_PICKER,
-            v4Config = PULSAR_V4_PICKER,
-            size = 36.dp,
+        PulsarSlotPicker(
+            engineId = spaceEngine,
+            harmonics = state.trackHarmonicsSpace[selected],
+            choices = choices,
+            onEngine = { actions.setTrackEngineSpace(selected, it) },
+            onHarmonics = { actions.setTrackHarmonicsSpace(selected, it) },
             onExpandedChange = onPickerExpandedChange,
         )
     }
+}
+
+/** One slot's engine pill. A bare engine leaves the slot's harmonics alone; a DX patch sets them with the engine. */
+@Composable
+private fun PulsarSlotPicker(
+    engineId: Int,
+    harmonics: Float,
+    choices: List<EngineChoice>,
+    onEngine: (Int) -> Unit,
+    onHarmonics: (Float) -> Unit,
+    onExpandedChange: (Boolean) -> Unit,
+) {
+    val engine = OrpheusEngineId.fromId(engineId) ?: OrpheusEngineId.OSC
+    // Keyed on the patch, not the float, so a harmonics write doesn't rebuild the choice.
+    val patchIndex = EngineCatalog.patchAt(engine, harmonics)?.index
+    val current = remember(engine, patchIndex) { EngineCatalog.choiceFor(engine, harmonics) }
+    EnginePicker(
+        current = current,
+        choices = choices,
+        onPick = { choice ->
+            onEngine(choice.engine.id)
+            if (choice is EngineChoice.Patch) onHarmonics(choice.patch.harmonics)
+        },
+        color = OrpheusColors.cosmicPurple,
+        pillHeight = 30.dp,
+        onExpandedChange = onExpandedChange,
+        // The Braids codes read "3SAW", not "TRIPLE_SAW"; a patch keeps the catalog's "DX2 · name".
+        pillLabel = (current as? EngineChoice.Engine)?.let { pulsarEngineLabel(it.engine.id) },
+    )
 }
 
 /**

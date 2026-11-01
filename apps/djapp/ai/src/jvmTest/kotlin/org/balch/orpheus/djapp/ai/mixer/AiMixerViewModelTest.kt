@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,7 +17,11 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import java.lang.reflect.Proxy
+import org.balch.orpheus.core.audio.EngineCatalog
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.features.FeatureCoroutineScope
@@ -81,6 +87,23 @@ class AiMixerViewModelTest {
     @BeforeTest fun setUp() { Dispatchers.setMain(testDispatcher) }
     @AfterTest fun tearDown() { Dispatchers.resetMain() }
 
+    private val viz = MutableStateFlow(PulsarVizData())
+
+    /** The mixer reads only [SynthEngine.pulsarVizFlow]; every other call is a no-op. */
+    private fun engineWithViz(flow: StateFlow<PulsarVizData>) = Proxy.newProxyInstance(
+        SynthEngine::class.java.classLoader,
+        arrayOf(SynthEngine::class.java),
+    ) { _, method, _ ->
+        when {
+            method.name == "getPulsarVizFlow" -> flow
+            method.returnType == Boolean::class.javaPrimitiveType -> false
+            method.returnType == Float::class.javaPrimitiveType -> 0f
+            method.returnType == Int::class.javaPrimitiveType -> 0
+            method.returnType == Double::class.javaPrimitiveType -> 0.0
+            else -> null
+        }
+    } as SynthEngine
+
     private class Rig(
         val pulsar: FakePulsar,
         val controller: MixBenchController,
@@ -102,6 +125,7 @@ class AiMixerViewModelTest {
         val collab = MixCollab()
         val mixer = CollabMixer({ controller }, { pulsar }, collab, backgroundScope, captureService = { capture })
         val vm = AiMixerViewModel(
+            synthEngine = engineWithViz(viz),
             controllerProvider = { controller },
             pulsarFeature = pulsar,
             collabMixer = mixer,
@@ -379,7 +403,7 @@ class AiMixerViewModelTest {
     @Test
     fun pickingAnEngineOnASplitTrackEditsThatSlotOnly() = runTest(testDispatcher) {
         val r = rig(splitVibe()).also { it.pulsar.retunes = true }
-        r.vm.actions.setEngine(4, EngineSlot.SPACE, OrpheusEngineId.VOWEL_FOF)
+        r.vm.actions.setEngine(4, EngineSlot.SPACE, OrpheusEngineId.VOWEL_FOF, null)
         advanceUntilIdle()
         assertEquals(listOf("tracks[4].engineSpace.engineId"), r.mixer.history.value.vibeEdits.map { it.path })
         val t = r.pulsar.vibeFlow.value.tracks[4]
@@ -390,7 +414,7 @@ class AiMixerViewModelTest {
     @Test
     fun pickingAnEngineOnAnEqualPairEditsBothSlots() = runTest(testDispatcher) {
         val r = rig().also { it.pulsar.retunes = true }
-        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.VOWEL_FOF)
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.VOWEL_FOF, null)
         advanceUntilIdle()
         assertEquals(
             listOf("tracks[2].engineEdm.engineId", "tracks[2].engineSpace.engineId"),
@@ -403,11 +427,75 @@ class AiMixerViewModelTest {
         assertEquals(OrpheusEngineId.VOWEL_FOF, r.vm.stateFlow.value.tracks[2].spaceEngineId)
     }
 
+    // The patch's harmonics ride in the same edit, so the pick lands whichever slot is shown and under AUTO.
+    @Test
+    fun pickingADxPatchEditsEngineAndHarmonicsTogether() = runTest(testDispatcher) {
+        val r = rig(splitVibe()).also { it.pulsar.retunes = true }
+        val bells = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 && it.name == "Bells" }
+        val other = if (r.vm.stateFlow.value.tracks[4].slot == EngineSlot.EDM) EngineSlot.SPACE else EngineSlot.EDM
+        assertEquals(SlotLock.AUTO, r.vm.stateFlow.value.tracks[4].slotLock)
+        r.vm.actions.setEngine(4, other, OrpheusEngineId.DX2, bells.harmonics)
+        advanceUntilIdle()
+        val t = r.pulsar.vibeFlow.value.tracks[4]
+        val e = if (other == EngineSlot.EDM) t.engineEdm else t.engineSpace
+        assertEquals(OrpheusEngineId.DX2, e.engineId)
+        assertEquals(bells.harmonics, e.harmonics)
+        val s = r.vm.stateFlow.value.tracks[4]
+        assertEquals(bells.harmonics, if (other == EngineSlot.EDM) s.edmHarmonics else s.spaceHarmonics)
+    }
+
+    @Test
+    fun aPatchPickWithinAnEqualPairLeavesTheOtherSlotAlone() = runTest(testDispatcher) {
+        val bellC = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 && it.name == "Bell C" }
+        val koto = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 && it.name == "Koto" }
+        val bells = EngineCatalog.patches.first { it.engine == OrpheusEngineId.DX2 && it.name == "Bells" }
+        val base = vibe("Night Drive")
+        fun dx(h: Float) = base.tracks[4].engineEdm.copy(engineId = OrpheusEngineId.DX2, harmonics = h)
+        val v = base.copy(tracks = base.tracks.toMutableList().also {
+            it[4] = it[4].copy(engineEdm = dx(bellC.harmonics), engineSpace = dx(koto.harmonics))
+        })
+        val r = rig(v).also { it.pulsar.retunes = true }
+        r.vm.actions.setEngine(4, EngineSlot.SPACE, OrpheusEngineId.DX2, bells.harmonics)
+        advanceUntilIdle()
+        val t = r.pulsar.vibeFlow.value.tracks[4]
+        assertEquals(bells.harmonics, t.engineSpace.harmonics)
+        assertEquals(bellC.harmonics, t.engineEdm.harmonics)
+    }
+
+    @Test
+    fun activePatchIgnoredWhenTheDspPlaysAnotherEngine() = runTest(testDispatcher) {
+        val r = rig(splitVibe())
+        val t = r.vm.stateFlow.value.tracks[4]
+        val shown = if (t.slot == EngineSlot.EDM) t.edmEngineId else t.spaceEngineId
+        val other = if (t.slot == EngineSlot.EDM) t.spaceEngineId else t.edmEngineId
+        viz.value = PulsarVizData(activePatches = IntArray(8) { 21 }, activeEngines = IntArray(8) { other.id })
+        advanceUntilIdle()
+        assertEquals(-1, r.vm.stateFlow.value.tracks[4].activePatch, "the other slot's patch is not the shown slot's")
+        viz.value = PulsarVizData(activePatches = IntArray(8) { 21 }, activeEngines = IntArray(8) { shown.id })
+        advanceUntilIdle()
+        assertEquals(21, r.vm.stateFlow.value.tracks[4].activePatch)
+        viz.value = PulsarVizData()
+    }
+
+    @Test
+    fun activePatchFollowsTheEnginesViz() = runTest(testDispatcher) {
+        val r = rig()
+        assertEquals(-1, r.vm.stateFlow.value.tracks[4].activePatch)
+        viz.value = PulsarVizData(
+            activePatches = IntArray(8) { if (it == 4) 21 else -1 },
+            activeEngines = IntArray(8) { r.vm.stateFlow.value.tracks[it].let { t -> (if (t.slot == EngineSlot.EDM) t.edmEngineId else t.spaceEngineId).id } },
+        )
+        advanceUntilIdle()
+        assertEquals(21, r.vm.stateFlow.value.tracks[4].activePatch)
+        assertEquals(-1, r.vm.stateFlow.value.tracks[3].activePatch)
+        viz.value = PulsarVizData()
+    }
+
     @Test
     fun pickingAnEnginePlaysOn() = runTest(testDispatcher) {
         val r = rig().also { it.pulsar.retunes = true }
         val loads = r.pulsar.vibeLoadCount.value
-        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB)
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB, null)
         advanceUntilIdle()
         assertEquals(loads, r.pulsar.vibeLoadCount.value, "an engine pick retunes; it never reloads the vibe")
         assertEquals(1, r.pulsar.retuneCount)
@@ -420,7 +508,7 @@ class AiMixerViewModelTest {
         val r = rig().also { it.pulsar.retunes = true }
         r.vm.actions.setScope(Scope.SECTION)
         advanceUntilIdle()
-        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB)
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB, null)
         advanceUntilIdle()
         assertEquals(OrpheusEngineId.WTB, r.pulsar.vibeFlow.value.tracks[2].engineEdm.engineId)
         assertEquals("Engines change the whole vibe.", r.vm.stateFlow.value.notice)
@@ -430,7 +518,7 @@ class AiMixerViewModelTest {
     fun pickingAnEngineLeavesTheLockAlone() = runTest(testDispatcher) {
         val r = rig(splitVibe()).also { it.pulsar.retunes = true }
         val heard = r.vm.stateFlow.value.tracks[4].slot
-        r.vm.actions.setEngine(4, if (heard == EngineSlot.EDM) EngineSlot.SPACE else EngineSlot.EDM, OrpheusEngineId.VOWEL_FOF)
+        r.vm.actions.setEngine(4, if (heard == EngineSlot.EDM) EngineSlot.SPACE else EngineSlot.EDM, OrpheusEngineId.VOWEL_FOF, null)
         advanceUntilIdle()
         val t = r.vm.stateFlow.value.tracks[4]
         assertEquals(SlotLock.AUTO, t.slotLock)
@@ -501,7 +589,7 @@ class AiMixerViewModelTest {
         val r = rig()
         // A load landing between the retune ask and the reload leaves the mixer unable to play the pick.
         r.pulsar.beforeRetune = { r.pulsar.vibeLoadCount.value++ }
-        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB)
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB, null)
         advanceUntilIdle()
         assertEquals("The engine did not change. Try again once the vibe has loaded.", r.vm.stateFlow.value.notice)
         assertEquals(OrpheusEngineId.VA, r.pulsar.vibeFlow.value.tracks[2].engineEdm.engineId)

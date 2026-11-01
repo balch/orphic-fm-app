@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
@@ -45,6 +46,7 @@ import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.bench.BenchLayers
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.knobPath
 import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
@@ -66,7 +68,7 @@ private data class Local(
 )
 
 /** The VM's overlay with the shared collaboration marks: what the user pinned and what the agent touched. */
-private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>, val hist: Hist)
+private data class Overlay(val local: Local, val pins: Set<Int>, val agentTouched: Set<Int>, val hist: Hist, val patches: Pair<List<Int>, List<Int>>)
 
 /** The History timeline as the panel shows it. */
 private data class Hist(val rows: List<HistoryRow>, val hearing: Int?, val onCount: Int, val loadedAtMs: Long, val edited: Set<String>)
@@ -92,6 +94,7 @@ class AiMixerViewModel(
     private val scope: FeatureCoroutineScope,
     private val dispatchers: DispatcherProvider,
     private val costTotals: AiCostTotals,
+    private val synthEngine: SynthEngine,
 ) : AiMixerFeature {
     private val log = logging("AiMixerViewModel")
     private val local = MutableStateFlow(Local())
@@ -129,7 +132,9 @@ class AiMixerViewModel(
             val rows = historyRows(h, vibe) { BenchMeters.CHANNEL_NAMES.getOrElse(it) { n -> "T$n" } }
             Hist(rows, hearing, h.onCount + h.vibeEdits.count { it.on }, h.loadedAtMs, h.vibeEdits.filter { it.on }.map { it.path }.toSet())
         }
-        val overlay = combine(local, collab.pins, collab.agentTouched, hist, ::Overlay)
+        // The viz repeats itself every poll; only a change in a track's sounding patch is news.
+        val patches = synthEngine.pulsarVizFlow.map { it.activePatches.toList() to it.activeEngines.toList() }.distinctUntilChanged()
+        val overlay = combine(local, collab.pins, collab.agentTouched, hist, patches, ::Overlay)
         // The slot playing, followed with the engine's own hold between 0.4 and 0.6 energy.
         var heard: EngineSlot? = null
         emitAll(
@@ -137,7 +142,7 @@ class AiMixerViewModel(
                 val energy = b.layers.macroView(vibe, section, Macro.ENERGY, k[Macro.ENERGY] ?: Macro.ENERGY.vibeDefault(vibe)).heard
                 val slot = slotAt(energy, heard ?: if (energy >= 0.5f) EngineSlot.EDM else EngineSlot.SPACE)
                 heard = slot
-                val voice = VoiceView(slot, o.hist.edited)
+                val voice = VoiceView(slot, o.hist.edited, o.patches.first, o.patches.second)
                 mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k, voice).copy(
                     capture = o.local.capture,
                     capturing = o.local.capturing,
@@ -208,10 +213,18 @@ class AiMixerViewModel(
     )
 
     // An equal pair moves together, so the pick is heard whichever slot plays; a split track keeps the other slot's engine.
-    private fun setEngine(track: Int, slot: EngineSlot, engine: OrpheusEngineId) {
+    // A DX patch pick carries its harmonics into the same edit, so it lands whatever the lock and the shown slot.
+    private fun setEngine(track: Int, slot: EngineSlot, engine: OrpheusEngineId, harmonics: Float?) {
         val t = stateFlow.value.tracks.getOrNull(track) ?: return
-        val slots = if (t.edmEngineId == t.spaceEngineId) EngineSlot.entries else listOf(slot)
-        editEngines(slots.map { enginePath(track, it) to JsonPrimitive(engine.name) })
+        // An equal pair moves together only when the pick changes the engine; a patch pick within it is that slot's own.
+        val pickedId = if (slot == EngineSlot.EDM) t.edmEngineId else t.spaceEngineId
+        val slots = if (t.edmEngineId == t.spaceEngineId && pickedId != engine) EngineSlot.entries else listOf(slot)
+        editEngines(
+            slots.flatMap { s ->
+                listOf(enginePath(track, s) to JsonPrimitive(engine.name)) +
+                    listOfNotNull(harmonics?.let { knobPath(track, s, EngineKnob.HARMONICS) to JsonPrimitive(it) })
+            },
+        )
     }
 
     private fun setSlotLock(track: Int, lock: SlotLock) {

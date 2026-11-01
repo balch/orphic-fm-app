@@ -38,8 +38,11 @@ data class AiMixerActions(
     val setVoiceKnob: (Int, EngineKnob, Float?) -> Unit = { _, _, _ -> },
     /** Holds a track on its EDM or SPACE engine, or back to AUTO; a vibe row that plays on. */
     val setSlotLock: (Int, SlotLock) -> Unit = { _, _ -> },
-    /** Swaps a slot's engine from the strip's picker; the song plays on and the swap lands on the track's next note. */
-    val setEngine: (track: Int, slot: EngineSlot, engine: OrpheusEngineId) -> Unit = { _, _, _ -> },
+    /**
+     * Swaps a slot's engine from the strip's picker; the song plays on and the swap lands on the track's next note.
+     * A DX patch pick passes the patch's [harmonics] so engine and patch change as one edit; null leaves them alone.
+     */
+    val setEngine: (track: Int, slot: EngineSlot, engine: OrpheusEngineId, harmonics: Float?) -> Unit = { _, _, _, _ -> },
 ) {
     companion object {
         val EMPTY = AiMixerActions(
