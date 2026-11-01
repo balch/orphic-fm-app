@@ -19,4 +19,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
         self.window = window
     }
+
+    // Fires on the first activation of a cold launch too; AppDelegate has booted the graph by then.
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        #if USING_AI
+        DjAiHost.shared.collectSharedTab()
+        #endif
+    }
 }

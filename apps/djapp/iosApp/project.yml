@@ -177,6 +177,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app.ai
         PRODUCT_MODULE_NAME: DjAppAiApp
+        CODE_SIGN_ENTITLEMENTS: DjApp/DjAppAi.entitlements
         APP_DISPLAY_NAME: "Orphic DJ AI"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         OTHER_SWIFT_FLAGS: "-DUSING_AI"
@@ -210,6 +211,42 @@ targets:
           FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]:
             - "$(inherited)"
             - "$(SRCROOT)/../ai/build/bin/iosSimulatorArm64/releaseFramework"
+    dependencies:
+      - target: DjShareExtension
+
+  # Share sheet target for tab text. Writes shared-tab.txt to the AI app group; the app reads it on activation.
+  DjShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: DjShareExtension
+        excludes:
+          - Info.plist
+          - DjShareExtension.entitlements
+    info:
+      path: DjShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: "Orphic DJ AI"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.balch.djapp.app.ai.share
+        CODE_SIGN_ENTITLEMENTS: DjShareExtension/DjShareExtension.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: "Orphic DJ AI"
+        # Must match DjAppAi's, or the archive warns and App Store validation rejects the extension.
+        MARKETING_VERSION: "1.9.0"
+        CURRENT_PROJECT_VERSION: "3"
+        SKIP_INSTALL: "YES"
+        # Links no Kotlin framework, same as DjWidgetExtension.
+        TARGETED_DEVICE_FAMILY: "1,2"
 
   DjWidgetExtension:
     type: app-extension
