@@ -73,6 +73,9 @@ import org.balch.orpheus.djapp.playlist.EightBallReveal
 import org.balch.orpheus.djapp.playlist.EightBallRevealState
 import org.balch.orpheus.djapp.playlist.LocalEightBall
 import org.balch.orpheus.djapp.playlist.PlaylistSheet
+import org.balch.orpheus.djapp.share.SharedTextInbox
+import org.balch.orpheus.djapp.share.shareMarker
+import org.balch.orpheus.djapp.share.shouldOpenForShare
 import org.balch.orpheus.djapp.variant.DjTabContribution
 import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
 import org.balch.orpheus.djapp.variant.mergeTabContributions
@@ -135,6 +138,7 @@ fun DjAppScreen(
     // Passed in rather than collected here: DjApp already watches the viz state, and collecting
     // it again would recompose this whole screen on every viz knob turn.
     hidesPanelsWhenIdle: Boolean = false,
+    sharedTextInbox: SharedTextInbox? = null,
 ) {
     val djFeature = DjViewModel.feature()
     val pulsarFeature = PulsarViewModel.feature()
@@ -166,6 +170,19 @@ fun DjAppScreen(
     }
     var activeSheet by rememberSaveable(stateSaver = sheetRouteSaver) {
         mutableStateOf<DjRoute?>(null)
+    }
+
+    // A shared tab opens the AI sheet; the marker is saved so rotation doesn't reopen it, and
+    // carries the inbox session so a count from before process death is ignored.
+    var handledShares by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(sharedTextInbox, tabs) {
+        val inbox = sharedTextInbox ?: return@LaunchedEffect
+        inbox.openRequests.collect { count ->
+            if (shouldOpenForShare(handledShares, inbox.session, count) && AiTab in tabs) {
+                if (activeSheet != AiTab) activeSheet = AiTab
+                handledShares = shareMarker(inbox.session, count)
+            }
+        }
     }
 
     // The dome's long press: the 8-ball rises over the stage, then opens the playlist sheet. It rests

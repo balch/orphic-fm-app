@@ -5,6 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -21,6 +24,8 @@ import org.balch.orpheus.djapp.ai.ideas.IdeasInput
 import org.balch.orpheus.djapp.ai.ideas.IdeasScheduler
 import org.balch.orpheus.djapp.ai.mcp.McpEndpoint
 import org.balch.orpheus.djapp.ai.mcp.McpEndpointState
+import org.balch.orpheus.djapp.ai.songref.SongPasteStore
+import org.balch.orpheus.djapp.share.SharedTextInbox
 import org.balch.orpheus.features.ai.AgentActivityEvent
 import org.balch.orpheus.features.ai.PromptIntent
 import org.balch.orpheus.features.ai.composer.CastMode
@@ -38,6 +43,7 @@ import kotlinx.serialization.json.put
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -1019,6 +1025,51 @@ class DjAiViewModelTest {
         rig.reply("Done.")
         rig.chat.send("Duck the drums", null)
         assertEquals("Duck the drums", rig.collab.turnLabel)
+    }
+
+    // ─────────────────────────────────────────────────
+    // Shared text: the inbox drain DjAiViewModel runs
+    // ─────────────────────────────────────────────────
+
+    /** A chat rig whose state the drain feeds from a fresh [SharedTextInbox]. */
+    private fun TestScope.shareRig(initial: DjAiUiState): Pair<ChatRig, SharedTextInbox> {
+        val rig = ChatRig(initial)
+        val inbox = SharedTextInbox()
+        val refs = ReferenceAttacher(SongPasteStore(), backgroundScope, StandardTestDispatcher(testScheduler), rig.state)
+        backgroundScope.launch { drainSharedText(inbox, rig.state, refs) }
+        return rig to inbox
+    }
+
+    @Test
+    fun sharedTabAttachesWithoutSending() = runTest {
+        val (rig, inbox) = shareRig(DjAiUiState(promptDraft = "keep me", sheetMode = AiSheetMode.MIXER))
+        inbox.offer("Shared Tab\nG C D\nEm\nAm\nC")
+        runCurrent()
+        assertNotNull(rig.state.value.reference)
+        assertEquals("keep me", rig.state.value.promptDraft)
+        assertEquals(AiSheetMode.MIXER, rig.state.value.sheetMode)
+        assertEquals(emptyList(), rig.sent)
+        assertNull(inbox.pending.value)
+    }
+
+    @Test
+    fun sharedUrlGoesToDraft() = runTest {
+        val (rig, inbox) = shareRig(DjAiUiState(promptDraft = "make it dub"))
+        inbox.offer("https://a.b/c")
+        runCurrent()
+        assertEquals("make it dub https://a.b/c", rig.state.value.promptDraft)
+        assertNull(rig.state.value.reference)
+        assertEquals(emptyList(), rig.sent)
+    }
+
+    @Test
+    fun shareDuringRunKeepsDraft() = runTest {
+        val (rig, inbox) = shareRig(DjAiUiState(phase = DjAiPhase.GENERATING, promptDraft = "then add pads"))
+        inbox.offer("Shared Tab\nG C D\nEm\nAm\nC")
+        runCurrent()
+        assertEquals("Shared Tab", rig.state.value.reference?.title)
+        assertEquals("then add pads", rig.state.value.promptDraft)
+        assertEquals(emptyList(), rig.sent)
     }
 
     /** The conversation core with a recording agent, a real [MixCollab] and no coroutines. */

@@ -181,6 +181,7 @@ fun DjApp(
                                 modifier = Modifier.fillMaxSize(),
                                 tabContributions = tabContributions,
                                 hidesPanelsWhenIdle = hidesPanelsWhenIdle,
+                                sharedTextInbox = graph.sharedTextInbox,
                             )
                         }
 
