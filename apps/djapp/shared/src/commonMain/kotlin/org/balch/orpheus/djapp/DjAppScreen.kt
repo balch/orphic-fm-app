@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -82,6 +83,7 @@ import org.balch.orpheus.djapp.variant.mergeTabContributions
 import org.balch.orpheus.djapp.variant.stageChromeOverhang
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoPanel
 import org.balch.orpheus.djapp.vibeinfo.VibeInfoSheet
+import org.balch.orpheus.djapp.vibepresets.PresetBarMaxWidth
 import org.balch.orpheus.djapp.vibepresets.VibePresetBar
 import org.balch.orpheus.djapp.vibepresets.VibePresetSheets
 import org.balch.orpheus.djapp.vibepresets.VibePresetsViewModel
@@ -582,8 +584,9 @@ internal fun DjAppMainContent(
     // what the idle fade applies to; the header and the nav are outside it in every layout.
     val stage = LocalVizStage.current
     val fade = LocalPanelIdleFade.current
-    // The bar's foot clears the dome and its name pill, which rise over the stage's bottom edge.
-    val barClearance = stageChromeOverhang(layout)
+    // No reserve under the bar: the dome's or phone bar's name pill may cover its foot, where only
+    // the preset name sits, rather than leave a dead gap.
+    val barClearance = 0.dp
 
     // Below header and Pulsar: the pair when the layout has room, else the nav-selected panel.
     val lowerPanels: @Composable (Modifier) -> Unit = { mod ->
@@ -612,7 +615,8 @@ internal fun DjAppMainContent(
                 ) { route, panelModifier ->
                     routePanel(route, panelModifier, true)
                 }
-                presetBar(Modifier.fillMaxWidth(1f - 2f * OverscanFraction).padding(bottom = barClearance))
+                // The dock is wide; the bar stays a bar, centred under it.
+                presetBar(Modifier.widthIn(max = PresetBarMaxWidth).fillMaxWidth().padding(bottom = barClearance))
             }
         }
         DjLayout.Landscape -> {

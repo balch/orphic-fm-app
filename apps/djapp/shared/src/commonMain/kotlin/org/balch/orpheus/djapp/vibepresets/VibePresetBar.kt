@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -83,9 +84,13 @@ internal const val HIDE_SAVES_DESCRIPTION = "Hide saves"
 /** The vibe's original, e.g. "Bell Tolls - OG". */
 internal fun originalLabel(vibeName: String): String = "$vibeName - OG"
 
-private val DotSize = 14.dp
+private val DotSize = 18.dp
 // Wider than the dot, so a thumb hits it; the joining line runs through the gap.
-private val DotCellSize = 28.dp
+private val DotCellSize = 34.dp
+// Where a caller caps the bar on a TV or large screen, instead of stretching it across the dock.
+internal val PresetBarMaxWidth = 520.dp
+// The bar's glass sits this far lower, over the transport's name pill, within its own padding.
+private val BarDrop = 2.dp
 // The panels' corner (CollapsibleColumnPanel).
 private val BarShape = RoundedCornerShape(8.dp)
 private val PillShape = RoundedCornerShape(6.dp)
@@ -134,97 +139,100 @@ internal fun VibePresetBar(
     val presets = state.presets
     val selected = presets.firstOrNull { it.id == state.selectedId }
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            // Vertical only: the panels above draw their glass to their slot's edges, so the bar does too.
-            .padding(vertical = 4.dp)
-            // The same glass the docked panels wear, tinted teal; flat on TV hardware like they are.
-            .panelGlassChrome(
-                liquidState = LocalLiquidState.current,
-                effects = LocalLiquidEffects.current,
-                color = PresetTeal,
-                shape = BarShape,
-                accented = true,
-                glassEnabled = !LocalTelevisionHardware.current || TvGlassEnabled,
-            )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        // A dot tap that would throw away unsaved changes asks first; a vibe switch or a save drops
-        // the question.
-        var asked by remember(state.vibeName) { mutableStateOf<PendingLoad?>(null) }
-        val pending = asked?.takeIf { state.changed }
-        fun load(target: PendingLoad) {
-            val id = target.presetId
-            if (id == null) actions.loadOriginal() else actions.select(id)
-        }
-        fun tap(target: PendingLoad) {
-            if (state.changed) asked = target else load(target)
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PresetDot(
-                description = originalLabel(state.vibeName),
-                color = PresetPurple,
-                selected = selected == null,
-                joinStart = false,
-                joinEnd = presets.isNotEmpty() || state.changed,
-                onClick = { if (state.changed || selected != null) tap(PendingLoad(null)) },
-            )
-            presets.forEachIndexed { i, preset ->
-                PresetDot(
-                    description = PRESET_DOT_PREFIX + preset.name,
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(y = BarDrop)
+                // Vertical only: the panels above draw their glass to their slot's edges, so the bar does too.
+                .padding(vertical = 4.dp)
+                // The same glass the docked panels wear, tinted teal; flat on TV hardware like they are.
+                .panelGlassChrome(
+                    liquidState = LocalLiquidState.current,
+                    effects = LocalLiquidEffects.current,
                     color = PresetTeal,
-                    selected = preset.id == state.selectedId,
-                    joinStart = true,
-                    joinEnd = i < presets.lastIndex || state.changed,
-                    onClick = { tap(PendingLoad(preset.id)) },
+                    shape = BarShape,
+                    accented = true,
+                    glassEnabled = !LocalTelevisionHardware.current || TvGlassEnabled,
                 )
-            }
-            if (state.changed) NowDot(joinStart = true)
-            Spacer(Modifier.weight(1f))
-            PresetPill(
-                text = MANAGE_LABEL,
-                color = PresetPurple,
-                modifier = Modifier.semantics { contentDescription = MANAGE_DESCRIPTION },
-                onClick = onManage,
-            )
-            Spacer(Modifier.width(6.dp))
-            PresetPill(CAPTURE_LABEL, PresetTeal, onClick = actions.openCapture)
-        }
-        Row(
-            modifier = Modifier.padding(start = 6.dp, bottom = 3.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 6.dp, vertical = 2.dp),
         ) {
-            if (pending != null) {
-                Text(
-                    text = DISCARD_PROMPT,
-                    color = PresetAmber,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
+            // A dot tap that would throw away unsaved changes asks first; a vibe switch or a save drops
+            // the question.
+            var asked by remember(state.vibeName) { mutableStateOf<PendingLoad?>(null) }
+            val pending = asked?.takeIf { state.changed }
+            fun load(target: PendingLoad) {
+                val id = target.presetId
+                if (id == null) actions.loadOriginal() else actions.select(id)
+            }
+            fun tap(target: PendingLoad) {
+                if (state.changed) asked = target else load(target)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PresetDot(
+                    description = originalLabel(state.vibeName),
+                    color = PresetPurple,
+                    selected = selected == null,
+                    joinStart = false,
+                    joinEnd = presets.isNotEmpty() || state.changed,
+                    onClick = { if (state.changed || selected != null) tap(PendingLoad(null)) },
                 )
-                PresetPill(CANCEL_LABEL, PresetPurple) { asked = null }
-                PresetPill(DISCARD_LABEL, PresetAmber) {
-                    asked = null
-                    load(pending)
+                presets.forEachIndexed { i, preset ->
+                    PresetDot(
+                        description = PRESET_DOT_PREFIX + preset.name,
+                        color = PresetTeal,
+                        selected = preset.id == state.selectedId,
+                        joinStart = true,
+                        joinEnd = i < presets.lastIndex || state.changed,
+                        onClick = { tap(PendingLoad(preset.id)) },
+                    )
                 }
-            } else {
-                Text(
-                    text = selected?.name ?: originalLabel(state.vibeName),
-                    color = if (selected != null) PresetTeal else PresetPurple,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
+                if (state.changed) NowDot(joinStart = true)
+                Spacer(Modifier.weight(1f))
+                PresetPill(
+                    text = MANAGE_LABEL,
+                    color = PresetPurple,
+                    modifier = Modifier.semantics { contentDescription = MANAGE_DESCRIPTION },
+                    onClick = onManage,
                 )
-                if (selected != null) {
-                    val time = selected.timeLabel(rememberNowMs())
-                    Text("· $time", color = PresetMuted, fontSize = 10.sp, maxLines = 1)
+                Spacer(Modifier.width(6.dp))
+                PresetPill(CAPTURE_LABEL, PresetTeal, onClick = actions.openCapture)
+            }
+            Row(
+                modifier = Modifier.padding(start = 6.dp, bottom = 3.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (pending != null) {
+                    Text(
+                        text = DISCARD_PROMPT,
+                        color = PresetAmber,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    PresetPill(CANCEL_LABEL, PresetPurple) { asked = null }
+                    PresetPill(DISCARD_LABEL, PresetAmber) {
+                        asked = null
+                        load(pending)
+                    }
+                } else {
+                    Text(
+                        text = selected?.name ?: originalLabel(state.vibeName),
+                        color = if (selected != null) PresetTeal else PresetPurple,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (selected != null) {
+                        val time = selected.timeLabel(rememberNowMs())
+                        Text("· $time", color = PresetMuted, fontSize = 10.sp, maxLines = 1)
+                    }
+                    if (state.changed) Text("· changed", color = PresetAmber, fontSize = 10.sp, maxLines = 1)
                 }
-                if (state.changed) Text("· changed", color = PresetAmber, fontSize = 10.sp, maxLines = 1)
             }
         }
     }

@@ -120,12 +120,14 @@ class DjAppMainContentWiringTest {
             val stage = assertNotNull(shot.stage, "${case.name}: no stage was reported")
             assertTrue(bar.height >= PresetBarHeight - 1f, "${case.name}: the bar was squeezed to $bar")
             assertTrue(stage.contains(bar, slack = 1f), "${case.name}: the bar $bar is outside the stage $stage")
-            // The ring and its name pill rise over the stage's foot; the bar sits clear above them.
+            // The bar sits clear of the ring; the name pill, at the transport's top, may cover its foot.
             shot.transport?.let { transport ->
-                assertTrue(!bar.overlaps(transport), "${case.name}: the bar $bar is under the transport $transport")
+                val ring = transport.copy(top = transport.top + NamePillReach)
+                assertTrue(!bar.overlaps(ring), "${case.name}: the bar $bar is under the transport's ring $ring")
             }
             assertTrue(
-                shot.paintedIn(bar.deflate(EdgeSlack)) == 0,
+                // Its foot may sit under the transport's name pill, which never fades.
+                shot.paintedIn(bar.copy(bottom = bar.bottom - NamePillReach).deflate(EdgeSlack)) == 0,
                 "${case.name}: the bar did not fade with the panels",
             )
         }
@@ -542,6 +544,8 @@ class DjAppMainContentWiringTest {
          * a panel that failed to fade would paint the whole region, not its first few rows.
          */
         const val EdgeSlack = 6f
+        // How far the transport's name pill reaches down from the transport rect's top.
+        const val NamePillReach = 24f
 
         const val PresetBarTag = "presetBar"
         const val PresetBarHeight = 40
