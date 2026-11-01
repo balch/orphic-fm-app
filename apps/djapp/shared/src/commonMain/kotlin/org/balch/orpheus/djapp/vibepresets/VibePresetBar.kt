@@ -86,7 +86,8 @@ internal fun originalLabel(vibeName: String): String = "$vibeName - OG"
 private val DotSize = 14.dp
 // Wider than the dot, so a thumb hits it; the joining line runs through the gap.
 private val DotCellSize = 28.dp
-private val BarShape = RoundedCornerShape(10.dp)
+// The panels' corner (CollapsibleColumnPanel).
+private val BarShape = RoundedCornerShape(8.dp)
 private val PillShape = RoundedCornerShape(6.dp)
 
 /** A dot tap waiting on "Discard changes?": a preset's id, or null for the vibe's original. */
@@ -136,7 +137,8 @@ internal fun VibePresetBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            // Vertical only: the panels above draw their glass to their slot's edges, so the bar does too.
+            .padding(vertical = 4.dp)
             // The same glass the docked panels wear, tinted teal; flat on TV hardware like they are.
             .panelGlassChrome(
                 liquidState = LocalLiquidState.current,
