@@ -5,7 +5,11 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.MidiNoteEvent
+import org.balch.orpheus.core.audio.OrpheusEngineId
+import org.balch.orpheus.core.audio.dxLockEngineControl
+import org.balch.orpheus.core.audio.isDrumModControl
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
@@ -96,6 +100,7 @@ class MidiInputHandler(
     // ═══════════════════════════════════════════════════════════
 
     private fun applyCCToControl(controlId: String, value: Float) {
+        if (isDxLocked(controlId)) return
         val isCycle = isCycleControl(controlId)
 
         var effectiveValue = value
@@ -116,6 +121,16 @@ class MidiInputHandler(
         dispatchControlChange(controlId, effectiveValue)
         lastCcValues[controlId] = effectiveValue
         lastRawCcValues[controlId] = value
+    }
+
+    /** On DX engines harmonics picks a patch, so a learned CC must leave it alone. */
+    private fun isDxLocked(controlId: String): Boolean {
+        val engineKey = dxLockEngineControl(controlId) ?: return false
+        val id = PluginControlId.parse(engineKey) ?: return false
+        val raw = synthController.getPluginControl(id)?.asInt() ?: return false
+        val engine = if (isDrumModControl(controlId)) OrpheusEngineId.entries.getOrNull(raw)
+        else OrpheusEngineId.fromId(raw)
+        return engine?.forcePinHarmonics == true
     }
 
     private fun toggleControl(controlId: String) {
