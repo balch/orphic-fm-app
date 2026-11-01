@@ -74,6 +74,8 @@ private class Grid(textScale: Float) {
         width - LIST_PAD * 2 - 16.dp - (name + pin + voice + meter + db + lu + ms + ROW_GAP * 7) >= 40.dp
 }
 
+internal const val LICK_LAB_NEEDS_WIDE = "Lick Lab needs a wider window"
+
 internal fun rowTag(index: Int) = "mixer-row-$index"
 
 /**
@@ -90,6 +92,7 @@ internal fun CompactMixer(
     onVoice: (Int) -> Unit,
     modifier: Modifier = Modifier,
     bottomOverhang: Dp = 0.dp,
+    onCloseLickLab: (() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableIntStateOf(-1) }
     val inline = width >= INLINE_SLIDERS_MIN
@@ -104,6 +107,10 @@ internal fun CompactMixer(
     ) {
         item(key = "header") {
             Header(state.vibeName, state.aiCostUsd, meters, stacked = width < WIDE_MIN)
+        }
+        // Lick Lab was open when the window shrank; it comes back once the window is wide again.
+        if (onCloseLickLab != null) {
+            item(key = "lick-lab") { NoticeLine(LICK_LAB_NEEDS_WIDE, onCloseLickLab, Modifier.fillMaxWidth()) }
         }
         item(key = "macros") {
             KnobsAndChips(

@@ -44,6 +44,8 @@ kotlin {
         // DjRoute extends NavKey; tests reading route fields need it on the classpath.
         jvmTest.dependencies {
             implementation(libs.jetbrains.navigation3.ui)
+            // runComposeUiTest: Lick Lab's keys and key strip need real key and mouse input.
+            implementation(libs.compose.ui.test)
         }
         // Koog's model clients need an engine; the Orpheus iOS app ships the same one.
         iosMain.dependencies {

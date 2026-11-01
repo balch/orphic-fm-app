@@ -46,8 +46,11 @@ import org.balch.orpheus.core.di.StartupRoot
 import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.djapp.ai.OrphicFiles
 import org.balch.orpheus.djapp.ai.collab.CollabMixer
+import org.balch.orpheus.djapp.ai.licklab.LickLabFeature
+import org.balch.orpheus.djapp.ai.tools.KeyboardReadTool
 import org.balch.orpheus.djapp.ai.usage.AiCostLedger
 import org.balch.orpheus.features.ai.AgentErrorLog
+import org.balch.orpheus.features.pulsar.PulsarFeature
 
 /**
  * Merged into the FeatureScope graph so the AppScope server can read the same tool set the
@@ -58,11 +61,13 @@ interface McpToolAccess {
     val mcpToolProviders: Set<ToolProvider>
     val agentErrorLog: AgentErrorLog
     val aiCostLedger: AiCostLedger
+    val lickLabFeature: LickLabFeature
+    val pulsarFeature: PulsarFeature
 }
 
 /**
  * The AI edition's loopback MCP server: every koog [ToolProvider] in FeatureScope plus [AgentErrorsTool],
- * [MixClearChangesTool] and [AiCostTool], served at `http://127.0.0.1:<port>/mcp` with a bearer token, `mcp.json` under
+ * [MixClearChangesTool], [AiCostTool] and [KeyboardReadTool], served at `http://127.0.0.1:<port>/mcp` with a bearer token, `mcp.json` under
  * [OrphicFiles.root].
  * Starts with the app, stops on process exit; [McpEndpointState] carries the endpoint once it listens.
  */
@@ -91,7 +96,7 @@ class OrphicMcpServer(
         val access = holder.featureGraph as? McpToolAccess
             ?: error("FeatureGraph does not merge McpToolAccess; is :apps:djapp:ai on the graph's classpath?")
         access.mcpToolProviders + AgentErrorsTool(access.agentErrorLog) + MixClearChangesTool(collabMixer) +
-            AiCostTool(access.aiCostLedger)
+            AiCostTool(access.aiCostLedger) + KeyboardReadTool({ access.lickLabFeature }, { access.pulsarFeature })
     }
 
     init {

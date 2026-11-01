@@ -43,6 +43,8 @@ import org.balch.orpheus.djapp.ai.chat.ChatInk
 import org.balch.orpheus.djapp.ai.chat.ChatInputFocus
 import org.balch.orpheus.djapp.ai.chat.LocalChatInputFocus
 import org.balch.orpheus.djapp.ai.chat.legibleDp
+import org.balch.orpheus.djapp.ai.licklab.LickLabFeature
+import org.balch.orpheus.djapp.ai.licklab.LickLabViewModel
 import org.balch.orpheus.djapp.ai.mixer.AiMixerFeature
 import org.balch.orpheus.djapp.ai.mixer.AiMixerPanel
 import org.balch.orpheus.djapp.ai.mixer.AiMixerViewModel
@@ -87,7 +89,8 @@ class AiTabContribution : DjTabContribution {
         // free (ON_FIRST_PROMPT), so resolving the feature while closed issues no LLM traffic.
         val feature = DjAiViewModel.feature()
         val mixer = AiMixerViewModel.feature()
-        if (isOpen) AiSheet(feature, mixer, isLandscape, onDismiss, modifier)
+        val lickLab = LickLabViewModel.feature()
+        if (isOpen) AiSheet(feature, mixer, isLandscape, onDismiss, modifier, lickLab)
     }
 }
 
@@ -103,6 +106,7 @@ internal fun AiSheet(
     isLandscape: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    lickLab: LickLabFeature? = null,
 ) {
     val mixerMode by remember(chat) {
         chat.stateFlow.map { it.sheetMode == AiSheetMode.MIXER }.distinctUntilChanged()
@@ -123,7 +127,7 @@ internal fun AiSheet(
         // The layout branch is taken here in composition, never under BoxWithConstraints: a bottom sheet's dialog layer
         // added or removed mid-measure crashes desktop Compose.
         when {
-            isLandscape && mixerMode -> MixerSheetContent(mixer, onDismiss) { overhang ->
+            isLandscape && mixerMode -> MixerSheetContent(mixer, onDismiss, lickLab) { overhang ->
                 val side = Modifier.fillMaxHeight().padding(bottom = overhang)
                 if (chatCollapsed) {
                     ChatRail(onExpand = { chatCollapsed = false }, side.width(railWidth))
@@ -141,7 +145,11 @@ internal fun AiSheet(
                 AdaptiveSheet(isLandscape = false, portraitPeekHeight = peek, onDismiss = onDismiss) {
                     Column(Modifier.fillMaxSize()) {
                         if (mixerMode) {
-                            AiMixerPanel(mixer, Modifier.fillMaxWidth().weight(StackedMixerWeight).testTag(SHEET_MIXER_TAG))
+                            AiMixerPanel(
+                                mixer,
+                                Modifier.fillMaxWidth().weight(StackedMixerWeight).testTag(SHEET_MIXER_TAG),
+                                lickLab = lickLab,
+                            )
                         }
                         ChatColumn(
                             chat,

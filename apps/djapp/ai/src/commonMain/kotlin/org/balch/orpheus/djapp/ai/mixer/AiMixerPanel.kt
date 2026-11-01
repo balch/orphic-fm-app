@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -64,9 +65,13 @@ import androidx.compose.ui.unit.min
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.ai.chat.rememberOverlayFocus
 import org.balch.orpheus.djapp.ai.chat.usd
+import org.balch.orpheus.djapp.ai.licklab.LickLabFeature
+import org.balch.orpheus.djapp.ai.licklab.LickLabPanel
 import org.balch.orpheus.djapp.legible
 import org.balch.orpheus.features.pulsar.SectionReadout
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
@@ -130,8 +135,16 @@ fun AiMixerPanel(
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
     bottomOverhang: Dp = 0.dp,
+    lickLab: LickLabFeature? = null,
 ) {
     val state by feature.stateFlow.collectAsState()
+    val lickShown = lickLab?.let { lab ->
+        remember(lab) { lab.stateFlow.map { it.shown }.distinctUntilChanged() }.collectAsState(lab.stateFlow.value.shown).value
+    } ?: false
+    // Closing the mixer hands an armed track back to its sequencer.
+    DisposableEffect(lickLab) {
+        onDispose { if (lickLab?.stateFlow?.value?.shown == true) lickLab.actions.toggleShown() }
+    }
     val meters = feature.meters.collectAsState(EMPTY_METERS)
     val readout = feature.sectionReadout.collectAsState(null)
     val flashes = remember { AgentFlashes() }
@@ -168,6 +181,8 @@ fun AiMixerPanel(
         val wideHeight = maxHeight - bottomOverhang
         val width = maxWidth
         val wide = width >= WIDE_MIN && wideHeight >= WIDE_MIN_HEIGHT
+        // Compact has no keyboard, so an armed track would sit silent: hand it back, Lick Lab stays open for wide.
+        LaunchedEffect(wide, lickShown) { if (!wide && lickShown) lickLab?.actions?.disarm() }
         Surface(
             Modifier.fillMaxSize().padding(bottom = if (wide) bottomOverhang else 0.dp),
             shape = shape,
@@ -176,9 +191,13 @@ fun AiMixerPanel(
         ) {
             Box(Modifier.fillMaxSize()) {
                 if (wide) {
-                    WideMixer(state, meters, readout, feature.actions, flashes, width, wideHeight, openVoice)
+                    WideMixer(state, meters, readout, feature.actions, flashes, width, wideHeight, openVoice, lickLab, lickShown)
                 } else {
-                    CompactMixer(state, meters, feature.actions, flashes, width, openVoice, bottomOverhang = bottomOverhang)
+                    CompactMixer(
+                        state, meters, feature.actions, flashes, width, openVoice,
+                        bottomOverhang = bottomOverhang,
+                        onCloseLickLab = if (lickShown) lickLab?.actions?.let { it::toggleShown } else null,
+                    )
                 }
                 if (voiceTrack != null) {
                     // A clear scrim: the strips' meters stay readable while the knobs turn.
@@ -216,6 +235,8 @@ private fun WideMixer(
     width: Dp,
     height: Dp,
     onVoice: (Int) -> Unit,
+    lickLab: LickLabFeature?,
+    lickShown: Boolean,
 ) {
     // Short windows (a 1280x800 desktop under the dome's clearance) tighten the furniture so the faders keep travel.
     val tight = height < TIGHT_HEIGHT
@@ -264,6 +285,7 @@ private fun WideMixer(
                             actions,
                             oneRow = width >= HEADER_ONE_ROW_MIN,
                             tight = tight,
+                            lickLab = lickLab?.actions?.let { LickLabToggle(lickShown, it::toggleShown) },
                             onChanges = {
                                 if (changesOpen) {
                                     closeChanges()
@@ -287,7 +309,13 @@ private fun WideMixer(
                         if (state.sectionScope) SectionPanNote()
                     }
                 },
-                strips = { Strips(state, meters, actions, flashes, stripWidth, wave, tight, onVoice) },
+                strips = {
+                    if (lickShown && lickLab != null) {
+                        LickLabPanel(lickLab, Modifier.fillMaxSize())
+                    } else {
+                        Strips(state, meters, actions, flashes, stripWidth, wave, tight, onVoice)
+                    }
+                },
             )
         }
         if (changesOpen) {
@@ -334,7 +362,12 @@ private fun TopThenStrips(viewport: Dp, gap: Dp, top: @Composable () -> Unit, st
     }
 }
 
-/** Title, the changes button, Capture and Reset; the bus readout beside them when [oneRow], else under. */
+/** The header's Lick Lab button: lit while Lick Lab replaces the strips. */
+private class LickLabToggle(val shown: Boolean, val onToggle: () -> Unit)
+
+internal const val LICK_LAB_TOGGLE_TAG = "mixer-lick-lab"
+
+/** Title, the Lick Lab and changes buttons, Capture and Reset; the bus readout beside them when [oneRow], else under. */
 @Composable
 private fun WideHeader(
     state: AiMixerUiState,
@@ -342,6 +375,7 @@ private fun WideHeader(
     actions: AiMixerActions,
     oneRow: Boolean,
     tight: Boolean,
+    lickLab: LickLabToggle?,
     onChanges: () -> Unit,
     onRowHeight: (Int) -> Unit,
 ) {
@@ -355,6 +389,7 @@ private fun WideHeader(
             Title(state.vibeName, state.aiCostUsd, Modifier.weight(1f))
             if (oneRow) BusReadout(meters)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                lickLab?.let { MixerButton("Lick Lab", it.onToggle, Modifier.testTag(LICK_LAB_TOGGLE_TAG), primary = it.shown) }
                 MixerButton(changesLabel(state.historyChangeCount), onChanges, Modifier.testTag(HISTORY_TAG))
                 MixerButton(if (state.capturing) "Capturing…" else "Capture", actions.capture, primary = true, enabled = !state.capturing)
                 MixerButton("Clear All", actions.reset)

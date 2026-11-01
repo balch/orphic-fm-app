@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import org.balch.orpheus.djapp.ai.licklab.LickLabFeature
 import org.balch.orpheus.djapp.variant.LocalStageChromeOverhang
 
 /** The panel's corners inside the sheet. */
@@ -65,6 +66,7 @@ fun MixerSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
 internal fun MixerSheetContent(
     feature: AiMixerFeature,
     onDismiss: () -> Unit,
+    lickLab: LickLabFeature? = null,
     beside: @Composable RowScope.(bottomOverhang: Dp) -> Unit = {},
 ) {
     val overhang = LocalStageChromeOverhang.current
@@ -75,6 +77,7 @@ internal fun MixerSheetContent(
                 Modifier.weight(1f).fillMaxHeight().testTag(SHEET_MIXER_TAG),
                 shape = MixerSheetShape,
                 bottomOverhang = overhang,
+                lickLab = lickLab,
             )
             beside(overhang)
         }
