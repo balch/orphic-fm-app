@@ -42,3 +42,9 @@ kotlin {
         }
     }
 }
+
+// The wasm test bundle imports skiko.mjs (Compose reaches it through :core:foundation), but only
+// the Compose convention copies that file in, so Karma's webpack fails and Chrome sits silent
+// until it times out. commonTest still runs on JVM, Android and iOS; re-enable if this module
+// adopts orpheus.kmp.compose.
+tasks.matching { it.name == "wasmJsBrowserTest" }.configureEach { enabled = false }
