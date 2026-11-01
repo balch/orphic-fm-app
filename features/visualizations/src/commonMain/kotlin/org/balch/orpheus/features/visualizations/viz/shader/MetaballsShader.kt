@@ -65,7 +65,8 @@ float4 main(float2 fragCoord) {
     float3 colorSum = float3(0.0);
     float weightSum = 0.0;
     float2 gradient = float2(0.0); // Analytical gradient
-    
+    float radiusSum = 0.0;
+
     // Single pass calculation of field AND gradient
     for (int i = 0; i < 16; i++) {
         if (i >= ballCount) break;
@@ -94,8 +95,11 @@ float4 main(float2 fragCoord) {
             // The -6 factor is omitted here as we normalize the normal anyway
             gradient += (g2 * energy / r2) * dv;
             
+            radiusSum += radius * influence;
+
+            // Weight colours by g^2, not g^3, so neighbours blend over a band instead of a hard seam
             float3 ballColor = colors[i].rgb;
-            float weight = influence * colors[i].a;
+            float weight = g2 * energy * colors[i].a;
             colorSum += ballColor * weight;
             weightSum += weight;
         }
@@ -109,20 +113,22 @@ float4 main(float2 fragCoord) {
     // Normalize color
     float3 baseColor = (weightSum > 0.001) ? colorSum / weightSum : float3(0.0);
     
-    // Calculate normal from analytical gradient
-    // We add a Z component to create the "thickness" of the blob
-    // Higher Z scale = flatter blobs, Lower Z scale = rounder/bubblier
-    float3 normal = normalize(float3(gradient.x, gradient.y, 0.025));
-    
-    // Lighting
-    float3 lightDir = normalize(float3(0.4, 0.4, 1.0));
+    // Sphere-shaped surface: height = R * F^(1/6) matches a ball's sqrt(1 - d²/R²) profile, so tops
+    // are smooth domes. A small fixed Z here made every blob a cone with a pinched point at its centre.
+    float avgRadius = radiusSum / totalInfluence;
+    float2 slope = gradient * avgRadius * pow(max(totalInfluence, 0.02), -0.8333);
+    float3 normal = normalize(float3(slope, 1.0));
     float3 viewDir = float3(0.0, 0.0, 1.0);
-    
-    float ambient = 0.2;
-    float diffuse = max(dot(normal, lightDir), 0.0) * 0.8;
-    float3 halfDir = normalize(lightDir + viewDir);
-    float specular = pow(max(dot(normal, halfDir), 0.0), 32.0) * 0.7;
-    float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0) * 0.5;
+
+    // Broad soft sheen plus a faint bounce light: wide lobes follow the curve instead of a pinpoint dot
+    float3 lightDir = normalize(float3(-0.45, 0.6, 0.66));
+    float3 bounceDir = normalize(float3(0.6, -0.5, 0.6));
+    float3 r = reflect(-viewDir, normal);
+    float specular = pow(max(dot(r, lightDir), 0.0), 8.0) * 0.45;
+    float bounce = pow(max(dot(r, bounceDir), 0.0), 6.0) * 0.25;
+    float ambient = 0.12;
+    float diffuse = max(dot(normal, lightDir), 0.0) * 0.75;
+    float rim = pow(1.0 - max(normal.z, 0.0), 2.0) * 0.35 + bounce;
     
     // Color effects
     if (abs(lfoMod) > 0.01) {
@@ -137,7 +143,7 @@ float4 main(float2 fragCoord) {
     }
     
     // Combine lighting
-    float3 finalColor = baseColor * (ambient + diffuse + rim) + float3(specular);
+    float3 finalColor = baseColor * (ambient + diffuse + rim) + mix(float3(1.0), baseColor, 0.5) * specular;
     
     // Master energy boost - keep it higher for color retention
     finalColor *= (0.8 + masterEnergy * 0.4);
