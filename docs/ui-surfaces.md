@@ -81,6 +81,13 @@ Notes that follow from the code:
 - Do not decide a layout with `BoxWithConstraints` around a sheet or popup. Adding or removing a
   dialog layer during measure crashes desktop Compose. Use `DjLayoutBox` or the window size.
 
+## Nav panels per edition
+
+Both editions have a customizable nav (long-press a chip, drag to swap). `navPanels(edition)` in
+`NavOrder.kt` lists what each can show: AI has DJ, Mix, Pulsar, AI, Timer, Horn, Cowbell; OG has
+the same without AI. A phone bar holds four, so the rest start off the bar until dragged on.
+`CowbellStartup` (shared DI) builds the cowbell at launch in both editions.
+
 ## Choosing, in order
 
 1. Do you hold it, drag it, tilt it, or play it? Panel (rule 4).
