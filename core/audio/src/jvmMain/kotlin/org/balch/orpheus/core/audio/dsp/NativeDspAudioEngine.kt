@@ -131,6 +131,20 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge, MixBenchTap, StemTapS
         bridge.nativeGetViz(channel, outBuf, lastReadPos)
     override fun nativeGetSpectrum(bands: FloatArray): Int = bridge.nativeGetSpectrum(bands)
 
+    // Guarded like nativeGetScope: a stale dylib would throw every tick and end the shared spectrum poll.
+    @Volatile
+    private var spectrogramMissing = false
+    override fun nativeGetSpectrogram(rows: FloatArray, fMin: Float, fMax: Float): Int {
+        if (spectrogramMissing) return 0
+        return try {
+            bridge.nativeGetSpectrogram(rows, fMin, fMax)
+        } catch (e: UnsatisfiedLinkError) {
+            spectrogramMissing = true
+            log.warn { "nativeGetSpectrogram missing from the native library; rebuild it (${e.message})" }
+            0
+        }
+    }
+
     // Guarded like nativeLoadPulsarClip, and remembered: a 60 Hz poll must not throw every tick.
     @Volatile
     private var scopeMissing = false

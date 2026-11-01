@@ -356,6 +356,11 @@ int OboeEngine::getViz(int channel, float* outBuf, int maxSamples, int* lastRead
 int OboeEngine::getSpectrum(float* bands, int numBands) {
     return engine_.with(0, [&](OrpheusEngine* e) { return orpheus_engine_get_spectrum(e, bands, numBands); });
 }
+int OboeEngine::getSpectrogram(float* rows, int numRows, float fMin, float fMax) {
+    return engine_.with(0, [&](OrpheusEngine* e) {
+        return orpheus_engine_get_spectrogram(e, rows, numRows, fMin, fMax);
+    });
+}
 int OboeEngine::getScope(float* out, int numPoints, float windowMs) {
     return engine_.with(-1, [&](OrpheusEngine* e) { return orpheus_engine_get_scope(e, out, numPoints, windowMs); });
 }

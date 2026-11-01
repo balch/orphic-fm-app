@@ -17,6 +17,7 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     auto* engine = new OrpheusEngine();
     engine->sample_rate = sample_rate;
     engine->spectrum_analyzer.Init(sample_rate);
+    engine->spectrogram_analyzer.Init(sample_rate);
 
     // Per-section per-track density: 0 is a MEANINGFUL value ("track out"), so this table
     // cannot use the zero-init every other section-override array relies on — an unpushed

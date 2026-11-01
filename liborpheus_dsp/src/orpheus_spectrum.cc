@@ -54,6 +54,48 @@ void SpectrumAnalyzer::Analyze(const SampleRing& ring, float* bands, int n) {
     }
 }
 
+void SpectrogramAnalyzer::Init(float sample_rate) {
+    sample_rate_ = sample_rate;
+    fft_.Init();
+    for (int i = 0; i < kFftSize; ++i) {
+        window_[i] = 0.5f * (1.0f - std::cos(2.0f * kPi * i / (kFftSize - 1)));  // Hann
+    }
+    initialized_ = true;
+}
+
+void SpectrogramAnalyzer::Analyze(const SampleRing& ring, float* rows, int n, float f_min, float f_max) {
+    if (!initialized_ || !rows || n <= 0) return;
+
+    uint32_t wc = ring.write_count.load(std::memory_order_acquire);
+    uint32_t start = wc - static_cast<uint32_t>(kFftSize);
+    for (int i = 0; i < kFftSize; ++i) {
+        fft_in_[i] = ring.buf[(start + i) % SampleRing::kSize] * window_[i];
+    }
+    fft_.Direct(fft_in_, fft_out_);  // clobbers fft_in_
+
+    // Same ShyFFT packing as SpectrumAnalyzer; bin 0 (DC) is left at the floor.
+    const int half = kFftSize / 2;
+    bin_db_[0] = kFloorDb;
+    for (int k = 1; k < half; ++k) {
+        float re = fft_out_[k];
+        float im = fft_out_[half + k];
+        float mag = std::sqrt(re * re + im * im) * (2.0f / kFftSize);
+        bin_db_[k] = std::max(kFloorDb, 20.0f * std::log10(mag + 1e-12f));
+    }
+
+    // dB is interpolated rather than magnitude, as the offline renderer does, so a
+    // partial's skirt fades evenly across the rows between two bins.
+    const float bin_hz = sample_rate_ / kFftSize;
+    const float ratio = f_max / f_min;
+    for (int r = 0; r < n; ++r) {
+        float hz = f_min * std::pow(ratio, n > 1 ? static_cast<float>(r) / (n - 1) : 0.0f);
+        float k = hz / bin_hz;
+        int k0 = std::min(half - 2, std::max(0, static_cast<int>(k)));
+        float t = std::min(1.0f, std::max(0.0f, k - k0));
+        rows[r] = bin_db_[k0] + (bin_db_[k0 + 1] - bin_db_[k0]) * t;
+    }
+}
+
 // C API — defined here so all spectrum code lives together. Declared in orpheus_dsp.h.
 #include "../include/orpheus_dsp.h"
 #include "orpheus_engine.h"
@@ -61,4 +103,11 @@ int orpheus_engine_get_spectrum(OrpheusEngine* engine, float* bands, int num_ban
     if (!engine || !bands || num_bands <= 0) return 0;
     engine->spectrum_analyzer.Analyze(engine->spectrum_ring, bands, num_bands);
     return num_bands;
+}
+
+int orpheus_engine_get_spectrogram(OrpheusEngine* engine, float* rows, int num_rows,
+                                   float f_min, float f_max) {
+    if (!engine || !rows || num_rows <= 0 || !(f_min > 0.0f) || !(f_max > f_min)) return 0;
+    engine->spectrogram_analyzer.Analyze(engine->spectrum_ring, rows, num_rows, f_min, f_max);
+    return num_rows;
 }

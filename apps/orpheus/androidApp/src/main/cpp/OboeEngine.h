@@ -59,6 +59,7 @@ public:
     void getMonitor(OrpheusMonitorData* out);
     int  getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
     int  getSpectrum(float* bands, int numBands);
+    int  getSpectrogram(float* rows, int numRows, float fMin, float fMax);
     int  getScope(float* out, int numPoints, float windowMs);
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void getPulsarActiveEngines(int* out);

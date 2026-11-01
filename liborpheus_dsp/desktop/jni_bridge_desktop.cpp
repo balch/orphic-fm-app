@@ -244,6 +244,14 @@ JNI_FN(nativeGetSpectrum)(JNIEnv *env, jobject thiz, jfloatArray bands) {
     return count;
 }
 
+JNIEXPORT jint JNICALL
+JNI_FN(nativeGetSpectrogram)(JNIEnv *env, jobject thiz, jfloatArray rows, jfloat fMin, jfloat fMax) {
+    jfloat* buf = env->GetFloatArrayElements(rows, nullptr);
+    int count = sEngine.getSpectrogram(buf, env->GetArrayLength(rows), fMin, fMax);
+    env->ReleaseFloatArrayElements(rows, buf, 0);
+    return count;
+}
+
 // Reads into a stack buffer and copies out only on success: no pinning, no Java allocation.
 JNIEXPORT jint JNICALL
 JNI_FN(nativeGetScope)(JNIEnv *env, jobject thiz, jfloatArray out, jfloat windowMs) {

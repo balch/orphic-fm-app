@@ -150,6 +150,7 @@ class DspSynthEngine(
     override val tidesCh2VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh2VizFlow
     override val tidesCh3VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh3VizFlow
     override val spectrumFlow: StateFlow<FloatArray> get() = monitor.spectrumFlow
+    override val spectrogramFlow: StateFlow<FloatArray> get() = monitor.spectrogramFlow
     override val scopeFrame: ScopeFrame get() = monitor.scopeFrame
     override val pulsarVizFlow get() = monitor.pulsarVizFlow
     override val pulsarTrackVizFlows get() = monitor.pulsarTrackVizFlows
@@ -526,6 +527,10 @@ class DspSynthEngine(
 
     override fun setVizEnabled(enabled: Boolean) {
         monitor.setVizEnabled(enabled)
+    }
+
+    override fun setSpectrogramEnabled(enabled: Boolean) {
+        monitor.setSpectrogramEnabled(enabled)
     }
 
     override fun setSpectrumEnabled(enabled: Boolean) {

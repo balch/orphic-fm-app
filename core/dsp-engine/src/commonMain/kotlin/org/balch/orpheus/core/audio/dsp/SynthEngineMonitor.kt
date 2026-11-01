@@ -17,7 +17,9 @@ import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.core.plugin.viz.ScopeFrame
+import org.balch.orpheus.core.plugin.viz.SpectrogramSpec
 import org.balch.orpheus.core.plugin.viz.VizHistory
+import kotlin.concurrent.Volatile
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -62,6 +64,10 @@ class SynthEngineMonitor(
     // Spectrum analyzer flow (FFT band magnitudes; UI-only poll, gated like the signal scope)
     private val _spectrumFlow = MutableStateFlow(FloatArray(0))
     val spectrumFlow: StateFlow<FloatArray> = _spectrumFlow.asStateFlow()
+
+    // Spectrogram rows (dB, SpectrogramSpec layout); the spectrum poll fills it alongside
+    private val _spectrogramFlow = MutableStateFlow(FloatArray(0))
+    val spectrogramFlow: StateFlow<FloatArray> = _spectrogramFlow.asStateFlow()
 
     // Triggered scope of the master mix. Not a flow: the poll fills one array in place and bumps
     // a version, and the ring's frame loop reads it by value.
@@ -176,7 +182,10 @@ class SynthEngineMonitor(
     private var vizRequested = false
 
     /** Spectrograph requested by UI (survives a background pause/resume and an engine restart). */
-    private var spectrumRequested = false
+    @Volatile private var spectrumRequested = false
+
+    /** Spectrogram requested by UI; shares the spectrum poll, which runs while either is wanted. */
+    @Volatile private var spectrogramRequested = false
 
     /**
      * True between startMonitoring() and stopMonitoring(). Stays true while iOS parks the host,
@@ -274,7 +283,7 @@ class SynthEngineMonitor(
             // setVizEnabled alone can't launch the poll until monitoring is active.
             if (vizRequested) launchVizPoll()
             if (turntableVizRequested) launchTurntableVizPoll()
-            if (spectrumRequested) launchSpectrumPoll()
+            if (spectrumRequested || spectrogramRequested) launchSpectrumPoll()
             if (scopeRequested) launchScopePoll()
         }
     }
@@ -305,7 +314,7 @@ class SynthEngineMonitor(
                 // it while the engine is actually monitoring, otherwise a resume
                 // after stopMonitoring() would poll a stopped engine.
                 if (turntableVizRequested) launchTurntableVizPoll()
-                if (spectrumRequested) launchSpectrumPoll()
+                if (spectrumRequested || spectrogramRequested) launchSpectrumPoll()
                 if (scopeRequested) launchScopePoll()
             }
         } else {
@@ -610,23 +619,45 @@ class SynthEngineMonitor(
     /** Enable/disable spectrum FFT polling. Only poll while Spectrograph is active. */
     fun setSpectrumEnabled(enabled: Boolean): Unit = synchronized(pollLock) {
         spectrumRequested = enabled
-        if (enabled && monitoringActive && uiVisible) {
-            launchSpectrumPoll()
-        } else if (!enabled) {
+        if (!enabled) _spectrumFlow.value = FloatArray(0)
+        updateSpectrumPoll()
+    }
+
+    /** Enable/disable the spectrogram rows. Only poll while Spectrogram is active. */
+    fun setSpectrogramEnabled(enabled: Boolean): Unit = synchronized(pollLock) {
+        spectrogramRequested = enabled
+        if (!enabled) _spectrogramFlow.value = FloatArray(0)
+        updateSpectrumPoll()
+    }
+
+    private fun updateSpectrumPoll() {
+        if (spectrumRequested || spectrogramRequested) {
+            if (monitoringActive && uiVisible) launchSpectrumPoll()
+        } else {
             spectrumJob?.cancel()
             spectrumJob = null
-            _spectrumFlow.value = FloatArray(0)
         }
     }
 
-    /** ~60fps FFT band-magnitude poll for the Spectrograph viz (UI-only consumer). */
+    /**
+     * ~60fps FFT poll for the Spectrograph bands and the Spectrogram rows (UI-only consumers).
+     * One job for both, so the native analyzers' scratch buffers only ever see one thread.
+     */
     private fun launchSpectrumPoll() {
         if (spectrumJob != null) return
         spectrumJob = monitoringScope.launch(dispatcherProvider.io) {
             while (isActive) {
-                val bands = FloatArray(SPECTRUM_BAND_COUNT)
-                nativeBridge.nativeGetSpectrum(bands)
-                _spectrumFlow.value = bands
+                if (spectrumRequested) {
+                    val bands = FloatArray(SPECTRUM_BAND_COUNT)
+                    nativeBridge.nativeGetSpectrum(bands)
+                    _spectrumFlow.value = bands
+                }
+                if (spectrogramRequested) {
+                    val rows = FloatArray(SpectrogramSpec.ROWS)
+                    if (nativeBridge.nativeGetSpectrogram(rows, SpectrogramSpec.F_MIN_HZ, SpectrogramSpec.F_MAX_HZ) > 0) {
+                        _spectrogramFlow.value = rows
+                    }
+                }
                 delay(VIZ_POLL_INTERVAL)
             }
         }

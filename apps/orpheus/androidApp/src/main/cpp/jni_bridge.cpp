@@ -320,6 +320,15 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetSpectrum(
     return count;
 }
 
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetSpectrogram(
+        JNIEnv *env, jobject thiz, jfloatArray rows, jfloat fMin, jfloat fMax) {
+    jfloat* buf = env->GetFloatArrayElements(rows, nullptr);
+    int count = sEngine.getSpectrogram(buf, env->GetArrayLength(rows), fMin, fMax);
+    env->ReleaseFloatArrayElements(rows, buf, 0);
+    return count;
+}
+
 // Reads into a stack buffer and copies out only on success: no pinning, no Java allocation.
 JNIEXPORT jint JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetScope(

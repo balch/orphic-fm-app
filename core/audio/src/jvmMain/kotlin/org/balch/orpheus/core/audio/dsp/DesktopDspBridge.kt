@@ -109,6 +109,7 @@ class DesktopDspBridge {
     external fun nativeGetMonitor(out: FloatArray)
     external fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     external fun nativeGetSpectrum(bands: FloatArray): Int
+    external fun nativeGetSpectrogram(rows: FloatArray, fMin: Float, fMax: Float): Int
     external fun nativeGetScope(out: FloatArray, windowMs: Float): Int
     external fun nativeStartRecording()
     external fun nativeStopRecording()

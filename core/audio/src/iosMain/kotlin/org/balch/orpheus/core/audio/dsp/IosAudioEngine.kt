@@ -38,6 +38,7 @@ import orpheus_dsp.orpheus_engine_get_port
 import orpheus_dsp.orpheus_engine_get_pulsar_arrangement
 import orpheus_dsp.orpheus_engine_get_pulsar_viz
 import orpheus_dsp.orpheus_engine_get_scope
+import orpheus_dsp.orpheus_engine_get_spectrogram
 import orpheus_dsp.orpheus_engine_get_spectrum
 import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
@@ -1331,6 +1332,15 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         return withEngine { eng ->
             bands.usePinned { pinned ->
                 orpheus_engine_get_spectrum(eng, pinned.addressOf(0), bands.size)
+            }
+        } ?: 0
+    }
+
+    override fun nativeGetSpectrogram(rows: FloatArray, fMin: Float, fMax: Float): Int {
+        if (rows.isEmpty()) return 0
+        return withEngine { eng ->
+            rows.usePinned { pinned ->
+                orpheus_engine_get_spectrogram(eng, pinned.addressOf(0), rows.size, fMin, fMax)
             }
         } ?: 0
     }

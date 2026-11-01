@@ -1526,8 +1526,9 @@ struct OrpheusEngine {
     // ── Spectrum analyzer (master-mix FFT for the Spectrograph viz) ──
     // Audio thread writes every sample into spectrum_ring; UI poll thread runs
     // spectrum_analyzer.Analyze() off the audio thread.
-    SampleRing       spectrum_ring;
-    SpectrumAnalyzer spectrum_analyzer;
+    SampleRing          spectrum_ring;
+    SpectrumAnalyzer    spectrum_analyzer;
+    SpectrogramAnalyzer spectrogram_analyzer;  // the Spectrogram viz's long FFT, same ring
 
     // ── Scope tap: the final output of every callback, read by orpheus_engine_get_scope ──
     ScopeRing scope_ring;

@@ -4,11 +4,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.plugin.viz.SpectrogramSpec
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.plugins.drum.DrumPlugin
 import org.balch.orpheus.plugins.duolfo.VoicePlugin
@@ -76,6 +78,35 @@ class DspSynthEngineParkedHostTest {
     }
 
     @Test
+    fun `the Spectrogram shares the spectrum poll and each gate clears only its own flow`() = runTest {
+        val bridge = ParkedBridge()
+        val scope = AppCoroutineScope(TestDispatcherProvider(StandardTestDispatcher(testScheduler)))
+        val engine = buildEngine(bridge, scope)
+        try {
+            engine.start()
+            engine.setSpectrogramEnabled(true)
+            runCurrent()
+            assertTrue(bridge.spectrogramCalls > 0, "the Spectrogram alone launches the poll")
+            assertEquals(0, bridge.spectrumCalls, "and reads no Spectrograph bands")
+            assertEquals(SpectrogramSpec.ROWS, engine.spectrogramFlow.value.size)
+
+            engine.setSpectrumEnabled(true)
+            engine.setSpectrogramEnabled(false)
+            runCurrent()
+            assertEquals(0, engine.spectrogramFlow.value.size, "disabling clears the rows")
+            val spectrogramCalls = bridge.spectrogramCalls
+            val spectrumCalls = bridge.spectrumCalls
+            advanceTimeBy(100)
+            runCurrent()
+            assertTrue(bridge.spectrumCalls > spectrumCalls, "the Spectrograph keeps the poll alive")
+            assertEquals(spectrogramCalls, bridge.spectrogramCalls, "with no more Spectrogram reads")
+        } finally {
+            scope.cancel()
+            runCurrent()
+        }
+    }
+
+    @Test
     fun `a park never lands while TTS is speaking`() = runTest {
         val bridge = ParkedBridge()
         val scope = AppCoroutineScope(TestDispatcherProvider(StandardTestDispatcher(testScheduler)))
@@ -136,6 +167,8 @@ class DspSynthEngineParkedHostTest {
             private set
         var spectrumCalls = 0
             private set
+        var spectrogramCalls = 0
+            private set
         var ttsPlaying = false
         var parkCheck: (() -> Boolean)? = null
             private set
@@ -159,6 +192,12 @@ class DspSynthEngineParkedHostTest {
         override fun nativeGetSpectrum(bands: FloatArray): Int {
             spectrumCalls++
             return 0
+        }
+
+        override fun nativeGetSpectrogram(rows: FloatArray, fMin: Float, fMax: Float): Int {
+            spectrogramCalls++
+            rows.fill(-60f)
+            return rows.size
         }
 
         // AudioEngine

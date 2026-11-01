@@ -154,6 +154,12 @@ int  orpheus_engine_get_viz(OrpheusEngine* engine, int channel,
 // Fills bands[0..num_bands) with linear magnitude per log-spaced band. Returns num_bands.
 int  orpheus_engine_get_spectrum(OrpheusEngine* engine, float* bands, int num_bands);
 
+// ── Spectrogram (polled at ~60fps from UI thread; 8192-point FFT runs here, off audio thread) ──
+// Fills rows[0..num_rows) with dB at log-spaced frequencies, rows[0] at f_min and the last row
+// at f_max (0 < f_min < f_max). Returns num_rows, or 0 for bad arguments with rows untouched.
+int  orpheus_engine_get_spectrogram(OrpheusEngine* engine, float* rows, int num_rows,
+                                    float f_min, float f_max);
+
 // ── Master scope (polled at ~60fps off the audio thread; the audio thread only writes) ──
 // Fills out[0..num_points) with window_ms (finite, > 0, clamped to 1-100) of the master mix as
 // heard, mono (L+R)/2, oldest first, each point a triangle-weighted average of the samples around

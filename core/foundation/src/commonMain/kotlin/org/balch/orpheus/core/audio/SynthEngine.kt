@@ -253,6 +253,9 @@ interface SynthEngine : AudioHostSuspender {
     // Spectrum analyzer flow (FFT band magnitudes, gated by setSpectrumEnabled)
     val spectrumFlow: StateFlow<FloatArray> get() = emptyVizFlow
 
+    /** Master-mix spectrogram rows as [org.balch.orpheus.core.plugin.viz.SpectrogramSpec] lays them out; filled while [setSpectrogramEnabled]. */
+    val spectrogramFlow: StateFlow<FloatArray> get() = emptyVizFlow
+
     /** Triggered scope of the master mix, read by value in a frame loop; filled while [setScopeEnabled]. */
     val scopeFrame: ScopeFrame get() = ScopeFrame.Empty
 
@@ -276,6 +279,9 @@ interface SynthEngine : AudioHostSuspender {
 
     /** Enable/disable spectrum FFT polling. Only poll while Spectrograph is active. */
     fun setSpectrumEnabled(enabled: Boolean) {}
+
+    /** Enable/disable the spectrogram poll behind [spectrogramFlow]. Only poll while Spectrogram is active. */
+    fun setSpectrogramEnabled(enabled: Boolean) {}
 
     /** Enable/disable the 60 Hz scope poll behind [scopeFrame]. Independent of the other viz gates. */
     fun setScopeEnabled(enabled: Boolean) {}

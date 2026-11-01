@@ -42,6 +42,9 @@ interface NativeDspBridge {
     fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     fun nativeGetSpectrum(bands: FloatArray): Int
 
+    /** Fills [rows] with master-mix dB at log-spaced frequencies [fMin]..[fMax]; returns rows filled, 0 when unsupported. */
+    fun nativeGetSpectrogram(rows: FloatArray, fMin: Float, fMax: Float): Int = 0
+
     /**
      * Fills [out] with the latest [windowMs] of the master mix, one averaged point per element
      * (at most 1024). Returns 1 when the window starts on a repeating rising zero crossing, 0 when
