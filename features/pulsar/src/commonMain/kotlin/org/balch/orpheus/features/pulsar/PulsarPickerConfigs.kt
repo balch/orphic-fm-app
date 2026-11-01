@@ -121,5 +121,6 @@ fun pulsarEngineLabel(engineIndex: Int): String = when (engineIndex) {
     105 -> "CSAW"; 106 -> "TOY"; 107 -> "VOW"; 108 -> "?"
     // Chaos / fractal engines (200..204)
     200 -> "LRZ"; 201 -> "ROS"; 202 -> "DUF"; 203 -> "HEN"; 204 -> "CHU"
+    300 -> "MST"; -1 -> "OSC"
     else -> "E$engineIndex"
 }

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.djapp.ai.collab.EditOrigin
 import org.balch.orpheus.djapp.ai.collab.HistoryPoint
 import org.balch.orpheus.djapp.ai.collab.HistoryVibeEdit
@@ -306,6 +307,18 @@ class AiMixerStateTest {
         assertEquals(0.8f, t.value)
         assertTrue(t.pinned && t.changed && t.source == null)
         assertEquals("VA", s.tracks[2].edmEngine)
+    }
+
+    @Test
+    fun mixerTrackCarriesBothSlotEngineIds() {
+        val split = v.copy(
+            tracks = v.tracks.toMutableList().also { it[4] = it[4].copy(engineSpace = it[4].engineSpace.copy(engineId = OrpheusEngineId.VOWEL_FOF)) },
+        )
+        val s = mixerState(split, 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, emptyMap())
+        assertEquals(OrpheusEngineId.VA, s.tracks[4].edmEngineId)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, s.tracks[4].spaceEngineId)
+        assertEquals("VOWEL_FOF", s.tracks[4].spaceEngine)
+        assertEquals(OrpheusEngineId.VA, s.tracks[3].spaceEngineId)
     }
 
     @Test

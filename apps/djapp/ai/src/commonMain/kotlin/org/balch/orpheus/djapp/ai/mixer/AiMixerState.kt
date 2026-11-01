@@ -64,6 +64,9 @@ data class MixerTrack(
     val slotHeard: Boolean = true,
     val edmEngine: String = "",
     val spaceEngine: String = "",
+    /** The ids behind [edmEngine] and [spaceEngine], for the strip's engine pickers. */
+    val edmEngineId: OrpheusEngineId = OrpheusEngineId.VA,
+    val spaceEngineId: OrpheusEngineId = OrpheusEngineId.VA,
     /** Harmonics, timbre and morph of [slot]'s engine, in that order. */
     val voice: List<MixerVoiceKnob> = emptyList(),
 )
@@ -395,6 +398,8 @@ fun mixerState(
             slotHeard = slot == voice.heard,
             edmEngine = track.engineEdm.engineId.name,
             spaceEngine = track.engineSpace.engineId.name,
+            edmEngineId = track.engineEdm.engineId,
+            spaceEngineId = track.engineSpace.engineId,
             voice = voiceKnobs,
         )
     }

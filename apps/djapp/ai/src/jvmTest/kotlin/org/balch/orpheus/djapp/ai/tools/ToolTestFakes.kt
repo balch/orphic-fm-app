@@ -75,7 +75,11 @@ internal class FakePulsar(override val vibeList: List<Vibe>) : PulsarFeature {
     var retuneCount = 0
         private set
 
+    /** Runs as a retune is asked for, so a test can land another load between the retune and the reload. */
+    var beforeRetune: (() -> Unit)? = null
+
     override fun retuneVibe(vibe: Vibe): Boolean {
+        beforeRetune?.invoke()
         if (!retunes || !vibeFlow.value.retunesTo(vibe)) return false
         vibeFlow.value = vibe
         retuneCount++

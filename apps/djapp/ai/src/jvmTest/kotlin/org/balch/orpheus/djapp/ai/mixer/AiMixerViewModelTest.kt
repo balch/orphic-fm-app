@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.features.FeatureCoroutineScope
@@ -32,6 +33,7 @@ import org.balch.orpheus.djapp.ai.usage.AiCostTotals
 import org.balch.orpheus.features.pulsar.bench.CaptureField
 import org.balch.orpheus.features.pulsar.bench.CaptureOutcome
 import org.balch.orpheus.features.pulsar.bench.CaptureRow
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
@@ -362,5 +364,83 @@ class AiMixerViewModelTest {
         assertEquals(MixControl.ClearAll, move.control)
         assertEquals("edited" to "file", move.before to move.after)
         assertEquals(0f, r.controller.layers.value.vibe.levelDb[3])
+    }
+
+    // Track 4 plays VA by day and WTB by night; the rest of the tracks hold the same engine in both slots.
+    private fun splitVibe(): Vibe = vibe("Night Drive").let { v ->
+        v.copy(tracks = v.tracks.toMutableList().also { it[4] = it[4].copy(engineSpace = it[4].engineSpace.copy(engineId = OrpheusEngineId.WTB)) })
+    }
+
+    @Test
+    fun pickingAnEngineOnASplitTrackEditsThatSlotOnly() = runTest(testDispatcher) {
+        val r = rig(splitVibe()).also { it.pulsar.retunes = true }
+        r.vm.actions.setEngine(4, EngineSlot.SPACE, OrpheusEngineId.VOWEL_FOF)
+        advanceUntilIdle()
+        assertEquals(listOf("tracks[4].engineSpace.engineId"), r.mixer.history.value.vibeEdits.map { it.path })
+        val t = r.pulsar.vibeFlow.value.tracks[4]
+        assertEquals(OrpheusEngineId.VOWEL_FOF, t.engineSpace.engineId)
+        assertEquals(OrpheusEngineId.VA, t.engineEdm.engineId)
+    }
+
+    @Test
+    fun pickingAnEngineOnAnEqualPairEditsBothSlots() = runTest(testDispatcher) {
+        val r = rig().also { it.pulsar.retunes = true }
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.VOWEL_FOF)
+        advanceUntilIdle()
+        assertEquals(
+            listOf("tracks[2].engineEdm.engineId", "tracks[2].engineSpace.engineId"),
+            r.mixer.history.value.vibeEdits.map { it.path }.sorted(),
+        )
+        val t = r.pulsar.vibeFlow.value.tracks[2]
+        assertEquals(OrpheusEngineId.VOWEL_FOF, t.engineEdm.engineId)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, t.engineSpace.engineId)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, r.vm.stateFlow.value.tracks[2].edmEngineId)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, r.vm.stateFlow.value.tracks[2].spaceEngineId)
+    }
+
+    @Test
+    fun pickingAnEnginePlaysOn() = runTest(testDispatcher) {
+        val r = rig().also { it.pulsar.retunes = true }
+        val loads = r.pulsar.vibeLoadCount.value
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB)
+        advanceUntilIdle()
+        assertEquals(loads, r.pulsar.vibeLoadCount.value, "an engine pick retunes; it never reloads the vibe")
+        assertEquals(1, r.pulsar.retuneCount)
+        assertNull(r.vm.stateFlow.value.notice)
+    }
+
+    // Engines are vibe-wide, so a pick made while the knobs edit one section says so.
+    @Test
+    fun pickingAnEngineInSectionScopeSaysItChangesTheWholeVibe() = runTest(testDispatcher) {
+        val r = rig().also { it.pulsar.retunes = true }
+        r.vm.actions.setScope(Scope.SECTION)
+        advanceUntilIdle()
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB)
+        advanceUntilIdle()
+        assertEquals(OrpheusEngineId.WTB, r.pulsar.vibeFlow.value.tracks[2].engineEdm.engineId)
+        assertEquals("Engines change the whole vibe.", r.vm.stateFlow.value.notice)
+    }
+
+    @Test
+    fun pickingAnEnginePicksThatSlotForTheKnobs() = runTest(testDispatcher) {
+        val r = rig(splitVibe()).also { it.pulsar.retunes = true }
+        assertEquals(EngineSlot.EDM, r.vm.stateFlow.value.tracks[4].slot)
+        r.vm.actions.setEngine(4, EngineSlot.SPACE, OrpheusEngineId.VOWEL_FOF)
+        advanceUntilIdle()
+        val t = r.vm.stateFlow.value.tracks[4]
+        assertEquals(EngineSlot.SPACE, t.slot)
+        assertEquals(OrpheusEngineId.VOWEL_FOF, t.voice.first().engineId, "the knobs now edit the engine just picked")
+    }
+
+    @Test
+    fun refusedEnginePickShowsItsOwnNotice() = runTest(testDispatcher) {
+        val r = rig()
+        // A load landing between the retune ask and the reload leaves the mixer unable to play the pick.
+        r.pulsar.beforeRetune = { r.pulsar.vibeLoadCount.value++ }
+        r.vm.actions.setEngine(2, EngineSlot.EDM, OrpheusEngineId.WTB)
+        advanceUntilIdle()
+        assertEquals("The engine did not change. Try again once the vibe has loaded.", r.vm.stateFlow.value.notice)
+        assertEquals(OrpheusEngineId.VA, r.pulsar.vibeFlow.value.tracks[2].engineEdm.engineId)
+        assertTrue(r.mixer.history.value.vibeEdits.isEmpty())
     }
 }

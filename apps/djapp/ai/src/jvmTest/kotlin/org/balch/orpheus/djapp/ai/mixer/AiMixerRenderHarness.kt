@@ -115,6 +115,8 @@ class AiMixerRenderHarness {
             slotHeard = t != 5,
             edmEngine = slots[t].first.name,
             spaceEngine = slots[t].second.name,
+            edmEngineId = slots[t].first,
+            spaceEngineId = slots[t].second,
             voice = voiceOf(t, if (t == 5) slots[t].second else slots[t].first),
         )
     }

@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
@@ -50,6 +52,7 @@ import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
 import org.balch.orpheus.features.pulsar.bench.macroView
+import org.balch.orpheus.features.pulsar.bench.enginePath
 import org.balch.orpheus.features.pulsar.bench.slotAt
 import org.balch.orpheus.features.pulsar.bench.vibeDefault
 
@@ -209,8 +212,31 @@ class AiMixerViewModel(
         endHear = { queue { collabMixer.endHear() } },
         rollBack = { id -> queue { collabMixer.rollBack(id) } },
         setVoiceKnob = ::setVoiceKnob,
-        pickSlot = { t, slot -> local.update { it.copy(slotPicks = it.slotPicks + (t to slot)) } },
+        pickSlot = ::pickSlot,
+        setEngine = ::setEngine,
     )
+
+    private fun pickSlot(track: Int, slot: EngineSlot) {
+        local.update { it.copy(slotPicks = it.slotPicks + (track to slot)) }
+    }
+
+    // An equal pair moves together, so the pick is heard whichever slot plays; a split track keeps the other slot's engine.
+    private fun setEngine(track: Int, slot: EngineSlot, engine: OrpheusEngineId) {
+        val t = stateFlow.value.tracks.getOrNull(track) ?: return
+        val slots = if (t.edmEngineId == t.spaceEngineId) EngineSlot.entries else listOf(slot)
+        queue {
+            val result = collabMixer.editVibe(EditOrigin.USER, slots.map { enginePath(track, it) to JsonPrimitive(engine.name) })
+            when (result) {
+                is VibeEditResult.Applied -> {
+                    clearNotice()
+                    pickSlot(track, slot)
+                    // Engines are vibe-wide, whatever section the knobs are scoped to.
+                    if (controllerProvider().scope.value == Scope.SECTION) local.update { it.copy(notice = ENGINES_VIBE_WIDE) }
+                }
+                is VibeEditResult.Refused, is VibeEditResult.Invalid -> local.update { it.copy(notice = ENGINE_UNCHANGED) }
+            }
+        }
+    }
 
     private fun setVoiceKnob(track: Int, knob: EngineKnob, value: Float?) {
         val slot = stateFlow.value.tracks.getOrNull(track)?.slot ?: return
@@ -297,6 +323,8 @@ class AiMixerViewModel(
         private const val MAX_DB = 3.5f
         private const val VIBE_ROW_REFUSED =
             "That change can't be turned off on its own: roll back to a capture instead."
+        private const val ENGINE_UNCHANGED = "The engine did not change. Try again once the vibe has loaded."
+        private const val ENGINES_VIBE_WIDE = "Engines change the whole vibe."
         private const val ZERO_SEND = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope."
 
         fun previewFeature(
