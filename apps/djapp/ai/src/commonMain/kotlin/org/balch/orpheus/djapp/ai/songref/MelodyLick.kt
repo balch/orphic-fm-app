@@ -28,7 +28,11 @@ internal fun toMelodies(
         }
         val steps = part.zip(melody) { n, m ->
             if (m.midi == null) Rest(n.beats)
-            else LickStep(m.degree, n.beats, if (n.ghost) 0.4f else 0.8f, if (n.restrike) 0f else glideFor(n.technique))
+            else LickStep(
+                // A wide melody can reach past the degrees a LickStep accepts; clamp rather than throw.
+                m.degree.coerceIn(LickStep.MIN_DEGREE, LickStep.MAX_DEGREE),
+                n.beats, if (n.ghost) 0.4f else 0.8f, if (n.restrike) 0f else glideFor(n.technique),
+            )
         }
         val total = part.sumOf { it.beats.toDouble() }
         SongMelody(

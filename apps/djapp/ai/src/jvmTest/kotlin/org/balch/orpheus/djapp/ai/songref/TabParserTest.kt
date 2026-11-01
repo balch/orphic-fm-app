@@ -3,6 +3,7 @@ package org.balch.orpheus.djapp.ai.songref
 import org.balch.orpheus.djapp.ai.songref.TabParserFixtures.AM_D
 import org.balch.orpheus.djapp.ai.songref.TabParserFixtures.RIFF_BARS
 import org.balch.orpheus.djapp.ai.songref.TabParserFixtures.RIFF_NO_BARS
+import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.RootNote
 import org.balch.orpheus.features.pulsar.models.ScaleType
 import kotlin.test.Test
@@ -73,6 +74,11 @@ class TabParserTest {
         assertTrue(parts.all { it.lick.steps.size <= 64 })
         assertEquals(listOf(16, 16, 4), parts.map { it.lick.loopLength })
         assertEquals(listOf("Solo", "Solo (part 2)", "Solo (part 3)"), parts.map { it.label }); assertEquals(listOf(0, 1, 2), parts.map { it.index })
+    }
+
+    @Test fun aMelodyWiderThanTheDegreeRangeClampsInsteadOfThrowing() {
+        val parts = toMelodies(listOf(TimedNote(9, 1f), TimedNote(127, 1f)), RhythmSource.BARS, aMinor, "Wide", 0, null, 0)
+        assertEquals(LickStep.MAX_DEGREE, parts.single().lick.steps[1].scaleDegree)
     }
 
     @Test fun twentyFourBeatMelodySplitsSixteenPlusEight() {
