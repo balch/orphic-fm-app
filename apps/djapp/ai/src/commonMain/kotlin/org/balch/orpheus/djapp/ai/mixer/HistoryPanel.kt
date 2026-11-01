@@ -147,9 +147,25 @@ internal fun HistoryTimeline(state: AiMixerUiState, actions: AiMixerActions, now
             actions = actions,
             rolling = rolling == MixHistory.FILE,
             onRolling = { rolling = it },
-            last = true,
+            last = state.beforeApply == null,
             diamond = MixerInk.dim,
         )
+        state.beforeApply?.let { b ->
+            val edits = if (b.changes == 0) "" else " · ${if (b.changes == 1) "1 mix change" else "${b.changes} mix changes"}"
+            PointLine(
+                id = MixHistory.BEFORE_APPLY,
+                label = "Before ${b.who}'s apply: ${b.vibeName}",
+                age = ageText(nowMs - b.atMs) + edits,
+                changesAfter = changeCount,
+                hearing = state.hearing,
+                actions = actions,
+                rolling = rolling == MixHistory.BEFORE_APPLY,
+                onRolling = { rolling = it },
+                last = true,
+                diamond = MixerInk.dim,
+                confirm = "Go back to ${b.vibeName} and its mix? The song restarts.",
+            )
+        }
         CaptureWrites(state.changes)
     }
 }
@@ -282,6 +298,8 @@ private fun PointLine(
     onRolling: (Int?) -> Unit,
     last: Boolean = false,
     diamond: Color,
+    /** The rollback question; null asks to throw away the [changesAfter] changes. A point with its own text has no hear. */
+    confirm: String? = null,
 ) {
     val shape = RoundedCornerShape(8.dp)
     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
@@ -302,7 +320,7 @@ private fun PointLine(
             if (rolling) {
                 val n = if (changesAfter == 1) "1 change" else "$changesAfter changes"
                 Text(
-                    "Throw away $n after this?",
+                    confirm ?: "Throw away $n after this?",
                     style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.changed, FontWeight.SemiBold),
                     modifier = Modifier.weight(1f),
                 )
@@ -313,7 +331,7 @@ private fun PointLine(
                     Text(label, style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text, FontWeight.Bold))
                     if (age.isNotEmpty()) Text(age, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1)
                 }
-                HearButton(id, hearing == id, actions)
+                if (confirm == null) HearButton(id, hearing == id, actions)
                 HistoryButton("roll back here", { onRolling(id) }, Modifier.testTag(historyRollBackTag(id)), warn = true)
             }
         }

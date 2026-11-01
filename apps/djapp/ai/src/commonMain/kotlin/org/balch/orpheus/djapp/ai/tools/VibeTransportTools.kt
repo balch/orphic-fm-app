@@ -99,8 +99,14 @@ class VibeLoadTool(
                 val name = pulsar.vibeNames.firstOrNull { it.equals(args.name.trim(), ignoreCase = true) }
                     ?: badArg("no vibe named \"${args.name}\"; see vibe_list")
                 wipeGuard.wipeRefusal()?.let { return@guarded VibeLoadResult(false, it.reason, refusal = it.refusal.name) }
-                val loaded = withContext(dispatchers.main) { pulsar.applyVibeByName(name) }
-                if (!loaded) badArg("vibe \"$name\" did not load")
+                wipeGuard.beforeApply()
+                val loaded = runCatching { withContext(dispatchers.main) { pulsar.applyVibeByName(name) } }
+                    .onFailure { wipeGuard.applyFailed() }
+                    .getOrThrow()
+                if (!loaded) {
+                    wipeGuard.applyFailed()
+                    badArg("vibe \"$name\" did not load")
+                }
                 VibeLoadResult(true, "Loaded \"$name\".", name)
             }
         }

@@ -84,6 +84,8 @@ data class AiMixerUiState(
     val onCount: Int = 0,
     /** When the vibe loaded, for the File row's age. */
     val loadedAtMs: Long = 0L,
+    /** The vibe an agent or MCP apply replaced, which the timeline can roll back to; null after any other load. */
+    val beforeApply: BeforeApplyRow? = null,
 ) {
     val sectionScope: Boolean get() = scope == Scope.SECTION && sectionScopeAvailable && section >= 0
 
@@ -92,6 +94,14 @@ data class AiMixerUiState(
 
     /** The changes History lists, for the header button: one edit can write several file values. */
     val historyChangeCount: Int get() = history.count { it is ChangeRow }
+}
+
+/** The timeline's row under File: the vibe the apply replaced, with [changes] mix edits of its own. */
+@Immutable
+data class BeforeApplyRow(val vibeName: String, val who: String, val changes: Int, val atMs: Long)
+
+fun beforeApplyRow(h: MixHistory): BeforeApplyRow? = h.beforeApply?.let {
+    BeforeApplyRow(it.vibe.name, it.origin.who(), it.history.onCount, it.atMs)
 }
 
 /** One row of the History timeline. */

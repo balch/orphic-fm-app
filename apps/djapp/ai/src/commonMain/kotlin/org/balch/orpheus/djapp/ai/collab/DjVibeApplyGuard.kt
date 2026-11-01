@@ -26,6 +26,11 @@ class DjVibeApplyGuard(
 
     override suspend fun refusal(): String? = wipeRefusal()?.reason
 
+    // The History keeps what the apply replaces, so the user can roll the apply back.
+    override suspend fun beforeApply() = collabMixer.keepBeforeApply(collabMixer.toolOrigin())
+
+    override fun applyFailed() = collabMixer.dropBeforeApply()
+
     /** For an apply or a vibe load, which clear the user's levels, pans, sends, mutes, solos and macro knobs. */
     suspend fun wipeRefusal(): CollabResult.Refused? = decide(collab.userChangesWipedByLoad(), capture = true)
 

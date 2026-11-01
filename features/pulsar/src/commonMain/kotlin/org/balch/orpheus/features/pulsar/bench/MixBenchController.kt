@@ -11,12 +11,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.balch.orpheus.core.audio.dsp.BenchSummaryLayout
 import org.balch.orpheus.core.audio.dsp.MixBenchTap
 import org.balch.orpheus.core.controller.SynthController
@@ -87,6 +89,12 @@ class MixBenchController(
     private var holds = 0
     /** The last vibeLoadCount the layers belong to, so edits for another vibe never come back. */
     private var loadsApplied = -1
+        set(v) {
+            field = v
+            followed.value = v
+        }
+    /** [loadsApplied] for [awaitLoadFollowed], which waits outside the lock. */
+    private val followed = MutableStateFlow(-1)
 
     // Ownership, all under [lock]: what the controller writes over the app.
     private val owned = mutableSetOf<Int>()
@@ -168,6 +176,13 @@ class MixBenchController(
             }
         }
     }
+
+    /**
+     * Waits until the vibe load playing now is followed, so edits land on it. False after [timeoutMs];
+     * true at once while stopped, when edits never wait on a load.
+     */
+    suspend fun awaitLoadFollowed(timeoutMs: Long = LOAD_FOLLOW_MS): Boolean =
+        withTimeoutOrNull(timeoutMs) { followed.first { !running || it == pulsar.vibeLoadCount.value } } != null
 
     /** True while a vibe load is not yet followed, when edits and captures would hit the new vibe. */
     suspend fun vibeLoadInFlight(): Boolean = lock.withLock { loadInFlight() }
@@ -603,6 +618,7 @@ class MixBenchController(
         const val POLL_MS = 33L
         const val MAX_DRAIN = 64
         const val MIN_SEND = 1e-4f
+        const val LOAD_FOLLOW_MS = 2_000L
 
         fun requireTrack(t: Int) = require(t in 0 until TRACKS) { "track $t out of range" }
 
