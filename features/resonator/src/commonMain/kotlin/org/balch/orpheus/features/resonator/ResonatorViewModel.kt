@@ -25,10 +25,11 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.SynthFeatureKey
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 
+/** Ordinal is the engine mode int: matches `ResonatorPlugin` options and `OrpheusResonator::process`. */
 enum class ResonatorMode(val displayName: String) {
     MODAL("Bar"),
-    STRING("String"),
-    SYMPATHETIC("Sitar")
+    SYMPATHETIC("Sitar"),
+    STRING("String")
 }
 
 /**

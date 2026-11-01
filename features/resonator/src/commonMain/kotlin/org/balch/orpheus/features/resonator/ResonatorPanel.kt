@@ -94,7 +94,7 @@ fun ResonatorPanel(
 }
 
 /**
- * Combined enable/mode segmented button row (Bar / String / Sitar).
+ * Combined enable/mode segmented button row (Bar / Sitar / String).
  */
 @Composable
 private fun ModeSelectorRow(
