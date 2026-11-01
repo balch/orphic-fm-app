@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.visualizations.viz.ants
 
 import androidx.compose.ui.geometry.Offset
+import org.balch.orpheus.core.media.PlaybackProgress
 
 // --------------------------------------------------------------------------------
 // Constants
@@ -101,6 +102,10 @@ internal const val STOMP_DURATION = 3.5f
 internal const val FIRE_ANT_DURATION = 4f
 internal const val MAG_GLASS_DURATION = 4.5f
 
+// Stomp splash, in grid fractions per second
+internal const val GOO_GRAVITY = 3.5f
+internal const val STOMP_IMPACT = 0.3f        // Stomp progress when the boot lands
+
 // Ant drawing dimensions (pixels)
 internal const val ANT_SEG_RADIUS = 5f        // Base segment radius
 internal const val ANT_SEG_GAP = 3.5f         // Gap between segments
@@ -198,10 +203,65 @@ internal class Debris(
     var decay: Float = 0.5f,
     var size: Float = 0.005f,
     var active: Boolean = false,
-)
+    /** A stomp's splash: flies in grid space under gravity, lands and spreads, drawn as a pod. */
+    var goo: Boolean = false,
+) {
+    fun step(dt: Float) {
+        life -= decay * dt
+        if (life <= 0f) { active = false; return }
+        if (goo) {
+            vy -= GOO_GRAVITY * dt
+            // Lands with a small bounce, then slides to a stop as a spreading puddle.
+            if (y + vy * dt <= 0f && vy < 0f) {
+                vy = if (vy < -0.6f) -vy * 0.2f else 0f
+                vx *= 0.5f
+                vz *= 0.5f
+            }
+        } else {
+            vy += 0.5f * dt
+        }
+        x += vx * dt
+        y += vy * dt
+        z += vz * dt
+        if (goo && y < 0f) y = 0f
+    }
+}
 
 internal enum class VizPhase { BUILDING, DESTRUCTION }
 internal enum class DestructionType { STOMP, FIRE_ANT_WAR, MAGNIFYING_GLASS }
+
+/** How long each destruction plays, which is how early it starts so it ends with the song. */
+internal val DestructionType.duration: Float
+    get() = when (this) {
+        DestructionType.STOMP -> STOMP_DURATION
+        DestructionType.FIRE_ANT_WAR -> FIRE_ANT_DURATION
+        DestructionType.MAGNIFYING_GLASS -> MAG_GLASS_DURATION
+    }
+
+/**
+ * Seconds until the playing song ends. Its progress only moves a bar at a time, so the frames
+ * between updates count down from the last one.
+ */
+internal class SongEndClock {
+    private var positionMs = -1L
+    private var sinceUpdate = 0f
+
+    /** [Float.MAX_VALUE] until the song's end is locked in; null when it has none coming. */
+    fun secondsLeft(progress: PlaybackProgress?, dt: Float): Float? {
+        if (progress == null || progress.endless || progress.durationMs <= 0L) {
+            positionMs = -1L
+            return null
+        }
+        if (progress.positionMs != positionMs) {
+            positionMs = progress.positionMs
+            sinceUpdate = 0f
+        } else {
+            sinceUpdate += dt
+        }
+        if (!progress.durationFinal) return Float.MAX_VALUE
+        return (progress.durationMs - progress.positionMs) / 1000f - sinceUpdate
+    }
+}
 
 internal fun isoProject(gx: Float, gy: Float, gz: Float, centerX: Float, centerY: Float): Offset {
     val cx = gx - GRID_W / 2f

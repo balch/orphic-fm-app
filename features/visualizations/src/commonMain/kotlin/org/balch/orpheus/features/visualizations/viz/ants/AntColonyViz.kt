@@ -3,19 +3,25 @@ package org.balch.orpheus.features.visualizations.viz.ants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.playback.MetadataProducer
+import org.balch.orpheus.features.visualizations.viz.shader.PlasmaShader
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -39,6 +45,7 @@ import kotlin.random.Random
 @ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class AntColonyViz(
     private val engine: SynthEngine,
+    private val metadataProducer: MetadataProducer,
 ) : Visualization {
 
     override val id = "ant_colony"
@@ -71,14 +78,20 @@ class AntColonyViz(
             return (fraction * MAX_MOUND_BLOCKS).toInt()
         }
 
-    // Knob 2 layout: 0-25% Stomp, 25-50% Fire Ants, 50-75% Random, 75-100% Mag Glass
+    // Knob 2 layout: 0-25% Stomp, 25-50% Fire Ants, 50-75% Random, 75-100% Mag Glass.
+    // Random is drawn ahead of time, so its duration is known when timing it to the song's end.
+    private var randomPick = DestructionType.entries[Random.nextInt(3)]
     private val selectedDestructionType: DestructionType
         get() = when {
             _doomType < 0.25f -> DestructionType.STOMP
             _doomType < 0.50f -> DestructionType.FIRE_ANT_WAR
-            _doomType < 0.75f -> DestructionType.entries[Random.nextInt(3)]
+            _doomType < 0.75f -> randomPick
             else -> DestructionType.MAGNIFYING_GLASS
         }
+
+    private val songEnd = SongEndClock()
+    private var songSecondsLeft: Float? = null
+    private var destroyedSong = -1  // The song start the last song-end destruction was for
 
     private val voiceColors = arrayOf(
         OrpheusColors.antNeonMagenta,    // Duo 0 (Bass)
@@ -99,8 +112,10 @@ class AntColonyViz(
     // Pre-allocated constants and simulation objects
     private val clusterOffsets = intArrayOf(-1, 0, 1, 0, 0, -1, 0, 1) // dx,dz pairs
     private val grid = Grid()
+    private val pods = PodField()
     private val ants = Array(MAX_ANTS) { Ant() }
     private val debris = Array(MAX_DEBRIS) { Debris() }
+    private val columnOrder = IntArray(GRID_W * GRID_D)
     private var trails = generateTrails()
 
     // State machine
@@ -123,6 +138,7 @@ class AntColonyViz(
     private val curlResult = FloatArray(2)
     private val trailPosResult = FloatArray(2)
     private val isoScratch = FloatArray(2)
+    private val drawIso = FloatArray(2) // the draw pass's own, apart from the simulation's
     private var antSpawnAccum = 0f
     private var nextTrailIndex = 0  // Round-robin trail assignment
 
@@ -147,6 +163,7 @@ class AntColonyViz(
 
     // Pre-allocated paths for drawing
     private val bootPath = Path()
+    private val beamPath = Path()
     // Pre-allocated Stroke constants
     private val strokeBoot = Stroke(width = 3f)
     private val strokeCrack = Stroke(width = 2f)
@@ -171,6 +188,7 @@ class AntColonyViz(
         trails = generateTrails()
         phase = VizPhase.BUILDING
         destructionProgress = 0f
+        destroyedSong = -1
         grid.clear()
         for (ant in ants) ant.active = false
         for (d in debris) d.active = false
@@ -224,29 +242,51 @@ class AntColonyViz(
             }
         }
 
+        val podShader = remember { PlasmaShader(PodsSksl.SOURCE) }
+        DisposableEffect(podShader) { onDispose { podShader.dispose() } }
+
         Canvas(modifier = modifier.fillMaxSize()) {
             // Read inside drawScope so per-frame _uiState writes only invalidate
             // the draw pass, not recompose this @Composable.
             val state = _uiState.value
+            val destroying = state.phase == VizPhase.DESTRUCTION
+            pods.clearEffects()
+            if (destroying) when (state.destructionType) {
+                DestructionType.STOMP -> stompShock(state.destructionProgress, size.width, size.height, pods.shock)
+                DestructionType.MAGNIFYING_GLASS -> magGlassLayout(
+                    state.magGlassCenterX, state.magGlassCenterY, state.destructionProgress,
+                    size.width, size.height, pods.lens, pods.heat, drawIso,
+                )
+                DestructionType.FIRE_ANT_WAR -> Unit
+            }
             drawBackground()
-            drawGroundPlane()
-            drawBlocks(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo)
-            drawAnts(ants, voiceColors, strokeLeg)
-            drawDebris(debris, voiceColors)
+            val shake = if (destroying && state.destructionType == DestructionType.STOMP) {
+                stompShake(state.destructionProgress)
+            } else Offset.Zero
+            translate(shake.x, shake.y) {
+                drawGroundPlane()
+                if (podShader.isSupported) {
+                    pods.splat(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo, size.width, size.height, debris)
+                    drawPods(podShader, pods)
+                } else {
+                    drawBlocks(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo)
+                }
+                drawAnts(ants, voiceColors, strokeLeg)
+                drawDebris(debris, voiceColors, gooInPods = podShader.isSupported, drawIso)
 
-            if (state.phase == VizPhase.DESTRUCTION) {
-                when (state.destructionType) {
-                    DestructionType.STOMP -> drawStompEffect(
-                        state.destructionProgress, state.stompY, state.stompPhase,
-                        bootPath, strokeBoot, strokeCrack,
-                    )
-                    DestructionType.FIRE_ANT_WAR -> drawFireAntEffect(
-                        state.destructionProgress, Random(fireAntSeed),
-                    )
-                    DestructionType.MAGNIFYING_GLASS -> drawMagnifyingGlassEffect(
-                        state.magGlassCenterX, state.magGlassCenterY,
-                        animationTime, strokeLens,
-                    )
+                if (destroying) {
+                    when (state.destructionType) {
+                        DestructionType.STOMP -> drawStompEffect(
+                            state.destructionProgress, state.stompY, state.stompPhase,
+                            pods.shock, bootPath, strokeBoot, strokeCrack,
+                        )
+                        DestructionType.FIRE_ANT_WAR -> drawFireAntEffect(
+                            state.destructionProgress, Random(fireAntSeed),
+                        )
+                        DestructionType.MAGNIFYING_GLASS -> drawMagnifyingGlassEffect(
+                            pods.lens, pods.heat, animationTime, beamPath, strokeLens,
+                        )
+                    }
                 }
             }
         }
@@ -276,6 +316,7 @@ class AntColonyViz(
             duoLevels[d] += (raw - duoLevels[d]) * (SMOOTH_DUO_RATE * dt).coerceAtMost(1f)
         }
 
+        songSecondsLeft = songEnd.secondsLeft(metadataProducer.progressFlow.value, dt)
         when (phase) {
             VizPhase.BUILDING -> updateBuilding(voiceLevels, dt)
             VizPhase.DESTRUCTION -> updateDestruction(dt)
@@ -283,10 +324,21 @@ class AntColonyViz(
     }
 
     private fun updateBuilding(voiceLevels: FloatArray, dt: Float) {
-        // Check threshold
-        if (grid.blockCount >= thresholdBlockCount && grid.blockCount > 0) {
-            startDestruction()
-            return
+        // With an end coming, the mound waits at DOOM's size and is destroyed so the effect ends
+        // with the song; without one, it is destroyed as soon as it reaches that size.
+        val secondsLeft = songSecondsLeft
+        val song = metadataProducer.songStartsFlow.value
+        if (grid.blockCount > 0) {
+            if (secondsLeft == null) {
+                if (grid.blockCount >= thresholdBlockCount) {
+                    startDestruction()
+                    return
+                }
+            } else if (song != destroyedSong && secondsLeft <= selectedDestructionType.duration) {
+                destroyedSong = song
+                startDestruction()
+                return
+            }
         }
 
         // Compute max voice level once
@@ -676,12 +728,14 @@ class AntColonyViz(
                 AntState.DEPOSITING -> {
                     ant.depositTimer -= dt
                     if (ant.depositTimer <= 0f) {
+                        // A mound at DOOM's size takes no more until the song's end destroys it.
+                        val full = grid.blockCount >= thresholdBlockCount
                         // Place primary block
-                        if (grid.canPlace(ant.targetX, ant.targetY, ant.targetZ)) {
+                        if (!full && grid.canPlace(ant.targetX, ant.targetY, ant.targetZ)) {
                             grid.set(ant.targetX, ant.targetY, ant.targetZ, ant.colorIndex)
                         }
                         // Cluster: attempt 1-3 extra blocks in adjacent cells
-                        val extras = 1 + Random.nextInt(3)
+                        val extras = if (full) 0 else 1 + Random.nextInt(3)
                         repeat(extras) {
                             val oi = (Random.nextInt(4)) * 2
                             val nx = ant.targetX + clusterOffsets[oi]
@@ -787,7 +841,9 @@ class AntColonyViz(
     private fun startDestruction() {
         phase = VizPhase.DESTRUCTION
         destructionType = selectedDestructionType
+        destructionDuration = destructionType.duration
         destructionProgress = 0f
+        randomPick = DestructionType.entries[Random.nextInt(3)]
 
         for (ant in ants) {
             if (ant.active && ant.state != AntState.FLEEING) {
@@ -800,16 +856,13 @@ class AntColonyViz(
             DestructionType.STOMP -> {
                 stompY = -0.3f
                 stompPhase = 0
-                destructionDuration = STOMP_DURATION
             }
             DestructionType.FIRE_ANT_WAR -> {
                 fireAntProgress = 0f
                 fireAntSeed = Random.nextLong()
-                destructionDuration = FIRE_ANT_DURATION
             }
             DestructionType.MAGNIFYING_GLASS -> {
                 magGlassAngle = 0f
-                destructionDuration = MAG_GLASS_DURATION
             }
         }
     }
@@ -825,13 +878,7 @@ class AntColonyViz(
 
         // Update debris
         for (d in debris) {
-            if (!d.active) continue
-            d.life -= d.decay * dt
-            if (d.life <= 0f) { d.active = false; continue }
-            d.vy += 0.5f * dt
-            d.x += d.vx * dt
-            d.y += d.vy * dt
-            d.z += d.vz * dt
+            if (d.active) d.step(dt)
         }
 
         when (destructionType) {
@@ -848,9 +895,9 @@ class AntColonyViz(
     private fun updateStomp() {
         val t = destructionProgress
         when {
-            t < 0.3f -> {
+            t < STOMP_IMPACT -> {
                 stompPhase = 0
-                stompY = -0.3f + t / 0.3f * 0.75f
+                stompY = -0.3f + t / STOMP_IMPACT * 0.75f
             }
             t < 0.4f -> {
                 if (stompPhase == 0) {
@@ -920,18 +967,41 @@ class AntColonyViz(
         }
     }
 
+    // Each column's top pod splashes, in random column order so the debris pool's limit
+    // thins the splash evenly instead of cutting off one side.
     private fun explodeAllBlocks() {
-        for (x in 0 until GRID_W) {
-            for (z in 0 until GRID_D) {
-                for (y in 0 until GRID_H) {
-                    val colorIdx = grid.get(x, y, z)
-                    if (colorIdx != 0) {
-                        spawnDebris(x, y, z, colorIdx, isFireAnt = false)
-                        grid.set(x, y, z, 0)
-                    }
+        for (i in columnOrder.indices) columnOrder[i] = i
+        columnOrder.shuffle()
+        for (col in columnOrder) {
+            val x = col % GRID_W
+            val z = col / GRID_W
+            for (y in GRID_H - 1 downTo 0) {
+                val colorIdx = grid.get(x, y, z)
+                if (colorIdx != 0) {
+                    spawnGoo(x, y, z, colorIdx)
+                    break
                 }
             }
         }
+        grid.clear()
+    }
+
+    private fun spawnGoo(gx: Int, gy: Int, gz: Int, colorIndex: Int) {
+        val d = debris.firstOrNull { !it.active } ?: return
+        val dx = (gx + 0.5f) / GRID_W - 0.5f
+        val dz = (gz + 0.5f) / GRID_D - 0.5f
+        d.x = (gx + 0.5f) / GRID_W
+        d.y = (gy + 0.5f) / GRID_H
+        d.z = (gz + 0.5f) / GRID_D
+        d.vx = dx * 0.7f + (Random.nextFloat() - 0.5f) * 0.3f
+        d.vy = 1.0f + Random.nextFloat() * 1.2f
+        d.vz = dz * 0.7f + (Random.nextFloat() - 0.5f) * 0.3f
+        d.colorIndex = colorIndex
+        d.life = 1f
+        d.decay = 0.35f + Random.nextFloat() * 0.15f
+        d.size = 0.004f + Random.nextFloat() * 0.004f
+        d.goo = true
+        d.active = true
     }
 
     private fun spawnDebris(gx: Int, gy: Int, gz: Int, colorIndex: Int, isFireAnt: Boolean) {
@@ -951,6 +1021,7 @@ class AntColonyViz(
         d.life = 1f
         d.decay = 0.4f + Random.nextFloat() * 0.3f
         d.size = 0.004f + Random.nextFloat() * 0.004f
+        d.goo = false
         d.active = true
     }
 

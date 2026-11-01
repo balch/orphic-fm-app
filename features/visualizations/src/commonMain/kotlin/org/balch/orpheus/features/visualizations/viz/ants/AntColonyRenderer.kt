@@ -1,11 +1,13 @@
 package org.balch.orpheus.features.visualizations.viz.ants
 
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -321,20 +323,31 @@ internal fun DrawScope.drawAnts(
     }
 }
 
+/** Embers and sparks; the stomp's goo too unless [gooInPods], when [PodField] melts it in instead. */
 internal fun DrawScope.drawDebris(
     debris: Array<Debris>,
     voiceColors: Array<Color>,
+    gooInPods: Boolean,
+    iso: FloatArray,
 ) {
     val w = size.width
     val h = size.height
 
     for (d in debris) {
-        if (!d.active) continue
+        if (!d.active || (d.goo && gooInPods)) continue
         val alpha = (d.life * d.life).coerceIn(0f, 1f)
         val color = voiceColors[(d.colorIndex - 1).coerceIn(0, voiceColors.lastIndex)]
 
-        val sx = d.x * w
-        val sy = (1f - d.y) * h * 0.5f + h * 0.3f
+        val sx: Float
+        val sy: Float
+        if (d.goo) {
+            isoProjectInto(d.x * GRID_W, d.y * GRID_H, d.z * GRID_D, ISO_CENTER_X, ISO_CENTER_Y, iso)
+            sx = iso[0] * w
+            sy = iso[1] * h
+        } else {
+            sx = d.x * w
+            sy = (1f - d.y) * h * 0.5f + h * 0.3f
+        }
         val radius = d.size * w
 
         drawCircle(
@@ -355,10 +368,39 @@ internal fun DrawScope.drawDebris(
 // Destruction Effects
 // ============================================================================
 
+/**
+ * The stomp's ripple into [out] as centre x, y, radius and strength in screen pixels: it runs out
+ * from where the boot lands and fades, and is all zeros before the impact and once it's gone.
+ */
+internal fun stompShock(progress: Float, w: Float, h: Float, out: FloatArray) {
+    val t = (progress - STOMP_IMPACT) / 0.45f
+    if (t < 0f || t > 1f) {
+        out.fill(0f)
+        return
+    }
+    out[0] = ISO_CENTER_X * w
+    out[1] = ISO_CENTER_Y * h
+    out[2] = t * w * 0.6f
+    out[3] = (1f - t) * (1f - t)
+}
+
+/** How far the impact shakes the whole scene, for half a second after the boot lands. */
+internal fun stompShake(progress: Float): Offset {
+    val t = (progress - STOMP_IMPACT) * STOMP_DURATION
+    if (t < 0f || t > 0.5f) return Offset.Zero
+    val amp = 12f * (1f - t / 0.5f)
+    return Offset(sin(t * 70f) * amp, cos(t * 95f) * amp * 0.7f)
+}
+
+private val glowStroke = Stroke(width = 12f)
+private val lensRimStroke = Stroke(width = 5f)
+private val lensGlintStroke = Stroke(width = 3f, cap = StrokeCap.Round)
+
 internal fun DrawScope.drawStompEffect(
     progress: Float,
     stompY: Float,
     stompPhase: Int,
+    shock: FloatArray,
     bootPath: Path,
     strokeBoot: Stroke,
     strokeCrack: Stroke,
@@ -366,20 +408,56 @@ internal fun DrawScope.drawStompEffect(
     val w = size.width
     val h = size.height
 
-    val bootColor = OrpheusColors.antBootNeon
-    val bootScreenY = stompY * h + h * 0.1f
-    val bootW = w * 0.3f
-    val bootH = h * 0.15f
-    val bootLeft = w * 0.35f
+    // The ripple's visible crest; the pod shader bends the pods along the same ring.
+    if (shock[3] > 0f) {
+        val r = shock[2]
+        val topLeft = Offset(shock[0] - r, shock[1] - r * 0.5f)
+        val ovalSize = Size(r * 2f, r)
+        drawOval(OrpheusColors.antBootNeon.copy(alpha = 0.2f * shock[3]), topLeft, ovalSize, style = glowStroke, blendMode = BlendMode.Plus)
+        drawOval(OrpheusColors.antBootNeon.copy(alpha = 0.6f * shock[3]), topLeft, ovalSize, style = strokeCrack, blendMode = BlendMode.Plus)
+    }
 
+    // A boot in profile, toe to the right: dark leather, a treaded sole and a neon rim light.
+    val bootColor = OrpheusColors.antBootNeon
+    val u = w * 0.3f
+    val bh = h * 0.15f
+    val left = w * 0.35f
+    val sole = stompY * h + h * 0.1f + bh
+    val st = bh * 0.24f
     bootPath.reset()
-    bootPath.moveTo(bootLeft, bootScreenY)
-    bootPath.lineTo(bootLeft + bootW, bootScreenY)
-    bootPath.lineTo(bootLeft + bootW * 0.9f, bootScreenY + bootH)
-    bootPath.lineTo(bootLeft + bootW * 0.1f, bootScreenY + bootH)
+    bootPath.moveTo(left + u * 0.06f, sole - bh * 3.2f)
+    bootPath.lineTo(left + u * 0.04f, sole - bh * 0.9f)
+    bootPath.quadraticTo(left, sole - bh * 0.6f, left + u * 0.01f, sole - st)
+    bootPath.lineTo(left + u * 0.94f, sole - st)
+    bootPath.quadraticTo(left + u * 1.02f, sole - st, left + u, sole - st - bh * 0.25f)
+    bootPath.quadraticTo(left + u * 0.97f, sole - bh * 0.85f, left + u * 0.72f, sole - bh * 0.95f)
+    bootPath.lineTo(left + u * 0.48f, sole - bh * 1.25f)
+    bootPath.lineTo(left + u * 0.44f, sole - bh * 3.2f)
     bootPath.close()
-    drawPath(bootPath, color = bootColor.copy(alpha = 0.6f), style = strokeBoot)
-    drawPath(bootPath, color = bootColor.copy(alpha = 0.15f))
+    drawPath(
+        bootPath,
+        Brush.verticalGradient(listOf(Color(0xFF223548), Color(0xFF101A26)), sole - bh * 3.2f, sole),
+    )
+    drawRoundRect(
+        color = Color(0xFF070B10),
+        topLeft = Offset(left, sole - st),
+        size = Size(u * 1.0f, st),
+        cornerRadius = CornerRadius(st * 0.4f),
+    )
+    for (i in 0 until 11) {
+        val x = left + u * (0.05f + 0.09f * i)
+        drawLine(bootColor.copy(alpha = 0.45f), Offset(x, sole - st * 0.5f), Offset(x, sole), strokeWidth = 2f)
+    }
+    drawLine(bootColor.copy(alpha = 0.5f), Offset(left + u * 0.02f, sole - st), Offset(left + u * 0.95f, sole - st), strokeWidth = 1.5f)
+    // Laces across the shin, hooked on the front edge.
+    for (i in 1..4) {
+        val f = i / 5f
+        val fx = left + u * (0.48f - 0.04f * f)
+        val fy = sole - bh * (1.25f + 1.95f * f)
+        drawLine(bootColor.copy(alpha = 0.5f), Offset(fx, fy), Offset(fx - u * 0.12f, fy + bh * 0.08f), strokeWidth = 2f)
+    }
+    drawPath(bootPath, bootColor.copy(alpha = 0.18f), style = glowStroke, blendMode = BlendMode.Plus)
+    drawPath(bootPath, bootColor.copy(alpha = 0.85f), style = strokeBoot)
 
     if (stompPhase == 1 && progress < 0.45f) {
         val flashAlpha = ((0.45f - progress) / 0.05f).coerceIn(0f, 0.5f)
@@ -447,45 +525,80 @@ internal fun DrawScope.drawFireAntEffect(
     }
 }
 
+/**
+ * Lays out the glass from its burn centre on the grid: [heat] gets the focus on the ground and the
+ * burn radius, [lens] the lens hanging above it, all in screen pixels for both shader and Canvas.
+ */
+internal fun magGlassLayout(
+    centerX: Float, centerZ: Float, progress: Float, w: Float, h: Float,
+    lens: FloatArray, heat: FloatArray, iso: FloatArray,
+) {
+    isoProjectInto(centerX * GRID_W, 0f, centerZ * GRID_D, ISO_CENTER_X, ISO_CENTER_Y, iso)
+    heat[0] = iso[0] * w
+    heat[1] = iso[1] * h
+    heat[2] = (2f + progress * 3f) * CUBE_SIZE * w
+    lens[0] = heat[0]
+    lens[1] = heat[1] - h * 0.24f
+    lens[2] = w * 0.075f
+}
+
 internal fun DrawScope.drawMagnifyingGlassEffect(
-    magGlassCenterX: Float,
-    magGlassCenterY: Float,
+    lens: FloatArray,
+    heat: FloatArray,
     animationTime: Float,
+    beamPath: Path,
     strokeLens: Stroke,
 ) {
-    val w = size.width
-    val h = size.height
+    val lx = lens[0]
+    val ly = lens[1]
+    val r = lens[2]
+    val fx = heat[0]
+    val fy = heat[1]
+    val sun = OrpheusColors.antMagGlassWhite
 
-    val lensRadius = w * 0.08f
-    val lensCenterX = magGlassCenterX * w
-    val lensCenterY = magGlassCenterY * h * 0.5f + h * 0.3f
+    // Sunlight falling onto the lens, then focused down to the burn in a cone.
+    drawRect(
+        Brush.horizontalGradient(listOf(sun.copy(alpha = 0f), sun.copy(alpha = 0.08f), sun.copy(alpha = 0f)), lx - r * 1.2f, lx + r * 1.2f),
+        topLeft = Offset(lx - r * 1.2f, 0f), size = Size(r * 2.4f, ly), blendMode = BlendMode.Plus,
+    )
+    val beam = Brush.verticalGradient(listOf(sun.copy(alpha = 0.06f), sun.copy(alpha = 0.3f)), ly, fy)
+    for (i in 0..1) {
+        val spread = if (i == 0) 0.9f else 0.35f
+        beamPath.reset()
+        beamPath.moveTo(lx - r * spread, ly)
+        beamPath.lineTo(lx + r * spread, ly)
+        beamPath.lineTo(fx, fy)
+        beamPath.close()
+        drawPath(beamPath, beam, blendMode = BlendMode.Plus)
+    }
 
+    // The handle, out from the rim at the lower right: a silver collar, then a dark grip.
+    val hx = lx + r * 0.7071f
+    val hy = ly + r * 0.7071f
+    val collar = Offset(hx + r * 0.2f, hy + r * 0.2f)
+    val end = Offset(hx + r * 1.15f, hy + r * 1.15f)
+    drawLine(Color(0xFFB8C4CE), collar, end, strokeWidth = 14f, cap = StrokeCap.Round)
+    drawLine(Color(0xFF1E1A2A), collar, end, strokeWidth = 10f, cap = StrokeCap.Round)
+    drawLine(Color(0xFFCFD8E0), Offset(hx, hy), collar, strokeWidth = 9f)
+
+    // The glass: a faint sheen, a silver rim with a dark inner edge, and a curved highlight.
+    val center = Offset(lx, ly)
     drawCircle(
-        color = Color.White.copy(alpha = 0.4f),
-        radius = lensRadius,
-        center = Offset(lensCenterX, lensCenterY),
-        style = strokeLens,
+        Brush.radialGradient(listOf(Color.White.copy(alpha = 0.02f), Color(0xFF9FE8FF).copy(alpha = 0.1f)), center, r),
+        radius = r, center = center,
+    )
+    drawCircle(Color(0xFFCFD8E0).copy(alpha = 0.9f), radius = r, center = center, style = lensRimStroke)
+    drawCircle(Color.Black.copy(alpha = 0.35f), radius = r - 3.5f, center = center, style = strokeLens)
+    drawArc(
+        Color.White.copy(alpha = 0.55f), startAngle = 200f, sweepAngle = 60f, useCenter = false,
+        topLeft = Offset(lx - r * 0.75f, ly - r * 0.75f), size = Size(r * 1.5f, r * 1.5f),
+        style = lensGlintStroke,
     )
 
-    val focalY = h * 0.55f
-    drawLine(
-        color = OrpheusColors.antMagGlassWhite.copy(alpha = 0.3f),
-        start = Offset(lensCenterX, lensCenterY),
-        end = Offset(lensCenterX, focalY),
-        strokeWidth = 1.5f,
-    )
-
-    val burnAlpha = 0.5f + sin(animationTime * 8f) * 0.2f
-    drawCircle(
-        color = OrpheusColors.antMagGlassWhite.copy(alpha = burnAlpha),
-        radius = 8f,
-        center = Offset(lensCenterX, focalY),
-        blendMode = BlendMode.Plus,
-    )
-    drawCircle(
-        color = OrpheusColors.antMagGlassBurn.copy(alpha = burnAlpha * 0.6f),
-        radius = 20f,
-        center = Offset(lensCenterX, focalY),
-        blendMode = BlendMode.Plus,
-    )
+    // The burn: a flickering white-hot point in an orange bloom.
+    val flicker = 0.5f + sin(animationTime * 8f) * 0.2f
+    val focal = Offset(fx, fy)
+    drawCircle(OrpheusColors.antMagGlassBurn.copy(alpha = flicker * 0.3f), radius = heat[2] * 0.6f, center = focal, blendMode = BlendMode.Plus)
+    drawCircle(OrpheusColors.antMagGlassBurn.copy(alpha = flicker * 0.6f), radius = 22f, center = focal, blendMode = BlendMode.Plus)
+    drawCircle(sun.copy(alpha = 0.6f + flicker * 0.4f), radius = 8f, center = focal, blendMode = BlendMode.Plus)
 }
