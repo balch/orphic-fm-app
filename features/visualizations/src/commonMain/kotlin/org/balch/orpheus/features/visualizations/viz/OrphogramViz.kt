@@ -10,8 +10,10 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.visualizations.viz.spectrogram.OrphogramCanvas
+import org.balch.orpheus.ui.infrastructure.LabelTone
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -62,31 +64,28 @@ class OrphogramViz(
 
     companion object {
         /**
-         * The phone's panel glass: a little frost and tint with some bend, so the plasma shows through
-         * the controls. The nav bars take [PlasmaBars] and the dock's panels [DockedPanels].
+         * The phone's panel glass: light frost and tint, no lens bend, and a lift in colour and
+         * contrast, so the plasma reads undistorted through the controls. The nav bars take
+         * [PlasmaBars] and the dock's panels [DockedPanels].
          */
         private val Default = VisualizationLiquidEffects(
-            frostSmall = 6f,
-            frostMedium = 8f,
-            frostLarge = 9f,
-            tintAlpha = 0.15f,
-            top = VisualizationLiquidScope(
-                saturation = .8f,
-                contrast = .9f,
-                dispersion = .3f,
-                refraction = 0.2f,
-                curve = .1f,
-            ),
-            bottom = VisualizationLiquidScope(
-                saturation = .8f,
-                contrast = .9f,
-                dispersion = .3f,
-                refraction = 0.2f,
-                curve = .1f,
-            ),
+            frostSmall = 2f,
+            frostMedium = 3f,
+            frostLarge = 4f,
+            tintAlpha = 0.06f,
+            top = VisualizationLiquidScope(saturation = 1.25f, contrast = 1.15f),
+            bottom = VisualizationLiquidScope(saturation = 1.25f, contrast = 1.15f),
+            // The plasma is the panels' own purple, so their labels go light to read over it.
+            labelTone = LabelTone.Light,
             title = PlasmaTitle,
             bars = PlasmaBars,
-            docked = DockedPanels,
+            // The dock's heavy frost turned the plasma pale lilac under every label, so its glass
+            // fills with the void's dark instead and the labels go light.
+            docked = DockedPanels.copy(
+                tintColor = OrpheusColors.darkVoid,
+                tintAlpha = 0.55f,
+                labelTone = LabelTone.Light,
+            ),
         )
     }
 }
