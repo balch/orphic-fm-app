@@ -57,6 +57,10 @@ static constexpr float kVibratoOnsetSeconds = 0.3f;
 // over this long. Snapping it in one block clicks on engines whose harmonics swap models (SPK).
 static constexpr float kRiseReturnSeconds = 0.08f;
 
+// Glide param for a chromatic slide-in on a track with no glide of its own: about 60 ms to
+// cover most of the semitone, slow enough to hear as a slide rather than a blip.
+static constexpr float kChromaticSlideGlide = 0.1f;
+
 // One block of a per-note rise: a 0..1 ramp over `time` seconds that restarts on a note-on,
 // reached by gliding from the last note's offset for kRiseReturnSeconds, or at once when
 // `snap` is set. Returns the offset.
@@ -5563,14 +5567,23 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             midi_note += tension_key_offset(state->tension.key_shift,
                                                             state->tension_intensity);
 
-                            // Chromatic passing tones. Not on ROOT_ONLY: every note there is the
-                            // chord root, so a nudge can only land a held wrong root.
+                            // Chromatic passing tones: a held semitone nudge, or a slide that
+                            // starts a semitone off and glides onto the true note. Auto slides on
+                            // ROOT_ONLY, where a held nudge can only be a wrong root.
+                            const float slide_pref =
+                                engine->pulsar_track_chromatic_slide[t].load(std::memory_order_relaxed);
+                            const bool chrom_slide = slide_pref < 0.0f
+                                ? ts.chord_follow == ChordFollowMode::ROOT_ONLY : slide_pref > 0.5f;
+                            int chrom_slide_from = 0;
                             float chrom_prob = state->tension.chromatic_passing * state->tension_intensity;
-                            if (chrom_prob > 0.001f && ts.chord_follow != ChordFollowMode::ROOT_ONLY) {
+                            if (chrom_prob > 0.001f
+                                && (chrom_slide || ts.chord_follow != ChordFollowMode::ROOT_ONLY)) {
                                 uint32_t rng = step_hash(ts.playhead, t + 7, state->loop_count, state->step_salt);
                                 float r = (rng & 0xFFFF) / 65535.0f;
                                 if (r < chrom_prob) {
-                                    midi_note += (rng & 0x10000) ? 1 : -1;
+                                    const int nudge = (rng & 0x10000) ? 1 : -1;
+                                    if (chrom_slide) chrom_slide_from = nudge;
+                                    else midi_note += nudge;
                                 }
                             }
 
@@ -5668,6 +5681,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             } else {
                                 ts.glide_rate = 0.0f;
                                 ts.current_pitch = ts.target_pitch;
+                            }
+                            // The slide-in starts off the note even after a rest, at the track's
+                            // glide or kChromaticSlideGlide on a track without one.
+                            if (chrom_slide_from != 0 && ts.arp_note_count == 0) {
+                                ts.current_pitch = ts.target_pitch + static_cast<float>(chrom_slide_from);
+                                const float g = glide_param > 0.001f ? glide_param : kChromaticSlideGlide;
+                                ts.glide_rate = 0.001f * std::pow(0.02f, g);
                             }
                             ts.prev_step_gated = true;
                             ts.suppress_hold_tail = false;
