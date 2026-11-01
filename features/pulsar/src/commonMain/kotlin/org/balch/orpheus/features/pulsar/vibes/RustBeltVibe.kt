@@ -26,6 +26,7 @@ import org.balch.orpheus.features.pulsar.models.Lick
 import org.balch.orpheus.features.pulsar.models.LickMode
 import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.LpgMode
+import org.balch.orpheus.features.pulsar.models.MacroTarget
 import org.balch.orpheus.features.pulsar.models.MacroOverrides
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
 import org.balch.orpheus.features.pulsar.models.ProgressionAnchor
@@ -166,12 +167,9 @@ class RustBeltVibe : VibeProvider {
                     0 to TrackSectionOverride(volume = 0.9f, morph = 0.90f, reverbSend = 0.36f, density = .32f),  // kick: loud, ringing
                     1 to TrackSectionOverride(volume = 0.62f, morph = 0.26f, density = .15f),  // snare: tight crack
                     2 to TrackSectionOverride(volume = 0.44f, morph = 0.54f, density = .85f),  // hat: open and washy
-                    // Track 3 — THE HOOK, held right back so the kit carries the build. The
-                    // morph pin is the point of this entry: unpinned, the tension evolution
-                    // above walks the bass morph 0.22 -> 0.72 and the fingered PLUCK character
-                    // wanders with it. 0.30 is what the verse's own Space resolves to through
-                    // MELODIC's spaceDecay, so the un-pin at the boundary is inaudible.
-                    3 to TrackSectionOverride(volume = 0.07f, morph = 0.30f, density = .15f),
+                    // Track 3 — THE HOOK, held right back so the kit carries the build.
+                    // Its tone is pinned on the engine, so the evolution above can't reach it.
+                    3 to TrackSectionOverride(volume = 0.07f, density = .15f),
                     4 to TrackSectionOverride(volume = 0.71f, density = .15f),   // jangle
                     5 to TrackSectionOverride(volume = 0.4f, density = .15f),   // twang
                     6 to TrackSectionOverride(volume = 0.4f, density = .15f),  // organ
@@ -470,9 +468,9 @@ class RustBeltVibe : VibeProvider {
             seed = 0,
             // --- macro defaults: relaxed pocket, warm, dry-forward ---
             energy = 0.58f,
-            complexity = 0.72f,
+            complexity = 0.64f,
             space = 0.34f,
-            mood = 0.62f,
+            mood = 0.50f,
             deep = 0.30f,
             levelDb = -2.1f,  // loudness match to -16 LUFS
             // --- THE HOOK (track 3 bass plays it as LickMode.Fill) ---
@@ -574,7 +572,7 @@ class RustBeltVibe : VibeProvider {
                     glideRate = 0.06f,        // tiny finger-slur between close notes
                     lpgMode = LpgMode.PLUCK,  // fingered articulation, note-by-note
                     lpgDecay = 0.52f,
-                    lpgColour = 0.45f,
+                    lpgColour = 0.55f,        // brighter pluck attack for bite
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
@@ -589,7 +587,16 @@ class RustBeltVibe : VibeProvider {
                         pan = 0.00f,
                         density = 0.95f,  // the hook fires on (nearly) every step
                         envelopeProfile = EnvelopeProfile.MELODIC,
-                        macroMap = TrackMacroMap.MELODIC,
+                        // Mood stays the wah, over a darker range. PD timbre is distortion
+                        // amount (squared): stock 0.4-0.8 twangs. Harmonics (modulator ratio)
+                        // locked near unison, off-unison goes clangy. EAR-TUNE(user owns after ear test)
+                        macroMap = TrackMacroMap.MELODIC.copy(
+                            moodHarmonics = MacroTarget(0.5f, 0.5f),
+                            moodTimbre = MacroTarget(0.12f, 0.50f),
+                        ),
+                        // The vibe's evolution sweep replaced timbre on most steps, which both
+                        // flickered the tone and overrode the mood knob.
+                        evolutionWeight = 0f,
                         barStrategy = BarStrategy.REPEAT,  // locked; variation = lickMutation only
                     )
                 },
