@@ -4,6 +4,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
 import org.balch.orpheus.features.pulsar.anonmalies.StormAnomaly
 import org.balch.orpheus.features.pulsar.models.DuckingProfile
 import org.balch.orpheus.features.pulsar.models.ScratchEffect
+import org.balch.orpheus.features.pulsar.models.SectionDelay
 import org.balch.orpheus.features.pulsar.models.SectionFog
 import org.balch.orpheus.features.pulsar.models.SectionStreet
 import org.balch.orpheus.features.pulsar.models.SectionWeather
@@ -217,6 +218,25 @@ class PulsarMarshalStrideTest {
         assertFailsWith<IllegalArgumentException> { SectionFog(intervalBars = 17) }
         assertFailsWith<IllegalArgumentException> { SectionFog(pitch = -13f) }
         assertFailsWith<IllegalArgumentException> { SectionFog(distance = 1.1f) }
+    }
+
+    // --- pulsar_section_data slots 55-57: SectionDelay ---
+
+    @Test
+    fun sectionDelayFieldOrderMatchesDelaySlotMarshal() {
+        // timeA(55), timeB(56), feedback(57), after the fog slots. A new field goes after feedback.
+        val descriptor = SectionDelay.serializer().descriptor
+        assertEquals(
+            listOf("timeA", "timeB", "feedback"),
+            (0 until descriptor.elementsCount).map { descriptor.getElementName(it) },
+        )
+    }
+
+    @Test
+    fun sectionDelayRejectsValuesOutsideTheirRanges() {
+        assertFailsWith<IllegalArgumentException> { SectionDelay(timeA = 1.1f) }
+        assertFailsWith<IllegalArgumentException> { SectionDelay(timeB = -0.1f) }
+        assertFailsWith<IllegalArgumentException> { SectionDelay(feedback = 0.96f) }
     }
 
     // --- fog_data_$i: 6 floats (5 FogHornAnomaly fields + declared flag) ---

@@ -18,7 +18,12 @@ void unit_process_pulsar_delay(GraphUnit* u, OrpheusEngine* engine, int num_fram
     float* in_l = engine->pulsar_delay_send_l;
     float* in_r = engine->pulsar_delay_send_r;
 
-    float fb_target = std::min(engine->pulsar_delay_feedback.load(std::memory_order_relaxed), 0.95f);
+    // A section's SectionDelay (>= 0) stands in for the vibe-level value.
+    auto section_or = [](const std::atomic<float>& section, const std::atomic<float>& vibe) {
+        const float v = section.load(std::memory_order_relaxed);
+        return v >= 0.0f ? v : vibe.load(std::memory_order_relaxed);
+    };
+    float fb_target = std::min(section_or(engine->pulsar_section_delay_feedback, engine->pulsar_delay_feedback), 0.95f);
 
     // Blend with per-track feedback overrides
     {
@@ -46,8 +51,8 @@ void unit_process_pulsar_delay(GraphUnit* u, OrpheusEngine* engine, int num_fram
         }
     }
 
-    float base_time_a = 0.01f + engine->pulsar_delay_time_a.load(std::memory_order_relaxed) * 1.99f;
-    float base_time_b = 0.01f + engine->pulsar_delay_time_b.load(std::memory_order_relaxed) * 1.99f;
+    float base_time_a = 0.01f + section_or(engine->pulsar_section_delay_time_a, engine->pulsar_delay_time_a) * 1.99f;
+    float base_time_b = 0.01f + section_or(engine->pulsar_section_delay_time_b, engine->pulsar_delay_time_b) * 1.99f;
 
     const int max_d = OrpheusEngine::kPulsarMaxDelaySamples;
     const float smooth = 1.0f - std::exp(-1.0f / (0.02f * sr));

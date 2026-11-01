@@ -2364,7 +2364,8 @@ class PulsarViewModel(
      *   27=street_footsteps, 28=street_run, 29=street_footstep_echo, 30=street_train,
      *   31=volume+1, 32..36=rampTo energy/complexity/space/mood/volume +1 (0 = unset),
      *   37=volumeEnvelope point count, 38..49=(bar, level) pairs,
-     *   50=fog_level, 51=fog_interval_bars, 52=fog_pattern, 53=fog_pitch, 54=fog_distance (SectionFog)
+     *   50=fog_level, 51=fog_interval_bars, 52=fog_pattern, 53=fog_pitch, 54=fog_distance (SectionFog),
+     *   55=delay_time_a+1, 56=delay_time_b+1, 57=delay_feedback+1 (SectionDelay, 0 = the vibe's)
      *
      * section_transitions[s * MAX_SECTION_TRANSITIONS * 3 + t * 3 + field]:
      *   0=targetIndex, 1=weight, 2=transitionBars
@@ -2569,6 +2570,12 @@ class PulsarViewModel(
             setSection(52, (sectionFog?.pattern?.ordinal ?: 0).toFloat())
             setSection(53, sectionFog?.pitch ?: 0f)
             setSection(54, sectionFog?.distance ?: 0.4f)
+
+            // Slots 55-57: SectionDelay, each value + 1 so 0 = unset (the vibe's delay).
+            val sectionDelay = section.delay
+            setSection(55, sectionDelay?.timeA?.plus(1f) ?: 0f)
+            setSection(56, sectionDelay?.timeB?.plus(1f) ?: 0f)
+            setSection(57, sectionDelay?.feedback?.plus(1f) ?: 0f)
 
             // Per-track section overrides. Always write all 8 slots so a vibe
             // reload doesn't carry stale overrides from a previous vibe.

@@ -39,13 +39,14 @@ static constexpr int kMaxSectionTransitions = 8;
 // width (slot 17 the bass-channel pin, slots 21-25 are SectionWeather, slot 26 is the
 // pinned lick, slots 27-30 are SectionStreet, slot 31 the section volume, slots 32-36 the
 // rampTo macros, slot 37 the volume envelope's point count and 38.. its (bar, level) pairs, then the 5
-// SectionFog slots at kSectionFogSlot) —
+// SectionFog slots at kSectionFogSlot, then the 3 SectionDelay slots at kSectionDelaySlot) —
 // pulsar_section_tension_data is indexed by its own kSectionTensionFields stride.
 static constexpr int kMaxSectionVolumePoints = 6;
 static constexpr int kSectionFogSlot = 38 + kMaxSectionVolumePoints * 2;   // 50: SectionFog, 5 slots
-static constexpr int kSectionDataFields = 55;   // pulsar_section_data, pulsar_section_tension_data
-static_assert(kSectionDataFields == kSectionFogSlot + 5,
-              "slot 37 is the volume envelope count, its pairs follow it, then the 5 fog slots");
+static constexpr int kSectionDelaySlot = kSectionFogSlot + 5;   // 55: SectionDelay, 3 slots
+static constexpr int kSectionDataFields = 58;   // pulsar_section_data, pulsar_section_tension_data
+static_assert(kSectionDataFields == kSectionDelaySlot + 3,
+              "slot 37 is the volume envelope count, its pairs follow it, then 5 fog and 3 delay slots");
 // pulsar_section_tension_data's stride: the 21 vibe-level tension fields plus the arc.
 static constexpr int kSectionTensionFields = 22;
 static_assert(kSectionTensionFields <= kSectionDataFields,

@@ -316,6 +316,8 @@ data class Section(
     val street: SectionStreet? = null,
     /** A fog horn phrase on a bar interval (slots 50-54). Null = no fog. */
     val fog: SectionFog? = null,
+    /** This section's delay times and feedback (slots 55-57). Null = the vibe's delay. */
+    val delay: SectionDelay? = null,
     /**
      * The section's mix volume as straight lines between [VolumePoint]s, holding the first
      * level before the first point and the last after the last (slots 37-49). Replaces
@@ -516,7 +518,7 @@ data class Arrangement(
         /**
          * Floats per section in the `section_data_$i` bank (slots 0-20 existing fields, slot 17
          * the bass-channel pin [Section.bassLineIndex], 21-25 [SectionWeather],
-         * 26 [Section.lickIndex], 27-30 SectionStreet, 50-54 [SectionFog]). MUST equal
+         * 26 [Section.lickIndex], 27-30 SectionStreet, 50-54 [SectionFog], 55-57 [SectionDelay]). MUST equal
          * `kSectionDataFields` in `pulsar_limits.h`.
          * `PulsarSectionLimitsTest` parses the header and fails if these drift apart.
          *
@@ -524,7 +526,7 @@ data class Arrangement(
          * reuses this constant only for its C++-side allocation size; its per-section
          * stride is [TENSION_DATA_FIELDS].
          */
-        const val SECTION_DATA_FIELDS = 55
+        const val SECTION_DATA_FIELDS = 58
 
         /**
          * Per-section stride of `pulsar_section_tension_data`: the 21 tension fields plus

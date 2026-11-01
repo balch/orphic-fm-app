@@ -1457,6 +1457,12 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_delay_damping{0.5f};
     std::atomic<int>   pulsar_delay_bypass{0};  // active by default (DEEP controls wet)
 
+    // The active section's SectionDelay, blended on the pre-roll by the pulsar unit each block.
+    // -1 = no section override: the delay reads the vibe-level value above.
+    std::atomic<float> pulsar_section_delay_time_a{-1.0f};
+    std::atomic<float> pulsar_section_delay_time_b{-1.0f};
+    std::atomic<float> pulsar_section_delay_feedback{-1.0f};
+
     float pulsar_delay_time_a_smooth{0.0f};
     float pulsar_delay_time_b_smooth{0.0f};
     float pulsar_smooth_delay_feedback{0.4f};

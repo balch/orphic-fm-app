@@ -2129,6 +2129,15 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.fog.pitch = std::max(-12.0f, std::min(12.0f, F(3)));
                 sec.fog.distance = clamp01(F(4));
             }
+            // Slots 55-57: SectionDelay (time A, time B, feedback), each value + 1 (0 = unset).
+            {
+                auto D = [&](int f) {
+                    return engine->pulsar_section_data[base + kSectionDelaySlot + f].load(std::memory_order_relaxed);
+                };
+                sec.delay.time_a = section_delay::decode(D(0), 1.0f);
+                sec.delay.time_b = section_delay::decode(D(1), 1.0f);
+                sec.delay.feedback = section_delay::decode(D(2), section_delay::kMaxFeedback);
+            }
             // Slot 37: volume envelope point count; 38..: (bar, level) pairs.
             {
                 int n = static_cast<int>(engine->pulsar_section_data[base + 37].load(std::memory_order_relaxed));
@@ -6722,6 +6731,34 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // The vibe's level trim, read once for the storm, street and speech blocks below. The
     // tracks took it in their volume, so the taps see every voice trimmed alike.
     const float vibe_gain = engine->pulsar_vibe_gain.load(std::memory_order_relaxed);
+
+    // ── Section delay ────────────────────────────────────────────────────
+    // The active section's SectionDelay crossfaded toward the destination's on the macro
+    // pre-roll, like the weather bed. The pulsar delay unit runs after this one and reads it.
+    {
+        float time_a = section_delay::kUnset, time_b = section_delay::kUnset, fb = section_delay::kUnset;
+        if (state->arrangement.active) {
+            const ArrangementParams& arr = state->arrangement;
+            const SectionState& ss = state->section_state;
+            const int cur = ss.current_section;
+            if (cur >= 0 && cur < arr.section_count) {
+                const section_delay::Param& c = arr.sections[cur].delay;
+                const int dst = ss.transition_target;
+                const bool in_transition = dst >= 0 && dst < arr.section_count;
+                const section_delay::Param none;
+                const section_delay::Param& n = in_transition ? arr.sections[dst].delay : none;
+                time_a = section_delay::blend(c.time_a, n.time_a, in_transition,
+                    engine->pulsar_delay_time_a.load(std::memory_order_relaxed), progress);
+                time_b = section_delay::blend(c.time_b, n.time_b, in_transition,
+                    engine->pulsar_delay_time_b.load(std::memory_order_relaxed), progress);
+                fb = section_delay::blend(c.feedback, n.feedback, in_transition,
+                    engine->pulsar_delay_feedback.load(std::memory_order_relaxed), progress);
+            }
+        }
+        engine->pulsar_section_delay_time_a.store(time_a, std::memory_order_relaxed);
+        engine->pulsar_section_delay_time_b.store(time_b, std::memory_order_relaxed);
+        engine->pulsar_section_delay_feedback.store(fb, std::memory_order_relaxed);
+    }
 
     // ── Storm weather bed (the 9th voice) ────────────────────────────────
     // Not sequenced and not a bus stem: the storm renders once per block, straight
