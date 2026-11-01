@@ -738,6 +738,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_seed.store(static_cast<int64_t>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "lick_mutation") == 0)
             engine->pulsar_lick_mutation.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "lick_mutation_mode") == 0)
+            engine->pulsar_lick_mutation_mode.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "lick_octave") == 0)
             engine->pulsar_lick_octave.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "step_count") == 0)

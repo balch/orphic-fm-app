@@ -384,6 +384,18 @@ inline int nearest_chord_tone_degree(int degree, int chord_degree, int scale_cou
     return best;
 }
 
+// Move a MIDI note to the nearest tone of the chord on chord_degree, measured in scale
+// degrees from root. Keeps the note's octave neighborhood, like nearest_chord_tone_degree.
+inline int snap_note_to_chord_tone(int note, int root, const PulsarScale& scale, int chord_degree) {
+    if (scale.count <= 0) return note;
+    auto semis = [&](int deg) {
+        const int d = ((deg % scale.count) + scale.count) % scale.count;
+        return (deg - d) / scale.count * 12 + scale.degrees[d];
+    };
+    const int deg = midi_to_lick_degree(note, root, scale);
+    return note + semis(nearest_chord_tone_degree(deg, chord_degree, scale.count)) - semis(deg);
+}
+
 // Nominal jam span used when the section clock is not running (a single-section
 // arrangement never decrements bars_remaining), so a jam still builds instead of
 // freezing at progress 0 for its whole life.

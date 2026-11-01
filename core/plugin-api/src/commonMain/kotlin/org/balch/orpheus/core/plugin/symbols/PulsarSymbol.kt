@@ -29,6 +29,7 @@ enum class PulsarSymbol(
     ENVELOPE_MODE("envelope_mode", displayName = "Envelope Mode"),
     SEED("seed"),
     LICK_MUTATION("lick_mutation"),
+    LICK_MUTATION_MODE("lick_mutation_mode"),
     LICK_OCTAVE("lick_octave"),
 
     // Per-track engine selectors (16 entries)

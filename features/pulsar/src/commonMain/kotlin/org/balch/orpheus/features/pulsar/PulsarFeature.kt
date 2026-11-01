@@ -770,6 +770,7 @@ class PulsarViewModel(
     private val envelopeModeId = synthController.controlFlow(PulsarSymbol.ENVELOPE_MODE.controlId)
     private val seedId = synthController.controlFlow(PulsarSymbol.SEED.controlId)
     private val lickMutationId = synthController.controlFlow(PulsarSymbol.LICK_MUTATION.controlId)
+    private val lickMutationModeId = synthController.controlFlow(PulsarSymbol.LICK_MUTATION_MODE.controlId)
     private val lickOctaveId = synthController.controlFlow(PulsarSymbol.LICK_OCTAVE.controlId)
     private val trackEdmIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ENGINE_EDM.ordinal + i * 2].controlId)
@@ -1955,6 +1956,9 @@ class PulsarViewModel(
                 IntValue(0)
             )
         }
+
+        // Outside the lick branch: the mode also covers the pool and the bass line.
+        lickMutationModeId.value = IntValue(vibe.lickMutationMode.ordinal)
 
         // Push lick (data first, length last as release fence)
         val lick = vibe.lick

@@ -56,6 +56,9 @@ struct PulsarStep {
     // the authored part, so the trigger path skips the energy_density roll on them;
     // hit_probability above is the authored channel for a note that is a maybe.
     bool from_lick = false;
+    // A CHORD_TONES mutation moved this lick note's degree, so note-on snaps it to the
+    // chord sounding under it. Never set under RANDOM.
+    bool mutated = false;
 };
 
 struct PulsarMacroTarget {
@@ -99,6 +102,13 @@ enum class LickMode : uint8_t {
     NONE = 0,
     SQUASH = 1,
     FILL = 2,
+};
+
+// Vibe-wide, from Vibe.lickMutationMode. CHORD_TONES keeps a lick's rests, moves a
+// mutated note one scale step and snaps it to the sounding chord at note-on.
+enum class LickMutationMode : uint8_t {
+    RANDOM = 0,
+    CHORD_TONES = 1,
 };
 
 enum class NoteFollowMode : uint8_t {

@@ -58,10 +58,11 @@ static bool test_pulsar_global_port_routing() {
     check_float_port(engine, "vibe_gain", 1.6f, engine->pulsar_vibe_gain, pass);
     check_int_port(engine, "envelope_mode", 2, engine->pulsar_envelope_mode, pass);
     check_float_port(engine, "lick_mutation", 0.33f, engine->pulsar_lick_mutation, pass);
+    check_int_port(engine, "lick_mutation_mode", 1, engine->pulsar_lick_mutation_mode, pass);
     check_int_port(engine, "step_count", 32, engine->pulsar_step_count, pass);
     check_int_port(engine, "playing", 1, engine->pulsar_playing, pass);
 
-    int routed = 16;
+    int routed = 18;
     printf("    %s: %d global ports verified\n", pass ? "PASS" : "FAIL", routed);
 
     orpheus_engine_destroy(engine);
