@@ -573,6 +573,9 @@ The highest-value part: translate a described feel into concrete parameter choic
   arpeggiate, or the voices scatter against each other.
 
 ### Lick / riff
+- Length: a Fill lick plays only stepCount / 4 beats (4 at the default 16), so a melody longer than one
+  bar is cut to its first 4 beats unless stepCount is 32 or 64. Keep each lick within that length and
+  carry a longer line across consecutive pool slots, one per section (lickIndex).
 - Repetitive 2-note riff (garage rock, industrial): 2 steps with long durations, lickMutation <= 0.3,
   lickMode = Fill. The riff locks in and barely drifts.
 - Walking bass line: longer lick (6–8 steps) with varied scale degrees, loopLength matches the phrase,
@@ -715,7 +718,9 @@ When the mix tools are available:
 Controls and behaviours the sections above leave out. Section B's rules still hold.
 
 ### Frame and groove
-- stepCount: 16 (one-bar patterns, the default) or 32 (two-bar phrases).
+- stepCount: 16 (one-bar patterns, the default), 32 (two-bar phrases) or 64 (four bars, the most).
+  A Fill lick plays only stepCount / 4 beats, so any lead or lyric line longer than 4 beats needs
+  32 or 64 (section D has the bar and chord maths for 64).
 - rootNote takes enharmonic names: G_SHARP is A flat.
 - deep: 0.4-0.7 for a wet vibe, 0.2-0.3 for a dry, punchy one.
 - progressionStyle in plain terms: POP (I-IV-V-vi), BLUES (12-bar), JAZZ (ii-V-I), DARK (diminished
