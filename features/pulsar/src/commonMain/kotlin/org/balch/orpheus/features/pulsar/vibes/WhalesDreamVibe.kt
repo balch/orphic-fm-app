@@ -6,7 +6,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.anonmalies.FogHornAnomaly
-import org.balch.orpheus.features.pulsar.anonmalies.VoidAnomaly
 import org.balch.orpheus.features.pulsar.models.ArpMode
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.Band
@@ -62,20 +61,25 @@ import org.balch.orpheus.features.pulsar.models.VolumePoint
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-public class AWhalesDreamVibe : VibeProvider {
+class WhalesDreamVibe : VibeProvider {
   override val name: VibeName = VibeNames.A_WHALES_DREAM
 
   override val vibe: Vibe by lazy {
       Vibe(
-        name = "A Whale's Dream",
+        name = "Whale's Dream",
         tracks = listOf(
           TrackVoice(
-            engineEdm = OrpheusEngine(
-              OrpheusEngineId.BD, volume = 0.964f, harmonics = 0.57f, timbre = 0.42f, morph = 0.26f,
+            engineEdm = OrpheusEngine(OrpheusEngineId.BD,
+              volume = 0.964f,
+              harmonics = 0.57f,
+              timbre = 0.42f,
+              morph = 0.26f,
             ),
-            engineSpace = OrpheusEngine(
-              OrpheusEngineId.MOD, volume = 0.827f, harmonics = 0.26f, timbre = 0.42f, morph = 0.26f,
-              pinHarmonics = true,
+            engineSpace = OrpheusEngine(OrpheusEngineId.MOD,
+              volume = 0.827f,
+              harmonics = 0.26f, pinHarmonics = true,
+              timbre = 0.42f,
+              morph = 0.26f,
             ),
             density = 0.43f,
             macroMap = TrackMacroMap(
@@ -89,15 +93,19 @@ public class AWhalesDreamVibe : VibeProvider {
             ),
           ),
           TrackVoice(
-            engineEdm = OrpheusEngine(
-              OrpheusEngineId.MOD, volume = 0.084f, harmonics = 0.3f, timbre = 0.6f, morph = 0.65f,
-              delaySend = 0.05f, reverbSend = 0.25f, noteRangeLow = 80, noteRangeHigh = 80,
+            engineEdm = OrpheusEngine(OrpheusEngineId.MOD,
+              volume = 0.084f,
+              harmonics = 0.3f, timbre = 0.6f, morph = 0.65f,
               pinHarmonics = true, pinTimbre = true, pinMorph = true,
+              delaySend = 0.05f, reverbSend = 0.25f,
+              noteRangeLow = 80, noteRangeHigh = 80,
             ),
-            engineSpace = OrpheusEngine(
-              OrpheusEngineId.MOD, volume = 0.084f, harmonics = 0.3f, timbre = 0.6f, morph = 0.95f,
-              delaySend = 0.05f, reverbSend = 0.25f, noteRangeLow = 80, noteRangeHigh = 80,
+            engineSpace = OrpheusEngine(OrpheusEngineId.MOD,
+              volume = 0.084f,
+              harmonics = 0.3f, timbre = 0.6f, morph = 0.95f,
               pinHarmonics = true, pinTimbre = true, pinMorph = true,
+              delaySend = 0.05f, reverbSend = 0.25f,
+              noteRangeLow = 80, noteRangeHigh = 80,
             ),
             pan = -0.09f,
             density = 0.36f,
@@ -562,13 +570,13 @@ public class AWhalesDreamVibe : VibeProvider {
           sections = listOf(
             Section(
               name = "ping",
-              barsMax = 4,
+              barsMin = 2, barsMax = 2,
               barStep = 2,
               transitions = listOf(SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = 1)),
               macroOverrides = MacroOverrides(energy = 0.35f, space = 1.2f),
               rampTo = MacroOverrides(energy = 0.5f),
               tensionOverride = TensionProfile(
-                outerBars = 4,
+                outerBars = 2,
                 outerDepth = 0.6f,
                 volume = 0.4f,
                 timing = 0.15f,
@@ -611,13 +619,13 @@ public class AWhalesDreamVibe : VibeProvider {
             ),
             Section(
               name = "swell",
-              barsMax = 4,
+              barsMin = 2, barsMax = 2,
               barStep = 2,
               transitions = listOf(SectionTransition(targetIndex = 2, weight = 1.0f, transitionBars = 1)),
               macroOverrides = MacroOverrides(energy = 0.6f),
               rampTo = MacroOverrides(energy = 1.1f),
               tensionOverride = TensionProfile(
-                outerBars = 4,
+                outerBars = 2,
                 outerDepth = 0.75f,
                 volume = 0.5f,
                 evolution = EvolutionTension(
@@ -654,18 +662,19 @@ public class AWhalesDreamVibe : VibeProvider {
               weather = SectionWeather(rain = 0.6f, rumble = 0.4f, distance = 0.7f, rainLevel = 0.22f),
               lickIndex = 0,
               delay = SectionDelay(timeA = 0.231f, timeB = 0.348f, feedback = 0.5f),
+              // Two crashes in the 2-bar swell: dips at bars 0 and 1.25, swelling to 1.2 at bar 1.
               volumeEnvelope = listOf(
                 VolumePoint(bar = 0.0f, level = 0.95f),
-                VolumePoint(bar = 0.5f, level = 0.45f),
-                VolumePoint(bar = 2.0f, level = 1.2f),
-                VolumePoint(bar = 2.5f, level = 0.5f),
-                VolumePoint(bar = 3.7f, level = 1.0f),
-                VolumePoint(bar = 4.0f, level = 1.15f),
+                VolumePoint(bar = 0.25f, level = 0.45f),
+                VolumePoint(bar = 1.0f, level = 1.2f),
+                VolumePoint(bar = 1.25f, level = 0.5f),
+                VolumePoint(bar = 1.85f, level = 1.0f),
+                VolumePoint(bar = 2.0f, level = 1.15f),
               ),
             ),
             Section(
               name = "pound",
-              barsMin = 6,
+              barsMin = 4, barsMax = 4,
               barStep = 2,
               transitions = listOf(SectionTransition(targetIndex = 3, weight = 1.0f, transitionBars = 2)),
               macroOverrides = MacroOverrides(energy = 1.3f, complexity = 0.3f, mood = 0.385f),
@@ -901,8 +910,7 @@ public class AWhalesDreamVibe : VibeProvider {
           deepFloor = 0.4f,
         ),
         anomalies = listOf(
-          VoidAnomaly(probability = 0.03f, floorLevel = 0.08f, ghostIntensity = 0.4f),
-          FogHornAnomaly(probability = 0.04f, intensity = 0.6f, distance = 0.7f),
+          FogHornAnomaly(probability = 0.2f, intensity = 0.6f, distance = 0.7f),
         ),
         cast = CastProvenance(
           seed = 7019L,
