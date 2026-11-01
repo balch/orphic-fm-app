@@ -1,5 +1,6 @@
 package org.balch.orpheus.djapp.ai.songref
 
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -201,11 +202,23 @@ private fun afterNote(body: String, i: Int): Boolean {
 
 private class Onset(val column: Int, val note: TabNote, val bends: MutableList<TabNote> = mutableListOf())
 
+// The top string of a single-note line answered by stabs: single notes outnumber the 2+ note columns, and every one
+// reaches above the line without going below its lowest string.
+private fun lineBelowStabs(system: TabSystem): Int? {
+    val (singles, stabs) = system.columns.partition { it.notes.size == 1 }
+    if (stabs.isEmpty() || singles.size <= stabs.size) return null
+    val top = singles.minOf { it.notes.single().string }
+    val bottom = singles.maxOf { it.notes.single().string }
+    return top.takeIf { stabs.all { s -> s.notes.minOf { it.string } < top && s.notes.maxOf { it.string } <= bottom } }
+}
+
 // Highest note per column; a bend or release on the same string joins the note before it instead of starting its own.
+// Under stabs the line is the part: a column keeps its lowest note on the line's strings, or drops out with none there.
 private fun melodyOnsets(system: TabSystem): List<Onset> {
     val out = mutableListOf<Onset>()
+    val lineTop = lineBelowStabs(system)
     for (col in system.columns) {
-        val top = col.notes.maxBy { it.midi }
+        val top = if (lineTop == null) col.notes.maxBy { it.midi } else col.notes.filter { it.string >= lineTop }.minByOrNull { it.midi } ?: continue
         val last = out.lastOrNull()
         val sameString = last != null && (last.bends.lastOrNull() ?: last.note).string == top.string
         if ((top.technique == "bend" || top.technique == "release") && sameString) last!!.bends += top else out += Onset(col.column, top)
@@ -232,28 +245,35 @@ private fun MutableList<TimedNote>.emit(onset: Onset, beats: Float) {
 /** Melody notes of the systems in order: exact from bar lines when every system has them, else guessed from spacing. */
 internal fun timeNotes(systems: List<TabSystem>): Pair<List<TimedNote>, RhythmSource> {
     val out = mutableListOf<TimedNote>()
+    var wrap = emptyList<TimedNote>()
     for (system in systems) {
         val onsets = melodyOnsets(system)
         if (onsets.isEmpty()) continue
         if (!system.hasInteriorBars()) { out += spacingTimes(onsets); continue }
-        val (leadIn, timed) = barTimes(system, onsets)
+        val timing = barTimes(system, onsets)
+        // A pickup plays over the end of what came before; the first one has nothing there, so it leads the loop back in.
+        if (timing.pickup.isNotEmpty()) { if (out.isEmpty()) wrap = timing.pickup else out.overlayTail(timing.pickup) }
         // The gap before a system's first note extends whatever came before; at the very start it is a rest.
         if (out.isNotEmpty()) {
-            if (leadIn > 0f) out[out.size - 1] = out.last().let { it.copy(beats = it.beats + leadIn) }
-        } else if (leadIn >= 0.25f) {
-            out += TimedNote(null, leadIn)
+            if (timing.leadIn > 0f) out[out.size - 1] = out.last().let { it.copy(beats = it.beats + timing.leadIn) }
+        } else if (timing.leadIn >= 0.25f) {
+            out += TimedNote(null, timing.leadIn)
         }
-        out += timed
+        out += timing.notes
     }
+    if (wrap.isNotEmpty()) out.overlayTail(wrap)
     val rhythm = if (systems.isNotEmpty() && systems.all { it.hasInteriorBars() }) RhythmSource.BARS else RhythmSource.SPACING
     return mergeRests(out) to rhythm
 }
 
+private fun commonestGap(columns: List<Int>): Int =
+    columns.zipWithNext { a, b -> b - a }.filter { it > 0 }.groupingBy { it }.eachCount()
+        .maxWithOrNull(compareBy<Map.Entry<Int, Int>> { it.value }.thenByDescending { it.key })?.key ?: 1
+
 // The commonest column gap is an eighth note.
 internal fun spacingGaps(columns: List<Int>): List<Float> {
     val gaps = columns.zipWithNext { a, b -> b - a }
-    val unit = gaps.filter { it > 0 }.groupingBy { it }.eachCount()
-        .maxWithOrNull(compareBy<Map.Entry<Int, Int>> { it.value }.thenByDescending { it.key })?.key ?: 1
+    val unit = commonestGap(columns)
     return gaps.map { max(0.25f, (it.toFloat() / unit * 0.5f * 4).roundToInt() / 4f) } + 0.5f
 }
 
@@ -281,45 +301,106 @@ internal fun barSegments(system: TabSystem, onsets: List<Int>): List<IntRange> {
  * A beat is a whole number of columns, ties rounded down, so a bar typed a column or two long or short stays on the beat.
  */
 internal fun TabSystem.beatInBar(seg: IntRange, col: Int): Float {
-    val width = seg.last - seg.first + 1
-    val pad = if (columns.none { it.column == seg.first } && width % 4 != 0) 1 else 0
-    val slots = max(1, width - pad)
-    val perBeat = max(1, (slots + 1) / 4)
+    val (pad, perBeat) = padAndPerBeat(seg)
     return (col - seg.first - pad).toFloat() / perBeat
 }
 
-// Each bar is 4 beats (see beatInBar), snapped to sixteenths; an empty bar is a rest.
-// Returns the lead-in before the first note when it sits in the first bar, and the timed notes.
-private fun barTimes(system: TabSystem, onsets: List<Onset>): Pair<Float, List<TimedNote>> {
-    val segments = barSegments(system, onsets.map { it.column })
-    if (segments.isEmpty()) return 0f to spacingTimes(onsets)
+private fun TabSystem.padAndPerBeat(seg: IntRange): Pair<Int, Int> {
+    val width = seg.last - seg.first + 1
+    val pad = if (columns.none { it.column == seg.first } && width % 4 != 0) 1 else 0
+    return pad to max(1, (max(1, width - pad) + 1) / 4)
+}
 
-    val barOf = IntArray(onsets.size)
-    val at = FloatArray(onsets.size)
-    onsets.forEachIndexed { i, onset ->
+private const val EPS = 1e-4f
+
+/** The beats a bar spans and its columns per beat after [pad] leading columns. */
+private class BarScale(val length: Float, val perBeat: Float, val pad: Int)
+
+// A bar is 4 beats (see beatInBar). One with 8+ notes mostly closer than a sixteenth is several bars typed as one:
+// its commonest gap is an eighth and it spans the whole bars its width needs.
+private fun TabSystem.barScale(seg: IntRange, cols: List<Int>): BarScale {
+    val (pad, perBeat) = padAndPerBeat(seg)
+    val gap = commonestGap(cols)
+    if (cols.size < 8 || gap * 4 >= perBeat) return BarScale(4f, perBeat.toFloat(), pad)
+    val eighths = 2f * gap
+    return BarScale(max(4f, ceil((seg.last - seg.first + 1 - pad) / eighths / 4f) * 4f), eighths, pad)
+}
+
+/** The lead-in before the first note when it sits in the first bar, the timed notes, and any pickup into the first bar. */
+private class BarTiming(val leadIn: Float, val notes: List<TimedNote>, val pickup: List<TimedNote>)
+
+// Notes snap to sixteenths within their bar's span (see barScale); an empty bar is a rest.
+// A first bar under half the width of the next is a pickup, timed back from the bar line and returned apart.
+private fun barTimes(system: TabSystem, onsets: List<Onset>): BarTiming {
+    val all = barSegments(system, onsets.map { it.column })
+    if (all.isEmpty()) return BarTiming(0f, spacingTimes(onsets), emptyList())
+    val first = all.first()
+    val pickup = all.size > 1 && first.count() * 2 < all[1].count() && onsets.first().column <= first.last && onsets.last().column > first.last
+    val segments = if (pickup) all.drop(1) else all
+    val lead = if (pickup) onsets.takeWhile { it.column <= first.last } else emptyList()
+    val body = onsets.drop(lead.size)
+    val scales = segments.map { seg -> system.barScale(seg, body.map { it.column }.filter { it in seg }) }
+    val starts = scales.runningFold(0f) { start, s -> start + s.length }
+
+    val barOf = IntArray(body.size)
+    val at = FloatArray(body.size)
+    body.forEachIndexed { i, onset ->
         val k = segments.indexOfFirst { onset.column <= it.last }.let { if (it < 0) segments.lastIndex else it }
-        val beat = (system.beatInBar(segments[k], onset.column) * 4).roundToInt().coerceIn(0, 15) / 4f
+        val s = scales[k]
+        val beat = ((onset.column - segments[k].first - s.pad) / s.perBeat * 4).roundToInt().coerceIn(0, (s.length * 4).toInt() - 1) / 4f
         barOf[i] = k
-        at[i] = max(4f * k + beat, if (i > 0) at[i - 1] + 0.25f else 0f)
+        at[i] = max(starts[k] + beat, if (i > 0) at[i - 1] + 0.25f else 0f)
     }
     val filled = barOf.toSet()
     val out = mutableListOf<TimedNote>()
     val leadIn = if (barOf[0] == 0) at[0] else 0f
     var cursor = leadIn
-    for (i in onsets.indices) {
+    for (i in body.indices) {
         if (at[i] > cursor) out += TimedNote(null, at[i] - cursor)
-        val end = if (i + 1 < onsets.size) {
+        val end = if (i + 1 < body.size) {
             val empty = (barOf[i] + 1 until barOf[i + 1]).firstOrNull { it !in filled }
-            max(if (empty != null) 4f * empty else at[i + 1], at[i] + 0.25f)
+            max(if (empty != null) starts[empty] else at[i + 1], at[i] + 0.25f)
         } else {
-            max(4f * (barOf[i] + 1), at[i] + 0.25f)
+            max(starts[barOf[i] + 1], at[i] + 0.25f)
         }
-        out.emit(onsets[i], end - at[i])
+        out.emit(body[i], end - at[i])
         cursor = end
     }
-    val total = 4f * segments.size
+    val total = starts.last()
     if (total > cursor) out += TimedNote(null, total - cursor)
-    return leadIn to out
+    return BarTiming(leadIn, out, pickupTimes(lead, first.last + 1, scales.first().perBeat))
+}
+
+// Each pickup note sits before the bar line at [barCol] by its columns at the first bar's scale; the last runs to the downbeat.
+private fun pickupTimes(lead: List<Onset>, barCol: Int, perBeat: Float): List<TimedNote> {
+    val at = FloatArray(lead.size)
+    for (i in lead.indices.reversed()) {
+        val beat = ((lead[i].column - barCol) / perBeat * 4).roundToInt() / 4f
+        at[i] = minOf(beat, if (i == lead.lastIndex) -0.25f else at[i + 1] - 0.25f)
+    }
+    val out = mutableListOf<TimedNote>()
+    lead.forEachIndexed { i, onset -> out.emit(onset, (if (i == lead.lastIndex) 0f else at[i + 1]) - at[i]) }
+    return out
+}
+
+// Lays [pickup] over the end of the line: trailing rests go first, then the last note down to a sixteenth.
+// A tail without that much room gets whole bars of rest added before it.
+private fun MutableList<TimedNote>.overlayTail(pickup: List<TimedNote>) {
+    val len = pickup.sumOf { it.beats.toDouble() }.toFloat()
+    var room = 0f
+    for (n in asReversed()) {
+        if (n.midi == null) room += n.beats else { room += n.beats - 0.25f; break }
+    }
+    if (room < len - EPS) add(TimedNote(null, ceil((len - room) / 4f - EPS) * 4f))
+    var cut = len
+    while (cut > EPS && isNotEmpty()) {
+        val last = last()
+        val take = minOf(cut, last.beats - if (last.midi == null) 0f else 0.25f)
+        cut -= take
+        if (last.beats - take < EPS) removeAt(lastIndex) else this[lastIndex] = last.copy(beats = last.beats - take)
+        if (last.midi != null) break
+    }
+    addAll(pickup)
 }
 
 private fun mergeRests(notes: List<TimedNote>): List<TimedNote> {
