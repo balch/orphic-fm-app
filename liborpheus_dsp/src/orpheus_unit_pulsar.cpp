@@ -6028,22 +6028,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             mod_harmonics += (macro_val - 0.5f) * 2.0f * ts.harmonics_macro_range;
         }
 
-        // ── CHD engine inversion: override morph to select voicing registration ──
-        // CHD (engine 14) uses morph to select chord voicing type.
-        // Map SectionInversion → morph: 0.0=root, 0.3=1st, 0.6=2nd, 0.9=open.
+        // ── CHD engine inversion: override timbre to pick the voicing ──
+        // CHD (engine 14) inverts from timbre; morph is its waveform and stays authored.
         if (ts.role == TrackRole::CHORDAL
             && engine_has_native_chord(ts.engine_index)
             && ts.section_inversion != SectionInversionId::FOLLOW_STYLE)
         {
-            float morph_val = mod_morph;  // default: preserve existing mod
-            switch (ts.section_inversion) {
-                case SectionInversionId::ROOT_POSITION:    morph_val = 0.0f;  break;
-                case SectionInversionId::FIRST_INVERSION:  morph_val = 0.3f;  break;
-                case SectionInversionId::SECOND_INVERSION: morph_val = 0.6f;  break;
-                case SectionInversionId::OPEN_VOICING:     morph_val = 0.9f;  break;
-                default: break;
-            }
-            mod_morph = morph_val;
+            mod_timbre = chd_inversion_timbre(ts.section_inversion, mod_timbre);
         }
 
         // Engines with internal VCAs keep their gate high during holds: BD(21), SD(22), HH(23),

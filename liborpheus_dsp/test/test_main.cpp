@@ -162,6 +162,7 @@ static TestSuite suites[] = {
     {"pulsar_texture_line", run_pulsar_texture_line_tests, true},
     {"pulsar_pan_glide", run_pulsar_pan_glide_tests, true},
     {"pulsar_pad_restrike", run_pulsar_pad_restrike_tests, true},
+    {"pulsar_chd_inversion", run_pulsar_chd_inversion_tests, true},
     {"pulsar_engine_swap", run_pulsar_engine_swap_tests, true},
     {"pulsar_slot_lock", run_pulsar_slot_lock_tests, true},
     {"pulsar_audition_gain", run_pulsar_audition_gain_tests, true},
