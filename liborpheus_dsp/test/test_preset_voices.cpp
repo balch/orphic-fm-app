@@ -11,10 +11,25 @@
 #include "data/preset_orpheus.h"
 #include "data/preset_funk491.h"
 #include "data/preset_swirly_dreams.h"
+#include <cstdlib>
 
 static constexpr int SR = 48000;
 static constexpr float DURATION_S = 2.0f;
 static constexpr float GATE_S = 1.0f;
+
+// ORPHEUS_PRESET_RENDER_DUMP=<dir> writes each render as raw float32 to <dir>/<preset>_<name>.f32,
+// so two builds can be compared with cmp.
+static void dump_render(const char* preset_name, const char* name, const std::vector<float>& buf) {
+    const char* dir = std::getenv("ORPHEUS_PRESET_RENDER_DUMP");
+    if (!dir || !*dir) return;
+    mkdir(dir, 0755);
+    char path[512];
+    snprintf(path, sizeof(path), "%s/%s_%s.f32", dir, preset_name, name);
+    FILE* f = std::fopen(path, "wb");
+    if (!f) { printf("  WARN: cannot write %s\n", path); return; }
+    std::fwrite(buf.data(), sizeof(float), buf.size(), f);
+    std::fclose(f);
+}
 
 // Apply a preset's port values to the engine via set_port
 static void apply_preset(OrpheusEngine* engine, const std::vector<PresetPort>& ports) {
@@ -70,6 +85,11 @@ static bool test_preset_duo_pair(const char* preset_name,
             engine->voice_params[v_b].gate.store(0, std::memory_order_relaxed);
         }
         orpheus_engine_process(engine, buf.data() + off * 2, chunk);
+    }
+    {
+        char name[32];
+        snprintf(name, sizeof(name), "duo%d", duo_index);
+        dump_render(preset_name, name, buf);
     }
 
     // Analyze per-channel
@@ -164,6 +184,7 @@ static bool test_preset_full_mix(const char* preset_name,
         }
         orpheus_engine_process(engine, buf.data() + off * 2, chunk);
     }
+    dump_render(preset_name, "full", buf);
 
     float rms = compute_rms(buf.data(), total * 2);
     float peak = compute_peak(buf.data(), total * 2);
