@@ -101,5 +101,7 @@ allprojects {
         // Scenes draw off screen; headless keeps the worker JVM out of the macOS Dock and focus.
         systemProperty("java.awt.headless", "true")
         if (!runRenderHarnesses) filter { excludeTestsMatching("*RenderHarness") }
+        // For a *Test that also writes pictures: it checks this before saving, so a plain run leaves none.
+        systemProperty("orpheus.renderHarness", runRenderHarnesses.toString())
     }
 }

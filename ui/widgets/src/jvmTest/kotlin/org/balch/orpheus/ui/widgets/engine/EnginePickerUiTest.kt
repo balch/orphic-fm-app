@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -68,6 +69,7 @@ class EnginePickerUiTest {
         current: EngineChoice,
         onPick: (EngineChoice) -> Unit,
         controller: EnginePickerController = rememberEnginePickerController(),
+        none: NoEngineOption? = null,
     ) {
         OrpheusTheme {
             val recents = remember { EngineRecents(null, CoroutineScope(Dispatchers.Unconfined)) }
@@ -80,6 +82,7 @@ class EnginePickerUiTest {
                         color = OrpheusColors.neonCyan,
                         controller = controller,
                         modifier = Modifier.enginePickerTestTag("p"),
+                        none = none,
                     )
                 }
             }
@@ -96,6 +99,41 @@ class EnginePickerUiTest {
 
         assertEquals(patch(OrpheusEngineId.DX2, 0), picked)
         assertTrue(onAllNodes(hasTestTagPrefix("p-tile-")).fetchSemanticsNodes().isEmpty(), "a pick closes the picker")
+    }
+
+    @Test
+    fun theNoneChipPicksNoEngineAndCloses() = runComposeUiTest {
+        var nonePicks = 0
+        var picked: EngineChoice? = null
+        setContent {
+            Host(
+                current = EngineChoice.Engine(OrpheusEngineId.VA),
+                onPick = { picked = it },
+                none = NoEngineOption("NONE", selected = false) { nonePicks++ },
+            )
+        }
+
+        onNodeWithTag("p").performClick()
+        onNodeWithTag("p-chip-NONE").assertIsNotSelected().performClick()
+
+        assertEquals(1, nonePicks)
+        assertNull(picked)
+        assertTrue(onAllNodes(hasTestTagPrefix("p-tile-")).fetchSemanticsNodes().isEmpty(), "picking none closes the picker")
+    }
+
+    @Test
+    fun aSelectedNoneLeavesNoEntryPicked() = runComposeUiTest {
+        setContent {
+            Host(
+                current = EngineChoice.Engine(OrpheusEngineId.VA),
+                onPick = {},
+                none = NoEngineOption("NONE", selected = true) {},
+            )
+        }
+
+        onNodeWithTag("p").performClick()
+        onNodeWithTag("p-chip-NONE").assertIsSelected()
+        onNodeWithTag("p-tile-VA").assertIsNotSelected()
     }
 
     @Test

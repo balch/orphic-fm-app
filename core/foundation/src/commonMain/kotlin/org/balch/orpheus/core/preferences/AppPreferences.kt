@@ -47,6 +47,11 @@ data class AppPreferences(
      */
     val portraitPairPanels: List<String>? = null,
     /**
+     * The DJ app's bottom nav order by route label, with `_open` marking the open slot. Null
+     * means never configured.
+     */
+    val navOrder: List<String>? = null,
+    /**
      * Whether the DJ app's user has ever committed a swipe on its play/pause dome. Until then the
      * dome wiggles once a launch to show that it swipes.
      */
@@ -75,6 +80,14 @@ data class AppPreferences(
     val vibePresetBarShown: Boolean = false,
     /** Engine picker Recent: `EngineCatalog.key` strings, most recent first, at most 8. */
     val recentEngines: List<String> = emptyList(),
+    /** The cowbell's mode-change morph by `BellMorphStyle` name: "SHARDS" or "LIQUID". */
+    val bellMorph: String = "SHARDS",
+    /** Whether the cowbell's bend snaps to the playing vibe's scale. */
+    val cowbellBendScale: Boolean = false,
+    /** The cowbell's knobs, engine, mode and fill, restored at launch where the app restores. */
+    val lastCowbellJson: String? = null,
+    /** How often the cowbell's mode menu was opened; its chip glows until the first few. */
+    val cowbellModeMenuOpens: Int = 0,
 )
 
 

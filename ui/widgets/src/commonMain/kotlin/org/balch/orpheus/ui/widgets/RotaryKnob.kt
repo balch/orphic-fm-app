@@ -712,13 +712,14 @@ internal fun KnobValueText(
     textAlign: TextAlign = TextAlign.Center,
     requireVerticalSlop: Boolean = false,
     locked: Boolean = false,
+    style: TextStyle = MaterialTheme.typography.labelMedium,
 ) {
     val sensitivity = 200f
     val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     Text(
         text = valueFormatter(dragState.internalValue),
-        style = MaterialTheme.typography.labelMedium,
+        style = style,
         color = progressColor.lighten(0.3f),
         textAlign = textAlign,
         maxLines = 1,
@@ -766,6 +767,7 @@ val DefaultValueFormatter: KnobValueFormatter = { v -> ((v * 100).roundToInt() /
  * @param caption A small second line under [label], such as the knob's glyph.
  * @param longLabel Shown above the knob while it is pressed, for a [label] too short to explain itself.
  * @param bipolar Draws the value arc from 12 o'clock toward the value, for a range centred on zero.
+ * @param valueStyle The readout's text style, for a knob packed tighter than the default.
  */
 @Composable
 fun RotaryKnob(
@@ -794,6 +796,7 @@ fun RotaryKnob(
     caption: String? = null,
     longLabel: String? = null,
     bipolar: Boolean = false,
+    valueStyle: TextStyle = MaterialTheme.typography.labelMedium,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // Every production call site leaves this null and gets live focus behavior.
     previewFocused: Boolean? = null,
@@ -893,6 +896,7 @@ fun RotaryKnob(
                 valueFormatter = valueFormatter,
                 requireVerticalSlop = requireVerticalSlop,
                 locked = locked,
+                style = valueStyle,
             )
         }
     }

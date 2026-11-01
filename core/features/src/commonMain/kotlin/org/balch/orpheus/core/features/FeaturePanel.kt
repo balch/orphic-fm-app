@@ -38,6 +38,8 @@ value class PanelId(val id: String) {
         val ASL_MAESTRO = PanelId("mediapipe")
         val BASS = PanelId("bass")
         val HORN = PanelId("horn")
+        val COWBELL = PanelId("cowbell")
+        val COWBELL_BEND = PanelId("cowbell_bend")
         val DJ = PanelId("dj")
         val TIDES = PanelId("tides")
         val PULSAR = PanelId("pulsar")

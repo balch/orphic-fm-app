@@ -33,6 +33,7 @@ class NavChromeRenderHarness {
         PanelId.PULSAR to OrpheusColors.cosmicPurple,
         PanelId.BEATS to OrpheusColors.neonOrange,
         PanelId.DRUMS to OrpheusColors.neonMagenta,
+        PanelId.COWBELL to OrpheusColors.bellBrass,
         PanelId.BASS to OrpheusColors.electricBlue,
         PanelId.DJ to OrpheusColors.neonCyan,
         PanelId.SPEECH to OrpheusColors.speechRose,

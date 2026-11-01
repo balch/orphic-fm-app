@@ -30,6 +30,7 @@ object FactoryPanelSets {
         collapse(PanelId.FLUX)
         collapse(PanelId.FLUX_TRIGGERS)
         collapse(PanelId.DRUMS)
+        collapse(PanelId.COWBELL)
         collapse(PanelId.BEATS)
         collapse(PanelId.BASS)
         collapse(PanelId.TWEAKS)
@@ -66,6 +67,7 @@ object FactoryPanelSets {
         expand(PanelId.FLUX)
         expand(PanelId.FLUX_TRIGGERS)
         expand(PanelId.DRUMS)
+        expand(PanelId.COWBELL)
         expand(PanelId.BEATS)
         expand(PanelId.BASS)
         expand(PanelId.DJ)
@@ -75,6 +77,7 @@ object FactoryPanelSets {
 //                    expand(PanelId.SPEECH)
         expand(PanelId.PULSAR)
         expand(PanelId.ASL_MAESTRO)
+        expand(PanelId.COWBELL_BEND)
     }
 
     /** Effects-focused layout. */

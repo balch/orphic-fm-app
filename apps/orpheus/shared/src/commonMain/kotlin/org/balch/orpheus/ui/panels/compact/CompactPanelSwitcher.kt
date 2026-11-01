@@ -40,6 +40,7 @@ import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.panels.LocalCompactMode
+import org.balch.orpheus.ui.panels.LocalPanelTopInset
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 
@@ -91,7 +92,10 @@ fun CompactPanelSwitcher(
                         RoundedCornerShape(12.dp)
                     )
             ) {
-                CompositionLocalProvider(LocalCompactMode provides true) {
+                CompositionLocalProvider(
+                    LocalCompactMode provides true,
+                    LocalPanelTopInset provides NavHeaderHeight,
+                ) {
                     panel.Content(
                         modifier = Modifier.fillMaxSize(),
                         isExpanded = true,
@@ -120,6 +124,9 @@ fun CompactPanelSwitcher(
     }
 }
 
+/** The header's height; it is drawn over the top of every panel. */
+private val NavHeaderHeight = 44.dp
+
 /**
  * Navigation header with left/right arrows.
  */
@@ -137,7 +144,7 @@ private fun PanelNavigationHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(NavHeaderHeight)
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .clip(shape)
             .background(OrpheusColors.darkVoid.copy(alpha = 0.1f))

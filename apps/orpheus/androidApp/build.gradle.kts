@@ -33,6 +33,7 @@ dependencies {
     implementation(project(":core:plugins:delay"))
     implementation(project(":core:plugins:distortion"))
     implementation(project(":core:plugins:resonator"))
+    implementation(project(":core:plugins:cowbell"))
     implementation(project(":core:plugins:bender"))
     implementation(project(":core:plugins:stereo"))
     implementation(project(":core:plugins:vibrato"))

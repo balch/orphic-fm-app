@@ -115,6 +115,7 @@ fun EnginePicker(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     controller: EnginePickerController = rememberEnginePickerController(),
     pillLabel: String? = null,
+    none: NoEngineOption? = null,
 ) {
     val tag = modifier.foldIn<String?>(null) { found, element -> (element as? EnginePickerTag)?.tag ?: found }
         ?: DEFAULT_TAG
@@ -159,11 +160,15 @@ fun EnginePicker(
                     startCategory = startCategory,
                     tag = tag,
                     controller = controller,
+                    none = none,
                 )
             }
         }
     }
 }
+
+/** A "no engine" chip for a slot that also plays with none; while [selected], no entry shows as picked. */
+class NoEngineOption(val label: String, val selected: Boolean, val onPick: () -> Unit)
 
 /**
  * The open picker. Window size, input mode, TV and recents are read here, outside the popup, so a
@@ -178,6 +183,7 @@ private fun EnginePickerOverlay(
     startCategory: EngineCategory?,
     tag: String,
     controller: EnginePickerController,
+    none: NoEngineOption?,
 ) {
     val recents = LocalEngineRecents.current
     val recentKeys by recents.keys.collectAsState()
@@ -214,6 +220,7 @@ private fun EnginePickerOverlay(
             onPick = pick,
             onDismiss = controller::close,
             modifier = sizeModifier,
+            none = none?.let { NoEngineOption(it.label, it.selected) { it.onPick(); controller.close() } },
         )
     }
 }

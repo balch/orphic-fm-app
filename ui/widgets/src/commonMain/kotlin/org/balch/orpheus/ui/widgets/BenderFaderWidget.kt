@@ -90,6 +90,7 @@ fun BenderFaderWidget(
     accentColor: Color = OrpheusColors.neonCyan,
     enabled: Boolean = true,
     springBack: Boolean = true, // When false, fader stays where released (e.g. crossfader)
+    showArrows: Boolean = true, // The direction arrows above and below the track (bender mode only)
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // null (every real call site) means "use live focus state" below. See RotaryKnobDial.
     previewFocused: Boolean? = null,
@@ -144,7 +145,7 @@ fun BenderFaderWidget(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         // Direction indicator: up arrow when pulling up (bender mode only)
-        if (springBack) {
+        if (springBack && showArrows) {
             Text(
                 text = if (animatedOffset.value < -10) "↑" else "",
                 fontSize = 10.sp,
@@ -236,48 +237,28 @@ fun BenderFaderWidget(
                             // Keep isLocallyAnimating = 1f during the spring-back animation
                             // to prevent external value syncing from interrupting
 
-                            // Calculate spring duration based on how far back it was pulled
-                            // ~1.2s at full extension, shorter for smaller pulls
+                            // Pull distance sets the length: ~1.2s at full extension, shorter for smaller pulls
                             val pullDistance = animatedOffset.value.absoluteValue / usableRange
-                            val springDuration = (400 + (pullDistance * 800)).toInt() // 400ms to 1200ms
 
-                            // Spring back to center with exaggerated oscillation
+                            // Spring back to center with exaggerated oscillation (overshoot, bounce, settle)
                             coroutineScope.launch {
-                                // Use a custom animation with overshoot for "unnatural" spring feel
-                                // Overshoot the target, then settle back
-                                val startValue = animatedOffset.value
-                                val overshootAmount = -startValue * 0.3f // 30% overshoot in opposite direction
-
-                                // First: animate past center (overshoot)
-                                animatedOffset.animateTo(
-                                    targetValue = overshootAmount,
-                                    animationSpec = tween(
-                                        durationMillis = (springDuration * 0.4f).toInt(),
-                                        easing = { t -> t * (2 - t) } // Ease out quad
+                                // Read inside the launch so a queued snapTo from the last drag lands first
+                                val stages = benderSpringStages(animatedOffset.value, pullDistance)
+                                stages.forEachIndexed { index, stage ->
+                                    animatedOffset.animateTo(
+                                        targetValue = stage.target,
+                                        animationSpec = tween(
+                                            durationMillis = stage.durationMillis,
+                                            easing = BenderSpringEasing,
+                                        )
                                     )
-                                )
-                                // Update value during overshoot
-                                val overshootValue = -(animatedOffset.value / usableRange)
-                                currentOnValueChange(overshootValue.coerceIn(-1f, 1f))
-
-                                // Second: bounce back past center again (smaller)
-                                animatedOffset.animateTo(
-                                    targetValue = -overshootAmount * 0.4f,
-                                    animationSpec = tween(
-                                        durationMillis = (springDuration * 0.3f).toInt(),
-                                        easing = { t -> t * (2 - t) }
-                                    )
-                                )
-                                currentOnValueChange(-(animatedOffset.value / usableRange).coerceIn(-1f, 1f))
-
-                                // Third: settle to center
-                                animatedOffset.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = tween(
-                                        durationMillis = (springDuration * 0.3f).toInt(),
-                                        easing = { t -> t * (2 - t) }
-                                    )
-                                )
+                                    // Report the overshoot and the bounce, not the final settle
+                                    if (index < stages.lastIndex) {
+                                        currentOnValueChange(
+                                            (-(animatedOffset.value / usableRange)).coerceIn(-1f, 1f)
+                                        )
+                                    }
+                                }
 
                                 currentOnRelease()
                                 currentOnValueChange(0f) // Ensure final value is zero
@@ -421,7 +402,7 @@ fun BenderFaderWidget(
         }
         
         // Direction indicator: down arrow when pulling down (bender mode only)
-        if (springBack) {
+        if (springBack && showArrows) {
             Text(
                 text = if (animatedOffset.value > 10) "↓" else "",
                 fontSize = 10.sp,

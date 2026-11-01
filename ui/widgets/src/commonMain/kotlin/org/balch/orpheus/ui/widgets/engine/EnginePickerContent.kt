@@ -157,8 +157,10 @@ internal fun EnginePickerPanel(
     onPick: (EngineChoice) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    none: NoEngineOption? = null,
 ) {
     val visible = state.visible
+    val current = state.current.takeUnless { none?.selected == true }
     val items = remember(visible) { itemsOf(visible) }
     val entries = remember(visible) { visible.flatMap { it.second } }
     val enterTarget = entries.firstOrNull()
@@ -167,7 +169,7 @@ internal fun EnginePickerPanel(
 
     // Open on the current pick's section, header included, so its neighbours show too.
     val startIndex = remember {
-        val at = items.indexOf(PickerItem.Entry(state.current))
+        val at = current?.let { items.indexOf(PickerItem.Entry(it)) } ?: -1
         if (at < 0) 0 else items.subList(0, at).indexOfLast { it is PickerItem.Header }.coerceAtLeast(0)
     }
     val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = startIndex)
@@ -201,7 +203,7 @@ internal fun EnginePickerPanel(
         withFrameNanos { }
         when (initialFocus) {
             PickerFocus.Search -> runCatching { searchFocus.requestFocus() }
-            PickerFocus.Current -> (entries.firstOrNull { it == state.current } ?: enterTarget)
+            PickerFocus.Current -> (entries.firstOrNull { it == current } ?: enterTarget)
                 ?.let(::focusEntry) ?: runCatching { rootFocus.requestFocus() }
             PickerFocus.None -> runCatching { rootFocus.requestFocus() }
         }
@@ -235,7 +237,7 @@ internal fun EnginePickerPanel(
                         false
                     }
                     Key.DirectionDown -> if (searchFocused) {
-                        (entries.firstOrNull { it == state.current } ?: enterTarget)?.let(::focusEntry)
+                        (entries.firstOrNull { it == current } ?: enterTarget)?.let(::focusEntry)
                         true
                     } else {
                         false
@@ -283,7 +285,7 @@ internal fun EnginePickerPanel(
                 .testTag("$tag-search"),
         )
         Spacer(Modifier.height(8.dp))
-        ChipRow(state = state, tag = tag)
+        ChipRow(state = state, tag = tag, none = none)
         Spacer(Modifier.height(4.dp))
 
         val emptyText = when {
@@ -305,7 +307,7 @@ internal fun EnginePickerPanel(
                         is PickerItem.Entry -> item(key = EngineCatalog.key(item.choice)) {
                             EngineTile(
                                 choice = item.choice,
-                                selected = item.choice == state.current,
+                                selected = item.choice == current,
                                 enterTarget = searchFocused && item.choice == searchPick,
                                 focusRequest = focusOn(item.choice),
                                 onClick = { onPick(item.choice) },
@@ -328,7 +330,7 @@ internal fun EnginePickerPanel(
                         is PickerItem.Entry -> item(key = EngineCatalog.key(item.choice)) {
                             EngineRow(
                                 choice = item.choice,
-                                selected = item.choice == state.current,
+                                selected = item.choice == current,
                                 focusRequest = focusOn(item.choice),
                                 onClick = { onPick(item.choice) },
                                 modifier = Modifier.testTag("$tag-row-${EngineCatalog.key(item.choice)}"),
@@ -389,9 +391,9 @@ private fun SearchField(
 
 /** One sideways row that never wraps, fading at the right edge while more chips lie past it. */
 @Composable
-private fun ChipRow(state: EnginePickerState, tag: String) {
+private fun ChipRow(state: EnginePickerState, tag: String, none: NoEngineOption?) {
     val rowState = rememberLazyListState()
-    val selectedIndex = when {
+    val selectedIndex = (if (none != null) 1 else 0) + when {
         state.recent -> 0
         state.category == null -> 1
         else -> 2 + state.categories.indexOf(state.category)
@@ -427,6 +429,9 @@ private fun ChipRow(state: EnginePickerState, tag: String) {
                 }
             },
     ) {
+        if (none != null) {
+            item(key = "NONE") { Chip(none.label, on = none.selected, tag = "$tag-chip-NONE", onClick = none.onPick) }
+        }
         item(key = "RECENT") {
             Chip("★ Recent", on = state.recent, tag = "$tag-chip-RECENT") {
                 state.query = ""

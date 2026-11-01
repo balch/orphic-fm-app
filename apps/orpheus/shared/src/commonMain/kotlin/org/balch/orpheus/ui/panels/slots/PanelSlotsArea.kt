@@ -66,6 +66,7 @@ import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.ui.panels.HeaderPanelActions
 import org.balch.orpheus.ui.panels.HeaderPanelUiState
 import org.balch.orpheus.ui.panels.LocalCompactMode
+import org.balch.orpheus.ui.panels.LocalPanelTopInset
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.lighten
 import kotlin.math.max
@@ -209,6 +210,8 @@ private fun PanelSlot(
                 CompositionLocalProvider(
                     LocalDensity provides Density(base.density * scale, base.fontScale),
                     LocalCompactMode provides true,
+                    // The pin and close targets overhang the body, which is drawn at this scale.
+                    LocalPanelTopInset provides (HeaderTouchTarget - SlotHeaderHeight) / scale,
                 ) {
                     FitOrScroll {
                         panel.Content(
