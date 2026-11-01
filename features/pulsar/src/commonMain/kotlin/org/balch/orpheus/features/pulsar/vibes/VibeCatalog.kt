@@ -3,12 +3,13 @@ package org.balch.orpheus.features.pulsar.vibes
 import com.diamondedge.logging.logging
 import org.balch.orpheus.features.pulsar.models.VibeName
 import org.balch.orpheus.features.pulsar.models.VibeProvider
-import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.curate
-import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.vibeStatusFromArg
 
 /**
  * Ship-readiness of a cataloged vibe.
  *
+ * - [EXCLUSIVE] — compiled only into builds run with `-Porphic.exclusiveVibes=true`, on every
+ *   platform and build type; without it the source file is cut (see `:features:pulsar`'s build).
+ *   Where it is compiled it shows on every build, as LIVE does.
  * - [LIVE]  — green-lit: appears in the picker (and to the AI vibe tools) in catalog order.
  * - [WIP]   — in tuning: hidden on release-like builds, visible where [VibeCatalogPolicy]
  *   allows (debug Android/iOS builds and always on the desktop ear-test harness). Flip to
@@ -16,7 +17,7 @@ import org.balch.orpheus.features.pulsar.vibes.VibeCatalog.vibeStatusFromArg
  * - [SHELF] — parked indefinitely: never shown on any build, but stays registered/compiling
  *   so the code doesn't rot and reviving it is a one-word flip.
  */
-enum class VibeStatus { LIVE, WIP, SHELF }
+enum class VibeStatus { EXCLUSIVE, LIVE, WIP, SHELF }
 
 /**
  * Curation metadata for one vibe. Deliberately tiny today.
@@ -75,8 +76,9 @@ data class CatalogEntry(
  *
  * DEBUG-ONLY TIER VISIBILITY (BUILT): [curate] takes `visibleThrough` — a [VibeStatus] tier
  * fed by [VibeCatalogPolicy] and contributed per platform from this module's platform source
- * sets. It is CUMULATIVE-LEFT: a level shows its own tier plus every lower tier (LIVE < WIP <
- * SHELF by ordinal). LIVE shows only live; WIP shows live+wip; SHELF shows live+wip+shelf.
+ * sets. It is CUMULATIVE-LEFT: a level shows its own tier plus every lower tier (EXCLUSIVE < LIVE
+ * < WIP < SHELF by ordinal). LIVE shows only live; WIP shows live+wip; SHELF shows live+wip+shelf.
+ * EXCLUSIVE sits below LIVE so it always shows when its source is compiled in.
  * - Android: WIP on debuggable builds, else LIVE.
  * - Desktop JVM: driven by `-Pcatalog=live|wip|shelf` (default `live`) — see
  *   [vibeStatusFromArg] and the desktopApp build file's `-Dcatalog` jvmArg.
@@ -92,7 +94,7 @@ object VibeCatalog {
 
     /** Declaration order = picker order. Kept as a list so [init] can catch a double-listing. */
     private val entryList: List<Pair<VibeName, CatalogEntry>> = listOf(
-        VibeNames.A_WHALES_DREAM to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient", "psych")),
+        VibeNames.WHALES_DREAM to CatalogEntry(VibeStatus.EXCLUSIVE, tags = listOf("ambient", "psych")),
         VibeNames.ORPHIC_LORE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "riff", "wah", "psych")),
         VibeNames.BELL_TOLLS to CatalogEntry(VibeStatus.LIVE, tags = listOf("riff")),
         VibeNames.DOG_HOUSE to CatalogEntry(VibeStatus.LIVE, tags = listOf("rock", "benchmark")),

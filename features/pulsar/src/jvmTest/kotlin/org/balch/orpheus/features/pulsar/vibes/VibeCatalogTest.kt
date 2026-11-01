@@ -23,7 +23,7 @@ class VibeCatalogTest {
         val curated = VibeCatalog.curate(providers)
 
         val expected = VibeCatalog.entries
-            .filterValues { it.status == VibeStatus.LIVE }
+            .filterValues { it.status == VibeStatus.LIVE || it.status == VibeStatus.EXCLUSIVE }
             .keys.toList()
         assertEquals(expected, curated.map { it.name }, "curated order must equal catalog order")
     }
@@ -37,6 +37,19 @@ class VibeCatalogTest {
         )
         val curated = VibeCatalog.curate(providers)
         assertEquals(listOf("Dog House"), curated.map { it.name.value })
+    }
+
+    @Test
+    fun exclusiveProvidersShowOnLiveBuildsWhenCompiledIn() {
+        val entries = linkedMapOf(
+            VibeName("Special") to CatalogEntry(VibeStatus.EXCLUSIVE),
+            VibeName("Alive") to CatalogEntry(VibeStatus.LIVE),
+        )
+        val withSpecial = setOf<VibeProvider>(LazyGuardProvider("Special"), LazyGuardProvider("Alive"))
+        assertEquals(listOf("Special", "Alive"), VibeCatalog.curate(withSpecial, entries = entries).map { it.name.value })
+        // Without -Porphic.exclusiveVibes=true the source is cut, so no provider registers.
+        val cut = setOf<VibeProvider>(LazyGuardProvider("Alive"))
+        assertEquals(listOf("Alive"), VibeCatalog.curate(cut, entries = entries).map { it.name.value })
     }
 
     @Test

@@ -16,24 +16,25 @@ import org.balch.orpheus.features.pulsar.models.LickStep
 import org.balch.orpheus.features.pulsar.models.Section
 import org.balch.orpheus.features.pulsar.models.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.models.Vibe
-import org.balch.orpheus.features.pulsar.vibes.WhalesDreamVibe
+import org.balch.orpheus.features.pulsar.vibes.DogHouseVibe
 import org.balch.orpheus.features.pulsar.vibes.VibeCatalogScan
 
 class VibeDiffTest {
-    private val whale: Vibe = WhalesDreamVibe().vibe
+    // A LIVE vibe: EXCLUSIVE and non-LIVE sources can be cut from the build.
+    private val fixture: Vibe = DogHouseVibe().vibe
     private val minimal = mkMinimalVibe("Diff")
 
     private fun Vibe.withSection(section: Section) =
         copy(arrangement = arrangement!!.copy(sections = listOf(section)))
 
     @Test fun leafChangeIsOneRow() {
-        val edm = whale.tracks[2].engineEdm
-        val edited = whale.copy(
-            tracks = whale.tracks.toMutableList().also {
+        val edm = fixture.tracks[2].engineEdm
+        val edited = fixture.copy(
+            tracks = fixture.tracks.toMutableList().also {
                 it[2] = it[2].copy(engineEdm = edm.copy(harmonics = edm.harmonics + 0.1f))
             },
         )
-        val changes = diffVibe(whale, edited)
+        val changes = diffVibe(fixture, edited)
         assertEquals(1, changes.size)
         assertEquals("tracks[2].engineEdm.harmonics", changes[0].path)
         assertEquals(edm.harmonics, changes[0].old.let { (it as JsonPrimitive).content.toFloat() })
@@ -143,7 +144,7 @@ class VibeDiffTest {
     }
 
     @Test fun atReadsPaths() {
-        val tree = whale.toTree()
+        val tree = fixture.toTree()
         assertNotNull(tree.at("tracks[2].engineEdm.harmonics"))
         assertNull(tree.at("tracks[2].nope"))
         assertNull(tree.at("tracks[99]"))
@@ -191,7 +192,7 @@ class VibeDiffTest {
     }
 
     @Test fun patchErrorsNameTheKindNotTheContents() {
-        val tree = whale.toTree()
+        val tree = fixture.toTree()
         val dotted = kotlin.test.assertFailsWith<IllegalStateException> { tree.patch("tracks.2.pan", JsonPrimitive(0.5f)) }
         assertEquals("'tracks' is a list; use tracks[2]", dotted.message)
         val number = kotlin.test.assertFailsWith<IllegalStateException> { tree.patch("energy[0]", JsonPrimitive(1)) }

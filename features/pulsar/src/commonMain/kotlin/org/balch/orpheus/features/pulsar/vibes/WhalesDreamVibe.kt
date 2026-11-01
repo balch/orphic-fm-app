@@ -70,7 +70,7 @@ import org.balch.orpheus.features.pulsar.models.VolumePoint
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class WhalesDreamVibe : VibeProvider {
-  override val name: VibeName = VibeNames.A_WHALES_DREAM
+  override val name: VibeName = VibeNames.WHALES_DREAM
 
   override val vibe: Vibe by lazy {
       Vibe(
