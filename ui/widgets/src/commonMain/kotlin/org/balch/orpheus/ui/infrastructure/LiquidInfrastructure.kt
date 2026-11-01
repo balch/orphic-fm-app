@@ -60,6 +60,9 @@ data class CenterPanelStyle(
  *
  * @param docked The glass for the large-screen dock, where panels float over the visualization
  * instead of covering it, so it can be lighter; null uses this glass there too.
+ * @param bars The glass for the nav bars (a phone's bottom bar and rail, the dock's top and
+ * bottom bars), which span the screen and hold only icons and labels, so they can take a
+ * different fill from the panels; null gives them the panels' glass.
  */
 data class VisualizationLiquidEffects(
     val frostSmall: Float = 4f,
@@ -70,6 +73,7 @@ data class VisualizationLiquidEffects(
     val bottom: VisualizationLiquidScope = VisualizationLiquidScope(),
     val title: CenterPanelStyle = CenterPanelStyle(),
     val docked: VisualizationLiquidEffects? = null,
+    val bars: VisualizationLiquidEffects? = null,
 ) {
     companion object {
         val Default = VisualizationLiquidEffects()

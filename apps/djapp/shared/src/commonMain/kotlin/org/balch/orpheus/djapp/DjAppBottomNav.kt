@@ -311,34 +311,39 @@ fun DjAppNavScaffold(
                         .consumeWindowInsets(NavigationBarDefaults.windowInsets.only(WindowInsetsSides.Bottom)),
                 ) { content() }
                 // NavigationBar's own Row without its Surface, whose clip would cut the raised ring and its hits.
-                // Aligned by baseline: the transport hangs from the tab labels' line, its pill over the stage.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(NavigationBarDefaults.windowInsets)
-                        .defaultMinSize(minHeight = NavBarHeight)
-                        .selectableGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(NavBarItemGap),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    tabs.forEachIndexed { index, route ->
-                        if (index == transportIndex) {
-                            transport(Modifier.weight(1f).alignBy(LastBaseline).hangFromLabelLine(PhoneBarDomeDrop), null)
+                // Its glass is a leaf behind it, to the screen's bottom edge, as the dock bars do: over a
+                // busy viz the labels vanished. Aligned by baseline: the transport hangs from the tab
+                // labels' line, its pill over the stage.
+                Box(Modifier.fillMaxWidth()) {
+                    DockBarGlass()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(NavigationBarDefaults.windowInsets)
+                            .defaultMinSize(minHeight = NavBarHeight)
+                            .selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(NavBarItemGap),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        tabs.forEachIndexed { index, route ->
+                            if (index == transportIndex) {
+                                transport(Modifier.weight(1f).alignBy(LastBaseline).hangFromLabelLine(PhoneBarDomeDrop), null)
+                            }
+                            val selected = isSelected(route)
+                            NavigationBarItem(
+                                selected = selected,
+                                onClick = { onItemClick(route) },
+                                // An icon tall at least, so a running Timer's countdown leaves its label on the line.
+                                icon = {
+                                    Box(Modifier.heightIn(min = NavIconSize), contentAlignment = Alignment.Center) {
+                                        tabIcon(route, selected)
+                                    }
+                                },
+                                label = { tabLabel(route, selected) },
+                                modifier = Modifier.alignBy(LastBaseline),
+                                colors = NavigationBarItemDefaults.colors(indicatorColor = NavIndicatorColor),
+                            )
                         }
-                        val selected = isSelected(route)
-                        NavigationBarItem(
-                            selected = selected,
-                            onClick = { onItemClick(route) },
-                            // An icon tall at least, so a running Timer's countdown leaves its label on the line.
-                            icon = {
-                                Box(Modifier.heightIn(min = NavIconSize), contentAlignment = Alignment.Center) {
-                                    tabIcon(route, selected)
-                                }
-                            },
-                            label = { tabLabel(route, selected) },
-                            modifier = Modifier.alignBy(LastBaseline),
-                            colors = NavigationBarItemDefaults.colors(indicatorColor = NavIndicatorColor),
-                        )
                     }
                 }
             }

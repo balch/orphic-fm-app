@@ -74,7 +74,9 @@ internal fun BoxScope.DockBarGlass() {
 
 @Composable
 private fun Modifier.tvBarGlassFill(): Modifier {
-    val effects = LocalLiquidEffects.current
+    val ambient = LocalLiquidEffects.current
+    // A visualization may give its bars a fill of their own; the panels' otherwise.
+    val effects = ambient.bars ?: ambient
     return panelGlassChrome(
         liquidState = LocalLiquidState.current,
         effects = effects,
