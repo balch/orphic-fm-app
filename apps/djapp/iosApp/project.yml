@@ -120,6 +120,25 @@ targets:
       - path: DjApp
         excludes:
           - Info.plist
+    # DjApp's resource copy, from the DjAppAi framework's aggregate (which carries shared's too).
+    postBuildScripts:
+      - name: Copy Compose Resources
+        basedOnDependencyAnalysis: false
+        script: |
+          case "$PLATFORM_NAME" in
+            iphoneos) KMP_TARGET=iosArm64 ;;
+            iphonesimulator) KMP_TARGET=iosSimulatorArm64 ;;
+            *) echo "warning: unsupported PLATFORM_NAME='$PLATFORM_NAME' — skipping compose resources"; exit 0 ;;
+          esac
+          SRC="$SRCROOT/../ai/build/kotlin-multiplatform-resources/aggregated-resources/$KMP_TARGET"
+          DST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/compose-resources"
+          if [ -d "$SRC" ]; then
+            mkdir -p "$DST"
+            rsync -a --delete "$SRC/" "$DST/"
+            echo "Copied compose resources ($KMP_TARGET) into $DST"
+          else
+            echo "warning: no compose resources at $SRC — run the gradle framework build first"
+          fi
     info:
       path: DjApp/Info.plist
       properties:

@@ -1,6 +1,6 @@
 # DI Architecture
 
-Both apps use [Metro](https://github.com/ZacSweers/metro). There are seven `@DependencyGraph`
+Both apps use [Metro](https://github.com/ZacSweers/metro). There are eight `@DependencyGraph`
 declarations and two `@GraphExtension` child graphs. This doc lists what each component is, why it
 exists, and what the two apps wire differently.
 
@@ -12,7 +12,7 @@ graph TD
     subgraph app["AppScope · one per process"]
         direction TB
         ORPH["Orpheus<br/>OrpheusGraphAndroid / Jvm / Ios / Wasm"]
-        DJ["Orphic DJ<br/>DjAppGraphAndroid / Desktop / Ios"]
+        DJ["Orphic DJ<br/>DjAppGraphAndroid / Desktop / Ios / IosAi"]
     end
 
     subgraph feat["FeatureScope · child graph"]
@@ -46,7 +46,9 @@ the only caller of `FeatureGraph.Factory.create()` in production code.
 | `DjAppGraph` | `apps/djapp/shared` commonMain | Plain interface, same role as `OrpheusGraph`. |
 | `DjAppGraphAndroid` | `apps/djapp/androidApp` | Entry module, so `:apps:djapp:ai` is on the classpath for the `ai` flavor. |
 | `DjAppGraphDesktop` | `apps/djapp/desktopApp` | Entry module, so `:apps:djapp:ai` is on the classpath with `-Pedition=ai`. |
-| `DjAppGraphIos` | `apps/djapp/shared` iosMain | iOS links the `DjAppShared` framework directly and has no entry module, so this is Core edition only. |
+| `IosDjGraph` | `apps/djapp/shared` iosMain | Plain interface: the roots `DjAppHost` and the widget updater read, so the host boots either iOS graph. |
+| `DjAppGraphIos` | `apps/djapp/shared` iosMain | Core edition: the `DjAppShared` framework, which never sees `:apps:djapp:ai`. |
+| `DjAppGraphIosAi` | `apps/djapp/ai` iosMain | AI edition: the `DjAppAi` framework (which re-exports shared for Swift). `DjAiHost.bootGraph()` hands it to `DjAppHost.useGraph` before the first boot. |
 
 ### Why placement matters
 

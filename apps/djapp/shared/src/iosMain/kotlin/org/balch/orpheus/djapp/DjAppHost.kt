@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import org.balch.orpheus.djapp.di.DjAppGraphIos
+import org.balch.orpheus.djapp.di.IosDjGraph
 import org.balch.orpheus.djapp.widget.IosDjWidgetUpdater
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.timer.TimerFeature
@@ -30,7 +31,8 @@ object DjAppHost {
     private val log = logging("DjAppHost")
     private val audioMutex = Mutex()
 
-    private var graph: DjAppGraphIos? = null
+    private var graph: IosDjGraph? = null
+    private var createGraph: () -> IosDjGraph = { createGraphFactory<DjAppGraphIos.Factory>().create() }
     private var audioStarted = false
     private var widgetReloader: (() -> Unit)? = null
 
@@ -38,10 +40,16 @@ object DjAppHost {
 
     val isGraphAlive: Boolean get() = graph != null
 
+    /** Makes [bootGraph] build [create]'s graph instead of Core's. The AI edition calls it before the first boot. */
+    fun useGraph(create: () -> IosDjGraph) {
+        check(graph == null) { "useGraph() after bootGraph()" }
+        createGraph = create
+    }
+
     /** Idempotent. Builds the graph and its startup features. Starts no audio. */
     fun bootGraph() {
         if (graph != null) return
-        val built = createGraphFactory<DjAppGraphIos.Factory>().create()
+        val built = createGraph()
         built.startupInitializer.run()
         graph = built
         IosDjWidgetUpdater(built).start()
@@ -64,7 +72,7 @@ object DjAppHost {
         log.info { "audio started" }
     }
 
-    fun requireGraph(): DjAppGraphIos = graph ?: error("graph not booted")
+    fun requireGraph(): IosDjGraph = graph ?: error("graph not booted")
 
     /** Swift injects WidgetCenter.reloadAllTimelines here; WidgetKit is invisible to Kotlin. */
     fun setWidgetReloader(reloader: () -> Unit) {

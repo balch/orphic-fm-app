@@ -6,7 +6,7 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import java.io.File
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +29,28 @@ import org.balch.orpheus.features.pulsar.playback.SavedVibe
 import org.balch.orpheus.features.pulsar.playback.SavedVibeLibrary
 
 /**
- * The AI edition's vibe archive and saved-vibe list over one folder, `ai-vibes` in [OrphicFiles.root]
- * (desktop `~/.config/orpheus-dj/ai-vibes/`, Android `filesDir/ai-vibes/`). Every apply writes its own
+ * The `ai-vibes` folder as [AiVibeFolder] needs it, one per platform: desktop `~/.config/orpheus-dj/ai-vibes/`,
+ * Android `filesDir/ai-vibes/`, iOS `Application Support/ai-vibes/`. Calls are blocking and come on io.
+ */
+interface AiVibeDir {
+    /** Names of the top-level `.json` files; `deleted/` is never among them. */
+    fun jsonFiles(): List<String>
+
+    /** The file's text, or null when it cannot be read. */
+    fun read(name: String): String?
+
+    /** Creates the folder if needed; throws when the file cannot be written. */
+    fun write(name: String, text: String)
+
+    /** Moves the file into `deleted/`; false when it could not. */
+    fun moveToDeleted(name: String): Boolean
+
+    /** Last-modified time in epoch millis, for a file whose name carries no timestamp. */
+    fun modifiedAt(name: String): Long
+}
+
+/**
+ * The AI edition's vibe archive and saved-vibe list over one [AiVibeDir]. Every apply writes its own
  * `<millis>_<name>.json`; the list is re-read after each write and delete. A delete moves the files into
  * `deleted/`, which is never listed, so they can be recovered by hand.
  */
@@ -38,15 +58,15 @@ import org.balch.orpheus.features.pulsar.playback.SavedVibeLibrary
 @ContributesBinding(AppScope::class, binding = binding<AiVibeArchive>(), replaces = [NoOpAiVibeArchive::class])
 @ContributesBinding(AppScope::class, binding = binding<SavedVibeLibrary>(), replaces = [NoSavedVibes::class])
 class AiVibeFolder internal constructor(
-    private val dir: File,
+    private val dir: AiVibeDir,
     private val io: CoroutineDispatcher,
     scope: CoroutineScope,
-    private val now: () -> Long = System::currentTimeMillis,
+    private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : AiVibeArchive, SavedVibeLibrary {
 
     @Inject
-    constructor(files: OrphicFiles, dispatchers: DispatcherProvider, scope: AppCoroutineScope) :
-        this(File(files.root, ARCHIVE_DIR), dispatchers.io, scope)
+    constructor(dir: AiVibeDir, dispatchers: DispatcherProvider, scope: AppCoroutineScope) :
+        this(dir, dispatchers.io, scope)
 
     private val log = logging("AiVibeFolder")
     private val flow = MutableStateFlow<List<SavedVibe>>(emptyList())
@@ -64,10 +84,9 @@ class AiVibeFolder internal constructor(
         val written = lock.withLock {
             withContext(io) {
                 try {
-                    dir.mkdirs()
-                    val file = File(dir, aiVibeFileName(vibeName, now()))
-                    file.writeText(vibeJson)
-                    log.debug { "Archived AI vibe '$vibeName' -> ${file.absolutePath}" }
+                    val name = aiVibeFileName(vibeName, now())
+                    dir.write(name, vibeJson)
+                    log.debug { "Archived AI vibe '$vibeName' -> $name" }
                     true
                 } catch (e: Exception) {
                     log.error { "Failed to archive AI vibe '$vibeName': ${e.message}" }
@@ -83,12 +102,9 @@ class AiVibeFolder internal constructor(
         lock.withLock {
             withContext(io) {
                 val key = keyOf(name)
-                val trash = File(dir, DELETED_DIR)
                 scan().filter { keyOf(it.vibe.name) == key }.forEach { entry ->
-                    trash.mkdirs()
-                    val moved = entry.file.renameTo(File(trash, entry.file.name))
-                    if (moved) decoded.remove(entry.file.name)
-                    else log.error { "Could not move ${entry.file.name} to $DELETED_DIR" }
+                    if (dir.moveToDeleted(entry.file)) decoded.remove(entry.file)
+                    else log.error { "Could not move ${entry.file} to deleted/" }
                 }
             }
         }
@@ -105,30 +121,27 @@ class AiVibeFolder internal constructor(
         }
     }
 
-    private class Entry(val file: File, val savedAt: Long, val vibe: Vibe)
+    private class Entry(val file: String, val savedAt: Long, val vibe: Vibe)
 
-    // Top-level json files only, so deleted/ stays out. Call under the lock on io.
-    private fun scan(): List<Entry> {
-        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return emptyList()
-        return files.mapNotNull { file ->
-            val vibe = decoded.getOrPut(file.name) { read(file) } ?: return@mapNotNull null
-            Entry(file, file.name.substringBefore('_').toLongOrNull() ?: file.lastModified(), vibe)
-        }
+    // Call under the lock on io.
+    private fun scan(): List<Entry> = dir.jsonFiles().mapNotNull { file ->
+        val vibe = decoded.getOrPut(file) { read(file) } ?: return@mapNotNull null
+        Entry(file, file.substringBefore('_').toLongOrNull() ?: dir.modifiedAt(file), vibe)
     }
 
-    private fun read(file: File): Vibe? {
-        val text = runCatching { file.readText() }.getOrElse {
-            log.debug { "Skipped AI vibe ${file.name}: ${it.message}" }
+    private fun read(file: String): Vibe? {
+        val text = dir.read(file) ?: run {
+            log.debug { "Skipped AI vibe $file: unreadable" }
             return null
         }
         return decodeVibe(vibeApplyJson, text)
-            .onFailure { log.debug { "Skipped AI vibe ${file.name}: ${it.message}" } }
+            .onFailure { log.debug { "Skipped AI vibe $file: ${it.message}" } }
             .getOrNull()
     }
 
     private fun keyOf(name: String) = name.trim().lowercase()
 
-    private companion object {
+    internal companion object {
         const val ARCHIVE_DIR = "ai-vibes"
         const val DELETED_DIR = "deleted"
     }

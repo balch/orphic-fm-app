@@ -12,6 +12,8 @@ kotlin {
         target.binaries.framework {
             baseName = "DjAppAi"
             isStatic = true
+            // The app's Swift calls DjAppHost, IosFold and MainViewController, which live in shared.
+            export(project(":apps:djapp:shared"))
         }
     }
 
@@ -42,6 +44,10 @@ kotlin {
         // DjRoute extends NavKey; tests reading route fields need it on the classpath.
         jvmTest.dependencies {
             implementation(libs.jetbrains.navigation3.ui)
+        }
+        // Koog's model clients need an engine; the Orpheus iOS app ships the same one.
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
         }
         // Only the ai edition carries this module, so the og flavor never gets the server stack.
         jvmAndroidMain.dependencies {

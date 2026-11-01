@@ -17,7 +17,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // starts IosDjWidgetUpdater, and a reload in its first moments would find
         // widgetReloader nil if the order were reversed.
         WidgetReloadBridge.install()
+        #if USING_AI
+        DjAiHost.shared.bootGraph()
+        #else
         DjAppHost.shared.bootGraph()
+        #endif
         return true
     }
 }
