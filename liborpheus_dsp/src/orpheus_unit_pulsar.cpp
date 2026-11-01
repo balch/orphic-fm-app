@@ -5526,9 +5526,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             midi_note += tension_key_offset(state->tension.key_shift,
                                                             state->tension_intensity);
 
-                            // Chromatic passing tones
+                            // Chromatic passing tones. Not on ROOT_ONLY: every note there is the
+                            // chord root, so a nudge can only land a held wrong root.
                             float chrom_prob = state->tension.chromatic_passing * state->tension_intensity;
-                            if (chrom_prob > 0.001f) {
+                            if (chrom_prob > 0.001f && ts.chord_follow != ChordFollowMode::ROOT_ONLY) {
                                 uint32_t rng = step_hash(ts.playhead, t + 7, state->loop_count, state->step_salt);
                                 float r = (rng & 0xFFFF) / 65535.0f;
                                 if (r < chrom_prob) {
