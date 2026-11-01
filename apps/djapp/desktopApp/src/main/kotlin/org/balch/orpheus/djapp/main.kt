@@ -29,11 +29,16 @@ fun main() {
         // The window hook sees every key regardless of focus, and runs the exact same rule.
         val panelKeys = remember { PanelKeyBridge() }
         val vibeKeys = remember { VibeStepKeys() }
+        val aiEdition = remember { graph.djTabContributions.any { it.route == AiTab } }
 
         Window(
             onPreviewKeyEvent = { panelKeys.onKeyEvent(it) },
             // Bubbling phase, after the focused element: see vibeStepForKey.
             onKeyEvent = { event ->
+                // Reached only if no focused field took the paste, so the chat keeps its own path.
+                if (aiEdition && isPasteShortcut(event)) {
+                    return@Window offerClipboard(readClipboardText(), graph.sharedTextInbox)
+                }
                 when (vibeKeys.stepFor(event)) {
                     SkipDirection.NEXT -> { graph.playbackController.onSkipNext(); true }
                     SkipDirection.PREVIOUS -> { graph.playbackController.onSkipPrevious(); true }
