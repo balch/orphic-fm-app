@@ -64,6 +64,7 @@ import org.balch.orpheus.djapp.variant.stageChromeOverhang
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarUiState
 import org.balch.orpheus.features.pulsar.PulsarViewModel
+import org.balch.orpheus.features.pulsar.SectionReadout
 import org.balch.orpheus.features.pulsar.VibeNavState
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.CaptureField
@@ -307,7 +308,9 @@ class AiMixerRenderHarness {
         scale: Float = 1f,
         content: @Composable (AiMixerFeature) -> Unit,
     ) {
-        val feature = AiMixerViewModel.previewFeature(state, meters)
+        // Right-aligned under the last section chip; a line wider than the chips starts under the first.
+        val readout = SectionReadout("groove 3/8 \u25b8 KEYS")
+        val feature = AiMixerViewModel.previewFeature(state, meters, sectionReadout = readout)
         val scene = ImageComposeScene(w * 2, h * 2, Density(2f)) {
             CompositionLocalProvider(LocalCanvasScale provides scale) {
                 OrpheusTheme { content(feature) }

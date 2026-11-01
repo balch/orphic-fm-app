@@ -68,6 +68,7 @@ import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.ai.chat.rememberOverlayFocus
 import org.balch.orpheus.djapp.ai.chat.usd
 import org.balch.orpheus.djapp.legible
+import org.balch.orpheus.features.pulsar.SectionReadout
 import org.balch.orpheus.features.pulsar.bench.BenchMeters
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 
@@ -132,6 +133,7 @@ fun AiMixerPanel(
 ) {
     val state by feature.stateFlow.collectAsState()
     val meters = feature.meters.collectAsState(EMPTY_METERS)
+    val readout = feature.sectionReadout.collectAsState(null)
     val flashes = remember { AgentFlashes() }
     val latest by rememberUpdatedState(state)
     LaunchedEffect(feature) {
@@ -174,7 +176,7 @@ fun AiMixerPanel(
         ) {
             Box(Modifier.fillMaxSize()) {
                 if (wide) {
-                    WideMixer(state, meters, feature.actions, flashes, width, wideHeight, openVoice)
+                    WideMixer(state, meters, readout, feature.actions, flashes, width, wideHeight, openVoice)
                 } else {
                     CompactMixer(state, meters, feature.actions, flashes, width, openVoice, bottomOverhang = bottomOverhang)
                 }
@@ -208,6 +210,7 @@ fun AiMixerPanel(
 private fun WideMixer(
     state: AiMixerUiState,
     meters: State<MeterSnapshot>,
+    readout: State<SectionReadout?>,
     actions: AiMixerActions,
     flashes: AgentFlashes,
     width: Dp,
@@ -280,6 +283,7 @@ private fun WideMixer(
                             flashes = flashes,
                             chipsTrailing = if (beside) null else scopeToggle,
                             underChips = if (beside) scopeToggle else null,
+                            underLastChip = { SectionReadoutLine(readout) },
                         )
                         if (state.sectionScope) SectionPanNote()
                     }
@@ -365,7 +369,8 @@ private fun WideHeader(
 
 /**
  * The macro knobs and the section chips: one row when [beside], else knobs (scrolling if cramped) over chips.
- * [chipsTrailing] ends the chips' row; [underChips] goes right under it either way.
+ * [chipsTrailing] ends the chips' row; [underChips] goes right under it either way; [underLastChip] sits below the
+ * chips, right-aligned to the last one.
  */
 @Composable
 internal fun KnobsAndChips(
@@ -377,6 +382,7 @@ internal fun KnobsAndChips(
     flashes: AgentFlashes? = null,
     chipsTrailing: (@Composable () -> Unit)? = null,
     underChips: (@Composable () -> Unit)? = null,
+    underLastChip: (@Composable () -> Unit)? = null,
 ) {
     @Composable
     fun chips() = SectionChips(
@@ -388,6 +394,7 @@ internal fun KnobsAndChips(
         Modifier.fillMaxWidth(),
         flashes = flashes,
         trailing = chipsTrailing,
+        underLastChip = underLastChip,
     )
     if (beside) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(KNOBS_CHIPS_GAP)) {

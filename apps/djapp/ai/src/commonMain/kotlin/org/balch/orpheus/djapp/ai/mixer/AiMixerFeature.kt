@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.features.pulsar.SectionReadout
 import org.balch.orpheus.features.pulsar.bench.EngineKnob
 import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
@@ -72,6 +73,9 @@ interface AiMixerFeature : SynthFeature<AiMixerUiState, AiMixerActions> {
 
     /** Each control the agent or MCP just changed, for the panel to flash. */
     val agentEdits: Flow<MixControl> get() = emptyFlow()
+
+    /** The Pulsar panel's section line (section, bar, soloist, transition), apart from [stateFlow] so bar ticks don't rebuild the mixer. */
+    val sectionReadout: Flow<SectionReadout?> get() = emptyFlow()
 
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty

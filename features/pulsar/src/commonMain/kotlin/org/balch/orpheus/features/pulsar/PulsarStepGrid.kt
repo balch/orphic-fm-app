@@ -33,9 +33,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -499,41 +496,11 @@ fun PulsarStepGrid(
             arrangement?.sections?.getOrNull(sectionIndex)?.name
         }
 
-        if (sectionName != null || activeTransition != null) {
-            // While a transition is firing the overlay reads "\u25b8 STYLE" in
-            // cosmicPurple \u2014 louder than the normal section/bar text because
-            // it's the moment the user is most likely curious about.
-            //
-            // Otherwise: "section bar X/Y [\u25b8 solo]" in white, with a trailing
-            // " \u2014 STYLE" suffix in cosmicPurple when the current section is
-            // the final section and a transition is pending. AnnotatedString
-            // lets the suffix carry its own color inline.
-            val overlay: AnnotatedString =
-                buildAnnotatedString {
-                    val accent = OrpheusColors.cosmicPurple.lighten()
-                    val base = Color.White.copy(alpha = 0.9f)
-                    if (activeTransition != null) {
-                        pushStyle(SpanStyle(color = accent))
-                        append("\u25b8 ${activeTransition.name}")
-                        pop()
-                    } else {
-                        val currentBar = (arrangementState?.barsElapsed ?: 0) + 1
-                        val barText = "$currentBar/${arrangementState?.barsTotal ?: 0}"
-                        val soloText = arrangementState?.soloistName()?.let { " \u25b8 $it" } ?: ""
-                        pushStyle(SpanStyle(color = base))
-                        append("$sectionName $barText$soloText")
-                        pop()
-                        val isFinal = arrangementState != null
-                            && finalSectionIndex >= 0
-                            && arrangementState.sectionIndex == finalSectionIndex
-                            && pendingTransition != null
-                        if (isFinal) {
-                            pushStyle(SpanStyle(color = accent))
-                            append(" \u2014 ${pendingTransition.name}")
-                            pop()
-                        }
-                    }
-                }
+        val readout = sectionReadout(sectionName, arrangementState, activeTransition, finalSectionIndex, pendingTransition)
+        if (readout != null) {
+            // The transition, firing or pending on the final section, carries cosmicPurple: it's the moment the
+            // user is most likely curious about.
+            val overlay = readout.annotated(Color.White.copy(alpha = 0.9f), OrpheusColors.cosmicPurple.lighten())
 
             Box(
                 modifier = Modifier

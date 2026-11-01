@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +65,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsPropertyKey
@@ -91,6 +96,7 @@ import org.balch.orpheus.djapp.LegibleText
 import org.balch.orpheus.djapp.LocalCanvasScale
 import org.balch.orpheus.djapp.ai.collab.MixControl
 import org.balch.orpheus.djapp.legible
+import org.balch.orpheus.features.pulsar.SectionReadout
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
@@ -811,7 +817,8 @@ private fun MacroKnob(m: MixerMacro, onSet: (Macro, Float) -> Unit, knobSize: Dp
 
 /**
  * The Loop toggle, then the arrangement's sections in a scrolling row. The playing chip is filled, the looped one
- * outlined amber; a tap jumps at the next bar line.
+ * outlined amber; a tap jumps at the next bar line. [underLastChip] goes on a line below, its right edge under the
+ * last chip's.
  */
 @Composable
 internal fun SectionChips(
@@ -823,35 +830,55 @@ internal fun SectionChips(
     modifier: Modifier = Modifier,
     flashes: AgentFlashes? = null,
     trailing: (@Composable () -> Unit)? = null,
+    underLastChip: (@Composable () -> Unit)? = null,
 ) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val looping = looped != null
-        Pill(
-            modifier = agentMark(flashes?.count(FlashTarget.Loop) ?: 0, glow = false, corner = 12.dp),
-            text = if (looping) "Looping " + (sections.getOrNull(looped) ?: "section") else "Loop section",
-            fill = if (looping) MixerInk.changed else MixerInk.chip,
-            textColor = if (looping) MixerInk.onBright else MixerInk.text,
-            border = MixerInk.line,
-            maxWidth = 180.dp,
-            onClick = { onLoop(!looping) },
-        )
-        // A jump lands at the next bar line, so the agent's jump flashes the whole row, not one chip.
-        LazyRow(
-            Modifier.weight(1f).then(agentMark(flashes?.count(FlashTarget.Section) ?: 0, glow = false, corner = 12.dp)),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            itemsIndexed(sections) { i, name ->
-                Pill(
-                    text = name,
-                    fill = if (i == playing) MixerInk.accent else MixerInk.chip,
-                    textColor = if (i == playing) MixerInk.text else MixerInk.dim,
-                    border = if (i == looped) MixerInk.changed else Color.Transparent,
-                    maxWidth = 160.dp,
-                    onClick = { onJump(i) },
-                )
+    val listState = rememberLazyListState()
+    var listX by remember { mutableIntStateOf(0) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val looping = looped != null
+            Pill(
+                modifier = agentMark(flashes?.count(FlashTarget.Loop) ?: 0, glow = false, corner = 12.dp),
+                text = if (looping) "Looping " + (sections.getOrNull(looped) ?: "section") else "Loop section",
+                fill = if (looping) MixerInk.changed else MixerInk.chip,
+                textColor = if (looping) MixerInk.onBright else MixerInk.text,
+                border = MixerInk.line,
+                maxWidth = 180.dp,
+                onClick = { onLoop(!looping) },
+            )
+            // A jump lands at the next bar line, so the agent's jump flashes the whole row, not one chip.
+            LazyRow(
+                Modifier
+                    .weight(1f)
+                    .onPlaced { listX = it.positionInParent().x.roundToInt() }
+                    .then(agentMark(flashes?.count(FlashTarget.Section) ?: 0, glow = false, corner = 12.dp)),
+                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                itemsIndexed(sections) { i, name ->
+                    Pill(
+                        text = name,
+                        fill = if (i == playing) MixerInk.accent else MixerInk.chip,
+                        textColor = if (i == playing) MixerInk.text else MixerInk.dim,
+                        border = if (i == looped) MixerInk.changed else Color.Transparent,
+                        maxWidth = 160.dp,
+                        onClick = { onJump(i) },
+                    )
+                }
+            }
+            trailing?.invoke()
+        }
+        if (underLastChip != null) {
+            // Read at measure time, so a scroll or a new bar moves only this line.
+            Layout(underLastChip, Modifier.fillMaxWidth()) { measurables, constraints ->
+                // Empty while no section plays (loading, between vibes): the readout draws nothing.
+                val p = measurables.firstOrNull()?.measure(constraints.copy(minWidth = 0)) ?: return@Layout layout(0, 0) {}
+                val info = listState.layoutInfo
+                val end = info.visibleItemsInfo.lastOrNull()?.let { minOf(it.offset + it.size, info.viewportEndOffset) } ?: 0
+                val right = (listX + end).coerceIn(minOf(p.width, constraints.maxWidth), constraints.maxWidth)
+                layout(constraints.maxWidth, p.height) { p.placeRelative(right - p.width, 0) }
             }
         }
-        trailing?.invoke()
     }
 }
 
@@ -956,6 +983,24 @@ private fun busText(m: MeterSnapshot, liveSize: TextUnit): AnnotatedString = bui
     append(" · corr ")
     value(fixed(m.correlation.toFloat(), 2))
 }
+
+/** The Pulsar panel's section line in a pill; a leaf, so a new bar recomposes only this. Nothing while no section plays. */
+@Composable
+internal fun SectionReadoutLine(readout: State<SectionReadout?>, modifier: Modifier = Modifier) {
+    val r = readout.value ?: return
+    Text(
+        r.annotated(MixerInk.text, MixerInk.accentSoft),
+        style = mixText(legible(PILL_SP), mono = true),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .testTag(SECTION_READOUT_TAG)
+            .background(MixerInk.well, RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+    )
+}
+
+internal const val SECTION_READOUT_TAG = "mixer-section-readout"
 
 /** Channel [ch]'s loudness against the dry mix; a leaf that recomposes only when its text changes. */
 @Composable
