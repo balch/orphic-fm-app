@@ -312,6 +312,17 @@ internal fun progressArc(normalized: Float, bipolar: Boolean, startAngle: Float,
         startAngle to sweepAngle * normalized
     }
 
+/**
+ * Sweep-gradient stops that run [from] to [to] along the dial. A sweep gradient starts at 3 o'clock,
+ * so a dial that wraps past it gets the colour at 3 o'clock on both ends instead of a seam there.
+ */
+internal fun dialGradientStops(from: Color, to: Color, startAngle: Float, sweepAngle: Float): Array<Pair<Float, Color>> {
+    val endAngle = startAngle + sweepAngle
+    if (endAngle <= 360f) return arrayOf(startAngle / 360f to from, endAngle / 360f to to)
+    val atThreeOClock = lerp(from, to, (360f - startAngle) / sweepAngle)
+    return arrayOf(0f to atThreeOClock, (endAngle - 360f) / 360f to to, startAngle / 360f to from, 1f to atThreeOClock)
+}
+
 @Composable
 internal fun RotaryKnobDial(
     dragState: KnobDragState,
@@ -515,11 +526,11 @@ internal fun RotaryKnobDial(
             val (arcStart, arcSweep) = progressArc(normalizedValue, bipolar, startAngle, sweepAngle)
             // A bipolar arc runs either way from 12 o'clock, so it is drawn solid: the sweep gradient fades its start.
             val glowBrush: Brush = if (bipolar) SolidColor(progressColor.copy(alpha = 0.45f * ring)) else Brush.sweepGradient(
-                colors = listOf(progressColor.copy(alpha = 0.0f), progressColor.copy(alpha = 0.6f * ring)),
+                *dialGradientStops(progressColor.copy(alpha = 0.0f), progressColor.copy(alpha = 0.6f * ring), startAngle, sweepAngle),
                 center = center,
             )
             val arcBrush: Brush = if (bipolar) SolidColor(progressColor.copy(alpha = ring)) else Brush.sweepGradient(
-                colors = listOf(progressColor.copy(alpha = 0.5f * ring), progressColor.copy(alpha = ring)),
+                *dialGradientStops(progressColor.copy(alpha = 0.5f * ring), progressColor.copy(alpha = ring), startAngle, sweepAngle),
                 center = center,
             )
 
