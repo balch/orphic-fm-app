@@ -13,7 +13,7 @@
 #      ear-test it — an uncataloged provider is auto-hidden anyway).
 # AlbumCatalog.kt is left alone: the vibe lands on STEALTH until another album lists it.
 #
-# Usage: import_vibe.sh <vibe.json> [--status WIP|LIVE|SHELF] [--tags "a,b"] [--force]
+# Usage: import_vibe.sh <vibe.json> [--status WIP|LIVE|SHELF|EXCLUSIVE] [--tags "a,b"] [--force]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,9 +40,9 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-[ -n "$JSON" ] || { echo "usage: import_vibe.sh <vibe.json> [--status WIP|LIVE|SHELF] [--tags a,b] [--force]" >&2; exit 2; }
+[ -n "$JSON" ] || { echo "usage: import_vibe.sh <vibe.json> [--status WIP|LIVE|SHELF|EXCLUSIVE] [--tags a,b] [--force]" >&2; exit 2; }
 [ -f "$JSON" ] || { echo "no such file: $JSON" >&2; exit 2; }
-case "$STATUS" in WIP|LIVE|SHELF) ;; *) echo "--status must be WIP, LIVE, or SHELF" >&2; exit 2 ;; esac
+case "$STATUS" in WIP|LIVE|SHELF|EXCLUSIVE) ;; *) echo "--status must be WIP, LIVE, SHELF, or EXCLUSIVE" >&2; exit 2 ;; esac
 [ -f "$CATALOG" ] || { echo "VibeCatalog.kt not found at $CATALOG — wrong repo layout?" >&2; exit 2; }
 [ -f "$NAMES" ] || { echo "VibeNames.kt not found at $NAMES, wrong repo layout?" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "jq is required (brew install jq)" >&2; exit 2; }
@@ -167,4 +167,5 @@ fi
 
 echo "Done. Verify: ./gradlew :features:pulsar:compileKotlinJvm"
 [ "$STATUS" = "WIP" ] && echo "Hidden until ear-tested; see it on desktop with -Pcatalog=wip, or flip to LIVE in VibeCatalog.kt."
+[ "$STATUS" = "EXCLUSIVE" ] && echo "Compiled only with -Porphic.exclusiveVibes=true; compile-check with that flag."
 exit 0
