@@ -255,7 +255,8 @@ internal fun vibePathLabel(path: String, vibe: Vibe?, trackNames: (Int) -> Strin
         return "$name · ${trackNames(track.toInt())} $field"
     }
     TRACK_FIELD.matchEntire(path)?.let { m ->
-        return "${trackNames(m.groupValues[1].toInt())} · ${m.groupValues[2]}"
+        val field = m.groupValues[2]
+        return "${trackNames(m.groupValues[1].toInt())} · ${if (field == "slotLock") "plays" else field}"
     }
     SECTION_FIELD.matchEntire(path)?.let { m ->
         val section = m.groupValues[1]

@@ -81,8 +81,9 @@ class VibeEditTool(
                 Change fields of the vibe that plays now, keeping the rest. Each changed field becomes a row in the
                 Mixer's History, on top of the vibe's file, so the user can see it, toggle it, roll back and capture it.
                 The song restarts to play the change, except when only engines, or their harmonics, timbre, morph or
-                pins, change: those play on live, a new engine from its track's next note. Use this for tweaks; use
-                pulsar_apply_vibe only for a new vibe.
+                pins, or a track's slotLock, change: those play on live, a new engine from its track's next note.
+                slotLock (AUTO, EDM or SPACE) holds a track on one engine whatever the energy. Use this for tweaks;
+                use pulsar_apply_vibe only for a new vibe.
                 Loop: make one change, tell the user what changed in plain words, then wait for their reaction.
                 Path syntax: dotted names with [index] for lists. Examples:
                   path "bpm", value "96"

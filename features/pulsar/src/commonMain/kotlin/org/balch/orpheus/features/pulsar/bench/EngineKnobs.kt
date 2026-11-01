@@ -94,6 +94,8 @@ fun knobPinPath(track: Int, slot: EngineSlot, knob: EngineKnob) = "tracks[$track
 
 fun enginePath(track: Int, slot: EngineSlot): String = "tracks[$track].${slot.pathKey}.engineId"
 
+fun lockPath(track: Int): String = "tracks[$track].slotLock"
+
 private fun Vibe.withEngine(track: Int, slot: EngineSlot, change: (OrpheusEngine) -> OrpheusEngine): Vibe {
     val tv = tracks[track]
     val next = if (slot == EngineSlot.EDM) tv.copy(engineEdm = change(tv.engineEdm)) else tv.copy(engineSpace = change(tv.engineSpace))
@@ -121,14 +123,19 @@ private fun OrpheusEngine.knobsOf(o: OrpheusEngine) = copy(
 )
 
 /**
- * True when [to] differs from this vibe only in its engines' ids, harmonics, timbre, morph and their pins. The engine
- * reads the knobs every block and adopts a new id on the track's next note, so they change under a playing song.
+ * True when [to] differs from this vibe only in its engines' ids, harmonics, timbre, morph and their pins, or a track's
+ * slot lock. The engine reads the knobs and the lock every block and adopts a new id on the track's next note, so they
+ * change under a playing song.
  */
 fun Vibe.retunesTo(to: Vibe): Boolean {
     if (to.tracks.size != tracks.size) return false
     val tuned = to.copy(
         tracks = to.tracks.mapIndexed { i, t ->
-            t.copy(engineEdm = t.engineEdm.knobsOf(tracks[i].engineEdm), engineSpace = t.engineSpace.knobsOf(tracks[i].engineSpace))
+            t.copy(
+                engineEdm = t.engineEdm.knobsOf(tracks[i].engineEdm),
+                engineSpace = t.engineSpace.knobsOf(tracks[i].engineSpace),
+                slotLock = tracks[i].slotLock,
+            )
         },
     )
     return tuned == this

@@ -24,7 +24,9 @@ import org.balch.orpheus.features.pulsar.bench.MixBenchController
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
 import org.balch.orpheus.features.pulsar.bench.enginePath
+import org.balch.orpheus.features.pulsar.bench.lockPath
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
+import org.balch.orpheus.features.pulsar.models.SlotLock
 import org.balch.orpheus.features.pulsar.models.Vibe
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -255,5 +257,47 @@ class CollabEngineKnobTest {
         assertEquals(loads + 1, r.loads)
         assertEquals(OrpheusEngineId.VOWEL_FOF, r.engine4Id)
         assertEquals(96f, r.pulsar.vibeFlow.value.bpm)
+    }
+
+    private val Rig.lock4 get() = pulsar.vibeFlow.value.tracks[4].slotLock
+
+    private suspend fun Rig.lockTo(lock: SlotLock): VibeEditResult =
+        mixer.editVibe(EditOrigin.USER, listOf(lockPath(4) to JsonPrimitive(lock.name)))
+
+    @Test
+    fun aLockEditPlaysOn() = runTest {
+        val r = rig()
+        val loads = r.loads
+
+        val result = assertIs<VibeEditResult.Applied>(r.lockTo(SlotLock.SPACE))
+        runCurrent()
+
+        assertEquals(false, result.restarted)
+        assertEquals(loads, r.loads)
+        assertEquals(SlotLock.SPACE, r.lock4)
+        assertEquals(listOf(lockPath(4)), r.paths())
+        assertEquals(1, r.history.items.count { it is HistoryVibeEdit })
+    }
+
+    @Test
+    fun togglingALockRowPlaysOn() = runTest {
+        val r = rig()
+        r.mixer.markPoint()
+        val point = r.history.items.filterIsInstance<HistoryPoint>().single().id
+        r.lockTo(SlotLock.SPACE)
+        val loads = r.loads
+        val row = r.history.vibeEdits.single()
+
+        assertTrue(r.mixer.toggleChange(row.id))
+        assertEquals(SlotLock.AUTO, r.lock4)
+        assertEquals(loads, r.loads)
+
+        assertTrue(r.mixer.toggleChange(row.id))
+        assertEquals(SlotLock.SPACE, r.lock4)
+        assertEquals(loads, r.loads)
+
+        assertTrue(r.mixer.rollBack(point))
+        assertEquals(SlotLock.AUTO, r.lock4)
+        assertEquals(loads, r.loads)
     }
 }

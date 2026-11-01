@@ -50,6 +50,16 @@ enum class PulsarSymbol(
     TRACK_7_ENGINE_EDM("track_7_engine_edm", displayName = "Track 7 EDM Engine"),
     TRACK_7_ENGINE_SPACE("track_7_engine_space", displayName = "Track 7 Space Engine"),
 
+    // Per-track slot lock: 0 Auto, 1 EDM, 2 SPACE (8 entries)
+    TRACK_0_SLOT_LOCK("track_0_slot_lock", displayName = "Track 0 Slot Lock"),
+    TRACK_1_SLOT_LOCK("track_1_slot_lock", displayName = "Track 1 Slot Lock"),
+    TRACK_2_SLOT_LOCK("track_2_slot_lock", displayName = "Track 2 Slot Lock"),
+    TRACK_3_SLOT_LOCK("track_3_slot_lock", displayName = "Track 3 Slot Lock"),
+    TRACK_4_SLOT_LOCK("track_4_slot_lock", displayName = "Track 4 Slot Lock"),
+    TRACK_5_SLOT_LOCK("track_5_slot_lock", displayName = "Track 5 Slot Lock"),
+    TRACK_6_SLOT_LOCK("track_6_slot_lock", displayName = "Track 6 Slot Lock"),
+    TRACK_7_SLOT_LOCK("track_7_slot_lock", displayName = "Track 7 Slot Lock"),
+
     // Per-track voice params: VOLUME (8 entries)
     TRACK_0_VOLUME("track_0_volume"),
     TRACK_1_VOLUME("track_1_volume"),
