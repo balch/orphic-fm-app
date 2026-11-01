@@ -23,6 +23,7 @@ import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixCaptureService
 import org.balch.orpheus.features.pulsar.bench.VibeFieldChange
 import org.balch.orpheus.features.pulsar.bench.MixBenchController
+import org.balch.orpheus.features.pulsar.bench.retunesTo
 import org.balch.orpheus.features.pulsar.models.Arrangement
 import org.balch.orpheus.features.pulsar.models.GenreProfile
 import org.balch.orpheus.features.pulsar.models.OrpheusEngine
@@ -67,6 +68,18 @@ internal class FakePulsar(override val vibeList: List<Vibe>) : PulsarFeature {
         vibeFlow.value = vibe
         benchMacros = emptyMap()
         vibeLoadCount.value++
+    }
+
+    /** Off by default, so a knob-only change reloads as it did before live retunes; on, it retunes as the app does. */
+    var retunes = false
+    var retuneCount = 0
+        private set
+
+    override fun retuneVibe(vibe: Vibe): Boolean {
+        if (!retunes || !vibeFlow.value.retunesTo(vibe)) return false
+        vibeFlow.value = vibe
+        retuneCount++
+        return true
     }
 
     /** Engine-only section macros, as the controller last set them. */

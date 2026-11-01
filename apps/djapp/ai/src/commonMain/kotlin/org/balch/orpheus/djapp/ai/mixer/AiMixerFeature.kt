@@ -4,6 +4,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.djapp.ai.collab.MixControl
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MeterSnapshot
 import org.balch.orpheus.features.pulsar.bench.Scope
@@ -30,6 +32,10 @@ data class AiMixerActions(
     val hear: (Int) -> Unit = {},
     val endHear: () -> Unit = {},
     val rollBack: (Int) -> Unit = {},
+    /** Turns a voice knob on the strip's picked slot and pins it; a null value returns knob and pin to the file. */
+    val setVoiceKnob: (Int, EngineKnob, Float?) -> Unit = { _, _, _ -> },
+    /** The strip's EDM / SPACE switch: which slot its voice knobs edit. */
+    val pickSlot: (Int, EngineSlot) -> Unit = { _, _ -> },
 ) {
     companion object {
         val EMPTY = AiMixerActions(

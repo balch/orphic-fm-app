@@ -47,11 +47,11 @@ data class VibeEditToolResult(
 )
 
 /** What a recorded vibe edit tells the agent; [ignored] are mixer paths the edit carried but the Mixer owns. */
-internal fun vibeEditedMessage(name: String, rows: Int, ignored: List<String>): String {
-    val head = if (rows == 0) {
-        "No field changed on '$name'; the song kept playing."
-    } else {
-        "Recorded as $rows History rows on '$name'; the song restarted."
+internal fun vibeEditedMessage(name: String, rows: Int, ignored: List<String>, restarted: Boolean = true): String {
+    val head = when {
+        rows == 0 -> "No field changed on '$name'; the song kept playing."
+        restarted -> "Recorded as $rows History rows on '$name'; the song restarted."
+        else -> "Recorded as $rows History rows on '$name'; the song played on with the change."
     }
     if (ignored.isEmpty()) return head
     val more = if (ignored.size > IGNORED_SHOWN) " and ${ignored.size - IGNORED_SHOWN} more" else ""
@@ -80,7 +80,8 @@ class VibeEditTool(
             description = """
                 Change fields of the vibe that plays now, keeping the rest. Each changed field becomes a row in the
                 Mixer's History, on top of the vibe's file, so the user can see it, toggle it, roll back and capture it.
-                The song restarts to play the change. Use this for tweaks; use pulsar_apply_vibe only for a new vibe.
+                The song restarts to play the change, except when only engine harmonics, timbre, morph or their pins
+                change: those play on live. Use this for tweaks; use pulsar_apply_vibe only for a new vibe.
                 Loop: make one change, tell the user what changed in plain words, then wait for their reaction.
                 Path syntax: dotted names with [index] for lists. Examples:
                   path "bpm", value "96"
@@ -112,7 +113,7 @@ class VibeEditTool(
                 // The mixer patches again under its lock, so rows above a heard point survive.
                 when (val r = collabMixer.editVibe(collabMixer.toolOrigin(), parsed)) {
                     is VibeEditResult.Applied -> {
-                        val msg = vibeEditedMessage(current.name, r.rows, r.ignoredMixerPaths)
+                        val msg = vibeEditedMessage(current.name, r.rows, r.ignoredMixerPaths, r.restarted)
                         VibeEditToolResult(true, if (r.rows == 0) msg else "Changed ${args.edits.joinToString { it.path }}. $msg", r.rows)
                     }
                     is VibeEditResult.Refused -> VibeEditToolResult(false, withNewVibePointer(r.reason, r.structure))

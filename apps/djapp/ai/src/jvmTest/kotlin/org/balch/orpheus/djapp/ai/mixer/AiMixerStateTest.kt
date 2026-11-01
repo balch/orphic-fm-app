@@ -25,7 +25,12 @@ import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SectionLayer
 import org.balch.orpheus.features.pulsar.bench.VibeLayer
+import org.balch.orpheus.features.pulsar.bench.BenchMeters
+import org.balch.orpheus.features.pulsar.bench.EngineKnob
+import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.capture
+import org.balch.orpheus.features.pulsar.bench.knobPath
+import org.balch.orpheus.features.pulsar.bench.withEngineKnob
 
 class AiMixerStateTest {
     private val v = vibe("Mixer")
@@ -283,5 +288,42 @@ class AiMixerStateTest {
         assertEquals(2, uncapturedOn(rows))
         assertEquals(" · 2 uncaptured of 4 changes on", nowDetail(rows, h.onCount))
         assertEquals(4, AiMixerUiState(history = rows).historyChangeCount)
+    }
+    @Test
+    fun voiceKnobsShowTheMacroUntilPinned() {
+        val tv = v.tracks[2]
+        val window = tv.macroMap.moodHarmonics
+        val pinned = v.withEngineKnob(2, EngineSlot.EDM, EngineKnob.TIMBRE, 0.8f)
+        val s = mixerState(
+            pinned, 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, mapOf(Macro.MOOD to 0.5f),
+            VoiceView(heard = EngineSlot.EDM, edited = setOf(knobPath(2, EngineSlot.EDM, EngineKnob.TIMBRE))),
+        )
+        val (h, t, _) = s.tracks[2].voice
+        assertEquals(window.min + 0.5f * (window.max - window.min), h.value, 1e-6f)
+        assertEquals(Macro.MOOD, h.source)
+        assertFalse(h.pinned || h.changed)
+        assertEquals("detune", h.label)
+        assertEquals(0.8f, t.value)
+        assertTrue(t.pinned && t.changed && t.source == null)
+        assertEquals("VA", s.tracks[2].edmEngine)
+    }
+
+    @Test
+    fun aPickedSlotWinsOverTheHeardOne() {
+        val s = mixerState(
+            v, 0, BenchLayers(), Scope.VIBE, emptySet(), emptySet(), null, emptyMap(),
+            VoiceView(heard = EngineSlot.EDM, picks = mapOf(4 to EngineSlot.SPACE)),
+        )
+        assertEquals(EngineSlot.SPACE, s.tracks[4].slot)
+        assertFalse(s.tracks[4].slotHeard)
+        assertEquals(EngineSlot.EDM, s.tracks[3].slot)
+        assertTrue(s.tracks[3].slotHeard)
+    }
+
+    @Test
+    fun aKnobPinRowReadsAsItsKnob() {
+        val names = { t: Int -> BenchMeters.CHANNEL_NAMES[t] }
+        assertEquals("BASS · EDM harmonics pin", vibePathLabel("tracks[3].engineEdm.pinHarmonics", v, names))
+        assertEquals("BASS · Space morph", vibePathLabel("tracks[3].engineSpace.morph", v, names))
     }
 }

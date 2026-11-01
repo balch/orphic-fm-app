@@ -648,7 +648,7 @@ private fun SmallToggle(text: String, on: Boolean, onColor: Color, onClick: () -
  */
 @Composable
 internal fun StripKnob(
-    label: String,
+    label: String?,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     onValueChange: (Float) -> Unit,
@@ -656,6 +656,8 @@ internal fun StripKnob(
     size: Dp,
     modifier: Modifier = Modifier,
     onReset: (() -> Unit)? = null,
+    color: Color = MixerInk.accent,
+    enabled: Boolean = true,
 ) {
     // RotaryKnob keeps its dragged value until its input changes, so a release re-keys it onto the state.
     var generation by remember { mutableIntStateOf(0) }
@@ -691,8 +693,9 @@ internal fun StripKnob(
                 labelColor = MixerInk.dim,
                 range = range,
                 size = size,
-                progressColor = MixerInk.accent,
+                progressColor = color,
                 indicatorColor = MixerInk.accentSoft,
+                enabled = enabled,
                 valueFormatter = null,
                 requireVerticalSlop = true,
             )

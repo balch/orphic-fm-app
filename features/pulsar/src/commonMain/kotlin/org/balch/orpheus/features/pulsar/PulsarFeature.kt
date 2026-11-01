@@ -80,6 +80,7 @@ import org.balch.orpheus.features.pulsar.anonmalies.WahAnomaly
 import org.balch.orpheus.features.pulsar.bench.DelayFx
 import org.balch.orpheus.features.pulsar.bench.Macro
 import org.balch.orpheus.features.pulsar.bench.MixOverlay
+import org.balch.orpheus.features.pulsar.bench.retunesTo
 import org.balch.orpheus.features.pulsar.kraken.KRAKEN_TARGET_COUNT
 import org.balch.orpheus.features.pulsar.kraken.KrakenGesture
 import org.balch.orpheus.features.pulsar.models.Album
@@ -397,6 +398,13 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
 
     /** Sets the 1.0x tempo; the live tempo becomes [bpm] times the current section's multiplier. */
     fun setBaseBpm(bpm: Float) {}
+
+    /**
+     * Plays [vibe] in place of the playing one without a reload, when the two differ only in engine harmonics, timbre,
+     * morph and their pins ([retunesTo]): the song keeps its place and [vibeLoadCount] stays. False, changing nothing,
+     * for any other difference. Previews and fakes return false, so callers reload instead.
+     */
+    fun retuneVibe(vibe: Vibe): Boolean = false
 
     /**
      * Look up a vibe by display name and apply it. Only the matched provider's
@@ -2364,6 +2372,35 @@ class PulsarViewModel(
             if (pan != (old?.pan(i, sectionPan) ?: sectionPan)) trackPanIds[i].value = FloatValue(pan)
         }
         pushEffectiveSends(deepId.value.asFloat())
+    }
+
+    // Not through setVibe: the session mirror's bump would restart the song's progress, and nothing it
+    // serves (name, tempo, arrangement) can differ here.
+    override fun retuneVibe(vibe: Vibe): Boolean {
+        val old = vibeFlow.value
+        if (!old.retunesTo(vibe)) return false
+        _vibeFlow.value = vibe
+        val overrides = vibe.arrangement?.sections?.getOrNull(pushedSection)?.trackOverrides
+        vibe.tracks.forEachIndexed { i, tv ->
+            if (tv != old.tracks[i]) pushEngineKnobs(i, tv.engineEdm, tv.engineSpace, overrides?.get(i)?.morph)
+        }
+        return true
+    }
+
+    // The engine knob ports as applyVibe writes them, with morph as applyTrackOverridesForSection does.
+    private fun pushEngineKnobs(i: Int, edm: OrpheusEngine, spa: OrpheusEngine, sectionMorph: Float?) {
+        trackHarmonicsIds[i].value = FloatValue(edm.harmonics)
+        trackHarmonicsSpaceIds[i].value = FloatValue(spa.harmonics)
+        trackTimbreIds[i].value = FloatValue(edm.timbre)
+        trackTimbreSpaceIds[i].value = FloatValue(spa.timbre)
+        trackMorphIds[i].value = FloatValue(sectionMorph ?: edm.morph)
+        trackMorphSpaceIds[i].value = FloatValue(sectionMorph ?: spa.morph)
+        trackPinHarmonicsIds[i].value = IntValue(if (edm.pinHarmonics || edm.engineId.forcePinHarmonics) 1 else 0)
+        trackPinHarmonicsSpaceIds[i].value = IntValue(if (spa.pinHarmonics || spa.engineId.forcePinHarmonics) 1 else 0)
+        trackPinTimbreIds[i].value = IntValue(if (edm.pinTimbre) 1 else 0)
+        trackPinTimbreSpaceIds[i].value = IntValue(if (spa.pinTimbre) 1 else 0)
+        trackPinMorphIds[i].value = IntValue(if (sectionMorph != null || edm.pinMorph) 1 else 0)
+        trackPinMorphSpaceIds[i].value = IntValue(if (sectionMorph != null || spa.pinMorph) 1 else 0)
     }
 
     private fun macroSymbol(m: Macro) = when (m) {
