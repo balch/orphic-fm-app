@@ -45,6 +45,8 @@ import org.balch.orpheus.ui.viz.PanelKeyBridge
 import org.balch.orpheus.ui.viz.VizStage
 import org.balch.orpheus.ui.viz.handlePanelKey
 import org.balch.orpheus.ui.widgets.VizBackground
+import org.balch.orpheus.ui.widgets.engine.LocalEngineRecents
+import org.balch.orpheus.ui.widgets.engine.rememberEngineRecents
 
 @Composable
 fun DjApp(
@@ -97,6 +99,7 @@ fun DjApp(
             val domeCues = rememberVibeDomeCues(pulsarFeature, graph.appPreferencesRepository, graph.domeWiggleLaunch)
             // The scope their rings trace, polled only while one of them plays.
             val scopeFeed = rememberScopeFeed(graph.synthEngine)
+            val engineRecents = rememberEngineRecents(graph.appPreferencesRepository)
             LaunchedEffect(Unit) {
                 pulsarFeature.vibeFlow
                     .distinctUntilChangedBy { it.name }
@@ -149,6 +152,7 @@ fun DjApp(
                     LocalPanelIdleFade provides panelFade,
                     LocalVibeDomeCues provides domeCues,
                     LocalScopeFeed provides scopeFeed,
+                    LocalEngineRecents provides engineRecents,
                 ) {
                     Box(
                         modifier = Modifier

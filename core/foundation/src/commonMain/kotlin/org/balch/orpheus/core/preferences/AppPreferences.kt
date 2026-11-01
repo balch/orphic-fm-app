@@ -73,6 +73,8 @@ data class AppPreferences(
     val vibePresets: Map<String, VibePresetSlot> = emptyMap(),
     /** Whether the DJ app's preset bar is shown. Presets load either way. */
     val vibePresetBarShown: Boolean = false,
+    /** Engine picker Recent: `EngineCatalog.key` strings, most recent first, at most 8. */
+    val recentEngines: List<String> = emptyList(),
 )
 
 
