@@ -64,6 +64,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -123,8 +124,12 @@ fun DjAiPanel(
             PromptInput(
                 draft = uiState.promptDraft,
                 isKeySet = uiState.isKeySet,
+                reference = uiState.reference,
+                parsing = uiState.parsing != null,
                 onDraftChange = actions.updateDraft,
                 onSubmit = actions.submit,
+                onAttach = actions.attachReference,
+                onDetach = actions.detachReference,
             )
         } else {
             WorkingStatusCard(
@@ -313,15 +318,47 @@ private fun McpEndpointRow(endpoint: McpEndpoint, modifier: Modifier = Modifier)
     }
 }
 
+/** One-line chip above the field naming the attached song reference, with a ✕ to drop it. */
+@Composable
+private fun ReferenceChip(reference: SongPasteRef, onDetach: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(OrpheusColors.midnightBlue.copy(alpha = 0.4f))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            "♪ ${reference.title ?: "Song reference"} · ${reference.lines} lines",
+            style = TextStyle(fontSize = 13.sp, color = OrpheusColors.pureWhite),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "✕",
+            style = TextStyle(fontSize = 13.sp, color = OrpheusColors.sterlingSilver),
+            modifier = Modifier.clickable(onClick = onDetach).padding(start = 8.dp),
+        )
+    }
+}
+
 @Composable
 private fun PromptInput(
     draft: String,
     isKeySet: Boolean,
+    reference: SongPasteRef?,
+    parsing: Boolean,
     onDraftChange: (String) -> Unit,
     onSubmit: () -> Unit,
+    onAttach: (String) -> Unit,
+    onDetach: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
+        if (reference != null) ReferenceChip(reference, onDetach)
         // IMEs deliver their Send/Enter key through FOUR different mechanisms, and Samsung
         // Keyboard picks per version/mode, so every path below must funnel into onSubmit():
         //   1. performEditorAction(SEND)      -> KeyboardActions(onSend)      [Gboard]
@@ -334,7 +371,8 @@ private fun PromptInput(
         val keyboardController = LocalSoftwareKeyboardController.current
         val focusManager = LocalFocusManager.current
         val submitIfAble = {
-            if (isKeySet) {
+            // A paste still parsing counts: the submit waits for its chip.
+            if (isKeySet && (draft.isNotBlank() || reference != null || parsing)) {
                 onSubmit()
                 // Dismiss the keyboard so the feed is visible while generating.
                 keyboardController?.hide()
@@ -344,11 +382,12 @@ private fun PromptInput(
         BasicTextField(
             value = draft,
             onValueChange = { new ->
-                if (new.any { it == '\n' }) {
-                    onDraftChange(new.filterNot { it == '\n' })
-                    submitIfAble()
-                } else {
-                    onDraftChange(new)
+                when (val edit = classifyDraftEdit(draft, new)) {
+                    is DraftEdit.Reference -> onAttach(edit.pasted)
+                    is DraftEdit.Text -> {
+                        onDraftChange(edit.draft)
+                        if (edit.submit) submitIfAble()
+                    }
                 }
             },
             // Multiline display, single-line SEMANTICS: text soft-wraps and the box grows
@@ -383,7 +422,7 @@ private fun PromptInput(
                 Box {
                     if (draft.isEmpty()) {
                         Text(
-                            "Describe a vibe…",
+                            "Describe a vibe, or paste a tab…",
                             style = TextStyle(fontSize = 13.sp, color = OrpheusColors.sterlingSilver.copy(alpha = 0.5f)),
                         )
                     }

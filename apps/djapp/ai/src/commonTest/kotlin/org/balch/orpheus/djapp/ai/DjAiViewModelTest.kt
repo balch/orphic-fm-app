@@ -373,6 +373,15 @@ class DjAiViewModelTest {
     // ─────────────────────────────────────────────────
 
     @Test
+    fun blankDraftRunKeepsLastPromptBlankAndModelSwitchLeavesDraftBlank() {
+        val ref = SongPasteRef("paste-1", 10, null)
+        val s1 = startRun(DjAiUiState(reference = ref), "", "♪ song reference")
+        assertEquals("", s1.lastPrompt)
+        assertEquals(listOf<DjAiFeedItem>(DjAiFeedItem.Request(0, "♪ song reference")), s1.feed)
+        assertEquals("", applyModelSwitch(s1).promptDraft)
+    }
+
+    @Test
     fun startRunSeedsFeedWithRequestRowAndRemembersLastPrompt() {
         val s0 = DjAiUiState(
             phase = DjAiPhase.IDLE,
