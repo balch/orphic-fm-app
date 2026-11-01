@@ -308,6 +308,9 @@ private sealed interface PulsarIntent {
     data class TrackMuteList(val muteList: List<Boolean>) : PulsarIntent
 }
 
+/** Runs inside applyVibe after the vibe's values and before the load triggers. True when it set the knobs itself. */
+fun interface VibeAppliedListener { fun onVibeApplied(vibe: Vibe): Boolean }
+
 interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     val vibeList: List<Vibe>
         get() = emptyList()  // default for previews
@@ -384,6 +387,16 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     fun holdMusicPulse(): DisposableHandle = MusicPulseSource.Silent.holdPulse()
 
     fun applyVibe(vibe: Vibe)
+
+    /** Called on every [applyVibe], re-applies of the playing vibe included. A no-op for previews and fakes. */
+    fun addVibeAppliedListener(listener: VibeAppliedListener) {}
+
+    /** The live tempo divided by the current section's bpmMultiplier. */
+    val baseBpm: Float
+        get() = stateFlow.value.bpm
+
+    /** Sets the 1.0x tempo; the live tempo becomes [bpm] times the current section's multiplier. */
+    fun setBaseBpm(bpm: Float) {}
 
     /**
      * Look up a vibe by display name and apply it. Only the matched provider's
@@ -798,6 +811,9 @@ class PulsarViewModel(
     private val scaleId = synthController.controlFlow(PulsarSymbol.SCALE.controlId)
     private val mixId = synthController.controlFlow(PulsarSymbol.MIX.controlId)
     private val percMixId = synthController.controlFlow(PulsarSymbol.PERC_MIX.controlId)
+    private val bassGainId = synthController.controlFlow(PulsarSymbol.BASS_GAIN.controlId)
+    private val keysGainId = synthController.controlFlow(PulsarSymbol.KEYS_GAIN.controlId)
+    private val fxGainId = synthController.controlFlow(PulsarSymbol.FX_GAIN.controlId)
     private val envelopeModeId = synthController.controlFlow(PulsarSymbol.ENVELOPE_MODE.controlId)
     private val seedId = synthController.controlFlow(PulsarSymbol.SEED.controlId)
     private val lickMutationId = synthController.controlFlow(PulsarSymbol.LICK_MUTATION.controlId)
@@ -1146,6 +1162,14 @@ class PulsarViewModel(
     // by the section-BPM collector and reset to 1.0f at every applyVibe (since
     // applyVibe resets globalTempo to vibe.bpm — the 1.0× baseline).
     @Volatile private var lastSectionMult: Float = 1.0f
+
+    private val vibeAppliedListeners = MutableStateFlow<List<VibeAppliedListener>>(emptyList())
+
+    // True when a listener set the knobs during the last applyVibe, so the saved ones must not override them.
+    @Volatile private var lastApplyClaimed = false
+
+    // The DJ app's bus reset compares against this; null until the first apply.
+    @Volatile private var lastAppliedVibeName: String? = null
 
     // Accelerando (Section.bpmRampBars): the in-flight tempo-ramp job, and a guard so a
     // ramp fires at most once per section visit. Cancelled + snapped-to-target on every
@@ -1630,21 +1654,32 @@ class PulsarViewModel(
         // 26 vibes to materialize. Only the matched provider's `vibe` is built.
         val provider = curatedProviders.firstOrNull { it.name.value == name }
             ?: curatedProviders.first()
-        applyVibe(provider.vibe)
-        // Then override with saved macro values
+        val vibe = provider.vibe
+        applyVibe(vibe)
+        // A listener that set the knobs during the apply wins over the last session's.
+        if (!lastApplyClaimed) restoreSavedKnobs(saved, vibe)
+        // The written part is not in the port map and applyVibe above just pushed the
+        // generative lick over its track, so the score has to be restored with the vibe --
+        // otherwise a saved classical selection comes back playing the wrong notes.
+        saved.notatedScoreId?.let { applyNotatedScore(it) }
+        log.debug { "Restored Pulsar state: vibe=${saved.vibe.name}, bpm=${saved.bpm}" }
+    }
+
+    /** The saved macros, tempo, deep, percMix and envelope over the vibe's own values. */
+    private fun restoreSavedKnobs(saved: PulsarUiState, vibe: Vibe) {
         energyId.value = FloatValue(saved.energy)
         complexityId.value = FloatValue(saved.complexity)
         spaceId.value = FloatValue(saved.space)
         moodId.value = FloatValue(saved.mood)
         // saved.bpm is the user's BASE (1.0x) tempo — scale it by the OPENING section's
-        // multiplier, exactly as applyVibe(above) does, so a half-time intro is restored at
+        // multiplier, exactly as applyVibe does, so a half-time intro is restored at
         // half-time and not the flat body tempo. BOTH pushes must be multiplied: bpmId feeds
         // the pulsar clock's live override, and globalTempo must match or the globalTempo->bpmId
         // collector would overwrite bpmId back to the flat value. applyVibe already seeded
         // lastSectionMult to introMult, so the section-0 collector stays idempotent. (In
         // MIX_GATED, presetFlow re-runs this after the graph-ready re-apply, so this push — not
         // applyVibe's — is the last writer; a flat value here is the "intro at default" bug.)
-        val savedArrangement = provider.vibe.arrangement
+        val savedArrangement = vibe.arrangement
         val introMult = savedArrangement?.introIndex
             ?.let { savedArrangement.sections.getOrNull(it)?.bpmMultiplier } ?: 1.0f
         bpmId.value = FloatValue(saved.bpm * introMult)
@@ -1653,11 +1688,6 @@ class PulsarViewModel(
         pushEffectiveSends(saved.deep)
         percMixId.value = FloatValue(saved.percMix)
         envelopeModeId.value = IntValue(saved.envelopeMode)
-        // The written part is not in the port map and applyVibe above just pushed the
-        // generative lick over its track, so the score has to be restored with the vibe --
-        // otherwise a saved classical selection comes back playing the wrong notes.
-        saved.notatedScoreId?.let { applyNotatedScore(it) }
-        log.debug { "Restored Pulsar state: vibe=${saved.vibe.name}, bpm=${saved.bpm}" }
     }
 
     private suspend fun saveState(state: PulsarUiState) {
@@ -1670,7 +1700,6 @@ class PulsarViewModel(
         // already carries lastSectionMult, so saving it raw made each launch multiply again —
         // the opening tempo became a function of how many times the app had been opened.
         // Dividing here keeps the two sides in the same units and makes restore idempotent.
-        val sectionMult = lastSectionMult.takeIf { it > 0.01f } ?: 1.0f
         val baseBpm = state.bpm / sectionMult
         val toSave = state.copy(
             playing = false,
@@ -1694,6 +1723,21 @@ class PulsarViewModel(
         val provider = curatedProviders.firstOrNull { it.name.value == name } ?: return false
         applyVibe(provider.vibe)
         return true
+    }
+
+    override fun addVibeAppliedListener(listener: VibeAppliedListener) {
+        vibeAppliedListeners.update { it + listener }
+    }
+
+    private val sectionMult: Float get() = lastSectionMult.takeIf { it > 0.01f } ?: 1.0f
+
+    override val baseBpm: Float get() = bpmId.value.asFloat() / sectionMult
+
+    override fun setBaseBpm(bpm: Float) {
+        // Both, as in applyVibe: bpmId is the clock's live override and the globalTempo collector echoes into it.
+        val live = bpm * sectionMult
+        bpmId.value = FloatValue(live)
+        globalTempo.setBpm(live.toDouble())
     }
 
     /**
@@ -1728,6 +1772,19 @@ class PulsarViewModel(
         for (i in 0 until 8) {
             val gainId = PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + i].controlId
             synthController.setPluginControl(gainId, FloatValue(1f))
+        }
+        // DJ app only: switching to a different vibe puts BASS/KEYS/FX back at unity; DIST and PERC
+        // are the user's taste and carry over. Same-vibe re-applies (launch restore, preset
+        // reload, engine rebuild) and the first load keep the mix. Orpheus never resets: its
+        // Distortion panel shares DRIVE/MIX.
+        if (playbackMode == PulsarPlaybackMode.EXPLICIT) {
+            val previous = lastAppliedVibeName
+            if (previous != null && previous != vibe.name) {
+                bassGainId.value = FloatValue(UNITY_FADER)
+                keysGainId.value = FloatValue(UNITY_FADER)
+                fxGainId.value = FloatValue(UNITY_FADER)
+            }
+            lastAppliedVibeName = vibe.name
         }
         synthController.setPluginControl(
             PulsarSymbol.VIBE_GAIN.controlId,
@@ -2197,6 +2254,12 @@ class PulsarViewModel(
         } else {
             mixId.value = FloatValue(1f)
         }
+
+        // Listeners (vibe presets) write over the vibe's values here so load_vibe consumes theirs.
+        // Every listener runs, even after one claims the knobs.
+        lastApplyClaimed = vibeAppliedListeners.value
+            .map { it.onVibeApplied(vibe) }
+            .any { it }
 
         // Trigger vibe reload (MUST be last — load_vibe consumes every port pushed above)
         vibeGenerationId.value = IntValue(vibeGenerationId.value.asInt() + 1)
@@ -3291,6 +3354,9 @@ class PulsarViewModel(
          * trigger landed.
          */
         private val ANOMALY_HIGHLIGHT = 8.seconds
+
+        /** Console-fader unity: 0.75 travel = 1x gain, matching the engine atomics' default. */
+        private const val UNITY_FADER = 0.75f
 
         /**
          * The seed a vibe loads with while Mode One is on: the low 24 bits of its name's

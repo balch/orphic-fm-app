@@ -2,7 +2,9 @@ package org.balch.orpheus.features.pulsar.mixer
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
@@ -16,7 +18,10 @@ class TrackTuningTest {
     private val ports = mutableMapOf<String, PortValue>()
     private val writes = mutableListOf<Pair<Int, Float>>()
 
-    private fun controller(vibeLoads: MutableStateFlow<Int> = MutableStateFlow(0)): TrackTuningController {
+    private fun controller(
+        vibeLoads: MutableStateFlow<Int> = MutableStateFlow(0),
+        scope: CoroutineScope = CoroutineScope(Dispatchers.Unconfined),
+    ): TrackTuningController {
         val synth = SynthController().apply {
             setDelegates(
                 setter = { id, value ->
@@ -29,7 +34,7 @@ class TrackTuningTest {
             )
         }
         // Unconfined: a vibeLoads change reaches the controller synchronously.
-        return TrackTuningController(synth, vibeLoads, CoroutineScope(Dispatchers.Unconfined)).also { writes.clear() }
+        return TrackTuningController(synth, vibeLoads, scope).also { writes.clear() }
     }
 
     private fun pushed(t: Int) = ports[PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + t].symbol]?.asFloat()
@@ -146,6 +151,52 @@ class TrackTuningTest {
         c.toggleMute(3)
         assertEquals(0f, pushed(3))
         loads.value = 1
+        assertEquals(TrackTuning(), c.state.value)
+        assertEquals(List(8) { 1f }, List(8) { pushed(it) })
+    }
+
+    @Test
+    fun loadPushesEveryTrackGain() {
+        val c = controller()
+        val tuning = TrackTuning(levels = List(8) { 0.5f })
+        c.load(tuning)
+        assertEquals(List(8) { 0.5f }, List(8) { pushed(it) })
+        // The engine was reset to unity behind the controller's back; the same state must still push.
+        for (t in 0 until 8) {
+            ports[PulsarSymbol.entries[PulsarSymbol.TRACK_0_AUDITION_GAIN.ordinal + t].symbol] = PortValue.FloatValue(1f)
+        }
+        writes.clear()
+        c.load(tuning)
+        assertEquals(8, writes.size)
+        assertEquals(List(8) { 0.5f }, List(8) { pushed(it) })
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun loadForCurrentVibeLoadSurvivesTheClear() {
+        val loads = MutableStateFlow(0)
+        val dispatcher = StandardTestDispatcher()
+        val c = controller(loads, CoroutineScope(dispatcher))
+        // applyVibe bumps the count, then loads, all before the collector gets to run.
+        loads.value = 1
+        val muted = TrackTuning(muted = List(8) { it == 2 })
+        c.load(muted)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(muted, c.state.value)
+        assertEquals(0f, pushed(2))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun nextVibeLoadClearsALoadedTuning() {
+        val loads = MutableStateFlow(0)
+        val dispatcher = StandardTestDispatcher()
+        val c = controller(loads, CoroutineScope(dispatcher))
+        loads.value = 1
+        c.load(TrackTuning(muted = List(8) { it == 2 }))
+        dispatcher.scheduler.runCurrent()
+        loads.value = 2
+        dispatcher.scheduler.runCurrent()
         assertEquals(TrackTuning(), c.state.value)
         assertEquals(List(8) { 1f }, List(8) { pushed(it) })
     }

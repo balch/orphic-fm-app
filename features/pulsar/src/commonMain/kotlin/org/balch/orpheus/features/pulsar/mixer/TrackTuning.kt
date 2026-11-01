@@ -16,6 +16,7 @@ import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.features.pulsar.PulsarFeature
+import kotlin.concurrent.Volatile
 
 /**
  * Per-track mute, solo and level for the debug TRACKS view. Solo works like a mixing desk:
@@ -67,6 +68,8 @@ interface TrackGainSink {
     /** [level] is linear gain, 0..[TrackTuning.MAX_LEVEL]. */
     fun setLevel(t: Int, level: Float)
     fun reset()
+    /** Replaces the whole tuning; a load made for the current vibe load is not cleared by it. */
+    fun load(tuning: TrackTuning) {}
 }
 
 /** The default sink: a [TrackTuningController] that writes `track_N_audition_gain` directly. */
@@ -83,10 +86,11 @@ class DirectTrackGainSink(
  * Holds the session's [TrackTuning] and writes each track's gain to `track_N_audition_gain`.
  * Never touches `track_N_mute`, which PulsarFeature owns. Every change to [vibeLoads] clears the
  * state and re-pushes unity, so a tap that raced the load's own engine reset cannot leave a track silent.
+ * The exception is a [load] made while the count was already at the new value.
  */
 class TrackTuningController(
     private val synthController: SynthController,
-    vibeLoads: StateFlow<Int>,
+    private val vibeLoads: StateFlow<Int>,
     scope: CoroutineScope,
 ) : TrackGainSink {
 
@@ -97,6 +101,9 @@ class TrackTuningController(
     private val _state = MutableStateFlow(TrackTuning())
     override val state: StateFlow<TrackTuning> = _state.asStateFlow()
 
+    // The vibe load count a tuning was loaded for; the collector must not clear that one.
+    @Volatile private var seededLoad = -1
+
     init {
         // The plugin outlives this controller, so seat the engine on the untouched mix.
         for (t in 0 until TrackTuning.TRACK_COUNT) push(t, TrackTuning.UNITY)
@@ -106,6 +113,7 @@ class TrackTuningController(
             vibeLoads.collect {
                 if (it != seen) {
                     seen = it
+                    if (it == seededLoad) return@collect
                     _state.value = TrackTuning()
                     // Idempotent with PulsarFeature's own write, but covers a tap that landed in between.
                     for (t in 0 until TrackTuning.TRACK_COUNT) push(t, TrackTuning.UNITY)
@@ -121,6 +129,13 @@ class TrackTuningController(
     override fun setLevel(t: Int, level: Float) = update { it.withLevel(t, level) }
 
     override fun reset() = update { TrackTuning() }
+
+    /** Pushes all 8 gains even if the state is unchanged, since the vibe load just reset the engine to unity. */
+    override fun load(tuning: TrackTuning) {
+        seededLoad = vibeLoads.value
+        _state.value = tuning
+        for (t in 0 until TrackTuning.TRACK_COUNT) push(t, tuning.gain(t))
+    }
 
     private inline fun update(change: (TrackTuning) -> TrackTuning) {
         val old = _state.value

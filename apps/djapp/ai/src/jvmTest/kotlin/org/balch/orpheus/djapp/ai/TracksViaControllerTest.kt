@@ -35,7 +35,6 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.engagement.DefaultEngagementTracker
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeatureStatePersistence
-import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.preferences.AppPreferences
@@ -111,7 +110,6 @@ class TracksViaControllerTest {
             persistence = FeatureStatePersistence(prefs, dispatchers, scope),
             engagementTracker = DefaultEngagementTracker(),
             restoreStrategy = RestoreStrategy.PRESET,
-            playbackMode = PulsarPlaybackMode.EXPLICIT,
             dispatcherProvider = dispatchers,
             scope = scope,
             trackGainSink = MixBenchTrackGainSink(collabMixer(c, backgroundScope), { c }, pulsar, scope),
