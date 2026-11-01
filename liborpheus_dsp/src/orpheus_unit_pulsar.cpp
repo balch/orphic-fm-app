@@ -1,5 +1,6 @@
 #include "orpheus_units.h"
 #include "orpheus_engine.h"
+#include "dx_engine_range.h"
 #include "orpheus_unit_chaos.h"
 #include "pulsar_pattern_gen.h"
 #include "pulsar_bar_strategy.h"
@@ -91,10 +92,8 @@ static inline int engine_note_floor(int engine_index) {
 }
 
 // DX, DX2, DX3: harmonics picks a patch, so these engines always pin it.
-static constexpr int kDxEngineMin = 2;
-static constexpr int kDxEngineMax = 4;
 static inline bool is_dx_engine(int engine_index) {
-    return engine_index >= kDxEngineMin && engine_index <= kDxEngineMax;
+    return is_dx_engine_index(engine_index);
 }
 
 // Storm send taps. Fixed rather than authored: the weather voice has no per-engine
@@ -3129,6 +3128,9 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         std::memset(engine->pulsar_reverb_send_r, 0, num_frames * sizeof(float));
         kraken_clear(state, engine);
         engine->viz_rings[VIZ_PULSAR_KRAKEN].write(static_cast<float>(kKrakenHome));
+        // Nothing sounds while paused or muted, so the mixer falls back to the picked patch.
+        for (int t = 0; t < kNumPulsarTracks; t++)
+            engine->pulsar_track_active_patch[t].store(-1, std::memory_order_relaxed);
         // Report the void glow as idle while paused/muted: this return sits above the
         // void-gain pre-pass and its viz write, so without these two lines a pause
         // mid-duck freezes the Kotlin VIBE-dropdown tint at the ring's last (ducked)

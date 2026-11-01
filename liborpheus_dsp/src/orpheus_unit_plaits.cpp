@@ -1,5 +1,6 @@
 #include "orpheus_units.h"
 #include "orpheus_units_common.h"
+#include "dx_engine_range.h"
 #include "orpheus_engine.h"
 #include "orpheus_unit_chaos.h"
 #include <cmath>
@@ -143,7 +144,7 @@ static inline float buf_rms(const float* buf, int n) {
 
 // DX engines (2, 3, 4) read harmonics as a patch selector, so LFO ch2 would hop patches.
 static inline bool lfo_ch2_targets_harmonics(int engine_index) {
-    return engine_index < 2 || engine_index > 4;
+    return !is_dx_engine_index(engine_index);
 }
 
 void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr,

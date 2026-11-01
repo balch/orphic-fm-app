@@ -15,7 +15,7 @@ static constexpr int kVa = 8;
 static constexpr float kPatch5 = (5.0f + 0.5f) / 32.64f;
 
 // Runs a pinned-harmonics track for a while and returns the reported patch.
-static int run_patch(int engine_id, float walk_range, float energy) {
+static int run_patch(int engine_id, float walk_range, float energy, bool pause_after = false) {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     GraphUnit unit;
     std::memset(&unit, 0, sizeof(unit));
@@ -46,6 +46,10 @@ static int run_patch(int engine_id, float walk_range, float energy) {
     // The macro is smoothed, so give it time to settle.
     for (int i = 0; i < 400; i++)
         unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+    if (pause_after) {
+        engine->pulsar_playing.store(0, std::memory_order_relaxed);
+        unit_process_pulsar(&unit, engine, kBlockFrames, 48000.0f);
+    }
     const int patch = engine->pulsar_track_active_patch[kTrack].load(std::memory_order_relaxed);
     orpheus_engine_destroy(engine);
     return patch;
@@ -78,11 +82,21 @@ static bool test_non_dx_reports_minus_one() {
     return ok;
 }
 
+static bool test_paused_reports_minus_one() {
+    printf("\n=== Test: pausing clears the reported patch ===\n");
+    const int patch = run_patch(kDx2, 0.0f, 0.5f, true);
+    printf("  patch: %d\n", patch);
+    bool ok = (patch == -1);
+    printf("Paused patch: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
 bool run_pulsar_active_patch_tests() {
     printf("\n=== Pulsar Active Patch Tests ===\n");
     int suite_pass = 0, suite_fail = 0;
     if (test_static_dx_track()) suite_pass++; else suite_fail++;
     if (test_walk_moves_patch()) suite_pass++; else suite_fail++;
     if (test_non_dx_reports_minus_one()) suite_pass++; else suite_fail++;
+    if (test_paused_reports_minus_one()) suite_pass++; else suite_fail++;
     TEST_SUITE_RETURN(suite_pass, suite_fail);
 }
