@@ -44,7 +44,7 @@ Notes:
 
 ## 3. Edit by hand
 
-Vibe files are hand-written. Expect `.copy()` chains, `let` blocks, shared helpers, and files that hold several vibes (for example `CompLabVibe.kt`). Read the whole vibe first.
+Vibe files are hand-written. Expect `.copy()` chains, `let` blocks, shared helpers, and files that hold several vibes (for example `FireSkyBackupVibes.kt`). Read the whole vibe first.
 
 - Edit the place that actually defines the value, not a copy of it.
 - If a shared helper or constant feeds several tracks or several vibes, ask the user before changing it. The usual alternative is a local `.copy(...)` at the one track.

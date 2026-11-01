@@ -146,7 +146,7 @@ static bool test_pulsar_viz_clamps_to_window() {
 
     // Simulate the audio thread's written viz state for a mix of pattern lengths:
     //   t0: 16-step (normal), t1: 32-step at the edge, t2/t3: 64-step with the playhead
-    //   already past the 32-step window (exactly the state a Corner Office loop reaches).
+    //   already past the 32-step window (the state a long 64-step loop reaches).
     auto& viz = engine->pulsar_viz;
     for (int t = 0; t < kNumPulsarTracks; t++) { viz.playheads[t] = 0; viz.step_counts[t] = 0; }
     viz.playheads[0] = 0;  viz.step_counts[0] = 16;

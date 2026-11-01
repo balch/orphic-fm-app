@@ -86,7 +86,7 @@ object BandPresets {
 
     /**
      * Four-piece whose two front-line voices trade the solo back and forth — the shape behind
-     * `SwampSwaggerVibe` (slide/keys), `VelvetLeashVibe` (marimba/keys) and `SpaceDroneVibe`
+     * `VelvetLeashVibe` (marimba/keys) and `SpaceDroneVibe`
      * (vibraphone/textures, the keys-led ensemble). The kit anchors, the bass is the third
      * option, and `leadA`/`leadB` hand off to each other far more than to anyone else.
      *

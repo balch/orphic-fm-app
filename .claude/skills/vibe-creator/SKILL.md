@@ -49,7 +49,7 @@ Do not set `album` on the `Vibe`. The apps ignore it (the field exists only so o
 
 This project has a hard rule: **never use trademarked artist, band, album, or song names in user-facing code or comments.** The `name` field in `Vibe(...)` is user-facing (shows up in the Pulsar vibe picker), as are KDoc block comments at the top of the file.
 
-- Pick an **evocative original name** that captures the *feel*, not a name that identifies the source. "Closer" -> "Sunken Place". "Echoes" -> "Deep Space". "You Really Got Me" -> "Garage Blitz".
+- Pick an **evocative original name** that captures the *feel*, not a name that identifies the source. "Closer" -> "Sunken Place". "Echoes" -> "Deep Space". "You Really Got Me" -> "Sixties Rebel".
 - In the KDoc at the top of the class, describe the feel (industrial, brooding, 4-on-floor, detuned bass, etc.) but do **not** name the source track, band, or album.
 - Internal private notes or commit messages can mention the source if it helps — just not the committed source file.
 - Check the existing vibes list before picking a name to avoid duplicates.
@@ -190,7 +190,7 @@ The guide's section 7 covers how a band works and its three traps. In Kotlin, `B
 | Preset | Cast | Use it for |
 | --- | --- | --- |
 | `BandPresets.quartet(kit, bass, lead, colour)` | Drummer (alwaysActive) / Bassist / Lead / Colour | The workhorse. Rock, blues, funk — anything with one star voice. `DogHouseVibe`'s shape. |
-| `BandPresets.tradingLeads(kit, bass, leadA, leadB)` | Drummer (alwaysActive) / Bassist / Lead A / Lead B | Two front-line voices passing the solo back and forth. `SwampSwaggerVibe`, `VelvetLeashVibe`, `SpaceDroneVibe`'s keys-led ensemble. |
+| `BandPresets.tradingLeads(kit, bass, leadA, leadB)` | Drummer (alwaysActive) / Bassist / Lead A / Lead B | Two front-line voices passing the solo back and forth. `VelvetLeashVibe`, `SpaceDroneVibe`'s keys-led ensemble. |
 | `BandPresets.twoVoiceTexture(bed, voiceA, voiceB)` | Bed (alwaysActive) / Voice A / Voice B | Sparse ambient. The minimum working band. |
 
 ```kotlin

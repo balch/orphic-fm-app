@@ -124,7 +124,7 @@ class VibeInfoMapperTest {
     fun `FmPatchNames reports the patch that actually loads for shipped vibe anchors`() {
         // DogHouseVibe track 4 EDM — comment says idx 18 "Spiral"
         assertEquals("Insert 1", FmPatchNames.patchNameFor(OrpheusEngineId.DX, 0.551f))
-        // SwampSwaggerVibe — comment says idx 18 "Vibe 1"
+        // DX2 at the same 0.551 anchor — an old comment said idx 18 "Vibe 1"
         assertEquals("Marimba", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.551f))
         // ArmyStompVibe lead EDM — comment says idx 5 "Clav E pno"
         assertEquals("Mark III", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.153f))
@@ -137,7 +137,7 @@ class VibeInfoMapperTest {
      */
     @Test
     fun `FmPatchNames resolves edge anchors the way a fresh engine load does`() {
-        // RustBelt / FireSky / BluesBurn organ space slot — 0.092 * 32.64 = 3.003
+        // RustBelt / FireSky organ space slot — 0.092 * 32.64 = 3.003
         assertEquals("E organ 3", FmPatchNames.patchNameFor(OrpheusEngineId.DX3, 0.092f))
         // VelvetLeashVibe — 0.4596 * 32.64 = 15.001
         assertEquals("Harpsich", FmPatchNames.patchNameFor(OrpheusEngineId.DX2, 0.4596f))

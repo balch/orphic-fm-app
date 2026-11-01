@@ -108,52 +108,22 @@ object VibeCatalog {
 
 // -----------------------------
         VibeNames.FIRE_SKY_05F to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        VibeNames.DOUBLE_SHIFT to CatalogEntry(VibeStatus.SHELF, tags = listOf("rock", "drone", "lope")),
-        VibeNames.BLUES_BURN to CatalogEntry(VibeStatus.SHELF, tags = listOf("rock", "riff")),
-        VibeNames.FIRE_SKY_CX to CatalogEntry(VibeStatus.SHELF, tags = listOf("og", "backup", "riff")),
         VibeNames.FIRE_SKY_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
         VibeNames.RUST_BELT_OG to CatalogEntry(VibeStatus.WIP, tags = listOf("og", "backup", "riff")),
-        VibeNames.BLACK_CAT to CatalogEntry(VibeStatus.SHELF, tags = listOf("blues", "riff", "soul")),
-        VibeNames.BLACK_CAT_OG to CatalogEntry(VibeStatus.SHELF, tags = listOf("og", "backup", "riff")),
         VibeNames.DUST_GROOVE to CatalogEntry(VibeStatus.WIP, tags = listOf("lofi")),
         // Keeps its slot in the picker order while it is reworked — flip to LIVE, don't move.
         VibeNames.AETHER_NATALIS to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "drone", "void", "swarm", "delay")),
-        VibeNames.CORNER_OFFICE to CatalogEntry(VibeStatus.SHELF, tags = listOf("funk", "rock", "riff")),
-        VibeNames.CORNER_OFFICE_OG to CatalogEntry(VibeStatus.SHELF, tags = listOf("og", "backup", "riff")),
         // ── STEALTH: grooves and moods ──
         VibeNames.TREMOLO_TIDE to CatalogEntry(VibeStatus.WIP, tags = listOf("surf")),
         VibeNames.ARMY_STOMP to CatalogEntry(VibeStatus.WIP, tags = listOf("march")),
-        VibeNames.SWAMP_SWAGGER to CatalogEntry(VibeStatus.SHELF, tags = listOf("swamp")),
-        VibeNames.BLACKTOP_BOOGIE to CatalogEntry(VibeStatus.SHELF, tags = listOf("boogie")),
         VibeNames.SIXTIES_REBEL to CatalogEntry(VibeStatus.WIP, tags = listOf("garage")),
-        VibeNames.GARAGE_BLITZ to CatalogEntry(VibeStatus.SHELF, tags = listOf("garage")),
-        VibeNames.MOD_PIONEER to CatalogEntry(VibeStatus.SHELF, tags = listOf("mod")),
-        // ── Blitz family ──
-        VibeNames.ASCENDING_BLITZ to CatalogEntry(VibeStatus.SHELF, tags = listOf("blitz")),
-        VibeNames.DARK_BLITZ to CatalogEntry(VibeStatus.SHELF, tags = listOf("blitz")),
-        VibeNames.FLOOR_BLITZ to CatalogEntry(VibeStatus.SHELF, tags = listOf("blitz")),
-        VibeNames.JAZZ_BLITZ to CatalogEntry(VibeStatus.SHELF, tags = listOf("blitz", "jazz")),
         // ── Club / ambient / time ──
         VibeNames.COSMIC_TECHNO to CatalogEntry(VibeStatus.WIP, tags = listOf("club")),
         VibeNames.DEEP_SPACE to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient")),
         VibeNames.RUNNING_OUT to CatalogEntry(VibeStatus.WIP, tags = listOf("ambient", "psych")),
-        VibeNames.TIME_ZONE to CatalogEntry(VibeStatus.SHELF, tags = listOf("time")),
-        VibeNames.UTC to CatalogEntry(VibeStatus.SHELF, tags = listOf("time")),
-        // ── Comp Lab: comping-style demos ──
-        VibeNames.COMP_PAD to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_ROCK to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_FUNK to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_BLUES to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_JAZZ to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_GOSPEL to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_REGGAE to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.COMP_SKA to CatalogEntry(VibeStatus.SHELF, tags = listOf("comp")),
-        VibeNames.VANISHED_SKYLINE to CatalogEntry(VibeStatus.SHELF, tags = listOf("ai")),
         VibeNames.KALEIDOSCOPE_DRIFT to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "opus 4.8", "drone", "void")),
         VibeNames.OUROBOROS_BLOOM to CatalogEntry(VibeStatus.WIP, tags = listOf("ai", "sonnet 5", "drone", "void")),
         VibeNames.NATALIS_SHIMMER to CatalogEntry(VibeStatus.WIP, tags = listOf("ai")),
-        VibeNames.BRICKLAYERS_LAMENT to CatalogEntry(VibeStatus.SHELF, tags = listOf("ai")),
-        VibeNames.MELLOW_HAZE to CatalogEntry(VibeStatus.SHELF, tags = listOf("ai")),
 
         // ── Classical adaptations ──
         VibeNames.SYMPHONY_NO_5 to CatalogEntry(VibeStatus.WIP, tags = listOf("classical", "electro", "riff")),

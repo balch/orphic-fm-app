@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
  * authoring guards.
  *
  * A hand-maintained list enforces nothing about the vibe someone adds tomorrow, which is
- * the only vibe a guard needed to catch. Filenames are no better: `CompLabVibe.kt` declares
- * eight providers and no class named `CompLabVibe`. Compiled class files are ground truth.
+ * the only vibe a guard needed to catch. Filenames are no better: `FireSkyBackupVibes.kt` declares
+ * two providers and no class named `FireSkyBackupVibes`. Compiled class files are ground truth.
  *
  * Constructing every provider also runs every `Vibe.init` and `EvolutionTension.init`
  * require for the whole catalog — most vibes are never otherwise force-instantiated.
@@ -22,11 +22,11 @@ internal object VibeCatalogScan {
     private const val PACKAGE_NAME = "org.balch.orpheus.features.pulsar.vibes"
 
     /**
-     * Sanity floor for the scan. Well below the real count (47 providers as of this writing)
+     * Sanity floor for the scan. Well below the real count (about 30 providers as of this writing)
      * so ordinary curation never trips it, but high enough that a scan returning nothing
      * fails loudly instead of passing vacuously.
      */
-    const val MIN_EXPECTED_PROVIDERS = 40
+    const val MIN_EXPECTED_PROVIDERS = 20
 
     private fun discoverClasses(subpackages: Boolean): List<Class<*>> {
         val loader = javaClass.classLoader
