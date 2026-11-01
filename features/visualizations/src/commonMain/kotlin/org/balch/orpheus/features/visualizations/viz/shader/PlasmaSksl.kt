@@ -71,6 +71,25 @@ float3 plasma(float3 hue, float gx, float gy, float depth) {
     // The rim light leans cyan, so every tube carries a blue edge like a plasma globe's.
     return hue * (0.25 + 0.8 * diff) + mix(hue, float3(0.2, 0.9, 1.0), 0.6) * rim * 1.2 + hue * bounce + white * sheen + white * pow(dome, 4.0) * 0.3;
 }
+
+// Plasma texture at p (view heights): x = the bright writhing filaments of a plasma globe, y = a
+// soft mottle between them. Both drift slowly with time, so the surface is never still.
+float2 plasmaTex(float2 p) {
+    float2 q = p * 5.0 + float2(time * 0.12, -time * 0.08);
+    float n1 = fbm(q);
+    float n2 = fbm(q * 2.3 + float2(5.2, 1.3) + float2(-time * 0.1, time * 0.15));
+    // Ridges where the noise crosses its middle: thin veins, a finer web between them.
+    float vein = pow(1.0 - abs(2.0 * n1 - 1.0), 7.0);
+    float web = pow(1.0 - abs(2.0 * n2 - 1.0), 9.0) * 0.6;
+    return float2(max(vein, web), n1);
+}
+
+// How the mottle tilts the surface at p, as an extra (gx, gy): the lit skin wrinkles with it.
+float2 plasmaBump(float2 p) {
+    float2 q = p * 5.0 + float2(time * 0.12, -time * 0.08);
+    float2 e = float2(0.06, 0.0);
+    return float2(vnoise(q + e) - vnoise(q - e), vnoise(q + e.yx) - vnoise(q - e.yx)) * 0.5;
+}
 """
 
     /**
@@ -100,11 +119,20 @@ half4 main(float2 fragCoord) {
     float dx = 3.0 * px.x;
     float f = fieldAt(uv, dx);
     float3 hue = pitchHue(uv.y);
-    float3 col = voidBg(uv, fragCoord) + hue * smoothstep(0.2, 0.5, f) * 0.35;
+    float2 p = float2(uv.x * resolution.x / resolution.y, uv.y);
+    float2 tex = plasmaTex(p);
+    // The halo outside the surface carries a faint trace of the filaments.
+    float3 col = voidBg(uv, fragCoord) + hue * smoothstep(0.2, 0.5, f) * (0.3 + 0.25 * tex.x);
     if (f > 0.47) {
         float gx = (fieldAt(uv + float2(2.0 * px.x, 0.0), dx) - fieldAt(uv - float2(2.0 * px.x, 0.0), dx)) * 0.25;
         float gy = (fieldAt(uv + float2(0.0, 2.0 * px.y), dx) - fieldAt(uv - float2(0.0, 2.0 * px.y), dx)) * 0.25;
-        float3 surf = plasma(hue, gx, gy, f - 0.5);
+        float depth = smoothstep(0.5, 0.9, f);
+        // The skin wrinkles with the mottle, most where the plasma is deep and the dome flat.
+        float2 bump = plasmaBump(p) * (0.03 + 0.05 * depth);
+        float3 surf = plasma(hue, gx + bump.x, gy + bump.y, f - 0.5);
+        // Mottled skin, and filaments glowing from inside, brighter the deeper the plasma.
+        surf *= 0.8 + 0.3 * tex.y;
+        surf += mix(float3(1.0), hue, 0.5) * tex.x * (0.25 + 0.45 * depth);
         // White-hot cores where the raw level runs at the peak: the sustained partials.
         surf += float3(1.0, 0.97, 1.0) * smoothstep(0.86, 1.0, level.eval(texel(uv)).a) * 0.55;
         col = mix(col, surf, smoothstep(0.48, 0.52, f));
