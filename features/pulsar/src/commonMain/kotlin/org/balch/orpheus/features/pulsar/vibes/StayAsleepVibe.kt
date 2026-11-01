@@ -173,10 +173,9 @@ class StayAsleepVibe : VibeProvider {
             // Bar counts are LOOP-CYCLES, not real bars: at stepCount 32 one cycle is two
             // real bars, so barsMin = 4 is 8 bars of music.
             //
-            // Track 3 (the gesture) is absent from every trackOverrides map on purpose. Its
-            // density never changes — only its lickIndex does. A positive density override
-            // would be a no-op on a LickMode.Fill track anyway (their generator takes no
-            // density parameter); only 0 would do anything, and it would mute the vibe.
+            // Track 3 (the gesture) never takes a density override: its density never changes,
+            // only its lickIndex does. A positive one is a no-op on a LickMode.Fill track, and 0
+            // would mute the vibe. Its overrides here shape only the FM (morph, morphRise).
 
             // 0: intro — the gesture, the kick, and the street. The gap is everything.
             //    No macroOverrides: the vibe's own macros ARE the intro's, and a multiplier
@@ -211,6 +210,10 @@ class StayAsleepVibe : VibeProvider {
                         hits = listOf(1),          // 1 beat cycle, nothing else
                     ),
                     2 to TrackSectionOverride(density = 0f),   // hat waits
+                    // Buzzier hold while the figure is sparse. morph caps the SPACE copy's 0.5
+                    // attack too: section overrides land on both slots, so without it a low
+                    // Energy knob would hold the SPACE bass at 0.34.
+                    3 to TrackSectionOverride(morph = 0.30f, morphRise = -0.16f),
                     4 to TrackSectionOverride(density = 0f),   // nothing answers yet
                     5 to TrackSectionOverride(density = 0f),   // rim waits
                     6 to TrackSectionOverride(density = 0f),   // the siren waits
@@ -230,6 +233,7 @@ class StayAsleepVibe : VibeProvider {
                     0 to TrackSectionOverride(volume = 0.84f, morph = 0.72f, density = 0.35f),
                     1 to TrackSectionOverride(volume = 0.45f, morph = 0.62f, density = 0.25f),
                     2 to TrackSectionOverride(density = 0f),
+                    3 to TrackSectionOverride(morph = 0.30f, morphRise = -0.20f), // see wakeup
                     4 to TrackSectionOverride(density = 0.50f, volume = 0.58f),
                     5 to TrackSectionOverride(density = 0f),
                     6 to TrackSectionOverride(density = 0f),
@@ -502,7 +506,13 @@ class StayAsleepVibe : VibeProvider {
                 ).let { bass ->
                     TrackVoice(
                         engineEdm = bass,
-                        engineSpace = bass,
+                        // Plays below energy 0.4, so escape and awake: a slightly harder hit
+                        // (3 rad) that sweeps to a clean tone over 0.3 s. 0.5 over 0.5 s was heavy.
+                        engineSpace = bass.copy(
+                            morph = .38f,
+                            morphRise = -0.38f,
+                            morphRiseTime = 0.3f,
+                        ),
                         role = TrackRole.Melodic(
                             chordFollow = ChordFollow.FOLLOW,
                             lickMode = LickMode.Fill,
