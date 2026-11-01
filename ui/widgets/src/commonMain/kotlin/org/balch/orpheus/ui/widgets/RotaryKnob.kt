@@ -6,16 +6,22 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,11 +35,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
@@ -45,20 +53,36 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import org.balch.orpheus.ui.infrastructure.LocalTvFocusChrome
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.lighten
+import org.balch.orpheus.ui.theme.proportional
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -182,6 +206,100 @@ private suspend fun AwaitPointerEventScope.awaitVerticalSlop(down: PointerInputC
     }
 }
 
+/** A small padlock centred on the knob body, drawn in place of the indicator notch. */
+private fun DrawScope.drawPadlock(center: Offset, knobRadius: Float, strokeWidth: Float, color: Color) {
+    val bodyW = knobRadius * 0.95f
+    val bodyH = knobRadius * 0.7f
+    val bodyTop = center.y - bodyH * 0.2f
+    val r = bodyW * 0.3f
+    val shackleTop = bodyTop - r * 0.4f
+    val stroke = Stroke(width = strokeWidth * 0.55f, cap = StrokeCap.Round)
+    drawArc(
+        color = color,
+        startAngle = 180f,
+        sweepAngle = 180f,
+        useCenter = false,
+        topLeft = Offset(center.x - r, shackleTop - r),
+        size = Size(r * 2, r * 2),
+        style = stroke,
+    )
+    drawLine(color, Offset(center.x - r, shackleTop), Offset(center.x - r, bodyTop), stroke.width)
+    drawLine(color, Offset(center.x + r, shackleTop), Offset(center.x + r, bodyTop), stroke.width)
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(center.x - bodyW / 2, bodyTop),
+        size = Size(bodyW, bodyH),
+        cornerRadius = CornerRadius(bodyW * 0.15f),
+    )
+}
+
+/** A press that lifts within touch slop. Any drag past slop is not a tap. */
+private suspend fun PointerInputScope.detectStillTap(onTap: () -> Unit) {
+    awaitEachGesture {
+        val down = awaitFirstDown()
+        var moved = Offset.Zero
+        while (true) {
+            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+            if (!change.pressed) {
+                change.consume()
+                onTap()
+                return@awaitEachGesture
+            }
+            moved += change.positionChange()
+            if (moved.getDistance() > viewConfiguration.touchSlop) return@awaitEachGesture
+        }
+    }
+}
+
+/** True from a pointer's press anywhere on the knob until every pointer lifts. Observes only. */
+private suspend fun PointerInputScope.trackHeld(onHeld: (Boolean) -> Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        onHeld(true)
+        try {
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+            } while (event.changes.any { it.pressed })
+        } finally {
+            onHeld(false)
+        }
+    }
+}
+
+/** Places a popup centred above its anchor, kept inside the window. */
+private class AboveAnchorPositionProvider(private val gap: Int) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = anchorBounds.center.x - popupContentSize.width / 2
+        val y = anchorBounds.top - popupContentSize.height - gap
+        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+        return IntOffset(x.coerceIn(0, maxX), y.coerceAtLeast(0))
+    }
+}
+
+/** The knob's long label, shown above it while it is held. */
+@Composable
+private fun KnobLongLabel(text: String, color: Color) {
+    val density = LocalDensity.current
+    val provider = remember(density) { AboveAnchorPositionProvider(with(density) { 4.dp.roundToPx() }) }
+    Popup(popupPositionProvider = provider, properties = PopupProperties(focusable = false)) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = OrpheusColors.pickerText,
+            maxLines = 1,
+            modifier = Modifier
+                .background(OrpheusColors.pickerSurface, RoundedCornerShape(6.dp))
+                .border(1.dp, color.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+    }
+}
+
 @Composable
 internal fun RotaryKnobDial(
     dragState: KnobDragState,
@@ -196,6 +314,8 @@ internal fun RotaryKnobDial(
     isLearning: Boolean = false,
     enabled: Boolean = true,
     requireVerticalSlop: Boolean = false,
+    locked: Boolean = false,
+    onLockedClick: (() -> Unit)? = null,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // null (the default, used by every real call site) means "use live focus state" below.
     previewFocused: Boolean? = null,
@@ -203,6 +323,7 @@ internal fun RotaryKnobDial(
 ) {
     val sensitivity = 200f
     val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentOnLockedClick by rememberUpdatedState(onLockedClick)
     var liveFocused by remember { mutableStateOf(false) }
     // D-pad left/right is also how focus moves, so a knob may only consume those keys once
     // the user has explicitly entered adjust mode with select. Otherwise focus is trapped:
@@ -247,6 +368,16 @@ internal fun RotaryKnobDial(
                     if (event.type != KeyEventType.KeyDown || isLearning || !enabled) {
                         return@onKeyEvent false
                     }
+                    // Locked: select opens whatever the lock points at; arrows keep moving focus.
+                    if (locked) {
+                        return@onKeyEvent when (event.key) {
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                currentOnLockedClick?.invoke()
+                                currentOnLockedClick != null
+                            }
+                            else -> false
+                        }
+                    }
                     when (event.key) {
                         // Select toggles adjust mode; back leaves it without exiting the app.
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
@@ -268,8 +399,8 @@ internal fun RotaryKnobDial(
                     }
                 }
                 .focusable(enabled = enabled && !isLearning)
-                .pointerInput(sensitivity, range, isLearning, enabled, requireVerticalSlop) {
-                    if (isLearning || !enabled) return@pointerInput
+                .pointerInput(sensitivity, range, isLearning, enabled, requireVerticalSlop, locked) {
+                    if (isLearning || !enabled || locked) return@pointerInput
                     detectKnobDrag(requireVerticalSlop) { dragAmount, ctrl ->
                         dragState.applyDrag(dragAmount, ctrl)?.let { currentOnValueChange(it) }
                     }
@@ -363,7 +494,8 @@ internal fun RotaryKnobDial(
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
-            // Active Progress Arc with Glow
+            // Active Progress Arc with Glow; a locked knob dims its ring.
+            val ring = if (locked) 0.35f else 1f
             val normalizedValue =
                 (dragState.internalValue - range.start) / (range.endInclusive - range.start)
             val currentSweep = sweepAngle * normalizedValue
@@ -372,7 +504,7 @@ internal fun RotaryKnobDial(
                 brush = Brush.sweepGradient(
                     colors = listOf(
                         progressColor.copy(alpha = 0.0f),
-                        progressColor.copy(alpha = 0.6f)
+                        progressColor.copy(alpha = 0.6f * ring)
                     ),
                     center = center
                 ),
@@ -386,7 +518,7 @@ internal fun RotaryKnobDial(
 
             drawArc(
                 brush = Brush.sweepGradient(
-                    colors = listOf(progressColor.copy(alpha = 0.5f), progressColor),
+                    colors = listOf(progressColor.copy(alpha = 0.5f * ring), progressColor.copy(alpha = ring)),
                     center = center
                 ),
                 startAngle = startAngle,
@@ -439,6 +571,11 @@ internal fun RotaryKnobDial(
                 radius = knobRadius,
                 center = center
             )
+
+            if (locked) {
+                drawPadlock(center, knobRadius, strokeWidth, indicatorColor)
+                return@Canvas
+            }
 
             // Indicator (Notch)
             val indicatorLength = knobRadius * 0.5f
@@ -508,6 +645,7 @@ private fun KnobLabel(
         color = shown,
         textAlign = TextAlign.Center,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
             .graphicsLayer {
                 val s = 1f + LabelPulseScale * (pulseState?.value ?: 0f)
@@ -547,6 +685,7 @@ internal fun KnobValueText(
     modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.Center,
     requireVerticalSlop: Boolean = false,
+    locked: Boolean = false,
 ) {
     val sensitivity = 200f
     val currentOnValueChange by rememberUpdatedState(onValueChange)
@@ -557,7 +696,8 @@ internal fun KnobValueText(
         color = progressColor.lighten(0.3f),
         textAlign = textAlign,
         maxLines = 1,
-        modifier = modifier.pointerInput(range, sensitivity, requireVerticalSlop) {
+        modifier = modifier.pointerInput(range, sensitivity, requireVerticalSlop, locked) {
+            if (locked) return@pointerInput
             detectKnobDrag(requireVerticalSlop) { dragAmount, ctrl ->
                 dragState.applyDrag(dragAmount, ctrl, fineTune = true)?.let { currentOnValueChange(it) }
             }
@@ -592,6 +732,10 @@ typealias KnobValueFormatter = (Float) -> String
  * @param requireVerticalSlop For a knob inside a scrolling list: the dial and value text change
  *   nothing until a drag passes vertical touch slop, and a sideways or short gesture is left alone.
  *   False (the default) turns on the first pixel of movement.
+ * @param locked Drags and arrow keys change nothing; the ring dims and a padlock replaces the
+ *   notch. A click, or select while focused, fires [onLockedClick] instead.
+ * @param caption A small second line under [label], such as the knob's glyph.
+ * @param longLabel Shown above the knob while it is pressed, for a [label] too short to explain itself.
  */
 @Composable
 fun RotaryKnob(
@@ -615,6 +759,10 @@ fun RotaryKnob(
     onLongPress: (() -> Unit)? = null,
     pulseLabel: Boolean = false,
     requireVerticalSlop: Boolean = false,
+    locked: Boolean = false,
+    onLockedClick: (() -> Unit)? = null,
+    caption: String? = null,
+    longLabel: String? = null,
     // Preview/render-harness seam only: forces the focus/adjust visuals without real input.
     // Every production call site leaves this null and gets live focus behavior.
     previewFocused: Boolean? = null,
@@ -624,6 +772,9 @@ fun RotaryKnob(
     val isLearning = controlId != null && learnState.isLearning(controlId)
     val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
     val dragState = rememberKnobDragState(value, range)
+    val currentOnLockedClick by rememberUpdatedState(onLockedClick)
+    val lockClickable = locked && enabled && !isLearning && onLockedClick != null
+    var held by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -634,9 +785,26 @@ fun RotaryKnob(
                 } else {
                     Modifier
                 }
-            ),
+            )
+            .then(
+                if (lockClickable) {
+                    Modifier
+                        .pointerInput(Unit) { detectStillTap { currentOnLockedClick?.invoke() } }
+                        .semantics {
+                            role = Role.Button
+                            onClick { currentOnLockedClick?.invoke(); true }
+                        }
+                } else {
+                    Modifier
+                }
+            )
+            .pointerInput(longLabel != null) {
+                if (longLabel == null) return@pointerInput
+                trackHeld { held = it }
+            },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (held && longLabel != null) KnobLongLabel(longLabel, progressColor)
         RotaryKnobDial(
             dragState = dragState,
             onValueChange = onValueChange,
@@ -649,6 +817,8 @@ fun RotaryKnob(
             isLearning = isLearning,
             enabled = enabled,
             requireVerticalSlop = requireVerticalSlop,
+            locked = locked,
+            onLockedClick = onLockedClick,
             previewFocused = previewFocused,
             previewAdjusting = previewAdjusting,
         )
@@ -665,6 +835,16 @@ fun RotaryKnob(
             )
         }
 
+        if (caption != null) {
+            Text(
+                text = caption,
+                style = labelStyle.copy(fontSize = 9.sp).proportional(),
+                color = labelColor.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
+
         if (valueFormatter != null) {
             KnobValueText(
                 dragState = dragState,
@@ -673,6 +853,7 @@ fun RotaryKnob(
                 progressColor = progressColor,
                 valueFormatter = valueFormatter,
                 requireVerticalSlop = requireVerticalSlop,
+                locked = locked,
             )
         }
     }
@@ -691,6 +872,35 @@ private fun RotaryKnobPulseLabelPreview() {
             valueFormatter = null,
             pulseLabel = true,
         )
+    }
+}
+
+@Preview(name = "Locked (DX patch) and captioned")
+@Composable
+private fun RotaryKnobLockedPreview() {
+    OrpheusTheme {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            RotaryKnob(
+                value = 0.02f,
+                onValueChange = {},
+                label = "E piano 1",
+                caption = "\u2261",
+                size = 28.dp,
+                progressColor = OrpheusColors.warmGlow,
+                locked = true,
+                onLockedClick = {},
+                valueFormatter = { "#1" },
+            )
+            RotaryKnob(
+                value = 0.6f,
+                onValueChange = {},
+                label = "detune",
+                caption = "\u03C8",
+                longLabel = "duo detune, \u00B125 cents",
+                size = 28.dp,
+                progressColor = OrpheusColors.neonMagenta,
+            )
+        }
     }
 }
 

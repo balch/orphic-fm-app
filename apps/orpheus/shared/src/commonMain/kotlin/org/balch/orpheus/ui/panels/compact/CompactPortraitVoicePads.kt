@@ -24,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoicePanelActions
@@ -186,7 +187,8 @@ private fun DuoVoiceColumn(
                 CompactDuoSettingsCard(
                     duoIndex = config.duoIndex,
                     color = config.color,
-                    engine = voiceState.duoEngines.getOrElse(config.duoIndex) { 0 },
+                    engine = voiceState.duoEngines.getOrElse(config.duoIndex) { OrpheusEngineId.OSC.id },
+                    hasNativeEngine = voiceState.hasNativeEngine,
                     modSource = voiceState.duoModSources.getOrElse(config.duoIndex) { ModSource.OFF },
                     modSourceLevel = voiceState.duoModSourceLevels.getOrElse(config.duoIndex) { 0f },
                     morph = voiceState.duoMorphs.getOrElse(config.duoIndex) { 0f },

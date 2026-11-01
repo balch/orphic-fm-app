@@ -10,10 +10,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.balch.orpheus.core.audio.EngineParam
+import org.balch.orpheus.core.audio.OrpheusEngineId
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
@@ -28,6 +32,7 @@ fun VoiceColumnMod(
     duoIndex: Int,
     tune: Float,
     duoMorph: Float,
+    morphLabel: DuoKnobLabel,
     envSpeed: Float,
     voiceActions: VoiceActions,
 ) {
@@ -39,14 +44,12 @@ fun VoiceColumnMod(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        RotaryKnob(
+        DuoEngineKnob(
             value = duoMorph,
             onValueChange = { voiceActions.setDuoMorph(duoIndex, it) },
-            label = "\u03C8",
-            labelStyle = MaterialTheme.typography.labelLarge,
+            label = morphLabel,
             controlId = VoiceSymbol.duoMorph(duoIndex).controlId.key,
-            size = 28.dp,
-            progressColor = OrpheusColors.neonMagenta
+            color = OrpheusColors.neonMagenta,
         )
         RotaryKnob(
             value = tune,
@@ -74,6 +77,7 @@ fun VoiceColumnSharp(
     duoIndex: Int,
     tune: Float,
     sharpness: Float,
+    sharpLabel: DuoKnobLabel,
     envSpeed: Float,
     voiceActions: VoiceActions,
 ) {
@@ -85,14 +89,12 @@ fun VoiceColumnSharp(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        RotaryKnob(
+        DuoEngineKnob(
             value = sharpness,
             onValueChange = { voiceActions.setDuoSharpness(duoIndex, it) },
-            label = "\u266F", // sharp
-            labelStyle = MaterialTheme.typography.labelLarge,
+            label = sharpLabel,
             controlId = VoiceSymbol.duoSharpness(duoIndex).controlId.key,
-            size = 28.dp,
-            progressColor = OrpheusColors.synthGreen
+            color = OrpheusColors.synthGreen,
         )
         RotaryKnob(
             value = tune,
@@ -113,6 +115,29 @@ fun VoiceColumnSharp(
     }
 }
 
+/** A duo knob that names its job on the current engine; an inactive one shows "-" and dims. */
+@Composable
+private fun DuoEngineKnob(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    label: DuoKnobLabel,
+    controlId: String,
+    color: Color,
+) {
+    RotaryKnob(
+        value = value,
+        onValueChange = onValueChange,
+        label = label.short,
+        caption = label.glyph,
+        longLabel = label.long,
+        controlId = controlId,
+        size = 28.dp,
+        progressColor = color,
+        labelColor = if (label.active) color else color.copy(alpha = 0.4f),
+        modifier = Modifier.alpha(if (label.active) 1f else 0.5f),
+    )
+}
+
 @Preview
 @Composable
 fun VoiceColumnModPreview() {
@@ -126,6 +151,7 @@ fun VoiceColumnModPreview() {
             duoIndex = 0,
             tune = voiceState.voiceStates[0].tune,
             duoMorph = voiceState.duoMorphs[0],
+            morphLabel = duoKnobLabel(OrpheusEngineId.OSC, EngineParam.MORPH, 0.5f),
             envSpeed = voiceState.voiceEnvelopeSpeeds[0],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)
@@ -146,6 +172,7 @@ fun VoiceColumnSharpPreview() {
             duoIndex = 0,
             tune = voiceState.voiceStates[1].tune,
             sharpness = voiceState.duoSharpness[0],
+            sharpLabel = duoKnobLabel(OrpheusEngineId.SPK, EngineParam.TIMBRE, 0.5f),
             envSpeed = voiceState.voiceEnvelopeSpeeds[1],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)
