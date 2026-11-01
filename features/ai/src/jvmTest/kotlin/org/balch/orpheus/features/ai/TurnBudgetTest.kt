@@ -125,6 +125,39 @@ class TurnBudgetTest {
         assertEquals(List(turns) { "Built vibe ${it + 1}." }, replies)
     }
 
+    /** A reply that is only thinking (max_tokens spent thinking) ends the turn, and the next turn still runs. */
+    @Test
+    fun thinkingOnlyReplyEndsTheTurnAndTheSessionGoesOn() = runBlocking {
+        val noop = object : ToolProvider {
+            override val tool = SpendTool(TurnBudget(), mutableListOf(), name = "noop")
+        }
+        val config = config(TurnBudget(), setOf(noop))
+        val executor = ScriptedExecutor(
+            listOf(thinking("still working out the gate"), calls("noop", 1), thinking("and the timing"), text("Done.")),
+        )
+        val replies = mutableListOf<String>()
+        val agent = AIAgent(
+            promptExecutor = executor,
+            strategy = config.agentStrategy(
+                name = "silent",
+                onAssistantMessage = { reply ->
+                    replies += reply
+                    if (replies.size < 3) "again" else throw StopRun()
+                },
+                streamResponses = false,
+                compressHistory = false,
+            ),
+            agentConfig = AIAgentConfig(prompt("t") { system("test") }, config.model, maxAgentIterations = 50),
+            toolRegistry = config.toolRegistry,
+        )
+        assertFailsWith<StopRun> { agent.run("first") }
+
+        assertEquals(listOf(config.thinkingOnlyMessage, config.thinkingOnlyMessage, "Done."), replies)
+        val history = executor.prompts.last().messages.filterIsInstance<Message.Assistant>()
+        assertTrue(history.none { m -> m.parts.all { it is MessagePart.Reasoning } }, "a thinking-only reply stayed in history")
+        assertEquals(2, history.count { m -> m.parts.any { it is MessagePart.Text && it.text == config.thinkingOnlyMessage } })
+    }
+
     @Test
     fun promptHasATweakPathAndConditionalMixing() {
         val prompt = config(TurnBudget(), emptySet()).systemInstruction
@@ -169,8 +202,9 @@ class TurnBudgetTest {
     /** Returns the scripted replies in order; the graph only uses the batched execute. */
     private class ScriptedExecutor(script: List<Message.Assistant>) : PromptExecutor() {
         private val queue = ArrayDeque(script)
+        val prompts = mutableListOf<Prompt>()
         override suspend fun execute(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>) =
-            queue.removeFirstOrNull() ?: error("script ran out")
+            (queue.removeFirstOrNull() ?: error("script ran out")).also { prompts += prompt }
         override fun executeStreaming(prompt: Prompt, model: LLModel, tools: List<ToolDescriptor>): Flow<StreamFrame> =
             error("streaming is not scripted")
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult = error("unused")
@@ -185,6 +219,8 @@ class TurnBudgetTest {
     )
 
     private fun text(s: String) = Message.Assistant(parts = listOf(MessagePart.Text(s)), metaInfo = ResponseMetaInfo.Empty)
+
+    private fun thinking(s: String) = Message.Assistant(parts = listOf(MessagePart.Reasoning(s)), metaInfo = ResponseMetaInfo.Empty)
 
     private fun config(budget: TurnBudget, tools: Set<ToolProvider>): OrpheusAgentConfig {
         val d = Dispatchers.Unconfined

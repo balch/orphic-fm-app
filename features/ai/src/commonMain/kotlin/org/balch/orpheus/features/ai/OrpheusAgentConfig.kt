@@ -14,7 +14,10 @@ import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.llm.LLModel
+import ai.koog.agents.core.agent.context.AIAgentGraphContextBase
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
+import ai.koog.prompt.message.ResponseMetaInfo
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
@@ -64,6 +67,11 @@ class OrpheusAgentConfig(
     /** Shown as Orpheus's reply when a turn is force-ended by [maxToolRoundsPerTurn]. */
     val turnToolBudgetMessage =
         "I have woven a great deal into that one. Take a listen, then tell me what you would like to reshape."
+
+    /** Shown as Orpheus's reply when the model spent its whole reply thinking (max_tokens) with no text or tool call. */
+    val thinkingOnlyMessage =
+        "I thought so long about that one that I ran out of room before doing anything. Nothing changed. " +
+            "Try asking for one smaller piece of it."
 
     /** System instruction defining Orpheus persona */
     val systemInstruction = """
@@ -469,6 +477,13 @@ class OrpheusAgentConfig(
                     onToolCalls { true }
         )
 
+        // A reply that is only thinking (max_tokens spent on it) matches no other edge and would kill the run.
+        edge(
+            nodeRequestLLM forwardTo nodeAssistantMessage
+                    onCondition { it.isThinkingOnly() }
+                    transformed { replaceThinkingOnlyReply() }
+        )
+
         edge(
             nodeRequestLLM forwardTo nodeAssistantMessage
                     onTextMessage { true }
@@ -512,7 +527,30 @@ class OrpheusAgentConfig(
 
         edge(
             nodeSendToolResult forwardTo nodeAssistantMessage
+                    onCondition { it.isThinkingOnly() }
+                    transformed { replaceThinkingOnlyReply() }
+        )
+
+        edge(
+            nodeSendToolResult forwardTo nodeAssistantMessage
                     onTextMessage { true }
         )
+    }
+
+    private fun Message.Assistant.isThinkingOnly(): Boolean =
+        parts.none { it is MessagePart.Tool.Call || (it is MessagePart.Text && it.text.isNotBlank()) }
+
+    // Swaps the thinking-only reply in history for the notice, so the next request has a plain assistant turn.
+    private suspend fun AIAgentGraphContextBase.replaceThinkingOnlyReply(): String {
+        llm.writeSession {
+            rewritePrompt { p ->
+                p.withMessages { messages ->
+                    val last = messages.lastOrNull()
+                    val kept = if (last is Message.Assistant && last.isThinkingOnly()) messages.dropLast(1) else messages
+                    kept + Message.Assistant(parts = listOf(MessagePart.Text(thinkingOnlyMessage)), metaInfo = ResponseMetaInfo.Empty)
+                }
+            }
+        }
+        return thinkingOnlyMessage
     }
 }
