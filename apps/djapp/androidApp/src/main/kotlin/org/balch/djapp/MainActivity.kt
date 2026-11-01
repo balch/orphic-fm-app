@@ -1,5 +1,6 @@
 package org.balch.djapp
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -21,8 +22,28 @@ import org.balch.orpheus.djapp.largeScreenCanvasScale
 import org.balch.orpheus.djapp.LocalCanvasScale
 import org.balch.orpheus.djapp.LocalHinge
 import org.balch.orpheus.djapp.rememberTabletopHinge
+import org.balch.orpheus.djapp.share.withShareSubject
 
 class MainActivity : ComponentActivity() {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        offerShare(intent)
+    }
+
+    // Skips history relaunches; the extra is removed after offering so a rotation
+    // (same Intent object) finds nothing to offer again.
+    private fun offerShare(intent: Intent?) {
+        if (intent == null || intent.action != Intent.ACTION_SEND) return
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        if (intent.type?.startsWith("text/") != true) return
+        // CharSequence reads keep rich-text shares that getStringExtra would drop as null.
+        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() } ?: return
+        val subject = intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString()
+        (application as DjAppApplication).graph.sharedTextInbox.offer(withShareSubject(text, subject))
+        intent.removeExtra(Intent.EXTRA_TEXT)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -37,6 +58,9 @@ class MainActivity : ComponentActivity() {
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         val graph = (application as DjAppApplication).graph
+
+        // Not gated on savedInstanceState: a fresh SEND after process death carries one.
+        offerShare(intent)
 
         // Keep screen on only while actively playing. Cleared on pause/stop so
         // the OS screen timeout applies normally. NOTE: this is intentionally
