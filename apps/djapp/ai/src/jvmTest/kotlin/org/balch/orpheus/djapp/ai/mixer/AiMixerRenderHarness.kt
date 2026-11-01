@@ -19,6 +19,7 @@ import org.balch.orpheus.features.pulsar.bench.EngineSlot
 import org.balch.orpheus.features.pulsar.bench.knobMeaning
 import org.balch.orpheus.features.pulsar.bench.knobSteps
 import org.balch.orpheus.features.pulsar.bench.knobValueText
+import org.balch.orpheus.features.pulsar.models.SlotLock
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -85,7 +86,7 @@ class AiMixerRenderHarness {
         BD to BD, SD to HH, HH to HH, VA to FM, CHD to WTB, STR to MOD, GRN to NSE, DX to VOWEL_FOF,
     )
 
-    // A mix of pinned, macro-led and edited knobs; track 5 has its switch on the Space engine, which is not playing.
+    // A mix of pinned, macro-led and edited knobs; track 5 is locked to its Space engine, the rest are AUTO.
     private fun voiceOf(t: Int, id: OrpheusEngineId) = EngineKnob.entries.mapIndexed { k, knob ->
         val meaning = knobMeaning(id, knob)
         val value = (0.15f + 0.3f * k + 0.04f * t).coerceAtMost(0.95f)
@@ -112,7 +113,7 @@ class AiMixerRenderHarness {
             soloed = t == 4,
             silenced = t != 4,
             slot = if (t == 5) EngineSlot.SPACE else EngineSlot.EDM,
-            slotHeard = t != 5,
+            slotLock = if (t == 5) SlotLock.SPACE else SlotLock.AUTO,
             edmEngine = slots[t].first.name,
             spaceEngine = slots[t].second.name,
             edmEngineId = slots[t].first,
@@ -349,6 +350,15 @@ class AiMixerRenderHarness {
 
     // BASS's sound panel popped out over the strips, beside the Fold's chat and on a phone's expanded row.
     @Test fun foldVoice() = render("fold_voice_840x1100", 840, 1100, scale = FOLD_SCALE) { tap(voiceButtonTag(3)) }
+
+    // PAD locked to Space: knobs live, the EDM row dimmed.
+    @Test fun foldVoiceLocked() = render("fold_voice_locked_840x1100", 840, 1100, scale = FOLD_SCALE) { tap(voiceButtonTag(5)) }
+
+    // A short phone window: the pop-out scrolls instead of clipping.
+    @Test fun phoneVoiceShort() = render("phone_voice_360x640", 360, 640) {
+        tap(rowTag(3))
+        tap(voiceButtonTag(3))
+    }
 
     @Test fun phoneVoice() = render("phone_voice", 360, 780) {
         tap(rowTag(3))

@@ -53,16 +53,16 @@ import org.balch.orpheus.features.pulsar.bench.Scope
 import org.balch.orpheus.features.pulsar.bench.SendEdit
 import org.balch.orpheus.features.pulsar.bench.macroView
 import org.balch.orpheus.features.pulsar.bench.enginePath
+import org.balch.orpheus.features.pulsar.bench.lockPath
 import org.balch.orpheus.features.pulsar.bench.slotAt
 import org.balch.orpheus.features.pulsar.bench.vibeDefault
+import org.balch.orpheus.features.pulsar.models.SlotLock
 
 /** The VM's own overlay on the controller-derived state. */
 private data class Local(
     val capture: MixerCapture? = null,
     val capturing: Boolean = false,
     val notice: String? = null,
-    /** Strips whose switch picked a slot; the rest follow the slot playing. Cleared on each vibe load. */
-    val slotPicks: Map<Int, EngineSlot> = emptyMap(),
 )
 
 /** The VM's overlay with the shared collaboration marks: what the user pinned and what the agent touched. */
@@ -103,15 +103,6 @@ class AiMixerViewModel(
 
     init {
         scope.launch(dispatchers.default) {
-            var seen = pulsarFeature.vibeLoadCount.value
-            pulsarFeature.vibeLoadCount.collect {
-                if (it != seen) {
-                    seen = it
-                    local.update { l -> l.copy(slotPicks = emptyMap()) }
-                }
-            }
-        }
-        scope.launch(dispatchers.default) {
             for (edit in edits) {
                 // One bad edit must not end the consumer: the scope is a SupervisorJob, so later edits would drop silently.
                 try {
@@ -146,7 +137,7 @@ class AiMixerViewModel(
                 val energy = b.layers.macroView(vibe, section, Macro.ENERGY, k[Macro.ENERGY] ?: Macro.ENERGY.vibeDefault(vibe)).heard
                 val slot = slotAt(energy, heard ?: if (energy >= 0.5f) EngineSlot.EDM else EngineSlot.SPACE)
                 heard = slot
-                val voice = VoiceView(slot, o.local.slotPicks, o.hist.edited)
+                val voice = VoiceView(slot, o.hist.edited)
                 mixerState(vibe, section, b.layers, b.scope, b.muted, b.soloed, b.loop, k, voice).copy(
                     capture = o.local.capture,
                     capturing = o.local.capturing,
@@ -212,34 +203,36 @@ class AiMixerViewModel(
         endHear = { queue { collabMixer.endHear() } },
         rollBack = { id -> queue { collabMixer.rollBack(id) } },
         setVoiceKnob = ::setVoiceKnob,
-        pickSlot = ::pickSlot,
+        setSlotLock = ::setSlotLock,
         setEngine = ::setEngine,
     )
-
-    private fun pickSlot(track: Int, slot: EngineSlot) {
-        local.update { it.copy(slotPicks = it.slotPicks + (track to slot)) }
-    }
 
     // An equal pair moves together, so the pick is heard whichever slot plays; a split track keeps the other slot's engine.
     private fun setEngine(track: Int, slot: EngineSlot, engine: OrpheusEngineId) {
         val t = stateFlow.value.tracks.getOrNull(track) ?: return
         val slots = if (t.edmEngineId == t.spaceEngineId) EngineSlot.entries else listOf(slot)
-        queue {
-            val result = collabMixer.editVibe(EditOrigin.USER, slots.map { enginePath(track, it) to JsonPrimitive(engine.name) })
-            when (result) {
-                is VibeEditResult.Applied -> {
-                    clearNotice()
-                    pickSlot(track, slot)
-                    // Engines are vibe-wide, whatever section the knobs are scoped to.
-                    if (controllerProvider().scope.value == Scope.SECTION) local.update { it.copy(notice = ENGINES_VIBE_WIDE) }
-                }
-                is VibeEditResult.Refused, is VibeEditResult.Invalid -> local.update { it.copy(notice = ENGINE_UNCHANGED) }
+        editEngines(slots.map { enginePath(track, it) to JsonPrimitive(engine.name) })
+    }
+
+    private fun setSlotLock(track: Int, lock: SlotLock) {
+        editEngines(listOf(lockPath(track) to JsonPrimitive(lock.name)), LOCK_UNCHANGED)
+    }
+
+    /** Engine picks and locks: vibe-wide rows that play on, whatever section the knobs are scoped to. */
+    private fun editEngines(edits: List<Pair<String, JsonPrimitive>>, refused: String = ENGINE_UNCHANGED) = queue {
+        when (collabMixer.editVibe(EditOrigin.USER, edits)) {
+            is VibeEditResult.Applied -> {
+                clearNotice()
+                if (controllerProvider().scope.value == Scope.SECTION) local.update { it.copy(notice = ENGINES_VIBE_WIDE) }
             }
+            is VibeEditResult.Refused, is VibeEditResult.Invalid -> local.update { it.copy(notice = refused) }
         }
     }
 
+    // Under AUTO the knobs are off: the slot they would tune is not held, so a turn writes nothing.
     private fun setVoiceKnob(track: Int, knob: EngineKnob, value: Float?) {
-        val slot = stateFlow.value.tracks.getOrNull(track)?.slot ?: return
+        val t = stateFlow.value.tracks.getOrNull(track)?.takeIf { it.knobsLive } ?: return
+        val slot = t.slot
         pendingVoice.update { it + (VoiceKey(track, slot, knob) to value) }
         queue(::applyVoiceKnobs)
     }
@@ -324,6 +317,7 @@ class AiMixerViewModel(
         private const val VIBE_ROW_REFUSED =
             "That change can't be turned off on its own: roll back to a capture instead."
         private const val ENGINE_UNCHANGED = "The engine did not change. Try again once the vibe has loaded."
+        private const val LOCK_UNCHANGED = "The lock did not change. Try again once the vibe has loaded."
         private const val ENGINES_VIBE_WIDE = "Engines change the whole vibe."
         private const val ZERO_SEND = "This send is 0 here, so a whole-vibe edit can't scale it; switch to section scope."
 

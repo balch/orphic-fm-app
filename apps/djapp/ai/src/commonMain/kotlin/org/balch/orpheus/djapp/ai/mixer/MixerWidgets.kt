@@ -489,16 +489,18 @@ internal fun DbFaderRow(
     modifier: Modifier = Modifier,
     labelWidth: Dp = 34.dp,
     valueWidth: Dp = 52.dp,
+    labelSize: Float = LegibleText.MIXER_MIN,
+    valueSize: Float = LegibleText.MIXER_VALUE,
 ) {
     val hold = remember { mutableStateOf<Float?>(null) }
     val shown = hold.value ?: db
     val changed = faderChanged(hold.value, db)
     Row(modifier.height(32.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("level", style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
+        Text("level", style = mixText(legible(labelSize), MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
         FaderTrack(index, vertical = false, hold, shown, changed, onDbChange, onReset, Modifier.weight(1f).fillMaxHeight())
         Text(
             dbText(shown),
-            style = mixText(legible(LegibleText.MIXER_VALUE), if (changed) MixerInk.changed else MixerInk.text),
+            style = mixText(legible(valueSize), if (changed) MixerInk.changed else MixerInk.text),
             maxLines = 1,
             textAlign = TextAlign.End,
             modifier = Modifier.width(valueWidth),
@@ -574,6 +576,8 @@ internal fun MixerSlider(
     labelWidth: Dp = 18.dp,
     valueWidth: Dp = 26.dp,
     height: Dp = SLIDER_HEIGHT,
+    labelSize: Float = LegibleText.MIXER_MIN,
+    valueSize: Float = LegibleText.MIXER_VALUE,
 ) {
     val hold = remember { mutableStateOf<Float?>(null) }
     val change = rememberUpdatedState(onValueChange)
@@ -586,7 +590,7 @@ internal fun MixerSlider(
         ((range.start + frac * span) * 100f).roundToInt() / 100f
     }
     Row(modifier.height(height), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = mixText(legible(LegibleText.MIXER_MIN), MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
+        Text(label, style = mixText(legible(labelSize), MixerInk.dim), maxLines = 1, modifier = Modifier.width(labelWidth))
         Box(
             Modifier
                 .weight(1f)
@@ -605,7 +609,7 @@ internal fun MixerSlider(
         )
         Text(
             valueText(shown),
-            style = mixText(legible(LegibleText.MIXER_VALUE), MixerInk.text),
+            style = mixText(legible(valueSize), MixerInk.text),
             maxLines = 1,
             textAlign = TextAlign.End,
             modifier = Modifier.width(valueWidth),
@@ -620,15 +624,16 @@ internal fun MuteSoloButtons(
     onMute: () -> Unit,
     onSolo: () -> Unit,
     modifier: Modifier = Modifier,
+    textSize: Float = LegibleText.MIXER_MIN,
 ) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        SmallToggle("M", muted, MixerInk.hot, onMute)
-        SmallToggle("S", soloed, MixerInk.changed, onSolo)
+        SmallToggle("M", muted, MixerInk.hot, onMute, textSize)
+        SmallToggle("S", soloed, MixerInk.changed, onSolo, textSize)
     }
 }
 
 @Composable
-private fun SmallToggle(text: String, on: Boolean, onColor: Color, onClick: () -> Unit) {
+private fun SmallToggle(text: String, on: Boolean, onColor: Color, onClick: () -> Unit, textSize: Float) {
     Box(
         Modifier
             .clip(RoundedCornerShape(4.dp))
@@ -638,7 +643,7 @@ private fun SmallToggle(text: String, on: Boolean, onColor: Color, onClick: () -
             .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = mixText(legible(LegibleText.MIXER_MIN), if (on) MixerInk.onBright else MixerInk.text, FontWeight.Bold), maxLines = 1)
+        Text(text, style = mixText(legible(textSize), if (on) MixerInk.onBright else MixerInk.text, FontWeight.Bold), maxLines = 1)
     }
 }
 
