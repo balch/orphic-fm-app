@@ -48,6 +48,7 @@ class PulsarSongAdvancerIntegrationTest {
             resolvedStyleFlow
         override fun armOutro() {}
         override fun onVibeApplied() {}
+        override fun restartSong() {}
         suspend fun emit(event: SongEndingEvent) = _events.emit(event)
     }
 

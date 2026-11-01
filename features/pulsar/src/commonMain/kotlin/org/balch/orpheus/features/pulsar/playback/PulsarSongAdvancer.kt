@@ -28,6 +28,7 @@ class PulsarSongAdvancer(
     private val transitionPreferences: TransitionPreferences,
     private val vibeNavigator: VibeNavigator,
     scope: AppCoroutineScope,
+    private val holds: Set<SongEndHold> = emptySet(),
 ) {
     private val log = logging("PulsarSongAdvancer")
 
@@ -51,6 +52,13 @@ class PulsarSongAdvancer(
                 // pre-check only: VibeNavigator makes the final call when it dequeues the advance.
                 if (vibeNavigator.isBusy) {
                     log.info { "SongEnded(${event.vibeName}) during a user transition — ignoring" }
+                    return@collect
+                }
+                // Any load, a repeat included, would clear the held edits, so the song starts over in place.
+                if (holds.any { it.holdsSong() }) {
+                    log.info { "SongEnded($currentName) held by live edits — restarting in place" }
+                    songEndingEventSource.restartSong()
+                    pulsarFeature.jumpToSection(pulsarFeature.vibeFlow.value.arrangement?.introIndex ?: 0)
                     return@collect
                 }
                 val nextName = if (event.repeat) {
